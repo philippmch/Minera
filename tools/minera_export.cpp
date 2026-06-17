@@ -8,6 +8,7 @@
 
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 
 namespace {
@@ -72,17 +73,18 @@ int main(int argc, char** argv) {
   try {
     const auto log = minera::import_csv_event_log(input, options);
     const auto graph = minera::discover_directly_follows_graph(log);
+    const auto tree = minera::discover_process_tree(log);
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
-      minera::write_analysis_json(std::cout, dataset, log, graph);
+      minera::write_analysis_json(std::cout, dataset, log, graph, &tree);
     } else {
       std::ofstream file(output);
       if (!file) {
         std::cerr << "error: cannot open output file " << output << '\n';
         return 1;
       }
-      minera::write_analysis_json(file, dataset, log, graph);
+      minera::write_analysis_json(file, dataset, log, graph, &tree);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

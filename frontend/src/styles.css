@@ -614,6 +614,170 @@ input[type="range"]::-moz-range-thumb {
   fill: var(--paper-raised);
 }
 
+/* ---- process tree (SVG) ---- */
+
+.tree-edge {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.2;
+  opacity: 0.5;
+}
+.tree-edge.redo {
+  stroke: var(--copper-deep);
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+.tree-op-box {
+  fill: var(--paper-raised);
+  stroke: var(--ink);
+  stroke-width: 1.3;
+}
+.tree-op-symbol {
+  font-family: var(--font-ui);
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--copper-deep);
+}
+.tree-op { cursor: default; }
+.tree-op:hover .tree-op-box { fill: var(--copper-soft); stroke: var(--copper-deep); }
+
+.tree-leaf-box {
+  fill: var(--paper-raised);
+  stroke: var(--ink);
+  stroke-width: 1.1;
+}
+.tree-leaf-name {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.tree-tau-box { fill: var(--ink); }
+.tree-tau-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  fill: var(--paper-raised);
+}
+
+.tree-legend {
+  display: flex;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-45);
+}
+.tree-legend span { display: flex; align-items: center; gap: 5px; }
+.tree-legend-op {
+  font-family: var(--font-ui);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--copper-deep);
+}
+
+/* ---- miner wizard ---- */
+
+.miner-flow { padding-top: 22px; }
+
+.miner-trail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.trail-item {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-45);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.trail-item:hover { color: var(--ink); }
+.trail-item.active { color: var(--ink); font-weight: 600; }
+.trail-item.current { color: var(--copper-deep); font-weight: 600; cursor: default; }
+.trail-sep { color: var(--ink-45); font-size: 11px; }
+
+.miner-step-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--copper);
+}
+.miner-step-title {
+  margin: 8px 0 22px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.miner-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.miner-card {
+  position: relative;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  padding: 20px 22px 22px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.miner-card:hover {
+  border-color: var(--copper);
+  background: var(--copper-soft);
+  transform: translateY(-2px);
+}
+
+.miner-card-name {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.miner-card-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+}
+.miner-card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-70);
+}
+.miner-card-go {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--copper-deep);
+}
+
+.model-empty {
+  padding: 44px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-45);
+  max-width: 52ch;
+}
+
 /* ---- event log ---- */
 
 .layout-log { display: block; }

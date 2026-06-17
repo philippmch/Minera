@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { type MineraExport, isMineraExport, numberFormat } from "./types";
 import { computeLayout } from "./layout";
+import { computeTreeLayout } from "./tree-layout";
 import { TopBar } from "./components/TopBar";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
+import { ProcessModel } from "./components/ProcessModel";
 import { VariantList } from "./components/VariantList";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { mineCsv } from "./api";
 
-type Tab = "log" | "dfg";
+type Tab = "log" | "dfg" | "model";
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
@@ -103,6 +105,14 @@ export default function App() {
     [data, fontsReady],
   );
 
+  const treeLayout = useMemo(
+    () =>
+      data && data.process_tree
+        ? computeTreeLayout(data.process_tree, data)
+        : null,
+    [data, fontsReady],
+  );
+
   const selection = useMemo(
     () =>
       data && selectedVariant !== null
@@ -156,13 +166,25 @@ export default function App() {
         >
           Directly-Follows Graph
         </button>
+        <button
+          className={tab === "model" ? "tab active" : "tab"}
+          onClick={() => setTab("model")}
+        >
+          Mine a Process Model
+        </button>
       </nav>
       <Kpis data={data} />
-      {tab === "log" ? (
+      {tab === "log" && (
         <main className="layout-log">
           <EventLogView data={data} />
         </main>
-      ) : (
+      )}
+      {tab === "model" && (
+        <main className="layout-log">
+          <ProcessModel treeLayout={treeLayout} />
+        </main>
+      )}
+      {tab === "dfg" && (
         <main className="layout">
           <ProcessMap
             layout={layout}

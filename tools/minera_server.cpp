@@ -11,6 +11,7 @@
 #include "httplib.h"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/version.hpp"
 
@@ -69,7 +70,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     std::istringstream input(csv);
     const auto log = minera::import_csv_event_log(input, options);
     const auto graph = minera::discover_directly_follows_graph(log);
-    response.set_content(minera::analysis_json(dataset, log, graph),
+    const auto tree = minera::discover_process_tree(log);
+    response.set_content(minera::analysis_json(dataset, log, graph, &tree),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

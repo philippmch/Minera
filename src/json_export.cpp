@@ -33,12 +33,48 @@ void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
 }
 
+std::string_view operator_name(ProcessTreeOperator op) {
+  switch (op) {
+    case ProcessTreeOperator::kActivity: return "activity";
+    case ProcessTreeOperator::kTau: return "tau";
+    case ProcessTreeOperator::kSequence: return "sequence";
+    case ProcessTreeOperator::kExclusive: return "exclusive";
+    case ProcessTreeOperator::kParallel: return "parallel";
+    case ProcessTreeOperator::kLoop: return "loop";
+  }
+  return "tau";
+}
+
+void write_process_tree_node(std::ostream& out,
+                             const ProcessTreeNode& node,
+                             const ProcessTree& tree,
+                             const DirectlyFollowsGraph& graph) {
+  out << "{\"operator\": \"" << operator_name(node.op) << '"';
+  if (node.op == ProcessTreeOperator::kActivity) {
+    // Re-resolve the activity id against the graph so it matches the ids used
+    // by the rest of the document regardless of interning order.
+    const auto& name = tree.activities()[node.activity];
+    const auto id = graph.activity_id(name);
+    out << ", \"activity\": " << (id ? *id : node.activity);
+  }
+  if (!node.children.empty()) {
+    out << ", \"children\": [";
+    for (std::size_t i = 0; i < node.children.size(); ++i) {
+      write_process_tree_node(out, node.children[i], tree, graph);
+      out << (i + 1 < node.children.size() ? ", " : "");
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& log,
-                         const DirectlyFollowsGraph& graph) {
+                         const DirectlyFollowsGraph& graph,
+                         const ProcessTree* tree) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -101,15 +137,24 @@ void write_analysis_json(std::ostream& out,
     out << "], \"count\": " << variants[i].count << '}'
         << (i + 1 < variants.size() ? "," : "") << '\n';
   }
-  out << "  ]\n";
+  out << "  ]";
+
+  if (tree != nullptr) {
+    out << ",\n  \"process_tree\": ";
+    write_process_tree_node(out, tree->root(), *tree, graph);
+    out << '\n';
+  } else {
+    out << '\n';
+  }
   out << "}\n";
 }
 
 std::string analysis_json(std::string_view dataset,
                           const EventLog& log,
-                          const DirectlyFollowsGraph& graph) {
+                          const DirectlyFollowsGraph& graph,
+                          const ProcessTree* tree) {
   std::ostringstream out;
-  write_analysis_json(out, dataset, log, graph);
+  write_analysis_json(out, dataset, log, graph, tree);
   return out.str();
 }
 
