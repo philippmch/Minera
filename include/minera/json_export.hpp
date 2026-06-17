@@ -6,18 +6,22 @@
 
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
+#include "minera/process_tree.hpp"
 
 namespace minera {
 
 // Serializes an analysis (the imported event log plus its discovered
 // directly-follows graph) into the JSON document consumed by the frontend.
+// When `tree` is non-null its process tree is embedded under "process_tree".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
-                         const DirectlyFollowsGraph& graph);
+                         const DirectlyFollowsGraph& graph,
+                         const ProcessTree* tree = nullptr);
 
 [[nodiscard]] std::string analysis_json(std::string_view dataset,
                                         const EventLog& event_log,
-                                        const DirectlyFollowsGraph& graph);
+                                        const DirectlyFollowsGraph& graph,
+                                        const ProcessTree* tree = nullptr);
 
 }  // namespace minera

@@ -16,6 +16,21 @@ export interface VariantStat {
   count: number;
 }
 
+export type ProcessTreeOperator =
+  | "sequence"
+  | "exclusive"
+  | "parallel"
+  | "loop"
+  | "activity"
+  | "tau";
+
+export interface ProcessTreeNode {
+  operator: ProcessTreeOperator;
+  /** Present iff operator === "activity"; indexes into activities. */
+  activity?: number;
+  children?: ProcessTreeNode[];
+}
+
 export interface TraceEvent {
   activity: number;
   timestamp: string;
@@ -36,6 +51,8 @@ export interface MineraExport {
   activities: ActivityStat[];
   edges: EdgeStat[];
   variants: VariantStat[];
+  /** Discovered process tree; absent in exports from older minera versions. */
+  process_tree?: ProcessTreeNode;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

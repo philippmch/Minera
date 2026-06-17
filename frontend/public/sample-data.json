@@ -366,5 +366,6 @@
     {"activities": [0, 1, 11], "count": 21},
     {"activities": [0, 1, 2, 12], "count": 20},
     {"activities": [0, 1, 2, 3, 4, 5, 6, 8, 8, 7], "count": 15}
-  ]
+  ],
+  "process_tree": {"operator": "sequence", "children": [{"operator": "activity", "activity": 0}, {"operator": "loop", "children": [{"operator": "activity", "activity": 1}, {"operator": "activity", "activity": 9}]}, {"operator": "exclusive", "children": [{"operator": "sequence", "children": [{"operator": "loop", "children": [{"operator": "activity", "activity": 2}, {"operator": "activity", "activity": 10}]}, {"operator": "exclusive", "children": [{"operator": "sequence", "children": [{"operator": "activity", "activity": 3}, {"operator": "activity", "activity": 4}, {"operator": "activity", "activity": 5}, {"operator": "activity", "activity": 6}, {"operator": "exclusive", "children": [{"operator": "tau"}, {"operator": "loop", "children": [{"operator": "activity", "activity": 8}, {"operator": "tau"}]}]}, {"operator": "activity", "activity": 7}]}, {"operator": "activity", "activity": 12}]}]}, {"operator": "activity", "activity": 11}]}]}
 }
