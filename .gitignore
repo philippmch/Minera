@@ -43,3 +43,7 @@ Thumbs.db
 # Local caches and logs
 .cache/
 *.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

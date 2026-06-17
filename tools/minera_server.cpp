@@ -1,0 +1,153 @@
+// Local application server: serves the built frontend and mines uploaded
+// CSV event logs with the native core via POST /api/mine.
+
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <string_view>
+
+#include "httplib.h"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/directly_follows_graph.hpp"
+#include "minera/json_export.hpp"
+#include "minera/version.hpp"
+
+namespace {
+
+std::string error_json(std::string_view message) {
+  std::ostringstream out;
+  out << "{\"error\": \"";
+  for (const char c : message) {
+    if (c == '"' || c == '\\') out << '\\';
+    out << c;
+  }
+  out << "\"}";
+  return out.str();
+}
+
+std::string form_field(const httplib::Request& request,
+                       const std::string& name) {
+  return request.has_file(name) ? request.get_file_value(name).content
+                                : std::string{};
+}
+
+void handle_mine(const httplib::Request& request, httplib::Response& response) {
+  try {
+    std::string csv;
+    std::string dataset = "event log";
+    minera::CsvImportOptions options;
+
+    if (request.is_multipart_form_data()) {
+      if (!request.has_file("log")) {
+        response.status = 400;
+        response.set_content(error_json("missing form field: log"),
+                             "application/json");
+        return;
+      }
+      const auto& file = request.get_file_value("log");
+      csv = file.content;
+      if (!file.filename.empty()) dataset = file.filename;
+
+      if (const auto value = form_field(request, "case_column"); !value.empty()) {
+        options.case_id_column = value;
+      }
+      if (const auto value = form_field(request, "activity_column"); !value.empty()) {
+        options.activity_column = value;
+      }
+      if (const auto value = form_field(request, "timestamp_column"); !value.empty()) {
+        options.timestamp_column = value;
+      }
+      if (const auto value = form_field(request, "delimiter"); !value.empty()) {
+        options.delimiter = value.front();
+      }
+    } else {
+      csv = request.body;
+    }
+
+    std::istringstream input(csv);
+    const auto log = minera::import_csv_event_log(input, options);
+    const auto graph = minera::discover_directly_follows_graph(log);
+    response.set_content(minera::analysis_json(dataset, log, graph),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+int usage(const char* program) {
+  std::cerr << "Usage: " << program
+            << " [options]\n"
+               "  --port <port>      Listen port (default: 8484)\n"
+               "  --frontend <dir>   Static frontend directory"
+               " (default: frontend/dist next to the working directory)\n";
+  return 2;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  int port = 8484;
+  std::filesystem::path frontend_dir = "frontend/dist";
+
+  for (int i = 1; i < argc; ++i) {
+    const std::string_view arg = argv[i];
+    const auto next = [&]() -> const char* {
+      return i + 1 < argc ? argv[++i] : nullptr;
+    };
+
+    if (arg == "--port") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      port = std::atoi(value);
+      if (port <= 0 || port > 65535) return usage(argv[0]);
+    } else if (arg == "--frontend") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      frontend_dir = value;
+    } else {
+      return usage(argv[0]);
+    }
+  }
+
+  httplib::Server server;
+
+  // The app is local-first; permissive CORS keeps the Vite dev server (a
+  // different port) working against this backend.
+  server.set_default_headers({{"Access-Control-Allow-Origin", "*"}});
+  server.Options("/api/mine", [](const httplib::Request&, httplib::Response& response) {
+    response.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.set_header("Access-Control-Allow-Headers", "Content-Type");
+    response.status = 204;
+  });
+
+  server.Post("/api/mine", handle_mine);
+
+  server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
+    std::ostringstream out;
+    out << "{\"generator\": \"minera " << minera::version_major << '.'
+        << minera::version_minor << '.' << minera::version_patch << "\"}";
+    response.set_content(out.str(), "application/json");
+  });
+
+  const bool has_frontend = std::filesystem::is_directory(frontend_dir);
+  if (has_frontend) {
+    server.set_mount_point("/", frontend_dir.string());
+  }
+
+  std::cout << "minera " << minera::version_major << '.' << minera::version_minor
+            << '.' << minera::version_patch << " — listening on http://localhost:"
+            << port << '\n';
+  if (!has_frontend) {
+    std::cout << "note: frontend directory not found (" << frontend_dir.string()
+              << "); serving the API only\n";
+  }
+
+  if (!server.listen("127.0.0.1", port)) {
+    std::cerr << "error: cannot listen on port " << port << '\n';
+    return 1;
+  }
+  return 0;
+}
