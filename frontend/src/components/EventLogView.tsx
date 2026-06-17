@@ -1,0 +1,116 @@
+import { useMemo, useState } from "react";
+import { type MineraExport, type Trace, numberFormat } from "../types";
+
+const PAGE_SIZE = 50;
+
+function formatTimestamp(value: string): string {
+  return value ? value.replace("T", " ") : "—";
+}
+
+function CaseRow({ trace, data }: { trace: Trace; data: MineraExport }) {
+  const [open, setOpen] = useState(false);
+  const first = trace.events[0]?.timestamp;
+  const last = trace.events[trace.events.length - 1]?.timestamp;
+
+  return (
+    <li className={open ? "case open" : "case"}>
+      <div className="case-row" onClick={() => setOpen(!open)}>
+        <span className="case-toggle">{open ? "−" : "+"}</span>
+        <span className="case-id">{trace.case_id}</span>
+        <span className="case-events">
+          {numberFormat.format(trace.events.length)} events
+        </span>
+        <span className="case-span">
+          {formatTimestamp(first)}
+          {last && last !== first ? ` → ${formatTimestamp(last)}` : ""}
+        </span>
+        <span className="case-seq">
+          {trace.events.map((event, i) => (
+            <i
+              key={i}
+              className="case-seq-dot"
+              title={data.activities[event.activity].name}
+            />
+          ))}
+        </span>
+      </div>
+      {open && (
+        <table className="case-events-table">
+          <tbody>
+            {trace.events.map((event, i) => (
+              <tr key={i}>
+                <td className="num">{i + 1}</td>
+                <td>{data.activities[event.activity].name}</td>
+                <td className="case-event-time">{formatTimestamp(event.timestamp)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </li>
+  );
+}
+
+export function EventLogView({ data }: { data: MineraExport }) {
+  const traces = data.traces ?? [];
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return traces;
+    return traces.filter((trace) =>
+      trace.case_id.toLowerCase().includes(needle),
+    );
+  }, [traces, query]);
+
+  const timeSpan = useMemo(() => {
+    let min = "";
+    let max = "";
+    for (const trace of traces) {
+      for (const event of trace.events) {
+        if (!event.timestamp) continue;
+        if (!min || event.timestamp < min) min = event.timestamp;
+        if (!max || event.timestamp > max) max = event.timestamp;
+      }
+    }
+    return min ? { min, max } : null;
+  }, [traces]);
+
+  return (
+    <section className="panel log-panel reveal">
+      <div className="panel-head">
+        <h2>Cases</h2>
+        <span className="panel-meta">
+          {numberFormat.format(filtered.length)}
+          {query ? ` of ${numberFormat.format(traces.length)}` : ""} cases
+          {timeSpan &&
+            ` · ${formatTimestamp(timeSpan.min)} — ${formatTimestamp(timeSpan.max)}`}
+        </span>
+        <input
+          className="case-search"
+          type="search"
+          placeholder="Filter case id…"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setLimit(PAGE_SIZE);
+          }}
+        />
+      </div>
+      <ol className="case-list">
+        {filtered.slice(0, limit).map((trace) => (
+          <CaseRow key={trace.case_id} trace={trace} data={data} />
+        ))}
+      </ol>
+      {filtered.length > limit && (
+        <button className="btn-ghost case-more" onClick={() => setLimit(limit + 200)}>
+          Show more · {numberFormat.format(filtered.length - limit)} remaining
+        </button>
+      )}
+      {filtered.length === 0 && (
+        <div className="case-empty">No cases match “{query}”.</div>
+      )}
+    </section>
+  );
+}

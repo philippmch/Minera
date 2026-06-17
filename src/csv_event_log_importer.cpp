@@ -98,18 +98,13 @@ std::string field_at(
 }  // namespace
 
 EventLog import_csv_event_log(
-    const std::filesystem::path& path,
+    std::istream& input,
     const CsvImportOptions& options) {
   if (!options.has_header) {
     throw std::invalid_argument("CSV import currently requires a header row");
   }
   if (options.delimiter == '"') {
     throw std::invalid_argument("CSV delimiter cannot be a quote character");
-  }
-
-  std::ifstream input(path);
-  if (!input) {
-    throw std::runtime_error("Unable to open CSV event log: " + path.string());
   }
 
   std::string line;
@@ -178,6 +173,16 @@ EventLog import_csv_event_log(
   }
 
   return log;
+}
+
+EventLog import_csv_event_log(
+    const std::filesystem::path& path,
+    const CsvImportOptions& options) {
+  std::ifstream input(path);
+  if (!input) {
+    throw std::runtime_error("Unable to open CSV event log: " + path.string());
+  }
+  return import_csv_event_log(input, options);
 }
 
 }  // namespace minera

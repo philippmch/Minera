@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <istream>
 #include <string>
 
 #include "minera/event_log.hpp"
@@ -16,6 +17,10 @@ struct CsvImportOptions {
   bool trim_fields = true;
   char delimiter = ',';
 };
+
+[[nodiscard]] EventLog import_csv_event_log(
+    std::istream& input,
+    const CsvImportOptions& options = {});
 
 [[nodiscard]] EventLog import_csv_event_log(
     const std::filesystem::path& path,
