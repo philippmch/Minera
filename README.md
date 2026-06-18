@@ -84,6 +84,10 @@ events first; discovery lives in tabs:
 - **Conformance** — fitness and precision of the log against the discovered
   model, plus a per-variant breakdown of where traces deviate.
 
+A **Filter log** bar above the tabs re-mines the original upload focused on the
+most frequent variants (top-N or a minimum frequency) or a subset of activities;
+every view — log, graph, model, and conformance — updates together.
+
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
 
