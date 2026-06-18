@@ -1,17 +1,38 @@
 // Runs the Minera core on a CSV event log and emits the analysis (event log
 // plus discovered directly-follows graph) as JSON for the frontend.
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <vector>
 
+#include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
+#include "minera/log_filter.hpp"
 
 namespace {
+
+// Splits a comma-separated option value into trimmed, non-empty activity names.
+std::vector<std::string> split_csv(std::string_view value) {
+  std::vector<std::string> parts;
+  std::string current;
+  for (const char ch : value) {
+    if (ch == ',') {
+      if (!current.empty()) parts.push_back(current);
+      current.clear();
+    } else if (ch != ' ' || !current.empty()) {
+      current.push_back(ch);
+    }
+  }
+  if (!current.empty()) parts.push_back(current);
+  return parts;
+}
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
@@ -20,7 +41,16 @@ int usage(const char* program) {
                "  --case-column <name>      Case id column (default: case_id)\n"
                "  --activity-column <name>  Activity column (default: activity)\n"
                "  --timestamp-column <name> Timestamp column (default: timestamp)\n"
-               "  --delimiter <char>        Field delimiter (default: ,)\n";
+               "  --delimiter <char>        Field delimiter (default: ,)\n"
+               "\n  Log filtering (applied before discovery):\n"
+               "  --keep-activities <a,b>   Keep only these activities\n"
+               "  --remove-activities <a,b> Drop these activities\n"
+               "  --start-activities <a,b>  Keep traces starting with one of these\n"
+               "  --end-activities <a,b>    Keep traces ending with one of these\n"
+               "  --min-length <n>          Drop traces shorter than n events\n"
+               "  --max-length <n>          Drop traces longer than n events\n"
+               "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
+               "  --top-variants <n>        Keep only the n most frequent variants\n";
   return 2;
 }
 
@@ -30,6 +60,7 @@ int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   minera::CsvImportOptions options;
+  minera::LogFilterOptions filter;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -57,6 +88,39 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
       options.delimiter = value[0];
+    } else if (arg == "--keep-activities") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_activities = split_csv(value);
+    } else if (arg == "--remove-activities") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_activities = split_csv(value);
+    } else if (arg == "--start-activities") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.start_activities = split_csv(value);
+    } else if (arg == "--end-activities") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.end_activities = split_csv(value);
+    } else if (arg == "--min-length") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.min_length = static_cast<std::size_t>(std::atoll(value));
+    } else if (arg == "--max-length") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.max_length = static_cast<std::size_t>(std::atoll(value));
+    } else if (arg == "--min-variant-frequency") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.min_variant_frequency =
+          static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--top-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.top_variants = static_cast<std::size_t>(std::atoll(value));
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {
@@ -71,20 +135,26 @@ int main(int argc, char** argv) {
   }
 
   try {
-    const auto log = minera::import_csv_event_log(input, options);
+    auto log = minera::import_csv_event_log(input, options);
+    if (filter.any()) {
+      log = minera::filter_event_log(log, filter);
+    }
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
+    const auto conformance = minera::check_conformance(log, tree);
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
-      minera::write_analysis_json(std::cout, dataset, log, graph, &tree);
+      minera::write_analysis_json(std::cout, dataset, log, graph, &tree,
+                                  &conformance);
     } else {
       std::ofstream file(output);
       if (!file) {
         std::cerr << "error: cannot open output file " << output << '\n';
         return 1;
       }
-      minera::write_analysis_json(file, dataset, log, graph, &tree);
+      minera::write_analysis_json(file, dataset, log, graph, &tree,
+                                  &conformance);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

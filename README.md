@@ -9,13 +9,28 @@ workflows with native performance.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
+- Process-model discovery with the **Inductive Miner**: recursive
+  exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
+  block-structured process tree that is always sound and perfectly fits the log
+  (logs without a cut fall through to a flower model).
+- Conformance checking of a log against the discovered process tree: the tree
+  is translated to a workflow net, then token-based replay measures **fitness**
+  (how much of the log the model reproduces) and escaping edges measure
+  **precision** (how little extra behavior the model allows), per variant and
+  in aggregate.
+- Log preprocessing: filter an event log by activity projection, trace length,
+  start/end activities, and variant frequency (minimum count or top-N) before
+  discovery.
 - `minera_server`, a local application server: it serves the frontend and
-  mines uploaded CSV event logs with the native core (`POST /api/mine`).
-- `minera_export` CLI that mines a CSV log and emits the event log plus the
-  discovered graph as JSON.
+  mines uploaded CSV event logs with the native core (`POST /api/mine`),
+  returning the event log, the directly-follows graph, the process tree, and
+  conformance results.
+- `minera_export` CLI that mines a CSV log and emits the event log, the
+  discovered graph, the process tree, and conformance results as JSON, with
+  optional log-filtering flags.
 - A React + TypeScript frontend (`frontend/`) that uploads a CSV event log to
-  the backend, shows the imported log first, and puts the discovered
-  directly-follows graph one tab away.
+  the backend, shows the imported log first, and puts the directly-follows
+  graph and the discovered process model one tab away each.
 
 ## Build
 
@@ -63,7 +78,11 @@ events first; discovery lives in tabs:
   timestamps, filterable by case id,
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter), a variant explorer that highlights paths on
-  the map, and per-activity frequency, entry, and exit statistics.
+  the map, and per-activity frequency, entry, and exit statistics,
+- **Mine a Process Model** — pick a discovery algorithm (currently the
+  Inductive Miner) and explore the resulting block-structured process tree,
+- **Conformance** — fitness and precision of the log against the discovered
+  model, plus a per-variant breakdown of where traces deviate.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
@@ -79,8 +98,19 @@ JSON files produced by the `minera_export` CLI open the same way as CSVs:
 ./build/minera_export my_event_log.csv -o my_export.json
 ```
 
-`minera_export` accepts options for custom column names and delimiters; run it
-without arguments to see usage. The HTTP layer uses the vendored
+`minera_export` accepts options for custom column names and delimiters, plus
+log-filtering flags applied before discovery — for example, focus on the most
+common behavior:
+
+```sh
+./build/minera_export my_event_log.csv --top-variants 5 -o my_export.json
+```
+
+Other filters include `--min-variant-frequency`, `--keep-activities`,
+`--remove-activities`, `--start-activities`, `--end-activities`, `--min-length`,
+and `--max-length`. Run `minera_export` without arguments to see usage. The same
+filters are available on `POST /api/mine` as form fields (`top_variants`,
+`min_variant_frequency`, `keep_activities`, …). The HTTP layer uses the vendored
 [cpp-httplib](https://github.com/yhirose/cpp-httplib)
 (`third_party/httplib.h`).
 

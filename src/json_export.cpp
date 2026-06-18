@@ -68,13 +68,40 @@ void write_process_tree_node(std::ostream& out,
   out << '}';
 }
 
+void write_conformance(std::ostream& out,
+                       const ConformanceResult& conformance,
+                       const DirectlyFollowsGraph& graph) {
+  out << "{\"fitness\": " << conformance.fitness
+      << ", \"precision\": " << conformance.precision
+      << ", \"fitting_traces\": " << conformance.fitting_traces
+      << ", \"trace_count\": " << conformance.trace_count
+      << ", \"produced\": " << conformance.produced
+      << ", \"consumed\": " << conformance.consumed
+      << ", \"missing\": " << conformance.missing
+      << ", \"remaining\": " << conformance.remaining << ", \"variants\": [";
+  const auto& variants = conformance.variants;
+  for (std::size_t i = 0; i < variants.size(); ++i) {
+    out << "{\"activities\": [";
+    for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
+      // Resolve names to the activity ids used elsewhere in the document.
+      const auto id = graph.activity_id(variants[i].activities[j]);
+      out << (id ? *id : 0) << (j + 1 < variants[i].activities.size() ? ", " : "");
+    }
+    out << "], \"count\": " << variants[i].count
+        << ", \"fitness\": " << variants[i].fitness << '}'
+        << (i + 1 < variants.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& log,
                          const DirectlyFollowsGraph& graph,
-                         const ProcessTree* tree) {
+                         const ProcessTree* tree,
+                         const ConformanceResult* conformance) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -142,19 +169,22 @@ void write_analysis_json(std::ostream& out,
   if (tree != nullptr) {
     out << ",\n  \"process_tree\": ";
     write_process_tree_node(out, tree->root(), *tree, graph);
-    out << '\n';
-  } else {
-    out << '\n';
   }
+  if (conformance != nullptr) {
+    out << ",\n  \"conformance\": ";
+    write_conformance(out, *conformance, graph);
+  }
+  out << '\n';
   out << "}\n";
 }
 
 std::string analysis_json(std::string_view dataset,
                           const EventLog& log,
                           const DirectlyFollowsGraph& graph,
-                          const ProcessTree* tree) {
+                          const ProcessTree* tree,
+                          const ConformanceResult* conformance) {
   std::ostringstream out;
-  write_analysis_json(out, dataset, log, graph, tree);
+  write_analysis_json(out, dataset, log, graph, tree, conformance);
   return out.str();
 }
 

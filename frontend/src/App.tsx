@@ -6,13 +6,14 @@ import { TopBar } from "./components/TopBar";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
+import { Conformance } from "./components/Conformance";
 import { VariantList } from "./components/VariantList";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { mineCsv } from "./api";
 
-type Tab = "log" | "dfg" | "model";
+type Tab = "log" | "dfg" | "model" | "conformance";
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
@@ -172,6 +173,14 @@ export default function App() {
         >
           Mine a Process Model
         </button>
+        {data.conformance && (
+          <button
+            className={tab === "conformance" ? "tab active" : "tab"}
+            onClick={() => setTab("conformance")}
+          >
+            Conformance
+          </button>
+        )}
       </nav>
       <Kpis data={data} />
       {tab === "log" && (
@@ -182,6 +191,11 @@ export default function App() {
       {tab === "model" && (
         <main className="layout-log">
           <ProcessModel treeLayout={treeLayout} />
+        </main>
+      )}
+      {tab === "conformance" && (
+        <main className="layout-log">
+          <Conformance data={data} />
         </main>
       )}
       {tab === "dfg" && (
