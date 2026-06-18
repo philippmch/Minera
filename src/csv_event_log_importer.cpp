@@ -112,6 +112,14 @@ EventLog import_csv_event_log(
     return {};
   }
 
+  // Strip a leading UTF-8 byte-order mark so the first column name still
+  // matches; spreadsheet exports routinely prepend one.
+  if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
+      static_cast<unsigned char>(line[1]) == 0xBB &&
+      static_cast<unsigned char>(line[2]) == 0xBF) {
+    line.erase(0, 3);
+  }
+
   auto columns = header_index(
       parse_csv_row(line, options.delimiter, options.trim_fields));
   const auto case_index = required_column(columns, options.case_id_column);

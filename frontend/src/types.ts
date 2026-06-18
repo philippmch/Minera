@@ -31,6 +31,27 @@ export interface ProcessTreeNode {
   children?: ProcessTreeNode[];
 }
 
+export interface VariantConformance {
+  activities: number[];
+  count: number;
+  fitness: number;
+}
+
+export interface Conformance {
+  /** Token-replay fitness in [0, 1]: does the model reproduce the log? */
+  fitness: number;
+  /** Escaping-edges precision in [0, 1]: how much extra behavior the model allows. */
+  precision: number;
+  fitting_traces: number;
+  trace_count: number;
+  produced: number;
+  consumed: number;
+  missing: number;
+  remaining: number;
+  /** Variants worst-fitting first. */
+  variants: VariantConformance[];
+}
+
 export interface TraceEvent {
   activity: number;
   timestamp: string;
@@ -53,6 +74,8 @@ export interface MineraExport {
   variants: VariantStat[];
   /** Discovered process tree; absent in exports from older minera versions. */
   process_tree?: ProcessTreeNode;
+  /** Conformance of the log against the process tree; absent in older exports. */
+  conformance?: Conformance;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

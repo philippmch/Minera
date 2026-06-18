@@ -1,21 +1,40 @@
 // Local application server: serves the built frontend and mines uploaded
 // CSV event logs with the native core via POST /api/mine.
 
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "httplib.h"
+#include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
+#include "minera/log_filter.hpp"
 #include "minera/version.hpp"
 
 namespace {
+
+std::vector<std::string> split_csv(std::string_view value) {
+  std::vector<std::string> parts;
+  std::string current;
+  for (const char ch : value) {
+    if (ch == ',') {
+      if (!current.empty()) parts.push_back(current);
+      current.clear();
+    } else if (ch != ' ' || !current.empty()) {
+      current.push_back(ch);
+    }
+  }
+  if (!current.empty()) parts.push_back(current);
+  return parts;
+}
 
 std::string error_json(std::string_view message) {
   std::ostringstream out;
@@ -39,6 +58,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     std::string csv;
     std::string dataset = "event log";
     minera::CsvImportOptions options;
+    minera::LogFilterOptions filter;
 
     if (request.is_multipart_form_data()) {
       if (!request.has_file("log")) {
@@ -63,16 +83,48 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       if (const auto value = form_field(request, "delimiter"); !value.empty()) {
         options.delimiter = value.front();
       }
+
+      // Optional log-preprocessing filters, applied before discovery.
+      if (const auto value = form_field(request, "keep_activities"); !value.empty()) {
+        filter.keep_activities = split_csv(value);
+      }
+      if (const auto value = form_field(request, "remove_activities"); !value.empty()) {
+        filter.remove_activities = split_csv(value);
+      }
+      if (const auto value = form_field(request, "start_activities"); !value.empty()) {
+        filter.start_activities = split_csv(value);
+      }
+      if (const auto value = form_field(request, "end_activities"); !value.empty()) {
+        filter.end_activities = split_csv(value);
+      }
+      if (const auto value = form_field(request, "min_length"); !value.empty()) {
+        filter.min_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+      }
+      if (const auto value = form_field(request, "max_length"); !value.empty()) {
+        filter.max_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+      }
+      if (const auto value = form_field(request, "min_variant_frequency"); !value.empty()) {
+        filter.min_variant_frequency =
+            static_cast<std::uint64_t>(std::atoll(value.c_str()));
+      }
+      if (const auto value = form_field(request, "top_variants"); !value.empty()) {
+        filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
+      }
     } else {
       csv = request.body;
     }
 
     std::istringstream input(csv);
-    const auto log = minera::import_csv_event_log(input, options);
+    auto log = minera::import_csv_event_log(input, options);
+    if (filter.any()) {
+      log = minera::filter_event_log(log, filter);
+    }
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
-    response.set_content(minera::analysis_json(dataset, log, graph, &tree),
-                         "application/json");
+    const auto conformance = minera::check_conformance(log, tree);
+    response.set_content(
+        minera::analysis_json(dataset, log, graph, &tree, &conformance),
+        "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
