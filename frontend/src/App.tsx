@@ -11,7 +11,8 @@ import { VariantList } from "./components/VariantList";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
-import { mineCsv } from "./api";
+import { Filters } from "./components/Filters";
+import { mineCsv, type FilterOptions } from "./api";
 
 type Tab = "log" | "dfg" | "model" | "conformance";
 
@@ -24,6 +25,12 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>("log");
   const [mining, setMining] = useState(false);
+  // The CSV upload behind the current view, kept so filters can re-mine it.
+  // null when the data came from a pre-mined JSON export (not re-minable).
+  const [source, setSource] = useState<
+    { file: File; delimiter?: string; activities: string[] } | null
+  >(null);
+  const [filtersActive, setFiltersActive] = useState(false);
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -47,10 +54,14 @@ export default function App() {
       if (/\.json$/i.test(file.name)) {
         const parsed: unknown = JSON.parse(await file.text());
         if (!isMineraExport(parsed)) throw new Error("not a Minera export");
+        setSource(null);
         openData(parsed);
       } else {
         const delimiter = /\.tsv$/i.test(file.name) ? "\t" : undefined;
-        openData(await mineCsv(file, { delimiter }));
+        const result = await mineCsv(file, { delimiter });
+        setSource({ file, delimiter, activities: result.activities.map((a) => a.name) });
+        setFiltersActive(false);
+        openData(result);
       }
     })()
       .catch((cause: Error) => {
@@ -64,9 +75,40 @@ export default function App() {
       .then((response) => response.json())
       .then((sample) => {
         if (!isMineraExport(sample)) throw new Error("invalid export");
+        setSource(null);
         openData(sample);
       })
       .catch(() => setError("Could not load the bundled sample dataset."));
+  };
+
+  // Re-mines the original upload with the given filters, keeping the active
+  // tab. Always filters from source.file so filters never compound.
+  const applyFilters = (filters: FilterOptions) => {
+    if (!source) return;
+    setFiltersActive(
+      Boolean(
+        filters.topVariants ||
+          filters.minVariantFrequency ||
+          filters.removeActivities?.length ||
+          filters.keepActivities?.length ||
+          filters.startActivities?.length ||
+          filters.endActivities?.length ||
+          filters.minLength ||
+          filters.maxLength,
+      ),
+    );
+    setMining(true);
+    mineCsv(source.file, { delimiter: source.delimiter, ...filters })
+      .then((result) => {
+        setData(result);
+        setSelectedVariant(null);
+        setThreshold(1);
+        setError(null);
+      })
+      .catch((cause: Error) =>
+        setError(`Could not filter ${source.file.name}: ${cause.message}`),
+      )
+      .finally(() => setMining(false));
   };
 
   useEffect(() => {
@@ -149,6 +191,8 @@ export default function App() {
         onHome={() => {
           setData(null);
           setError(null);
+          setSource(null);
+          setFiltersActive(false);
         }}
       />
       {error && <div className="error-banner">{error}</div>}
@@ -183,6 +227,15 @@ export default function App() {
         )}
       </nav>
       <Kpis data={data} />
+      {source && (
+        <Filters
+          key={source.file.name}
+          activities={source.activities}
+          active={filtersActive}
+          mining={mining}
+          onApply={applyFilters}
+        />
+      )}
       {tab === "log" && (
         <main className="layout-log">
           <EventLogView data={data} />
