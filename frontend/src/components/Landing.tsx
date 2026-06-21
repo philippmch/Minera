@@ -16,13 +16,13 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
         <h1 className="landing-title reveal">Minera</h1>
         <p className="landing-tagline reveal">process intelligence</p>
         <p className="landing-lede reveal">
-          Local process mining for CSV event logs.
+          Local process mining for CSV and XES event logs.
         </p>
 
         <label className={mining ? "landing-drop mining" : "landing-drop"}>
           <input
             type="file"
-            accept=".csv,.tsv,.json,text/csv"
+            accept=".csv,.tsv,.xes,.json,text/csv,application/xml"
             disabled={mining}
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -34,7 +34,7 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
             {mining ? "Mining event log…" : "Drop your event log here"}
           </span>
           <span className="landing-drop-sub">
-            or click to browse — .csv with case_id, activity, timestamp columns
+            or click to browse — .csv (case_id, activity, timestamp) or .xes
           </span>
         </label>
 

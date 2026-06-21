@@ -18,6 +18,7 @@ add_library(minera_core
   src/json_export.cpp
   src/log_filter.cpp
   src/petri_net.cpp
+  src/xes_event_log_importer.cpp
 )
 
 add_library(minera::core ALIAS minera_core)

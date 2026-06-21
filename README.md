@@ -6,6 +6,9 @@ workflows with native performance.
 ## Current Core
 
 - CSV event-log import with configurable case, activity, and timestamp columns.
+- XES event-log import (IEEE 1849-2016) for the standard interchange format used
+  by public datasets (e.g. the BPI Challenge logs), reading the common
+  `concept:name` / `time:timestamp` attribute subset.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
@@ -69,9 +72,10 @@ cmake -S . -B build && cmake --build build
 ```
 
 The launch screen takes a CSV event log (`case_id`, `activity`, `timestamp`
-columns; a bundled order-to-cash sample is one click away). The frontend
-uploads it to `POST /api/mine`, where the native core imports and mines it
-in memory — the log never leaves your machine. An opened log shows the raw
+columns; a bundled order-to-cash sample is one click away) or an `.xes` file.
+The frontend uploads it to `POST /api/mine`, where the native core picks the
+importer by extension/content, then imports and mines it in memory — the log
+never leaves your machine. An opened log shows the raw
 events first; discovery lives in tabs:
 
 - **Event Log** — the imported cases with their event sequences and
@@ -102,9 +106,10 @@ JSON files produced by the `minera_export` CLI open the same way as CSVs:
 ./build/minera_export my_event_log.csv -o my_export.json
 ```
 
-`minera_export` accepts options for custom column names and delimiters, plus
-log-filtering flags applied before discovery — for example, focus on the most
-common behavior:
+`minera_export` reads a `.xes` file as XES and any other file as CSV (the
+column/delimiter options apply to CSV only). It accepts options for custom
+column names and delimiters, plus log-filtering flags applied before discovery
+— for example, focus on the most common behavior:
 
 ```sh
 ./build/minera_export my_event_log.csv --top-variants 5 -o my_export.json

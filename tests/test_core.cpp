@@ -11,12 +11,14 @@
 #include "minera/log_filter.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -574,6 +576,158 @@ void importer_rejects_malformed_rows() {
   }));
 }
 
+minera::EventLog import_xes(const std::string& xml) {
+  std::istringstream input(xml);
+  return minera::import_xes_event_log(input);
+}
+
+std::filesystem::path write_temp_xes(const std::string& content) {
+  auto path = std::filesystem::temp_directory_path() / "minera_core_test.xes";
+  std::ofstream output(path, std::ios::binary);
+  output << content;
+  return path;
+}
+
+void xes_importer_reads_a_file_from_disk() {
+  // A UTF-8 BOM is stripped, and the file-path overload opens it in binary.
+  const auto path = write_temp_xes(
+      "\xEF\xBB\xBF"
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"case-1\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:00:00\"/>\n"
+      "    </event>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"B\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:01:00\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  const auto log = minera::import_xes_event_log(path);
+  assert(log.trace_count() == 1);
+  assert(log.event_count() == 2);
+  assert(log.traces[0].case_id == "case-1");
+  assert(log.traces[0].events[0].activity == "A");
+  assert(log.traces[0].events[1].activity == "B");
+
+  const auto graph = minera::discover_directly_follows_graph(log);
+  assert(graph.edge_count("A", "B") == 1);
+
+  // Opening a path that does not exist is an error, not an empty log.
+  assert(throws([] {
+    (void)minera::import_xes_event_log(
+        std::filesystem::temp_directory_path() / "minera_no_such_file.xes");
+  }));
+}
+
+void xes_importer_reads_traces_and_events() {
+  const auto log = import_xes(
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<!-- a minimal XES log -->\n"
+      "<log xes.version=\"1.0\">\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"case-1\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:00:00\"/>\n"
+      "    </event>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"B\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:01:00\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"case-2\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  assert(log.trace_count() == 2);
+  assert(log.event_count() == 3);
+  assert(log.traces[0].case_id == "case-1");
+  assert(log.traces[0].events.size() == 2);
+  assert(log.traces[0].events[0].activity == "A");
+  assert(log.traces[0].events[0].case_id == "case-1");
+  assert(log.traces[0].events[1].activity == "B");
+  assert(log.traces[1].case_id == "case-2");
+  assert(log.traces[1].events[0].activity == "A");
+
+  // The XES log mines just like a CSV log would.
+  const auto graph = minera::discover_directly_follows_graph(log);
+  assert(graph.edge_count("A", "B") == 1);
+}
+
+void xes_importer_sorts_events_by_timestamp() {
+  // Events out of order in the document are reordered by their timestamp.
+  const auto log = import_xes(
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"c\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"B\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:02:00\"/>\n"
+      "    </event>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "      <date key=\"time:timestamp\" value=\"2026-01-01T00:01:00\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  assert(log.traces.size() == 1);
+  assert(log.traces[0].events.size() == 2);
+  assert(log.traces[0].events[0].activity == "A");
+  assert(log.traces[0].events[1].activity == "B");
+}
+
+void xes_importer_decodes_entities_and_ignores_nesting() {
+  // Nested sub-attributes must not be mistaken for case/activity attributes,
+  // and XML entities in values are decoded.
+  const auto log = import_xes(
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"Tom &amp; Jerry\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"Pay &lt;50&gt;\">\n"
+      "        <string key=\"concept:name\" value=\"NESTED\"/>\n"
+      "      </string>\n"
+      "      <string key=\"org:resource\" value=\"clerk\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  assert(log.trace_count() == 1);
+  assert(log.traces[0].case_id == "Tom & Jerry");
+  assert(log.traces[0].events.size() == 1);
+  assert(log.traces[0].events[0].activity == "Pay <50>");
+}
+
+void xes_importer_rejects_malformed_logs() {
+  // Trace without a case attribute.
+  assert(throws([] {
+    (void)import_xes("<log><trace><event>"
+                     "<string key=\"concept:name\" value=\"A\"/>"
+                     "</event></trace></log>");
+  }));
+  // Event without an activity attribute.
+  assert(throws([] {
+    (void)import_xes("<log><trace>"
+                     "<string key=\"concept:name\" value=\"c\"/>"
+                     "<event><string key=\"org:resource\" value=\"x\"/></event>"
+                     "</trace></log>");
+  }));
+  // Unterminated tag.
+  assert(throws([] { (void)import_xes("<log><trace"); }));
+  // An empty stream yields an empty log rather than throwing.
+  assert(import_xes("").trace_count() == 0);
+}
+
 }  // namespace
 
 int main() {
@@ -610,5 +764,10 @@ int main() {
   filter_keeps_only_the_top_variant();
   filter_projects_activities();
   filter_applies_length_and_endpoint_constraints();
+  xes_importer_reads_traces_and_events();
+  xes_importer_reads_a_file_from_disk();
+  xes_importer_sorts_events_by_timestamp();
+  xes_importer_decodes_entities_and_ignores_nesting();
+  xes_importer_rejects_malformed_logs();
   return 0;
 }
