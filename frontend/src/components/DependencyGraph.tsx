@@ -1,19 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
-import { type DependencyLayout } from "../dependency-layout";
-import { numberFormat } from "../types";
+import { computeDependencyLayout } from "../dependency-layout";
+import { discoverHeuristicsNet } from "../heuristic-miner";
+import { type MineraExport, numberFormat } from "../types";
 
 interface DependencyGraphProps {
-  layout: DependencyLayout;
+  data: MineraExport;
   /** Caption shown next to the panel title, e.g. the selected miner. */
   title?: string;
 }
 
 // Renders a heuristics net: the dependency graph the Heuristic Miner keeps after
 // thresholding. Boxes are activities, edges are accepted dependencies labelled
-// with their dependency measure. Pan/zoom mirrors the other model views.
-export function DependencyGraph({ layout, title }: DependencyGraphProps) {
-  const { graph, dependency } = layout;
+// with their dependency measure. The dependency and frequency thresholds are
+// live sliders that re-mine the net in the browser. Pan/zoom mirrors the other
+// model views.
+export function DependencyGraph({ data, title }: DependencyGraphProps) {
+  const [dependencyThreshold, setDependencyThreshold] = useState(0.9);
+  const [minFrequency, setMinFrequency] = useState(1);
+
+  const maxFrequency = useMemo(
+    () => Math.max(1, ...data.edges.map((edge) => edge.count)),
+    [data],
+  );
+
+  const { graph, dependency } = useMemo(() => {
+    const net = discoverHeuristicsNet(data, { dependencyThreshold, minFrequency });
+    return computeDependencyLayout(net, data);
+  }, [data, dependencyThreshold, minFrequency]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(graph.fit);
   const [hoverNode, setHoverNode] = useState<number | null>(null);
@@ -74,6 +89,31 @@ export function DependencyGraph({ layout, title }: DependencyGraphProps) {
         <h2>Heuristics net</h2>
         {title && <span className="panel-meta">{title}</span>}
         <div className="map-controls">
+          <label className="threshold">
+            <span className="threshold-label">dependency ≥</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={dependencyThreshold}
+              onChange={(event) =>
+                setDependencyThreshold(Number(event.target.value))
+              }
+            />
+            <span className="threshold-value">{dependencyThreshold.toFixed(2)}</span>
+          </label>
+          <label className="threshold">
+            <span className="threshold-label">freq ≥</span>
+            <input
+              type="range"
+              min={1}
+              max={maxFrequency}
+              value={minFrequency}
+              onChange={(event) => setMinFrequency(Number(event.target.value))}
+            />
+            <span className="threshold-value">{minFrequency}</span>
+          </label>
           <button className="btn-ghost" onClick={() => setView(graph.fit)}>
             Fit
           </button>

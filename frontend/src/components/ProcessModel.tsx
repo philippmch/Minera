@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
-import { type DependencyLayout } from "../dependency-layout";
+import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
@@ -10,20 +10,20 @@ import { DependencyGraph } from "./DependencyGraph";
 type Step = "miner" | "variant" | "result";
 
 interface ProcessModelProps {
+  /** The analysis, used to mine the heuristic miner's dependency graph live. */
+  data: MineraExport;
   /** Layout for the inductive miner's process tree, if the export carries one. */
   treeLayout: TreeLayout | null;
   /** Layout for the alpha miner's Petri net, if the export carries one. */
   petriLayout: PetriLayout | null;
-  /** Layout for the heuristic miner's dependency graph, if the export carries one. */
-  dependencyLayout: DependencyLayout | null;
 }
 
 // A small wizard: pick a miner family, then a variant, then the mined model is
 // shown. The breadcrumb steps back to any earlier choice.
 export function ProcessModel({
+  data,
   treeLayout,
   petriLayout,
-  dependencyLayout,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -117,9 +117,9 @@ export function ProcessModel({
         <ModelResult
           variant={variant}
           groupName={group.name}
+          data={data}
           treeLayout={treeLayout}
           petriLayout={petriLayout}
-          dependencyLayout={dependencyLayout}
         />
       )}
     </div>
@@ -129,9 +129,9 @@ export function ProcessModel({
 interface ModelResultProps {
   variant: MinerVariant;
   groupName: string;
+  data: MineraExport;
   treeLayout: TreeLayout | null;
   petriLayout: PetriLayout | null;
-  dependencyLayout: DependencyLayout | null;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
@@ -140,9 +140,9 @@ interface ModelResultProps {
 function ModelResult({
   variant,
   groupName,
+  data,
   treeLayout,
   petriLayout,
-  dependencyLayout,
 }: ModelResultProps) {
   if (variant.artifact === "process-tree") {
     return treeLayout ? (
@@ -156,14 +156,9 @@ function ModelResult({
   }
 
   if (variant.artifact === "dependency-graph") {
-    return dependencyLayout ? (
-      <DependencyGraph layout={dependencyLayout} title={groupName} />
-    ) : (
-      <Placeholder>
-        No model to display. This export predates {groupName} discovery — re-open
-        the event log to mine a dependency graph.
-      </Placeholder>
-    );
+    // The dependency graph is derived from the directly-follows counts, which
+    // every analysis carries, so it is always available.
+    return <DependencyGraph data={data} title={groupName} />;
   }
 
   return petriLayout ? (
