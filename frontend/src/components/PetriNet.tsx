@@ -1,0 +1,205 @@
+import { useEffect, useRef, useState } from "react";
+import { type ViewBox } from "../layout";
+import { type PetriLayout } from "../petri-layout";
+
+interface PetriNetProps {
+  layout: PetriLayout;
+  /** Caption shown next to the panel title, e.g. the selected miner. */
+  title?: string;
+}
+
+// Renders an Alpha Miner workflow net: places as circles (source and sink
+// marked), transitions as labeled boxes, arcs as arrowed curves. Pan/zoom
+// behaviour mirrors the process-tree view.
+export function PetriNet({ layout, title }: PetriNetProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [view, setView] = useState<ViewBox>(layout.fit);
+
+  useEffect(() => setView(layout.fit), [layout]);
+
+  // React attaches wheel listeners as passive; a manual non-passive listener is
+  // needed to preventDefault page scrolling while zooming.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const factor = Math.exp(event.deltaY * 0.0016);
+      const rect = svg.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width;
+      const py = (event.clientY - rect.top) / rect.height;
+      setView((view) => {
+        const newW = Math.min(Math.max(view.w * factor, 160), layout.fit.w * 4);
+        const newH = view.h * (newW / view.w);
+        return {
+          x: view.x + (view.w - newW) * px,
+          y: view.y + (view.h - newH) * py,
+          w: newW,
+          h: newH,
+        };
+      });
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [layout]);
+
+  const panRef = useRef<{ x: number; y: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+
+  return (
+    <section className="panel map-panel reveal">
+      <div className="panel-head">
+        <h2>Petri net</h2>
+        {title && <span className="panel-meta">{title}</span>}
+        <div className="map-controls">
+          <div className="tree-legend">
+            <span><i className="petri-legend-place" /> place</span>
+            <span><i className="petri-legend-trans" /> activity</span>
+          </div>
+          <button className="btn-ghost" onClick={() => setView(layout.fit)}>
+            Fit
+          </button>
+        </div>
+      </div>
+      <div className="map-wrap">
+        <svg
+          ref={svgRef}
+          className={panning ? "panning" : undefined}
+          viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+          role="img"
+          aria-label="Petri net"
+          onPointerDown={(event) => {
+            panRef.current = { x: event.clientX, y: event.clientY };
+            setPanning(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            const pan = panRef.current;
+            if (!pan) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const scale = view.w / rect.width;
+            setView({
+              ...view,
+              x: view.x - (event.clientX - pan.x) * scale,
+              y: view.y - (event.clientY - pan.y) * scale,
+            });
+            panRef.current = { x: event.clientX, y: event.clientY };
+          }}
+          onPointerUp={() => {
+            panRef.current = null;
+            setPanning(false);
+          }}
+          onPointerCancel={() => {
+            panRef.current = null;
+            setPanning(false);
+          }}
+          onDoubleClick={() => setView(layout.fit)}
+        >
+          <defs>
+            <marker
+              id="petri-arrow"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path className="petri-arrowhead" d="M 0 0 L 10 5 L 0 10 z" />
+            </marker>
+          </defs>
+          <g>
+            {layout.arcs.map((arc) => (
+              <path
+                key={arc.key}
+                className="petri-arc"
+                d={arc.path}
+                markerEnd="url(#petri-arrow)"
+              />
+            ))}
+          </g>
+          <g>
+            {layout.places.map((place) => (
+              <g className={`petri-place ${place.kind}`} key={`p${place.id}`}>
+                <title>
+                  {place.kind === "source"
+                    ? "Source place (initial marking)"
+                    : place.kind === "sink"
+                      ? "Sink place (final marking)"
+                      : "Place"}
+                </title>
+                <circle
+                  className="petri-place-box"
+                  cx={place.x}
+                  cy={place.y}
+                  r={place.r}
+                />
+                {place.kind === "source" && (
+                  <circle
+                    className="petri-token"
+                    cx={place.x}
+                    cy={place.y}
+                    r={place.r * 0.4}
+                  />
+                )}
+              </g>
+            ))}
+          </g>
+          {layout.unconnectedY !== null && (
+            <g className="petri-lane">
+              <line
+                x1={layout.fit.x + 12}
+                y1={layout.unconnectedY}
+                x2={layout.fit.x + layout.fit.w - 12}
+                y2={layout.unconnectedY}
+              />
+              <text
+                className="petri-lane-label"
+                x={layout.fit.x + 16}
+                y={layout.unconnectedY + 16}
+              >
+                unconnected — short-loop activities the Alpha Miner cannot place
+              </text>
+            </g>
+          )}
+          <g>
+            {layout.transitions.map((transition) => {
+              const classes = ["petri-trans"];
+              if (transition.silent) classes.push("silent");
+              if (transition.disconnected) classes.push("disconnected");
+              return (
+                <g className={classes.join(" ")} key={`t${transition.id}`}>
+                  <title>
+                    {transition.silent
+                      ? "Silent step (τ)"
+                      : transition.disconnected
+                        ? `${transition.label} — not placeable by the Alpha Miner (short loop)`
+                        : transition.label}
+                  </title>
+                  <rect
+                    className="petri-trans-box"
+                    x={transition.x - transition.w / 2}
+                    y={transition.y - transition.h / 2}
+                    width={transition.w}
+                    height={transition.h}
+                    rx={3}
+                  />
+                  <text
+                    className="petri-trans-label"
+                    x={transition.x}
+                    y={transition.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                  >
+                    {transition.label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+        <div className="map-hint">scroll to zoom · drag to pan</div>
+      </div>
+    </section>
+  );
+}

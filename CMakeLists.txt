@@ -10,6 +10,7 @@ project(
 option(MINERA_BUILD_TESTS "Build Minera tests" ON)
 
 add_library(minera_core
+  src/alpha_miner.cpp
   src/conformance.cpp
   src/csv_event_log_importer.cpp
   src/directly_follows_graph.cpp

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { type MineraExport, isMineraExport, numberFormat } from "./types";
 import { computeLayout } from "./layout";
 import { computeTreeLayout } from "./tree-layout";
+import { computePetriLayout } from "./petri-layout";
 import { TopBar } from "./components/TopBar";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
@@ -156,6 +157,12 @@ export default function App() {
     [data, fontsReady],
   );
 
+  const petriLayout = useMemo(
+    () =>
+      data && data.petri_net ? computePetriLayout(data.petri_net, data) : null,
+    [data, fontsReady],
+  );
+
   const selection = useMemo(
     () =>
       data && selectedVariant !== null
@@ -243,7 +250,7 @@ export default function App() {
       )}
       {tab === "model" && (
         <main className="layout-log">
-          <ProcessModel treeLayout={treeLayout} />
+          <ProcessModel treeLayout={treeLayout} petriLayout={petriLayout} />
         </main>
       )}
       {tab === "conformance" && (

@@ -68,6 +68,42 @@ void write_process_tree_node(std::ostream& out,
   out << '}';
 }
 
+void write_place_list(std::ostream& out, const std::vector<std::size_t>& places) {
+  out << '[';
+  for (std::size_t i = 0; i < places.size(); ++i) {
+    out << places[i] << (i + 1 < places.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+void write_petri_net(std::ostream& out,
+                     const PetriNet& net,
+                     const DirectlyFollowsGraph& graph) {
+  out << "{\"place_count\": " << net.place_count()
+      << ", \"source\": " << net.source() << ", \"sink\": " << net.sink()
+      << ", \"transitions\": [";
+  const auto& transitions = net.transitions();
+  for (std::size_t i = 0; i < transitions.size(); ++i) {
+    const auto& transition = transitions[i];
+    out << "{\"activity\": ";
+    if (transition.silent()) {
+      out << "null";
+    } else {
+      // Re-resolve through the activity name so the id matches the rest of the
+      // document regardless of the net's own interning order.
+      const auto& name = net.activities()[*transition.activity];
+      const auto id = graph.activity_id(name);
+      out << (id ? *id : *transition.activity);
+    }
+    out << ", \"inputs\": ";
+    write_place_list(out, transition.inputs);
+    out << ", \"outputs\": ";
+    write_place_list(out, transition.outputs);
+    out << '}' << (i + 1 < transitions.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph) {
@@ -101,7 +137,8 @@ void write_analysis_json(std::ostream& out,
                          const EventLog& log,
                          const DirectlyFollowsGraph& graph,
                          const ProcessTree* tree,
-                         const ConformanceResult* conformance) {
+                         const ConformanceResult* conformance,
+                         const PetriNet* net) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -174,6 +211,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"conformance\": ";
     write_conformance(out, *conformance, graph);
   }
+  if (net != nullptr) {
+    out << ",\n  \"petri_net\": ";
+    write_petri_net(out, *net, graph);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -182,9 +223,10 @@ std::string analysis_json(std::string_view dataset,
                           const EventLog& log,
                           const DirectlyFollowsGraph& graph,
                           const ProcessTree* tree,
-                          const ConformanceResult* conformance) {
+                          const ConformanceResult* conformance,
+                          const PetriNet* net) {
   std::ostringstream out;
-  write_analysis_json(out, dataset, log, graph, tree, conformance);
+  write_analysis_json(out, dataset, log, graph, tree, conformance, net);
   return out.str();
 }
 
