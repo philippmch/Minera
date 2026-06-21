@@ -90,7 +90,8 @@ events first; discovery lives in tabs:
   the map, and per-activity frequency, entry, and exit statistics,
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
-  graph) and explore the resulting model,
+  graph) and explore the resulting model; the Heuristic Miner's dependency and
+  frequency thresholds are live sliders that re-mine the net in the browser,
 - **Conformance** — fitness and precision of the log against the discovered
   model, plus a per-variant breakdown of where traces deviate.
 
