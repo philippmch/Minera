@@ -48,6 +48,21 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+export interface HeuristicEdge {
+  source: number;
+  target: number;
+  /** Dependency measure in (-1, 1]: how reliably source is followed by target. */
+  dependency: number;
+  /** Direct successions observed (|source > target|). */
+  frequency: number;
+}
+
+export interface HeuristicsNet {
+  edges: HeuristicEdge[];
+  start_activities: number[];
+  end_activities: number[];
+}
+
 export interface VariantConformance {
   activities: number[];
   count: number;
@@ -95,6 +110,8 @@ export interface MineraExport {
   conformance?: Conformance;
   /** Alpha Miner Petri net; absent in exports from older minera versions. */
   petri_net?: PetriNetModel;
+  /** Heuristic Miner dependency graph; absent in exports from older versions. */
+  heuristics_net?: HeuristicsNet;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

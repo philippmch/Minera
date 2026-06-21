@@ -3,6 +3,7 @@ import { type MineraExport, isMineraExport, numberFormat } from "./types";
 import { computeLayout } from "./layout";
 import { computeTreeLayout } from "./tree-layout";
 import { computePetriLayout } from "./petri-layout";
+import { computeDependencyLayout } from "./dependency-layout";
 import { TopBar } from "./components/TopBar";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
@@ -163,6 +164,14 @@ export default function App() {
     [data, fontsReady],
   );
 
+  const dependencyLayout = useMemo(
+    () =>
+      data && data.heuristics_net
+        ? computeDependencyLayout(data.heuristics_net, data)
+        : null,
+    [data, fontsReady],
+  );
+
   const selection = useMemo(
     () =>
       data && selectedVariant !== null
@@ -250,7 +259,11 @@ export default function App() {
       )}
       {tab === "model" && (
         <main className="layout-log">
-          <ProcessModel treeLayout={treeLayout} petriLayout={petriLayout} />
+          <ProcessModel
+            treeLayout={treeLayout}
+            petriLayout={petriLayout}
+            dependencyLayout={dependencyLayout}
+          />
         </main>
       )}
       {tab === "conformance" && (

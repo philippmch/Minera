@@ -17,6 +17,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -155,8 +156,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto tree = minera::discover_process_tree(log);
     const auto conformance = minera::check_conformance(log, tree);
     const auto net = minera::discover_petri_net(log);
+    const auto heuristics = minera::discover_heuristics_net(log);
     response.set_content(
-        minera::analysis_json(dataset, log, graph, &tree, &conformance, &net),
+        minera::analysis_json(dataset, log, graph, &tree, &conformance, &net,
+                              &heuristics),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
