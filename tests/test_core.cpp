@@ -6,6 +6,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -728,6 +729,98 @@ void xes_importer_rejects_malformed_logs() {
   assert(import_xes("").trace_count() == 0);
 }
 
+std::size_t net_activity(const minera::HeuristicsNet& net, const std::string& name) {
+  for (std::size_t i = 0; i < net.activities.size(); ++i) {
+    if (net.activities[i] == name) return i;
+  }
+  assert(false);
+  return 0;
+}
+
+const minera::HeuristicDependency* net_edge(
+    const minera::HeuristicsNet& net,
+    const std::string& source,
+    const std::string& target) {
+  const auto s = net_activity(net, source);
+  const auto t = net_activity(net, target);
+  for (const auto& edge : net.edges) {
+    if (edge.source == s && edge.target == t) return &edge;
+  }
+  return nullptr;
+}
+
+minera::EventLog log_of(const std::vector<std::vector<std::string>>& traces) {
+  minera::EventLog log;
+  std::size_t order = 0;
+  for (std::size_t i = 0; i < traces.size(); ++i) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(i);
+    for (const auto& activity : traces[i]) {
+      trace.events.push_back(minera::Event{trace.case_id, activity, "", order++});
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+void heuristic_miner_keeps_a_clean_sequence() {
+  // A pure A -> B -> C sequence seen often enough to clear the 0.9 threshold.
+  const auto log = log_of(std::vector<std::vector<std::string>>(
+      10, {"A", "B", "C"}));
+  const auto net = minera::discover_heuristics_net(log);
+
+  assert(net_edge(net, "A", "B") != nullptr);
+  assert(net_edge(net, "B", "C") != nullptr);
+  // No spurious reverse edges.
+  assert(net_edge(net, "B", "A") == nullptr);
+  assert(net_edge(net, "C", "B") == nullptr);
+  assert(net_edge(net, "A", "B")->frequency == 10);
+  assert(net_edge(net, "A", "B")->dependency > 0.9);
+  assert(net.start_activities.size() == 1);
+  assert(net.start_activities[0] == net_activity(net, "A"));
+  assert(net.end_activities.size() == 1);
+  assert(net.end_activities[0] == net_activity(net, "C"));
+}
+
+void heuristic_miner_filters_noisy_reverse_edges() {
+  // A is mostly followed by B, with a single reversed occurrence of noise. The
+  // directly-follows graph keeps both directions; the Heuristic Miner does not.
+  auto traces = std::vector<std::vector<std::string>>(5, {"A", "B"});
+  traces.push_back({"B", "A"});
+  const auto log = log_of(traces);
+
+  const auto dfg = minera::discover_directly_follows_graph(log);
+  assert(dfg.edge_count("A", "B") == 5);
+  assert(dfg.edge_count("B", "A") == 1);
+
+  minera::HeuristicMinerOptions options;
+  options.dependency_threshold = 0.5;
+  const auto net = minera::discover_heuristics_net(log, options);
+  assert(net_edge(net, "A", "B") != nullptr);
+  assert(net_edge(net, "B", "A") == nullptr);
+}
+
+void heuristic_miner_detects_self_loops() {
+  minera::HeuristicMinerOptions options;
+  options.dependency_threshold = 0.5;
+  const auto log = log_of(std::vector<std::vector<std::string>>(
+      3, {"A", "A", "A", "B"}));
+  const auto net = minera::discover_heuristics_net(log, options);
+
+  const auto* loop = net_edge(net, "A", "A");
+  assert(loop != nullptr);
+  assert(loop->frequency == 6);  // two A>A per trace, three traces
+  assert(net_edge(net, "A", "B") != nullptr);
+}
+
+void heuristic_miner_handles_an_empty_log() {
+  const auto net = minera::discover_heuristics_net(minera::EventLog{});
+  assert(net.activities.empty());
+  assert(net.edges.empty());
+  assert(net.start_activities.empty());
+  assert(net.end_activities.empty());
+}
+
 }  // namespace
 
 int main() {
@@ -769,5 +862,9 @@ int main() {
   xes_importer_sorts_events_by_timestamp();
   xes_importer_decodes_entities_and_ignores_nesting();
   xes_importer_rejects_malformed_logs();
+  heuristic_miner_keeps_a_clean_sequence();
+  heuristic_miner_filters_noisy_reverse_edges();
+  heuristic_miner_detects_self_loops();
+  heuristic_miner_handles_an_empty_log();
   return 0;
 }

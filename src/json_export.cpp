@@ -104,6 +104,39 @@ void write_petri_net(std::ostream& out,
   out << "]}";
 }
 
+void write_heuristics_net(std::ostream& out,
+                          const HeuristicsNet& net,
+                          const DirectlyFollowsGraph& graph) {
+  // Resolve the net's internal activity ids to the ids used everywhere else in
+  // the document by going through the activity name.
+  const auto resolve = [&](std::size_t local) {
+    const auto id = graph.activity_id(net.activities[local]);
+    return id ? *id : local;
+  };
+  const auto write_ids = [&](const std::vector<std::size_t>& locals) {
+    out << '[';
+    for (std::size_t i = 0; i < locals.size(); ++i) {
+      out << resolve(locals[i]) << (i + 1 < locals.size() ? ", " : "");
+    }
+    out << ']';
+  };
+
+  out << "{\"edges\": [";
+  for (std::size_t i = 0; i < net.edges.size(); ++i) {
+    const auto& edge = net.edges[i];
+    out << "{\"source\": " << resolve(edge.source)
+        << ", \"target\": " << resolve(edge.target)
+        << ", \"dependency\": " << edge.dependency
+        << ", \"frequency\": " << edge.frequency << '}'
+        << (i + 1 < net.edges.size() ? ", " : "");
+  }
+  out << "], \"start_activities\": ";
+  write_ids(net.start_activities);
+  out << ", \"end_activities\": ";
+  write_ids(net.end_activities);
+  out << '}';
+}
+
 void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph) {
@@ -138,7 +171,8 @@ void write_analysis_json(std::ostream& out,
                          const DirectlyFollowsGraph& graph,
                          const ProcessTree* tree,
                          const ConformanceResult* conformance,
-                         const PetriNet* net) {
+                         const PetriNet* net,
+                         const HeuristicsNet* heuristics) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -215,6 +249,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"petri_net\": ";
     write_petri_net(out, *net, graph);
   }
+  if (heuristics != nullptr) {
+    out << ",\n  \"heuristics_net\": ";
+    write_heuristics_net(out, *heuristics, graph);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -224,9 +262,11 @@ std::string analysis_json(std::string_view dataset,
                           const DirectlyFollowsGraph& graph,
                           const ProcessTree* tree,
                           const ConformanceResult* conformance,
-                          const PetriNet* net) {
+                          const PetriNet* net,
+                          const HeuristicsNet* heuristics) {
   std::ostringstream out;
-  write_analysis_json(out, dataset, log, graph, tree, conformance, net);
+  write_analysis_json(out, dataset, log, graph, tree, conformance, net,
+                      heuristics);
   return out.str();
 }
 

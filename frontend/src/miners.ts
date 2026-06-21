@@ -5,7 +5,7 @@
 // how to render it. An artifact the backend does not yet produce falls back to
 // an honest "not available yet" placeholder.
 
-export type ModelArtifact = "process-tree" | "petri-net";
+export type ModelArtifact = "process-tree" | "petri-net" | "dependency-graph";
 
 export interface MinerVariant {
   id: string;
@@ -55,6 +55,24 @@ export const MINER_GROUPS: MinerGroup[] = [
           "directly-follows relations and assembles them into a Petri net. " +
           "Foundational, but sensitive to noise and incomplete logs.",
         artifact: "petri-net",
+      },
+    ],
+  },
+  {
+    id: "heuristic",
+    name: "Heuristic Miner",
+    tagline:
+      "Noise-tolerant: keeps only the dependencies frequent and reliable enough to trust.",
+    variants: [
+      {
+        id: "classic",
+        name: "Classic",
+        description:
+          "Scores each ordering with a dependency measure that weighs how often " +
+          "one activity follows another against how often it precedes it, then " +
+          "keeps only edges above the dependency and frequency thresholds — " +
+          "filtering the infrequent paths that mislead the Alpha Miner.",
+        artifact: "dependency-graph",
       },
     ],
   },

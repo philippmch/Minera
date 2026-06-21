@@ -12,6 +12,11 @@ workflows with native performance.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
+- Process-model discovery with the **Heuristic Miner**: a dependency measure
+  weighs how often one activity follows another against the reverse, and only
+  edges above a dependency and frequency threshold are kept — yielding a
+  noise-tolerant dependency graph (heuristics net) where the Alpha Miner would
+  be misled by infrequent paths.
 - Process-model discovery with the **Inductive Miner**: recursive
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
@@ -83,8 +88,9 @@ events first; discovery lives in tabs:
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter), a variant explorer that highlights paths on
   the map, and per-activity frequency, entry, and exit statistics,
-- **Mine a Process Model** — pick a discovery algorithm (currently the
-  Inductive Miner) and explore the resulting block-structured process tree,
+- **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
+  process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
+  graph) and explore the resulting model,
 - **Conformance** — fitness and precision of the log against the discovered
   model, plus a per-variant breakdown of where traces deviate.
 

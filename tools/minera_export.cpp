@@ -15,6 +15,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -159,11 +160,12 @@ int main(int argc, char** argv) {
     const auto tree = minera::discover_process_tree(log);
     const auto conformance = minera::check_conformance(log, tree);
     const auto net = minera::discover_petri_net(log);
+    const auto heuristics = minera::discover_heuristics_net(log);
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree,
-                                  &conformance, &net);
+                                  &conformance, &net, &heuristics);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -171,7 +173,7 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree,
-                                  &conformance, &net);
+                                  &conformance, &net, &heuristics);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';
