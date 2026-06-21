@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "httplib.h"
+#include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -122,8 +123,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
     const auto conformance = minera::check_conformance(log, tree);
+    const auto net = minera::discover_petri_net(log);
     response.set_content(
-        minera::analysis_json(dataset, log, graph, &tree, &conformance),
+        minera::analysis_json(dataset, log, graph, &tree, &conformance, &net),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

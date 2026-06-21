@@ -1,26 +1,30 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type TreeLayout } from "../tree-layout";
-import { MINER_GROUPS } from "../miners";
+import { type PetriLayout } from "../petri-layout";
+import { MINER_GROUPS, type MinerVariant } from "../miners";
 import { ProcessTree } from "./ProcessTree";
+import { PetriNet } from "./PetriNet";
 
-type Step = "algorithm" | "variant" | "result";
+type Step = "miner" | "variant" | "result";
 
 interface ProcessModelProps {
   /** Layout for the inductive miner's process tree, if the export carries one. */
   treeLayout: TreeLayout | null;
+  /** Layout for the alpha miner's Petri net, if the export carries one. */
+  petriLayout: PetriLayout | null;
 }
 
-// A small wizard: pick an algorithm family, then a variant, then the mined
-// model is shown. The breadcrumb steps back to any earlier choice.
-export function ProcessModel({ treeLayout }: ProcessModelProps) {
-  const [step, setStep] = useState<Step>("algorithm");
+// A small wizard: pick a miner family, then a variant, then the mined model is
+// shown. The breadcrumb steps back to any earlier choice.
+export function ProcessModel({ treeLayout, petriLayout }: ProcessModelProps) {
+  const [step, setStep] = useState<Step>("miner");
   const [groupId, setGroupId] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
 
   const group = MINER_GROUPS.find((g) => g.id === groupId) ?? null;
   const variant = group?.variants.find((v) => v.id === variantId) ?? null;
 
-  const chooseAlgorithm = (id: string) => {
+  const chooseMiner = (id: string) => {
     setGroupId(id);
     setVariantId(null);
     setStep("variant");
@@ -34,12 +38,12 @@ export function ProcessModel({ treeLayout }: ProcessModelProps) {
     <div className="miner-flow reveal">
       <nav className="miner-trail">
         <button
-          className={step === "algorithm" ? "trail-item active" : "trail-item"}
-          onClick={() => setStep("algorithm")}
+          className={step === "miner" ? "trail-item active" : "trail-item"}
+          onClick={() => setStep("miner")}
         >
-          Algorithm
+          Miner
         </button>
-        {group && step !== "algorithm" && (
+        {group && step !== "miner" && (
           <>
             <span className="trail-sep">›</span>
             <button
@@ -58,16 +62,16 @@ export function ProcessModel({ treeLayout }: ProcessModelProps) {
         )}
       </nav>
 
-      {step === "algorithm" && (
+      {step === "miner" && (
         <div className="miner-step">
-          <p className="miner-step-label">Step 1 — Discovery algorithm</p>
-          <h2 className="miner-step-title">Choose an algorithm</h2>
+          <p className="miner-step-label">Step 1 — Discovery miner</p>
+          <h2 className="miner-step-title">Choose a miner</h2>
           <div className="miner-cards">
             {MINER_GROUPS.map((g) => (
               <button
                 key={g.id}
                 className="miner-card"
-                onClick={() => chooseAlgorithm(g.id)}
+                onClick={() => chooseMiner(g.id)}
               >
                 <span className="miner-card-name">{g.name}</span>
                 <span className="miner-card-count">
@@ -101,18 +105,59 @@ export function ProcessModel({ treeLayout }: ProcessModelProps) {
         </div>
       )}
 
-      {step === "result" &&
-        variant &&
-        (variant.artifact === "process-tree" && treeLayout ? (
-          <ProcessTree layout={treeLayout} />
-        ) : (
-          <section className="panel map-panel">
-            <div className="model-empty">
-              No model to display. This export predates model discovery — re-open
-              the CSV event log to mine a process tree.
-            </div>
-          </section>
-        ))}
+      {step === "result" && group && variant && (
+        <ModelResult
+          variant={variant}
+          groupName={group.name}
+          treeLayout={treeLayout}
+          petriLayout={petriLayout}
+        />
+      )}
     </div>
+  );
+}
+
+interface ModelResultProps {
+  variant: MinerVariant;
+  groupName: string;
+  treeLayout: TreeLayout | null;
+  petriLayout: PetriLayout | null;
+}
+
+// Renders the mined model for the chosen variant by its artifact type. A null
+// layout means the export carries no model of that kind (an older export, or a
+// log too small to mine one), so an honest placeholder is shown instead.
+function ModelResult({
+  variant,
+  groupName,
+  treeLayout,
+  petriLayout,
+}: ModelResultProps) {
+  if (variant.artifact === "process-tree") {
+    return treeLayout ? (
+      <ProcessTree layout={treeLayout} title={groupName} />
+    ) : (
+      <Placeholder>
+        No model to display. This export predates model discovery — re-open the
+        CSV event log to mine a process tree.
+      </Placeholder>
+    );
+  }
+
+  return petriLayout ? (
+    <PetriNet layout={petriLayout} title={groupName} />
+  ) : (
+    <Placeholder>
+      No model to display. This export predates {groupName} discovery — re-open
+      the CSV event log to mine a Petri net.
+    </Placeholder>
+  );
+}
+
+function Placeholder({ children }: { children: ReactNode }) {
+  return (
+    <section className="panel map-panel">
+      <div className="model-empty">{children}</div>
+    </section>
   );
 }

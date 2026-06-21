@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -142,11 +143,12 @@ int main(int argc, char** argv) {
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
     const auto conformance = minera::check_conformance(log, tree);
+    const auto net = minera::discover_petri_net(log);
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree,
-                                  &conformance);
+                                  &conformance, &net);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -154,7 +156,7 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree,
-                                  &conformance);
+                                  &conformance, &net);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

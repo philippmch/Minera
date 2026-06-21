@@ -1,9 +1,11 @@
-// Registry of discovery algorithms shown in the "Mine a process model" tab.
-// Grouped by algorithm family so new miners (and new variants of an existing
-// family) can be added without touching the UI: append to MINER_GROUPS and,
-// for a genuinely new output artifact, teach ProcessModel how to render it.
+// Registry of discovery miners shown in the "Mine a Process Model" and
+// "Conformance" tabs. Grouped by miner family so new miners (and new variants
+// of an existing family) can be added without touching the UI: append to
+// MINER_GROUPS and, for a genuinely new output artifact, teach ProcessModel
+// how to render it. An artifact the backend does not yet produce falls back to
+// an honest "not available yet" placeholder.
 
-export type ModelArtifact = "process-tree";
+export type ModelArtifact = "process-tree" | "petri-net";
 
 export interface MinerVariant {
   id: string;
@@ -36,6 +38,23 @@ export const MINER_GROUPS: MinerGroup[] = [
           "sequence, parallel and loop operators, yielding a block-structured " +
           "process tree that is always sound and perfectly fits the log.",
         artifact: "process-tree",
+      },
+    ],
+  },
+  {
+    id: "alpha",
+    name: "Alpha Miner",
+    tagline:
+      "The classic algorithm: derives a Petri net from directly-follows relations.",
+    variants: [
+      {
+        id: "classic",
+        name: "Classic",
+        description:
+          "Infers ordering, causality, parallelism and choice from the " +
+          "directly-follows relations and assembles them into a Petri net. " +
+          "Foundational, but sensitive to noise and incomplete logs.",
+        artifact: "petri-net",
       },
     ],
   },

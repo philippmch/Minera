@@ -2,6 +2,7 @@
 // test, so its asserts must never compile away. Must precede <cassert>.
 #undef NDEBUG
 
+#include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -222,6 +223,115 @@ void petri_net_adds_silent_split_and_join_for_parallel() {
   }
   // The parallel block contributes exactly one AND-split and one AND-join.
   assert(silent == 2);
+}
+
+bool contains(const std::vector<std::size_t>& places, std::size_t place) {
+  return std::find(places.begin(), places.end(), place) != places.end();
+}
+
+const minera::PetriTransition* transition_for(const minera::PetriNet& net,
+                                              const std::string& activity) {
+  for (std::size_t id = 0; id < net.activities().size(); ++id) {
+    if (net.activities()[id] != activity) continue;
+    for (const auto& transition : net.transitions()) {
+      if (transition.activity && *transition.activity == id) return &transition;
+    }
+  }
+  return nullptr;
+}
+
+void alpha_miner_discovers_a_sequence() {
+  const auto net = minera::discover_petri_net(log_from_variants({{"a", "b", "c"}}));
+  // source + sink + one place between each consecutive activity pair.
+  assert(net.place_count() == 4);
+  assert(net.transitions().size() == 3);
+  const auto* a = transition_for(net, "a");
+  const auto* c = transition_for(net, "c");
+  assert(a != nullptr && c != nullptr);
+  assert(contains(a->inputs, net.source()));   // start activity fed by source
+  assert(contains(c->outputs, net.sink()));     // end activity drains to sink
+  // The Alpha Miner emits only labeled transitions, never silent ones.
+  for (const auto& transition : net.transitions()) assert(!transition.silent());
+}
+
+void alpha_miner_shares_a_place_for_exclusive_choice() {
+  // a, then either b or c, then d. b # c, so one place routes a's token to both
+  // branches and one place collects them before d.
+  const auto net = minera::discover_petri_net(
+      log_from_variants({{"a", "b", "d"}, {"a", "c", "d"}}));
+  // source, sink, ({a},{b,c}) and ({b,c},{d}).
+  assert(net.place_count() == 4);
+  const auto* a = transition_for(net, "a");
+  const auto* b = transition_for(net, "b");
+  const auto* c = transition_for(net, "c");
+  const auto* d = transition_for(net, "d");
+  assert(a && b && c && d);
+  // a's lone output place is exactly the shared entry of branches b and c.
+  assert(a->outputs.size() == 1);
+  const std::size_t branch_in = a->outputs.front();
+  assert(contains(b->inputs, branch_in) && contains(c->inputs, branch_in));
+  // b and c merge into one place that feeds d.
+  assert(b->outputs.size() == 1 && b->outputs == c->outputs);
+  assert(contains(d->inputs, b->outputs.front()));
+}
+
+void alpha_miner_keeps_parallel_branches_on_separate_places() {
+  // b and c are concurrent between a and d (a||... no: b||c). Classic Alpha
+  // represents concurrency as two independent places, never a shared one, so a
+  // forks into two places and d joins from two.
+  const auto net = minera::discover_petri_net(
+      log_from_variants({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}));
+  // source, sink, ({a},{b}), ({a},{c}), ({b},{d}), ({c},{d}).
+  assert(net.place_count() == 6);
+  const auto* a = transition_for(net, "a");
+  const auto* d = transition_for(net, "d");
+  assert(a && d);
+  assert(a->outputs.size() == 2);  // one place per concurrent branch
+  assert(d->inputs.size() == 2);
+  // No place is shared between b and c (that would force an order between them).
+  const auto* b = transition_for(net, "b");
+  const auto* c = transition_for(net, "c");
+  assert(b && c);
+  for (const auto place : b->inputs) assert(!contains(c->inputs, place));
+}
+
+void alpha_miner_drops_short_loop_activities() {
+  // A length-two loop (b after a, a after b) makes a and b parallel under the
+  // footprint, so the classic algorithm cannot place either — the textbook
+  // short-loop limitation. The transitions still exist but carry no arcs.
+  const auto net = minera::discover_petri_net(
+      log_from_variants({{"x", "a", "b", "a", "y"}, {"x", "a", "y"}}));
+  const auto* a = transition_for(net, "a");
+  const auto* b = transition_for(net, "b");
+  assert(a && b);
+  assert(b->inputs.empty() && b->outputs.empty());
+}
+
+void alpha_miner_handles_an_empty_log() {
+  const minera::EventLog empty;
+  const auto net = minera::discover_petri_net(empty);
+  assert(net.place_count() == 2);  // just source and sink
+  assert(net.transitions().empty());
+}
+
+void json_export_carries_the_petri_net_contract() {
+  // The frontend reads these keys by name, so guard them against renames.
+  const auto log = log_from_variants({{"a", "b"}, {"a", "c"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto net = minera::discover_petri_net(log);
+
+  const auto json =
+      minera::analysis_json("test", log, graph, nullptr, nullptr, &net);
+  for (const char* key : {"\"petri_net\"", "\"place_count\"", "\"source\"",
+                          "\"sink\"", "\"transitions\"", "\"inputs\"",
+                          "\"outputs\""}) {
+    assert(json.find(key) != std::string::npos);
+  }
+
+  // The Petri net is omitted when not supplied (older-export compatibility).
+  const auto without =
+      minera::analysis_json("test", log, graph, nullptr, nullptr, nullptr);
+  assert(without.find("\"petri_net\"") == std::string::npos);
 }
 
 void conformance_is_perfect_on_the_discovery_log() {
@@ -479,6 +589,12 @@ int main() {
   inductive_miner_falls_back_to_flower();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
+  alpha_miner_discovers_a_sequence();
+  alpha_miner_shares_a_place_for_exclusive_choice();
+  alpha_miner_keeps_parallel_branches_on_separate_places();
+  alpha_miner_drops_short_loop_activities();
+  alpha_miner_handles_an_empty_log();
+  json_export_carries_the_petri_net_contract();
   conformance_is_perfect_on_the_discovery_log();
   conformance_is_perfect_for_every_operator();
   conformance_counts_unmodeled_activities();

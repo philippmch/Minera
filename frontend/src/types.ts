@@ -31,6 +31,23 @@ export interface ProcessTreeNode {
   children?: ProcessTreeNode[];
 }
 
+export interface PetriTransition {
+  /** Activity id this transition fires; null for a silent (tau) transition. */
+  activity: number | null;
+  /** Place ids consumed when the transition fires. */
+  inputs: number[];
+  /** Place ids produced when the transition fires. */
+  outputs: number[];
+}
+
+export interface PetriNetModel {
+  /** Places are ids 0..place_count-1. */
+  place_count: number;
+  source: number;
+  sink: number;
+  transitions: PetriTransition[];
+}
+
 export interface VariantConformance {
   activities: number[];
   count: number;
@@ -76,6 +93,8 @@ export interface MineraExport {
   process_tree?: ProcessTreeNode;
   /** Conformance of the log against the process tree; absent in older exports. */
   conformance?: Conformance;
+  /** Alpha Miner Petri net; absent in exports from older minera versions. */
+  petri_net?: PetriNetModel;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
