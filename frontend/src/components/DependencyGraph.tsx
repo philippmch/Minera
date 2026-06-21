@@ -88,6 +88,9 @@ export function DependencyGraph({ data, title }: DependencyGraphProps) {
       <div className="panel-head">
         <h2>Heuristics net</h2>
         {title && <span className="panel-meta">{title}</span>}
+        <span className="panel-meta">
+          {dependency.size} {dependency.size === 1 ? "dependency" : "dependencies"}
+        </span>
         <div className="map-controls">
           <label className="threshold">
             <span className="threshold-label">dependency ≥</span>
