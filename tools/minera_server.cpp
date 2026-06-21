@@ -1,6 +1,8 @@
 // Local application server: serves the built frontend and mines uploaded
 // CSV event logs with the native core via POST /api/mine.
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -19,8 +21,35 @@
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/version.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
+
+bool ends_with_ci(std::string_view value, std::string_view suffix) {
+  if (value.size() < suffix.size()) return false;
+  const auto tail = value.substr(value.size() - suffix.size());
+  return std::equal(tail.begin(), tail.end(), suffix.begin(), [](char a, char b) {
+    return std::tolower(static_cast<unsigned char>(a)) == b;
+  });
+}
+
+// Picks the importer by filename extension, falling back to sniffing the
+// content for an XML/XES preamble so extension-less uploads still work.
+bool looks_like_xes(std::string_view filename, std::string_view content) {
+  if (ends_with_ci(filename, ".xes")) return true;
+  std::size_t i = 0;
+  if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
+      static_cast<unsigned char>(content[1]) == 0xBB &&
+      static_cast<unsigned char>(content[2]) == 0xBF) {
+    i = 3;
+  }
+  while (i < content.size() &&
+         std::isspace(static_cast<unsigned char>(content[i]))) {
+    ++i;
+  }
+  const auto rest = content.substr(i);
+  return rest.rfind("<?xml", 0) == 0 || rest.rfind("<log", 0) == 0;
+}
 
 std::vector<std::string> split_csv(std::string_view value) {
   std::vector<std::string> parts;
@@ -116,7 +145,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
 
     std::istringstream input(csv);
-    auto log = minera::import_csv_event_log(input, options);
+    auto log = looks_like_xes(dataset, csv)
+                   ? minera::import_xes_event_log(input)
+                   : minera::import_csv_event_log(input, options);
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
     }

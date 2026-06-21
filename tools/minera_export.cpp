@@ -1,6 +1,8 @@
 // Runs the Minera core on a CSV event log and emits the analysis (event log
 // plus discovered directly-follows graph) as JSON for the frontend.
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -16,8 +18,17 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
+
+bool ends_with_ci(std::string_view value, std::string_view suffix) {
+  if (value.size() < suffix.size()) return false;
+  const auto tail = value.substr(value.size() - suffix.size());
+  return std::equal(tail.begin(), tail.end(), suffix.begin(), [](char a, char b) {
+    return std::tolower(static_cast<unsigned char>(a)) == b;
+  });
+}
 
 // Splits a comma-separated option value into trimmed, non-empty activity names.
 std::vector<std::string> split_csv(std::string_view value) {
@@ -37,7 +48,8 @@ std::vector<std::string> split_csv(std::string_view value) {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " <event_log.csv> [options]\n"
+            << " <event_log.csv|.xes> [options]\n"
+               "  A .xes file is imported as XES; any other file as CSV.\n"
                "  -o <path>                 Write JSON to <path> instead of stdout\n"
                "  --case-column <name>      Case id column (default: case_id)\n"
                "  --activity-column <name>  Activity column (default: activity)\n"
@@ -136,7 +148,10 @@ int main(int argc, char** argv) {
   }
 
   try {
-    auto log = minera::import_csv_event_log(input, options);
+    // A .xes file is read as XES; everything else is treated as CSV.
+    auto log = ends_with_ci(input.string(), ".xes")
+                   ? minera::import_xes_event_log(input)
+                   : minera::import_csv_event_log(input, options);
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
     }
