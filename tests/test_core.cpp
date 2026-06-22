@@ -538,9 +538,13 @@ void json_export_carries_the_alignment_contract() {
   const auto deviating = log_from_variants({{"a", "c"}});
   const auto alignments = minera::check_alignment(deviating, tree);
 
-  const auto json = minera::analysis_json("test", deviating, graph, &tree,
-                                          nullptr, nullptr, nullptr, &alignments);
-  for (const char* key : {"\"alignments\"", "\"total_cost\"", "\"moves\"",
+  const auto alpha_net = minera::discover_petri_net(deviating);
+  const auto alpha_alignments = minera::check_alignment(deviating, alpha_net);
+  const auto json =
+      minera::analysis_json("test", deviating, graph, &tree, nullptr, nullptr,
+                            nullptr, &alignments, &alpha_alignments);
+  for (const char* key : {"\"alignments\"", "\"alpha_alignments\"",
+                          "\"computed\"", "\"total_cost\"", "\"moves\"",
                           "\"cost\"", "\"type\"", "\"model\"", "\"sync\""}) {
     assert(json.find(key) != std::string::npos);
   }
@@ -548,6 +552,39 @@ void json_export_carries_the_alignment_contract() {
   // Alignments are omitted when not supplied (older-export compatibility).
   const auto without = minera::analysis_json("test", deviating, graph, &tree);
   assert(without.find("\"alignments\"") == std::string::npos);
+  assert(without.find("\"alpha_alignments\"") == std::string::npos);
+}
+
+void alignment_scores_a_sound_alpha_net() {
+  // The Alpha Miner yields a sound, perfectly-fitting net for an exclusive
+  // choice (every run keeps a single token), so the log aligns at zero cost.
+  // (A parallel log, by contrast, makes Alpha's shared sink unsound — both
+  // branches deposit a token — which the aligner correctly refuses to score.)
+  const auto log = log_from_variants({{"a", "b", "d"}, {"a", "c", "d"}});
+  const auto net = minera::discover_petri_net(log);
+  const auto alignment = minera::check_alignment(log, net);
+
+  assert(alignment.computed);
+  assert(alignment.fitness > 0.9999);
+  assert(alignment.fitting_traces == alignment.trace_count);
+}
+
+void alignment_flags_an_unsound_net() {
+  // A net whose only transition drains the source but produces nothing leaves
+  // the sink unreachable — not a sound workflow net. The aligner must refuse to
+  // score it rather than report a misleading number.
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a"});
+  net.add_transition(0, {source}, {});  // consumes the source, produces nothing
+
+  const auto log = log_from_variants({{"a"}});
+  const auto alignment = minera::check_alignment(log, net);
+  assert(!alignment.computed);
+  assert(alignment.variants.empty());
 }
 
 void alignment_handles_an_empty_log() {
@@ -969,6 +1006,8 @@ int main() {
   alignment_diagnoses_a_skipped_activity();
   alignment_diagnoses_an_inserted_activity();
   json_export_carries_the_alignment_contract();
+  alignment_scores_a_sound_alpha_net();
+  alignment_flags_an_unsound_net();
   alignment_handles_an_empty_log();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();

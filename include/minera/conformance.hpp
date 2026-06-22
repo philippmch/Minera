@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
 
 namespace minera {
@@ -71,6 +72,11 @@ struct VariantAlignment {
 // from its initial to its final marking — giving an exact, optimal account of
 // where and how each trace deviates.
 struct AlignmentResult {
+  // False when the net is not a sound workflow net — its final marking is
+  // unreachable, or the search could not align a trace within its bounds (as
+  // can happen for Alpha/Heuristic models, which carry no soundness guarantee).
+  // The other fields are then meaningless and `variants` is empty.
+  bool computed = true;
   double fitness = 1.0;               // cost-based log fitness in [0, 1]
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
@@ -78,12 +84,19 @@ struct AlignmentResult {
   std::vector<VariantAlignment> variants;  // worst-fitting first
 };
 
-// Computes optimal alignments of every trace variant against `tree` (translated
-// to a workflow net) using a uniform-cost search over the synchronous product,
-// and reports cost-based fitness overall and per variant. The standard cost
-// function charges 1 for a log-only or visible model-only move and 0 for a
-// synchronous or silent move (Adriansyah, van der Aalst & van Dongen).
+// Computes optimal alignments of every trace variant against the model using a
+// uniform-cost search over the synchronous product, and reports cost-based
+// fitness overall and per variant. The standard cost function charges 1 for a
+// log-only or visible model-only move and 0 for a synchronous or silent move
+// (Adriansyah, van der Aalst & van Dongen).
+//
+// The process-tree overload translates the tree to a (always sound) workflow
+// net; the Petri-net overload aligns against any net directly but, because a
+// net from the Alpha Miner need not be sound, returns `computed == false`
+// rather than misleading numbers when its final marking cannot be reached.
 [[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
                                               const ProcessTree& tree);
+[[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
+                                              const PetriNet& net);
 
 }  // namespace minera

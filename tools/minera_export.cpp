@@ -161,12 +161,14 @@ int main(int argc, char** argv) {
     const auto conformance = minera::check_conformance(log, tree);
     const auto alignments = minera::check_alignment(log, tree);
     const auto net = minera::discover_petri_net(log);
+    const auto alpha_alignments = minera::check_alignment(log, net);
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree,
-                                  &conformance, &net, &heuristics, &alignments);
+                                  &conformance, &net, &heuristics, &alignments,
+                                  &alpha_alignments);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -174,7 +176,8 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree,
-                                  &conformance, &net, &heuristics, &alignments);
+                                  &conformance, &net, &heuristics, &alignments,
+                                  &alpha_alignments);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

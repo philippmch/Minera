@@ -331,8 +331,15 @@ class Aligner {
     }
     final_ = Marking(net_.place_count(), 0);
     final_[net_.sink()] = 1;
-    empty_run_cost_ = shortest_model_run();
+    if (const auto cost = shortest_model_run()) {
+      reachable_ = true;
+      empty_run_cost_ = *cost;
+    }
   }
+
+  // Whether the net's final marking is reachable from its initial marking — the
+  // minimum bar for it to be a workflow net the aligner can score.
+  [[nodiscard]] bool reachable() const { return reachable_; }
 
   [[nodiscard]] std::optional<std::size_t> activity_id(
       const std::string& name) const {
@@ -348,6 +355,7 @@ class Aligner {
   struct Outcome {
     std::vector<AlignmentMove> moves;
     std::uint64_t cost = 0;
+    bool capped = false;  // search hit its bound before reaching the goal
   };
 
   // Optimal alignment of one trace (activity ids; std::nullopt = activity absent
@@ -446,12 +454,14 @@ class Aligner {
 
     Outcome outcome;
     if (goal_key.empty()) {
-      // Search capped out (only possible for pathological models): fall back to
-      // the worst-case alignment so callers still get a well-formed result.
+      // Search capped out (only possible for unsound models): fall back to the
+      // worst-case alignment so callers still get a well-formed result, and flag
+      // that the numbers are not trustworthy.
       for (std::size_t i = 0; i < len; ++i) {
         outcome.moves.push_back({AlignmentMoveType::kLog, names[i]});
       }
       outcome.cost = static_cast<std::uint64_t>(len) + empty_run_cost_;
+      outcome.capped = true;
       return outcome;
     }
 
@@ -484,8 +494,9 @@ class Aligner {
   }
 
   // Cheapest count of visible transitions on any run from the initial to the
-  // final marking, found by the same uniform-cost search with no trace.
-  [[nodiscard]] std::uint64_t shortest_model_run() const {
+  // final marking, found by the same uniform-cost search with no trace, or
+  // std::nullopt when the final marking is unreachable within the search bound.
+  [[nodiscard]] std::optional<std::uint64_t> shortest_model_run() const {
     Marking start(net_.place_count(), 0);
     start[net_.source()] = 1;
     std::priority_queue<std::pair<std::uint64_t, Marking>,
@@ -512,12 +523,13 @@ class Aligner {
         frontier.push({next_cost, std::move(next)});
       }
     }
-    return 0;  // final marking unreachable (degenerate net): no model-move floor
+    return std::nullopt;  // final marking unreachable: the net is not a sound WF-net
   }
 
   const PetriNet& net_;
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   Marking final_;
+  bool reachable_ = false;
   std::uint64_t empty_run_cost_ = 0;
 };
 
@@ -568,17 +580,33 @@ ConformanceResult check_conformance(const EventLog& event_log,
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,
-                                const ProcessTree& tree) {
-  const PetriNet net = to_petri_net(tree);
+                                const PetriNet& net) {
   const Aligner aligner(net);
-  const auto variants = collect_variants(event_log, aligner);
 
   AlignmentResult result;
   result.trace_count = event_log.trace_count();
 
+  if (!aligner.reachable()) {
+    // Not a sound workflow net (e.g. an Alpha net whose sink is unreachable):
+    // report that alignments could not be computed rather than fake numbers.
+    result.computed = false;
+    return result;
+  }
+
+  const auto variants = collect_variants(event_log, aligner);
   std::uint64_t total_worst = 0;
   for (const auto& variant : variants) {
     const auto outcome = aligner.align(variant.ids, variant.names);
+    if (outcome.capped) {
+      // The search could not align a trace within its bound — the net admits
+      // unbounded behavior, so the results are not trustworthy.
+      result.computed = false;
+      result.variants.clear();
+      result.fitting_traces = 0;
+      result.total_cost = 0;
+      result.fitness = 1.0;
+      return result;
+    }
     // Worst case: every event as a log move plus the cheapest complete model
     // run. A perfectly fitting trace has cost 0 and fitness 1.
     const std::uint64_t worst =
@@ -606,6 +634,13 @@ AlignmentResult check_alignment(const EventLog& event_log,
                      return a.count > b.count;
                    });
   return result;
+}
+
+AlignmentResult check_alignment(const EventLog& event_log,
+                                const ProcessTree& tree) {
+  // A process tree always translates to a sound workflow net, so this path
+  // never reports computed == false.
+  return check_alignment(event_log, to_petri_net(tree));
 }
 
 }  // namespace minera
