@@ -84,4 +84,41 @@ PetriNet to_petri_net(const ProcessTree& tree) {
   return net;
 }
 
+PetriNet to_petri_net(const HeuristicsNet& heuristics) {
+  PetriNet net;
+  net.set_activities(heuristics.activities);
+  const std::size_t source = net.add_place();
+  const std::size_t sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+
+  // One "ready" and one "done" place per activity; the visible transition moves
+  // a token from ready to done, i.e. fires the activity exactly once it is
+  // routed in.
+  const std::size_t count = heuristics.activities.size();
+  std::vector<std::size_t> ready(count);
+  std::vector<std::size_t> done(count);
+  for (std::size_t a = 0; a < count; ++a) {
+    ready[a] = net.add_place();
+    done[a] = net.add_place();
+    net.add_transition(a, {ready[a]}, {done[a]});
+  }
+
+  // Start activities are reachable from the source; end activities drain to the
+  // sink. Silent transitions keep the choice free (exactly one fires per token).
+  for (const std::size_t s : heuristics.start_activities) {
+    net.add_transition(std::nullopt, {source}, {ready[s]});
+  }
+  for (const std::size_t e : heuristics.end_activities) {
+    net.add_transition(std::nullopt, {done[e]}, {sink});
+  }
+
+  // Each accepted dependency edge routes a token from the predecessor's done
+  // place to the successor's ready place (self-loops route done back to ready).
+  for (const auto& edge : heuristics.edges) {
+    net.add_transition(std::nullopt, {done[edge.source]}, {ready[edge.target]});
+  }
+  return net;
+}
+
 }  // namespace minera

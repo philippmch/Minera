@@ -323,8 +323,7 @@ void json_export_carries_the_petri_net_contract() {
   const auto graph = minera::discover_directly_follows_graph(log);
   const auto net = minera::discover_petri_net(log);
 
-  const auto json =
-      minera::analysis_json("test", log, graph, nullptr, nullptr, &net);
+  const auto json = minera::analysis_json("test", log, graph, nullptr, &net);
   for (const char* key : {"\"petri_net\"", "\"place_count\"", "\"source\"",
                           "\"sink\"", "\"transitions\"", "\"inputs\"",
                           "\"outputs\""}) {
@@ -332,8 +331,7 @@ void json_export_carries_the_petri_net_contract() {
   }
 
   // The Petri net is omitted when not supplied (older-export compatibility).
-  const auto without =
-      minera::analysis_json("test", log, graph, nullptr, nullptr, nullptr);
+  const auto without = minera::analysis_json("test", log, graph);
   assert(without.find("\"petri_net\"") == std::string::npos);
 }
 
@@ -418,21 +416,31 @@ void precision_is_high_for_a_tight_model_and_low_for_a_flower() {
 }
 
 void json_export_carries_the_conformance_contract() {
-  // The frontend reads these keys by name, so guard them against renames.
+  // The frontend reads these keys by name, so guard them against renames. The
+  // "conformance" object is keyed by miner id, each carrying a token-replay and
+  // an alignment result.
   const auto log = log_from_variants({{"a", "b"}, {"a", "c"}});
   const auto graph = minera::discover_directly_follows_graph(log);
   const auto tree = minera::discover_process_tree(log);
-  const auto conformance = minera::check_conformance(log, tree);
+  const auto net = minera::to_petri_net(tree);
+  const std::vector<minera::ModelConformance> conformance = {
+      {"inductive", minera::check_conformance(log, net),
+       minera::check_alignment(log, net)},
+  };
 
-  const auto json = minera::analysis_json("test", log, graph, &tree, &conformance);
-  for (const char* key : {"\"conformance\"", "\"fitness\"", "\"precision\"",
-                          "\"fitting_traces\"", "\"trace_count\"", "\"missing\"",
-                          "\"remaining\"", "\"variants\""}) {
+  const auto json =
+      minera::analysis_json("test", log, graph, &tree, nullptr, nullptr,
+                            &conformance);
+  for (const char* key : {"\"conformance\"", "\"inductive\"",
+                          "\"token_replay\"", "\"alignments\"", "\"fitness\"",
+                          "\"precision\"", "\"fitting_traces\"",
+                          "\"trace_count\"", "\"missing\"", "\"remaining\"",
+                          "\"computed\"", "\"variants\""}) {
     assert(json.find(key) != std::string::npos);
   }
 
   // Conformance is omitted when not supplied (older-export compatibility).
-  const auto without = minera::analysis_json("test", log, graph, &tree, nullptr);
+  const auto without = minera::analysis_json("test", log, graph, &tree);
   assert(without.find("\"conformance\"") == std::string::npos);
 }
 
@@ -531,28 +539,24 @@ void alignment_diagnoses_an_inserted_activity() {
 }
 
 void json_export_carries_the_alignment_contract() {
-  // The frontend reads these keys by name, so guard them against renames.
-  const auto log = log_from_variants({{"a", "b", "c"}});
-  const auto tree = minera::discover_process_tree(log);
-  const auto graph = minera::discover_directly_follows_graph(log);
+  // A deviating trace makes the per-move alignment keys appear in the JSON, so
+  // guard those against renames too.
+  const auto model_log = log_from_variants({{"a", "b", "c"}});
+  const auto tree = minera::discover_process_tree(model_log);
+  const auto net = minera::to_petri_net(tree);
   const auto deviating = log_from_variants({{"a", "c"}});
-  const auto alignments = minera::check_alignment(deviating, tree);
+  const auto graph = minera::discover_directly_follows_graph(deviating);
+  const std::vector<minera::ModelConformance> conformance = {
+      {"inductive", minera::check_conformance(deviating, net),
+       minera::check_alignment(deviating, net)},
+  };
 
-  const auto alpha_net = minera::discover_petri_net(deviating);
-  const auto alpha_alignments = minera::check_alignment(deviating, alpha_net);
-  const auto json =
-      minera::analysis_json("test", deviating, graph, &tree, nullptr, nullptr,
-                            nullptr, &alignments, &alpha_alignments);
-  for (const char* key : {"\"alignments\"", "\"alpha_alignments\"",
-                          "\"computed\"", "\"total_cost\"", "\"moves\"",
+  const auto json = minera::analysis_json("test", deviating, graph, &tree,
+                                          nullptr, nullptr, &conformance);
+  for (const char* key : {"\"alignments\"", "\"total_cost\"", "\"moves\"",
                           "\"cost\"", "\"type\"", "\"model\"", "\"sync\""}) {
     assert(json.find(key) != std::string::npos);
   }
-
-  // Alignments are omitted when not supplied (older-export compatibility).
-  const auto without = minera::analysis_json("test", deviating, graph, &tree);
-  assert(without.find("\"alignments\"") == std::string::npos);
-  assert(without.find("\"alpha_alignments\"") == std::string::npos);
 }
 
 void alignment_scores_a_sound_alpha_net() {
@@ -595,6 +599,54 @@ void alignment_handles_an_empty_log() {
   assert(alignment.fitting_traces == 0);
   assert(alignment.total_cost == 0);
   assert(alignment.fitness > 0.9999);
+}
+
+void heuristics_net_becomes_a_sound_workflow_net() {
+  // The Heuristic Miner emits a dependency graph; converting it to a workflow
+  // net must always yield a sound, replayable model so both conformance methods
+  // work. A strongly-sequential log (every dependency clears the 0.9 threshold)
+  // converts to a clean chain that the log fits perfectly.
+  const std::vector<std::vector<std::string>> sequence(12,
+                                                       {"a", "b", "c", "d"});
+  const auto log = log_from_variants(sequence);
+  const auto heuristics = minera::discover_heuristics_net(log);
+  const auto net = minera::to_petri_net(heuristics);
+
+  // Source and sink plus a ready/done pair per activity.
+  assert(net.place_count() == 2 + 2 * heuristics.activities.size());
+
+  const auto replay = minera::check_conformance(log, net);
+  assert(replay.fitness > 0.999);
+
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);  // the conversion is always a sound state machine
+  assert(alignment.fitness > 0.999);
+}
+
+void heuristics_net_is_always_sound_even_when_it_drops_edges() {
+  // With a high threshold the Heuristic Miner drops weak dependencies, so the
+  // log no longer fits perfectly — but the converted net must still be sound
+  // (alignment computes a finite cost rather than refusing).
+  const auto log = log_from_variants(
+      {{"a", "b", "d"}, {"a", "c", "d"}, {"a", "b", "d"}});
+  const auto net = minera::to_petri_net(minera::discover_heuristics_net(log));
+
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+  assert(alignment.fitness >= 0.0 && alignment.fitness <= 1.0);
+}
+
+void heuristics_net_handles_a_self_loop() {
+  // A self-loop dependency (a after a) must route done(a) back to ready(a) so
+  // the converted net can replay the repetition rather than deadlock.
+  const std::vector<std::vector<std::string>> looping(
+      12, {"a", "a", "a", "b"});
+  const auto log = log_from_variants(looping);
+  const auto net = minera::to_petri_net(minera::discover_heuristics_net(log));
+
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+  assert(alignment.fitness > 0.999);
 }
 
 template <typename Fn>
@@ -1009,6 +1061,9 @@ int main() {
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
   alignment_handles_an_empty_log();
+  heuristics_net_becomes_a_sound_workflow_net();
+  heuristics_net_is_always_sound_even_when_it_drops_edges();
+  heuristics_net_handles_a_self_loop();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
   dfg_handles_single_event_traces();

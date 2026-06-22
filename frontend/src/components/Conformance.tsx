@@ -1,5 +1,9 @@
 import { Fragment, useState } from "react";
-import { type MineraExport, numberFormat } from "../types";
+import {
+  type Alignments as AlignmentsResult,
+  type MineraExport,
+  numberFormat,
+} from "../types";
 import { CONFORMANCE_METHODS } from "../conformance";
 import { MINER_GROUPS } from "../miners";
 
@@ -35,15 +39,10 @@ export function Conformance({ data }: { data: MineraExport }) {
     setStep("result");
   };
 
-  // The backend mines the inductive-miner model at import and checks it both
-  // ways — token replay (data.conformance) and alignments (data.alignments) —
-  // and also aligns the log against the Alpha net (data.alpha_alignments).
-  // Any other miner/method pair is offered but has no results to render yet.
-  const supported =
-    (miner?.id === "inductive" &&
-      (method?.artifact === "token-replay" ||
-        method?.artifact === "alignments")) ||
-    (miner?.id === "alpha" && method?.artifact === "alignments");
+  // The backend checks every discovered model both ways, keyed by miner id, so
+  // any miner × any method has results — as long as this export carries them.
+  const models = miner ? data.conformance?.[miner.id] : undefined;
+  const supported = Boolean(models && method);
 
   return (
     <div className="miner-flow reveal">
@@ -119,24 +118,26 @@ export function Conformance({ data }: { data: MineraExport }) {
       {step === "result" &&
         miner &&
         method &&
-        (supported ? (
+        (supported && models ? (
           method.artifact === "alignments" ? (
             <Alignments
               data={data}
-              alignments={
-                miner.id === "alpha" ? data.alpha_alignments : data.alignments
-              }
+              alignments={models.alignments}
               minerName={miner.name}
             />
           ) : (
-            <TokenReplay data={data} />
+            <TokenReplay
+              data={data}
+              conformance={models.token_replay}
+              minerName={miner.name}
+            />
           )
         ) : (
           <section className="panel map-panel">
             <div className="model-empty">
-              Conformance for {miner.name} via {method.name} isn't computed yet.
-              The backend currently replays the inductive-miner model with token
-              replay — pick that pair to see results.
+              No conformance results for {miner.name} via {method.name}. This
+              export predates per-model conformance — re-open the event log to
+              check it against every discovered model.
             </div>
           </section>
         ))}
@@ -146,19 +147,15 @@ export function Conformance({ data }: { data: MineraExport }) {
 
 // Token-replay results: quality gauges, the token tally, and per-variant
 // deviation. Rendered when the "token-replay" method is selected.
-function TokenReplay({ data }: { data: MineraExport }) {
-  const conformance = data.conformance;
-  if (!conformance) {
-    return (
-      <section className="panel map-panel">
-        <div className="model-empty">
-          No conformance results. This export predates conformance checking —
-          re-open the CSV event log to replay it against the process model.
-        </div>
-      </section>
-    );
-  }
-
+function TokenReplay({
+  data,
+  conformance,
+  minerName,
+}: {
+  data: MineraExport;
+  conformance: NonNullable<MineraExport["conformance"]>[string]["token_replay"];
+  minerName: string;
+}) {
   const fittingShare =
     conformance.trace_count > 0
       ? conformance.fitting_traces / conformance.trace_count
@@ -201,7 +198,7 @@ function TokenReplay({ data }: { data: MineraExport }) {
         <div className="panel-head">
           <h2>Token replay</h2>
           <span className="panel-meta">
-            inductive-miner process tree as a workflow net
+            {minerName} model as a workflow net
           </span>
         </div>
         <div className="conf-tokens">
@@ -283,7 +280,7 @@ function Alignments({
   minerName,
 }: {
   data: MineraExport;
-  alignments: MineraExport["alignments"];
+  alignments: AlignmentsResult | undefined;
   minerName: string;
 }) {
   if (!alignments) {

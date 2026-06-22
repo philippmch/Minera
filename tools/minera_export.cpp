@@ -158,26 +158,33 @@ int main(int argc, char** argv) {
     }
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
-    const auto conformance = minera::check_conformance(log, tree);
-    const auto alignments = minera::check_alignment(log, tree);
     const auto net = minera::discover_petri_net(log);
-    const auto alpha_alignments = minera::check_alignment(log, net);
     const auto heuristics = minera::discover_heuristics_net(log);
+
+    // Check every discovered model both ways, keyed by miner id.
+    const auto inductive_net = minera::to_petri_net(tree);
+    const auto heuristic_net = minera::to_petri_net(heuristics);
+    const std::vector<minera::ModelConformance> conformance = {
+        {"inductive", minera::check_conformance(log, inductive_net),
+         minera::check_alignment(log, inductive_net)},
+        {"alpha", minera::check_conformance(log, net),
+         minera::check_alignment(log, net)},
+        {"heuristic", minera::check_conformance(log, heuristic_net),
+         minera::check_alignment(log, heuristic_net)},
+    };
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
-      minera::write_analysis_json(std::cout, dataset, log, graph, &tree,
-                                  &conformance, &net, &heuristics, &alignments,
-                                  &alpha_alignments);
+      minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
+                                  &heuristics, &conformance);
     } else {
       std::ofstream file(output);
       if (!file) {
         std::cerr << "error: cannot open output file " << output << '\n';
         return 1;
       }
-      minera::write_analysis_json(file, dataset, log, graph, &tree,
-                                  &conformance, &net, &heuristics, &alignments,
-                                  &alpha_alignments);
+      minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
+                                  &heuristics, &conformance);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

@@ -43,6 +43,12 @@ struct ConformanceResult {
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const ProcessTree& tree);
 
+// Token replay against any workflow net (the Alpha Miner produces one directly;
+// a process tree or heuristics net is translated with to_petri_net). Replay is
+// robust on unsound nets, so unlike alignments it always yields a result.
+[[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
+                                                  const PetriNet& net);
+
 // One move of an optimal alignment between a trace and the model.
 enum class AlignmentMoveType {
   kSynchronous,  // log and model agree on the activity — no deviation (cost 0)
@@ -98,5 +104,14 @@ struct AlignmentResult {
                                               const ProcessTree& tree);
 [[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
                                               const PetriNet& net);
+
+// The conformance of one discovered model, checked every supported way, so the
+// frontend can offer any miner against any method. `miner` is the miner id used
+// by the UI registry ("inductive", "alpha", "heuristic").
+struct ModelConformance {
+  std::string miner;
+  ConformanceResult token_replay;
+  AlignmentResult alignments;
+};
 
 }  // namespace minera
