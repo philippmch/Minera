@@ -105,6 +105,11 @@ export interface VariantAlignment {
 }
 
 export interface Alignments {
+  /**
+   * False when the model is not a sound workflow net (e.g. an Alpha net with an
+   * unreachable sink); the other fields are then meaningless and variants empty.
+   */
+  computed: boolean;
   /** Cost-based fitness in [0, 1]: how cheaply the log aligns to the model. */
   fitness: number;
   fitting_traces: number;
@@ -143,8 +148,10 @@ export interface MineraExport {
   petri_net?: PetriNetModel;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
-  /** Alignment-based conformance; absent in exports from older versions. */
+  /** Alignment-based conformance of the inductive model; absent in older exports. */
   alignments?: Alignments;
+  /** Alignment-based conformance of the Alpha Miner's net; absent in older exports. */
+  alpha_alignments?: Alignments;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

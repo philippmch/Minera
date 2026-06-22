@@ -175,7 +175,8 @@ std::string_view move_type_name(AlignmentMoveType type) {
 void write_alignments(std::ostream& out,
                       const AlignmentResult& alignments,
                       const DirectlyFollowsGraph& graph) {
-  out << "{\"fitness\": " << alignments.fitness
+  out << "{\"computed\": " << (alignments.computed ? "true" : "false")
+      << ", \"fitness\": " << alignments.fitness
       << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
       << ", \"total_cost\": " << alignments.total_cost << ", \"variants\": [";
@@ -211,7 +212,8 @@ void write_analysis_json(std::ostream& out,
                          const ConformanceResult* conformance,
                          const PetriNet* net,
                          const HeuristicsNet* heuristics,
-                         const AlignmentResult* alignments) {
+                         const AlignmentResult* alignments,
+                         const AlignmentResult* alpha_alignments) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -296,6 +298,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"alignments\": ";
     write_alignments(out, *alignments, graph);
   }
+  if (alpha_alignments != nullptr) {
+    out << ",\n  \"alpha_alignments\": ";
+    write_alignments(out, *alpha_alignments, graph);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -307,10 +313,11 @@ std::string analysis_json(std::string_view dataset,
                           const ConformanceResult* conformance,
                           const PetriNet* net,
                           const HeuristicsNet* heuristics,
-                          const AlignmentResult* alignments) {
+                          const AlignmentResult* alignments,
+                          const AlignmentResult* alpha_alignments) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, conformance, net,
-                      heuristics, alignments);
+                      heuristics, alignments, alpha_alignments);
   return out.str();
 }
 

@@ -36,11 +36,14 @@ export function Conformance({ data }: { data: MineraExport }) {
   };
 
   // The backend mines the inductive-miner model at import and checks it both
-  // ways — token replay (data.conformance) and alignments (data.alignments).
+  // ways — token replay (data.conformance) and alignments (data.alignments) —
+  // and also aligns the log against the Alpha net (data.alpha_alignments).
   // Any other miner/method pair is offered but has no results to render yet.
   const supported =
-    miner?.id === "inductive" &&
-    (method?.artifact === "token-replay" || method?.artifact === "alignments");
+    (miner?.id === "inductive" &&
+      (method?.artifact === "token-replay" ||
+        method?.artifact === "alignments")) ||
+    (miner?.id === "alpha" && method?.artifact === "alignments");
 
   return (
     <div className="miner-flow reveal">
@@ -118,7 +121,13 @@ export function Conformance({ data }: { data: MineraExport }) {
         method &&
         (supported ? (
           method.artifact === "alignments" ? (
-            <Alignments data={data} />
+            <Alignments
+              data={data}
+              alignments={
+                miner.id === "alpha" ? data.alpha_alignments : data.alignments
+              }
+              minerName={miner.name}
+            />
           ) : (
             <TokenReplay data={data} />
           )
@@ -268,14 +277,37 @@ function TokenReplay({ data }: { data: MineraExport }) {
 // Alignment results: cost-based gauges and, per deviating variant, the optimal
 // alignment rendered move by move so a log-only insertion or a model-only skip
 // is visible at a glance. Rendered when the "alignments" method is selected.
-function Alignments({ data }: { data: MineraExport }) {
-  const alignments = data.alignments;
+function Alignments({
+  data,
+  alignments,
+  minerName,
+}: {
+  data: MineraExport;
+  alignments: MineraExport["alignments"];
+  minerName: string;
+}) {
   if (!alignments) {
     return (
       <section className="panel map-panel">
         <div className="model-empty">
           No alignment results. This export predates alignment checking — re-open
           the event log to align it against the process model.
+        </div>
+      </section>
+    );
+  }
+
+  // An Alpha (or Heuristic) model need not be a sound workflow net; when its
+  // final marking is unreachable the backend cannot align against it, so there
+  // are no trustworthy numbers to show.
+  if (!alignments.computed) {
+    return (
+      <section className="panel map-panel">
+        <div className="model-empty">
+          The {minerName} model isn't a sound workflow net — its end state can't
+          be reached without leftover or duplicated tokens — so optimal
+          alignments can't be computed for it. Try the Inductive Miner, whose
+          model is always sound.
         </div>
       </section>
     );

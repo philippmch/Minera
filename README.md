@@ -99,7 +99,10 @@ events first; discovery lives in tabs:
 - **Conformance** — fitness and precision of the log against the discovered
   model, plus a per-variant breakdown of where traces deviate; pick **Token
   Replay** for token counts or **Alignments** to see each deviating trace
-  rendered move by move (synchronous, log-only, model-only).
+  rendered move by move (synchronous, log-only, model-only). Alignments run
+  against the Inductive Miner's (always sound) model and the Alpha Miner's net;
+  when an Alpha net isn't a sound workflow net the view says so rather than
+  showing misleading numbers.
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency) or a subset of activities;
