@@ -444,6 +444,122 @@ void conformance_handles_an_empty_log() {
   assert(conformance.fitting_traces == 0);
 }
 
+// Counts alignment moves of a given type in a variant.
+std::size_t count_moves(const minera::VariantAlignment& variant,
+                        minera::AlignmentMoveType type) {
+  return static_cast<std::size_t>(std::count_if(
+      variant.moves.begin(), variant.moves.end(),
+      [&](const minera::AlignmentMove& move) { return move.type == type; }));
+}
+
+void alignment_is_perfect_for_every_operator() {
+  // The inductive miner yields a perfectly fitting model, so every trace must
+  // align at cost 0 — only synchronous (and dropped silent) moves. This walks
+  // the AND-join and loop-redo routing the same way the token-replay test does.
+  const std::vector<std::vector<std::vector<std::string>>> logs = {
+      {{"a", "b", "c"}},                                    // sequence
+      {{"a", "b", "d"}, {"a", "c", "d"}},                   // exclusive choice
+      {{"a", "b", "c", "d"}, {"a", "c", "b", "d"}},         // parallel
+      {{"a"}, {"a", "b", "a"}, {"a", "b", "a", "b", "a"}},  // loop
+      {{}, {"a"}, {"a", "a"}},                              // optional + self loop
+      {{"a", "b"}, {"b", "c"}, {"c", "a"}},                 // flower fallback
+  };
+  for (const auto& variants : logs) {
+    const auto log = log_from_variants(variants);
+    const auto tree = minera::discover_process_tree(log);
+    const auto alignment = minera::check_alignment(log, tree);
+    assert(alignment.fitness > 0.9999);
+    assert(alignment.total_cost == 0);
+    assert(alignment.fitting_traces == alignment.trace_count);
+    for (const auto& variant : alignment.variants) {
+      assert(variant.cost == 0);
+      assert(count_moves(variant, minera::AlignmentMoveType::kLog) == 0);
+      assert(count_moves(variant, minera::AlignmentMoveType::kModel) == 0);
+      // Every observed event is explained by a synchronous move.
+      assert(count_moves(variant, minera::AlignmentMoveType::kSynchronous) ==
+             variant.activities.size());
+    }
+  }
+}
+
+void alignment_diagnoses_a_skipped_activity() {
+  // Model is a strict a -> b -> c sequence; the trace skips b. The optimal
+  // alignment keeps a and c synchronous and inserts a model move for b.
+  const auto model_log = log_from_variants({{"a", "b", "c"}});
+  const auto tree = minera::discover_process_tree(model_log);
+
+  const auto deviating = log_from_variants({{"a", "c"}});
+  const auto alignment = minera::check_alignment(deviating, tree);
+
+  assert(alignment.fitting_traces == 0);
+  assert(alignment.fitness < 1.0);
+  assert(!alignment.variants.empty());
+  const auto& variant = alignment.variants.front();
+  assert(variant.cost == 1);  // one visible model move for the skipped b
+  assert(count_moves(variant, minera::AlignmentMoveType::kModel) == 1);
+  assert(count_moves(variant, minera::AlignmentMoveType::kSynchronous) == 2);
+  // The model move names the activity the trace skipped.
+  const auto model_move = std::find_if(
+      variant.moves.begin(), variant.moves.end(),
+      [](const minera::AlignmentMove& m) {
+        return m.type == minera::AlignmentMoveType::kModel;
+      });
+  assert(model_move != variant.moves.end() && model_move->activity == "b");
+}
+
+void alignment_diagnoses_an_inserted_activity() {
+  // The model knows only a -> b; the trace inserts an unmodeled z, which can
+  // only be explained by a log move.
+  const auto model_log = log_from_variants({{"a", "b"}});
+  const auto tree = minera::discover_process_tree(model_log);
+
+  const auto foreign = log_from_variants({{"a", "z", "b"}});
+  const auto alignment = minera::check_alignment(foreign, tree);
+
+  assert(alignment.fitting_traces == 0);
+  assert(!alignment.variants.empty());
+  const auto& variant = alignment.variants.front();
+  assert(variant.cost == 1);  // one log move for the inserted z
+  assert(count_moves(variant, minera::AlignmentMoveType::kLog) == 1);
+  assert(count_moves(variant, minera::AlignmentMoveType::kSynchronous) == 2);
+  const auto log_move = std::find_if(
+      variant.moves.begin(), variant.moves.end(),
+      [](const minera::AlignmentMove& m) {
+        return m.type == minera::AlignmentMoveType::kLog;
+      });
+  assert(log_move != variant.moves.end() && log_move->activity == "z");
+}
+
+void json_export_carries_the_alignment_contract() {
+  // The frontend reads these keys by name, so guard them against renames.
+  const auto log = log_from_variants({{"a", "b", "c"}});
+  const auto tree = minera::discover_process_tree(log);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto deviating = log_from_variants({{"a", "c"}});
+  const auto alignments = minera::check_alignment(deviating, tree);
+
+  const auto json = minera::analysis_json("test", deviating, graph, &tree,
+                                          nullptr, nullptr, nullptr, &alignments);
+  for (const char* key : {"\"alignments\"", "\"total_cost\"", "\"moves\"",
+                          "\"cost\"", "\"type\"", "\"model\"", "\"sync\""}) {
+    assert(json.find(key) != std::string::npos);
+  }
+
+  // Alignments are omitted when not supplied (older-export compatibility).
+  const auto without = minera::analysis_json("test", deviating, graph, &tree);
+  assert(without.find("\"alignments\"") == std::string::npos);
+}
+
+void alignment_handles_an_empty_log() {
+  const minera::EventLog empty;
+  const auto tree = minera::discover_process_tree(empty);
+  const auto alignment = minera::check_alignment(empty, tree);
+  assert(alignment.trace_count == 0);
+  assert(alignment.fitting_traces == 0);
+  assert(alignment.total_cost == 0);
+  assert(alignment.fitness > 0.9999);
+}
+
 template <typename Fn>
 bool throws(Fn&& fn) {
   try {
@@ -849,6 +965,11 @@ int main() {
   precision_is_high_for_a_tight_model_and_low_for_a_flower();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
+  alignment_is_perfect_for_every_operator();
+  alignment_diagnoses_a_skipped_activity();
+  alignment_diagnoses_an_inserted_activity();
+  json_export_carries_the_alignment_contract();
+  alignment_handles_an_empty_log();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
   dfg_handles_single_event_traces();

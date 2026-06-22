@@ -155,11 +155,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log);
     const auto conformance = minera::check_conformance(log, tree);
+    const auto alignments = minera::check_alignment(log, tree);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
     response.set_content(
         minera::analysis_json(dataset, log, graph, &tree, &conformance, &net,
-                              &heuristics),
+                              &heuristics, &alignments),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

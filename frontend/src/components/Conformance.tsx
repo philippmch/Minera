@@ -35,11 +35,12 @@ export function Conformance({ data }: { data: MineraExport }) {
     setStep("result");
   };
 
-  // The backend mines the inductive-miner model at import and replays it with
-  // token replay; that single combination is what data.conformance carries.
+  // The backend mines the inductive-miner model at import and checks it both
+  // ways — token replay (data.conformance) and alignments (data.alignments).
   // Any other miner/method pair is offered but has no results to render yet.
   const supported =
-    miner?.id === "inductive" && method?.artifact === "token-replay";
+    miner?.id === "inductive" &&
+    (method?.artifact === "token-replay" || method?.artifact === "alignments");
 
   return (
     <div className="miner-flow reveal">
@@ -116,7 +117,11 @@ export function Conformance({ data }: { data: MineraExport }) {
         miner &&
         method &&
         (supported ? (
-          <TokenReplay data={data} />
+          method.artifact === "alignments" ? (
+            <Alignments data={data} />
+          ) : (
+            <TokenReplay data={data} />
+          )
         ) : (
           <section className="panel map-panel">
             <div className="model-empty">
@@ -247,6 +252,123 @@ function TokenReplay({ data }: { data: MineraExport }) {
                             {name}
                           </span>
                         </Fragment>
+                      );
+                    })}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// Alignment results: cost-based gauges and, per deviating variant, the optimal
+// alignment rendered move by move so a log-only insertion or a model-only skip
+// is visible at a glance. Rendered when the "alignments" method is selected.
+function Alignments({ data }: { data: MineraExport }) {
+  const alignments = data.alignments;
+  if (!alignments) {
+    return (
+      <section className="panel map-panel">
+        <div className="model-empty">
+          No alignment results. This export predates alignment checking — re-open
+          the event log to align it against the process model.
+        </div>
+      </section>
+    );
+  }
+
+  const fittingShare =
+    alignments.trace_count > 0
+      ? alignments.fitting_traces / alignments.trace_count
+      : 1;
+  const deviating = alignments.variants.filter((v) => v.cost > 0);
+
+  const metrics: { label: string; value: number; hint: string }[] = [
+    {
+      label: "Fitness",
+      value: alignments.fitness,
+      hint: "Cost-based: how cheaply the log aligns to the model (1 = no deviation).",
+    },
+    {
+      label: "Fitting traces",
+      value: fittingShare,
+      hint: `${numberFormat.format(alignments.fitting_traces)} of ${numberFormat.format(
+        alignments.trace_count,
+      )} cases align with zero cost.`,
+    },
+  ];
+
+  return (
+    <div className="conformance reveal">
+      <section className="conf-metrics">
+        {metrics.map((metric) => (
+          <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
+            <div className="conf-gauge-value">{percent(metric.value)}</div>
+            <div className="conf-gauge-label">{metric.label}</div>
+            <p className="conf-gauge-hint">{metric.hint}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="panel conf-panel">
+        <div className="panel-head">
+          <h2>Optimal alignments</h2>
+          <span className="panel-meta">
+            {deviating.length > 0
+              ? `${numberFormat.format(deviating.length)} deviating · total cost ${numberFormat.format(
+                  alignments.total_cost,
+                )}`
+              : "every variant aligns perfectly"}
+          </span>
+        </div>
+
+        <div className="align-legend">
+          <span className="align-move sync">A</span> sync — log &amp; model agree
+          <span className="align-move log">A</span> log only — inserted
+          <span className="align-move model">A</span> model only — skipped
+        </div>
+
+        {deviating.length === 0 ? (
+          <p className="conf-allfit">
+            Every distinct path walks the model with only synchronous moves — no
+            log-only or model-only deviations.
+          </p>
+        ) : (
+          <ol className="variant-list">
+            {deviating.map((variant, index) => {
+              const share =
+                alignments.trace_count > 0
+                  ? variant.count / alignments.trace_count
+                  : 0;
+              return (
+                <li className="variant" key={index}>
+                  <div className="variant-top">
+                    <span className={`conf-pill ${grade(variant.fitness)}`}>
+                      {percent(variant.fitness)}
+                    </span>
+                    <span className="variant-count">
+                      {numberFormat.format(variant.count)}{" "}
+                      <small>
+                        {(share * 100).toFixed(1)}% · cost{" "}
+                        {numberFormat.format(variant.cost)}
+                      </small>
+                    </span>
+                  </div>
+                  <div className="align-moves">
+                    {variant.moves.map((move, i) => {
+                      const name = data.activities[move.activity]?.name ?? "?";
+                      return (
+                        <span
+                          key={i}
+                          className={`align-move ${move.type}`}
+                          title={`${move.type}: ${name}`}
+                        >
+                          {name}
+                        </span>
                       );
                     })}
                   </div>
