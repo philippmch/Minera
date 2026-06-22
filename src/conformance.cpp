@@ -248,15 +248,18 @@ struct Variant {
   std::uint64_t count = 0;
 };
 
+// `resolver.activity_id(name)` maps an activity name to its model id (or
+// std::nullopt when absent), so this works for any net wrapper.
+template <typename Resolver>
 std::vector<Variant> collect_variants(const EventLog& log,
-                                      const Replayer& replayer) {
+                                      const Resolver& resolver) {
   std::vector<Variant> variants;
   std::unordered_map<std::string, std::size_t> index;
   for (const auto& trace : log.traces) {
     std::string key;
     Variant variant;
     for (const auto& event : trace.events) {
-      variant.ids.push_back(replayer.activity_id(event.activity));
+      variant.ids.push_back(resolver.activity_id(event.activity));
       variant.names.push_back(event.activity);
       key.push_back('\x1f');
       key += event.activity;
@@ -309,6 +312,215 @@ double compute_precision(const std::vector<Variant>& variants,
                             : 1.0 - double(escaping_total) / double(enabled_total);
 }
 
+// Bounds the alignment search so a pathological model can never run forever; the
+// bounded, block-structured nets the inductive miner produces reach the final
+// marking well within this many state expansions.
+constexpr std::size_t kAlignSearchCap = 200000;
+
+// Computes optimal alignments by a uniform-cost (Dijkstra) search over the
+// synchronous product of the trace and the workflow net. A search state is a
+// (marking, trace-position) pair; the goal is the final marking with the whole
+// trace consumed. Edge costs follow the standard alignment cost function:
+// synchronous and silent moves are free, log-only and visible model-only moves
+// cost one each.
+class Aligner {
+ public:
+  explicit Aligner(const PetriNet& net) : net_(net) {
+    for (std::size_t i = 0; i < net_.activities().size(); ++i) {
+      name_to_activity_.emplace(net_.activities()[i], i);
+    }
+    final_ = Marking(net_.place_count(), 0);
+    final_[net_.sink()] = 1;
+    empty_run_cost_ = shortest_model_run();
+  }
+
+  [[nodiscard]] std::optional<std::size_t> activity_id(
+      const std::string& name) const {
+    const auto it = name_to_activity_.find(name);
+    return it == name_to_activity_.end() ? std::nullopt
+                                         : std::optional<std::size_t>(it->second);
+  }
+
+  // The fewest visible activities any complete model run fires — the model-move
+  // half of the worst-case alignment cost used to normalize fitness.
+  [[nodiscard]] std::uint64_t empty_run_cost() const { return empty_run_cost_; }
+
+  struct Outcome {
+    std::vector<AlignmentMove> moves;
+    std::uint64_t cost = 0;
+  };
+
+  // Optimal alignment of one trace (activity ids; std::nullopt = activity absent
+  // from the model) carrying the matching activity names for display.
+  [[nodiscard]] Outcome align(
+      const std::vector<std::optional<std::size_t>>& ids,
+      const std::vector<std::string>& names) const {
+    const std::size_t len = ids.size();
+    Marking start(net_.place_count(), 0);
+    start[net_.source()] = 1;
+
+    // How a state was reached, for path reconstruction. A silent step carries no
+    // visible move; its `name` is empty and it is dropped from the alignment.
+    struct Recorded {
+      std::string prev;
+      AlignmentMoveType type = AlignmentMoveType::kModel;
+      std::string name;
+      bool silent = false;
+    };
+
+    struct Node {
+      std::uint64_t cost;
+      std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
+      Marking marking;
+      std::size_t pos;
+      bool operator>(const Node& other) const {
+        return cost != other.cost ? cost > other.cost : seq > other.seq;
+      }
+    };
+
+    std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
+    std::unordered_map<std::string, std::uint64_t> best;
+    std::unordered_map<std::string, Recorded> came;
+    std::uint64_t seq = 0;
+
+    const auto key_of = [](const Marking& m, std::size_t pos) {
+      return encode(m) + '#' + std::to_string(pos);
+    };
+    const std::string start_key = key_of(start, 0);
+    best[start_key] = 0;
+    frontier.push({0, seq++, start, 0});
+
+    const auto relax = [&](const Marking& m, std::size_t pos,
+                           std::uint64_t cost, const std::string& prev,
+                           AlignmentMoveType type, std::string name,
+                           bool silent) {
+      const std::string key = key_of(m, pos);
+      const auto it = best.find(key);
+      if (it != best.end() && it->second <= cost) return;
+      best[key] = cost;
+      came[key] = Recorded{prev, type, std::move(name), silent};
+      frontier.push({cost, seq++, m, pos});
+    };
+
+    std::string goal_key;
+    std::size_t expanded = 0;
+    while (!frontier.empty() && expanded < kAlignSearchCap) {
+      Node node = std::move(const_cast<Node&>(frontier.top()));
+      frontier.pop();
+      const std::string key = key_of(node.marking, node.pos);
+      const auto it = best.find(key);
+      if (it != best.end() && node.cost > it->second) continue;  // stale entry
+      ++expanded;
+
+      if (node.pos == len && node.marking == final_) {
+        goal_key = key;
+        break;
+      }
+
+      // Log move: the trace advances while the model stands still.
+      if (node.pos < len) {
+        relax(node.marking, node.pos + 1, node.cost + 1, key,
+              AlignmentMoveType::kLog, names[node.pos], false);
+      }
+
+      // Model moves (and the synchronous move when the labels agree).
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        if (!enabled(node.marking, t)) continue;
+        const auto& transition = net_.transitions()[t];
+        Marking next = fire(node.marking, t);
+        if (transition.silent()) {
+          relax(next, node.pos, node.cost, key, AlignmentMoveType::kModel,
+                std::string{}, true);
+          continue;
+        }
+        const std::string& name = net_.activities()[*transition.activity];
+        relax(next, node.pos, node.cost + 1, key, AlignmentMoveType::kModel,
+              name, false);
+        if (node.pos < len && ids[node.pos] &&
+            *ids[node.pos] == *transition.activity) {
+          relax(next, node.pos + 1, node.cost, key,
+                AlignmentMoveType::kSynchronous, name, false);
+        }
+      }
+    }
+
+    Outcome outcome;
+    if (goal_key.empty()) {
+      // Search capped out (only possible for pathological models): fall back to
+      // the worst-case alignment so callers still get a well-formed result.
+      for (std::size_t i = 0; i < len; ++i) {
+        outcome.moves.push_back({AlignmentMoveType::kLog, names[i]});
+      }
+      outcome.cost = static_cast<std::uint64_t>(len) + empty_run_cost_;
+      return outcome;
+    }
+
+    outcome.cost = best[goal_key];
+    for (std::string key = goal_key; key != start_key;) {
+      const Recorded& rec = came[key];
+      if (!rec.silent) {
+        outcome.moves.push_back({rec.type, rec.name});
+      }
+      key = rec.prev;
+    }
+    std::reverse(outcome.moves.begin(), outcome.moves.end());
+    return outcome;
+  }
+
+ private:
+  [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
+    for (const std::size_t place : net_.transitions()[t].inputs) {
+      if (marking[place] <= 0) return false;
+    }
+    return true;
+  }
+
+  [[nodiscard]] Marking fire(const Marking& marking, std::size_t t) const {
+    Marking next = marking;
+    const auto& transition = net_.transitions()[t];
+    for (const std::size_t place : transition.inputs) --next[place];
+    for (const std::size_t place : transition.outputs) ++next[place];
+    return next;
+  }
+
+  // Cheapest count of visible transitions on any run from the initial to the
+  // final marking, found by the same uniform-cost search with no trace.
+  [[nodiscard]] std::uint64_t shortest_model_run() const {
+    Marking start(net_.place_count(), 0);
+    start[net_.source()] = 1;
+    std::priority_queue<std::pair<std::uint64_t, Marking>,
+                        std::vector<std::pair<std::uint64_t, Marking>>,
+                        std::greater<>>
+        frontier;
+    std::unordered_map<std::string, std::uint64_t> best{{encode(start), 0}};
+    frontier.push({0, start});
+    std::size_t expanded = 0;
+    while (!frontier.empty() && expanded++ < kAlignSearchCap) {
+      auto [cost, marking] = std::move(frontier.top());
+      frontier.pop();
+      const auto it = best.find(encode(marking));
+      if (it != best.end() && cost > it->second) continue;
+      if (marking == final_) return cost;
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        if (!enabled(marking, t)) continue;
+        Marking next = fire(marking, t);
+        const std::uint64_t next_cost =
+            cost + (net_.transitions()[t].silent() ? 0 : 1);
+        const auto found = best.find(encode(next));
+        if (found != best.end() && found->second <= next_cost) continue;
+        best[encode(next)] = next_cost;
+        frontier.push({next_cost, std::move(next)});
+      }
+    }
+    return 0;  // final marking unreachable (degenerate net): no model-move floor
+  }
+
+  const PetriNet& net_;
+  std::unordered_map<std::string, std::size_t> name_to_activity_;
+  Marking final_;
+  std::uint64_t empty_run_cost_ = 0;
+};
+
 }  // namespace
 
 ConformanceResult check_conformance(const EventLog& event_log,
@@ -349,6 +561,47 @@ ConformanceResult check_conformance(const EventLog& event_log,
   // most impactful deviations lead.
   std::stable_sort(result.variants.begin(), result.variants.end(),
                    [](const VariantConformance& a, const VariantConformance& b) {
+                     if (a.fitness != b.fitness) return a.fitness < b.fitness;
+                     return a.count > b.count;
+                   });
+  return result;
+}
+
+AlignmentResult check_alignment(const EventLog& event_log,
+                                const ProcessTree& tree) {
+  const PetriNet net = to_petri_net(tree);
+  const Aligner aligner(net);
+  const auto variants = collect_variants(event_log, aligner);
+
+  AlignmentResult result;
+  result.trace_count = event_log.trace_count();
+
+  std::uint64_t total_worst = 0;
+  for (const auto& variant : variants) {
+    const auto outcome = aligner.align(variant.ids, variant.names);
+    // Worst case: every event as a log move plus the cheapest complete model
+    // run. A perfectly fitting trace has cost 0 and fitness 1.
+    const std::uint64_t worst =
+        static_cast<std::uint64_t>(variant.names.size()) +
+        aligner.empty_run_cost();
+    const double fitness =
+        worst == 0 ? 1.0 : 1.0 - double(outcome.cost) / double(worst);
+
+    result.total_cost += outcome.cost * variant.count;
+    total_worst += worst * variant.count;
+    if (outcome.cost == 0) result.fitting_traces += variant.count;
+
+    result.variants.push_back(VariantAlignment{
+        variant.names, variant.count, outcome.moves, outcome.cost, fitness});
+  }
+
+  result.fitness =
+      total_worst == 0 ? 1.0 : 1.0 - double(result.total_cost) / double(total_worst);
+
+  // Surface the costliest variants first; break ties by frequency so the most
+  // impactful deviations lead.
+  std::stable_sort(result.variants.begin(), result.variants.end(),
+                   [](const VariantAlignment& a, const VariantAlignment& b) {
                      if (a.fitness != b.fitness) return a.fitness < b.fitness;
                      return a.count > b.count;
                    });

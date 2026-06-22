@@ -84,6 +84,37 @@ export interface Conformance {
   variants: VariantConformance[];
 }
 
+/** One move of an optimal alignment between a trace and the model. */
+export type AlignmentMoveType = "sync" | "log" | "model";
+
+export interface AlignmentMove {
+  type: AlignmentMoveType;
+  /** Activity id of the move; indexes into activities. */
+  activity: number;
+}
+
+export interface VariantAlignment {
+  activities: number[];
+  count: number;
+  /** Optimal alignment, in execution order. */
+  moves: AlignmentMove[];
+  /** Total cost: one per log-only or visible model-only move. */
+  cost: number;
+  /** 1 - cost / worst-case cost, in [0, 1]. */
+  fitness: number;
+}
+
+export interface Alignments {
+  /** Cost-based fitness in [0, 1]: how cheaply the log aligns to the model. */
+  fitness: number;
+  fitting_traces: number;
+  trace_count: number;
+  /** Summed optimal alignment cost over all traces. */
+  total_cost: number;
+  /** Variants worst-fitting first. */
+  variants: VariantAlignment[];
+}
+
 export interface TraceEvent {
   activity: number;
   timestamp: string;
@@ -112,6 +143,8 @@ export interface MineraExport {
   petri_net?: PetriNetModel;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
+  /** Alignment-based conformance; absent in exports from older versions. */
+  alignments?: Alignments;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

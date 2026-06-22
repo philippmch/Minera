@@ -42,4 +42,48 @@ struct ConformanceResult {
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const ProcessTree& tree);
 
+// One move of an optimal alignment between a trace and the model.
+enum class AlignmentMoveType {
+  kSynchronous,  // log and model agree on the activity — no deviation (cost 0)
+  kLog,          // the log event has no matching model step here (cost 1)
+  kModel,        // the model must fire a visible transition the log skips (cost 1)
+};
+
+// A single step of an alignment. Silent (tau) model moves are routing only and
+// are never emitted, so every move carries a non-empty activity name.
+struct AlignmentMove {
+  AlignmentMoveType type;
+  std::string activity;  // the activity name involved in the move
+};
+
+// The optimal (least-cost) alignment of one trace variant against the model.
+struct VariantAlignment {
+  std::vector<std::string> activities;  // activity names, in trace order
+  std::uint64_t count = 0;              // traces collapsing to this variant
+  std::vector<AlignmentMove> moves;     // the alignment, in execution order
+  std::uint64_t cost = 0;               // total cost (log + visible model moves)
+  double fitness = 1.0;                 // 1 - cost / worst-case cost, in [0, 1]
+};
+
+// Alignment-based conformance of an event log against a discovered process
+// tree. Unlike token replay, an alignment finds for each trace the cheapest
+// sequence of synchronous, log-only, and model-only moves that walks the model
+// from its initial to its final marking — giving an exact, optimal account of
+// where and how each trace deviates.
+struct AlignmentResult {
+  double fitness = 1.0;               // cost-based log fitness in [0, 1]
+  std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
+  std::uint64_t trace_count = 0;
+  std::uint64_t total_cost = 0;      // summed optimal cost over all traces
+  std::vector<VariantAlignment> variants;  // worst-fitting first
+};
+
+// Computes optimal alignments of every trace variant against `tree` (translated
+// to a workflow net) using a uniform-cost search over the synchronous product,
+// and reports cost-based fitness overall and per variant. The standard cost
+// function charges 1 for a log-only or visible model-only move and 0 for a
+// synchronous or silent move (Adriansyah, van der Aalst & van Dongen).
+[[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
+                                              const ProcessTree& tree);
+
 }  // namespace minera

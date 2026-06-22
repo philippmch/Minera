@@ -1071,6 +1071,57 @@ input[type="range"]::-moz-range-thumb {
   font-size: 9px;
 }
 
+/* ---- alignment moves ---- */
+
+.align-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-45);
+  margin-bottom: 14px;
+}
+.align-legend .align-move { margin-left: 4px; }
+.align-legend .align-move:first-child { margin-left: 0; }
+
+.align-moves {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.7;
+}
+
+.align-move {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+  max-width: 17ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+/* sync: log and model agree — quiet. */
+.align-move.sync {
+  background: rgba(32, 29, 24, 0.055);
+  color: var(--ink-70);
+}
+/* log only: the trace inserted an event the model has no step for. */
+.align-move.log {
+  background: var(--poor-soft);
+  color: var(--poor);
+  border-color: rgba(162, 59, 42, 0.28);
+}
+/* model only: the model must fire a step the trace skipped. */
+.align-move.model {
+  background: var(--copper-soft);
+  color: var(--copper-deep);
+  border-color: rgba(179, 83, 36, 0.28);
+  border-style: dashed;
+}
+
 /* ---- activities table ---- */
 
 .activity-table {

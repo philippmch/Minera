@@ -163,6 +163,44 @@ void write_conformance(std::ostream& out,
   out << "]}";
 }
 
+std::string_view move_type_name(AlignmentMoveType type) {
+  switch (type) {
+    case AlignmentMoveType::kSynchronous: return "sync";
+    case AlignmentMoveType::kLog: return "log";
+    case AlignmentMoveType::kModel: return "model";
+  }
+  return "sync";
+}
+
+void write_alignments(std::ostream& out,
+                      const AlignmentResult& alignments,
+                      const DirectlyFollowsGraph& graph) {
+  out << "{\"fitness\": " << alignments.fitness
+      << ", \"fitting_traces\": " << alignments.fitting_traces
+      << ", \"trace_count\": " << alignments.trace_count
+      << ", \"total_cost\": " << alignments.total_cost << ", \"variants\": [";
+  const auto& variants = alignments.variants;
+  for (std::size_t i = 0; i < variants.size(); ++i) {
+    const auto& variant = variants[i];
+    out << "{\"activities\": [";
+    for (std::size_t j = 0; j < variant.activities.size(); ++j) {
+      const auto id = graph.activity_id(variant.activities[j]);
+      out << (id ? *id : 0) << (j + 1 < variant.activities.size() ? ", " : "");
+    }
+    out << "], \"count\": " << variant.count << ", \"cost\": " << variant.cost
+        << ", \"fitness\": " << variant.fitness << ", \"moves\": [";
+    for (std::size_t j = 0; j < variant.moves.size(); ++j) {
+      const auto& move = variant.moves[j];
+      const auto id = graph.activity_id(move.activity);
+      out << "{\"type\": \"" << move_type_name(move.type)
+          << "\", \"activity\": " << (id ? *id : 0) << '}'
+          << (j + 1 < variant.moves.size() ? ", " : "");
+    }
+    out << "]}" << (i + 1 < variants.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -172,7 +210,8 @@ void write_analysis_json(std::ostream& out,
                          const ProcessTree* tree,
                          const ConformanceResult* conformance,
                          const PetriNet* net,
-                         const HeuristicsNet* heuristics) {
+                         const HeuristicsNet* heuristics,
+                         const AlignmentResult* alignments) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -253,6 +292,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
   }
+  if (alignments != nullptr) {
+    out << ",\n  \"alignments\": ";
+    write_alignments(out, *alignments, graph);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -263,10 +306,11 @@ std::string analysis_json(std::string_view dataset,
                           const ProcessTree* tree,
                           const ConformanceResult* conformance,
                           const PetriNet* net,
-                          const HeuristicsNet* heuristics) {
+                          const HeuristicsNet* heuristics,
+                          const AlignmentResult* alignments) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, conformance, net,
-                      heuristics);
+                      heuristics, alignments);
   return out.str();
 }
 

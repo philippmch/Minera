@@ -25,7 +25,11 @@ workflows with native performance.
   is translated to a workflow net, then token-based replay measures **fitness**
   (how much of the log the model reproduces) and escaping edges measure
   **precision** (how little extra behavior the model allows), per variant and
-  in aggregate.
+  in aggregate. As an alternative, **alignment-based conformance** finds, per
+  trace, the cheapest sequence of synchronous, log-only, and model-only moves
+  that walks the net from start to end (a uniform-cost search over the
+  synchronous product) — giving exact, optimal diagnostics of *where* and *how*
+  each trace deviates, plus cost-based fitness.
 - Log preprocessing: filter an event log by activity projection, trace length,
   start/end activities, and variant frequency (minimum count or top-N) before
   discovery.
@@ -93,7 +97,9 @@ events first; discovery lives in tabs:
   graph) and explore the resulting model; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser,
 - **Conformance** — fitness and precision of the log against the discovered
-  model, plus a per-variant breakdown of where traces deviate.
+  model, plus a per-variant breakdown of where traces deviate; pick **Token
+  Replay** for token counts or **Alignments** to see each deviating trace
+  rendered move by move (synchronous, log-only, model-only).
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency) or a subset of activities;
