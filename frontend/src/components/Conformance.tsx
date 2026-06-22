@@ -299,12 +299,23 @@ function Alignments({
   // are no trustworthy numbers to show.
   if (!alignments.computed) {
     return (
-      <section className="panel map-panel">
-        <div className="model-empty">
-          The {minerName} model isn't a sound workflow net — its end state can't
-          be reached without leftover or duplicated tokens — so optimal
-          alignments can't be computed for it. Try the Inductive Miner, whose
-          model is always sound.
+      <section className="panel conf-panel">
+        <div className="conf-notice">
+          <span className="conf-notice-mark">⚠</span>
+          <div>
+            <h3>Alignments unavailable for the {minerName} model</h3>
+            <p>
+              The {minerName} model isn't a <strong>sound workflow net</strong>:
+              its end state can't be reached without leftover or duplicated
+              tokens. (The Alpha Miner produces this when concurrent activities
+              are the process's start or end points.) Optimal alignments require
+              a sound net, so there are no trustworthy numbers to show.
+            </p>
+            <p>
+              <strong>Token Replay</strong> still works on this model, and the{" "}
+              <strong>Inductive Miner</strong>'s model is always sound.
+            </p>
+          </div>
         </div>
       </section>
     );

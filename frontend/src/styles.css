@@ -1310,6 +1310,34 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 700;
 }
 
+/* Shown when a model isn't a sound workflow net and so can't be aligned. */
+.conf-notice {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-left: 3px solid var(--fair);
+  background: var(--fair-soft);
+}
+.conf-notice-mark {
+  font-size: 18px;
+  color: var(--fair);
+  line-height: 1.3;
+}
+.conf-notice h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.conf-notice p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-70);
+  max-width: 66ch;
+}
+.conf-notice p:last-child { margin-bottom: 0; }
+
 .conf-pill {
   font-family: var(--font-mono);
   font-size: 12px;
