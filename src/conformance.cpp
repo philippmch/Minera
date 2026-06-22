@@ -585,11 +585,17 @@ ConformanceResult check_conformance(const EventLog& event_log,
 
 AlignmentResult check_alignment(const EventLog& event_log,
                                 const PetriNet& net) {
-  const Aligner aligner(net);
-
   AlignmentResult result;
   result.trace_count = event_log.trace_count();
 
+  // No traces: there is nothing to align, so the result is trivially perfect.
+  // Guard this before the soundness check so an empty log against an Alpha or
+  // heuristic net (whose sink is unreachable) is not misreported as unsound.
+  if (result.trace_count == 0) {
+    return result;
+  }
+
+  const Aligner aligner(net);
   if (!aligner.reachable()) {
     // Not a sound workflow net (e.g. an Alpha net whose sink is unreachable):
     // report that alignments could not be computed rather than fake numbers.

@@ -601,6 +601,22 @@ void alignment_handles_an_empty_log() {
   assert(alignment.fitness > 0.9999);
 }
 
+void alignment_treats_an_empty_log_as_perfect_for_every_model() {
+  // With no traces there is nothing to align, so the result must be trivially
+  // perfect for every miner — never reported as unsound just because an empty
+  // net's sink is unreachable.
+  const minera::EventLog empty;
+  const auto alpha = minera::discover_petri_net(empty);
+  const auto heuristic = minera::to_petri_net(minera::discover_heuristics_net(empty));
+  for (const auto* net : {&alpha, &heuristic}) {
+    const auto alignment = minera::check_alignment(empty, *net);
+    assert(alignment.computed);
+    assert(alignment.trace_count == 0);
+    assert(alignment.total_cost == 0);
+    assert(alignment.fitness > 0.9999);
+  }
+}
+
 void heuristics_net_becomes_a_sound_workflow_net() {
   // The Heuristic Miner emits a dependency graph; converting it to a workflow
   // net must always yield a sound, replayable model so both conformance methods
@@ -1061,6 +1077,7 @@ int main() {
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
   alignment_handles_an_empty_log();
+  alignment_treats_an_empty_log_as_perfect_for_every_model();
   heuristics_net_becomes_a_sound_workflow_net();
   heuristics_net_is_always_sound_even_when_it_drops_edges();
   heuristics_net_handles_a_self_loop();
