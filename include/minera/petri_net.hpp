@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/heuristic_miner.hpp"
 #include "minera/process_tree.hpp"
 
 namespace minera {
@@ -66,5 +67,15 @@ class PetriNet {
 // place, parallel adds silent AND-split/join transitions, and loop wires the
 // redo children from the body's exit back to its entry.
 [[nodiscard]] PetriNet to_petri_net(const ProcessTree& tree);
+
+// Translates a Heuristic Miner dependency graph into a workflow net so it can be
+// replayed and aligned like any other model. Each activity becomes a visible
+// transition between a "ready" and a "done" place; every accepted dependency
+// edge a->b becomes a silent transition from a's done place to b's ready place;
+// the source feeds each start activity and each end activity drains to the sink.
+// The result is a one-token state machine — always a sound workflow net (a trace
+// is one path through the dependency graph), at the cost of not expressing
+// concurrency, which the binding-free heuristics net does not capture anyway.
+[[nodiscard]] PetriNet to_petri_net(const HeuristicsNet& heuristics);
 
 }  // namespace minera

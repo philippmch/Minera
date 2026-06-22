@@ -536,8 +536,7 @@ class Aligner {
 }  // namespace
 
 ConformanceResult check_conformance(const EventLog& event_log,
-                                    const ProcessTree& tree) {
-  const PetriNet net = to_petri_net(tree);
+                                    const PetriNet& net) {
   const Replayer replayer(net);
   const auto variants = collect_variants(event_log, replayer);
 
@@ -577,6 +576,11 @@ ConformanceResult check_conformance(const EventLog& event_log,
                      return a.count > b.count;
                    });
   return result;
+}
+
+ConformanceResult check_conformance(const EventLog& event_log,
+                                    const ProcessTree& tree) {
+  return check_conformance(event_log, to_petri_net(tree));
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,

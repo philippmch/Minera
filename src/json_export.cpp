@@ -202,6 +202,23 @@ void write_alignments(std::ostream& out,
   out << "]}";
 }
 
+// Writes the per-miner conformance map: each miner id maps to its token-replay
+// and alignment results, so the frontend can offer any miner against any method.
+void write_conformance_models(std::ostream& out,
+                              const std::vector<ModelConformance>& models,
+                              const DirectlyFollowsGraph& graph) {
+  out << '{';
+  for (std::size_t i = 0; i < models.size(); ++i) {
+    write_json_string(out, models[i].miner);
+    out << ": {\"token_replay\": ";
+    write_conformance(out, models[i].token_replay, graph);
+    out << ", \"alignments\": ";
+    write_alignments(out, models[i].alignments, graph);
+    out << '}' << (i + 1 < models.size() ? ", " : "");
+  }
+  out << '}';
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -209,11 +226,9 @@ void write_analysis_json(std::ostream& out,
                          const EventLog& log,
                          const DirectlyFollowsGraph& graph,
                          const ProcessTree* tree,
-                         const ConformanceResult* conformance,
                          const PetriNet* net,
                          const HeuristicsNet* heuristics,
-                         const AlignmentResult* alignments,
-                         const AlignmentResult* alpha_alignments) {
+                         const std::vector<ModelConformance>* conformance) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -282,10 +297,6 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"process_tree\": ";
     write_process_tree_node(out, tree->root(), *tree, graph);
   }
-  if (conformance != nullptr) {
-    out << ",\n  \"conformance\": ";
-    write_conformance(out, *conformance, graph);
-  }
   if (net != nullptr) {
     out << ",\n  \"petri_net\": ";
     write_petri_net(out, *net, graph);
@@ -294,13 +305,9 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
   }
-  if (alignments != nullptr) {
-    out << ",\n  \"alignments\": ";
-    write_alignments(out, *alignments, graph);
-  }
-  if (alpha_alignments != nullptr) {
-    out << ",\n  \"alpha_alignments\": ";
-    write_alignments(out, *alpha_alignments, graph);
+  if (conformance != nullptr) {
+    out << ",\n  \"conformance\": ";
+    write_conformance_models(out, *conformance, graph);
   }
   out << '\n';
   out << "}\n";
@@ -310,14 +317,12 @@ std::string analysis_json(std::string_view dataset,
                           const EventLog& log,
                           const DirectlyFollowsGraph& graph,
                           const ProcessTree* tree,
-                          const ConformanceResult* conformance,
                           const PetriNet* net,
                           const HeuristicsNet* heuristics,
-                          const AlignmentResult* alignments,
-                          const AlignmentResult* alpha_alignments) {
+                          const std::vector<ModelConformance>* conformance) {
   std::ostringstream out;
-  write_analysis_json(out, dataset, log, graph, tree, conformance, net,
-                      heuristics, alignments, alpha_alignments);
+  write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
+                      conformance);
   return out.str();
 }
 

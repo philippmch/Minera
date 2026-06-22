@@ -120,6 +120,15 @@ export interface Alignments {
   variants: VariantAlignment[];
 }
 
+/** Both conformance results for one discovered model. */
+export interface ModelConformance {
+  token_replay: Conformance;
+  alignments: Alignments;
+}
+
+/** Per-miner conformance, keyed by miner id ("inductive", "alpha", "heuristic"). */
+export type ConformanceModels = Record<string, ModelConformance>;
+
 export interface TraceEvent {
   activity: number;
   timestamp: string;
@@ -142,16 +151,16 @@ export interface MineraExport {
   variants: VariantStat[];
   /** Discovered process tree; absent in exports from older minera versions. */
   process_tree?: ProcessTreeNode;
-  /** Conformance of the log against the process tree; absent in older exports. */
-  conformance?: Conformance;
+  /**
+   * Conformance of the log against each discovered model, keyed by miner id;
+   * every entry carries a token-replay and an alignment result. Absent in
+   * exports from older minera versions.
+   */
+  conformance?: ConformanceModels;
   /** Alpha Miner Petri net; absent in exports from older minera versions. */
   petri_net?: PetriNetModel;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
-  /** Alignment-based conformance of the inductive model; absent in older exports. */
-  alignments?: Alignments;
-  /** Alignment-based conformance of the Alpha Miner's net; absent in older exports. */
-  alpha_alignments?: Alignments;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

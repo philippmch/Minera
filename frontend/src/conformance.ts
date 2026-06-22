@@ -22,9 +22,9 @@ export const CONFORMANCE_METHODS: ConformanceMethod[] = [
     tagline:
       "Replay every trace against the model, counting missing and remaining tokens.",
     description:
-      "Replays each trace on the inductive-miner process tree (as a workflow " +
-      "net), tracking produced, consumed, missing and remaining tokens to " +
-      "derive fitness and precision overall and per variant.",
+      "Replays each trace on the chosen model (as a workflow net), tracking " +
+      "produced, consumed, missing and remaining tokens to derive fitness and " +
+      "precision overall and per variant.",
     artifact: "token-replay",
   },
   {
@@ -33,10 +33,10 @@ export const CONFORMANCE_METHODS: ConformanceMethod[] = [
     tagline:
       "Find each trace's cheapest path through the model, move by move.",
     description:
-      "Computes the optimal alignment of every trace against the inductive-" +
-      "miner model: the least-cost sequence of synchronous, log-only and " +
-      "model-only moves that walks the net to its end. Gives exact, optimal " +
-      "diagnostics of where each trace deviates, plus cost-based fitness.",
+      "Computes the optimal alignment of every trace against the chosen " +
+      "model: the least-cost sequence of synchronous, log-only and model-only " +
+      "moves that walks the net to its end. Gives exact, optimal diagnostics " +
+      "of where each trace deviates, plus cost-based fitness.",
     artifact: "alignments",
   },
 ];

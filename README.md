@@ -21,15 +21,19 @@ workflows with native performance.
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
   (logs without a cut fall through to a flower model).
-- Conformance checking of a log against the discovered process tree: the tree
-  is translated to a workflow net, then token-based replay measures **fitness**
-  (how much of the log the model reproduces) and escaping edges measure
-  **precision** (how little extra behavior the model allows), per variant and
-  in aggregate. As an alternative, **alignment-based conformance** finds, per
-  trace, the cheapest sequence of synchronous, log-only, and model-only moves
-  that walks the net from start to end (a uniform-cost search over the
-  synchronous product) — giving exact, optimal diagnostics of *where* and *how*
-  each trace deviates, plus cost-based fitness.
+- Conformance checking of a log against **any** discovered model — every miner
+  is translated to a workflow net (the Inductive Miner's process tree, the Alpha
+  Miner's net directly, and the Heuristic Miner's dependency graph as a
+  one-token state machine), and both methods run on each. **Token replay**
+  measures **fitness** (how much of the log the model reproduces) and escaping
+  edges measure **precision** (how little extra behavior the model allows), per
+  variant and in aggregate. **Alignment-based conformance** finds, per trace,
+  the cheapest sequence of synchronous, log-only, and model-only moves that
+  walks the net from start to end (a uniform-cost search over the synchronous
+  product) — giving exact, optimal diagnostics of *where* and *how* each trace
+  deviates, plus cost-based fitness. Token replay is robust on unsound nets;
+  alignments report that they can't be computed when a net (e.g. an Alpha net
+  with concurrency) has an unreachable final marking.
 - Log preprocessing: filter an event log by activity projection, trace length,
   start/end activities, and variant frequency (minimum count or top-N) before
   discovery.
@@ -96,13 +100,12 @@ events first; discovery lives in tabs:
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser,
-- **Conformance** — fitness and precision of the log against the discovered
-  model, plus a per-variant breakdown of where traces deviate; pick **Token
-  Replay** for token counts or **Alignments** to see each deviating trace
-  rendered move by move (synchronous, log-only, model-only). Alignments run
-  against the Inductive Miner's (always sound) model and the Alpha Miner's net;
-  when an Alpha net isn't a sound workflow net the view says so rather than
-  showing misleading numbers.
+- **Conformance** — pick any miner and any method: fitness and precision of the
+  log against that miner's model, plus a per-variant breakdown of where traces
+  deviate. **Token Replay** shows token counts; **Alignments** renders each
+  deviating trace move by move (synchronous, log-only, model-only). Every miner
+  is checked both ways at import; when a model isn't a sound workflow net the
+  alignment view says so rather than showing misleading numbers.
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency) or a subset of activities;
