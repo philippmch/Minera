@@ -1,7 +1,8 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   type Alignments as AlignmentsResult,
   type MineraExport,
+  type ModelConformance,
   numberFormat,
 } from "../types";
 import { CONFORMANCE_METHODS } from "../conformance";
@@ -21,7 +22,13 @@ const grade = (value: number) =>
 // then which conformance method to replay with — before showing results.
 // Both come from shared registries (MINER_GROUPS, CONFORMANCE_METHODS) so new
 // miners and methods appear here automatically.
-export function Conformance({ data }: { data: MineraExport }) {
+export function Conformance({
+  data,
+  onRequestAlignment,
+}: {
+  data: MineraExport;
+  onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
+}) {
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
@@ -122,14 +129,17 @@ export function Conformance({ data }: { data: MineraExport }) {
           method.artifact === "alignments" ? (
             <Alignments
               data={data}
-              alignments={models.alignments}
+              minerId={miner.id}
               minerName={miner.name}
+              model={models}
+              onRequestAlignment={onRequestAlignment}
             />
           ) : (
             <TokenReplay
               data={data}
               conformance={models.token_replay}
               minerName={miner.name}
+              sound={models.sound}
             />
           )
         ) : (
@@ -151,10 +161,12 @@ function TokenReplay({
   data,
   conformance,
   minerName,
+  sound,
 }: {
   data: MineraExport;
   conformance: NonNullable<MineraExport["conformance"]>[string]["token_replay"];
   minerName: string;
+  sound: boolean;
 }) {
   const fittingShare =
     conformance.trace_count > 0
@@ -184,6 +196,13 @@ function TokenReplay({
 
   return (
     <div className="conformance reveal">
+      {!sound && (
+        <p className="conf-inline-note">
+          The {minerName} model isn't a sound workflow net, so token replay has to
+          force missing tokens — read these numbers as approximate. Alignments
+          can't be computed for it at all.
+        </p>
+      )}
       <section className="conf-metrics">
         {metrics.map((metric) => (
           <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
@@ -271,56 +290,134 @@ function TokenReplay({
   );
 }
 
-// Alignment results: cost-based gauges and, per deviating variant, the optimal
-// alignment rendered move by move so a log-only insertion or a model-only skip
-// is visible at a glance. Rendered when the "alignments" method is selected.
+// Alignments are the costly check, so the server defers them: this wrapper uses
+// the embedded result (CLI exports) when present, skips the work entirely for an
+// unsound model, and otherwise fetches the result on demand for the model the
+// user actually opened.
 function Alignments({
   data,
-  alignments,
+  minerId,
   minerName,
+  model,
+  onRequestAlignment,
 }: {
   data: MineraExport;
-  alignments: AlignmentsResult | undefined;
+  minerId: string;
   minerName: string;
+  model: ModelConformance;
+  onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
 }) {
-  if (!alignments) {
-    return (
-      <section className="panel map-panel">
-        <div className="model-empty">
-          No alignment results. This export predates alignment checking — re-open
-          the event log to align it against the process model.
-        </div>
-      </section>
-    );
-  }
+  const embedded = model.alignments;
+  const [fetched, setFetched] = useState<AlignmentsResult | null>(embedded ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const requestRef = useRef(onRequestAlignment);
+  requestRef.current = onRequestAlignment;
 
-  // An Alpha (or Heuristic) model need not be a sound workflow net; when its
-  // final marking is unreachable the backend cannot align against it, so there
-  // are no trustworthy numbers to show.
-  if (!alignments.computed) {
+  useEffect(() => {
+    if (embedded) {
+      setFetched(embedded);
+      return;
+    }
+    if (!model.sound) return;  // unsound: nothing to fetch, the notice says why
+    let cancelled = false;
+    setFetched(null);
+    setError(null);
+    setLoading(true);
+    requestRef
+      .current(minerId)
+      .then((result) => !cancelled && setFetched(result))
+      .catch((cause) =>
+        !cancelled && setError(cause instanceof Error ? cause.message : String(cause)),
+      )
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [minerId, model.sound, embedded]);
+
+  // Known up front from the mine: an unsound model can't be aligned at all.
+  if (!model.sound) {
+    return <AlignmentNotice minerName={minerName} exhausted={false} />;
+  }
+  if (error) {
     return (
       <section className="panel conf-panel">
         <div className="conf-notice">
           <span className="conf-notice-mark">⚠</span>
           <div>
-            <h3>Alignments unavailable for the {minerName} model</h3>
-            <p>
-              The {minerName} model isn't a <strong>sound workflow net</strong>:
-              its end state can't be reached without leftover or duplicated
-              tokens. (The Alpha Miner produces this when concurrent activities
-              are the process's start or end points.) Optimal alignments require
-              a sound net, so there are no trustworthy numbers to show.
-            </p>
-            <p>
-              <strong>Token Replay</strong> still works on this model, and the{" "}
-              <strong>Inductive Miner</strong>'s model is always sound.
-            </p>
+            <h3>Couldn't compute alignments</h3>
+            <p>{error}</p>
           </div>
         </div>
       </section>
     );
   }
+  if (loading || !fetched) {
+    return (
+      <section className="panel conf-panel">
+        <p className="conf-loading">Computing optimal alignments</p>
+      </section>
+    );
+  }
+  // Sound but the search could not finish (reachable yet unbounded/too large).
+  if (!fetched.computed) {
+    return <AlignmentNotice minerName={minerName} exhausted={fetched.exhausted} />;
+  }
+  return <AlignmentResultView data={data} alignments={fetched} />;
+}
 
+// Explains why a model could not be aligned: unsound (unreachable end state) or
+// exhausted (reachable but the search hit its bound).
+function AlignmentNotice({
+  minerName,
+  exhausted,
+}: {
+  minerName: string;
+  exhausted: boolean;
+}) {
+  return (
+    <section className="panel conf-panel">
+      <div className="conf-notice">
+        <span className="conf-notice-mark">⚠</span>
+        <div>
+          <h3>Alignments unavailable for the {minerName} model</h3>
+          {exhausted ? (
+            <p>
+              The {minerName} model is reachable but admits{" "}
+              <strong>unbounded behavior</strong>, so the alignment search hit its
+              limit before finding optimal alignments — the numbers wouldn't be
+              trustworthy.
+            </p>
+          ) : (
+            <p>
+              The {minerName} model isn't a <strong>sound workflow net</strong>:
+              its end state can't be reached without leftover or duplicated
+              tokens. (The Alpha Miner produces this when concurrent activities
+              are the process's start or end points.) Optimal alignments require a
+              sound net.
+            </p>
+          )}
+          <p>
+            <strong>Token Replay</strong> still works on this model, and the{" "}
+            <strong>Inductive Miner</strong>'s model is always sound.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Renders a computed alignment result: cost-based gauges and, per deviating
+// variant, the optimal alignment move by move so a log-only insertion or a
+// model-only skip is visible at a glance.
+function AlignmentResultView({
+  data,
+  alignments,
+}: {
+  data: MineraExport;
+  alignments: AlignmentsResult;
+}) {
   const fittingShare =
     alignments.trace_count > 0
       ? alignments.fitting_traces / alignments.trace_count

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -78,17 +79,24 @@ struct VariantAlignment {
 // from its initial to its final marking — giving an exact, optimal account of
 // where and how each trace deviates.
 struct AlignmentResult {
-  // False when the net is not a sound workflow net — its final marking is
-  // unreachable, or the search could not align a trace within its bounds (as
-  // can happen for Alpha/Heuristic models, which carry no soundness guarantee).
-  // The other fields are then meaningless and `variants` is empty.
+  // False when the model could not be aligned. Two distinct causes, told apart
+  // by `exhausted`: the final marking is unreachable (an unsound net), or the
+  // search exceeded its bound on a reachable but unbounded/very large net. In
+  // either case the other fields are meaningless and `variants` is empty.
   bool computed = true;
+  bool exhausted = false;  // when !computed: true = search bound hit, false = unsound
   double fitness = 1.0;               // cost-based log fitness in [0, 1]
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
   std::uint64_t total_cost = 0;      // summed optimal cost over all traces
   std::vector<VariantAlignment> variants;  // worst-fitting first
 };
+
+// Whether `net`'s final marking is reachable from its initial marking — the
+// practical bar for being a sound workflow net, and the precondition for
+// alignment. Cheap: a single shortest-run search. The Alpha Miner can produce
+// nets that fail this (e.g. concurrent start/end activities overflow the sink).
+[[nodiscard]] bool final_marking_reachable(const PetriNet& net);
 
 // Computes optimal alignments of every trace variant against the model using a
 // uniform-cost search over the synchronous product, and reports cost-based
@@ -105,13 +113,16 @@ struct AlignmentResult {
 [[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
                                               const PetriNet& net);
 
-// The conformance of one discovered model, checked every supported way, so the
-// frontend can offer any miner against any method. `miner` is the miner id used
-// by the UI registry ("inductive", "alpha", "heuristic").
+// The conformance of one discovered model, so the frontend can offer any miner
+// against any method. `miner` is the UI registry id ("inductive", "alpha",
+// "heuristic"). Token replay is always computed (it is cheap and robust);
+// `alignments` is optional so the server can defer the costlier alignment to an
+// on-demand request while the CLI export still embeds it.
 struct ModelConformance {
   std::string miner;
+  bool sound = true;  // final marking reachable — whether alignment is possible
   ConformanceResult token_replay;
-  AlignmentResult alignments;
+  std::optional<AlignmentResult> alignments;
 };
 
 }  // namespace minera

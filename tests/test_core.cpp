@@ -424,18 +424,18 @@ void json_export_carries_the_conformance_contract() {
   const auto tree = minera::discover_process_tree(log);
   const auto net = minera::to_petri_net(tree);
   const std::vector<minera::ModelConformance> conformance = {
-      {"inductive", minera::check_conformance(log, net),
-       minera::check_alignment(log, net)},
+      {"inductive", minera::final_marking_reachable(net),
+       minera::check_conformance(log, net), minera::check_alignment(log, net)},
   };
 
   const auto json =
       minera::analysis_json("test", log, graph, &tree, nullptr, nullptr,
                             &conformance);
-  for (const char* key : {"\"conformance\"", "\"inductive\"",
+  for (const char* key : {"\"conformance\"", "\"inductive\"", "\"sound\"",
                           "\"token_replay\"", "\"alignments\"", "\"fitness\"",
                           "\"precision\"", "\"fitting_traces\"",
                           "\"trace_count\"", "\"missing\"", "\"remaining\"",
-                          "\"computed\"", "\"variants\""}) {
+                          "\"computed\"", "\"exhausted\"", "\"variants\""}) {
     assert(json.find(key) != std::string::npos);
   }
 
@@ -547,7 +547,8 @@ void json_export_carries_the_alignment_contract() {
   const auto deviating = log_from_variants({{"a", "c"}});
   const auto graph = minera::discover_directly_follows_graph(deviating);
   const std::vector<minera::ModelConformance> conformance = {
-      {"inductive", minera::check_conformance(deviating, net),
+      {"inductive", minera::final_marking_reachable(net),
+       minera::check_conformance(deviating, net),
        minera::check_alignment(deviating, net)},
   };
 
@@ -557,6 +558,18 @@ void json_export_carries_the_alignment_contract() {
                           "\"cost\"", "\"type\"", "\"model\"", "\"sync\""}) {
     assert(json.find(key) != std::string::npos);
   }
+}
+
+void final_marking_reachable_distinguishes_sound_nets() {
+  // A sound model's final marking is reachable; an Alpha net with concurrent end
+  // activities overflows its sink and is not reachable.
+  const auto sound = log_from_variants({{"a", "b", "c"}});
+  assert(minera::final_marking_reachable(
+      minera::to_petri_net(minera::discover_process_tree(sound))));
+
+  const auto concurrent = log_from_variants({{"a", "b", "c"}, {"a", "c", "b"}});
+  assert(!minera::final_marking_reachable(
+      minera::discover_petri_net(concurrent)));
 }
 
 void alignment_scores_a_sound_alpha_net() {
@@ -1074,6 +1087,7 @@ int main() {
   alignment_diagnoses_a_skipped_activity();
   alignment_diagnoses_an_inserted_activity();
   json_export_carries_the_alignment_contract();
+  final_marking_reachable_distinguishes_sound_nets();
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
   alignment_handles_an_empty_log();

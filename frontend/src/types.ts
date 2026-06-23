@@ -106,10 +106,12 @@ export interface VariantAlignment {
 
 export interface Alignments {
   /**
-   * False when the model is not a sound workflow net (e.g. an Alpha net with an
-   * unreachable sink); the other fields are then meaningless and variants empty.
+   * False when the model could not be aligned; the other fields are then
+   * meaningless and variants empty. `exhausted` tells the two causes apart.
    */
   computed: boolean;
+  /** When !computed: true = search bound hit (reachable but too large), false = unsound. */
+  exhausted: boolean;
   /** Cost-based fitness in [0, 1]: how cheaply the log aligns to the model. */
   fitness: number;
   fitting_traces: number;
@@ -120,10 +122,13 @@ export interface Alignments {
   variants: VariantAlignment[];
 }
 
-/** Both conformance results for one discovered model. */
+/** Conformance results for one discovered model. */
 export interface ModelConformance {
+  /** Whether the model's final marking is reachable — the bar for alignment. */
+  sound: boolean;
   token_replay: Conformance;
-  alignments: Alignments;
+  /** Present in CLI exports; the server omits it and serves it from /api/align. */
+  alignments?: Alignments;
 }
 
 /** Per-miner conformance, keyed by miner id ("inductive", "alpha", "heuristic"). */

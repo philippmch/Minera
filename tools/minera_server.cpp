@@ -7,9 +7,12 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "httplib.h"
@@ -21,10 +24,24 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/petri_net.hpp"
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
 namespace {
+
+// The most recently mined log and its discovered nets, kept so the costly
+// alignment of a model can be computed on demand (POST /api/align) instead of
+// eagerly for every miner on every mine. The app is local and single-user, so
+// caching just the latest analysis is enough; a shared_ptr lets a slow
+// alignment run on a snapshot without holding the lock.
+struct MinedSession {
+  minera::EventLog log;
+  minera::DirectlyFollowsGraph graph;
+  std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
+};
+std::shared_ptr<const MinedSession> g_session;
+std::mutex g_session_mutex;
 
 bool ends_with_ci(std::string_view value, std::string_view suffix) {
   if (value.size() < suffix.size()) return false;
@@ -156,23 +173,72 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto tree = minera::discover_process_tree(log);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
-
-    // Check every discovered model both ways, so the frontend can offer any
-    // miner against any conformance method.
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
-    const std::vector<minera::ModelConformance> conformance = {
-        {"inductive", minera::check_conformance(log, inductive_net),
-         minera::check_alignment(log, inductive_net)},
-        {"alpha", minera::check_conformance(log, net),
-         minera::check_alignment(log, net)},
-        {"heuristic", minera::check_conformance(log, heuristic_net),
-         minera::check_alignment(log, heuristic_net)},
+
+    // Token replay is cheap and robust, so run it for every model now; defer the
+    // costlier alignment to POST /api/align, which reuses the cached nets below.
+    const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      return minera::ModelConformance{std::move(id),
+                                      minera::final_marking_reachable(petri),
+                                      minera::check_conformance(log, petri),
+                                      std::nullopt};
     };
-    response.set_content(
-        minera::analysis_json(dataset, log, graph, &tree, &net, &heuristics,
-                              &conformance),
-        "application/json");
+    const std::vector<minera::ModelConformance> conformance = {
+        model("inductive", inductive_net), model("alpha", net),
+        model("heuristic", heuristic_net)};
+
+    const std::string body = minera::analysis_json(dataset, log, graph, &tree,
+                                                   &net, &heuristics, &conformance);
+
+    // Cache this analysis so alignments can be served on demand for the model
+    // the user actually opens, rather than computed for all three up front.
+    auto session = std::make_shared<MinedSession>();
+    session->log = log;
+    session->graph = graph;
+    session->nets.emplace("inductive", inductive_net);
+    session->nets.emplace("alpha", net);
+    session->nets.emplace("heuristic", heuristic_net);
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      g_session = std::move(session);
+    }
+
+    response.set_content(body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+// On-demand alignment of one model from the most recent mine. Expects a `miner`
+// query parameter ("inductive" | "alpha" | "heuristic").
+void handle_align(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  const std::string miner = request.get_param_value("miner");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+
+  try {
+    const auto alignment = minera::check_alignment(session->log, it->second);
+    response.set_content(minera::alignment_json(alignment, session->graph),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -219,13 +285,16 @@ int main(int argc, char** argv) {
   // The app is local-first; permissive CORS keeps the Vite dev server (a
   // different port) working against this backend.
   server.set_default_headers({{"Access-Control-Allow-Origin", "*"}});
-  server.Options("/api/mine", [](const httplib::Request&, httplib::Response& response) {
+  const auto preflight = [](const httplib::Request&, httplib::Response& response) {
     response.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
     response.set_header("Access-Control-Allow-Headers", "Content-Type");
     response.status = 204;
-  });
+  };
+  server.Options("/api/mine", preflight);
+  server.Options("/api/align", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/align", handle_align);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;
