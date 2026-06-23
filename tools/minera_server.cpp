@@ -110,6 +110,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     std::string dataset = "event log";
     minera::CsvImportOptions options;
     minera::LogFilterOptions filter;
+    minera::InductiveMinerOptions inductive_options;
 
     if (request.is_multipart_form_data()) {
       if (!request.has_file("log")) {
@@ -164,6 +165,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       if (const auto value = form_field(request, "top_variants"); !value.empty()) {
         filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
       }
+      if (const auto value = form_field(request, "noise_threshold"); !value.empty()) {
+        inductive_options.noise_threshold = std::atof(value.c_str());
+      }
     } else {
       csv = request.body;
     }
@@ -176,7 +180,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       log = minera::filter_event_log(log, filter);
     }
     const auto graph = minera::discover_directly_follows_graph(log);
-    const auto tree = minera::discover_process_tree(log);
+    const auto tree = minera::discover_process_tree(log, inductive_options);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto inductive_net = minera::to_petri_net(tree);

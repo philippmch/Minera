@@ -60,6 +60,8 @@ int usage(const char* program) {
                "  --timestamp-column <name> Timestamp column (default: timestamp)\n"
                "  --resource-column <name>  Resource column (default: resource)\n"
                "  --delimiter <char>        Field delimiter (default: ,)\n"
+               "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
+               "                            in [0,1] (default: 0 = classic)\n"
                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, or heuristic\n"
@@ -84,6 +86,7 @@ int main(int argc, char** argv) {
   std::string pnml_miner = "inductive";
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
+  minera::InductiveMinerOptions inductive_options;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -119,6 +122,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       pnml_miner = value;
+    } else if (arg == "--noise-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      inductive_options.noise_threshold = std::atof(value);
     } else if (arg == "--delimiter") {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
@@ -178,7 +185,7 @@ int main(int argc, char** argv) {
       log = minera::filter_event_log(log, filter);
     }
     const auto graph = minera::discover_directly_follows_graph(log);
-    const auto tree = minera::discover_process_tree(log);
+    const auto tree = minera::discover_process_tree(log, inductive_options);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto performance = minera::compute_performance_metrics(log, graph);

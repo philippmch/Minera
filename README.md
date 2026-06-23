@@ -20,7 +20,14 @@ workflows with native performance.
 - Process-model discovery with the **Inductive Miner**: recursive
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
-  (logs without a cut fall through to a flower model).
+  (logs without a cut fall through to a flower model). A **noise threshold**
+  switches on the **infrequent variant (IMf)**: before each cut is sought, weak
+  directly-follows edges (and rare start/end activities, empty traces, and
+  repetitions) are filtered relative to the dominant behaviour, so a noisy log
+  yields a structured model instead of collapsing to a flower. The full log is
+  still split along the chosen cut, so filtering changes which structure is
+  found, not what behaviour is routed where; a threshold of 0 is the classic
+  miner.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph as a
@@ -160,6 +167,10 @@ Other filters include `--min-variant-frequency`, `--keep-activities`,
 and `--max-length`. Run `minera_export` without arguments to see usage. The same
 filters are available on `POST /api/mine` as form fields (`top_variants`,
 `min_variant_frequency`, `keep_activities`, …).
+
+Pass `--noise-threshold <f>` (0–1) to run the Inductive Miner's infrequent
+variant (IMf) during discovery; `0` is the classic miner. The same value is
+accepted on `POST /api/mine` as the `noise_threshold` form field.
 
 The JSON export also carries the performance (`performance`) and resource
 (`resources`) perspectives. To additionally write a model as PNML, pass

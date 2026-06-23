@@ -26,18 +26,75 @@ using Sublog = std::vector<WeightedTrace>;
 
 // Dense, matrix-friendly view of a sublog. Activities are renumbered to
 // 0..size()-1 for cut detection and mapped back to global ids via to_global.
+// The `follows`/`succ`/`is_start`/`is_end` relations are what the cut detectors
+// read; under the infrequent variant they are the *filtered* relations, while
+// the raw counts are retained for the noise-aware base cases.
 struct LocalDfg {
   std::vector<ActId> to_global;
   std::unordered_map<ActId, std::size_t> to_local;
-  std::vector<std::vector<char>> follows;     // follows[a][b]: a -> b observed
+  std::vector<std::vector<char>> follows;     // follows[a][b]: a -> b kept
   std::vector<std::vector<std::size_t>> succ;  // adjacency list of follows
   std::vector<char> is_start;
   std::vector<char> is_end;
 
+  // Raw, unfiltered weighted counts (a -> b directly-follows, and how often each
+  // activity starts/ends a trace), summed over the weighted sublog.
+  std::vector<std::vector<std::uint64_t>> edge_count;
+  std::vector<std::uint64_t> start_count;
+  std::vector<std::uint64_t> end_count;
+
   [[nodiscard]] std::size_t size() const { return to_global.size(); }
 };
 
-LocalDfg build_local_dfg(const Sublog& log) {
+// Recomputes the boolean relations the cut detectors use from the raw counts,
+// dropping behaviour that falls below the noise threshold:
+//   * an edge a->b survives only when its count is at least `f` times a's
+//     strongest outgoing edge (so a node always keeps its dominant successor);
+//   * an activity counts as a start/end only when its start/end count clears
+//     `f` times the most frequent start/end.
+// With f == 0 nothing is dropped: every observed edge and every observed
+// start/end is kept, exactly reproducing the classic Inductive Miner.
+void apply_noise_filter(LocalDfg& dfg, double f) {
+  const std::size_t n = dfg.size();
+  dfg.follows.assign(n, std::vector<char>(n, 0));
+  dfg.succ.assign(n, {});
+  dfg.is_start.assign(n, 0);
+  dfg.is_end.assign(n, 0);
+
+  for (std::size_t a = 0; a < n; ++a) {
+    std::uint64_t max_out = 0;
+    for (std::size_t b = 0; b < n; ++b) {
+      max_out = std::max(max_out, dfg.edge_count[a][b]);
+    }
+    const double cutoff = f * static_cast<double>(max_out);
+    for (std::size_t b = 0; b < n; ++b) {
+      const std::uint64_t count = dfg.edge_count[a][b];
+      if (count > 0 && static_cast<double>(count) >= cutoff) {
+        dfg.follows[a][b] = 1;
+        dfg.succ[a].push_back(b);
+      }
+    }
+  }
+
+  std::uint64_t max_start = 0;
+  std::uint64_t max_end = 0;
+  for (std::size_t a = 0; a < n; ++a) {
+    max_start = std::max(max_start, dfg.start_count[a]);
+    max_end = std::max(max_end, dfg.end_count[a]);
+  }
+  for (std::size_t a = 0; a < n; ++a) {
+    if (dfg.start_count[a] > 0 &&
+        static_cast<double>(dfg.start_count[a]) >= f * static_cast<double>(max_start)) {
+      dfg.is_start[a] = 1;
+    }
+    if (dfg.end_count[a] > 0 &&
+        static_cast<double>(dfg.end_count[a]) >= f * static_cast<double>(max_end)) {
+      dfg.is_end[a] = 1;
+    }
+  }
+}
+
+LocalDfg build_local_dfg(const Sublog& log, double f) {
   LocalDfg dfg;
   for (const auto& wt : log) {
     for (const ActId act : wt.activities) {
@@ -48,26 +105,24 @@ LocalDfg build_local_dfg(const Sublog& log) {
   }
 
   const std::size_t n = dfg.size();
-  dfg.follows.assign(n, std::vector<char>(n, 0));
-  dfg.succ.assign(n, {});
-  dfg.is_start.assign(n, 0);
-  dfg.is_end.assign(n, 0);
+  dfg.edge_count.assign(n, std::vector<std::uint64_t>(n, 0));
+  dfg.start_count.assign(n, 0);
+  dfg.end_count.assign(n, 0);
 
   for (const auto& wt : log) {
     if (wt.activities.empty()) {
       continue;
     }
-    dfg.is_start[dfg.to_local.at(wt.activities.front())] = 1;
-    dfg.is_end[dfg.to_local.at(wt.activities.back())] = 1;
+    dfg.start_count[dfg.to_local.at(wt.activities.front())] += wt.count;
+    dfg.end_count[dfg.to_local.at(wt.activities.back())] += wt.count;
     for (std::size_t i = 1; i < wt.activities.size(); ++i) {
       const std::size_t a = dfg.to_local.at(wt.activities[i - 1]);
       const std::size_t b = dfg.to_local.at(wt.activities[i]);
-      if (!dfg.follows[a][b]) {
-        dfg.follows[a][b] = 1;
-        dfg.succ[a].push_back(b);
-      }
+      dfg.edge_count[a][b] += wt.count;
     }
   }
+
+  apply_noise_filter(dfg, f);
   return dfg;
 }
 
@@ -558,11 +613,12 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
   return node;
 }
 
-ProcessTreeNode mine(const Sublog& log);
+ProcessTreeNode mine(const Sublog& log, double f);
 
 ProcessTreeNode build_from_cut(ProcessTreeOperator op,
                                const std::vector<std::vector<ActId>>& groups,
-                               const Sublog& log) {
+                               const Sublog& log,
+                               double f) {
   const GroupOf group_of = index_groups(groups);
   std::vector<Sublog> sublogs;
   switch (op) {
@@ -583,7 +639,7 @@ ProcessTreeNode build_from_cut(ProcessTreeOperator op,
   std::vector<ProcessTreeNode> children;
   children.reserve(sublogs.size());
   for (const auto& sublog : sublogs) {
-    children.push_back(mine(sublog));
+    children.push_back(mine(sublog, f));
   }
   return make_node(op, std::move(children));
 }
@@ -609,32 +665,35 @@ ProcessTreeNode flower(const std::vector<ActId>& activities) {
 // cut that fits the non-empty behaviour and are only modelled explicitly when
 // no cut applies -- this matches the canonical algorithm rather than skipping
 // the empty trace eagerly.
-ProcessTreeNode mine(const Sublog& log) {
-  bool has_empty = false;
-  bool has_nonempty = false;
+ProcessTreeNode mine(const Sublog& log, double f) {
+  std::uint64_t empty_weight = 0;
+  std::uint64_t nonempty_weight = 0;
   for (const auto& wt : log) {
-    (wt.activities.empty() ? has_empty : has_nonempty) = true;
+    (wt.activities.empty() ? empty_weight : nonempty_weight) += wt.count;
   }
+  const bool has_empty = empty_weight > 0;
 
   // Base case: an empty log (or only empty traces) is a silent step.
-  if (!has_nonempty) {
+  if (nonempty_weight == 0) {
     return ProcessTreeNode::tau();
   }
 
-  const LocalDfg dfg = build_local_dfg(log);
+  const LocalDfg dfg = build_local_dfg(log, f);
 
-  // Base case: a single activity with no empty traces. A bare leaf if it always
-  // occurs exactly once, otherwise a self-loop because it repeats in a trace.
+  // Base case: a single activity with no empty traces. It is a bare leaf when
+  // it always occurs once; a self-loop when it genuinely repeats. Under the
+  // infrequent variant, repetitions rarer than the threshold are treated as
+  // noise and still yield a leaf.
   if (dfg.size() == 1 && !has_empty) {
     const ActId act = dfg.to_global.front();
-    bool always_once = true;
+    std::uint64_t multi_weight = 0;
     for (const auto& wt : log) {
-      if (wt.activities.size() != 1) {
-        always_once = false;
-        break;
+      if (wt.activities.size() > 1) {
+        multi_weight += wt.count;
       }
     }
-    if (always_once) {
+    if (static_cast<double>(multi_weight) <=
+        f * static_cast<double>(nonempty_weight)) {
       return ProcessTreeNode::leaf(act);
     }
     ProcessTreeNode node;
@@ -644,19 +703,21 @@ ProcessTreeNode mine(const Sublog& log) {
   }
 
   if (auto cut = exclusive_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log);
+    return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f);
   }
   if (auto cut = sequence_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kSequence, *cut, log);
+    return build_from_cut(ProcessTreeOperator::kSequence, *cut, log, f);
   }
   if (auto cut = parallel_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kParallel, *cut, log);
+    return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f);
   }
   if (auto cut = loop_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kLoop, *cut, log);
+    return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f);
   }
 
-  // Fall-through: model the empty trace as a skip around the rest of the log.
+  // Fall-through for empty traces. When they are frequent enough they are kept
+  // as an explicit skip around the rest of the log; when they are noise (below
+  // the threshold) they are dropped and the non-empty behaviour is re-mined.
   if (has_empty) {
     Sublog nonempty;
     nonempty.reserve(log.size());
@@ -665,8 +726,12 @@ ProcessTreeNode mine(const Sublog& log) {
         nonempty.push_back(wt);
       }
     }
-    return make_node(ProcessTreeOperator::kExclusive,
-                     {ProcessTreeNode::tau(), mine(nonempty)});
+    if (static_cast<double>(empty_weight) >
+        f * static_cast<double>(nonempty_weight)) {
+      return make_node(ProcessTreeOperator::kExclusive,
+                       {ProcessTreeNode::tau(), mine(nonempty, f)});
+    }
+    return mine(nonempty, f);
   }
 
   // Fall-through: unstructured behaviour becomes a flower model.
@@ -675,7 +740,8 @@ ProcessTreeNode mine(const Sublog& log) {
 
 }  // namespace
 
-ProcessTree discover_process_tree(const EventLog& event_log) {
+ProcessTree discover_process_tree(const EventLog& event_log,
+                                  const InductiveMinerOptions& options) {
   std::vector<std::string> names;
   std::unordered_map<std::string, ActId> ids;
 
@@ -703,7 +769,8 @@ ProcessTree discover_process_tree(const EventLog& event_log) {
     }
   }
 
-  ProcessTreeNode root = mine(sublog);
+  const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
+  ProcessTreeNode root = mine(sublog, f);
   return ProcessTree(std::move(names), std::move(root));
 }
 

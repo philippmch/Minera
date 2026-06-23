@@ -159,6 +159,15 @@ std::string mine_tree(const std::vector<std::vector<std::string>>& variants) {
   return render(tree, tree.root());
 }
 
+std::string mine_tree_imf(const std::vector<std::vector<std::string>>& variants,
+                          double noise_threshold) {
+  const auto log = log_from_variants(variants);
+  minera::InductiveMinerOptions options;
+  options.noise_threshold = noise_threshold;
+  const auto tree = minera::discover_process_tree(log, options);
+  return render(tree, tree.root());
+}
+
 void inductive_miner_discovers_sequence() {
   assert(mine_tree({{"a", "b", "c"}}) == "->(a, b, c)");
 }
@@ -199,6 +208,27 @@ void inductive_miner_falls_back_to_flower() {
   // or loop cut, so it falls through to the flower model.
   const auto tree = mine_tree({{"a", "b"}, {"b", "c"}, {"c", "a"}});
   assert(tree == "*(tau, a, b, c)");
+}
+
+void inductive_miner_infrequent_recovers_a_noisy_sequence() {
+  // A dominant a->b->c->d sequence with one rare trace that adds infrequent
+  // a->c and c->a hops (and an extra a). The infrequent edges form a cycle that
+  // derails the classic miner, but the IMf threshold filters them out.
+  std::vector<std::vector<std::string>> variants(20, {"a", "b", "c", "d"});
+  variants.push_back({"a", "c", "a", "b", "c", "d"});
+
+  // Classic IM (threshold 0) is misled by the rare edges.
+  assert(mine_tree_imf(variants, 0.0) != "->(a, b, c, d)");
+  // IMf drops the noise and recovers the clean chain.
+  assert(mine_tree_imf(variants, 0.2) == "->(a, b, c, d)");
+}
+
+void inductive_miner_infrequent_leaves_a_clean_log_untouched() {
+  // With no infrequent behaviour there is nothing to filter, so a non-zero
+  // threshold yields exactly the same model as the classic miner.
+  assert(mine_tree_imf({{"a", "b", "c"}}, 0.3) == "->(a, b, c)");
+  assert(mine_tree_imf({{"a", "b", "d"}, {"a", "c", "d"}}, 0.3) ==
+         "->(a, X(b, c), d)");
 }
 
 minera::ProcessTree tree_from_variants(
@@ -1069,6 +1099,8 @@ int main() {
   inductive_miner_models_optional_skip();
   inductive_miner_pushes_empty_trace_through_cut();
   inductive_miner_falls_back_to_flower();
+  inductive_miner_infrequent_recovers_a_noisy_sequence();
+  inductive_miner_infrequent_leaves_a_clean_log_untouched();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
   alpha_miner_discovers_a_sequence();
