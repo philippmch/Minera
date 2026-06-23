@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
 import { type PetriLayout } from "../petri-layout";
 
@@ -6,12 +6,14 @@ interface PetriNetProps {
   layout: PetriLayout;
   /** Caption shown next to the panel title, e.g. the selected miner. */
   title?: string;
+  /** Extra controls (e.g. an export button) shown in the panel header. */
+  actions?: ReactNode;
 }
 
 // Renders an Alpha Miner workflow net: places as circles (source and sink
 // marked), transitions as labeled boxes, arcs as arrowed curves. Pan/zoom
 // behaviour mirrors the process-tree view.
-export function PetriNet({ layout, title }: PetriNetProps) {
+export function PetriNet({ layout, title, actions }: PetriNetProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
 
@@ -56,6 +58,7 @@ export function PetriNet({ layout, title }: PetriNetProps) {
             <span><i className="petri-legend-place" /> place</span>
             <span><i className="petri-legend-trans" /> activity</span>
           </div>
+          {actions}
           <button className="btn-ghost" onClick={() => setView(layout.fit)}>
             Fit
           </button>

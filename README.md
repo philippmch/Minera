@@ -34,6 +34,19 @@ workflows with native performance.
   deviates, plus cost-based fitness. Token replay is robust on unsound nets;
   alignments report that they can't be computed when a net (e.g. an Alpha net
   with concurrency) has an unreachable final marking.
+- **Performance (time) perspective**: from event timestamps, Minera measures
+  the waiting time on every directly-follows edge (count, mean, median, min,
+  max, total) and the end-to-end throughput time of each case. An ISO-8601
+  timestamp parser normalizes instants (handling `T`/space separators,
+  fractional seconds, and `Z`/±HH:MM offsets); untimed events are simply skipped.
+- **Organizational (resource) perspective**: with a resource attribute (a CSV
+  `resource` column or the XES `org:resource` attribute), Minera builds the
+  handover-of-work social network — how often work passes from one resource to
+  another within a case — plus per-resource workload counts.
+- **PNML export**: any discovered model can be written as PNML (ISO/IEC
+  15909-2), the standard Petri-net interchange format read by ProM and PM4Py.
+  Every miner reuses the same workflow-net translation used for conformance, so
+  the exported net is exactly what Minera checks.
 - Log preprocessing: filter an event log by activity projection, trace length,
   start/end activities, and variant frequency (minimum count or top-N) before
   discovery.
@@ -69,8 +82,10 @@ auto count = graph.edge_count("Register request", "Check ticket");
 ```
 
 By default, Minera expects CSV columns named `case_id`, `activity`, and
-optionally `timestamp`. If `timestamp` is present, events inside each trace are
-sorted lexicographically by timestamp, which fits ISO-8601 exports.
+optionally `timestamp` and `resource`. If `timestamp` is present, events inside
+each trace are sorted lexicographically by timestamp, which fits ISO-8601
+exports, and feeds the performance perspective; if `resource` is present it
+feeds the organizational perspective.
 
 ## Frontend
 
@@ -94,22 +109,28 @@ events first; discovery lives in tabs:
 - **Event Log** — the imported cases with their event sequences and
   timestamps, filterable by case id,
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
-  minimum-frequency path filter), a variant explorer that highlights paths on
-  the map, and per-activity frequency, entry, and exit statistics,
+  minimum-frequency path filter) with a **frequency / performance** toggle that
+  relabels edges with mean waiting times (and shows median/mean case throughput)
+  when the log is timed, a variant explorer that highlights paths on the map,
+  and per-activity frequency, entry, and exit statistics,
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the Heuristic Miner's dependency and
-  frequency thresholds are live sliders that re-mine the net in the browser,
+  frequency thresholds are live sliders that re-mine the net in the browser, and
+  a **Download … as PNML** button exports the model for ProM/PM4Py,
 - **Conformance** — pick any miner and any method: fitness and precision of the
   log against that miner's model, plus a per-variant breakdown of where traces
   deviate. **Token Replay** shows token counts; **Alignments** renders each
   deviating trace move by move (synchronous, log-only, model-only). Every miner
   is checked both ways at import; when a model isn't a sound workflow net the
-  alignment view says so rather than showing misleading numbers.
+  alignment view says so rather than showing misleading numbers,
+- **Resources** — when the log carries a resource attribute: the workload per
+  resource and the handover-of-work network (how often a case passes from one
+  resource to the next).
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency) or a subset of activities;
-every view — log, graph, model, and conformance — updates together.
+every view — log, graph, model, conformance, and resources — updates together.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
@@ -138,7 +159,19 @@ Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--start-activities`, `--end-activities`, `--min-length`,
 and `--max-length`. Run `minera_export` without arguments to see usage. The same
 filters are available on `POST /api/mine` as form fields (`top_variants`,
-`min_variant_frequency`, `keep_activities`, …). The HTTP layer uses the vendored
+`min_variant_frequency`, `keep_activities`, …).
+
+The JSON export also carries the performance (`performance`) and resource
+(`resources`) perspectives. To additionally write a model as PNML, pass
+`--pnml <path>` (and `--pnml-miner inductive|alpha|heuristic`, default
+`inductive`); the running server exposes the same export at
+`GET /api/pnml?miner=…`:
+
+```sh
+./build/minera_export my_event_log.csv --pnml model.pnml --pnml-miner alpha
+```
+
+The HTTP layer uses the vendored
 [cpp-httplib](https://github.com/yhirose/cpp-httplib)
 (`third_party/httplib.h`).
 

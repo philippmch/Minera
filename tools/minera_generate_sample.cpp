@@ -54,6 +54,24 @@ std::string to_timestamp(long minutes) {
   return buffer;
 }
 
+// The team that performs each activity, so the sample carries an organizational
+// perspective (handover-of-work between roles) alongside its timing.
+std::string resource_for(const std::string& activity) {
+  if (activity == "Receive Order") return "Sales";
+  if (activity == "Check Credit" || activity == "Request Credit Review") {
+    return "Finance";
+  }
+  if (activity == "Approve Order" || activity == "Reject Order" ||
+      activity == "Amend Order" || activity == "Cancel Order") {
+    return "Manager";
+  }
+  if (activity == "Pick Items" || activity == "Pack Shipment") {
+    return "Warehouse";
+  }
+  if (activity == "Ship Order") return "Logistics";
+  return "Billing";  // Send Invoice, Send Reminder, Receive Payment
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -80,14 +98,15 @@ int main(int argc, char** argv) {
   std::uniform_int_distribution<long> start_offset(0, 120L * 24 * 60);
   std::uniform_int_distribution<long> step_gap(30, 36L * 60);
 
-  out << "case_id,activity,timestamp\n";
+  out << "case_id,activity,timestamp,resource\n";
   for (int id = 1; id <= kCaseCount; ++id) {
     const auto& steps = population[pick(rng)]->steps;
     long minutes = 4L * 24 * 60 + start_offset(rng);
     char case_id[16];
     std::snprintf(case_id, sizeof(case_id), "ORD-%04d", id);
     for (const auto& step : steps) {
-      out << case_id << ',' << step << ',' << to_timestamp(minutes) << '\n';
+      out << case_id << ',' << step << ',' << to_timestamp(minutes) << ','
+          << resource_for(step) << '\n';
       minutes += step_gap(rng);
     }
   }

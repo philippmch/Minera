@@ -97,3 +97,27 @@ export async function alignModel(miner: string): Promise<Alignments> {
   }
   return parsed as Alignments;
 }
+
+/**
+ * Fetches one miner's model from the most recently mined log as standard PNML.
+ * The net is translated server-side (the single source of truth used for
+ * conformance), so this only works for a log mined this session.
+ */
+export async function fetchPnml(miner: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/pnml?miner=${encodeURIComponent(miner)}`);
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  if (!response.ok) {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}

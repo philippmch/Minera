@@ -30,6 +30,8 @@ export interface EdgeLayout {
   label: { x: number; y: number };
   width: number;
   opacity: number;
+  /** Mean waiting time in seconds, when the log is timed; undefined otherwise. */
+  duration?: number;
 }
 
 export interface ViewBox {
@@ -313,6 +315,15 @@ export function computeLayout(data: MineraExport): GraphLayout {
     h: maxY - minY + pad * 2,
   };
 
+  // Mean waiting time per real edge, keyed by source>target, so the process map
+  // can label edges with time as well as frequency. START/END edges have none.
+  const durations = new Map<string, number>();
+  for (const edge of data.performance?.edges ?? []) {
+    if (edge.stats.count > 0) {
+      durations.set(edgeKey(edge.source, edge.target), edge.stats.mean);
+    }
+  }
+
   // Render geometry.
   const maxCount = Math.max(...edges.map((e) => e.count));
   let backIndex = 0;
@@ -341,6 +352,7 @@ export function computeLayout(data: MineraExport): GraphLayout {
       label: geo.label,
       width,
       opacity: 0.3 + 0.65 * (edge.count / maxCount),
+      duration: durations.get(edgeKey(edge.source, edge.target)),
     };
   });
 

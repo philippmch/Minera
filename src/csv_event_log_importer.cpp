@@ -129,6 +129,7 @@ EventLog import_csv_event_log(
     throw std::invalid_argument(
         "CSV column not found: " + options.timestamp_column);
   }
+  auto resource_index = optional_column(columns, options.resource_column);
 
   std::unordered_map<std::string, std::size_t> trace_ids;
   EventLog log;
@@ -147,6 +148,9 @@ EventLog import_csv_event_log(
     auto timestamp = timestamp_index
                          ? field_at(fields, *timestamp_index, line_number)
                          : std::string{};
+    auto resource = resource_index
+                        ? field_at(fields, *resource_index, line_number)
+                        : std::string{};
 
     if (case_id.empty()) {
       throw std::runtime_error(
@@ -163,7 +167,7 @@ EventLog import_csv_event_log(
     }
 
     log.traces[it->second].events.push_back(
-        Event{case_id, activity, timestamp, input_order++});
+        Event{case_id, activity, timestamp, resource, input_order++});
   }
 
   if (timestamp_index) {

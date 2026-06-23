@@ -19,6 +19,9 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/performance.hpp"
+#include "minera/pnml.hpp"
+#include "minera/resource_analysis.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
 namespace {
@@ -55,7 +58,11 @@ int usage(const char* program) {
                "  --case-column <name>      Case id column (default: case_id)\n"
                "  --activity-column <name>  Activity column (default: activity)\n"
                "  --timestamp-column <name> Timestamp column (default: timestamp)\n"
+               "  --resource-column <name>  Resource column (default: resource)\n"
                "  --delimiter <char>        Field delimiter (default: ,)\n"
+               "  --pnml <path>             Also write a model as PNML to <path>\n"
+               "  --pnml-miner <id>         Which model to export as PNML:\n"
+               "                            inductive (default), alpha, or heuristic\n"
                "\n  Log filtering (applied before discovery):\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
@@ -73,6 +80,8 @@ int usage(const char* program) {
 int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
+  std::filesystem::path pnml_output;
+  std::string pnml_miner = "inductive";
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
 
@@ -98,6 +107,18 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       options.timestamp_column = value;
+    } else if (arg == "--resource-column") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      options.resource_column = value;
+    } else if (arg == "--pnml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      pnml_output = value;
+    } else if (arg == "--pnml-miner") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      pnml_miner = value;
     } else if (arg == "--delimiter") {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
@@ -160,6 +181,8 @@ int main(int argc, char** argv) {
     const auto tree = minera::discover_process_tree(log);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
+    const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto resources = minera::discover_resource_network(log);
 
     // Check every discovered model both ways, keyed by miner id. The export is
     // offline, so embed the alignments too (the server defers them instead).
@@ -178,7 +201,8 @@ int main(int argc, char** argv) {
 
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
-                                  &heuristics, &conformance);
+                                  &heuristics, &conformance, &performance,
+                                  &resources);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -186,7 +210,31 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
-                                  &heuristics, &conformance);
+                                  &heuristics, &conformance, &performance,
+                                  &resources);
+    }
+
+    // Optionally emit one discovered model as standard PNML.
+    if (!pnml_output.empty()) {
+      const minera::PetriNet* selected = nullptr;
+      if (pnml_miner == "inductive") {
+        selected = &inductive_net;
+      } else if (pnml_miner == "alpha") {
+        selected = &net;
+      } else if (pnml_miner == "heuristic") {
+        selected = &heuristic_net;
+      } else {
+        std::cerr << "error: unknown --pnml-miner '" << pnml_miner
+                  << "' (expected inductive, alpha, or heuristic)\n";
+        return 1;
+      }
+      std::ofstream pnml_file(pnml_output);
+      if (!pnml_file) {
+        std::cerr << "error: cannot open PNML output file " << pnml_output
+                  << '\n';
+        return 1;
+      }
+      minera::write_pnml(pnml_file, *selected, pnml_miner + " net");
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

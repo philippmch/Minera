@@ -225,6 +225,47 @@ void write_conformance_models(std::ostream& out,
   out << '}';
 }
 
+void write_duration_stats(std::ostream& out, const DurationStats& stats) {
+  out << "{\"count\": " << stats.count << ", \"total\": " << stats.total
+      << ", \"mean\": " << stats.mean << ", \"median\": " << stats.median
+      << ", \"min\": " << stats.min << ", \"max\": " << stats.max << '}';
+}
+
+void write_performance(std::ostream& out, const PerformanceMetrics& performance) {
+  out << "{\"timed_traces\": " << performance.timed_traces
+      << ", \"case_duration\": ";
+  write_duration_stats(out, performance.case_duration);
+  out << ", \"edges\": [";
+  const auto& edges = performance.edges;
+  for (std::size_t i = 0; i < edges.size(); ++i) {
+    out << "{\"source\": " << edges[i].source
+        << ", \"target\": " << edges[i].target << ", \"stats\": ";
+    write_duration_stats(out, edges[i].stats);
+    out << '}' << (i + 1 < edges.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
+void write_resources(std::ostream& out, const ResourceNetwork& resources) {
+  out << "{\"total_handovers\": " << resources.total_handovers
+      << ", \"resources\": [";
+  for (std::size_t i = 0; i < resources.resources.size(); ++i) {
+    out << "{\"name\": ";
+    write_json_string(out, resources.resources[i]);
+    out << ", \"event_count\": " << resources.event_counts[i] << '}'
+        << (i + 1 < resources.resources.size() ? ", " : "");
+  }
+  out << "], \"handovers\": [";
+  const auto& handovers = resources.handovers;
+  for (std::size_t i = 0; i < handovers.size(); ++i) {
+    out << "{\"source\": " << handovers[i].source
+        << ", \"target\": " << handovers[i].target
+        << ", \"count\": " << handovers[i].count << '}'
+        << (i + 1 < handovers.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -234,7 +275,9 @@ void write_analysis_json(std::ostream& out,
                          const ProcessTree* tree,
                          const PetriNet* net,
                          const HeuristicsNet* heuristics,
-                         const std::vector<ModelConformance>* conformance) {
+                         const std::vector<ModelConformance>* conformance,
+                         const PerformanceMetrics* performance,
+                         const ResourceNetwork* resources) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -255,6 +298,10 @@ void write_analysis_json(std::ostream& out,
       out << "{\"activity\": " << *graph.activity_id(event.activity)
           << ", \"timestamp\": ";
       write_json_string(out, event.timestamp);
+      if (!event.resource.empty()) {
+        out << ", \"resource\": ";
+        write_json_string(out, event.resource);
+      }
       out << '}' << (j + 1 < trace.events.size() ? ", " : "");
     }
     out << "]}" << (i + 1 < log.traces.size() ? "," : "") << '\n';
@@ -315,6 +362,14 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"conformance\": ";
     write_conformance_models(out, *conformance, graph);
   }
+  if (performance != nullptr) {
+    out << ",\n  \"performance\": ";
+    write_performance(out, *performance);
+  }
+  if (resources != nullptr) {
+    out << ",\n  \"resources\": ";
+    write_resources(out, *resources);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -325,10 +380,12 @@ std::string analysis_json(std::string_view dataset,
                           const ProcessTree* tree,
                           const PetriNet* net,
                           const HeuristicsNet* heuristics,
-                          const std::vector<ModelConformance>* conformance) {
+                          const std::vector<ModelConformance>* conformance,
+                          const PerformanceMetrics* performance,
+                          const ResourceNetwork* resources) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
-                      conformance);
+                      conformance, performance, resources);
   return out.str();
 }
 

@@ -10,6 +10,7 @@ struct Event {
   std::string case_id;
   std::string activity;
   std::string timestamp;
+  std::string resource;  // who performed the activity; empty when unknown
   std::size_t input_order = 0;
 };
 

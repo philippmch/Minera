@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type GraphLayout, type ViewBox, edgeKey } from "../layout";
-import { numberFormat, START, END } from "../types";
+import { type DurationStats, formatDuration, numberFormat, START, END } from "../types";
 
 interface Highlight {
   edges: Set<string>;
   nodes: Set<number>;
 }
+
+type MapMode = "frequency" | "performance";
 
 interface ProcessMapProps {
   layout: GraphLayout;
@@ -14,6 +16,8 @@ interface ProcessMapProps {
   onThresholdChange: (value: number) => void;
   /** Variant selection from the side panel, if any. */
   selection: Highlight | null;
+  /** Case throughput stats, when the log is timed; enables the time view. */
+  caseDuration?: DurationStats;
 }
 
 export function ProcessMap({
@@ -22,10 +26,16 @@ export function ProcessMap({
   maxEdgeCount,
   onThresholdChange,
   selection,
+  caseDuration,
 }: ProcessMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
   const [hoverNode, setHoverNode] = useState<number | null>(null);
+  const [mode, setMode] = useState<MapMode>("frequency");
+
+  // The time view is only meaningful when the log carried timestamps.
+  const hasPerformance = (caseDuration?.count ?? 0) > 0;
+  const showTime = mode === "performance" && hasPerformance;
 
   useEffect(() => setView(layout.fit), [layout]);
 
@@ -95,6 +105,28 @@ export function ProcessMap({
       <div className="panel-head">
         <h2>Process map</h2>
         <div className="map-controls">
+          {hasPerformance && (
+            <div className="map-mode" role="group" aria-label="Map metric">
+              <button
+                className={mode === "frequency" ? "mode-btn active" : "mode-btn"}
+                onClick={() => setMode("frequency")}
+              >
+                Frequency
+              </button>
+              <button
+                className={mode === "performance" ? "mode-btn active" : "mode-btn"}
+                onClick={() => setMode("performance")}
+              >
+                Performance
+              </button>
+            </div>
+          )}
+          {showTime && caseDuration && (
+            <span className="map-stat" title="Median / mean case throughput time">
+              case ≈ {formatDuration(caseDuration.median)} ·{" "}
+              {formatDuration(caseDuration.mean)} avg
+            </span>
+          )}
           <label className="threshold">
             <span className="threshold-label">paths ≥</span>
             <input
@@ -162,7 +194,9 @@ export function ProcessMap({
                       x={edge.label.x}
                       y={edge.label.y + 3}
                     >
-                      {numberFormat.format(edge.count)}
+                      {showTime
+                        ? formatDuration(edge.duration ?? 0)
+                        : numberFormat.format(edge.count)}
                     </text>
                   )}
                 </g>

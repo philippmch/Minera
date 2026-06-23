@@ -134,9 +134,57 @@ export interface ModelConformance {
 /** Per-miner conformance, keyed by miner id ("inductive", "alpha", "heuristic"). */
 export type ConformanceModels = Record<string, ModelConformance>;
 
+/** Summary statistics over a set of durations, in seconds. */
+export interface DurationStats {
+  count: number;
+  total: number;
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+}
+
+/** Waiting-time statistics for one directly-follows edge. */
+export interface EdgePerformance {
+  source: number;
+  target: number;
+  stats: DurationStats;
+}
+
+/** The time perspective: per-edge waiting times and case throughput. */
+export interface Performance {
+  /** Traces with at least two parseable timestamps. */
+  timed_traces: number;
+  /** First-to-last event duration across timed traces. */
+  case_duration: DurationStats;
+  /** Edge timings, in the same order as MineraExport.edges. */
+  edges: EdgePerformance[];
+}
+
+export interface ResourceStat {
+  name: string;
+  event_count: number;
+}
+
+/** A handover of work from one resource to another (indexes into resources). */
+export interface ResourceHandover {
+  source: number;
+  target: number;
+  count: number;
+}
+
+/** The organizational perspective: who works, and how work is handed over. */
+export interface ResourceNetwork {
+  total_handovers: number;
+  resources: ResourceStat[];
+  handovers: ResourceHandover[];
+}
+
 export interface TraceEvent {
   activity: number;
   timestamp: string;
+  /** Performing resource; present only when the log carries one. */
+  resource?: string;
 }
 
 export interface Trace {
@@ -166,6 +214,10 @@ export interface MineraExport {
   petri_net?: PetriNetModel;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
+  /** Time perspective (edge waiting times, case throughput); absent in older exports. */
+  performance?: Performance;
+  /** Organizational perspective (handover-of-work network); absent in older exports. */
+  resources?: ResourceNetwork;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
@@ -185,3 +237,16 @@ export const START = -1;
 export const END = -2;
 
 export const numberFormat = new Intl.NumberFormat("en-US");
+
+/**
+ * Formats a duration in seconds as a compact human label, picking the largest
+ * fitting unit: "12s", "3.4m", "2.1h", "5.0d". Non-positive or non-finite
+ * inputs render as an em dash so untimed edges read as "no data".
+ */
+export function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}
