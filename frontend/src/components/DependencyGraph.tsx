@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
 import { computeDependencyLayout } from "../dependency-layout";
 import { discoverHeuristicsNet } from "../heuristic-miner";
@@ -8,6 +8,8 @@ interface DependencyGraphProps {
   data: MineraExport;
   /** Caption shown next to the panel title, e.g. the selected miner. */
   title?: string;
+  /** Extra controls (e.g. an export button) shown in the panel header. */
+  actions?: ReactNode;
 }
 
 // Renders a heuristics net: the dependency graph the Heuristic Miner keeps after
@@ -15,7 +17,7 @@ interface DependencyGraphProps {
 // with their dependency measure. The dependency and frequency thresholds are
 // live sliders that re-mine the net in the browser. Pan/zoom mirrors the other
 // model views.
-export function DependencyGraph({ data, title }: DependencyGraphProps) {
+export function DependencyGraph({ data, title, actions }: DependencyGraphProps) {
   const [dependencyThreshold, setDependencyThreshold] = useState(0.9);
   const [minFrequency, setMinFrequency] = useState(1);
 
@@ -117,6 +119,7 @@ export function DependencyGraph({ data, title }: DependencyGraphProps) {
             />
             <span className="threshold-value">{minFrequency}</span>
           </label>
+          {actions}
           <button className="btn-ghost" onClick={() => setView(graph.fit)}>
             Fit
           </button>

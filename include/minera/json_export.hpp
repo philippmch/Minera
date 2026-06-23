@@ -9,8 +9,10 @@
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
 #include "minera/heuristic_miner.hpp"
+#include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/resource_analysis.hpp"
 
 namespace minera {
 
@@ -21,7 +23,10 @@ namespace minera {
 // "petri_net"; when `heuristics` is non-null the Heuristic Miner's dependency
 // graph is embedded under "heuristics_net"; when `conformance` is non-null each
 // model's conformance is embedded under "conformance", keyed by miner id, with
-// a "token_replay" and an "alignments" result per miner.
+// a "token_replay" and an "alignments" result per miner. When `performance` is
+// non-null the time perspective (per-edge waiting times and case throughput) is
+// embedded under "performance"; when `resources` is non-null the handover-of-
+// work network is embedded under "resources".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -29,7 +34,9 @@ void write_analysis_json(std::ostream& out,
                          const ProcessTree* tree = nullptr,
                          const PetriNet* net = nullptr,
                          const HeuristicsNet* heuristics = nullptr,
-                         const std::vector<ModelConformance>* conformance = nullptr);
+                         const std::vector<ModelConformance>* conformance = nullptr,
+                         const PerformanceMetrics* performance = nullptr,
+                         const ResourceNetwork* resources = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -38,7 +45,9 @@ void write_analysis_json(std::ostream& out,
     const ProcessTree* tree = nullptr,
     const PetriNet* net = nullptr,
     const HeuristicsNet* heuristics = nullptr,
-    const std::vector<ModelConformance>* conformance = nullptr);
+    const std::vector<ModelConformance>* conformance = nullptr,
+    const PerformanceMetrics* performance = nullptr,
+    const ResourceNetwork* resources = nullptr);
 
 // Serializes a single alignment result (the object the frontend reads as one
 // model's `alignments`), for the server's on-demand alignment endpoint.

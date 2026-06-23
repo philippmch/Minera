@@ -24,7 +24,10 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/pnml.hpp"
+#include "minera/resource_analysis.hpp"
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
@@ -128,6 +131,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       if (const auto value = form_field(request, "timestamp_column"); !value.empty()) {
         options.timestamp_column = value;
       }
+      if (const auto value = form_field(request, "resource_column"); !value.empty()) {
+        options.resource_column = value;
+      }
       if (const auto value = form_field(request, "delimiter"); !value.empty()) {
         options.delimiter = value.front();
       }
@@ -175,6 +181,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
+    const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto resources = minera::discover_resource_network(log);
 
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
@@ -188,8 +196,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net)};
 
-    const std::string body = minera::analysis_json(dataset, log, graph, &tree,
-                                                   &net, &heuristics, &conformance);
+    const std::string body =
+        minera::analysis_json(dataset, log, graph, &tree, &net, &heuristics,
+                              &conformance, &performance, &resources);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.
@@ -245,6 +254,34 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+// Exports one model from the most recent mine as standard PNML. Expects a
+// `miner` query parameter ("inductive" | "alpha" | "heuristic").
+void handle_pnml(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  const std::string miner = request.get_param_value("miner");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+
+  response.set_content(minera::to_pnml(it->second, miner + " net"),
+                       "application/xml");
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -295,6 +332,7 @@ int main(int argc, char** argv) {
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Get("/api/pnml", handle_pnml);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;

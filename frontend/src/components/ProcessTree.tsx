@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
 import { type TreeLayout } from "../tree-layout";
 
@@ -13,9 +13,11 @@ interface ProcessTreeProps {
   layout: TreeLayout;
   /** Caption shown next to the panel title, e.g. the selected miner. */
   title?: string;
+  /** Extra controls (e.g. an export button) shown in the panel header. */
+  actions?: ReactNode;
 }
 
-export function ProcessTree({ layout, title }: ProcessTreeProps) {
+export function ProcessTree({ layout, title, actions }: ProcessTreeProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
 
@@ -62,6 +64,7 @@ export function ProcessTree({ layout, title }: ProcessTreeProps) {
             <span><i className="tree-legend-op">∧</i> parallel</span>
             <span><i className="tree-legend-op">↺</i> loop</span>
           </div>
+          {actions}
           <button className="btn-ghost" onClick={() => setView(layout.fit)}>
             Fit
           </button>

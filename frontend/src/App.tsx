@@ -13,6 +13,7 @@ import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
 import { Conformance } from "./components/Conformance";
+import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
@@ -20,7 +21,7 @@ import { EventLogView } from "./components/EventLogView";
 import { Filters } from "./components/Filters";
 import { alignModel, mineCsv, type FilterOptions } from "./api";
 
-type Tab = "log" | "dfg" | "model" | "conformance";
+type Tab = "log" | "dfg" | "model" | "conformance" | "resources";
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
@@ -256,6 +257,14 @@ export default function App() {
             Conformance
           </button>
         )}
+        {data.resources && data.resources.resources.length > 0 && (
+          <button
+            className={tab === "resources" ? "tab active" : "tab"}
+            onClick={() => setTab("resources")}
+          >
+            Resources
+          </button>
+        )}
       </nav>
       <Kpis data={data} />
       {source && (
@@ -278,12 +287,18 @@ export default function App() {
             data={data}
             treeLayout={treeLayout}
             petriLayout={petriLayout}
+            canExportPnml={source !== null}
           />
         </main>
       )}
       {tab === "conformance" && (
         <main className="layout-log">
           <Conformance data={data} onRequestAlignment={requestAlignment} />
+        </main>
+      )}
+      {tab === "resources" && (
+        <main className="layout-log">
+          <Resources data={data} />
         </main>
       )}
       {tab === "dfg" && (
@@ -294,6 +309,7 @@ export default function App() {
             maxEdgeCount={maxEdgeCount}
             onThresholdChange={setThreshold}
             selection={selection}
+            caseDuration={data.performance?.case_duration}
           />
           <VariantList data={data} selected={selectedVariant} onSelect={setSelectedVariant} />
           <ActivityTable data={data} />

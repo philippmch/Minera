@@ -18,7 +18,11 @@ add_library(minera_core
   src/inductive_miner.cpp
   src/json_export.cpp
   src/log_filter.cpp
+  src/performance.cpp
   src/petri_net.cpp
+  src/pnml.cpp
+  src/resource_analysis.cpp
+  src/timestamp.cpp
   src/xes_event_log_importer.cpp
 )
 
@@ -67,4 +71,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_core_tests PRIVATE cxx_std_20)
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_perspective_tests
+    tests/test_perspectives.cpp
+  )
+  target_link_libraries(minera_perspective_tests PRIVATE minera::core)
+  target_compile_features(minera_perspective_tests PRIVATE cxx_std_20)
+
+  add_test(NAME minera_perspective_tests COMMAND minera_perspective_tests)
 endif()

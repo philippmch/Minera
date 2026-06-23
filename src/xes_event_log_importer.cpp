@@ -349,6 +349,8 @@ EventLog import_xes_event_log(
             } else if (*key == options.timestamp_attribute) {
               current_event.timestamp = *value;
               saw_timestamp = true;
+            } else if (*key == options.resource_attribute) {
+              current_event.resource = *value;
             }
           }
         }

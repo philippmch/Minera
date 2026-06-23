@@ -7,7 +7,15 @@ function formatTimestamp(value: string): string {
   return value ? value.replace("T", " ") : "—";
 }
 
-function CaseRow({ trace, data }: { trace: Trace; data: MineraExport }) {
+function CaseRow({
+  trace,
+  data,
+  showResource,
+}: {
+  trace: Trace;
+  data: MineraExport;
+  showResource: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const first = trace.events[0]?.timestamp;
   const last = trace.events[trace.events.length - 1]?.timestamp;
@@ -41,6 +49,9 @@ function CaseRow({ trace, data }: { trace: Trace; data: MineraExport }) {
               <tr key={i}>
                 <td className="num">{i + 1}</td>
                 <td>{data.activities[event.activity].name}</td>
+                {showResource && (
+                  <td className="case-event-resource">{event.resource ?? "—"}</td>
+                )}
                 <td className="case-event-time">{formatTimestamp(event.timestamp)}</td>
               </tr>
             ))}
@@ -55,6 +66,12 @@ export function EventLogView({ data }: { data: MineraExport }) {
   const traces = data.traces ?? [];
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
+
+  // Show the resource column only when the log actually carries one.
+  const showResource = useMemo(
+    () => traces.some((trace) => trace.events.some((event) => event.resource)),
+    [traces],
+  );
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -100,7 +117,12 @@ export function EventLogView({ data }: { data: MineraExport }) {
       </div>
       <ol className="case-list">
         {filtered.slice(0, limit).map((trace) => (
-          <CaseRow key={trace.case_id} trace={trace} data={data} />
+          <CaseRow
+            key={trace.case_id}
+            trace={trace}
+            data={data}
+            showResource={showResource}
+          />
         ))}
       </ol>
       {filtered.length > limit && (

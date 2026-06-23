@@ -523,6 +523,60 @@ input[type="range"]::-moz-range-thumb {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
+.btn-ghost:disabled { opacity: 0.5; cursor: default; }
+
+/* Frequency / performance toggle on the process map. */
+.map-mode {
+  display: inline-flex;
+  border: 1px solid var(--line);
+}
+.mode-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: var(--ink-45);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mode-btn + .mode-btn { border-left: 1px solid var(--line); }
+.mode-btn:hover { color: var(--ink); }
+.mode-btn.active { background: var(--copper-soft); color: var(--copper-deep); }
+
+.map-stat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-70);
+}
+
+.pnml-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pnml-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #b3261e;
+  max-width: 240px;
+}
+
+/* Resource (organizational) perspective: two side-by-side tables. */
+.layout-resources {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 32px;
+  align-items: start;
+}
+/* These panels reuse .activities-panel for table styling, which carries a
+   grid-area meant for the DFG layout; clear it so they flow into the columns. */
+.layout-resources > .panel { grid-area: auto; }
+@media (max-width: 900px) {
+  .layout-resources { grid-template-columns: 1fr; }
+}
 
 .map-wrap {
   position: relative;
@@ -969,6 +1023,12 @@ input[type="range"]::-moz-range-thumb {
   font-size: 11.5px;
   color: var(--ink-70);
   text-align: right;
+}
+
+.case-event-resource {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-45);
 }
 
 .case-more {

@@ -990,7 +990,8 @@ minera::EventLog log_of(const std::vector<std::vector<std::string>>& traces) {
     minera::Trace trace;
     trace.case_id = std::to_string(i);
     for (const auto& activity : traces[i]) {
-      trace.events.push_back(minera::Event{trace.case_id, activity, "", order++});
+      trace.events.push_back(
+          minera::Event{trace.case_id, activity, "", "", order++});
     }
     log.traces.push_back(std::move(trace));
   }

@@ -12,6 +12,7 @@ struct CsvImportOptions {
   std::string case_id_column = "case_id";
   std::string activity_column = "activity";
   std::string timestamp_column = "timestamp";
+  std::string resource_column = "resource";  // optional; the org perspective
   bool require_timestamp_column = false;
   bool has_header = true;
   bool trim_fields = true;

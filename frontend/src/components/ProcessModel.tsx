@@ -3,6 +3,7 @@ import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
+import { fetchPnml } from "../api";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
@@ -16,6 +17,8 @@ interface ProcessModelProps {
   treeLayout: TreeLayout | null;
   /** Layout for the alpha miner's Petri net, if the export carries one. */
   petriLayout: PetriLayout | null;
+  /** Whether the backend can export PNML (a log was mined this session). */
+  canExportPnml: boolean;
 }
 
 // A small wizard: pick a miner family, then a variant, then the mined model is
@@ -24,6 +27,7 @@ export function ProcessModel({
   data,
   treeLayout,
   petriLayout,
+  canExportPnml,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -116,10 +120,12 @@ export function ProcessModel({
       {step === "result" && group && variant && (
         <ModelResult
           variant={variant}
+          minerId={group.id}
           groupName={group.name}
           data={data}
           treeLayout={treeLayout}
           petriLayout={petriLayout}
+          canExportPnml={canExportPnml}
         />
       )}
     </div>
@@ -128,10 +134,12 @@ export function ProcessModel({
 
 interface ModelResultProps {
   variant: MinerVariant;
+  minerId: string;
   groupName: string;
   data: MineraExport;
   treeLayout: TreeLayout | null;
   petriLayout: PetriLayout | null;
+  canExportPnml: boolean;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
@@ -139,14 +147,20 @@ interface ModelResultProps {
 // log too small to mine one), so an honest placeholder is shown instead.
 function ModelResult({
   variant,
+  minerId,
   groupName,
   data,
   treeLayout,
   petriLayout,
+  canExportPnml,
 }: ModelResultProps) {
+  const pnml = canExportPnml ? (
+    <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
+  ) : null;
+
   if (variant.artifact === "process-tree") {
     return treeLayout ? (
-      <ProcessTree layout={treeLayout} title={groupName} />
+      <ProcessTree layout={treeLayout} title={groupName} actions={pnml} />
     ) : (
       <Placeholder>
         No model to display. This export predates model discovery — re-open the
@@ -158,16 +172,59 @@ function ModelResult({
   if (variant.artifact === "dependency-graph") {
     // The dependency graph is derived from the directly-follows counts, which
     // every analysis carries, so it is always available.
-    return <DependencyGraph data={data} title={groupName} />;
+    return <DependencyGraph data={data} title={groupName} actions={pnml} />;
   }
 
   return petriLayout ? (
-    <PetriNet layout={petriLayout} title={groupName} />
+    <PetriNet layout={petriLayout} title={groupName} actions={pnml} />
   ) : (
     <Placeholder>
       No model to display. This export predates {groupName} discovery — re-open
       the CSV event log to mine a Petri net.
     </Placeholder>
+  );
+}
+
+// Downloads the shown model as standard PNML. Every miner is translated to a
+// workflow net server-side — the same net used for conformance — so the export
+// is faithful to what Minera actually checks.
+function PnmlButton({
+  minerId,
+  groupName,
+  dataset,
+}: {
+  minerId: string;
+  groupName: string;
+  dataset: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = () => {
+    setBusy(true);
+    setError(null);
+    fetchPnml(minerId)
+      .then((xml) => {
+        const blob = new Blob([xml], { type: "application/xml" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const base = dataset.replace(/\.[^.]+$/, "") || "model";
+        anchor.href = url;
+        anchor.download = `${base}-${minerId}.pnml`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="pnml-export">
+      <button className="btn-ghost" onClick={download} disabled={busy}>
+        {busy ? "Exporting…" : `Download ${groupName} as PNML`}
+      </button>
+      {error && <span className="pnml-error">{error}</span>}
+    </span>
   );
 }
 
