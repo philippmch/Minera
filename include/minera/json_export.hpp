@@ -40,4 +40,9 @@ void write_analysis_json(std::ostream& out,
     const HeuristicsNet* heuristics = nullptr,
     const std::vector<ModelConformance>* conformance = nullptr);
 
+// Serializes a single alignment result (the object the frontend reads as one
+// model's `alignments`), for the server's on-demand alignment endpoint.
+[[nodiscard]] std::string alignment_json(const AlignmentResult& alignment,
+                                         const DirectlyFollowsGraph& graph);
+
 }  // namespace minera

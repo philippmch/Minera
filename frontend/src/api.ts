@@ -1,4 +1,4 @@
-import { type MineraExport, isMineraExport } from "./types";
+import { type Alignments, type MineraExport, isMineraExport } from "./types";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -66,4 +66,34 @@ export async function mineCsv(
     throw new Error("the Minera backend returned an invalid analysis");
   }
   return parsed;
+}
+
+/**
+ * Asks the backend to align the most recently mined log against one miner's
+ * model. The server defers this costlier computation to here so a mine never
+ * pays for alignments the user may not open.
+ */
+export async function alignModel(miner: string): Promise<Alignments> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/align?miner=${encodeURIComponent(miner)}`, {
+      method: "POST",
+    });
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+    throw new Error(String((parsed as { error: unknown }).error));
+  }
+  if (!response.ok) {
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (parsed === null || typeof parsed !== "object" || !("computed" in parsed)) {
+    throw new Error("the Minera backend returned an invalid alignment");
+  }
+  return parsed as Alignments;
 }

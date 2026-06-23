@@ -161,17 +161,19 @@ int main(int argc, char** argv) {
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
 
-    // Check every discovered model both ways, keyed by miner id.
+    // Check every discovered model both ways, keyed by miner id. The export is
+    // offline, so embed the alignments too (the server defers them instead).
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
-    const std::vector<minera::ModelConformance> conformance = {
-        {"inductive", minera::check_conformance(log, inductive_net),
-         minera::check_alignment(log, inductive_net)},
-        {"alpha", minera::check_conformance(log, net),
-         minera::check_alignment(log, net)},
-        {"heuristic", minera::check_conformance(log, heuristic_net),
-         minera::check_alignment(log, heuristic_net)},
+    const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      return minera::ModelConformance{
+          std::move(id), minera::final_marking_reachable(petri),
+          minera::check_conformance(log, petri),
+          minera::check_alignment(log, petri)};
     };
+    const std::vector<minera::ModelConformance> conformance = {
+        model("inductive", inductive_net), model("alpha", net),
+        model("heuristic", heuristic_net)};
     const auto dataset = input.filename().string();
 
     if (output.empty()) {

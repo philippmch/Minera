@@ -176,6 +176,7 @@ void write_alignments(std::ostream& out,
                       const AlignmentResult& alignments,
                       const DirectlyFollowsGraph& graph) {
   out << "{\"computed\": " << (alignments.computed ? "true" : "false")
+      << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false")
       << ", \"fitness\": " << alignments.fitness
       << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
@@ -202,18 +203,23 @@ void write_alignments(std::ostream& out,
   out << "]}";
 }
 
-// Writes the per-miner conformance map: each miner id maps to its token-replay
-// and alignment results, so the frontend can offer any miner against any method.
+// Writes the per-miner conformance map: each miner id maps to whether its net is
+// sound, its token-replay result, and — when present — its alignment result.
+// (The server omits alignments here and serves them on demand; the CLI embeds
+// them.) This lets the frontend offer any miner against any method.
 void write_conformance_models(std::ostream& out,
                               const std::vector<ModelConformance>& models,
                               const DirectlyFollowsGraph& graph) {
   out << '{';
   for (std::size_t i = 0; i < models.size(); ++i) {
     write_json_string(out, models[i].miner);
-    out << ": {\"token_replay\": ";
+    out << ": {\"sound\": " << (models[i].sound ? "true" : "false")
+        << ", \"token_replay\": ";
     write_conformance(out, models[i].token_replay, graph);
-    out << ", \"alignments\": ";
-    write_alignments(out, models[i].alignments, graph);
+    if (models[i].alignments) {
+      out << ", \"alignments\": ";
+      write_alignments(out, *models[i].alignments, graph);
+    }
     out << '}' << (i + 1 < models.size() ? ", " : "");
   }
   out << '}';
@@ -323,6 +329,13 @@ std::string analysis_json(std::string_view dataset,
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance);
+  return out.str();
+}
+
+std::string alignment_json(const AlignmentResult& alignment,
+                           const DirectlyFollowsGraph& graph) {
+  std::ostringstream out;
+  write_alignments(out, alignment, graph);
   return out.str();
 }
 

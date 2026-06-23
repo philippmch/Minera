@@ -34,6 +34,20 @@ std::string encode(const Marking& marking) {
   return key;
 }
 
+// FNV-1a hash of a token vector, used to key alignment search states directly on
+// the marking (with the trace position appended) instead of formatting a string
+// per state — the search visits far too many states for that to be cheap.
+struct MarkingHash {
+  std::size_t operator()(const std::vector<int>& v) const noexcept {
+    std::size_t h = 1469598103934665603ull;
+    for (const int x : v) {
+      h = (h ^ static_cast<std::size_t>(static_cast<unsigned>(x))) *
+          1099511628211ull;
+    }
+    return h;
+  }
+};
+
 // Holds the net plus the lookups token replay needs and drives both the
 // fitness and precision passes over a single shared translation.
 class Replayer {
@@ -367,10 +381,19 @@ class Aligner {
     Marking start(net_.place_count(), 0);
     start[net_.source()] = 1;
 
+    // A search state is the marking with the trace position appended, so it can
+    // serve directly as a hash-map key without formatting a string per state.
+    const auto key_of = [](const Marking& m, std::size_t pos) {
+      Marking key = m;
+      key.push_back(static_cast<int>(pos));
+      return key;
+    };
+    using State = Marking;
+
     // How a state was reached, for path reconstruction. A silent step carries no
     // visible move; its `name` is empty and it is dropped from the alignment.
     struct Recorded {
-      std::string prev;
+      State prev;
       AlignmentMoveType type = AlignmentMoveType::kModel;
       std::string name;
       bool silent = false;
@@ -387,35 +410,32 @@ class Aligner {
     };
 
     std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
-    std::unordered_map<std::string, std::uint64_t> best;
-    std::unordered_map<std::string, Recorded> came;
+    std::unordered_map<State, std::uint64_t, MarkingHash> best;
+    std::unordered_map<State, Recorded, MarkingHash> came;
     std::uint64_t seq = 0;
 
-    const auto key_of = [](const Marking& m, std::size_t pos) {
-      return encode(m) + '#' + std::to_string(pos);
-    };
-    const std::string start_key = key_of(start, 0);
+    const State start_key = key_of(start, 0);
     best[start_key] = 0;
     frontier.push({0, seq++, start, 0});
 
     const auto relax = [&](const Marking& m, std::size_t pos,
-                           std::uint64_t cost, const std::string& prev,
+                           std::uint64_t cost, const State& prev,
                            AlignmentMoveType type, std::string name,
                            bool silent) {
-      const std::string key = key_of(m, pos);
+      State key = key_of(m, pos);
       const auto it = best.find(key);
       if (it != best.end() && it->second <= cost) return;
-      best[key] = cost;
       came[key] = Recorded{prev, type, std::move(name), silent};
+      best[std::move(key)] = cost;
       frontier.push({cost, seq++, m, pos});
     };
 
-    std::string goal_key;
+    State goal_key;
     std::size_t expanded = 0;
     while (!frontier.empty() && expanded < kAlignSearchCap) {
       Node node = std::move(const_cast<Node&>(frontier.top()));
       frontier.pop();
-      const std::string key = key_of(node.marking, node.pos);
+      const State key = key_of(node.marking, node.pos);
       const auto it = best.find(key);
       if (it != best.end() && node.cost > it->second) continue;  // stale entry
       ++expanded;
@@ -466,7 +486,7 @@ class Aligner {
     }
 
     outcome.cost = best[goal_key];
-    for (std::string key = goal_key; key != start_key;) {
+    for (State key = goal_key; key != start_key;) {
       const Recorded& rec = came[key];
       if (!rec.silent) {
         outcome.moves.push_back({rec.type, rec.name});
@@ -608,9 +628,11 @@ AlignmentResult check_alignment(const EventLog& event_log,
   for (const auto& variant : variants) {
     const auto outcome = aligner.align(variant.ids, variant.names);
     if (outcome.capped) {
-      // The search could not align a trace within its bound — the net admits
-      // unbounded behavior, so the results are not trustworthy.
+      // The search could not align a trace within its bound — the net is
+      // reachable but unbounded or simply too large, so the results are not
+      // trustworthy. Flag it as exhausted (distinct from an unsound net).
       result.computed = false;
+      result.exhausted = true;
       result.variants.clear();
       result.fitting_traces = 0;
       result.total_cost = 0;
@@ -651,6 +673,12 @@ AlignmentResult check_alignment(const EventLog& event_log,
   // A process tree always translates to a sound workflow net, so this path
   // never reports computed == false.
   return check_alignment(event_log, to_petri_net(tree));
+}
+
+bool final_marking_reachable(const PetriNet& net) {
+  // The Aligner computes final-marking reachability in its constructor as the
+  // precondition for scoring, so reuse it rather than duplicate the search.
+  return Aligner(net).reachable();
 }
 
 }  // namespace minera

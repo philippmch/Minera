@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { type MineraExport, isMineraExport, numberFormat } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Alignments,
+  type MineraExport,
+  isMineraExport,
+  numberFormat,
+} from "./types";
 import { computeLayout } from "./layout";
 import { computeTreeLayout } from "./tree-layout";
 import { computePetriLayout } from "./petri-layout";
@@ -13,7 +18,7 @@ import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { Filters } from "./components/Filters";
-import { mineCsv, type FilterOptions } from "./api";
+import { alignModel, mineCsv, type FilterOptions } from "./api";
 
 type Tab = "log" | "dfg" | "model" | "conformance";
 
@@ -32,13 +37,32 @@ export default function App() {
     { file: File; delimiter?: string; activities: string[] } | null
   >(null);
   const [filtersActive, setFiltersActive] = useState(false);
+  // Alignments the backend computed on demand, cached per miner for the current
+  // analysis so revisiting a model never refetches. Reset whenever data changes.
+  const alignCache = useRef<Record<string, Alignments>>({});
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
   }, []);
 
+  // Returns a model's alignments: embedded (CLI exports), cached, or fetched
+  // from the backend (server mines defer it). Stable except across data loads.
+  const requestAlignment = useCallback(
+    async (minerId: string): Promise<Alignments> => {
+      const embedded = data?.conformance?.[minerId]?.alignments;
+      if (embedded) return embedded;
+      const cached = alignCache.current[minerId];
+      if (cached) return cached;
+      const result = await alignModel(minerId);
+      alignCache.current = { ...alignCache.current, [minerId]: result };
+      return result;
+    },
+    [data],
+  );
+
   const openData = (parsed: MineraExport) => {
     setData(parsed);
+    alignCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -259,7 +283,7 @@ export default function App() {
       )}
       {tab === "conformance" && (
         <main className="layout-log">
-          <Conformance data={data} />
+          <Conformance data={data} onRequestAlignment={requestAlignment} />
         </main>
       )}
       {tab === "dfg" && (

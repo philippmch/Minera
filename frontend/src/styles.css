@@ -1310,6 +1310,37 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 700;
 }
 
+/* Inline caveat above token-replay gauges when the model isn't sound. */
+.conf-inline-note {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-70);
+  background: var(--fair-soft);
+  border-left: 3px solid var(--fair);
+  max-width: 66ch;
+}
+
+/* While an alignment is being computed on demand by the backend. */
+.conf-loading {
+  margin: 0;
+  padding: 26px 0;
+  font-size: 13.5px;
+  color: var(--ink-45);
+  text-align: center;
+}
+.conf-loading::after {
+  content: "";
+  animation: conf-ellipsis 1.4s steps(4, end) infinite;
+}
+@keyframes conf-ellipsis {
+  0% { content: ""; }
+  25% { content: "·"; }
+  50% { content: "··"; }
+  75% { content: "···"; }
+}
+
 /* Shown when a model isn't a sound workflow net and so can't be aligned. */
 .conf-notice {
   display: flex;
