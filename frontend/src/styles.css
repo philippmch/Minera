@@ -17,6 +17,17 @@
 
 * { box-sizing: border-box; }
 
+/* Keyboard focus: one cohesive copper ring across every interactive control,
+   shown only for keyboard navigation so it never competes with hover/active
+   styling for mouse users. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+/* The pannable map fills its frame, so tuck its ring just inside the border. */
+.map-wrap svg:focus-visible { outline-offset: -3px; }
+
 html, body {
   margin: 0;
   background: var(--paper);
@@ -588,6 +599,7 @@ input[type="range"]::-moz-range-thumb {
   background-color: var(--paper-raised);
   height: min(72vh, 760px);
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(32, 29, 24, 0.04);
 }
 
 .map-wrap svg {
@@ -859,12 +871,15 @@ input[type="range"]::-moz-range-thumb {
   background: var(--paper-raised);
   padding: 20px 22px 22px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(32, 29, 24, 0.03);
+  transition: border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease, box-shadow 0.15s ease;
 }
 .miner-card:hover {
   border-color: var(--copper);
   background: var(--copper-soft);
   transform: translateY(-2px);
+  box-shadow: 0 12px 26px -12px rgba(32, 29, 24, 0.28);
 }
 
 .miner-card-name {
