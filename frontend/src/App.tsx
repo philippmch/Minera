@@ -20,8 +20,14 @@ import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { Filters } from "./components/Filters";
 import { alignModel, mineCsv, type FilterOptions } from "./api";
-
-type Tab = "log" | "dfg" | "model" | "conformance" | "resources";
+import {
+  delimiterForFile,
+  hasActiveFilters,
+  initialTab,
+  isJsonExport,
+  maxEdgeCount,
+  type Tab,
+} from "./app-logic";
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
@@ -67,9 +73,7 @@ export default function App() {
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
-    // Inspect the raw log first; discovery views are one tab away. Exports
-    // from older tool versions carry no traces, so they open on the graph.
-    setTab(parsed.traces && parsed.traces.length > 0 ? "log" : "dfg");
+    setTab(initialTab(parsed));
   };
 
   const loadFile = (file: File) => {
@@ -77,13 +81,13 @@ export default function App() {
     (async () => {
       // JSON files are pre-mined exports and open directly; anything else
       // is a raw CSV event log, uploaded to the local backend for mining.
-      if (/\.json$/i.test(file.name)) {
+      if (isJsonExport(file.name)) {
         const parsed: unknown = JSON.parse(await file.text());
         if (!isMineraExport(parsed)) throw new Error("not a Minera export");
         setSource(null);
         openData(parsed);
       } else {
-        const delimiter = /\.tsv$/i.test(file.name) ? "\t" : undefined;
+        const delimiter = delimiterForFile(file.name);
         const result = await mineCsv(file, { delimiter });
         setSource({ file, delimiter, activities: result.activities.map((a) => a.name) });
         setFiltersActive(false);
@@ -111,18 +115,7 @@ export default function App() {
   // tab. Always filters from source.file so filters never compound.
   const applyFilters = (filters: FilterOptions) => {
     if (!source) return;
-    setFiltersActive(
-      Boolean(
-        filters.topVariants ||
-          filters.minVariantFrequency ||
-          filters.removeActivities?.length ||
-          filters.keepActivities?.length ||
-          filters.startActivities?.length ||
-          filters.endActivities?.length ||
-          filters.minLength ||
-          filters.maxLength,
-      ),
-    );
+    setFiltersActive(hasActiveFilters(filters));
     setMining(true);
     mineCsv(source.file, { delimiter: source.delimiter, ...filters })
       .then((result) => {
@@ -212,7 +205,7 @@ export default function App() {
     );
   }
 
-  const maxEdgeCount = Math.max(1, ...data.edges.map((e) => e.count));
+  const maxEdge = maxEdgeCount(data);
 
   return (
     <>
@@ -306,7 +299,7 @@ export default function App() {
           <ProcessMap
             layout={layout}
             threshold={threshold}
-            maxEdgeCount={maxEdgeCount}
+            maxEdgeCount={maxEdge}
             onThresholdChange={setThreshold}
             selection={selection}
             caseDuration={data.performance?.case_duration}
