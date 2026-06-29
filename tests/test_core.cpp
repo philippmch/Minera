@@ -231,6 +231,23 @@ void inductive_miner_infrequent_leaves_a_clean_log_untouched() {
          "->(a, X(b, c), d)");
 }
 
+void inductive_miner_infrequent_filters_an_edge_at_the_cutoff() {
+  // Node `a` has a dominant successor `b` (ten a-b-c traces) and an infrequent
+  // shortcut straight to `c` (two a-c traces). IMf keeps an outgoing edge only
+  // when its weight clears the threshold times the node's strongest outgoing
+  // weight: 0.15 * 10 = 1.5 and 0.25 * 10 = 2.5 bracket the shortcut's weight of
+  // 2. So a 0.15 threshold keeps the shortcut — b becomes skippable — while 0.25
+  // drops it as noise and recovers the clean chain. This pins the direction of
+  // the cutoff: raising the threshold removes infrequent behaviour, never adds
+  // it. (The exact integer boundary is left untested on purpose: f * weight lands
+  // on floating-point values like 0.1 * 10 whose side of >= is not meaningful.)
+  std::vector<std::vector<std::string>> variants(10, {"a", "b", "c"});
+  variants.push_back({"a", "c"});
+  variants.push_back({"a", "c"});
+  assert(mine_tree_imf(variants, 0.15) == "->(a, X(tau, b), c)");
+  assert(mine_tree_imf(variants, 0.25) == "->(a, b, c)");
+}
+
 minera::ProcessTree tree_from_variants(
     const std::vector<std::vector<std::string>>& variants) {
   return minera::discover_process_tree(log_from_variants(variants));
@@ -689,6 +706,34 @@ void alignment_treats_an_empty_log_as_perfect_for_every_model() {
   }
 }
 
+void replay_degrades_gracefully_on_an_unbounded_silent_net() {
+  // Token replay routes silent (tau) transitions to enable each visible step,
+  // searching the silent reachability space. This net makes that space infinite:
+  // a silent transition consumes the source and produces the source back plus a
+  // token on an auxiliary place, so it can fire forever. The visible activity
+  // "a" needs a token on a `gate` place that nothing ever produces, so the
+  // silent search can never reach it and must lean on its bound to stop. Replay
+  // must return a finite, deviating result (the forced firing creates missing
+  // tokens) rather than spinning forever — this test would hang without the cap.
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  const auto aux = net.add_place();
+  const auto gate = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a"});
+  net.add_transition(std::nullopt, {source}, {source, aux});  // unbounded silent
+  net.add_transition(0, {gate}, {sink});  // visible "a", gate never produced
+
+  const auto log = log_from_variants({{"a"}});
+  const auto replay = minera::check_conformance(log, net);
+  assert(replay.trace_count == 1);
+  assert(replay.missing > 0);       // the unreachable gate forces a token
+  assert(replay.fitness < 1.0);     // so the trace does not fit
+  assert(replay.fitting_traces == 0);
+}
+
 void heuristics_net_becomes_a_sound_workflow_net() {
   // The Heuristic Miner emits a dependency graph; converting it to a workflow
   // net must always yield a sound, replayable model so both conformance methods
@@ -1130,6 +1175,7 @@ int main() {
   inductive_miner_falls_back_to_flower();
   inductive_miner_infrequent_recovers_a_noisy_sequence();
   inductive_miner_infrequent_leaves_a_clean_log_untouched();
+  inductive_miner_infrequent_filters_an_edge_at_the_cutoff();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
   alpha_miner_discovers_a_sequence();
@@ -1155,6 +1201,7 @@ int main() {
   alignment_flags_an_exhausted_search_on_an_unbounded_net();
   alignment_handles_an_empty_log();
   alignment_treats_an_empty_log_as_perfect_for_every_model();
+  replay_degrades_gracefully_on_an_unbounded_silent_net();
   heuristics_net_becomes_a_sound_workflow_net();
   heuristics_net_is_always_sound_even_when_it_drops_edges();
   heuristics_net_handles_a_self_loop();
