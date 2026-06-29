@@ -310,11 +310,22 @@ double compute_precision(const std::vector<Variant>& variants,
     }
   }
 
+  // Distinct prefixes routinely reach the same marking, and computing a
+  // marking's enabled activities is the costly step (a silent-transition search
+  // per activity). Cache it by marking so that work happens once per marking
+  // rather than once per prefix.
+  std::unordered_map<Marking, std::unordered_set<std::size_t>, MarkingHash>
+      enabled_cache;
+
   std::uint64_t enabled_total = 0;
   std::uint64_t escaping_total = 0;
   for (const auto& [prefix, state] : states) {
-    const Marking marking = replayer.marking_after(prefix, prefix.size());
-    const auto enabled = replayer.enabled_activities(marking);
+    Marking marking = replayer.marking_after(prefix, prefix.size());
+    auto [it, inserted] = enabled_cache.try_emplace(std::move(marking));
+    if (inserted) {
+      it->second = replayer.enabled_activities(it->first);
+    }
+    const auto& enabled = it->second;
     std::uint64_t escaping = 0;
     for (const std::size_t a : enabled) {
       if (state.observed.find(a) == state.observed.end()) ++escaping;
@@ -378,21 +389,26 @@ class Aligner {
       const std::vector<std::optional<std::size_t>>& ids,
       const std::vector<std::string>& names) const {
     const std::size_t len = ids.size();
-    Marking start(net_.place_count(), 0);
-    start[net_.source()] = 1;
+    const std::size_t pc = net_.place_count();
 
-    // A search state is the marking with the trace position appended, so it can
-    // serve directly as a hash-map key without formatting a string per state.
-    const auto key_of = [](const Marking& m, std::size_t pos) {
-      Marking key = m;
-      key.push_back(static_cast<int>(pos));
-      return key;
-    };
+    // A search state is the marking with the trace position appended at index
+    // `pc`, so the same flat vector is both the search node and its hash-map key
+    // -- no string is formatted and the marking is never copied just to key it.
+    // enabled()/the firing below only ever touch place indices < pc, so the
+    // appended position rides along untouched until a log or sync move bumps it.
     using State = Marking;
+    State start_key(pc, 0);
+    start_key[net_.source()] = 1;
+    start_key.push_back(0);
+    State final_key = final_;
+    final_key.push_back(static_cast<int>(len));
 
-    // How a state was reached, for path reconstruction. A silent step carries no
-    // visible move; its `name` is empty and it is dropped from the alignment.
-    struct Recorded {
+    // One entry per discovered state: its best known cost plus how it was first
+    // reached at that cost, for path reconstruction. Merging the cost and
+    // back-pointer tables halves both the key copies and the lookups per edge. A
+    // silent step carries no visible move; its `name` is empty and it is dropped.
+    struct Entry {
+      std::uint64_t cost = 0;
       State prev;
       AlignmentMoveType type = AlignmentMoveType::kModel;
       std::string name;
@@ -402,78 +418,84 @@ class Aligner {
     struct Node {
       std::uint64_t cost;
       std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
-      Marking marking;
-      std::size_t pos;
+      State state;
       bool operator>(const Node& other) const {
         return cost != other.cost ? cost > other.cost : seq > other.seq;
       }
     };
 
     std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
-    std::unordered_map<State, std::uint64_t, MarkingHash> best;
-    std::unordered_map<State, Recorded, MarkingHash> came;
+    std::unordered_map<State, Entry, MarkingHash> seen;
     std::uint64_t seq = 0;
 
-    const State start_key = key_of(start, 0);
-    best[start_key] = 0;
-    frontier.push({0, seq++, start, 0});
+    seen[start_key].cost = 0;
+    frontier.push({0, seq++, start_key});
 
-    const auto relax = [&](const Marking& m, std::size_t pos,
-                           std::uint64_t cost, const State& prev,
+    const auto relax = [&](State next, std::uint64_t cost, const State& prev,
                            AlignmentMoveType type, std::string name,
                            bool silent) {
-      State key = key_of(m, pos);
-      const auto it = best.find(key);
-      if (it != best.end() && it->second <= cost) return;
-      came[key] = Recorded{prev, type, std::move(name), silent};
-      best[std::move(key)] = cost;
-      frontier.push({cost, seq++, m, pos});
+      auto [it, inserted] = seen.try_emplace(std::move(next));
+      if (!inserted && it->second.cost <= cost) return;
+      it->second = Entry{cost, prev, type, std::move(name), silent};
+      frontier.push({cost, seq++, it->first});
     };
 
-    State goal_key;
+    bool reached = false;
     std::size_t expanded = 0;
     while (!frontier.empty() && expanded < kAlignSearchCap) {
       Node node = std::move(const_cast<Node&>(frontier.top()));
       frontier.pop();
-      const State key = key_of(node.marking, node.pos);
-      const auto it = best.find(key);
-      if (it != best.end() && node.cost > it->second) continue;  // stale entry
+      const auto it = seen.find(node.state);
+      if (it != seen.end() && node.cost > it->second.cost) continue;  // stale
       ++expanded;
 
-      if (node.pos == len && node.marking == final_) {
-        goal_key = key;
+      if (node.state == final_key) {
+        reached = true;
         break;
       }
 
+      const State& state = node.state;
+      const std::size_t pos = static_cast<std::size_t>(state.back());
+
       // Log move: the trace advances while the model stands still.
-      if (node.pos < len) {
-        relax(node.marking, node.pos + 1, node.cost + 1, key,
-              AlignmentMoveType::kLog, names[node.pos], false);
+      if (pos < len) {
+        State next = state;
+        next.back() = static_cast<int>(pos + 1);
+        relax(std::move(next), node.cost + 1, state, AlignmentMoveType::kLog,
+              names[pos], false);
       }
 
       // Model moves (and the synchronous move when the labels agree).
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
-        if (!enabled(node.marking, t)) continue;
+        if (!enabled(state, t)) continue;
         const auto& transition = net_.transitions()[t];
-        Marking next = fire(node.marking, t);
+        State fired = state;
+        for (const std::size_t place : transition.inputs) --fired[place];
+        for (const std::size_t place : transition.outputs) ++fired[place];
         if (transition.silent()) {
-          relax(next, node.pos, node.cost, key, AlignmentMoveType::kModel,
+          relax(std::move(fired), node.cost, state, AlignmentMoveType::kModel,
                 std::string{}, true);
           continue;
         }
         const std::string& name = net_.activities()[*transition.activity];
-        relax(next, node.pos, node.cost + 1, key, AlignmentMoveType::kModel,
-              name, false);
-        if (node.pos < len && ids[node.pos] &&
-            *ids[node.pos] == *transition.activity) {
-          relax(next, node.pos + 1, node.cost, key,
+        const bool sync = pos < len && ids[pos] &&
+                          *ids[pos] == *transition.activity;
+        if (sync) {
+          State synced = fired;
+          synced.back() = static_cast<int>(pos + 1);
+          relax(std::move(fired), node.cost + 1, state,
+                AlignmentMoveType::kModel, name, false);
+          relax(std::move(synced), node.cost, state,
                 AlignmentMoveType::kSynchronous, name, false);
+        } else {
+          relax(std::move(fired), node.cost + 1, state,
+                AlignmentMoveType::kModel, name, false);
         }
       }
     }
 
     Outcome outcome;
-    if (goal_key.empty()) {
+    if (!reached) {
       // Search capped out (only possible for unsound models): fall back to the
       // worst-case alignment so callers still get a well-formed result, and flag
       // that the numbers are not trustworthy.
@@ -485,13 +507,13 @@ class Aligner {
       return outcome;
     }
 
-    outcome.cost = best[goal_key];
-    for (State key = goal_key; key != start_key;) {
-      const Recorded& rec = came[key];
-      if (!rec.silent) {
-        outcome.moves.push_back({rec.type, rec.name});
+    outcome.cost = seen[final_key].cost;
+    for (State key = final_key; key != start_key;) {
+      const Entry& entry = seen[key];
+      if (!entry.silent) {
+        outcome.moves.push_back({entry.type, entry.name});
       }
-      key = rec.prev;
+      key = entry.prev;
     }
     std::reverse(outcome.moves.begin(), outcome.moves.end());
     return outcome;
