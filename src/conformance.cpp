@@ -527,7 +527,7 @@ class Aligner {
     frontier.push({0, start});
     std::size_t expanded = 0;
     while (!frontier.empty() && expanded++ < kAlignSearchCap) {
-      auto [cost, marking] = std::move(frontier.top());
+      auto [cost, marking] = frontier.top();  // top() is const&: this copies
       frontier.pop();
       const auto it = best.find(encode(marking));
       if (it != best.end() && cost > it->second) continue;

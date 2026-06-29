@@ -172,15 +172,7 @@ EventLog import_csv_event_log(
 
   if (timestamp_index) {
     for (auto& trace : log.traces) {
-      std::stable_sort(
-          trace.events.begin(),
-          trace.events.end(),
-          [](const Event& lhs, const Event& rhs) {
-            if (lhs.timestamp == rhs.timestamp) {
-              return lhs.input_order < rhs.input_order;
-            }
-            return lhs.timestamp < rhs.timestamp;
-          });
+      order_events_by_time(trace.events);
     }
   }
 

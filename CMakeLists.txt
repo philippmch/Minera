@@ -14,6 +14,7 @@ add_library(minera_core
   src/conformance.cpp
   src/csv_event_log_importer.cpp
   src/directly_follows_graph.cpp
+  src/event_ordering.cpp
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
   src/json_export.cpp

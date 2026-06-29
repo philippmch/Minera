@@ -19,6 +19,14 @@ struct Trace {
   std::vector<Event> events;
 };
 
+// Orders a trace's events by their parsed timestamp instant (normalized to UTC
+// via parse_timestamp), so events recorded with different timezone offsets or
+// formats still sort by the moment they actually occurred. Document order
+// (input_order) breaks ties. When any event's timestamp is not a recognizable
+// instant, the function falls back to a stable lexicographic order so the
+// comparison stays a consistent strict weak ordering.
+void order_events_by_time(std::vector<Event>& events);
+
 struct EventLog {
   std::vector<Trace> traces;
 
