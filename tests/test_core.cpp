@@ -631,7 +631,36 @@ void alignment_flags_an_unsound_net() {
   const auto log = log_from_variants({{"a"}});
   const auto alignment = minera::check_alignment(log, net);
   assert(!alignment.computed);
+  assert(!alignment.exhausted);  // unreachable sink, not a search-bound timeout
   assert(alignment.variants.empty());
+}
+
+void alignment_flags_an_exhausted_search_on_an_unbounded_net() {
+  // A reachable but unbounded net: a silent transition consumes the source and
+  // produces the source back plus a token on an auxiliary place, so it can fire
+  // forever, growing the marking without bound. The sink is still reachable (a
+  // second silent transition drains the source to it), so the net clears the
+  // soundness gate — but aligning a trace floods the search with infinitely many
+  // zero-cost markings before the goal's positive cost is ever reached. The
+  // aligner must hit its bound and report `exhausted` (distinct from an unsound
+  // net) rather than spin forever or emit a fabricated score.
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  const auto aux = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({});
+  net.add_transition(std::nullopt, {source}, {source, aux});  // unbounded growth
+  net.add_transition(std::nullopt, {source}, {sink});          // reaches the sink
+
+  const auto log = log_from_variants({{"x"}});
+  const auto alignment = minera::check_alignment(log, net);
+  assert(!alignment.computed);
+  assert(alignment.exhausted);  // search bound hit, distinct from an unsound net
+  assert(alignment.variants.empty());
+  assert(alignment.fitting_traces == 0);
+  assert(alignment.total_cost == 0);
 }
 
 void alignment_handles_an_empty_log() {
@@ -1123,6 +1152,7 @@ int main() {
   final_marking_reachable_distinguishes_sound_nets();
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
+  alignment_flags_an_exhausted_search_on_an_unbounded_net();
   alignment_handles_an_empty_log();
   alignment_treats_an_empty_log_as_perfect_for_every_model();
   heuristics_net_becomes_a_sound_workflow_net();
