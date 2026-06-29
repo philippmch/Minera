@@ -60,6 +60,39 @@ void timestamp_parses_iso8601_forms() {
   assert(!minera::parse_timestamp("2020-13-01"));  // month out of range
 }
 
+void importer_orders_events_by_instant_not_string() {
+  // The three events arrive in document order A, B, C, but their timestamps
+  // carry different timezone offsets so that, by the actual instant, the true
+  // order is C (07:30Z) -> A (08:00Z) -> B (09:00Z). A naive lexicographic sort
+  // on the raw timestamp strings would keep A, B, C; ordering by the normalized
+  // UTC instant must reorder them to C, A, B.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp\n"
+      "1,A,2026-01-01T08:00:00Z\n"
+      "1,B,2026-01-01T10:00:00+01:00\n"   // 09:00Z
+      "1,C,2026-01-01T09:30:00+02:00\n"); // 07:30Z
+  const auto log = minera::import_csv_event_log(path);
+  const auto& events = log.traces.front().events;
+  assert(events.size() == 3);
+  assert(events[0].activity == "C");
+  assert(events[1].activity == "A");
+  assert(events[2].activity == "B");
+}
+
+void importer_keeps_document_order_for_equal_instants() {
+  // Same instant expressed two ways (UTC vs an offset) must not be reordered;
+  // document order breaks the tie.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp\n"
+      "1,first,2026-01-01T12:00:00Z\n"
+      "1,second,2026-01-01T13:00:00+01:00\n");  // also 12:00Z
+  const auto log = minera::import_csv_event_log(path);
+  const auto& events = log.traces.front().events;
+  assert(events.size() == 2);
+  assert(events[0].activity == "first");
+  assert(events[1].activity == "second");
+}
+
 void performance_measures_edge_waiting_and_case_duration() {
   // Two identical cases A->B->C, each step one minute apart, so every edge waits
   // exactly 60 s and each case spans 120 s.
@@ -284,6 +317,8 @@ void json_export_carries_performance_and_resource_contracts() {
 
 int main() {
   timestamp_parses_iso8601_forms();
+  importer_orders_events_by_instant_not_string();
+  importer_keeps_document_order_for_equal_instants();
   performance_measures_edge_waiting_and_case_duration();
   performance_takes_the_median_of_varied_waits();
   performance_ignores_untimed_logs();

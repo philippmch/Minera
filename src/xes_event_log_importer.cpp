@@ -402,15 +402,7 @@ EventLog import_xes_event_log(
   // each trace by timestamp, keeping document order for equal timestamps.
   if (saw_timestamp) {
     for (auto& trace : log.traces) {
-      std::stable_sort(
-          trace.events.begin(),
-          trace.events.end(),
-          [](const Event& lhs, const Event& rhs) {
-            if (lhs.timestamp == rhs.timestamp) {
-              return lhs.input_order < rhs.input_order;
-            }
-            return lhs.timestamp < rhs.timestamp;
-          });
+      order_events_by_time(trace.events);
     }
   }
 

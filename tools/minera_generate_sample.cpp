@@ -47,7 +47,7 @@ std::string to_timestamp(long minutes) {
     day_index -= days_in_month[month];
     ++month;
   }
-  char buffer[24];
+  char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "2026-%02d-%02dT%02d:%02d:00",
                 month + 1, day_index + 1, minute_of_day / 60,
                 minute_of_day % 60);
