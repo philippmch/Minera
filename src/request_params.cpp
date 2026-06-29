@@ -1,0 +1,116 @@
+#include "minera/request_params.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <cstdlib>
+#include <sstream>
+
+namespace minera {
+
+bool ends_with_ci(std::string_view value, std::string_view suffix) {
+  if (value.size() < suffix.size()) return false;
+  const auto tail = value.substr(value.size() - suffix.size());
+  return std::equal(tail.begin(), tail.end(), suffix.begin(), [](char a, char b) {
+    return std::tolower(static_cast<unsigned char>(a)) == b;
+  });
+}
+
+bool looks_like_xes(std::string_view filename, std::string_view content) {
+  if (ends_with_ci(filename, ".xes")) return true;
+  std::size_t i = 0;
+  if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
+      static_cast<unsigned char>(content[1]) == 0xBB &&
+      static_cast<unsigned char>(content[2]) == 0xBF) {
+    i = 3;
+  }
+  while (i < content.size() &&
+         std::isspace(static_cast<unsigned char>(content[i]))) {
+    ++i;
+  }
+  const auto rest = content.substr(i);
+  return rest.rfind("<?xml", 0) == 0 || rest.rfind("<log", 0) == 0;
+}
+
+std::vector<std::string> split_csv(std::string_view value) {
+  std::vector<std::string> parts;
+  const auto flush = [&](std::string_view token) {
+    const auto begin = token.find_first_not_of(' ');
+    if (begin == std::string_view::npos) return;  // all spaces: an empty part
+    const auto end = token.find_last_not_of(' ');
+    parts.emplace_back(token.substr(begin, end - begin + 1));
+  };
+  std::size_t start = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i == value.size() || value[i] == ',') {
+      flush(value.substr(start, i - start));
+      start = i + 1;
+    }
+  }
+  return parts;
+}
+
+std::string error_json(std::string_view message) {
+  std::ostringstream out;
+  out << "{\"error\": \"";
+  for (const char c : message) {
+    if (c == '"' || c == '\\') out << '\\';
+    out << c;
+  }
+  out << "\"}";
+  return out.str();
+}
+
+MineParams parse_mine_params(const FieldLookup& field) {
+  MineParams params;
+
+  if (const auto value = field("case_column"); !value.empty()) {
+    params.csv.case_id_column = value;
+  }
+  if (const auto value = field("activity_column"); !value.empty()) {
+    params.csv.activity_column = value;
+  }
+  if (const auto value = field("timestamp_column"); !value.empty()) {
+    params.csv.timestamp_column = value;
+  }
+  if (const auto value = field("resource_column"); !value.empty()) {
+    params.csv.resource_column = value;
+  }
+  if (const auto value = field("delimiter"); !value.empty()) {
+    params.csv.delimiter = value.front();
+  }
+
+  // Optional log-preprocessing filters, applied before discovery.
+  if (const auto value = field("keep_activities"); !value.empty()) {
+    params.filter.keep_activities = split_csv(value);
+  }
+  if (const auto value = field("remove_activities"); !value.empty()) {
+    params.filter.remove_activities = split_csv(value);
+  }
+  if (const auto value = field("start_activities"); !value.empty()) {
+    params.filter.start_activities = split_csv(value);
+  }
+  if (const auto value = field("end_activities"); !value.empty()) {
+    params.filter.end_activities = split_csv(value);
+  }
+  if (const auto value = field("min_length"); !value.empty()) {
+    params.filter.min_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("max_length"); !value.empty()) {
+    params.filter.max_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("min_variant_frequency"); !value.empty()) {
+    params.filter.min_variant_frequency =
+        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("top_variants"); !value.empty()) {
+    params.filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("noise_threshold"); !value.empty()) {
+    params.inductive.noise_threshold = std::atof(value.c_str());
+  }
+
+  return params;
+}
+
+}  // namespace minera
