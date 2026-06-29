@@ -1,0 +1,142 @@
+// Tests for the server's request-parsing layer (tools/minera_server feeds these
+// the raw form fields). Kept httplib-free so the parsing — importer selection,
+// CSV-list splitting, error escaping, and option mapping — can be exercised
+// directly without standing up an HTTP server.
+#undef NDEBUG
+
+#include "minera/request_params.hpp"
+
+#include <cassert>
+#include <map>
+#include <string>
+
+namespace {
+
+// Builds a field lookup over a fixed map, mirroring how the server resolves a
+// multipart form field (absent fields read as "").
+minera::FieldLookup fields(std::map<std::string, std::string> values) {
+  return [values = std::move(values)](std::string_view name) -> std::string {
+    const auto it = values.find(std::string(name));
+    return it == values.end() ? std::string{} : it->second;
+  };
+}
+
+void ends_with_ci_is_case_insensitive() {
+  assert(minera::ends_with_ci("LOG.XES", ".xes"));
+  assert(minera::ends_with_ci("log.xes", ".xes"));
+  assert(!minera::ends_with_ci("log.csv", ".xes"));
+  assert(!minera::ends_with_ci("xe", ".xes"));  // shorter than the suffix
+}
+
+void looks_like_xes_uses_extension_then_content_sniff() {
+  // Extension wins outright.
+  assert(minera::looks_like_xes("trace.xes", "anything"));
+  // A CSV name with XML content is still recognized by sniffing the preamble.
+  assert(minera::looks_like_xes("trace.csv", "<?xml version=\"1.0\"?><log/>"));
+  assert(minera::looks_like_xes("noext", "<log></log>"));
+  // Leading whitespace before the preamble is tolerated.
+  assert(minera::looks_like_xes("noext", "  \n\t<log/>"));
+  // A UTF-8 BOM ahead of the preamble is skipped.
+  assert(minera::looks_like_xes("noext", "\xEF\xBB\xBF<?xml ?>"));
+  // Plain CSV is not XES.
+  assert(!minera::looks_like_xes("trace.csv", "case,activity\n1,a\n"));
+  assert(!minera::looks_like_xes("noext", "case,activity\n"));
+}
+
+void split_csv_trims_and_drops_empty_parts() {
+  assert((minera::split_csv("a,b,c") ==
+          std::vector<std::string>{"a", "b", "c"}));
+  // Surrounding spaces are dropped on both sides; an internal space is kept.
+  assert((minera::split_csv("a b, c") ==
+          std::vector<std::string>{"a b", "c"}));
+  assert((minera::split_csv("a , b ,c") ==
+          std::vector<std::string>{"a", "b", "c"}));
+  // Empty parts from doubled or trailing commas are skipped.
+  assert((minera::split_csv("a,,b,") ==
+          std::vector<std::string>{"a", "b"}));
+  assert(minera::split_csv("").empty());
+  assert(minera::split_csv(" , ").empty());
+}
+
+void error_json_escapes_quotes_and_backslashes() {
+  assert(minera::error_json("plain") == "{\"error\": \"plain\"}");
+  assert(minera::error_json("a\"b") == "{\"error\": \"a\\\"b\"}");
+  assert(minera::error_json("a\\b") == "{\"error\": \"a\\\\b\"}");
+}
+
+void parse_mine_params_defaults_when_empty() {
+  const auto params = minera::parse_mine_params(fields({}));
+  // Stock importer defaults survive an empty form.
+  assert(params.csv.case_id_column == "case_id");
+  assert(params.csv.activity_column == "activity");
+  assert(params.csv.delimiter == ',');
+  assert(!params.filter.any());
+  assert(params.inductive.noise_threshold == 0.0);
+}
+
+void parse_mine_params_maps_csv_and_inductive_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"case_column", "Case"},
+      {"activity_column", "Act"},
+      {"timestamp_column", "Time"},
+      {"resource_column", "Who"},
+      {"delimiter", ";"},
+      {"noise_threshold", "0.25"},
+  }));
+  assert(params.csv.case_id_column == "Case");
+  assert(params.csv.activity_column == "Act");
+  assert(params.csv.timestamp_column == "Time");
+  assert(params.csv.resource_column == "Who");
+  assert(params.csv.delimiter == ';');  // only the first char is taken
+  assert(params.inductive.noise_threshold == 0.25);
+}
+
+void parse_mine_params_maps_filters() {
+  const auto params = minera::parse_mine_params(fields({
+      {"keep_activities", "a, b ,c"},
+      {"remove_activities", "x"},
+      {"start_activities", "a"},
+      {"end_activities", "c"},
+      {"min_length", "2"},
+      {"max_length", "10"},
+      {"min_variant_frequency", "3"},
+      {"top_variants", "5"},
+  }));
+  assert((params.filter.keep_activities ==
+          std::vector<std::string>{"a", "b", "c"}));
+  assert((params.filter.remove_activities == std::vector<std::string>{"x"}));
+  assert((params.filter.start_activities == std::vector<std::string>{"a"}));
+  assert((params.filter.end_activities == std::vector<std::string>{"c"}));
+  assert(params.filter.min_length == 2);
+  assert(params.filter.max_length == 10);
+  assert(params.filter.min_variant_frequency == 3);
+  assert(params.filter.top_variants == 5);
+  assert(params.filter.any());
+}
+
+void parse_mine_params_ignores_blank_fields() {
+  // A field present but empty must not override the default (the server treats
+  // "" as "not supplied").
+  const auto params = minera::parse_mine_params(fields({
+      {"case_column", ""},
+      {"delimiter", ""},
+      {"min_length", ""},
+  }));
+  assert(params.csv.case_id_column == "case_id");
+  assert(params.csv.delimiter == ',');
+  assert(params.filter.min_length == 0);
+}
+
+}  // namespace
+
+int main() {
+  ends_with_ci_is_case_insensitive();
+  looks_like_xes_uses_extension_then_content_sniff();
+  split_csv_trims_and_drops_empty_parts();
+  error_json_escapes_quotes_and_backslashes();
+  parse_mine_params_defaults_when_empty();
+  parse_mine_params_maps_csv_and_inductive_options();
+  parse_mine_params_maps_filters();
+  parse_mine_params_ignores_blank_fields();
+  return 0;
+}

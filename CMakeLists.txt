@@ -22,6 +22,7 @@ add_library(minera_core
   src/performance.cpp
   src/petri_net.cpp
   src/pnml.cpp
+  src/request_params.cpp
   src/resource_analysis.cpp
   src/timestamp.cpp
   src/xes_event_log_importer.cpp
@@ -80,4 +81,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_perspective_tests PRIVATE cxx_std_20)
 
   add_test(NAME minera_perspective_tests COMMAND minera_perspective_tests)
+
+  add_executable(minera_request_params_tests
+    tests/test_request_params.cpp
+  )
+  target_link_libraries(minera_request_params_tests PRIVATE minera::core)
+  target_compile_features(minera_request_params_tests PRIVATE cxx_std_20)
+
+  add_test(NAME minera_request_params_tests COMMAND minera_request_params_tests)
 endif()
