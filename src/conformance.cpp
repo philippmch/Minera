@@ -24,19 +24,10 @@ using Marking = std::vector<int>;
 // block-structured nets the inductive miner produces.
 constexpr std::size_t kSilentSearchCap = 4096;
 
-std::string encode(const Marking& marking) {
-  std::string key;
-  key.reserve(marking.size() * 3);
-  for (const int tokens : marking) {
-    key += std::to_string(tokens);  // decimal text: no overflow, no aliasing
-    key.push_back(',');
-  }
-  return key;
-}
-
-// FNV-1a hash of a token vector, used to key alignment search states directly on
-// the marking (with the trace position appended) instead of formatting a string
-// per state — the search visits far too many states for that to be cheap.
+// FNV-1a hash of a token vector, used to key every marking-indexed search
+// (token replay's silent routing, the precision pass, and alignment) directly
+// on the marking instead of formatting a string per state — these searches
+// visit far too many states for that to be cheap.
 struct MarkingHash {
   std::size_t operator()(const std::vector<int>& v) const noexcept {
     std::size_t h = 1469598103934665603ull;
@@ -146,15 +137,38 @@ class Replayer {
   // firing silent transitions) — the model's allowed next observable steps.
   [[nodiscard]] std::unordered_set<std::size_t> enabled_activities(
       const Marking& marking) const {
-    std::unordered_set<std::size_t> enabled;
-    for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
-      if (silent_path(marking, [&](const Marking& m) {
-            return any_enabled(m, transitions_by_activity_[a]);
-          })) {
-        enabled.insert(a);
+    // An activity is allowed next if a transition for it is enabled at this
+    // marking or at any marking reachable by firing silent transitions. A
+    // single breadth-first silent closure (bounded so a pathological model
+    // cannot loop forever) collects them all at once, rather than re-walking the
+    // same silent space once per activity.
+    std::unordered_set<std::size_t> acts;
+    const auto collect = [&](const Marking& m) {
+      for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
+        if (acts.count(a)) continue;
+        if (any_enabled(m, transitions_by_activity_[a])) acts.insert(a);
+      }
+    };
+    collect(marking);
+
+    std::unordered_set<Marking, MarkingHash> seen{marking};
+    std::queue<Marking> frontier;
+    frontier.push(marking);
+    std::size_t expanded = 0;
+    while (!frontier.empty() && expanded++ < kSilentSearchCap) {
+      const Marking current = std::move(frontier.front());
+      frontier.pop();
+      for (const std::size_t s : silent_transitions_) {
+        if (!enabled(current, s)) continue;
+        Marking next = current;
+        Counts scratch;
+        fire(next, s, scratch);
+        if (!seen.insert(next).second) continue;
+        collect(next);
+        frontier.push(std::move(next));
       }
     }
-    return enabled;
+    return acts;
   }
 
  private:
@@ -203,7 +217,7 @@ class Replayer {
       const std::function<bool(const Marking&)>& goal) const {
     if (goal(start)) return std::vector<std::size_t>{};
 
-    std::unordered_set<std::string> seen{encode(start)};
+    std::unordered_set<Marking, MarkingHash> seen{start};
     std::queue<std::pair<Marking, std::vector<std::size_t>>> frontier;
     frontier.push({start, {}});
     std::size_t expanded = 0;
@@ -216,7 +230,7 @@ class Replayer {
         Marking next = marking;
         Counts scratch;
         fire(next, s, scratch);
-        if (!seen.insert(encode(next)).second) continue;
+        if (!seen.insert(next).second) continue;
         std::vector<std::size_t> extended = path;
         extended.push_back(s);
         if (goal(next)) return extended;
@@ -545,13 +559,13 @@ class Aligner {
                         std::vector<std::pair<std::uint64_t, Marking>>,
                         std::greater<>>
         frontier;
-    std::unordered_map<std::string, std::uint64_t> best{{encode(start), 0}};
+    std::unordered_map<Marking, std::uint64_t, MarkingHash> best{{start, 0}};
     frontier.push({0, start});
     std::size_t expanded = 0;
     while (!frontier.empty() && expanded++ < kAlignSearchCap) {
       auto [cost, marking] = frontier.top();  // top() is const&: this copies
       frontier.pop();
-      const auto it = best.find(encode(marking));
+      const auto it = best.find(marking);
       if (it != best.end() && cost > it->second) continue;
       if (marking == final_) return cost;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
@@ -559,9 +573,9 @@ class Aligner {
         Marking next = fire(marking, t);
         const std::uint64_t next_cost =
             cost + (net_.transitions()[t].silent() ? 0 : 1);
-        const auto found = best.find(encode(next));
+        const auto found = best.find(next);
         if (found != best.end() && found->second <= next_cost) continue;
-        best[encode(next)] = next_cost;
+        best[next] = next_cost;
         frontier.push({next_cost, std::move(next)});
       }
     }
