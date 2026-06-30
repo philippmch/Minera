@@ -94,6 +94,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto variant_durations =
+        minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
 
     // Token replay is cheap and robust, so run it for every model now; defer the
@@ -110,7 +112,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     const std::string body =
         minera::analysis_json(dataset, log, graph, &tree, &net, &heuristics,
-                              &conformance, &performance, &resources);
+                              &conformance, &performance, &resources,
+                              &variant_durations);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

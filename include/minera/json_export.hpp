@@ -26,7 +26,9 @@ namespace minera {
 // a "token_replay" and an "alignments" result per miner. When `performance` is
 // non-null the time perspective (per-edge waiting times and case throughput) is
 // embedded under "performance"; when `resources` is non-null the handover-of-
-// work network is embedded under "resources".
+// work network is embedded under "resources". When `variant_durations` is
+// non-null its entries (aligned to `graph.variants()` order) add a "duration"
+// object to each emitted variant — the variant's case-throughput statistics.
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -36,7 +38,8 @@ void write_analysis_json(std::ostream& out,
                          const HeuristicsNet* heuristics = nullptr,
                          const std::vector<ModelConformance>* conformance = nullptr,
                          const PerformanceMetrics* performance = nullptr,
-                         const ResourceNetwork* resources = nullptr);
+                         const ResourceNetwork* resources = nullptr,
+                         const std::vector<DurationStats>* variant_durations = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -47,7 +50,8 @@ void write_analysis_json(std::ostream& out,
     const HeuristicsNet* heuristics = nullptr,
     const std::vector<ModelConformance>* conformance = nullptr,
     const PerformanceMetrics* performance = nullptr,
-    const ResourceNetwork* resources = nullptr);
+    const ResourceNetwork* resources = nullptr,
+    const std::vector<DurationStats>* variant_durations = nullptr);
 
 // Serializes a single alignment result (the object the frontend reads as one
 // model's `alignments`), for the server's on-demand alignment endpoint.

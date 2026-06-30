@@ -46,4 +46,13 @@ struct PerformanceMetrics {
     const EventLog& log,
     const DirectlyFollowsGraph& graph);
 
+// Case throughput time (first-to-last event) summarized per trace variant. The
+// returned vector is aligned to `graph.variants()` order, so entry i describes
+// the variant graph.variants()[i]. A variant whose traces carry no parseable
+// timestamps yields an empty DurationStats (count 0) rather than fabricated
+// numbers, matching compute_performance_metrics.
+[[nodiscard]] std::vector<DurationStats> compute_variant_durations(
+    const EventLog& log,
+    const DirectlyFollowsGraph& graph);
+
 }  // namespace minera

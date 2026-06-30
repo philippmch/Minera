@@ -1,5 +1,6 @@
 import { Fragment } from "react";
-import { type MineraExport, numberFormat } from "../types";
+import { type MineraExport, formatDuration, numberFormat } from "../types";
+import { cumulativeCoverage } from "../variant-insights";
 
 interface VariantListProps {
   data: MineraExport;
@@ -9,6 +10,7 @@ interface VariantListProps {
 
 export function VariantList({ data, selected, onSelect }: VariantListProps) {
   const maxCount = Math.max(...data.variants.map((v) => v.count));
+  const coverage = cumulativeCoverage(data.variants, data.trace_count);
 
   return (
     <aside className="panel variants-panel reveal">
@@ -34,6 +36,14 @@ export function VariantList({ data, selected, onSelect }: VariantListProps) {
                 <span className="variant-count">
                   {numberFormat.format(variant.count)}{" "}
                   <small>{(share * 100).toFixed(1)}%</small>
+                </span>
+                {variant.duration && variant.duration.count > 0 && (
+                  <span className="variant-duration" title="median throughput time">
+                    {formatDuration(variant.duration.median)}
+                  </span>
+                )}
+                <span className="variant-cumulative" title="cumulative share of cases">
+                  Σ {(coverage[index] * 100).toFixed(0)}%
                 </span>
                 <span className="variant-share">
                   <i style={{ width: `${((variant.count / maxCount) * 100).toFixed(1)}%` }} />

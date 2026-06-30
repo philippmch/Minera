@@ -14,6 +14,12 @@ export interface EdgeStat {
 export interface VariantStat {
   activities: number[];
   count: number;
+  /**
+   * Case throughput-time statistics for this variant, in seconds. Absent in
+   * exports from older minera versions and on logs with no parseable
+   * timestamps; `duration.count === 0` likewise means no timing was observed.
+   */
+  duration?: DurationStats;
 }
 
 export type ProcessTreeOperator =
