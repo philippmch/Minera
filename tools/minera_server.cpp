@@ -17,6 +17,7 @@
 
 #include "httplib.h"
 #include "minera/alpha_miner.hpp"
+#include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -27,6 +28,7 @@
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/pnml.hpp"
+#include "minera/process_tree.hpp"
 #include "minera/request_params.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/version.hpp"
@@ -46,6 +48,7 @@ struct MinedSession {
   minera::EventLog log;
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
+  minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
 };
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
@@ -123,6 +126,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->nets.emplace("inductive", inductive_net);
     session->nets.emplace("alpha", net);
     session->nets.emplace("heuristic", heuristic_net);
+    session->tree = tree;
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
@@ -197,6 +201,26 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
                        "application/xml");
 }
 
+// Exports the inductive model from the most recent mine as BPMN 2.0. The
+// inductive miner is the one that yields a block-structured process tree, which
+// maps cleanly onto BPMN, so this endpoint always serves that model.
+void handle_bpmn(const httplib::Request&, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  response.set_content(minera::to_bpmn(session->tree, "process"),
+                       "application/xml");
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -248,6 +272,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
   server.Get("/api/pnml", handle_pnml);
+  server.Get("/api/bpmn", handle_bpmn);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;

@@ -3,7 +3,7 @@ import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
-import { fetchPnml } from "../api";
+import { fetchBpmn, fetchPnml } from "../api";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
@@ -159,8 +159,15 @@ function ModelResult({
   ) : null;
 
   if (variant.artifact === "process-tree") {
+    // The inductive tree is the one model that also exports as BPMN.
+    const actions = canExportPnml ? (
+      <>
+        {pnml}
+        <BpmnButton groupName={groupName} dataset={data.dataset} />
+      </>
+    ) : null;
     return treeLayout ? (
-      <ProcessTree layout={treeLayout} title={groupName} actions={pnml} />
+      <ProcessTree layout={treeLayout} title={groupName} actions={actions} />
     ) : (
       <Placeholder>
         No model to display. This export predates model discovery — re-open the
@@ -222,6 +229,46 @@ function PnmlButton({
     <span className="pnml-export">
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : `Download ${groupName} as PNML`}
+      </button>
+      {error && <span className="pnml-error">{error}</span>}
+    </span>
+  );
+}
+
+// Downloads the inductive model as BPMN 2.0. The process tree is converted
+// server-side, so the export matches the model Minera actually discovered.
+function BpmnButton({
+  groupName,
+  dataset,
+}: {
+  groupName: string;
+  dataset: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = () => {
+    setBusy(true);
+    setError(null);
+    fetchBpmn()
+      .then((xml) => {
+        const blob = new Blob([xml], { type: "application/xml" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const base = dataset.replace(/\.[^.]+$/, "") || "model";
+        anchor.href = url;
+        anchor.download = `${base}.bpmn`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="pnml-export">
+      <button className="btn-ghost" onClick={download} disabled={busy}>
+        {busy ? "Exporting…" : `Download ${groupName} as BPMN`}
       </button>
       {error && <span className="pnml-error">{error}</span>}
     </span>
