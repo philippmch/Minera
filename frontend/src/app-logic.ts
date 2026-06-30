@@ -1,7 +1,7 @@
 import { type FilterOptions } from "./api";
 import { type MineraExport } from "./types";
 
-export type Tab = "log" | "dfg" | "model" | "conformance" | "resources";
+export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resources";
 
 /**
  * Opening tab for a freshly loaded analysis: inspect the raw event log first
