@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/alpha_miner.hpp"
+#include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -65,6 +66,8 @@ int usage(const char* program) {
                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, or heuristic\n"
+               "  --bpmn <path>             Also write the inductive model as BPMN\n"
+               "                            2.0 to <path>\n"
                "\n  Log filtering (applied before discovery):\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
@@ -83,6 +86,7 @@ int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   std::filesystem::path pnml_output;
+  std::filesystem::path bpmn_output;
   std::string pnml_miner = "inductive";
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
@@ -118,6 +122,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       pnml_output = value;
+    } else if (arg == "--bpmn") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      bpmn_output = value;
     } else if (arg == "--pnml-miner") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -244,6 +252,17 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_pnml(pnml_file, *selected, pnml_miner + " net");
+    }
+
+    // Optionally emit the inductive model (a block-structured tree) as BPMN.
+    if (!bpmn_output.empty()) {
+      std::ofstream bpmn_file(bpmn_output);
+      if (!bpmn_file) {
+        std::cerr << "error: cannot open BPMN output file " << bpmn_output
+                  << '\n';
+        return 1;
+      }
+      minera::write_bpmn(bpmn_file, tree, dataset);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

@@ -3,6 +3,7 @@
 // test file stays focused on discovery and conformance.
 #undef NDEBUG
 
+#include "minera/bpmn.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/inductive_miner.hpp"
@@ -341,6 +342,41 @@ void pnml_export_escapes_xml_metacharacters() {
   assert(pnml.find("a & b") == std::string::npos);  // raw '&' never leaks
 }
 
+void bpmn_export_carries_block_structure() {
+  // "a" then a parallel block of "b" and "c" then "d": the inductive miner
+  // discovers a parallel operator, which must become a parallel gateway pair
+  // with the activities wired as tasks between start and end events.
+  const auto tree = minera::discover_process_tree(
+      log_from_variants({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}));
+  const auto bpmn = minera::to_bpmn(tree, "test");
+
+  for (const char* key : {"<definitions", "<process", "<startEvent",
+                          "<endEvent", "<task", "<parallelGateway",
+                          "<sequenceFlow"}) {
+    assert(bpmn.find(key) != std::string::npos);
+  }
+  // Activity names ride along as task labels.
+  assert(bpmn.find("name=\"a\"") != std::string::npos);
+  assert(bpmn.find("name=\"d\"") != std::string::npos);
+}
+
+void bpmn_export_uses_a_gateway_for_an_exclusive_choice() {
+  // Two disjoint single-activity traces are an exclusive choice between "a" and
+  // "b", which must surface as an exclusive gateway.
+  const auto tree =
+      minera::discover_process_tree(log_from_variants({{"a"}, {"b"}}));
+  const auto bpmn = minera::to_bpmn(tree);
+  assert(bpmn.find("<exclusiveGateway") != std::string::npos);
+}
+
+void bpmn_export_escapes_xml_metacharacters() {
+  const auto tree =
+      minera::discover_process_tree(log_from_variants({{"a & b", "c"}}));
+  const auto bpmn = minera::to_bpmn(tree);
+  assert(bpmn.find("a &amp; b") != std::string::npos);
+  assert(bpmn.find("a & b") == std::string::npos);  // raw '&' never leaks
+}
+
 void json_export_carries_performance_and_resource_contracts() {
   const auto path = write_temp_log(
       "case_id,activity,timestamp,resource\n"
@@ -394,6 +430,9 @@ int main() {
   pnml_export_carries_the_net_structure();
   pnml_export_flags_silent_transitions();
   pnml_export_escapes_xml_metacharacters();
+  bpmn_export_carries_block_structure();
+  bpmn_export_uses_a_gateway_for_an_exclusive_choice();
+  bpmn_export_escapes_xml_metacharacters();
   json_export_carries_performance_and_resource_contracts();
   return 0;
 }
