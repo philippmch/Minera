@@ -15,6 +15,8 @@ import { ProcessModel } from "./components/ProcessModel";
 import { Conformance } from "./components/Conformance";
 import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
+import { DottedChartView } from "./components/DottedChart";
+import { buildDottedChart } from "./dotted-chart";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
@@ -181,6 +183,13 @@ export default function App() {
     [data, fontsReady],
   );
 
+  // Whether the log has any timestamped events to plot. Built once per load so
+  // the Dotted Chart tab only appears when it would have something to show.
+  const hasDottedChart = useMemo(
+    () => (data?.traces ? buildDottedChart(data.traces).rowCount > 0 : false),
+    [data],
+  );
+
   const selection = useMemo(
     () =>
       data && selectedVariant !== null
@@ -228,6 +237,14 @@ export default function App() {
             onClick={() => setTab("log")}
           >
             Event Log
+          </button>
+        )}
+        {hasDottedChart && (
+          <button
+            className={tab === "dotted" ? "tab active" : "tab"}
+            onClick={() => setTab("dotted")}
+          >
+            Dotted Chart
           </button>
         )}
         <button
@@ -282,6 +299,11 @@ export default function App() {
             petriLayout={petriLayout}
             canExportPnml={source !== null}
           />
+        </main>
+      )}
+      {tab === "dotted" && (
+        <main className="layout-log">
+          <DottedChartView data={data} />
         </main>
       )}
       {tab === "conformance" && (
