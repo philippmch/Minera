@@ -189,6 +189,8 @@ int main(int argc, char** argv) {
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto variant_durations =
+        minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
 
     // Check every discovered model both ways, keyed by miner id. The export is
@@ -209,7 +211,7 @@ int main(int argc, char** argv) {
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources);
+                                  &resources, &variant_durations);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -218,7 +220,7 @@ int main(int argc, char** argv) {
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources);
+                                  &resources, &variant_durations);
     }
 
     // Optionally emit one discovered model as standard PNML.

@@ -162,6 +162,61 @@ void performance_ignores_untimed_logs() {
   assert(perf.edges.front().stats.count == 0);
 }
 
+void variant_durations_summarize_per_variant() {
+  // Two cases share the variant A->B->C (spanning 120 s and 60 s) and one case
+  // is the variant A->C (spanning 30 s). Throughput must be summarized per
+  // variant and reported in the graph's variant order.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp\n"
+      "1,A,2026-01-01T00:00:00\n"
+      "1,B,2026-01-01T00:01:00\n"
+      "1,C,2026-01-01T00:02:00\n"
+      "2,A,2026-01-01T00:00:00\n"
+      "2,B,2026-01-01T00:00:30\n"
+      "2,C,2026-01-01T00:01:00\n"
+      "3,A,2026-01-01T00:00:00\n"
+      "3,C,2026-01-01T00:00:30\n");
+  const auto log = minera::import_csv_event_log(path);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto durations = minera::compute_variant_durations(log, graph);
+
+  assert(durations.size() == graph.variants().size());
+  bool saw_abc = false;
+  bool saw_ac = false;
+  for (std::size_t i = 0; i < graph.variants().size(); ++i) {
+    const auto& stats = durations[i];
+    if (graph.variants()[i].activities.size() == 3) {  // A->B->C
+      saw_abc = true;
+      assert(stats.count == 2);
+      assert(near(stats.median, 90.0));  // (60 + 120) / 2
+      assert(near(stats.mean, 90.0));
+      assert(near(stats.min, 60.0));
+      assert(near(stats.max, 120.0));
+    } else {  // A->C
+      saw_ac = true;
+      assert(stats.count == 1);
+      assert(near(stats.median, 30.0));
+    }
+  }
+  assert(saw_abc && saw_ac);
+}
+
+void variant_durations_empty_without_timestamps() {
+  // An untimed log yields a stats entry per variant, each with count 0 — no
+  // fabricated throughput.
+  const auto path = write_temp_log("case_id,activity\n1,A\n1,B\n2,A\n2,C\n");
+  minera::CsvImportOptions options;
+  options.timestamp_column = "missing";
+  const auto log = minera::import_csv_event_log(path, options);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto durations = minera::compute_variant_durations(log, graph);
+
+  assert(durations.size() == graph.variants().size());
+  for (const auto& stats : durations) {
+    assert(stats.count == 0);
+  }
+}
+
 void resource_network_counts_handovers() {
   const auto path = write_temp_log(
       "case_id,activity,resource\n"
@@ -311,6 +366,15 @@ void json_export_carries_performance_and_resource_contracts() {
   const auto without = minera::analysis_json("test", log, graph);
   assert(without.find("\"performance\"") == std::string::npos);
   assert(without.find("\"resources\"") == std::string::npos);
+  // Per-variant durations are likewise opt-in: absent unless passed.
+  assert(without.find("\"duration\"") == std::string::npos);
+
+  // When supplied, each variant carries a "duration" object.
+  const auto variant_durations = minera::compute_variant_durations(log, graph);
+  const auto with_durations =
+      minera::analysis_json("test", log, graph, nullptr, nullptr, nullptr,
+                            nullptr, nullptr, nullptr, &variant_durations);
+  assert(with_durations.find("\"duration\"") != std::string::npos);
 }
 
 }  // namespace
@@ -322,6 +386,8 @@ int main() {
   performance_measures_edge_waiting_and_case_duration();
   performance_takes_the_median_of_varied_waits();
   performance_ignores_untimed_logs();
+  variant_durations_summarize_per_variant();
+  variant_durations_empty_without_timestamps();
   resource_network_counts_handovers();
   resource_network_breaks_the_chain_on_missing_resource();
   xes_importer_reads_the_resource_attribute();

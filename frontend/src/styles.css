@@ -1106,6 +1106,18 @@ input[type="range"]::-moz-range-thumb {
   font-size: 10.5px;
 }
 
+.variant-duration {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--copper);
+}
+
+.variant-cumulative {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-45);
+}
+
 .variant-share {
   margin-left: auto;
   width: 72px;

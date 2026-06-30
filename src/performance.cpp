@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <limits>
+#include <map>
 #include <optional>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "minera/timestamp.hpp"
 
@@ -98,6 +101,51 @@ PerformanceMetrics compute_performance_metrics(
   }
 
   return metrics;
+}
+
+std::vector<DurationStats> compute_variant_durations(
+    const EventLog& log,
+    const DirectlyFollowsGraph& graph) {
+  // Group case throughput times by the trace's activity sequence — the same
+  // grouping the directly-follows graph uses for its variants.
+  std::map<std::vector<std::string>, std::vector<double>> durations_by_variant;
+
+  for (const auto& trace : log.traces) {
+    if (trace.events.empty()) {
+      continue;
+    }
+
+    std::vector<std::string> variant;
+    variant.reserve(trace.events.size());
+    std::optional<double> first;
+    std::optional<double> last;
+
+    for (const auto& event : trace.events) {
+      variant.push_back(event.activity);
+      const auto instant = parse_timestamp(event.timestamp);
+      if (instant) {
+        if (!first) {
+          first = *instant;
+        }
+        last = *instant;
+      }
+    }
+
+    auto& bucket = durations_by_variant[std::move(variant)];
+    if (first && last) {
+      bucket.push_back(*last - *first);
+    }
+  }
+
+  // Emit aligned to the graph's variant order so a caller can zip the two.
+  std::vector<DurationStats> result;
+  result.reserve(graph.variants().size());
+  for (const auto& variant : graph.variants()) {
+    const auto it = durations_by_variant.find(variant.activities);
+    result.push_back(it != durations_by_variant.end() ? summarize(it->second)
+                                                       : DurationStats{});
+  }
+  return result;
 }
 
 }  // namespace minera

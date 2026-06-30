@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <numeric>
 #include <sstream>
 #include <vector>
 
@@ -277,7 +278,8 @@ void write_analysis_json(std::ostream& out,
                          const HeuristicsNet* heuristics,
                          const std::vector<ModelConformance>* conformance,
                          const PerformanceMetrics* performance,
-                         const ResourceNetwork* resources) {
+                         const ResourceNetwork* resources,
+                         const std::vector<DurationStats>* variant_durations) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -331,18 +333,30 @@ void write_analysis_json(std::ostream& out,
   }
   out << "  ],\n";
 
-  auto variants = graph.variants();
-  std::stable_sort(variants.begin(), variants.end(),
-                   [](const auto& a, const auto& b) { return a.count > b.count; });
+  // Sort an index permutation so any aligned per-variant data (durations) stays
+  // matched to its variant after the most-frequent-first reordering.
+  const auto& variants = graph.variants();
+  std::vector<std::size_t> variant_order(variants.size());
+  std::iota(variant_order.begin(), variant_order.end(), std::size_t{0});
+  std::stable_sort(variant_order.begin(), variant_order.end(),
+                   [&](std::size_t a, std::size_t b) {
+                     return variants[a].count > variants[b].count;
+                   });
   out << "  \"variants\": [\n";
-  for (std::size_t i = 0; i < variants.size(); ++i) {
+  for (std::size_t i = 0; i < variant_order.size(); ++i) {
+    const auto idx = variant_order[i];
+    const auto& variant = variants[idx];
     out << "    {\"activities\": [";
-    for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
-      out << *graph.activity_id(variants[i].activities[j])
-          << (j + 1 < variants[i].activities.size() ? ", " : "");
+    for (std::size_t j = 0; j < variant.activities.size(); ++j) {
+      out << *graph.activity_id(variant.activities[j])
+          << (j + 1 < variant.activities.size() ? ", " : "");
     }
-    out << "], \"count\": " << variants[i].count << '}'
-        << (i + 1 < variants.size() ? "," : "") << '\n';
+    out << "], \"count\": " << variant.count;
+    if (variant_durations != nullptr && idx < variant_durations->size()) {
+      out << ", \"duration\": ";
+      write_duration_stats(out, (*variant_durations)[idx]);
+    }
+    out << '}' << (i + 1 < variant_order.size() ? "," : "") << '\n';
   }
   out << "  ]";
 
@@ -382,10 +396,11 @@ std::string analysis_json(std::string_view dataset,
                           const HeuristicsNet* heuristics,
                           const std::vector<ModelConformance>* conformance,
                           const PerformanceMetrics* performance,
-                          const ResourceNetwork* resources) {
+                          const ResourceNetwork* resources,
+                          const std::vector<DurationStats>* variant_durations) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
-                      conformance, performance, resources);
+                      conformance, performance, resources, variant_durations);
   return out.str();
 }
 
