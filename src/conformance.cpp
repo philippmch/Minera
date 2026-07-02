@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <map>
+#include <limits>
 #include <optional>
 #include <queue>
 #include <string>
@@ -84,8 +84,7 @@ class Replayer {
   // and remaining == 0.
   [[nodiscard]] Counts replay(
       const std::vector<std::optional<std::size_t>>& trace) const {
-    Marking marking(net_.place_count(), 0);
-    marking[net_.source()] = 1;
+    Marking marking = initial_marking();
     Counts counts;
     counts.produced = 1;  // the initial token on the source place
 
@@ -97,13 +96,19 @@ class Replayer {
         ++counts.consumed;
         continue;
       }
-      const auto& targets = transitions_by_activity_[*step];
-      route_silently(marking, targets, counts);
-      fire(marking, pick_enabled(marking, targets), counts);
+      const Step& result = cached_step(marking, *step);
+      marking = result.marking;
+      counts.produced += result.produced;
+      counts.consumed += result.consumed;
+      counts.missing += result.missing;
     }
 
     // Route whatever is left toward the sink, then consume the final token.
-    route_silently_to(marking, net_.sink(), counts);
+    const Step& finish = cached_finish(marking);
+    marking = finish.marking;
+    counts.produced += finish.produced;
+    counts.consumed += finish.consumed;
+    counts.missing += finish.missing;
     ++counts.consumed;
     if (marking[net_.sink()] > 0) {
       --marking[net_.sink()];
@@ -116,21 +121,20 @@ class Replayer {
     return counts;
   }
 
-  // The marking reached after replaying the first `length` steps of a trace,
-  // used to position the model for the precision pass.
-  [[nodiscard]] Marking marking_after(
-      const std::vector<std::optional<std::size_t>>& trace,
-      std::size_t length) const {
+  // The marking replay starts from: one token on the source place.
+  [[nodiscard]] Marking initial_marking() const {
     Marking marking(net_.place_count(), 0);
     marking[net_.source()] = 1;
-    Counts scratch;
-    for (std::size_t i = 0; i < length && i < trace.size(); ++i) {
-      if (!trace[i] || transitions_by_activity_[*trace[i]].empty()) continue;
-      const auto& targets = transitions_by_activity_[*trace[i]];
-      route_silently(marking, targets, scratch);
-      fire(marking, pick_enabled(marking, targets), scratch);
-    }
     return marking;
+  }
+
+  // Advances `marking` by replaying one activity — the same step `replay`
+  // takes, so walking a trace with `advance` reaches exactly the markings a
+  // full replay would. Lets the precision pass extend a parent prefix's
+  // marking by one step instead of replaying every prefix from scratch.
+  void advance(Marking& marking, std::optional<std::size_t> activity) const {
+    if (!activity || transitions_by_activity_[*activity].empty()) return;
+    marking = cached_step(marking, *activity).marking;
   }
 
   // Activities whose transitions can be enabled from `marking` (possibly after
@@ -172,6 +176,60 @@ class Replayer {
   }
 
  private:
+  // One replay step's outcome — the marking it leads to and the token
+  // bookkeeping it added. Replay is a deterministic function of the marking
+  // and the activity, and real logs repeat the same steps constantly (shared
+  // variant prefixes, recurring states), so each distinct step is computed
+  // (with its silent-routing search) once and replayed from the cache after
+  // that. The fitness and precision passes share the caches through the one
+  // Replayer a conformance check builds.
+  struct Step {
+    Marking marking;
+    std::uint64_t produced = 0;
+    std::uint64_t consumed = 0;
+    std::uint64_t missing = 0;
+  };
+
+  struct StepKeyHash {
+    std::size_t operator()(
+        const std::pair<Marking, std::size_t>& key) const noexcept {
+      return MarkingHash{}(key.first) ^ (key.second * 0x9e3779b97f4a7c15ull);
+    }
+  };
+
+  [[nodiscard]] const Step& cached_step(const Marking& marking,
+                                        std::size_t activity) const {
+    const auto [it, inserted] =
+        step_cache_.try_emplace(std::make_pair(marking, activity));
+    if (inserted) {
+      Step& step = it->second;
+      step.marking = marking;
+      Counts counts;
+      const auto& targets = transitions_by_activity_[activity];
+      route_silently(step.marking, targets, counts);
+      fire(step.marking, pick_enabled(step.marking, targets), counts);
+      step.produced = counts.produced;
+      step.consumed = counts.consumed;
+      step.missing = counts.missing;
+    }
+    return it->second;
+  }
+
+  // The end-of-trace routing toward the sink, cached like a step.
+  [[nodiscard]] const Step& cached_finish(const Marking& marking) const {
+    const auto [it, inserted] = finish_cache_.try_emplace(marking);
+    if (inserted) {
+      Step& step = it->second;
+      step.marking = marking;
+      Counts counts;
+      route_silently_to(step.marking, net_.sink(), counts);
+      step.produced = counts.produced;
+      step.consumed = counts.consumed;
+      step.missing = counts.missing;
+    }
+    return it->second;
+  }
+
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
     for (const std::size_t place : net_.transitions()[t].inputs) {
       if (marking[place] <= 0) return false;
@@ -211,30 +269,50 @@ class Replayer {
 
   // Breadth-first search over silent-transition firings for a marking meeting
   // `goal`. Returns the silent transitions to fire, or std::nullopt if `goal`
-  // is unreachable without creating tokens.
+  // is unreachable without creating tokens. Visited states live in an arena
+  // with parent links, so the found path is reconstructed once at the end
+  // instead of being copied into every frontier entry.
+  template <typename Goal>
   [[nodiscard]] std::optional<std::vector<std::size_t>> silent_path(
-      const Marking& start,
-      const std::function<bool(const Marking&)>& goal) const {
+      const Marking& start, const Goal& goal) const {
     if (goal(start)) return std::vector<std::size_t>{};
 
+    constexpr std::size_t kStart = std::numeric_limits<std::size_t>::max();
+    struct Visited {
+      Marking marking;
+      std::size_t transition;
+      std::size_t parent;
+    };
+    std::vector<Visited> arena;
     std::unordered_set<Marking, MarkingHash> seen{start};
-    std::queue<std::pair<Marking, std::vector<std::size_t>>> frontier;
-    frontier.push({start, {}});
+    std::queue<std::size_t> frontier;
+    frontier.push(kStart);
     std::size_t expanded = 0;
 
+    const auto reconstruct = [&](std::size_t index) {
+      std::vector<std::size_t> path;
+      for (std::size_t i = index; i != kStart; i = arena[i].parent) {
+        path.push_back(arena[i].transition);
+      }
+      std::reverse(path.begin(), path.end());
+      return path;
+    };
+
     while (!frontier.empty() && expanded++ < kSilentSearchCap) {
-      auto [marking, path] = std::move(frontier.front());
+      const std::size_t index = frontier.front();
       frontier.pop();
+      // Copy: growing the arena below would invalidate a reference.
+      const Marking current = index == kStart ? start : arena[index].marking;
       for (const std::size_t s : silent_transitions_) {
-        if (!enabled(marking, s)) continue;
-        Marking next = marking;
+        if (!enabled(current, s)) continue;
+        Marking next = current;
         Counts scratch;
         fire(next, s, scratch);
         if (!seen.insert(next).second) continue;
-        std::vector<std::size_t> extended = path;
-        extended.push_back(s);
-        if (goal(next)) return extended;
-        frontier.push({std::move(next), std::move(extended)});
+        const bool done = goal(next);
+        arena.push_back(Visited{std::move(next), s, index});
+        if (done) return reconstruct(arena.size() - 1);
+        frontier.push(arena.size() - 1);
       }
     }
     return std::nullopt;
@@ -266,6 +344,9 @@ class Replayer {
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   std::vector<std::vector<std::size_t>> transitions_by_activity_;
   std::vector<std::size_t> silent_transitions_;
+  mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
+      step_cache_;
+  mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
 };
 
 // Collapses the log into distinct activity-id sequences with occurrence counts,
@@ -305,22 +386,27 @@ std::vector<Variant> collect_variants(const EventLog& log,
 
 double compute_precision(const std::vector<Variant>& variants,
                          const Replayer& replayer) {
-  // Prefix automaton: each distinct prefix records how many traces pass through
-  // it and which activities they go on to take.
-  struct State {
+  // Prefix automaton as a trie: each node is a distinct prefix and records how
+  // many traces pass through it and which activities they go on to take.
+  // Activities absent from the model all collapse onto one edge key, matching
+  // how replay treats them (the marking does not move).
+  constexpr std::size_t kAbsent = std::numeric_limits<std::size_t>::max();
+  struct Node {
+    std::unordered_map<std::size_t, std::size_t> children;  // edge -> node
     std::uint64_t freq = 0;
-    std::unordered_set<std::size_t> observed;
+    std::unordered_set<std::size_t> observed;  // next activities the log takes
   };
-  std::map<std::vector<std::optional<std::size_t>>, State> states;
+  std::vector<Node> nodes(1);
   for (const auto& variant : variants) {
-    for (std::size_t k = 0; k <= variant.ids.size(); ++k) {
-      std::vector<std::optional<std::size_t>> prefix(variant.ids.begin(),
-                                                     variant.ids.begin() + k);
-      auto& state = states[prefix];
-      state.freq += variant.count;
-      if (k < variant.ids.size() && variant.ids[k]) {
-        state.observed.insert(*variant.ids[k]);
-      }
+    std::size_t current = 0;
+    nodes[current].freq += variant.count;
+    for (const auto& id : variant.ids) {
+      if (id) nodes[current].observed.insert(*id);
+      const auto [it, inserted] =
+          nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
+      if (inserted) nodes.emplace_back();
+      current = it->second;
+      nodes[current].freq += variant.count;
     }
   }
 
@@ -333,19 +419,35 @@ double compute_precision(const std::vector<Variant>& variants,
 
   std::uint64_t enabled_total = 0;
   std::uint64_t escaping_total = 0;
-  for (const auto& [prefix, state] : states) {
-    Marking marking = replayer.marking_after(prefix, prefix.size());
-    auto [it, inserted] = enabled_cache.try_emplace(std::move(marking));
+
+  // Depth-first walk carrying the marking: a child's marking is its parent's
+  // advanced by one replay step, so each trie node costs one step rather than
+  // a from-scratch replay of its whole prefix.
+  std::vector<std::pair<std::size_t, Marking>> stack;
+  stack.emplace_back(0, replayer.initial_marking());
+  while (!stack.empty()) {
+    auto [index, marking] = std::move(stack.back());
+    stack.pop_back();
+    const Node& node = nodes[index];
+
+    for (const auto& [edge, child] : node.children) {
+      Marking next = marking;
+      replayer.advance(
+          next, edge == kAbsent ? std::nullopt : std::optional<std::size_t>(edge));
+      stack.emplace_back(child, std::move(next));
+    }
+
+    const auto [it, inserted] = enabled_cache.try_emplace(std::move(marking));
     if (inserted) {
       it->second = replayer.enabled_activities(it->first);
     }
     const auto& enabled = it->second;
     std::uint64_t escaping = 0;
     for (const std::size_t a : enabled) {
-      if (state.observed.find(a) == state.observed.end()) ++escaping;
+      if (node.observed.find(a) == node.observed.end()) ++escaping;
     }
-    enabled_total += state.freq * enabled.size();
-    escaping_total += state.freq * escaping;
+    enabled_total += node.freq * enabled.size();
+    escaping_total += node.freq * escaping;
   }
   return enabled_total == 0 ? 1.0
                             : 1.0 - double(escaping_total) / double(enabled_total);

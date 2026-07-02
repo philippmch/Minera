@@ -9,6 +9,16 @@ project(
 
 option(MINERA_BUILD_TESTS "Build Minera tests" ON)
 
+# A mining core lives or dies by codegen: an unoptimized build is 5-10x slower
+# on real event logs. Default to Release when the user picks nothing (the
+# usual `cmake -S . -B build` invocation), while leaving explicit choices and
+# multi-config generators untouched.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+               Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 add_library(minera_core
   src/alpha_miner.cpp
   src/bpmn.cpp
@@ -67,11 +77,18 @@ target_compile_features(minera_server PRIVATE cxx_std_20)
 if(MINERA_BUILD_TESTS)
   enable_testing()
 
+  # The tests are assert()-based; Release's -DNDEBUG would compile every
+  # check away and leave the suite vacuously green. Re-enable assert for the
+  # test translation units only.
+  set(MINERA_TEST_OPTIONS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>
+                          $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>)
+
   add_executable(minera_core_tests
     tests/test_core.cpp
   )
   target_link_libraries(minera_core_tests PRIVATE minera::core)
   target_compile_features(minera_core_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
 
@@ -80,6 +97,7 @@ if(MINERA_BUILD_TESTS)
   )
   target_link_libraries(minera_perspective_tests PRIVATE minera::core)
   target_compile_features(minera_perspective_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_perspective_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_perspective_tests COMMAND minera_perspective_tests)
 
@@ -88,6 +106,7 @@ if(MINERA_BUILD_TESTS)
   )
   target_link_libraries(minera_request_params_tests PRIVATE minera::core)
   target_compile_features(minera_request_params_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_request_params_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_request_params_tests COMMAND minera_request_params_tests)
 endif()
