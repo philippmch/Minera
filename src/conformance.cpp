@@ -56,6 +56,7 @@ class Replayer {
         transitions_by_activity_[*transition.activity].push_back(t);
       }
     }
+    build_place_closure();
   }
 
   [[nodiscard]] std::optional<std::size_t> activity_id(
@@ -141,11 +142,28 @@ class Replayer {
   // firing silent transitions) — the model's allowed next observable steps.
   [[nodiscard]] std::unordered_set<std::size_t> enabled_activities(
       const Marking& marking) const {
-    // An activity is allowed next if a transition for it is enabled at this
-    // marking or at any marking reachable by firing silent transitions. A
-    // single breadth-first silent closure (bounded so a pathological model
-    // cannot loop forever) collects them all at once, rather than re-walking the
-    // same silent space once per activity.
+    // When every silent transition moves a single token (one input, one
+    // output) and every visible transition needs a single place, tokens
+    // wander the silent structure independently and the closure is exact and
+    // cheap: an activity is allowed next iff some occupied place silently
+    // reaches one of its input places. This covers the heuristic miner's
+    // one-token nets — whose interleaved multi-token closures are far too
+    // large to enumerate (and used to be cut off by the search cap, slightly
+    // understating what the model allows).
+    if (place_closure_exact_) {
+      std::unordered_set<std::size_t> acts;
+      for (std::size_t p = 0; p < marking.size(); ++p) {
+        if (marking[p] <= 0) continue;
+        for (const std::size_t a : place_enables_[p]) acts.insert(a);
+      }
+      return acts;
+    }
+
+    // General nets: an activity is allowed next if a transition for it is
+    // enabled at this marking or at any marking reachable by firing silent
+    // transitions. A single breadth-first silent closure (bounded so a
+    // pathological model cannot loop forever) collects them all at once,
+    // rather than re-walking the same silent space once per activity.
     std::unordered_set<std::size_t> acts;
     const auto collect = [&](const Marking& m) {
       for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
@@ -228,6 +246,59 @@ class Replayer {
       step.missing = counts.missing;
     }
     return it->second;
+  }
+
+  // Detects whether the exact per-place closure applies (see
+  // enabled_activities) and precomputes, for every place, which activities a
+  // single token there can eventually enable through silent firings.
+  void build_place_closure() {
+    for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+      const auto& transition = net_.transitions()[t];
+      const bool ok = transition.silent()
+                          ? transition.inputs.size() == 1 &&
+                                transition.outputs.size() == 1
+                          : transition.inputs.size() == 1;
+      if (!ok) return;  // fall back to the breadth-first closure
+    }
+
+    const std::size_t places = net_.place_count();
+    std::vector<std::vector<std::size_t>> silent_out(places);
+    for (const std::size_t s : silent_transitions_) {
+      silent_out[net_.transitions()[s].inputs.front()].push_back(
+          net_.transitions()[s].outputs.front());
+    }
+    std::vector<std::vector<std::size_t>> enables_at(places);
+    for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
+      for (const std::size_t t : transitions_by_activity_[a]) {
+        enables_at[net_.transitions()[t].inputs.front()].push_back(a);
+      }
+    }
+
+    place_enables_.resize(places);
+    std::vector<char> seen(places);
+    std::vector<std::size_t> stack;
+    std::vector<char> acts(transitions_by_activity_.size());
+    for (std::size_t p = 0; p < places; ++p) {
+      std::fill(seen.begin(), seen.end(), 0);
+      std::fill(acts.begin(), acts.end(), 0);
+      seen[p] = 1;
+      stack.assign(1, p);
+      while (!stack.empty()) {
+        const std::size_t q = stack.back();
+        stack.pop_back();
+        for (const std::size_t a : enables_at[q]) acts[a] = 1;
+        for (const std::size_t r : silent_out[q]) {
+          if (!seen[r]) {
+            seen[r] = 1;
+            stack.push_back(r);
+          }
+        }
+      }
+      for (std::size_t a = 0; a < acts.size(); ++a) {
+        if (acts[a]) place_enables_[p].push_back(a);
+      }
+    }
+    place_closure_exact_ = true;
   }
 
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
@@ -347,6 +418,8 @@ class Replayer {
   mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
       step_cache_;
   mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
+  bool place_closure_exact_ = false;
+  std::vector<std::vector<std::size_t>> place_enables_;
 };
 
 // Collapses the log into distinct activity-id sequences with occurrence counts,
@@ -519,66 +592,81 @@ class Aligner {
     State final_key = final_;
     final_key.push_back(static_cast<int>(len));
 
-    // One entry per discovered state: its best known cost plus how it was first
-    // reached at that cost, for path reconstruction. Merging the cost and
-    // back-pointer tables halves both the key copies and the lookups per edge. A
-    // silent step carries no visible move; its `name` is empty and it is dropped.
+    // States are interned: the hash map owns each state once and hands out a
+    // dense id, so back-pointers, the frontier, and the cost table are plain
+    // integers rather than copies of the state vector (and the move label is
+    // reconstructed from an id at the end rather than stored as a string per
+    // state). Map nodes are stable, so by_id can point into the map.
     struct Entry {
       std::uint64_t cost = 0;
-      State prev;
+      std::uint32_t prev = 0;
       AlignmentMoveType type = AlignmentMoveType::kModel;
-      std::string name;
+      std::int32_t ref = -1;  // kLog: trace position; otherwise: activity id
       bool silent = false;
     };
 
     struct Node {
       std::uint64_t cost;
       std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
-      State state;
+      std::uint32_t state;
       bool operator>(const Node& other) const {
         return cost != other.cost ? cost > other.cost : seq > other.seq;
       }
     };
 
+    constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
     std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
-    std::unordered_map<State, Entry, MarkingHash> seen;
+    std::unordered_map<State, std::uint32_t, MarkingHash> index;
+    std::vector<const State*> by_id;
+    std::vector<Entry> entries;
     std::uint64_t seq = 0;
+    std::uint32_t final_id = kNone;
 
-    seen[start_key].cost = 0;
-    frontier.push({0, seq++, start_key});
+    const auto intern = [&](State state) {
+      const auto [it, inserted] =
+          index.try_emplace(std::move(state), std::uint32_t(entries.size()));
+      if (inserted) {
+        by_id.push_back(&it->first);
+        entries.emplace_back();
+        if (it->first == final_key) final_id = it->second;
+      }
+      return std::make_pair(it->second, inserted);
+    };
 
-    const auto relax = [&](State next, std::uint64_t cost, const State& prev,
-                           AlignmentMoveType type, std::string name,
+    const std::uint32_t start_id = intern(start_key).first;
+    frontier.push({0, seq++, start_id});
+
+    const auto relax = [&](State next, std::uint64_t cost, std::uint32_t prev,
+                           AlignmentMoveType type, std::int32_t ref,
                            bool silent) {
-      auto [it, inserted] = seen.try_emplace(std::move(next));
-      if (!inserted && it->second.cost <= cost) return;
-      it->second = Entry{cost, prev, type, std::move(name), silent};
-      frontier.push({cost, seq++, it->first});
+      const auto [id, inserted] = intern(std::move(next));
+      if (!inserted && entries[id].cost <= cost) return;
+      entries[id] = Entry{cost, prev, type, ref, silent};
+      frontier.push({cost, seq++, id});
     };
 
     bool reached = false;
     std::size_t expanded = 0;
     while (!frontier.empty() && expanded < kAlignSearchCap) {
-      Node node = std::move(const_cast<Node&>(frontier.top()));
+      const Node node = frontier.top();
       frontier.pop();
-      const auto it = seen.find(node.state);
-      if (it != seen.end() && node.cost > it->second.cost) continue;  // stale
+      if (node.cost > entries[node.state].cost) continue;  // stale
       ++expanded;
 
-      if (node.state == final_key) {
+      if (node.state == final_id) {
         reached = true;
         break;
       }
 
-      const State& state = node.state;
+      const State& state = *by_id[node.state];
       const std::size_t pos = static_cast<std::size_t>(state.back());
 
       // Log move: the trace advances while the model stands still.
       if (pos < len) {
         State next = state;
         next.back() = static_cast<int>(pos + 1);
-        relax(std::move(next), node.cost + 1, state, AlignmentMoveType::kLog,
-              names[pos], false);
+        relax(std::move(next), node.cost + 1, node.state,
+              AlignmentMoveType::kLog, static_cast<std::int32_t>(pos), false);
       }
 
       // Model moves (and the synchronous move when the labels agree).
@@ -589,23 +677,23 @@ class Aligner {
         for (const std::size_t place : transition.inputs) --fired[place];
         for (const std::size_t place : transition.outputs) ++fired[place];
         if (transition.silent()) {
-          relax(std::move(fired), node.cost, state, AlignmentMoveType::kModel,
-                std::string{}, true);
+          relax(std::move(fired), node.cost, node.state,
+                AlignmentMoveType::kModel, -1, true);
           continue;
         }
-        const std::string& name = net_.activities()[*transition.activity];
+        const auto activity = static_cast<std::int32_t>(*transition.activity);
         const bool sync = pos < len && ids[pos] &&
                           *ids[pos] == *transition.activity;
         if (sync) {
           State synced = fired;
           synced.back() = static_cast<int>(pos + 1);
-          relax(std::move(fired), node.cost + 1, state,
-                AlignmentMoveType::kModel, name, false);
-          relax(std::move(synced), node.cost, state,
-                AlignmentMoveType::kSynchronous, name, false);
+          relax(std::move(fired), node.cost + 1, node.state,
+                AlignmentMoveType::kModel, activity, false);
+          relax(std::move(synced), node.cost, node.state,
+                AlignmentMoveType::kSynchronous, activity, false);
         } else {
-          relax(std::move(fired), node.cost + 1, state,
-                AlignmentMoveType::kModel, name, false);
+          relax(std::move(fired), node.cost + 1, node.state,
+                AlignmentMoveType::kModel, activity, false);
         }
       }
     }
@@ -623,13 +711,17 @@ class Aligner {
       return outcome;
     }
 
-    outcome.cost = seen[final_key].cost;
-    for (State key = final_key; key != start_key;) {
-      const Entry& entry = seen[key];
+    outcome.cost = entries[final_id].cost;
+    for (std::uint32_t id = final_id; id != start_id;) {
+      const Entry& entry = entries[id];
       if (!entry.silent) {
-        outcome.moves.push_back({entry.type, entry.name});
+        outcome.moves.push_back(
+            {entry.type, entry.type == AlignmentMoveType::kLog
+                             ? names[static_cast<std::size_t>(entry.ref)]
+                             : net_.activities()[static_cast<std::size_t>(
+                                   entry.ref)]});
       }
-      key = entry.prev;
+      id = entry.prev;
     }
     std::reverse(outcome.moves.begin(), outcome.moves.end());
     return outcome;
