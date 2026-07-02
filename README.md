@@ -21,13 +21,13 @@ workflows with native performance.
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
   (logs without a cut fall through to a flower model). A **noise threshold**
-  switches on the **infrequent variant (IMf)**: before each cut is sought, weak
+  switches on the **infrequent variant (IMf)**: cuts are sought on the
+  unfiltered relations first, and only a sublog with no cut has its weak
   directly-follows edges (and rare start/end activities, empty traces, and
-  repetitions) are filtered relative to the dominant behaviour, so a noisy log
-  yields a structured model instead of collapsing to a flower. The full log is
-  still split along the chosen cut, so filtering changes which structure is
-  found, not what behaviour is routed where; a threshold of 0 is the classic
-  miner.
+  repetitions) filtered relative to the dominant behaviour before the cut
+  search is retried — so a noisy log yields a structured model instead of
+  collapsing to a flower, while structure the full relations already exhibit
+  is never filtered away. A threshold of 0 is the classic miner.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph as a

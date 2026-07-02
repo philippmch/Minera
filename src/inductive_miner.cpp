@@ -27,8 +27,9 @@ using Sublog = std::vector<WeightedTrace>;
 // Dense, matrix-friendly view of a sublog. Activities are renumbered to
 // 0..size()-1 for cut detection and mapped back to global ids via to_global.
 // The `follows`/`succ`/`is_start`/`is_end` relations are what the cut detectors
-// read; under the infrequent variant they are the *filtered* relations, while
-// the raw counts are retained for the noise-aware base cases.
+// read. They start out unfiltered; when no cut is found, the infrequent variant
+// recomputes them with the noise filter (from the retained raw counts) and the
+// cut detectors run once more.
 struct LocalDfg {
   std::vector<ActId> to_global;
   std::unordered_map<ActId, std::size_t> to_local;
@@ -49,7 +50,9 @@ struct LocalDfg {
 // Recomputes the boolean relations the cut detectors use from the raw counts,
 // dropping behaviour that falls below the noise threshold:
 //   * an edge a->b survives only when its count is at least `f` times a's
-//     strongest outgoing edge (so a node always keeps its dominant successor);
+//     strongest outgoing behaviour -- its heaviest outgoing edge or how often
+//     the trace ends at a, whichever is larger (so a node always keeps its
+//     dominant successor, and an end activity's stray edges count as noise);
 //   * an activity counts as a start/end only when its start/end count clears
 //     `f` times the most frequent start/end.
 // With f == 0 nothing is dropped: every observed edge and every observed
@@ -62,7 +65,10 @@ void apply_noise_filter(LocalDfg& dfg, double f) {
   dfg.is_end.assign(n, 0);
 
   for (std::size_t a = 0; a < n; ++a) {
-    std::uint64_t max_out = 0;
+    // Ending the trace competes as a's dominant behaviour too: without this,
+    // a stray outgoing edge of an activity that mostly *ends* traces is its
+    // strongest (often only) edge and can never be dropped as noise.
+    std::uint64_t max_out = dfg.end_count[a];
     for (std::size_t b = 0; b < n; ++b) {
       max_out = std::max(max_out, dfg.edge_count[a][b]);
     }
@@ -94,7 +100,7 @@ void apply_noise_filter(LocalDfg& dfg, double f) {
   }
 }
 
-LocalDfg build_local_dfg(const Sublog& log, double f) {
+LocalDfg build_local_dfg(const Sublog& log) {
   LocalDfg dfg;
   for (const auto& wt : log) {
     for (const ActId act : wt.activities) {
@@ -122,7 +128,7 @@ LocalDfg build_local_dfg(const Sublog& log, double f) {
     }
   }
 
-  apply_noise_filter(dfg, f);
+  apply_noise_filter(dfg, 0.0);
   return dfg;
 }
 
@@ -499,16 +505,36 @@ GroupOf index_groups(const std::vector<std::vector<ActId>>& groups) {
   return group_of;
 }
 
-// Exclusive: every trace's activities live in one component, so the whole
-// trace is routed there.
+// Exclusive: a trace is routed to the group holding most of its events, and
+// events outside that group are dropped as noise. On an unfiltered cut the
+// groups are true components, so every trace lands whole in its own group;
+// on a noise-filtered cut a trace may span groups, and projecting it onto the
+// winning group is what keeps each sublog's alphabet strictly smaller than
+// its parent's -- without it the recursion need not terminate.
 std::vector<Sublog> split_exclusive(const Sublog& log,
                                     std::size_t groups,
                                     const GroupOf& group_of) {
   std::vector<Sublog> out(groups);
+  std::vector<std::uint64_t> hits(groups);
   for (const auto& wt : log) {
-    const std::size_t target =
-        wt.activities.empty() ? 0 : group_of.at(wt.activities.front());
-    out[target].push_back(wt);
+    if (wt.activities.empty()) {
+      out[0].push_back(wt);
+      continue;
+    }
+    hits.assign(groups, 0);
+    for (const ActId act : wt.activities) {
+      ++hits[group_of.at(act)];
+    }
+    const std::size_t target = static_cast<std::size_t>(
+        std::max_element(hits.begin(), hits.end()) - hits.begin());
+    std::vector<ActId> kept;
+    kept.reserve(wt.activities.size());
+    for (const ActId act : wt.activities) {
+      if (group_of.at(act) == target) {
+        kept.push_back(act);
+      }
+    }
+    out[target].push_back(WeightedTrace{std::move(kept), wt.count});
   }
   for (auto& sublog : out) {
     sublog = compress(std::move(sublog));
@@ -678,7 +704,7 @@ ProcessTreeNode mine(const Sublog& log, double f) {
     return ProcessTreeNode::tau();
   }
 
-  const LocalDfg dfg = build_local_dfg(log, f);
+  LocalDfg dfg = build_local_dfg(log);
 
   // Base case: a single activity with no empty traces. It is a bare leaf when
   // it always occurs once; a self-loop when it genuinely repeats. Under the
@@ -702,17 +728,36 @@ ProcessTreeNode mine(const Sublog& log, double f) {
     return node;
   }
 
-  if (auto cut = exclusive_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f);
+  const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
+    if (auto cut = exclusive_cut(d)) {
+      return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f);
+    }
+    if (auto cut = sequence_cut(d)) {
+      return build_from_cut(ProcessTreeOperator::kSequence, *cut, log, f);
+    }
+    if (auto cut = parallel_cut(d)) {
+      return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f);
+    }
+    if (auto cut = loop_cut(d)) {
+      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f);
+    }
+    return std::nullopt;
+  };
+
+  if (auto node = try_cuts(dfg)) {
+    return std::move(*node);
   }
-  if (auto cut = sequence_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kSequence, *cut, log, f);
-  }
-  if (auto cut = parallel_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f);
-  }
-  if (auto cut = loop_cut(dfg)) {
-    return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f);
+
+  // IMf: filtering is a fall-through, not a preprocessing step. Cuts are
+  // sought on the full relations first, and only a sublog that has no cut
+  // gets its weak edges (and rare starts/ends) dropped for a second attempt.
+  // Filtering up front can erase structure the unfiltered relations exhibit,
+  // collapsing a merely noisy log to a flower.
+  if (f > 0.0) {
+    apply_noise_filter(dfg, f);
+    if (auto node = try_cuts(dfg)) {
+      return std::move(*node);
+    }
   }
 
   // Fall-through for empty traces. When they are frequent enough they are kept

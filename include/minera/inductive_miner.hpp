@@ -7,13 +7,15 @@ namespace minera {
 
 struct InductiveMinerOptions {
   // Noise filter in [0, 1], the Inductive Miner – infrequent (IMf) threshold.
-  // Before each cut is sought, a directly-follows edge a->b is kept only when
-  // its frequency is at least this fraction of a's strongest outgoing edge;
-  // rare start/end activities, rare empty traces, and rare repetitions are
-  // likewise treated as noise. The full log is still split along the cut, so
-  // filtering changes which structure is found, not what behaviour is routed
-  // where. 0.0 disables filtering and reproduces the classic Inductive Miner;
-  // higher values resist noise that would otherwise collapse to a flower model.
+  // Cuts are always sought on the unfiltered relations first; only when a
+  // sublog exhibits no cut is the filter applied and the search retried. The
+  // filter keeps a directly-follows edge a->b only when its frequency is at
+  // least this fraction of a's strongest observed behaviour (its heaviest
+  // outgoing edge, or how often the trace ends at a); rare start/end
+  // activities, rare empty traces, and rare repetitions are likewise treated
+  // as noise. 0.0 disables filtering and reproduces the classic Inductive
+  // Miner; higher values resist noise that would otherwise collapse to a
+  // flower model.
   double noise_threshold = 0.0;
 };
 

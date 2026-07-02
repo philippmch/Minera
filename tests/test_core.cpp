@@ -248,6 +248,41 @@ void inductive_miner_infrequent_filters_an_edge_at_the_cutoff() {
   assert(mine_tree_imf(variants, 0.25) == "->(a, b, c)");
 }
 
+void inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut() {
+  // The noise filter drops a->c (1 vs a's dominant a->b at 10), so the
+  // filtered graph falls apart into {a, b} and {c} and an exclusive cut
+  // fires even though the a-c trace spans both groups. The split must route
+  // that trace by majority and project it onto the winning group; routing it
+  // whole (by its first activity) reproduces the parent sublog verbatim and
+  // recursed forever.
+  std::vector<std::vector<std::string>> variants(10, {"a", "b"});
+  variants.push_back({"a", "c"});
+  assert(mine_tree_imf(variants, 0.5) == "->(a, X(b, c))");
+}
+
+void inductive_miner_infrequent_keeps_structure_the_filter_would_destroy() {
+  // a and b are genuinely parallel, but at threshold 0.5 the filter drops b
+  // as a rare start and a as a rare end, which kills the parallel cut. IMf
+  // filters only when the unfiltered relations have no cut, so the parallel
+  // structure must survive a high threshold instead of collapsing to a
+  // flower.
+  std::vector<std::vector<std::string>> variants(10, {"a", "b"});
+  variants.push_back({"b", "a"});
+  variants.push_back({"b", "a"});
+  assert(mine_tree_imf(variants, 0.5) == "+(a, b)");
+}
+
+void inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity() {
+  // The rare trace adds a->c and c->a hops. c ends twenty-one traces, so
+  // ending is its dominant behaviour and the stray c->a edge (its only
+  // outgoing edge) is noise relative to it. Without weighing the end count,
+  // c->a could never be filtered and the unresolvable cycle would collapse
+  // this log to a flower.
+  std::vector<std::vector<std::string>> variants(20, {"a", "b", "c"});
+  variants.push_back({"a", "c", "a", "b", "c"});
+  assert(mine_tree_imf(variants, 0.2) == "->(a, b, c)");
+}
+
 minera::ProcessTree tree_from_variants(
     const std::vector<std::vector<std::string>>& variants) {
   return minera::discover_process_tree(log_from_variants(variants));
@@ -1176,6 +1211,9 @@ int main() {
   inductive_miner_infrequent_recovers_a_noisy_sequence();
   inductive_miner_infrequent_leaves_a_clean_log_untouched();
   inductive_miner_infrequent_filters_an_edge_at_the_cutoff();
+  inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut();
+  inductive_miner_infrequent_keeps_structure_the_filter_would_destroy();
+  inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
   alpha_miner_discovers_a_sequence();
