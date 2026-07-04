@@ -263,10 +263,12 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
                        "application/xml");
 }
 
-// Exports the inductive model from the most recent mine as BPMN 2.0. The
-// inductive miner is the one that yields a block-structured process tree, which
-// maps cleanly onto BPMN, so this endpoint always serves that model.
-void handle_bpmn(const httplib::Request&, httplib::Response& response) {
+// Exports one model from the most recent mine as BPMN 2.0. The `miner` query
+// parameter picks it (default "inductive"). The inductive model converts from
+// its block-structured process tree, which maps cleanly onto BPMN; any other
+// model ("alpha" | "heuristic" | "imported") converts from its workflow net
+// by the net's token semantics.
+void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
@@ -279,7 +281,22 @@ void handle_bpmn(const httplib::Request&, httplib::Response& response) {
     return;
   }
 
-  response.set_content(minera::to_bpmn(session->tree, "process"),
+  const std::string miner = request.has_param("miner")
+                                ? request.get_param_value("miner")
+                                : std::string("inductive");
+  if (miner == "inductive") {
+    response.set_content(minera::to_bpmn(session->tree, "process"),
+                         "application/xml");
+    return;
+  }
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+  response.set_content(minera::to_bpmn(it->second, "process"),
                        "application/xml");
 }
 

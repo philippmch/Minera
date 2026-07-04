@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
 
 namespace minera {
@@ -20,6 +21,22 @@ void write_bpmn(std::ostream& out,
                 std::string_view name = "process");
 
 [[nodiscard]] std::string to_bpmn(const ProcessTree& tree,
+                                  std::string_view name = "process");
+
+// Serializes any workflow net as BPMN 2.0 XML, so the Alpha and Heuristic
+// miners' models (and imported nets) export like the inductive one. The
+// mapping follows the nets' token semantics: a visible transition becomes a
+// task, a transition consuming from (producing to) several places gets a
+// parallel join (split) gateway, and a place with several producers or
+// consumers becomes an exclusive gateway — a token rests in one place and
+// leaves through one arc. The source place becomes the start event, the sink
+// the end event; trivial places and silent one-in-one-out transitions
+// collapse into plain sequence flows.
+void write_bpmn(std::ostream& out,
+                const PetriNet& net,
+                std::string_view name = "process");
+
+[[nodiscard]] std::string to_bpmn(const PetriNet& net,
                                   std::string_view name = "process");
 
 }  // namespace minera

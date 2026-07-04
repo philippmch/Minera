@@ -233,15 +233,15 @@ export async function fetchXes(): Promise<string> {
 }
 
 /**
- * Fetches the inductive model from the most recently mined log as BPMN 2.0.
- * The block-structured process tree maps cleanly onto BPMN, so the backend
- * always serves that model; like PNML it only works for a log mined this
- * session.
+ * Fetches one miner's model from the most recently mined log as BPMN 2.0.
+ * The inductive model converts from its block-structured process tree; the
+ * others convert from their workflow nets server-side. Like PNML this only
+ * works for a log mined this session.
  */
-export async function fetchBpmn(): Promise<string> {
+export async function fetchBpmn(miner: string): Promise<string> {
   let response: Response;
   try {
-    response = await fetch("/api/bpmn");
+    response = await fetch(`/api/bpmn?miner=${encodeURIComponent(miner)}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",

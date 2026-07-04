@@ -3,6 +3,7 @@
 // test file stays focused on discovery and conformance.
 #undef NDEBUG
 
+#include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -400,6 +401,44 @@ void bpmn_export_escapes_xml_metacharacters() {
   assert(bpmn.find("a & b") == std::string::npos);  // raw '&' never leaks
 }
 
+void bpmn_net_export_keeps_a_sequence_gateway_free() {
+  // A plain a→b workflow net: start, the two tasks, end — the connector
+  // places collapse into sequence flows and no gateway appears.
+  const auto tree =
+      minera::discover_process_tree(log_from_variants({{"a", "b"}}));
+  const auto bpmn = minera::to_bpmn(minera::to_petri_net(tree), "test");
+  for (const char* key : {"<definitions", "<startEvent", "<endEvent",
+                          "name=\"a\"", "name=\"b\"", "<sequenceFlow"}) {
+    assert(bpmn.find(key) != std::string::npos);
+  }
+  assert(bpmn.find("Gateway") == std::string::npos);
+}
+
+void bpmn_net_export_maps_places_and_transitions_to_gateways() {
+  // The Alpha Miner's net for {a}|{b} branches at a place (a token picks one
+  // consumer), which must become an exclusive gateway — and never a parallel
+  // one, since no transition forks tokens here.
+  const auto choice = minera::discover_petri_net(log_from_variants({{"a"}, {"b"}}));
+  const auto choice_bpmn = minera::to_bpmn(choice);
+  assert(choice_bpmn.find("<exclusiveGateway") != std::string::npos);
+  assert(choice_bpmn.find("<parallelGateway") == std::string::npos);
+
+  // A parallel block of b and c converts to a net whose silent AND-split
+  // transition produces two places at once — a parallel gateway in BPMN.
+  const auto tree = minera::discover_process_tree(
+      log_from_variants({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}));
+  const auto parallel_bpmn = minera::to_bpmn(minera::to_petri_net(tree));
+  assert(parallel_bpmn.find("<parallelGateway") != std::string::npos);
+}
+
+void bpmn_net_export_escapes_xml_metacharacters() {
+  const auto tree =
+      minera::discover_process_tree(log_from_variants({{"a & b", "c"}}));
+  const auto bpmn = minera::to_bpmn(minera::to_petri_net(tree));
+  assert(bpmn.find("a &amp; b") != std::string::npos);
+  assert(bpmn.find("a & b") == std::string::npos);  // raw '&' never leaks
+}
+
 void json_export_carries_performance_and_resource_contracts() {
   const auto path = write_temp_log(
       "case_id,activity,timestamp,resource\n"
@@ -458,6 +497,9 @@ int main() {
   bpmn_export_carries_block_structure();
   bpmn_export_uses_a_gateway_for_an_exclusive_choice();
   bpmn_export_escapes_xml_metacharacters();
+  bpmn_net_export_keeps_a_sequence_gateway_free();
+  bpmn_net_export_maps_places_and_transitions_to_gateways();
+  bpmn_net_export_escapes_xml_metacharacters();
   json_export_carries_performance_and_resource_contracts();
   return 0;
 }

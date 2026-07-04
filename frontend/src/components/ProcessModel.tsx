@@ -154,18 +154,16 @@ function ModelResult({
   petriLayout,
   canExportPnml,
 }: ModelResultProps) {
-  const pnml = canExportPnml ? (
-    <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
+  // Every miner exports both ways: PNML from its workflow net, BPMN from the
+  // inductive tree or from the net's token semantics (converted server-side).
+  const actions = canExportPnml ? (
+    <>
+      <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
+      <BpmnButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
+    </>
   ) : null;
 
   if (variant.artifact === "process-tree") {
-    // The inductive tree is the one model that also exports as BPMN.
-    const actions = canExportPnml ? (
-      <>
-        {pnml}
-        <BpmnButton groupName={groupName} dataset={data.dataset} />
-      </>
-    ) : null;
     return treeLayout ? (
       <ProcessTree layout={treeLayout} title={groupName} actions={actions} />
     ) : (
@@ -179,11 +177,11 @@ function ModelResult({
   if (variant.artifact === "dependency-graph") {
     // The dependency graph is derived from the directly-follows counts, which
     // every analysis carries, so it is always available.
-    return <DependencyGraph data={data} title={groupName} actions={pnml} />;
+    return <DependencyGraph data={data} title={groupName} actions={actions} />;
   }
 
   return petriLayout ? (
-    <PetriNet layout={petriLayout} title={groupName} actions={pnml} />
+    <PetriNet layout={petriLayout} title={groupName} actions={actions} />
   ) : (
     <Placeholder>
       No model to display. This export predates {groupName} discovery — re-open
@@ -235,12 +233,16 @@ function PnmlButton({
   );
 }
 
-// Downloads the inductive model as BPMN 2.0. The process tree is converted
-// server-side, so the export matches the model Minera actually discovered.
+// Downloads the shown model as BPMN 2.0. The conversion runs server-side —
+// from the process tree for the inductive miner, from the workflow net's
+// token semantics for the others — so the export matches the model Minera
+// actually discovered.
 function BpmnButton({
+  minerId,
   groupName,
   dataset,
 }: {
+  minerId: string;
   groupName: string;
   dataset: string;
 }) {
@@ -250,14 +252,14 @@ function BpmnButton({
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchBpmn()
+    fetchBpmn(minerId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
         anchor.href = url;
-        anchor.download = `${base}.bpmn`;
+        anchor.download = `${base}-${minerId}.bpmn`;
         anchor.click();
         URL.revokeObjectURL(url);
       })
