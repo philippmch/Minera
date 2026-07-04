@@ -71,8 +71,9 @@ int usage(const char* program) {
                "                            (conformance id: imported)\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, or heuristic\n"
-               "  --bpmn <path>             Also write the inductive model as BPMN\n"
-               "                            2.0 to <path>\n"
+               "  --bpmn <path>             Also write a model as BPMN 2.0 to <path>\n"
+               "  --bpmn-miner <id>         Which model to export as BPMN:\n"
+               "                            inductive (default), alpha, or heuristic\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
                "\n  Log filtering (applied before discovery):\n"
@@ -110,6 +111,7 @@ int main(int argc, char** argv) {
   std::filesystem::path bpmn_output;
   std::filesystem::path xes_output;
   std::string pnml_miner = "inductive";
+  std::string bpmn_miner = "inductive";
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   minera::InductiveMinerOptions inductive_options;
@@ -160,6 +162,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       pnml_miner = value;
+    } else if (arg == "--bpmn-miner") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      bpmn_miner = value;
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -341,7 +347,9 @@ int main(int argc, char** argv) {
       minera::write_pnml(pnml_file, *selected, pnml_miner + " net");
     }
 
-    // Optionally emit the inductive model (a block-structured tree) as BPMN.
+    // Optionally emit one discovered model as BPMN. The inductive tree maps
+    // block by block; the other miners' workflow nets convert by their token
+    // semantics.
     if (!bpmn_output.empty()) {
       std::ofstream bpmn_file(bpmn_output);
       if (!bpmn_file) {
@@ -349,7 +357,17 @@ int main(int argc, char** argv) {
                   << '\n';
         return 1;
       }
-      minera::write_bpmn(bpmn_file, tree, dataset);
+      if (bpmn_miner == "inductive") {
+        minera::write_bpmn(bpmn_file, tree, dataset);
+      } else if (bpmn_miner == "alpha") {
+        minera::write_bpmn(bpmn_file, net, dataset);
+      } else if (bpmn_miner == "heuristic") {
+        minera::write_bpmn(bpmn_file, heuristic_net, dataset);
+      } else {
+        std::cerr << "error: unknown --bpmn-miner '" << bpmn_miner
+                  << "' (expected inductive, alpha, or heuristic)\n";
+        return 1;
+      }
     }
 
     // Optionally emit the (filtered) event log as standard XES, making the

@@ -75,6 +75,11 @@ workflows with native performance.
   PM4Py — and a PNML workflow net from any of those tools can be read back for
   conformance checking. Every miner reuses the same workflow-net translation
   used for conformance, so the exported net is exactly what Minera checks.
+- **BPMN 2.0 export** for every miner: the inductive model converts block by
+  block from its process tree, and the Alpha and Heuristic models convert
+  from their workflow nets by token semantics — a branching place becomes an
+  exclusive gateway, a forking transition a parallel gateway — readable by
+  Camunda, bpmn.io, Signavio, and most BPM suites.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
   resource (performer) projection, rework (keep only cases where an activity
@@ -152,7 +157,8 @@ events first; discovery lives in tabs:
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser, and
-  a **Download … as PNML** button exports the model for ProM/PM4Py,
+  **Download … as PNML / as BPMN** buttons export any miner's model for
+  ProM/PM4Py or a BPM suite,
 - **Conformance** — pick any miner (or upload a PNML workflow net from another
   tool) and any method: fitness, precision, generalization, and simplicity of
   the log against that model, plus a per-variant breakdown of where traces
@@ -201,7 +207,10 @@ in that PNML file; its results appear in the export under the conformance id
 `imported`, next to the discovered models.
 
 `--xes out.xes` additionally writes the event log — after any filtering — as
-standard XES, making the CLI double as a CSV-to-XES converter.
+standard XES, making the CLI double as a CSV-to-XES converter. `--bpmn
+out.bpmn` writes a discovered model as BPMN 2.0, with `--bpmn-miner`
+(inductive, alpha, or heuristic) picking which — mirroring `--pnml` /
+`--pnml-miner`.
 
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--keep-resources`, `--remove-resources`,
