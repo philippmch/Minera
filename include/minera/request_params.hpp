@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "minera/alpha_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_filter.hpp"
@@ -37,6 +38,7 @@ struct MineParams {
   CsvImportOptions csv;
   LogFilterOptions filter;
   InductiveMinerOptions inductive;
+  AlphaMinerOptions alpha;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.

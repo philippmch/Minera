@@ -145,6 +145,13 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("noise_threshold"); !value.empty()) {
     params.inductive.noise_threshold = std::atof(value.c_str());
   }
+  if (const auto value = field("alpha_variant"); !value.empty()) {
+    if (value != "classic" && value != "plus") {
+      throw std::invalid_argument("alpha_variant: expected classic or plus, got '" +
+                                  value + "'");
+    }
+    params.alpha.short_loops = value == "plus";
+  }
 
   return params;
 }

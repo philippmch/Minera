@@ -27,45 +27,80 @@ bool is_subset(const ActivitySet& sub, const ActivitySet& sup) {
   return std::includes(sup.begin(), sup.end(), sub.begin(), sub.end());
 }
 
-// The log footprint: which activities directly follow which, plus the start and
-// end activities. All higher-level relations derive from this matrix.
-struct Footprint {
+// The log with activity names interned to dense ids, so the full-log and
+// reduced-log footprints of the Alpha+ variant share one id space.
+struct IdLog {
   std::vector<std::string> names;
-  std::vector<std::vector<bool>> follows;  // follows[a][b]: a directly precedes b
+  std::vector<std::vector<std::size_t>> traces;
+};
+
+IdLog intern_log(const EventLog& log) {
+  IdLog out;
+  std::unordered_map<std::string, std::size_t> ids;
+  for (const auto& trace : log.traces) {
+    std::vector<std::size_t> sequence;
+    sequence.reserve(trace.events.size());
+    for (const auto& event : trace.events) {
+      const auto [it, inserted] =
+          ids.try_emplace(event.activity, out.names.size());
+      if (inserted) out.names.push_back(event.activity);
+      sequence.push_back(it->second);
+    }
+    out.traces.push_back(std::move(sequence));
+  }
+  return out;
+}
+
+// The log footprint: which activities directly follow which, plus the start and
+// end activities. All higher-level relations derive from this matrix. With
+// short_loops set, "a b a" patterns are also recorded so that a length-two loop
+// — where both directions of succession appear — can be told apart from true
+// concurrency when reading causality.
+struct Footprint {
+  std::vector<std::vector<bool>> follows;   // follows[a][b]: a directly precedes b
+  std::vector<std::vector<bool>> two_loop;  // two_loop[a][b]: "a b a" occurs
   std::set<std::size_t> starts;
   std::set<std::size_t> ends;
+  bool short_loops = false;
 
-  [[nodiscard]] std::size_t size() const { return names.size(); }
+  [[nodiscard]] std::size_t size() const { return follows.size(); }
   [[nodiscard]] bool causal(std::size_t a, std::size_t b) const {
-    return follows[a][b] && !follows[b][a];
+    if (!follows[a][b]) return false;
+    if (!follows[b][a]) return true;
+    // Succession in both directions: concurrency for the classic miner, but a
+    // length-two loop — hence causal both ways — when "a b a" and "b a b" both
+    // occur, which interleaved concurrent activities cannot produce.
+    return short_loops && two_loop[a][b] && two_loop[b][a];
   }
   [[nodiscard]] bool choice(std::size_t a, std::size_t b) const {
     return !follows[a][b] && !follows[b][a];
   }
 };
 
-Footprint build_footprint(const EventLog& log) {
+// Builds the footprint over the interned log. Activities marked in `exclude`
+// (the Alpha+ length-one-loop removal) are read as absent from every trace.
+Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
+                          bool short_loops) {
+  const std::size_t n = log.names.size();
   Footprint fp;
-  std::unordered_map<std::string, std::size_t> ids;
-  const auto intern = [&](const std::string& name) {
-    const auto [it, inserted] = ids.try_emplace(name, fp.names.size());
-    if (inserted) fp.names.push_back(name);
-    return it->second;
-  };
-
-  for (const auto& trace : log.traces) {
-    for (const auto& event : trace.events) intern(event.activity);
-  }
-
-  const std::size_t n = fp.names.size();
+  fp.short_loops = short_loops;
   fp.follows.assign(n, std::vector<bool>(n, false));
+  if (short_loops) fp.two_loop.assign(n, std::vector<bool>(n, false));
+
+  std::vector<std::size_t> sequence;
   for (const auto& trace : log.traces) {
-    const auto& events = trace.events;
-    if (events.empty()) continue;
-    fp.starts.insert(ids[events.front().activity]);
-    fp.ends.insert(ids[events.back().activity]);
-    for (std::size_t i = 1; i < events.size(); ++i) {
-      fp.follows[ids[events[i - 1].activity]][ids[events[i].activity]] = true;
+    sequence.clear();
+    for (const auto id : trace) {
+      if (!exclude || !(*exclude)[id]) sequence.push_back(id);
+    }
+    if (sequence.empty()) continue;
+    fp.starts.insert(sequence.front());
+    fp.ends.insert(sequence.back());
+    for (std::size_t i = 1; i < sequence.size(); ++i) {
+      fp.follows[sequence[i - 1]][sequence[i]] = true;
+      if (short_loops && i >= 2 && sequence[i - 2] == sequence[i]) {
+        fp.two_loop[sequence[i]][sequence[i - 1]] = true;
+      }
     }
   }
   return fp;
@@ -146,12 +181,30 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 
 }  // namespace
 
-PetriNet discover_petri_net(const EventLog& log) {
-  const Footprint fp = build_footprint(log);
-  const std::size_t n = fp.size();
+PetriNet discover_petri_net(const EventLog& log,
+                            const AlphaMinerOptions& options) {
+  const IdLog ids = intern_log(log);
+  const std::size_t n = ids.names.size();
+
+  // Alpha+ first sets aside the length-one-loop activities (those that directly
+  // follow themselves): they can never sit on a valid place, so the place
+  // search runs on the log read without them, and each is re-attached to the
+  // place between its neighbours afterwards.
+  const Footprint full = build_footprint(ids, nullptr, options.short_loops);
+  std::vector<bool> loops(n, false);
+  bool any_loop = false;
+  if (options.short_loops) {
+    for (std::size_t a = 0; a < n; ++a) {
+      loops[a] = full.follows[a][a];
+      any_loop |= loops[a];
+    }
+  }
+  const Footprint reduced =
+      any_loop ? build_footprint(ids, &loops, true) : Footprint{};
+  const Footprint& fp = any_loop ? reduced : full;
 
   PetriNet net;
-  net.set_activities(fp.names);
+  net.set_activities(ids.names);
   const std::size_t source = net.add_place();
   const std::size_t sink = net.add_place();
   net.set_source(source);
@@ -165,10 +218,47 @@ PetriNet discover_petri_net(const EventLog& log) {
   for (const auto start : fp.starts) inputs[start].push_back(source);
   for (const auto end : fp.ends) outputs[end].push_back(sink);
 
-  for (const auto& [a, b] : maximal_places(fp)) {
+  std::vector<std::pair<Place, std::size_t>> placed;
+  for (auto& pair : maximal_places(fp)) {
     const std::size_t place = net.add_place();
-    for (const auto from : a) outputs[from].push_back(place);
-    for (const auto to : b) inputs[to].push_back(place);
+    for (const auto from : pair.first) outputs[from].push_back(place);
+    for (const auto to : pair.second) inputs[to].push_back(place);
+    placed.emplace_back(std::move(pair), place);
+  }
+
+  // Re-attach each length-one loop t as a self loop on the place between its
+  // neighbours A = {a | a > t} and B = {b | t > b} (other loops excluded): t
+  // borrows the token and puts it back, leaving the surrounding flow intact.
+  // On a well-formed log (A, B) is exactly one of the discovered places; on a
+  // noisy one, fall back to the largest place nested inside the pair.
+  for (std::size_t t = 0; any_loop && t < n; ++t) {
+    if (!loops[t]) continue;
+    ActivitySet a_side;
+    ActivitySet b_side;
+    for (std::size_t other = 0; other < n; ++other) {
+      if (loops[other]) continue;
+      if (full.follows[other][t]) a_side.push_back(other);
+      if (full.follows[t][other]) b_side.push_back(other);
+    }
+    const std::pair<Place, std::size_t>* best = nullptr;
+    for (const auto& candidate : placed) {
+      if (candidate.first.first == a_side && candidate.first.second == b_side) {
+        best = &candidate;
+        break;
+      }
+      if (!is_subset(candidate.first.first, a_side) ||
+          !is_subset(candidate.first.second, b_side)) {
+        continue;
+      }
+      const auto span = [](const Place& place) {
+        return place.first.size() + place.second.size();
+      };
+      if (!best || span(candidate.first) > span(best->first)) best = &candidate;
+    }
+    if (best) {
+      inputs[t].push_back(best->second);
+      outputs[t].push_back(best->second);
+    }
   }
 
   for (std::size_t activity = 0; activity < n; ++activity) {

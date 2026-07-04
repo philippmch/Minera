@@ -385,16 +385,63 @@ void alpha_miner_keeps_parallel_branches_on_separate_places() {
   for (const auto place : b->inputs) assert(!contains(c->inputs, place));
 }
 
-void alpha_miner_drops_short_loop_activities() {
+void alpha_miner_classic_drops_short_loop_activities() {
   // A length-two loop (b after a, a after b) makes a and b parallel under the
   // footprint, so the classic algorithm cannot place either — the textbook
   // short-loop limitation. The transitions still exist but carry no arcs.
   const auto net = minera::discover_petri_net(
-      log_from_variants({{"x", "a", "b", "a", "y"}, {"x", "a", "y"}}));
+      log_from_variants({{"x", "a", "b", "a", "b", "a", "y"}, {"x", "a", "y"}}),
+      {.short_loops = false});
   const auto* a = transition_for(net, "a");
   const auto* b = transition_for(net, "b");
   assert(a && b);
   assert(b->inputs.empty() && b->outputs.empty());
+}
+
+void alpha_plus_attaches_a_length_one_loop() {
+  // t repeats directly between a and b, so classic Alpha sees t > t and can
+  // never place it. Alpha+ mines the net without t, then re-attaches t as a
+  // self loop on the place between its neighbours a and b.
+  const auto net = minera::discover_petri_net(
+      log_from_variants({{"a", "t", "t", "b"}, {"a", "b"}}));
+  const auto* a = transition_for(net, "a");
+  const auto* b = transition_for(net, "b");
+  const auto* t = transition_for(net, "t");
+  assert(a && b && t);
+  // The surrounding flow is the plain a -> b sequence net.
+  assert(net.place_count() == 3);
+  assert(a->outputs.size() == 1 && a->outputs == b->inputs);
+  // t borrows the token from that middle place and puts it straight back.
+  assert(t->inputs == a->outputs && t->outputs == a->outputs);
+}
+
+void alpha_plus_discovers_a_length_two_loop() {
+  // a and b alternate (a b a b a): both "a b a" and "b a b" occur, which true
+  // concurrency of single occurrences cannot produce, so Alpha+ reads causality
+  // in both directions and wires the loop instead of dropping the arcs.
+  const auto net = minera::discover_petri_net(
+      log_from_variants({{"x", "a", "b", "a", "b", "a", "y"}, {"x", "a", "y"}}));
+  const auto* a = transition_for(net, "a");
+  const auto* b = transition_for(net, "b");
+  assert(a && b);
+  // b loops back: its input is a's output place and its output is a's input.
+  assert(a->outputs.size() == 1 && b->inputs == a->outputs);
+  assert(a->inputs.size() == 1 && b->outputs == a->inputs);
+}
+
+void alpha_plus_matches_classic_without_short_loops() {
+  // On a short-loop-free log the plus relations collapse to the classic ones,
+  // so both variants must produce the same net.
+  const auto log = log_from_variants(
+      {{"a", "b", "c", "e"}, {"a", "c", "b", "e"}, {"a", "d", "e"}});
+  const auto plus = minera::discover_petri_net(log);
+  const auto classic = minera::discover_petri_net(log, {.short_loops = false});
+  assert(plus.place_count() == classic.place_count());
+  assert(plus.transitions().size() == classic.transitions().size());
+  for (std::size_t i = 0; i < plus.transitions().size(); ++i) {
+    assert(plus.transitions()[i].inputs == classic.transitions()[i].inputs);
+    assert(plus.transitions()[i].outputs == classic.transitions()[i].outputs);
+  }
 }
 
 void alpha_miner_handles_an_empty_log() {
@@ -1846,7 +1893,10 @@ int main() {
   alpha_miner_discovers_a_sequence();
   alpha_miner_shares_a_place_for_exclusive_choice();
   alpha_miner_keeps_parallel_branches_on_separate_places();
-  alpha_miner_drops_short_loop_activities();
+  alpha_miner_classic_drops_short_loop_activities();
+  alpha_plus_attaches_a_length_one_loop();
+  alpha_plus_discovers_a_length_two_loop();
+  alpha_plus_matches_classic_without_short_loops();
   alpha_miner_handles_an_empty_log();
   json_export_carries_the_petri_net_contract();
   conformance_is_perfect_on_the_discovery_log();

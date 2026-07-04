@@ -96,7 +96,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
     const auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log, params.inductive);
-    const auto net = minera::discover_petri_net(log);
+    const auto net = minera::discover_petri_net(log, params.alpha);
     const auto heuristics = minera::discover_heuristics_net(log);
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);

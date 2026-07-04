@@ -48,12 +48,16 @@ export const MINER_GROUPS: MinerGroup[] = [
       "The classic algorithm: derives a Petri net from directly-follows relations.",
     variants: [
       {
-        id: "classic",
-        name: "Classic",
+        id: "plus",
+        name: "Alpha+",
         description:
           "Infers ordering, causality, parallelism and choice from the " +
           "directly-follows relations and assembles them into a Petri net. " +
-          "Foundational, but sensitive to noise and incomplete logs.",
+          "The + variant also handles the classic algorithm's short-loop " +
+          "blind spots: directly repeating activities become self loops, and " +
+          "two alternating activities become a loop instead of being mistaken " +
+          "for concurrency. Foundational, but sensitive to noise and " +
+          "incomplete logs.",
         artifact: "petri-net",
       },
     ],
