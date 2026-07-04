@@ -21,6 +21,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
@@ -102,6 +103,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
+    const auto eventually = minera::discover_eventually_follows(log, graph);
 
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
@@ -119,7 +121,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const std::string body =
         minera::analysis_json(dataset, log, graph, &tree, &net, &heuristics,
                               &conformance, &performance, &resources,
-                              &variant_durations);
+                              &variant_durations, &eventually);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

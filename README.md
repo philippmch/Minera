@@ -15,6 +15,9 @@ workflows with native performance.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
+- Eventually-follows graph discovery: for every activity pair, how often one
+  is followed by the other — directly or transitively — later in the same
+  case, surfacing long-range dependencies the directly-follows edges miss.
 - Process-model discovery with the **Heuristic Miner**: a dependency measure
   weighs how often one activity follows another against the reverse, and only
   edges above a dependency and frequency threshold are kept — yielding a
@@ -137,7 +140,10 @@ events first; discovery lives in tabs:
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)
   when the log is timed, a variant explorer that highlights paths on the map,
-  and per-activity frequency, entry, and exit statistics,
+  per-activity frequency, entry, and exit statistics, and an
+  **eventually-follows matrix** — a heatmap of how often each activity is
+  eventually followed by each other, exposing long-range order the map's
+  local edges don't show,
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the Heuristic Miner's dependency and
