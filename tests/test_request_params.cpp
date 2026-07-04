@@ -85,6 +85,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"delimiter", ";"},
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
+      {"inductive_variant", "dfg"},
   }));
   assert(params.csv.case_id_column == "Case");
   assert(params.csv.activity_column == "Act");
@@ -92,7 +93,18 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.csv.resource_column == "Who");
   assert(params.csv.delimiter == ';');  // only the first char is taken
   assert(params.inductive.noise_threshold == 0.25);
+  assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
   assert(!params.alpha.short_loops);
+}
+
+void parse_mine_params_rejects_an_unknown_inductive_variant() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"inductive_variant", "bogus"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_an_unknown_alpha_variant() {
@@ -183,6 +195,7 @@ int main() {
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_rejects_an_unknown_alpha_variant();
+  parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_ignores_blank_fields();
   return 0;
 }

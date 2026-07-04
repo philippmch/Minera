@@ -47,7 +47,15 @@ workflows with native performance.
   repetitions) filtered relative to the dominant behaviour before the cut
   search is retried — so a noisy log yields a structured model instead of
   collapsing to a flower, while structure the full relations already exhibit
-  is never filtered away. A threshold of 0 is the classic miner.
+  is never filtered away. A threshold of 0 is the classic miner. The
+  **directly-follows variant (IMd)** reads the log exactly once to build the
+  directly-follows graph and then recurses on *projections of the graph*
+  instead of splitting traces — time and memory scale with the number of
+  activities rather than events, at some model-quality cost (a projected graph
+  can imply orderings no trace exhibits, and skipped sequence steps are
+  inferred from jumping edges instead of observed empty subtraces). Select it
+  with `--inductive-variant dfg` (CLI) or the `inductive_variant` form field;
+  the noise threshold applies to both variants.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph as a

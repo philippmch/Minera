@@ -783,6 +783,192 @@ ProcessTreeNode mine(const Sublog& log, double f) {
   return flower(dfg.to_global);
 }
 
+// --- IMd: recursion over the directly-follows graph -------------------------
+//
+// The log is read exactly once (build_local_dfg on the whole log); afterwards
+// each cut projects the *graph* onto its groups instead of splitting traces,
+// so recursion cost depends on the number of activities, not events.
+
+// Projects the parent graph onto one group of a cut. Internal edges keep their
+// counts and the group inherits its members' start/end counts. With
+// `crossing_edges` set (sequence, parallel, and loop cuts), an edge entering
+// the group from outside makes its target a start of the sub-graph and an edge
+// leaving makes its source an end — the sub-behaviour begins and ends at the
+// crossing points. An exclusive cut has no meaningful crossing edges (its
+// groups are components; anything across is filtered noise), so they are
+// dropped there.
+LocalDfg project_dfg(const LocalDfg& parent,
+                     const std::vector<ActId>& group,
+                     bool crossing_edges) {
+  LocalDfg sub;
+  for (const ActId act : group) {
+    sub.to_local.emplace(act, sub.to_global.size());
+    sub.to_global.push_back(act);
+  }
+  const std::size_t m = sub.size();
+  sub.edge_count.assign(m, std::vector<std::uint64_t>(m, 0));
+  sub.start_count.assign(m, 0);
+  sub.end_count.assign(m, 0);
+
+  constexpr std::size_t kOutside = static_cast<std::size_t>(-1);
+  std::vector<std::size_t> to_sub(parent.size(), kOutside);
+  for (std::size_t i = 0; i < m; ++i) {
+    to_sub[parent.to_local.at(sub.to_global[i])] = i;
+  }
+
+  for (std::size_t a = 0; a < parent.size(); ++a) {
+    if (to_sub[a] != kOutside) {
+      sub.start_count[to_sub[a]] += parent.start_count[a];
+      sub.end_count[to_sub[a]] += parent.end_count[a];
+    }
+    for (std::size_t b = 0; b < parent.size(); ++b) {
+      const std::uint64_t weight = parent.edge_count[a][b];
+      if (weight == 0) {
+        continue;
+      }
+      const bool a_in = to_sub[a] != kOutside;
+      const bool b_in = to_sub[b] != kOutside;
+      if (a_in && b_in) {
+        sub.edge_count[to_sub[a]][to_sub[b]] += weight;
+      } else if (crossing_edges && !a_in && b_in) {
+        sub.start_count[to_sub[b]] += weight;
+      } else if (crossing_edges && a_in && !b_in) {
+        sub.end_count[to_sub[a]] += weight;
+      }
+    }
+  }
+
+  apply_noise_filter(sub, 0.0);
+  return sub;
+}
+
+ProcessTreeNode mine_dfg(LocalDfg dfg, double f) {
+  if (dfg.size() == 0) {
+    return ProcessTreeNode::tau();
+  }
+
+  // Base case: a single activity is a bare leaf, or a self-loop when its
+  // self-edge survives the noise filter.
+  if (dfg.size() == 1) {
+    if (f > 0.0) {
+      apply_noise_filter(dfg, f);
+    }
+    if (!dfg.follows[0][0]) {
+      return ProcessTreeNode::leaf(dfg.to_global.front());
+    }
+    ProcessTreeNode node;
+    node.op = ProcessTreeOperator::kLoop;
+    node.children = {ProcessTreeNode::leaf(dfg.to_global.front()),
+                     ProcessTreeNode::tau()};
+    return node;
+  }
+
+  const auto build = [&](ProcessTreeOperator op,
+                         const std::vector<std::vector<ActId>>& groups) {
+    const bool crossing_edges = op != ProcessTreeOperator::kExclusive;
+
+    // A sequence group is skippable when some trace evidently jumps over it:
+    // an edge from an earlier group straight to a later one, a trace starting
+    // in a later group, or one ending in an earlier group. The log recursion
+    // sees such skips as empty projected traces; a graph projection never
+    // receives that evidence, so it must be read off the parent graph here
+    // and modelled as an explicit optional child.
+    std::vector<char> skippable(groups.size(), 0);
+    if (op == ProcessTreeOperator::kSequence) {
+      std::vector<std::size_t> group_of(dfg.size(), 0);
+      for (std::size_t i = 0; i < groups.size(); ++i) {
+        for (const ActId act : groups[i]) {
+          group_of[dfg.to_local.at(act)] = i;
+        }
+      }
+      for (std::size_t a = 0; a < dfg.size(); ++a) {
+        if (dfg.is_start[a]) {
+          for (std::size_t i = 0; i < group_of[a]; ++i) {
+            skippable[i] = 1;
+          }
+        }
+        if (dfg.is_end[a]) {
+          for (std::size_t i = group_of[a] + 1; i < groups.size(); ++i) {
+            skippable[i] = 1;
+          }
+        }
+        for (const std::size_t b : dfg.succ[a]) {
+          for (std::size_t i = group_of[a] + 1; i < group_of[b]; ++i) {
+            skippable[i] = 1;
+          }
+        }
+      }
+    }
+
+    std::vector<ProcessTreeNode> children;
+    children.reserve(groups.size());
+    for (std::size_t i = 0; i < groups.size(); ++i) {
+      auto child = mine_dfg(project_dfg(dfg, groups[i], crossing_edges), f);
+      if (skippable[i]) {
+        child = make_node(ProcessTreeOperator::kExclusive,
+                          {ProcessTreeNode::tau(), std::move(child)});
+      }
+      children.push_back(std::move(child));
+    }
+    return make_node(op, std::move(children));
+  };
+
+  const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
+    if (auto cut = exclusive_cut(d)) {
+      return build(ProcessTreeOperator::kExclusive, *cut);
+    }
+    if (auto cut = sequence_cut(d)) {
+      return build(ProcessTreeOperator::kSequence, *cut);
+    }
+    if (auto cut = parallel_cut(d)) {
+      return build(ProcessTreeOperator::kParallel, *cut);
+    }
+    if (auto cut = loop_cut(d)) {
+      return build(ProcessTreeOperator::kLoop, *cut);
+    }
+    return std::nullopt;
+  };
+
+  if (auto node = try_cuts(dfg)) {
+    return std::move(*node);
+  }
+
+  // Same fall-through order as the log recursion: filtering only when the
+  // unfiltered relations exhibit no cut.
+  if (f > 0.0) {
+    apply_noise_filter(dfg, f);
+    if (auto node = try_cuts(dfg)) {
+      return std::move(*node);
+    }
+  }
+
+  return flower(dfg.to_global);
+}
+
+// IMd entry: one pass over the (variant-compressed) log builds the root graph,
+// then the recursion never touches traces again. Empty traces are invisible to
+// a directly-follows graph, so the option to skip everything is decided here at
+// the root — the one place the log itself is still in hand — mirroring the
+// empty-trace fall-through of the log recursion.
+ProcessTreeNode mine_dfg_root(const Sublog& log, double f) {
+  std::uint64_t empty_weight = 0;
+  std::uint64_t nonempty_weight = 0;
+  for (const auto& wt : log) {
+    (wt.activities.empty() ? empty_weight : nonempty_weight) += wt.count;
+  }
+  if (nonempty_weight == 0) {
+    return ProcessTreeNode::tau();
+  }
+
+  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f);
+  if (static_cast<double>(empty_weight) >
+      f * static_cast<double>(nonempty_weight)) {
+    return make_node(ProcessTreeOperator::kExclusive,
+                     {ProcessTreeNode::tau(), std::move(root)});
+  }
+  return root;
+}
+
 }  // namespace
 
 ProcessTree discover_process_tree(const EventLog& event_log,
@@ -815,7 +1001,9 @@ ProcessTree discover_process_tree(const EventLog& event_log,
   }
 
   const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
-  ProcessTreeNode root = mine(sublog, f);
+  ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
+                             ? mine_dfg_root(sublog, f)
+                             : mine(sublog, f);
   return ProcessTree(std::move(names), std::move(root));
 }
 

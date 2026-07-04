@@ -277,6 +277,48 @@ void inductive_miner_infrequent_keeps_structure_the_filter_would_destroy() {
   assert(mine_tree_imf(variants, 0.5) == "+(a, b)");
 }
 
+std::string mine_tree_imd(const std::vector<std::vector<std::string>>& variants,
+                          double noise_threshold = 0.0) {
+  const auto log = log_from_variants(variants);
+  minera::InductiveMinerOptions options;
+  options.noise_threshold = noise_threshold;
+  options.variant = minera::InductiveMinerVariant::kDfg;
+  const auto tree = minera::discover_process_tree(log, options);
+  return render(tree, tree.root());
+}
+
+void inductive_miner_dfg_matches_log_recursion_on_structured_logs() {
+  // On logs whose structure the directly-follows graph fully captures, the
+  // graph-projection recursion must find the same tree as the log recursion.
+  assert(mine_tree_imd({{"a", "b", "c"}}) == "->(a, b, c)");
+  assert(mine_tree_imd({{"a", "b", "d"}, {"a", "c", "d"}}) ==
+         "->(a, X(b, c), d)");
+  assert(mine_tree_imd({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}) ==
+         "->(a, +(b, c), d)");
+  assert(mine_tree_imd({{"a"}, {"a", "b", "a"}, {"a", "b", "a", "b", "a"}}) ==
+         "*(a, b)");
+  // The flower fall-through is shared too.
+  assert(mine_tree_imd({{"a", "b"}, {"b", "c"}, {"c", "a"}}) ==
+         "*(tau, a, b, c)");
+}
+
+void inductive_miner_dfg_skips_empty_traces_at_the_root() {
+  // A directly-follows graph cannot see empty traces, so IMd decides the skip
+  // once at the root instead of riding it through every split like the log
+  // recursion (which yields "->(X(tau, a), X(tau, b))" here).
+  assert(mine_tree_imd({{}, {"a", "b"}}) == "X(tau, ->(a, b))");
+}
+
+void inductive_miner_dfg_filters_noise_on_fallthrough() {
+  // The same noisy sequence the IMf test recovers: the rare a->c / c->a hops
+  // leave no cut, so the sub-graph is filtered and re-cut. The self-loop base
+  // case and the filter run on graph counts alone.
+  std::vector<std::vector<std::string>> variants(20, {"a", "b", "c", "d"});
+  variants.push_back({"a", "c", "a", "b", "c", "d"});
+  assert(mine_tree_imd(variants, 0.0) != "->(a, b, c, d)");
+  assert(mine_tree_imd(variants, 0.2) == "->(a, b, c, d)");
+}
+
 void inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity() {
   // The rare trace adds a->c and c->a hops. c ends twenty-one traces, so
   // ending is its dominant behaviour and the stray c->a edge (its only
@@ -1888,6 +1930,9 @@ int main() {
   inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut();
   inductive_miner_infrequent_keeps_structure_the_filter_would_destroy();
   inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity();
+  inductive_miner_dfg_matches_log_recursion_on_structured_logs();
+  inductive_miner_dfg_skips_empty_traces_at_the_root();
+  inductive_miner_dfg_filters_noise_on_fallthrough();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
   alpha_miner_discovers_a_sequence();

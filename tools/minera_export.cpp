@@ -65,6 +65,10 @@ int usage(const char* program) {
                "  --delimiter <char>        Field delimiter (default: ,)\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
+               "  --inductive-variant <id>  log (default: split the log and\n"
+               "                            recurse) or dfg (IMd: recurse on\n"
+               "                            the directly-follows graph alone,\n"
+               "                            scaling to huge logs)\n"
                "  --alpha-variant <id>      plus (default: short loops become\n"
                "                            self loops and two-way causality)\n"
                "                            or classic (the textbook Alpha)\n"
@@ -174,6 +178,14 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       inductive_options.noise_threshold = std::atof(value);
+    } else if (arg == "--inductive-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view variant = value;
+      if (variant != "log" && variant != "dfg") return usage(argv[0]);
+      inductive_options.variant = variant == "dfg"
+                                      ? minera::InductiveMinerVariant::kDfg
+                                      : minera::InductiveMinerVariant::kLog;
     } else if (arg == "--alpha-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
