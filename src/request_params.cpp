@@ -104,6 +104,12 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("remove_activities"); !value.empty()) {
     params.filter.remove_activities = split_csv(value);
   }
+  if (const auto value = field("keep_resources"); !value.empty()) {
+    params.filter.keep_resources = split_csv(value);
+  }
+  if (const auto value = field("remove_resources"); !value.empty()) {
+    params.filter.remove_resources = split_csv(value);
+  }
   if (const auto value = field("start_activities"); !value.empty()) {
     params.filter.start_activities = split_csv(value);
   }

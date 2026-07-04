@@ -20,6 +20,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.minVariantFrequency ||
       filters.removeActivities?.length ||
       filters.keepActivities?.length ||
+      filters.removeResources?.length ||
+      filters.keepResources?.length ||
       filters.startActivities?.length ||
       filters.endActivities?.length ||
       filters.minLength ||

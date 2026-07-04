@@ -76,6 +76,8 @@ int usage(const char* program) {
                "                            traces_contained, or traces_intersecting\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
+               "  --keep-resources <a,b>    Keep only events by these resources\n"
+               "  --remove-resources <a,b>  Drop events by these resources\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
                "  --end-activities <a,b>    Keep traces ending with one of these\n"
                "  --min-length <n>          Drop traces shorter than n events\n"
@@ -170,6 +172,14 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.remove_activities = split_csv(value);
+    } else if (arg == "--keep-resources") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_resources = split_csv(value);
+    } else if (arg == "--remove-resources") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_resources = split_csv(value);
     } else if (arg == "--start-activities") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

@@ -20,15 +20,36 @@ std::unordered_set<std::string> to_set(const std::vector<std::string>& values) {
   return {values.begin(), values.end()};
 }
 
-// Drops events outside the keep-set and inside the remove-set, preserving order.
-Trace project_activities(const Trace& trace,
-                         const std::unordered_set<std::string>& keep,
-                         const std::unordered_set<std::string>& remove) {
+// Projects a trace's events on the activity and resource attributes at once,
+// dropping events outside a keep-set or inside a remove-set and preserving
+// order. An event with no resource is never kept by a resource keep-set and
+// never dropped by a resource remove-set, so a resource filter only ever acts
+// on events that actually name a performer.
+Trace project_events(const Trace& trace,
+                     const std::unordered_set<std::string>& keep_activities,
+                     const std::unordered_set<std::string>& remove_activities,
+                     const std::unordered_set<std::string>& keep_resources,
+                     const std::unordered_set<std::string>& remove_resources) {
   Trace result;
   result.case_id = trace.case_id;
   for (const auto& event : trace.events) {
-    if (!keep.empty() && keep.find(event.activity) == keep.end()) continue;
-    if (!remove.empty() && remove.find(event.activity) != remove.end()) continue;
+    if (!keep_activities.empty() &&
+        keep_activities.find(event.activity) == keep_activities.end()) {
+      continue;
+    }
+    if (!remove_activities.empty() &&
+        remove_activities.find(event.activity) != remove_activities.end()) {
+      continue;
+    }
+    if (!keep_resources.empty() &&
+        (event.resource.empty() ||
+         keep_resources.find(event.resource) == keep_resources.end())) {
+      continue;
+    }
+    if (!remove_resources.empty() && !event.resource.empty() &&
+        remove_resources.find(event.resource) != remove_resources.end()) {
+      continue;
+    }
     result.events.push_back(event);
   }
   return result;
@@ -84,6 +105,8 @@ std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
+  const auto keep_res = to_set(options.keep_resources);
+  const auto remove_res = to_set(options.remove_resources);
   const auto starts = to_set(options.start_activities);
   const auto ends = to_set(options.end_activities);
 
@@ -131,7 +154,8 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       }
     }
 
-    Trace projected = project_activities(*source, keep, remove);
+    Trace projected =
+        project_events(*source, keep, remove, keep_res, remove_res);
     if (projected.events.empty()) continue;
 
     const std::size_t length = projected.events.size();

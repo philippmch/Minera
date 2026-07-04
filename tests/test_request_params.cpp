@@ -99,6 +99,8 @@ void parse_mine_params_maps_filters() {
       {"time_mode", "traces_intersecting"},
       {"keep_activities", "a, b ,c"},
       {"remove_activities", "x"},
+      {"keep_resources", "Alice, Bob"},
+      {"remove_resources", "Carol"},
       {"start_activities", "a"},
       {"end_activities", "c"},
       {"min_length", "2"},
@@ -113,6 +115,9 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.keep_activities ==
           std::vector<std::string>{"a", "b", "c"}));
   assert((params.filter.remove_activities == std::vector<std::string>{"x"}));
+  assert((params.filter.keep_resources ==
+          std::vector<std::string>{"Alice", "Bob"}));
+  assert((params.filter.remove_resources == std::vector<std::string>{"Carol"}));
   assert((params.filter.start_activities == std::vector<std::string>{"a"}));
   assert((params.filter.end_activities == std::vector<std::string>{"c"}));
   assert(params.filter.min_length == 2);

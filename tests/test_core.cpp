@@ -945,6 +945,35 @@ void filter_projects_activities() {
           std::vector<std::string>{"a", "c"}));
 }
 
+void filter_projects_by_resource() {
+  // Two events per case, one by Alice and one by Bob; an unattributed event
+  // carries no resource at all.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "1";
+  trace.events.push_back(minera::Event{"1", "a", "", "Alice", 0});
+  trace.events.push_back(minera::Event{"1", "b", "", "Bob", 1});
+  trace.events.push_back(minera::Event{"1", "c", "", "", 2});
+  log.traces.push_back(trace);
+
+  minera::LogFilterOptions keep;
+  keep.keep_resources = {"Alice"};
+  assert(keep.any());
+  const auto only_alice = minera::filter_event_log(log, keep);
+  assert(only_alice.trace_count() == 1);
+  // Only Alice's event survives; Bob's and the unattributed event are dropped.
+  assert((activity_names(only_alice.traces.front()) ==
+          std::vector<std::string>{"a"}));
+
+  minera::LogFilterOptions remove;
+  remove.remove_resources = {"Bob"};
+  const auto without_bob = minera::filter_event_log(log, remove);
+  // Bob's event goes; the unattributed event is never dropped by a resource
+  // remove-set.
+  assert((activity_names(without_bob.traces.front()) ==
+          std::vector<std::string>{"a", "c"}));
+}
+
 void filter_applies_length_and_endpoint_constraints() {
   const auto log = log_from_variants({{"a"}, {"a", "b", "c"}});
   minera::LogFilterOptions length;
@@ -1378,6 +1407,7 @@ int main() {
   filter_keeps_only_the_top_variant();
   filter_projects_activities();
   filter_applies_length_and_endpoint_constraints();
+  filter_projects_by_resource();
   filter_time_range_trims_events();
   filter_time_range_selects_whole_traces();
   filter_time_range_bounds_are_inclusive_and_one_sided();

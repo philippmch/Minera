@@ -40,6 +40,14 @@ struct LogFilterOptions {
   std::vector<std::string> keep_activities;
   std::vector<std::string> remove_activities;
 
+  // Resource (performer) projection, applied like the activity projection but on
+  // each event's resource attribute: `keep_resources` keeps only events done by
+  // a listed resource, `remove_resources` then drops events by a listed one. An
+  // event with no resource is never kept by `keep_resources` and never dropped
+  // by `remove_resources`. Empty lists mean "no constraint".
+  std::vector<std::string> keep_resources;
+  std::vector<std::string> remove_resources;
+
   // Trace-length bounds on the projected traces (0 = unbounded).
   std::size_t min_length = 0;
   std::size_t max_length = 0;
@@ -59,6 +67,7 @@ struct LogFilterOptions {
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
+           !keep_resources.empty() || !remove_resources.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || min_variant_frequency > 1 ||
            top_variants != 0;

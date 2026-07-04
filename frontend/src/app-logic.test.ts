@@ -52,6 +52,8 @@ describe("hasActiveFilters", () => {
       { endActivities: ["z"] },
       { minLength: 1 },
       { maxLength: 9 },
+      { removeResources: ["Alice"] },
+      { keepResources: ["Bob"] },
       { timeFrom: "2024-01-01T00:00" },
       { timeTo: "2024-01-31T23:59" },
     ];
