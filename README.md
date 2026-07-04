@@ -34,7 +34,10 @@ workflows with native performance.
   one-token state machine), and both methods run on each. **Token replay**
   measures **fitness** (how much of the log the model reproduces) and escaping
   edges measure **precision** (how little extra behavior the model allows), per
-  variant and in aggregate. **Alignment-based conformance** finds, per trace,
+  variant and in aggregate — alongside **generalization** (how evenly the
+  replay exercises the model's transitions, so a model whose parts hinge on a
+  few observations scores low) and **simplicity** (how lean the net itself is,
+  by mean arc degree), completing the four standard quality dimensions. **Alignment-based conformance** finds, per trace,
   the cheapest sequence of synchronous, log-only, and model-only moves that
   walks the net from start to end (a uniform-cost search over the synchronous
   product) — giving exact, optimal diagnostics of *where* and *how* each trace
@@ -126,9 +129,9 @@ events first; discovery lives in tabs:
   graph) and explore the resulting model; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser, and
   a **Download … as PNML** button exports the model for ProM/PM4Py,
-- **Conformance** — pick any miner and any method: fitness and precision of the
-  log against that miner's model, plus a per-variant breakdown of where traces
-  deviate. **Token Replay** shows token counts; **Alignments** renders each
+- **Conformance** — pick any miner and any method: fitness, precision,
+  generalization, and simplicity of the log against that miner's model, plus a
+  per-variant breakdown of where traces deviate. **Token Replay** shows token counts; **Alignments** renders each
   deviating trace move by move (synchronous, log-only, model-only). Every miner
   is checked both ways at import; when a model isn't a sound workflow net the
   alignment view says so rather than showing misleading numbers,

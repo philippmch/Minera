@@ -143,6 +143,8 @@ void write_conformance(std::ostream& out,
                        const DirectlyFollowsGraph& graph) {
   out << "{\"fitness\": " << conformance.fitness
       << ", \"precision\": " << conformance.precision
+      << ", \"generalization\": " << conformance.generalization
+      << ", \"simplicity\": " << conformance.simplicity
       << ", \"fitting_traces\": " << conformance.fitting_traces
       << ", \"trace_count\": " << conformance.trace_count
       << ", \"produced\": " << conformance.produced

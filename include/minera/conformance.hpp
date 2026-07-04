@@ -18,12 +18,17 @@ struct VariantConformance {
   double fitness = 1.0;                 // token-replay fitness in [0, 1]
 };
 
-// Conformance of an event log against a discovered process tree, combining
-// token-based replay fitness (does the model reproduce the log?) with
-// escaping-edges precision (does the model allow much more than the log?).
+// Conformance of an event log against a discovered model: the four standard
+// quality dimensions. Token-based replay fitness (does the model reproduce the
+// log?), escaping-edges precision (does the model allow much more than the
+// log?), generalization (will the model likely accommodate unseen but related
+// behaviour, judged by how evenly replay exercises its transitions?), and
+// simplicity (is the net itself lean, judged by its mean arc degree?).
 struct ConformanceResult {
-  double fitness = 1.0;    // log-level replay fitness in [0, 1]
-  double precision = 1.0;  // escaping-edges precision in [0, 1]
+  double fitness = 1.0;         // log-level replay fitness in [0, 1]
+  double precision = 1.0;       // escaping-edges precision in [0, 1]
+  double generalization = 1.0;  // token-replay generalization in [0, 1]
+  double simplicity = 1.0;      // inverse arc-degree simplicity in (0, 1]
 
   std::uint64_t fitting_traces = 0;  // traces replayed with no deviation
   std::uint64_t trace_count = 0;
@@ -37,10 +42,12 @@ struct ConformanceResult {
   std::vector<VariantConformance> variants;  // worst-fitting first
 };
 
-// Replays `event_log` against `tree` and reports fitness and precision. The
-// process tree is translated to a workflow net; fitness comes from token-based
-// replay (Rozinat & van der Aalst) and precision from escaping edges
-// (Munoz-Gama & Carmona).
+// Replays `event_log` against `tree` and reports all four quality dimensions.
+// The process tree is translated to a workflow net; fitness comes from
+// token-based replay (Rozinat & van der Aalst), precision from escaping edges
+// (Munoz-Gama & Carmona), generalization from the replay's per-transition
+// execution counts (Buijs, van Dongen & van der Aalst), and simplicity from
+// the net's mean arc degree.
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const ProcessTree& tree);
 

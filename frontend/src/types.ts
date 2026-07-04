@@ -80,6 +80,10 @@ export interface Conformance {
   fitness: number;
   /** Escaping-edges precision in [0, 1]: how much extra behavior the model allows. */
   precision: number;
+  /** Token-replay generalization in [0, 1]: how evenly the log exercises the model. Absent in older exports. */
+  generalization?: number;
+  /** Inverse arc-degree simplicity in (0, 1]: how lean the net itself is. Absent in older exports. */
+  simplicity?: number;
   fitting_traces: number;
   trace_count: number;
   produced: number;
