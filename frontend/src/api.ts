@@ -1,4 +1,10 @@
-import { type Alignments, type MineraExport, isMineraExport } from "./types";
+import {
+  type ActivityStat,
+  type Alignments,
+  type MineraExport,
+  type ModelConformance,
+  isMineraExport,
+} from "./types";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -131,6 +137,51 @@ export async function alignModel(miner: string): Promise<Alignments> {
     throw new Error("the Minera backend returned an invalid alignment");
   }
   return parsed as Alignments;
+}
+
+/** The backend's answer to checking an uploaded PNML model against the log. */
+export interface ImportedModelCheck {
+  /**
+   * The activity registry, re-sent because the imported model may name
+   * activities the log never shows; ids in `model` index into this list.
+   */
+  activities: ActivityStat[];
+  model: ModelConformance;
+}
+
+/**
+ * Checks the most recently mined log against a user-supplied PNML workflow
+ * net. The server keeps the net under the miner id "imported", so alignments
+ * can be requested for it afterwards like for any discovered model.
+ */
+export async function checkModel(file: File): Promise<ImportedModelCheck> {
+  const form = new FormData();
+  form.append("model", file, file.name);
+  let response: Response;
+  try {
+    response = await fetch("/api/check-model", { method: "POST", body: form });
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+    throw new Error(String((parsed as { error: unknown }).error));
+  }
+  if (!response.ok) {
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    !("model" in parsed) ||
+    !("activities" in parsed)
+  ) {
+    throw new Error("the Minera backend returned an invalid model check");
+  }
+  return parsed as ImportedModelCheck;
 }
 
 /**

@@ -31,7 +31,10 @@ workflows with native performance.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph as a
-  one-token state machine), and both methods run on each. **Token replay**
+  one-token state machine) — or against a **user-supplied model**: a PNML
+  importer reads a workflow net discovered or drawn in another tool, so the
+  same checks run on it (CLI `--check-pnml`, or upload it in the frontend's
+  Conformance tab). **Token replay**
   measures **fitness** (how much of the log the model reproduces) and escaping
   edges measure **precision** (how little extra behavior the model allows), per
   variant and in aggregate — alongside **generalization** (how evenly the
@@ -57,10 +60,11 @@ workflows with native performance.
   `resource` column or the XES `org:resource` attribute), Minera builds the
   handover-of-work social network — how often work passes from one resource to
   another within a case — plus per-resource workload counts.
-- **PNML export**: any discovered model can be written as PNML (ISO/IEC
-  15909-2), the standard Petri-net interchange format read by ProM and PM4Py.
-  Every miner reuses the same workflow-net translation used for conformance, so
-  the exported net is exactly what Minera checks.
+- **PNML export and import**: any discovered model can be written as PNML
+  (ISO/IEC 15909-2), the standard Petri-net interchange format read by ProM and
+  PM4Py — and a PNML workflow net from any of those tools can be read back for
+  conformance checking. Every miner reuses the same workflow-net translation
+  used for conformance, so the exported net is exactly what Minera checks.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
   resource (performer) projection, rework (keep only cases where an activity
@@ -135,15 +139,15 @@ events first; discovery lives in tabs:
   graph) and explore the resulting model; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser, and
   a **Download … as PNML** button exports the model for ProM/PM4Py,
-- **Conformance** — pick any miner and any method: fitness, precision,
-  generalization, and simplicity of the log against that miner's model, plus a
-  per-variant breakdown of where traces deviate. **Token Replay** shows token
-  counts; **Alignments** renders each deviating trace move by move (synchronous,
-  log-only, model-only); **Footprints** compares the log's and model's
-  directly-follows relations and lists the successions they disagree on. Every
-  miner is checked at import; when a model isn't a sound workflow net the
-  alignment view says so rather than showing misleading numbers (token replay
-  and footprints still apply),
+- **Conformance** — pick any miner (or upload a PNML workflow net from another
+  tool) and any method: fitness, precision, generalization, and simplicity of
+  the log against that model, plus a per-variant breakdown of where traces
+  deviate. **Token Replay** shows token counts; **Alignments** renders each
+  deviating trace move by move (synchronous, log-only, model-only);
+  **Footprints** compares the log's and model's directly-follows relations and
+  lists the successions they disagree on. Every miner is checked at import;
+  when a model isn't a sound workflow net the alignment view says so rather
+  than showing misleading numbers (token replay and footprints still apply),
 - **Resources** — when the log carries a resource attribute: the workload per
   resource and the handover-of-work network (how often a case passes from one
   resource to the next).
@@ -177,6 +181,10 @@ column names and delimiters, plus log-filtering flags applied before discovery
 ```sh
 ./build/minera_export my_event_log.csv --top-variants 5 -o my_export.json
 ```
+
+`--check-pnml model.pnml` additionally checks the log against the workflow net
+in that PNML file; its results appear in the export under the conformance id
+`imported`, next to the discovered models.
 
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--keep-resources`, `--remove-resources`,

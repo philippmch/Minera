@@ -11,6 +11,7 @@
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/pnml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
@@ -571,6 +572,133 @@ void footprints_detect_a_too_loose_model() {
   assert(!footprints.model_only.empty());
 }
 
+template <typename Fn>
+bool throws(Fn&& fn) {
+  try {
+    fn();
+  } catch (const std::exception&) {
+    return true;
+  }
+  return false;
+}
+
+void pnml_round_trip_preserves_replay_behavior() {
+  // A net written by to_pnml and read back by parse_pnml must replay the log
+  // identically — same token counts, same footprint relation.
+  const auto log = log_from_variants(
+      {{"a", "b", "c", "d"}, {"a", "c", "b", "d"}, {"a", "e", "d"}});
+  const auto tree = minera::discover_process_tree(log);
+  const auto net = minera::to_petri_net(tree);
+  const auto reread = minera::parse_pnml(minera::to_pnml(net));
+
+  assert(reread.place_count() == net.place_count());
+  assert(reread.transitions().size() == net.transitions().size());
+
+  const auto before = minera::check_conformance(log, net);
+  const auto after = minera::check_conformance(log, reread);
+  assert(before.fitness == after.fitness);
+  assert(before.produced == after.produced);
+  assert(before.missing == after.missing);
+
+  const auto footprints_before = minera::check_footprints(log, net);
+  const auto footprints_after = minera::check_footprints(log, reread);
+  assert(footprints_before.fitness == footprints_after.fitness);
+  assert(footprints_before.model_relations == footprints_after.model_relations);
+
+  assert(minera::final_marking_reachable(reread));
+  assert(minera::check_alignment(log, reread).fitness == 1.0);
+}
+
+// A hand-written PNML the way other tools emit it: explicit markings, an
+// invisible routing transition, an escaped label, and single quotes.
+constexpr const char* kForeignPnml = R"(<?xml version="1.0"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id='n1' type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name><text>foreign</text></name>
+    <page id="g1">
+      <place id="start"><initialMarking><text>1</text></initialMarking></place>
+      <place id="mid"/>
+      <place id="end"/>
+      <transition id="t_a"><name><text>a &amp; go</text></name></transition>
+      <transition id="t_skip">
+        <name><text>skip</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$"/>
+      </transition>
+      <arc id="1" source="start" target="t_a"/>
+      <arc id="2" source="t_a" target="mid"/>
+      <arc id="3" source="mid" target="t_skip"/>
+      <arc id="4" source="t_skip" target="end"/>
+    </page>
+    <finalmarkings>
+      <marking><place idref="end"><text>1</text></place></marking>
+    </finalmarkings>
+  </net>
+</pnml>)";
+
+void parse_pnml_reads_a_foreign_net() {
+  const auto net = minera::parse_pnml(kForeignPnml);
+  assert(net.place_count() == 3);
+  assert(net.transitions().size() == 2);
+  // The toolspecific $invisible$ flag wins over the "skip" label.
+  assert((net.activities() == std::vector<std::string>{"a & go"}));
+  assert(!net.transitions()[0].silent());
+  assert(net.transitions()[1].silent());
+  assert(net.source() == 0);  // "start", the marked place
+  assert(net.sink() == 2);    // "end", from <finalmarkings>
+
+  // The single visible activity replays a matching one-event log perfectly.
+  const auto log = log_from_variants({{"a & go"}});
+  assert(minera::check_conformance(log, net).fitness == 1.0);
+
+  // Against a log with a different activity, both deviations are reported:
+  // "x" is unmodeled (log-only) and "a & go" is unobserved (model-only).
+  const auto other = log_from_variants({{"x", "a & go"}});
+  const auto footprints = minera::check_footprints(other, net);
+  assert(footprints.fitness == 0.0);
+  assert(footprints.log_relations == 1);
+}
+
+void parse_pnml_infers_missing_markings() {
+  // No initialMarking and no finalmarkings: the unique place without incoming
+  // arcs is the source, the unique place without outgoing arcs the sink.
+  const auto net = minera::parse_pnml(R"(<pnml><net id="n"><page id="g">
+    <place id="p0"/><place id="p1"/>
+    <transition id="t"><name><text>a</text></name></transition>
+    <arc id="1" source="p0" target="t"/>
+    <arc id="2" source="t" target="p1"/>
+  </page></net></pnml>)");
+  assert(net.source() == 0);
+  assert(net.sink() == 1);
+  assert(minera::check_conformance(log_from_variants({{"a"}}), net).fitness ==
+         1.0);
+}
+
+void parse_pnml_rejects_malformed_nets() {
+  // An arc referencing an id that exists as neither place nor transition.
+  assert(throws([] {
+    (void)minera::parse_pnml(R"(<pnml><net id="n"><page id="g">
+      <place id="p0"/><place id="p1"/>
+      <transition id="t"/>
+      <arc id="1" source="p0" target="ghost"/>
+      <arc id="2" source="t" target="p1"/>
+    </page></net></pnml>)");
+  }));
+  // Two initially marked places: not a workflow net.
+  assert(throws([] {
+    (void)minera::parse_pnml(R"(<pnml><net id="n"><page id="g">
+      <place id="p0"><initialMarking><text>1</text></initialMarking></place>
+      <place id="p1"><initialMarking><text>1</text></initialMarking></place>
+      <place id="p2"/>
+      <transition id="t"/>
+      <arc id="1" source="p0" target="t"/>
+      <arc id="2" source="p1" target="t"/>
+      <arc id="3" source="t" target="p2"/>
+    </page></net></pnml>)");
+  }));
+  // No net at all.
+  assert(throws([] { (void)minera::parse_pnml("<pnml></pnml>"); }));
+}
+
 void json_export_carries_the_conformance_contract() {
   // The frontend reads these keys by name, so guard them against renames. The
   // "conformance" object is keyed by miner id, each carrying a token-replay and
@@ -894,16 +1022,6 @@ void heuristics_net_handles_a_self_loop() {
   const auto alignment = minera::check_alignment(log, net);
   assert(alignment.computed);
   assert(alignment.fitness > 0.999);
-}
-
-template <typename Fn>
-bool throws(Fn&& fn) {
-  try {
-    fn();
-  } catch (const std::exception&) {
-    return true;
-  }
-  return false;
 }
 
 void importer_handles_a_header_only_log() {
@@ -1500,6 +1618,10 @@ int main() {
   footprints_match_the_discovery_log();
   footprints_flag_a_forbidden_succession();
   footprints_detect_a_too_loose_model();
+  pnml_round_trip_preserves_replay_behavior();
+  parse_pnml_reads_a_foreign_net();
+  parse_pnml_infers_missing_markings();
+  parse_pnml_rejects_malformed_nets();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
   alignment_is_perfect_for_every_operator();

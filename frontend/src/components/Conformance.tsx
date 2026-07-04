@@ -5,10 +5,14 @@ import {
   type ModelConformance,
   numberFormat,
 } from "../types";
+import { type ImportedModelCheck } from "../api";
 import { CONFORMANCE_METHODS } from "../conformance";
 import { MINER_GROUPS } from "../miners";
 
 type Step = "miner" | "method" | "result";
+
+/** The conformance tab's extra, non-miner model: a user-uploaded PNML net. */
+const IMPORTED = "imported";
 
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 
@@ -25,15 +29,34 @@ const grade = (value: number) =>
 export function Conformance({
   data,
   onRequestAlignment,
+  onCheckModel,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
+  onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
 }) {
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
 
+  // A user-uploaded PNML model, checked server-side against the mined log.
+  const [imported, setImported] = useState<ImportedModelCheck | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  // A re-mine invalidates the uploaded model's results (and the server drops
+  // its cached net), so fall back to the start of the wizard.
+  useEffect(() => {
+    setImported(null);
+    setImportError(null);
+    setMinerId(null);
+    setStep("miner");
+  }, [data]);
+
+  const isImported = minerId === IMPORTED;
   const miner = MINER_GROUPS.find((g) => g.id === minerId) ?? null;
+  // Used in prose ("The … model isn't sound"), so lowercase for the upload.
+  const minerName = isImported ? "imported" : miner?.name ?? "";
   const method = CONFORMANCE_METHODS.find((m) => m.id === methodId) ?? null;
 
   const chooseMiner = (id: string) => {
@@ -46,10 +69,36 @@ export function Conformance({
     setStep("result");
   };
 
+  const uploadModel = async (file: File) => {
+    if (!onCheckModel) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const result = await onCheckModel(file);
+      setImported(result);
+      chooseMiner(IMPORTED);
+    } catch (cause) {
+      setImportError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // The backend checks every discovered model both ways, keyed by miner id, so
   // any miner × any method has results — as long as this export carries them.
-  const models = miner ? data.conformance?.[miner.id] : undefined;
+  // The imported model's results come from the upload (or are embedded when a
+  // CLI export was produced with --check-pnml).
+  const models = isImported
+    ? imported?.model ?? data.conformance?.[IMPORTED]
+    : miner
+      ? data.conformance?.[miner.id]
+      : undefined;
   const supported = Boolean(models && method);
+
+  // An uploaded model can name activities the log never shows; its response
+  // carries the extended registry, so the result panels resolve every id.
+  const viewData =
+    isImported && imported ? { ...data, activities: imported.activities } : data;
 
   return (
     <div className="miner-flow reveal">
@@ -60,18 +109,18 @@ export function Conformance({
         >
           Miner
         </button>
-        {miner && step !== "miner" && (
+        {minerId && step !== "miner" && (
           <>
             <span className="trail-sep">›</span>
             <button
               className={step === "method" ? "trail-item active" : "trail-item"}
               onClick={() => setStep("method")}
             >
-              {miner.name}
+              {isImported ? "Imported model" : miner?.name}
             </button>
           </>
         )}
-        {miner && method && step === "result" && (
+        {minerId && method && step === "result" && (
           <>
             <span className="trail-sep">›</span>
             <span className="trail-item current">{method.name}</span>
@@ -98,11 +147,47 @@ export function Conformance({
                 <span className="miner-card-go">Select →</span>
               </button>
             ))}
+            {imported || data.conformance?.[IMPORTED] ? (
+              <button className="miner-card" onClick={() => chooseMiner(IMPORTED)}>
+                <span className="miner-card-name">Imported model</span>
+                <span className="miner-card-count">PNML</span>
+                <p className="miner-card-desc">
+                  A workflow net you supplied, checked against this log.
+                </p>
+                <span className="miner-card-go">Select →</span>
+              </button>
+            ) : (
+              <label className="miner-card miner-card-upload">
+                <span className="miner-card-name">Your model</span>
+                <span className="miner-card-count">PNML</span>
+                <p className="miner-card-desc">
+                  Check the log against a workflow net from another tool —
+                  upload a PNML file.
+                </p>
+                <span className="miner-card-go">
+                  {importing ? "Checking…" : "Upload →"}
+                </span>
+                {importError && (
+                  <p className="miner-card-error">{importError}</p>
+                )}
+                <input
+                  type="file"
+                  accept=".pnml,.xml"
+                  hidden
+                  disabled={importing}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void uploadModel(file);
+                  }}
+                />
+              </label>
+            )}
           </div>
         </div>
       )}
 
-      {step === "method" && miner && (
+      {step === "method" && minerId && (
         <div className="miner-step">
           <p className="miner-step-label">Step 2 — Conformance method</p>
           <h2 className="miner-step-title">Choose a method</h2>
@@ -123,35 +208,35 @@ export function Conformance({
       )}
 
       {step === "result" &&
-        miner &&
+        minerId &&
         method &&
         (supported && models ? (
           method.artifact === "alignments" ? (
             <Alignments
-              data={data}
-              minerId={miner.id}
-              minerName={miner.name}
+              data={viewData}
+              minerId={minerId}
+              minerName={minerName}
               model={models}
               onRequestAlignment={onRequestAlignment}
             />
           ) : method.artifact === "footprints" ? (
             <Footprints
-              data={data}
+              data={viewData}
               footprints={models.footprints}
-              minerName={miner.name}
+              minerName={minerName}
             />
           ) : (
             <TokenReplay
-              data={data}
+              data={viewData}
               conformance={models.token_replay}
-              minerName={miner.name}
+              minerName={minerName}
               sound={models.sound}
             />
           )
         ) : (
           <section className="panel map-panel">
             <div className="model-empty">
-              No conformance results for {miner.name} via {method.name}. This
+              No conformance results for {minerName} via {method.name}. This
               export predates per-model conformance — re-open the event log to
               check it against every discovered model.
             </div>

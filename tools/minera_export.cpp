@@ -64,6 +64,9 @@ int usage(const char* program) {
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
                "  --pnml <path>             Also write a model as PNML to <path>\n"
+               "  --check-pnml <path>       Also check the log against the\n"
+               "                            workflow net in this PNML file\n"
+               "                            (conformance id: imported)\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, or heuristic\n"
                "  --bpmn <path>             Also write the inductive model as BPMN\n"
@@ -99,6 +102,7 @@ int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   std::filesystem::path pnml_output;
+  std::filesystem::path check_pnml;
   std::filesystem::path bpmn_output;
   std::string pnml_miner = "inductive";
   minera::CsvImportOptions options;
@@ -135,6 +139,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       pnml_output = value;
+    } else if (arg == "--check-pnml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      check_pnml = value;
     } else if (arg == "--bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -249,7 +257,7 @@ int main(int argc, char** argv) {
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
     }
-    const auto graph = minera::discover_directly_follows_graph(log);
+    auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log, inductive_options);
     const auto net = minera::discover_petri_net(log);
     const auto heuristics = minera::discover_heuristics_net(log);
@@ -269,9 +277,20 @@ int main(int argc, char** argv) {
           minera::check_footprints(log, petri),
           minera::check_alignment(log, petri)};
     };
-    const std::vector<minera::ModelConformance> conformance = {
+    std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net)};
+
+    // Optionally check the log against a user-supplied workflow net too. Its
+    // activities are registered in the id registry first, so the ones the log
+    // never shows still resolve to names in the export.
+    if (!check_pnml.empty()) {
+      const auto imported = minera::import_pnml(check_pnml);
+      for (const auto& activity : imported.activities()) {
+        graph.ensure_activity(activity);
+      }
+      conformance.push_back(model("imported", imported));
+    }
     const auto dataset = input.filename().string();
 
     if (output.empty()) {
