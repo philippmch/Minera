@@ -68,14 +68,19 @@ class PetriNet {
 // redo children from the body's exit back to its entry.
 [[nodiscard]] PetriNet to_petri_net(const ProcessTree& tree);
 
-// Translates a Heuristic Miner dependency graph into a workflow net so it can be
-// replayed and aligned like any other model. Each activity becomes a visible
-// transition between a "ready" and a "done" place; every accepted dependency
-// edge a->b becomes a silent transition from a's done place to b's ready place;
-// the source feeds each start activity and each end activity drains to the sink.
-// The result is a one-token state machine — always a sound workflow net (a trace
-// is one path through the dependency graph), at the cost of not expressing
-// concurrency, which the binding-free heuristics net does not capture anyway.
+// Translates a Heuristic Miner dependency graph into a workflow net so it can
+// be replayed and aligned like any other model, honouring the net's split and
+// join semantics. Every accepted dependency edge becomes a place; each
+// activity is one visible transition that consumes and produces the places of
+// its input and output bundles: a bundle of several edges is an AND split or
+// join wired straight onto the transition, while several bundles meet at a
+// hub place through one silent transition per bundle, keeping the choice
+// exclusive. Starting is one more join alternative (from the source place)
+// and finishing one more split alternative (to the sink). Unlike the former
+// one-token translation this expresses the concurrency the AND measure
+// discovered, so parallel behaviour replays instead of counting as deviation;
+// in exchange, soundness is no longer guaranteed on graphs whose splits and
+// joins do not balance (alignments report such nets as not computable).
 [[nodiscard]] PetriNet to_petri_net(const HeuristicsNet& heuristics);
 
 }  // namespace minera

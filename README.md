@@ -36,7 +36,14 @@ workflows with native performance.
   weighs how often one activity follows another against the reverse, and only
   edges above a dependency and frequency threshold are kept — yielding a
   noise-tolerant dependency graph (heuristics net) where the Alpha Miner would
-  be misled by infrequent paths.
+  be misled by infrequent paths. An **AND measure** then decides, per split and
+  join, which neighbours run in parallel and which are exclusive alternatives:
+  two successors of the same activity are bundled as concurrent when they
+  follow each other often relative to the split itself. These semantics carry
+  into the workflow-net translation used for conformance, PNML, and BPMN, so
+  parallel behaviour replays as concurrency instead of counting as deviation
+  (the price is that a badly unbalanced graph can yield an unsound net, which
+  conformance reports honestly).
 - Process-model discovery with the **Inductive Miner**: recursive
   exclusive/sequence/parallel/loop cuts on the directly-follows graph yield a
   block-structured process tree that is always sound and perfectly fits the log
@@ -58,8 +65,8 @@ workflows with native performance.
   the noise threshold applies to both variants.
 - Conformance checking of a log against **any** discovered model — every miner
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
-  Miner's net directly, and the Heuristic Miner's dependency graph as a
-  one-token state machine) — or against a **user-supplied model**: a PNML
+  Miner's net directly, and the Heuristic Miner's dependency graph with its
+  AND/XOR split and join semantics) — or against a **user-supplied model**: a PNML
   importer reads a workflow net discovered or drawn in another tool, so the
   same checks run on it (CLI `--check-pnml`, or upload it in the frontend's
   Conformance tab). **Token replay**

@@ -75,7 +75,10 @@ export const MINER_GROUPS: MinerGroup[] = [
           "Scores each ordering with a dependency measure that weighs how often " +
           "one activity follows another against how often it precedes it, then " +
           "keeps only edges above the dependency and frequency thresholds — " +
-          "filtering the infrequent paths that mislead the Alpha Miner.",
+          "filtering the infrequent paths that mislead the Alpha Miner. An AND " +
+          "measure decides per split and join which branches run in parallel " +
+          "and which are exclusive, and conformance checks respect those " +
+          "semantics.",
         artifact: "dependency-graph",
       },
     ],

@@ -56,6 +56,49 @@ double dependency(const Counts& counts, std::size_t a, std::size_t b) {
   return (forward - backward) / (forward + backward + 1.0);
 }
 
+// Groups the neighbours on one side of `center` into AND bundles. Two edges
+// leaving (or entering) the same activity are bundled when their targets (or
+// sources) follow each other often enough relative to the edges themselves —
+// the AND measure (see HeuristicMinerOptions::and_threshold). The relation is
+// closed transitively (b~c and c~d put b, c, d in one bundle), so bundles
+// partition the neighbours: XOR across bundles, AND within.
+std::vector<HeuristicBundle> to_bundles(const Counts& counts,
+                                        std::size_t center,
+                                        const std::vector<std::size_t>& neighbours,
+                                        bool outgoing,
+                                        double threshold) {
+  const std::size_t k = neighbours.size();
+  std::vector<std::size_t> root(k);
+  for (std::size_t i = 0; i < k; ++i) root[i] = i;
+  const auto find = [&](std::size_t x) {
+    while (root[x] != x) x = root[x] = root[root[x]];
+    return x;
+  };
+
+  for (std::size_t i = 0; i < k; ++i) {
+    for (std::size_t j = i + 1; j < k; ++j) {
+      const std::size_t b = neighbours[i];
+      const std::size_t c = neighbours[j];
+      const double between =
+          static_cast<double>(counts.follows[b][c] + counts.follows[c][b]);
+      const double base = static_cast<double>(
+          outgoing ? counts.follows[center][b] + counts.follows[center][c]
+                   : counts.follows[b][center] + counts.follows[c][center]);
+      if (between / (base + 1.0) >= threshold) root[find(i)] = find(j);
+    }
+  }
+
+  // Collect the classes in first-appearance order so bundles are deterministic.
+  std::vector<HeuristicBundle> bundles;
+  std::unordered_map<std::size_t, std::size_t> bundle_of_root;
+  for (std::size_t i = 0; i < k; ++i) {
+    const auto [it, inserted] = bundle_of_root.emplace(find(i), bundles.size());
+    if (inserted) bundles.emplace_back();
+    bundles[it->second].push_back(neighbours[i]);
+  }
+  return bundles;
+}
+
 }  // namespace
 
 HeuristicsNet discover_heuristics_net(
@@ -144,6 +187,34 @@ HeuristicsNet discover_heuristics_net(
               if (lhs.source != rhs.source) return lhs.source < rhs.source;
               return lhs.target < rhs.target;
             });
+
+  // Derive the split/join semantics: partition each activity's successors and
+  // predecessors into AND bundles. A self-loop is kept out of the clustering
+  // and appended as its own bundle — repeating is always an alternative to
+  // moving on, never concurrent with it.
+  net.output_bundles.assign(n, {});
+  net.input_bundles.assign(n, {});
+  std::vector<std::vector<std::size_t>> successors(n);
+  std::vector<std::vector<std::size_t>> predecessors(n);
+  std::vector<bool> self_loop(n, false);
+  for (const auto& edge : net.edges) {
+    if (edge.source == edge.target) {
+      self_loop[edge.source] = true;
+    } else {
+      successors[edge.source].push_back(edge.target);
+      predecessors[edge.target].push_back(edge.source);
+    }
+  }
+  for (std::size_t a = 0; a < n; ++a) {
+    net.output_bundles[a] =
+        to_bundles(counts, a, successors[a], true, options.and_threshold);
+    net.input_bundles[a] =
+        to_bundles(counts, a, predecessors[a], false, options.and_threshold);
+    if (self_loop[a]) {
+      net.output_bundles[a].push_back({a});
+      net.input_bundles[a].push_back({a});
+    }
+  }
   return net;
 }
 

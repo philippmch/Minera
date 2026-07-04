@@ -1306,32 +1306,36 @@ void replay_degrades_gracefully_on_an_unbounded_silent_net() {
   assert(replay.fitting_traces == 0);
 }
 
-void heuristics_net_becomes_a_sound_workflow_net() {
+void heuristics_net_becomes_a_replayable_workflow_net() {
   // The Heuristic Miner emits a dependency graph; converting it to a workflow
-  // net must always yield a sound, replayable model so both conformance methods
-  // work. A strongly-sequential log (every dependency clears the 0.9 threshold)
-  // converts to a clean chain that the log fits perfectly.
+  // net must yield a replayable model so both conformance methods work. A
+  // strongly-sequential log (every dependency clears the 0.9 threshold)
+  // converts to a clean chain — one place per edge, no silent routing at all —
+  // that the log fits perfectly.
   const std::vector<std::vector<std::string>> sequence(12,
                                                        {"a", "b", "c", "d"});
   const auto log = log_from_variants(sequence);
   const auto heuristics = minera::discover_heuristics_net(log);
   const auto net = minera::to_petri_net(heuristics);
 
-  // Source and sink plus a ready/done pair per activity.
-  assert(net.place_count() == 2 + 2 * heuristics.activities.size());
+  // Source and sink plus a place per dependency edge.
+  assert(net.place_count() == 2 + heuristics.edges.size());
+  for (const auto& transition : net.transitions()) {
+    assert(!transition.silent());
+  }
 
   const auto replay = minera::check_conformance(log, net);
   assert(replay.fitness > 0.999);
 
   const auto alignment = minera::check_alignment(log, net);
-  assert(alignment.computed);  // the conversion is always a sound state machine
+  assert(alignment.computed);
   assert(alignment.fitness > 0.999);
 }
 
-void heuristics_net_is_always_sound_even_when_it_drops_edges() {
+void heuristics_net_stays_replayable_when_it_drops_edges() {
   // With a high threshold the Heuristic Miner drops weak dependencies, so the
-  // log no longer fits perfectly — but the converted net must still be sound
-  // (alignment computes a finite cost rather than refusing).
+  // log no longer fits perfectly — but the converted net must still replay and
+  // align (a finite cost rather than a refusal).
   const auto log = log_from_variants(
       {{"a", "b", "d"}, {"a", "c", "d"}, {"a", "b", "d"}});
   const auto net = minera::to_petri_net(minera::discover_heuristics_net(log));
@@ -1339,6 +1343,44 @@ void heuristics_net_is_always_sound_even_when_it_drops_edges() {
   const auto alignment = minera::check_alignment(log, net);
   assert(alignment.computed);
   assert(alignment.fitness >= 0.0 && alignment.fitness <= 1.0);
+}
+
+void heuristics_net_translates_an_and_split_and_join() {
+  // b and c are concurrent between a and d, and the AND measure sees it: b and
+  // c follow each other constantly relative to a's split. The translation must
+  // wire a real AND split/join — the former one-token state machine could
+  // replay only one branch, so every trace here counted as deviating.
+  std::vector<std::vector<std::string>> variants(6, {"a", "b", "c", "d"});
+  for (int i = 0; i < 6; ++i) variants.push_back({"a", "c", "b", "d"});
+  const auto log = log_from_variants(variants);
+  const auto heuristics = minera::discover_heuristics_net(log);
+  const auto net = minera::to_petri_net(heuristics);
+
+  // a fires both branch places at once; d waits for both.
+  const auto* a = transition_for(net, "a");
+  const auto* d = transition_for(net, "d");
+  assert(a && d);
+  assert(a->outputs.size() == 2);
+  assert(d->inputs.size() == 2);
+
+  assert(minera::check_conformance(log, net).fitness > 0.999);
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+  assert(alignment.fitness > 0.999);
+}
+
+void heuristics_net_keeps_exclusive_branches_exclusive() {
+  // b and c never follow each other, so the AND measure keeps them in separate
+  // bundles: after a exactly one of them may run. Both single-branch traces
+  // fit; a trace running b *and* c must deviate.
+  std::vector<std::vector<std::string>> variants(6, {"a", "b", "d"});
+  for (int i = 0; i < 6; ++i) variants.push_back({"a", "c", "d"});
+  const auto log = log_from_variants(variants);
+  const auto net = minera::to_petri_net(minera::discover_heuristics_net(log));
+
+  assert(minera::check_conformance(log, net).fitness > 0.999);
+  const auto both = log_from_variants({{"a", "b", "c", "d"}});
+  assert(minera::check_conformance(both, net).fitness < 1.0);
 }
 
 void heuristics_net_handles_a_self_loop() {
@@ -1982,8 +2024,10 @@ int main() {
   alignment_handles_an_empty_log();
   alignment_treats_an_empty_log_as_perfect_for_every_model();
   replay_degrades_gracefully_on_an_unbounded_silent_net();
-  heuristics_net_becomes_a_sound_workflow_net();
-  heuristics_net_is_always_sound_even_when_it_drops_edges();
+  heuristics_net_becomes_a_replayable_workflow_net();
+  heuristics_net_stays_replayable_when_it_drops_edges();
+  heuristics_net_translates_an_and_split_and_join();
+  heuristics_net_keeps_exclusive_branches_exclusive();
   heuristics_net_handles_a_self_loop();
   importer_handles_a_header_only_log();
   importer_strips_a_utf8_bom();
