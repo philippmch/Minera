@@ -69,6 +69,11 @@ int usage(const char* program) {
                "  --bpmn <path>             Also write the inductive model as BPMN\n"
                "                            2.0 to <path>\n"
                "\n  Log filtering (applied before discovery):\n"
+               "  --time-from <iso8601>     Keep only behaviour at/after this instant\n"
+               "  --time-to <iso8601>       Keep only behaviour at/before this instant\n"
+               "  --time-mode <mode>        How the time range reads a trace:\n"
+               "                            events (default: keep events in range),\n"
+               "                            traces_contained, or traces_intersecting\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
@@ -138,6 +143,25 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
       options.delimiter = value[0];
+    } else if (arg == "--time-from") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.time_from = value;
+    } else if (arg == "--time-to") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.time_to = value;
+    } else if (arg == "--time-mode") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto mode = minera::parse_time_filter_mode(value);
+      if (!mode) {
+        std::cerr << "error: unknown --time-mode '" << value
+                  << "' (expected events, traces_contained, or "
+                     "traces_intersecting)\n";
+        return 2;
+      }
+      filter.time_mode = *mode;
     } else if (arg == "--keep-activities") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

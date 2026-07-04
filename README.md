@@ -54,9 +54,10 @@ workflows with native performance.
   15909-2), the standard Petri-net interchange format read by ProM and PM4Py.
   Every miner reuses the same workflow-net translation used for conformance, so
   the exported net is exactly what Minera checks.
-- Log preprocessing: filter an event log by activity projection, trace length,
-  start/end activities, and variant frequency (minimum count or top-N) before
-  discovery.
+- Log preprocessing: filter an event log by time range (keep the events inside
+  a window, or the cases contained in / intersecting it), activity projection,
+  trace length, start/end activities, and variant frequency (minimum count or
+  top-N) before discovery.
 - `minera_server`, a local application server: it serves the frontend and
   mines uploaded CSV event logs with the native core (`POST /api/mine`),
   returning the event log, the directly-follows graph, the process tree, and
@@ -136,8 +137,10 @@ events first; discovery lives in tabs:
   resource to the next).
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
-most frequent variants (top-N or a minimum frequency) or a subset of activities;
-every view — log, graph, model, conformance, and resources — updates together.
+most frequent variants (top-N or a minimum frequency), a time window (keeping
+the events inside it, or the cases contained in / touching it), or a subset of
+activities; every view — log, graph, model, conformance, and resources —
+updates together.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
@@ -164,9 +167,14 @@ column names and delimiters, plus log-filtering flags applied before discovery
 
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--start-activities`, `--end-activities`, `--min-length`,
-and `--max-length`. Run `minera_export` without arguments to see usage. The same
-filters are available on `POST /api/mine` as form fields (`top_variants`,
-`min_variant_frequency`, `keep_activities`, …).
+and `--max-length`. A time window is `--time-from` / `--time-to` (ISO-8601,
+both inclusive, either side may be open) with `--time-mode` choosing how it
+reads a trace: `events` (default) keeps only the events inside the window,
+`traces_contained` keeps whole cases that lie fully inside it, and
+`traces_intersecting` keeps whole cases that touch it. Run `minera_export`
+without arguments to see usage. The same filters are available on
+`POST /api/mine` as form fields (`top_variants`, `min_variant_frequency`,
+`keep_activities`, `time_from`, `time_to`, `time_mode`, …).
 
 Pass `--noise-threshold <f>` (0–1) to run the Inductive Miner's infrequent
 variant (IMf) during discovery; `0` is the classic miner. The same value is

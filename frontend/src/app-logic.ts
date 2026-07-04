@@ -23,7 +23,9 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.startActivities?.length ||
       filters.endActivities?.length ||
       filters.minLength ||
-      filters.maxLength,
+      filters.maxLength ||
+      filters.timeFrom ||
+      filters.timeTo,
   );
 }
 

@@ -38,6 +38,8 @@ describe("hasActiveFilters", () => {
   it("is false for an empty filter set", () => {
     expect(hasActiveFilters({})).toBe(false);
     expect(hasActiveFilters({ keepActivities: [], minLength: 0 })).toBe(false);
+    // A mode without bounds constrains nothing.
+    expect(hasActiveFilters({ timeMode: "events" })).toBe(false);
   });
 
   it("is true when any constraint is set", () => {
@@ -50,6 +52,8 @@ describe("hasActiveFilters", () => {
       { endActivities: ["z"] },
       { minLength: 1 },
       { maxLength: 9 },
+      { timeFrom: "2024-01-01T00:00" },
+      { timeTo: "2024-01-31T23:59" },
     ];
     for (const filters of cases) expect(hasActiveFilters(filters)).toBe(true);
   });

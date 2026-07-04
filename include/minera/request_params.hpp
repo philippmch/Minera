@@ -44,7 +44,9 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 
 // Builds the discovery options from a mine request's form fields. Absent or
 // empty fields leave each option at its default, so a bare upload mines with the
-// stock settings.
+// stock settings. A `time_mode` value that is not one of the three known modes
+// throws std::invalid_argument, so the caller can report it instead of silently
+// mining with the wrong filter.
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field);
 
 }  // namespace minera
