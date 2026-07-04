@@ -140,6 +140,62 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
+// Checks the most recently mined log against a user-supplied PNML workflow
+// net (multipart field `model`, or the raw body). The imported net joins the
+// cached session under the id "imported", so POST /api/align?miner=imported
+// can align against it on demand like any discovered model; the session's
+// registry is extended with the net's activities so ids stay resolvable.
+void handle_check_model(const httplib::Request& request,
+                        httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  try {
+    const std::string pnml = request.has_file("model")
+                                 ? request.get_file_value("model").content
+                                 : request.body;
+    if (pnml.empty()) {
+      response.status = 400;
+      response.set_content(error_json("missing form field: model"),
+                           "application/json");
+      return;
+    }
+    const auto imported = minera::parse_pnml(pnml);
+
+    auto next_session = std::make_shared<MinedSession>(*session);
+    for (const auto& activity : imported.activities()) {
+      next_session->graph.ensure_activity(activity);
+    }
+    next_session->nets.insert_or_assign("imported", imported);
+
+    const minera::ModelConformance conformance{
+        "imported", minera::final_marking_reachable(imported),
+        minera::check_conformance(session->log, imported),
+        minera::check_footprints(session->log, imported), std::nullopt};
+    const auto body =
+        minera::imported_model_json(conformance, next_session->graph);
+
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      // Only publish if no re-mine replaced the session in the meantime.
+      if (g_session == session) g_session = std::move(next_session);
+    }
+    response.set_content(body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // On-demand alignment of one model from the most recent mine. Expects a `miner`
 // query parameter ("inductive" | "alpha" | "heuristic").
 void handle_align(const httplib::Request& request, httplib::Response& response) {
@@ -269,9 +325,11 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
+  server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);
 

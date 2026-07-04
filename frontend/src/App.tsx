@@ -21,7 +21,7 @@ import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { Filters } from "./components/Filters";
-import { alignModel, mineCsv, type FilterOptions } from "./api";
+import { alignModel, checkModel, mineCsv, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
@@ -68,6 +68,15 @@ export default function App() {
     },
     [data],
   );
+
+  // Checks an uploaded PNML model against the mined log. A new upload replaces
+  // the server's cached "imported" net, so its stale alignments are dropped.
+  const requestModelCheck = useCallback(async (file: File) => {
+    const result = await checkModel(file);
+    const { imported: _dropped, ...rest } = alignCache.current;
+    alignCache.current = rest;
+    return result;
+  }, []);
 
   const openData = (parsed: MineraExport) => {
     setData(parsed);
@@ -314,7 +323,11 @@ export default function App() {
       )}
       {tab === "conformance" && (
         <main className="layout-log">
-          <Conformance data={data} onRequestAlignment={requestAlignment} />
+          <Conformance
+            data={data}
+            onRequestAlignment={requestAlignment}
+            onCheckModel={requestModelCheck}
+          />
         </main>
       )}
       {tab === "resources" && (

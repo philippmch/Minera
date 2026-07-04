@@ -235,29 +235,55 @@ void write_footprints(std::ostream& out, const FootprintResult& footprints,
   out << '}';
 }
 
-// Writes the per-miner conformance map: each miner id maps to whether its net is
-// sound, its token-replay result, its footprint comparison, and — when present —
-// its alignment result. (The server omits alignments here and serves them on
-// demand; the CLI embeds them.) This lets the frontend offer any miner against
-// any method.
+// Writes one model's conformance object: whether its net is sound, its
+// token-replay result, its footprint comparison, and — when present — its
+// alignment result.
+void write_model_conformance(std::ostream& out, const ModelConformance& model,
+                             const DirectlyFollowsGraph& graph) {
+  out << "{\"sound\": " << (model.sound ? "true" : "false")
+      << ", \"token_replay\": ";
+  write_conformance(out, model.token_replay, graph);
+  out << ", \"footprints\": ";
+  write_footprints(out, model.footprints, graph);
+  if (model.alignments) {
+    out << ", \"alignments\": ";
+    write_alignments(out, *model.alignments, graph);
+  }
+  out << '}';
+}
+
+// Writes the per-miner conformance map, keyed by miner id. (The server omits
+// alignments here and serves them on demand; the CLI embeds them.) This lets
+// the frontend offer any miner against any method.
 void write_conformance_models(std::ostream& out,
                               const std::vector<ModelConformance>& models,
                               const DirectlyFollowsGraph& graph) {
   out << '{';
   for (std::size_t i = 0; i < models.size(); ++i) {
     write_json_string(out, models[i].miner);
-    out << ": {\"sound\": " << (models[i].sound ? "true" : "false")
-        << ", \"token_replay\": ";
-    write_conformance(out, models[i].token_replay, graph);
-    out << ", \"footprints\": ";
-    write_footprints(out, models[i].footprints, graph);
-    if (models[i].alignments) {
-      out << ", \"alignments\": ";
-      write_alignments(out, *models[i].alignments, graph);
-    }
-    out << '}' << (i + 1 < models.size() ? ", " : "");
+    out << ": ";
+    write_model_conformance(out, models[i], graph);
+    out << (i + 1 < models.size() ? ", " : "");
   }
   out << '}';
+}
+
+// Writes the activity registry: one stats object per activity, indexed by the
+// ids every other part of the document uses.
+void write_activity_stats(std::ostream& out,
+                          const DirectlyFollowsGraph& graph) {
+  out << "[\n";
+  const auto& activities = graph.activities();
+  for (std::size_t i = 0; i < activities.size(); ++i) {
+    const auto& name = activities[i];
+    out << "    {\"name\": ";
+    write_json_string(out, name);
+    out << ", \"count\": " << graph.activity_count(name)
+        << ", \"start_count\": " << graph.start_activity_count(name)
+        << ", \"end_count\": " << graph.end_activity_count(name) << '}'
+        << (i + 1 < activities.size() ? "," : "") << '\n';
+  }
+  out << "  ]";
 }
 
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
@@ -344,18 +370,9 @@ void write_analysis_json(std::ostream& out,
   }
   out << "  ],\n";
 
-  out << "  \"activities\": [\n";
-  const auto& activities = graph.activities();
-  for (std::size_t i = 0; i < activities.size(); ++i) {
-    const auto& name = activities[i];
-    out << "    {\"name\": ";
-    write_json_string(out, name);
-    out << ", \"count\": " << graph.activity_count(name)
-        << ", \"start_count\": " << graph.start_activity_count(name)
-        << ", \"end_count\": " << graph.end_activity_count(name) << '}'
-        << (i + 1 < activities.size() ? "," : "") << '\n';
-  }
-  out << "  ],\n";
+  out << "  \"activities\": ";
+  write_activity_stats(out, graph);
+  out << ",\n";
 
   out << "  \"edges\": [\n";
   const auto& edges = graph.edges();
@@ -442,6 +459,17 @@ std::string alignment_json(const AlignmentResult& alignment,
                            const DirectlyFollowsGraph& graph) {
   std::ostringstream out;
   write_alignments(out, alignment, graph);
+  return out.str();
+}
+
+std::string imported_model_json(const ModelConformance& model,
+                                const DirectlyFollowsGraph& graph) {
+  std::ostringstream out;
+  out << "{\"activities\": ";
+  write_activity_stats(out, graph);
+  out << ", \"model\": ";
+  write_model_conformance(out, model, graph);
+  out << '}';
   return out.str();
 }
 

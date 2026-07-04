@@ -58,4 +58,12 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string alignment_json(const AlignmentResult& alignment,
                                          const DirectlyFollowsGraph& graph);
 
+// Serializes the conformance of an imported (user-supplied) model for the
+// server's model-checking endpoint: `model` holds the same object written per
+// miner under "conformance", and `activities` re-sends the id registry, which
+// may have grown — the imported net can name activities the log never shows,
+// so the frontend needs the extended registry to label them.
+[[nodiscard]] std::string imported_model_json(const ModelConformance& model,
+                                              const DirectlyFollowsGraph& graph);
+
 }  // namespace minera

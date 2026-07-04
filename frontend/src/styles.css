@@ -908,6 +908,18 @@ input[type="range"]::-moz-range-thumb {
   color: var(--copper-deep);
 }
 
+/* The upload card is a <label> around a hidden file input, so it needs the
+   button cards' dashed-invitation look and its own error line. */
+.miner-card-upload {
+  border-style: dashed;
+}
+.miner-card-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--red, #a03d2e);
+}
+
 .model-empty {
   padding: 44px 0;
   font-family: var(--font-mono);

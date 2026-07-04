@@ -40,6 +40,13 @@ class DirectlyFollowsGraph {
   [[nodiscard]] std::optional<std::size_t> activity_id(
       std::string_view activity) const;
 
+  // Registers an activity name in the id registry without recording any
+  // occurrence (its counts stay 0). Lets an imported model's activities — which
+  // the log may never show — resolve to ids in exports like everything else.
+  std::size_t ensure_activity(const std::string& activity) {
+    return intern_activity(activity);
+  }
+
   [[nodiscard]] std::uint64_t activity_count(std::string_view activity) const;
   [[nodiscard]] std::uint64_t start_activity_count(
       std::string_view activity) const;
