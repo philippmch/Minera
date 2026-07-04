@@ -209,6 +209,30 @@ export async function fetchPnml(miner: string): Promise<string> {
 }
 
 /**
+ * Fetches the most recently mined event log — after any filtering applied at
+ * mine time — as standard XES. Like PNML, this is served from the backend's
+ * cached session, so it only works for a log mined this session.
+ */
+export async function fetchXes(): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch("/api/xes");
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  if (!response.ok) {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}
+
+/**
  * Fetches the inductive model from the most recently mined log as BPMN 2.0.
  * The block-structured process tree maps cleanly onto BPMN, so the backend
  * always serves that model; like PNML it only works for a log mined this

@@ -33,6 +33,7 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
 
 namespace {
 
@@ -49,6 +50,7 @@ struct MinedSession {
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
   minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
+  std::string dataset;       // uploaded file name, echoed into XES exports
 };
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
@@ -128,6 +130,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->nets.emplace("alpha", net);
     session->nets.emplace("heuristic", heuristic_net);
     session->tree = tree;
+    session->dataset = dataset;
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
@@ -278,6 +281,25 @@ void handle_bpmn(const httplib::Request&, httplib::Response& response) {
                        "application/xml");
 }
 
+// Exports the most recently mined event log — after any server-side filtering
+// applied at mine time — as standard XES.
+void handle_xes(const httplib::Request&, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  response.set_content(minera::to_xes(session->log, session->dataset),
+                       "application/xml");
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -332,6 +354,7 @@ int main(int argc, char** argv) {
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);
+  server.Get("/api/xes", handle_xes);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;

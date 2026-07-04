@@ -13,7 +13,9 @@
 #include "minera/petri_net.hpp"
 #include "minera/pnml.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -697,6 +699,82 @@ void parse_pnml_rejects_malformed_nets() {
   }));
   // No net at all.
   assert(throws([] { (void)minera::parse_pnml("<pnml></pnml>"); }));
+}
+
+void xes_export_round_trips_the_log() {
+  // A log written by to_xes and read back by the XES importer must carry the
+  // same cases, activities, resources, and timestamp instants — including
+  // XML metacharacters in every field.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "case <1> & \"two\"";
+  minera::Event first;
+  first.case_id = trace.case_id;
+  first.activity = "check & <verify>";
+  first.timestamp = "2024-03-01 10:00:00+02:00";  // offset form, space sep
+  first.resource = "alice 'a'";
+  minera::Event second;
+  second.case_id = trace.case_id;
+  second.activity = "ship";
+  second.timestamp = "2024-03-01T09:30:00.250Z";
+  trace.events = {first, second};
+  log.traces.push_back(trace);
+
+  const auto xes = minera::to_xes(log, "unit log");
+  std::istringstream input(xes);
+  const auto reread = minera::import_xes_event_log(input);
+
+  assert(reread.trace_count() == 1);
+  assert(reread.traces[0].case_id == trace.case_id);
+  assert(reread.traces[0].events.size() == 2);
+  assert(reread.traces[0].events[0].activity == first.activity);
+  assert(reread.traces[0].events[0].resource == first.resource);
+  assert(reread.traces[0].events[1].activity == second.activity);
+  assert(reread.traces[0].events[1].resource.empty());
+
+  // Timestamps are normalized to UTC on export, so compare instants.
+  for (std::size_t i = 0; i < 2; ++i) {
+    const auto before = minera::parse_timestamp(trace.events[i].timestamp);
+    const auto after =
+        minera::parse_timestamp(reread.traces[0].events[i].timestamp);
+    assert(before && after && *before == *after);
+  }
+  // The offset timestamp reads back as its UTC instant in ISO form.
+  assert(reread.traces[0].events[0].timestamp == "2024-03-01T08:00:00.000Z");
+}
+
+void xes_export_keeps_unparseable_timestamps_verbatim() {
+  // A timestamp that isn't a recognizable instant must not be silently
+  // dropped or emitted as an invalid <date>: it survives as a string
+  // attribute under the same key, and an empty timestamp is omitted.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "c1";
+  minera::Event odd;
+  odd.case_id = "c1";
+  odd.activity = "a";
+  odd.timestamp = "yesterday-ish";
+  minera::Event untimed;
+  untimed.case_id = "c1";
+  untimed.activity = "b";
+  trace.events = {odd, untimed};
+  log.traces.push_back(trace);
+
+  const auto xes = minera::to_xes(log);
+  assert(xes.find("<string key=\"time:timestamp\" value=\"yesterday-ish\"/>") !=
+         std::string::npos);
+  assert(xes.find("<date") == std::string::npos);
+  // No resource anywhere, so the org extension is not declared.
+  assert(xes.find("org.xesext") == std::string::npos);
+
+  // The importer re-orders events by timestamp (lexicographic fallback here),
+  // so find them by activity rather than position.
+  std::istringstream input(xes);
+  const auto reread = minera::import_xes_event_log(input);
+  assert(reread.traces[0].events.size() == 2);
+  for (const auto& event : reread.traces[0].events) {
+    assert(event.timestamp == (event.activity == "a" ? "yesterday-ish" : ""));
+  }
 }
 
 void json_export_carries_the_conformance_contract() {
@@ -1622,6 +1700,8 @@ int main() {
   parse_pnml_reads_a_foreign_net();
   parse_pnml_infers_missing_markings();
   parse_pnml_rejects_malformed_nets();
+  xes_export_round_trips_the_log();
+  xes_export_keeps_unparseable_timestamps_verbatim();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
   alignment_is_perfect_for_every_operator();

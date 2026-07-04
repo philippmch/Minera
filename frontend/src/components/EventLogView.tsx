@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, type Trace, numberFormat } from "../types";
+import { fetchXes } from "../api";
 
 const PAGE_SIZE = 50;
 
@@ -62,6 +63,42 @@ function CaseRow({
   );
 }
 
+// Downloads the mined log — after any filters applied at mine time — as
+// standard XES, the interchange format read by ProM, PM4Py, and friends. The
+// file is serialized server-side from the cached session, so it matches what
+// Minera actually analyzed.
+function XesButton({ dataset }: { dataset: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = () => {
+    setBusy(true);
+    setError(null);
+    fetchXes()
+      .then((xml) => {
+        const blob = new Blob([xml], { type: "application/xml" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const base = dataset.replace(/\.[^.]+$/, "") || "log";
+        anchor.href = url;
+        anchor.download = `${base}.xes`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="pnml-export">
+      <button className="btn-ghost" onClick={download} disabled={busy}>
+        {busy ? "Exporting…" : "Download log as XES"}
+      </button>
+      {error && <span className="pnml-error">{error}</span>}
+    </span>
+  );
+}
+
 export function EventLogView({ data }: { data: MineraExport }) {
   const traces = data.traces ?? [];
   const [query, setQuery] = useState("");
@@ -104,6 +141,7 @@ export function EventLogView({ data }: { data: MineraExport }) {
           {timeSpan &&
             ` · ${formatTimestamp(timeSpan.min)} — ${formatTimestamp(timeSpan.max)}`}
         </span>
+        <XesButton dataset={data.dataset} />
         <input
           className="case-search"
           type="search"
