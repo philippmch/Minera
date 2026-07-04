@@ -22,6 +22,16 @@ workflows with native performance.
   than once — repeated work that a frequency count alone hides.
 - Case arrival rate: summary statistics over the gaps between consecutive
   case starts, alongside the existing case-throughput and edge waiting times.
+- Process-model discovery with the **Alpha Miner**, running the **Alpha+
+  variant** by default: the log's causality, parallelism, and choice relations
+  are assembled into a Petri net, and the classic algorithm's two short-loop
+  blind spots are repaired — an activity that directly repeats is mined out and
+  re-attached as a self loop on the place between its neighbours, and two
+  activities that alternate (`a b a b …`) are recognised as a loop instead of
+  being mistaken for concurrency (which would leave both unconnected). On a log
+  without short loops the result is identical to the textbook algorithm, which
+  remains available via `--alpha-variant classic` (CLI) or the `alpha_variant`
+  form field (server).
 - Process-model discovery with the **Heuristic Miner**: a dependency measure
   weighs how often one activity follows another against the reverse, and only
   edges above a dependency and frequency threshold are kept — yielding a
