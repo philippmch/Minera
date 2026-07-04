@@ -78,6 +78,12 @@ int usage(const char* program) {
                "  --remove-activities <a,b> Drop these activities\n"
                "  --keep-resources <a,b>    Keep only events by these resources\n"
                "  --remove-resources <a,b>  Drop events by these resources\n"
+               "  --rework-activity <a>     Keep only traces where <a> repeats\n"
+               "  --rework-min <n>          Repetitions that count as rework\n"
+               "                            (default: 2)\n"
+               "  --between-start <a>       With --between-end: cut each trace\n"
+               "  --between-end <b>         into the subtraces running from <a>\n"
+               "                            to <b>, endpoints included\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
                "  --end-activities <a,b>    Keep traces ending with one of these\n"
                "  --min-length <n>          Drop traces shorter than n events\n"
@@ -180,6 +186,23 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.remove_resources = split_csv(value);
+    } else if (arg == "--rework-activity") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.rework_activity = value;
+    } else if (arg == "--rework-min") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.rework_min_occurrences =
+          static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--between-start") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.between_start = value;
+    } else if (arg == "--between-end") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.between_end = value;
     } else if (arg == "--start-activities") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

@@ -63,8 +63,10 @@ workflows with native performance.
   the exported net is exactly what Minera checks.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
-  resource (performer) projection, trace length, start/end activities, and
-  variant frequency (minimum count or top-N) before discovery.
+  resource (performer) projection, rework (keep only cases where an activity
+  repeats), between-extraction (cut each case into the subtraces running from
+  one activity to another — e.g. every loop iteration), trace length, start/end
+  activities, and variant frequency (minimum count or top-N) before discovery.
 - `minera_server`, a local application server: it serves the frontend and
   mines uploaded CSV event logs with the native core (`POST /api/mine`),
   returning the event log, the directly-follows graph, the process tree, and
@@ -148,9 +150,10 @@ events first; discovery lives in tabs:
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency), a time window (keeping
-the events inside it, or the cases contained in / touching it), or a subset of
-activities; every view — log, graph, model, conformance, and resources —
-updates together.
+the events inside it, or the cases contained in / touching it), rework (only
+cases where a chosen activity repeats), a between cut (each case reduced to its
+stretches from one activity to another), or a subset of activities; every view
+— log, graph, model, conformance, and resources — updates together.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
@@ -178,6 +181,10 @@ column names and delimiters, plus log-filtering flags applied before discovery
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--keep-resources`, `--remove-resources`,
 `--start-activities`, `--end-activities`, `--min-length`, and `--max-length`.
+`--rework-activity` (with `--rework-min`, default 2) keeps only cases where an
+activity repeats; `--between-start` / `--between-end` cut each case into the
+subtraces running from one activity to the next occurrence of the other, both
+endpoints included.
 A time window is `--time-from` / `--time-to` (ISO-8601,
 both inclusive, either side may be open) with `--time-mode` choosing how it
 reads a trace: `events` (default) keeps only the events inside the window,

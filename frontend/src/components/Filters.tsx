@@ -28,6 +28,10 @@ export function Filters({
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [timeMode, setTimeMode] = useState<TimeFilterMode>("events");
+  const [reworkActivity, setReworkActivity] = useState("");
+  const [reworkMin, setReworkMin] = useState("");
+  const [betweenStart, setBetweenStart] = useState("");
+  const [betweenEnd, setBetweenEnd] = useState("");
   // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [removedResources, setRemovedResources] = useState<Set<string>>(
@@ -62,6 +66,10 @@ export function Filters({
       timeFrom: timeFrom || undefined,
       timeTo: timeTo || undefined,
       timeMode: timeFrom || timeTo ? timeMode : undefined,
+      reworkActivity: reworkActivity || undefined,
+      reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
+      betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
+      betweenEnd: betweenStart && betweenEnd ? betweenEnd : undefined,
     });
   };
 
@@ -71,6 +79,10 @@ export function Filters({
     setTimeFrom("");
     setTimeTo("");
     setTimeMode("events");
+    setReworkActivity("");
+    setReworkMin("");
+    setBetweenStart("");
+    setBetweenEnd("");
     setRemoved(new Set());
     setRemovedResources(new Set());
     onApply({});
@@ -81,6 +93,9 @@ export function Filters({
     minFrequency !== "" ||
     timeFrom !== "" ||
     timeTo !== "" ||
+    reworkActivity !== "" ||
+    betweenStart !== "" ||
+    betweenEnd !== "" ||
     removed.size > 0 ||
     removedResources.size > 0;
 
@@ -148,6 +163,62 @@ export function Filters({
                 <option value="events">events in the window</option>
                 <option value="traces_contained">cases fully inside</option>
                 <option value="traces_intersecting">cases touching it</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Rework: activity repeats</span>
+              <select
+                value={reworkActivity}
+                onChange={(e) => setReworkActivity(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>at least</span>
+              <input
+                type="number"
+                min={2}
+                placeholder="2"
+                value={reworkMin}
+                disabled={reworkActivity === ""}
+                onChange={(e) => setReworkMin(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Cut cases from</span>
+              <select
+                value={betweenStart}
+                onChange={(e) => setBetweenStart(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>to</span>
+              <select
+                value={betweenEnd}
+                onChange={(e) => setBetweenEnd(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

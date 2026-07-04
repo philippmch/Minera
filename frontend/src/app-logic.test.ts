@@ -40,6 +40,11 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters({ keepActivities: [], minLength: 0 })).toBe(false);
     // A mode without bounds constrains nothing.
     expect(hasActiveFilters({ timeMode: "events" })).toBe(false);
+    // A rework minimum without an activity, or a half-set between pair,
+    // constrains nothing either.
+    expect(hasActiveFilters({ reworkMin: 3 })).toBe(false);
+    expect(hasActiveFilters({ betweenStart: "a" })).toBe(false);
+    expect(hasActiveFilters({ betweenEnd: "b" })).toBe(false);
   });
 
   it("is true when any constraint is set", () => {
@@ -56,6 +61,8 @@ describe("hasActiveFilters", () => {
       { keepResources: ["Bob"] },
       { timeFrom: "2024-01-01T00:00" },
       { timeTo: "2024-01-31T23:59" },
+      { reworkActivity: "a" },
+      { betweenStart: "a", betweenEnd: "b" },
     ];
     for (const filters of cases) expect(hasActiveFilters(filters)).toBe(true);
   });

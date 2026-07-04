@@ -23,6 +23,12 @@ export interface FilterOptions {
   removeResources?: string[];
   startActivities?: string[];
   endActivities?: string[];
+  /** Keep only cases where this activity occurs at least reworkMin times. */
+  reworkActivity?: string;
+  reworkMin?: number;
+  /** Cut each case into the subtraces from betweenStart to betweenEnd. */
+  betweenStart?: string;
+  betweenEnd?: string;
   minLength?: number;
   maxLength?: number;
   /** ISO-8601 bounds, both inclusive; either side may be open. */
@@ -59,6 +65,15 @@ export async function mineCsv(
     form.append("start_activities", options.startActivities.join(","));
   if (options.endActivities?.length)
     form.append("end_activities", options.endActivities.join(","));
+  if (options.reworkActivity) {
+    form.append("rework_activity", options.reworkActivity);
+    if (options.reworkMin)
+      form.append("rework_min_occurrences", String(options.reworkMin));
+  }
+  if (options.betweenStart && options.betweenEnd) {
+    form.append("between_start", options.betweenStart);
+    form.append("between_end", options.betweenEnd);
+  }
   if (options.minLength) form.append("min_length", String(options.minLength));
   if (options.maxLength) form.append("max_length", String(options.maxLength));
   if (options.timeFrom) form.append("time_from", options.timeFrom);

@@ -27,7 +27,9 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.minLength ||
       filters.maxLength ||
       filters.timeFrom ||
-      filters.timeTo,
+      filters.timeTo ||
+      filters.reworkActivity ||
+      (filters.betweenStart && filters.betweenEnd),
   );
 }
 
