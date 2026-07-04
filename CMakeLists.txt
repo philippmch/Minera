@@ -37,6 +37,7 @@ add_library(minera_core
   src/resource_analysis.cpp
   src/timestamp.cpp
   src/xes_event_log_importer.cpp
+  src/xes_export.cpp
 )
 
 add_library(minera::core ALIAS minera_core)

@@ -24,6 +24,7 @@
 #include "minera/pnml.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
 
 namespace {
 
@@ -71,6 +72,8 @@ int usage(const char* program) {
                "                            inductive (default), alpha, or heuristic\n"
                "  --bpmn <path>             Also write the inductive model as BPMN\n"
                "                            2.0 to <path>\n"
+               "  --xes <path>              Also write the event log (after any\n"
+               "                            filtering) as XES to <path>\n"
                "\n  Log filtering (applied before discovery):\n"
                "  --time-from <iso8601>     Keep only behaviour at/after this instant\n"
                "  --time-to <iso8601>       Keep only behaviour at/before this instant\n"
@@ -104,6 +107,7 @@ int main(int argc, char** argv) {
   std::filesystem::path pnml_output;
   std::filesystem::path check_pnml;
   std::filesystem::path bpmn_output;
+  std::filesystem::path xes_output;
   std::string pnml_miner = "inductive";
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
@@ -147,6 +151,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       bpmn_output = value;
+    } else if (arg == "--xes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      xes_output = value;
     } else if (arg == "--pnml-miner") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -340,6 +348,18 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_bpmn(bpmn_file, tree, dataset);
+    }
+
+    // Optionally emit the (filtered) event log as standard XES, making the
+    // CLI double as a CSV-to-XES converter.
+    if (!xes_output.empty()) {
+      std::ofstream xes_file(xes_output);
+      if (!xes_file) {
+        std::cerr << "error: cannot open XES output file " << xes_output
+                  << '\n';
+        return 1;
+      }
+      minera::write_xes(xes_file, log, dataset);
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

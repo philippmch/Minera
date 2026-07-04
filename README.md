@@ -6,9 +6,12 @@ workflows with native performance.
 ## Current Core
 
 - CSV event-log import with configurable case, activity, and timestamp columns.
-- XES event-log import (IEEE 1849-2016) for the standard interchange format used
-  by public datasets (e.g. the BPI Challenge logs), reading the common
-  `concept:name` / `time:timestamp` attribute subset.
+- XES event-log import **and export** (IEEE 1849-2016), the standard
+  interchange format used by public datasets (e.g. the BPI Challenge logs),
+  reading and writing the common `concept:name` / `time:timestamp` /
+  `org:resource` attribute subset — so a log can be cleaned and filtered in
+  Minera, then handed to any other XES-speaking tool (CLI `--xes`, or the
+  frontend's **Download log as XES** button).
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
@@ -128,7 +131,8 @@ never leaves your machine. An opened log shows the raw
 events first; discovery lives in tabs:
 
 - **Event Log** — the imported cases with their event sequences and
-  timestamps, filterable by case id,
+  timestamps, filterable by case id, with a **Download log as XES** button
+  that exports the log exactly as mined (filters included),
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)
@@ -185,6 +189,9 @@ column names and delimiters, plus log-filtering flags applied before discovery
 `--check-pnml model.pnml` additionally checks the log against the workflow net
 in that PNML file; its results appear in the export under the conformance id
 `imported`, next to the discovered models.
+
+`--xes out.xes` additionally writes the event log — after any filtering — as
+standard XES, making the CLI double as a CSV-to-XES converter.
 
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--keep-resources`, `--remove-resources`,
