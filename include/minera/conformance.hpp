@@ -57,6 +57,38 @@ struct ConformanceResult {
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const PetriNet& net);
 
+// Footprint (directly-follows relation) conformance between a log and a model.
+// The footprint of each is the set of ordered activity pairs (a, b) where b can
+// directly follow a — the log's read straight off its traces, the model's found
+// by exploring the net's reachable markings. Comparing the two sets tells apart
+// behaviour the log shows but the model forbids (a fitness gap) from behaviour
+// the model allows but the log never shows (a precision gap). Robust on unsound
+// nets, so it yields a reading even where alignments cannot.
+struct FootprintRelation {
+  std::string source;  // activity a
+  std::string target;  // activity b, which directly follows a
+};
+
+struct FootprintResult {
+  double fitness = 1.0;    // share of log successions the model also allows
+  double precision = 1.0;  // share of model successions the log also shows
+  std::uint64_t log_relations = 0;     // |L|
+  std::uint64_t model_relations = 0;   // |M|
+  std::uint64_t shared_relations = 0;  // |L ∩ M|
+  bool exhausted = false;  // model exploration hit its bound (relation partial)
+  std::vector<FootprintRelation> log_only;    // in log, not model (fitness gap)
+  std::vector<FootprintRelation> model_only;  // in model, not log (precision gap)
+};
+
+// Footprint conformance of a log against any workflow net, or a process tree
+// (translated with to_petri_net). Cheap and robust: it explores only the model's
+// reachable markings, so unlike alignments it produces a result even for an
+// unsound net.
+[[nodiscard]] FootprintResult check_footprints(const EventLog& event_log,
+                                               const PetriNet& net);
+[[nodiscard]] FootprintResult check_footprints(const EventLog& event_log,
+                                               const ProcessTree& tree);
+
 // One move of an optimal alignment between a trace and the model.
 enum class AlignmentMoveType {
   kSynchronous,  // log and model agree on the activity — no deviation (cost 0)
@@ -129,6 +161,7 @@ struct ModelConformance {
   std::string miner;
   bool sound = true;  // final marking reachable — whether alignment is possible
   ConformanceResult token_replay;
+  FootprintResult footprints;
   std::optional<AlignmentResult> alignments;
 };
 

@@ -530,6 +530,47 @@ void simplicity_reflects_routing_density() {
   assert(flower.simplicity > 0.0);
 }
 
+void footprints_match_the_discovery_log() {
+  // The inductive model perfectly fits its log, so every succession the log
+  // shows the model also allows: footprint fitness is 1 with no log-only gaps.
+  const auto log = log_from_variants(
+      {{"a", "b", "c"}, {"a", "c", "b"}});  // b and c parallel
+  const auto tree = minera::discover_process_tree(log);
+  const auto footprints = minera::check_footprints(log, tree);
+  assert(footprints.fitness > 0.999);
+  assert(footprints.log_only.empty());
+  assert(footprints.log_relations > 0);
+  assert(footprints.shared_relations == footprints.log_relations);
+}
+
+void footprints_flag_a_forbidden_succession() {
+  // Model is a strict a -> b -> c chain. A log that also puts c before b shows
+  // a succession (c -> b) the model forbids, so footprint fitness drops and the
+  // deviation is reported.
+  const auto model_log = log_from_variants({{"a", "b", "c"}});
+  const auto tree = minera::discover_process_tree(model_log);
+
+  const auto log = log_from_variants({{"a", "c", "b"}});
+  const auto footprints = minera::check_footprints(log, tree);
+  assert(footprints.fitness < 1.0);
+  bool found_cb = false;
+  for (const auto& dev : footprints.log_only) {
+    if (dev.source == "c" && dev.target == "b") found_cb = true;
+  }
+  assert(found_cb);
+}
+
+void footprints_detect_a_too_loose_model() {
+  // A directly-follows cycle yields a flower model that allows every activity to
+  // follow every other, so it has successions the tight log never shows:
+  // footprint precision falls well below 1 and model-only pairs are reported.
+  const auto log = log_from_variants({{"a", "b"}, {"b", "c"}, {"c", "a"}});
+  const auto tree = minera::discover_process_tree(log);
+  const auto footprints = minera::check_footprints(log, tree);
+  assert(footprints.precision < 1.0);
+  assert(!footprints.model_only.empty());
+}
+
 void json_export_carries_the_conformance_contract() {
   // The frontend reads these keys by name, so guard them against renames. The
   // "conformance" object is keyed by miner id, each carrying a token-replay and
@@ -540,14 +581,17 @@ void json_export_carries_the_conformance_contract() {
   const auto net = minera::to_petri_net(tree);
   const std::vector<minera::ModelConformance> conformance = {
       {"inductive", minera::final_marking_reachable(net),
-       minera::check_conformance(log, net), minera::check_alignment(log, net)},
+       minera::check_conformance(log, net), minera::check_footprints(log, net),
+       minera::check_alignment(log, net)},
   };
 
   const auto json =
       minera::analysis_json("test", log, graph, &tree, nullptr, nullptr,
                             &conformance);
   for (const char* key : {"\"conformance\"", "\"inductive\"", "\"sound\"",
-                          "\"token_replay\"", "\"alignments\"", "\"fitness\"",
+                          "\"token_replay\"", "\"footprints\"", "\"log_only\"",
+                          "\"model_only\"", "\"shared_relations\"",
+                          "\"alignments\"", "\"fitness\"",
                           "\"precision\"", "\"generalization\"",
                           "\"simplicity\"", "\"fitting_traces\"",
                           "\"trace_count\"", "\"missing\"", "\"remaining\"",
@@ -665,6 +709,7 @@ void json_export_carries_the_alignment_contract() {
   const std::vector<minera::ModelConformance> conformance = {
       {"inductive", minera::final_marking_reachable(net),
        minera::check_conformance(deviating, net),
+       minera::check_footprints(deviating, net),
        minera::check_alignment(deviating, net)},
   };
 
@@ -1383,6 +1428,9 @@ int main() {
   precision_is_high_for_a_tight_model_and_low_for_a_flower();
   generalization_rewards_a_well_exercised_model();
   simplicity_reflects_routing_density();
+  footprints_match_the_discovery_log();
+  footprints_flag_a_forbidden_succession();
+  footprints_detect_a_too_loose_model();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
   alignment_is_perfect_for_every_operator();

@@ -134,6 +134,12 @@ export function Conformance({
               model={models}
               onRequestAlignment={onRequestAlignment}
             />
+          ) : method.artifact === "footprints" ? (
+            <Footprints
+              data={data}
+              footprints={models.footprints}
+              minerName={miner.name}
+            />
           ) : (
             <TokenReplay
               data={data}
@@ -303,6 +309,114 @@ function TokenReplay({
             })}
           </ol>
         )}
+      </section>
+    </div>
+  );
+}
+
+// Footprint conformance: the two headline ratios, the relation tally, and the
+// deviating successions the log and model disagree on. Computed at mine time and
+// robust on unsound nets, so it always has a result to show.
+function Footprints({
+  data,
+  footprints,
+  minerName,
+}: {
+  data: MineraExport;
+  footprints: ModelConformance["footprints"];
+  minerName: string;
+}) {
+  if (!footprints) {
+    return (
+      <section className="panel map-panel">
+        <div className="model-empty">
+          No footprint comparison for the {minerName} model. This export predates
+          footprint conformance — re-open the event log to compute it.
+        </div>
+      </section>
+    );
+  }
+
+  const name = (id: number) => data.activities[id]?.name ?? "?";
+  const pair = (relation: { source: number; target: number }, i: number) => (
+    <li className="footprint-pair" key={i}>
+      <span className="variant-step">{name(relation.source)}</span>
+      <span className="variant-arrow">→</span>
+      <span className="variant-step">{name(relation.target)}</span>
+    </li>
+  );
+
+  const metrics = [
+    {
+      label: "Fitness",
+      value: footprints.fitness,
+      hint: "Share of the log's directly-follows successions the model also allows.",
+    },
+    {
+      label: "Precision",
+      value: footprints.precision,
+      hint: "Share of the model's directly-follows successions the log also shows.",
+    },
+  ];
+
+  return (
+    <div className="conformance reveal">
+      {footprints.exhausted && (
+        <p className="conf-inline-note">
+          The {minerName} model is large enough that its footprint exploration
+          hit its bound — read the model-side numbers as a lower bound.
+        </p>
+      )}
+      <section className="conf-metrics">
+        {metrics.map((metric) => (
+          <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
+            <div className="conf-gauge-value">{percent(metric.value)}</div>
+            <div className="conf-gauge-label">{metric.label}</div>
+            <p className="conf-gauge-hint">{metric.hint}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="panel conf-panel">
+        <div className="panel-head">
+          <h2>Directly-follows relations</h2>
+          <span className="panel-meta">
+            {numberFormat.format(footprints.shared_relations)} shared ·{" "}
+            {numberFormat.format(footprints.log_relations)} in log ·{" "}
+            {numberFormat.format(footprints.model_relations)} in model
+          </span>
+        </div>
+        <div className="footprint-columns">
+          <div>
+            <span className="filters-field-label">
+              In log, not in model <small>({footprints.log_only.length})</small>
+            </span>
+            {footprints.log_only.length === 0 ? (
+              <p className="conf-allfit">
+                The model reproduces every succession the log shows.
+              </p>
+            ) : (
+              <ul className="footprint-list">
+                {footprints.log_only.map(pair)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <span className="filters-field-label">
+              In model, not in log{" "}
+              <small>({footprints.model_only.length})</small>
+            </span>
+            {footprints.model_only.length === 0 ? (
+              <p className="conf-allfit">
+                The model allows no succession the log never shows.
+              </p>
+            ) : (
+              <ul className="footprint-list">
+                {footprints.model_only.map(pair)}
+              </ul>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

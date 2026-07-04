@@ -8,6 +8,7 @@
 #include <limits>
 #include <optional>
 #include <queue>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -831,7 +832,98 @@ class Aligner {
   std::uint64_t empty_run_cost_ = 0;
 };
 
+// Bounds the model-footprint exploration so a highly concurrent net cannot
+// enumerate markings forever; a bounded block-structured net is covered well
+// within this many marking expansions.
+constexpr std::size_t kFootprintCap = 200000;
+
+using Relation = std::set<std::pair<std::string, std::string>>;
+
+// The log's directly-follows relation: every ordered pair of adjacent
+// activities seen in some trace.
+Relation log_footprint(const EventLog& log) {
+  Relation relation;
+  for (const auto& trace : log.traces) {
+    for (std::size_t i = 1; i < trace.events.size(); ++i) {
+      relation.emplace(trace.events[i - 1].activity, trace.events[i].activity);
+    }
+  }
+  return relation;
+}
+
+// The model's directly-follows relation: explore the net's reachable markings,
+// and for every activity a enabled at a marking, record a->b for each activity
+// b enabled right after a fires. `exhausted` is set when the marking budget runs
+// out before the reachable space is covered.
+Relation model_footprint(const PetriNet& net, const Replayer& replayer,
+                         bool& exhausted) {
+  Relation relation;
+  const auto& names = net.activities();
+  const Marking start = replayer.initial_marking();
+
+  std::unordered_set<Marking, MarkingHash> seen{start};
+  std::queue<Marking> frontier;
+  frontier.push(start);
+  std::size_t expanded = 0;
+  while (!frontier.empty()) {
+    if (expanded++ >= kFootprintCap) {
+      exhausted = true;
+      break;
+    }
+    const Marking current = std::move(frontier.front());
+    frontier.pop();
+    const auto enabled = replayer.enabled_activities(current);
+    for (const std::size_t a : enabled) {
+      Marking after = current;
+      replayer.advance(after, a);
+      for (const std::size_t b : replayer.enabled_activities(after)) {
+        relation.emplace(names[a], names[b]);
+      }
+      if (seen.insert(after).second) frontier.push(after);
+    }
+  }
+  return relation;
+}
+
+FootprintResult compare_footprints(const Relation& log, const Relation& model,
+                                   bool exhausted) {
+  FootprintResult result;
+  result.exhausted = exhausted;
+  result.log_relations = log.size();
+  result.model_relations = model.size();
+  for (const auto& pair : log) {
+    if (model.count(pair)) {
+      ++result.shared_relations;
+    } else {
+      result.log_only.push_back({pair.first, pair.second});
+    }
+  }
+  for (const auto& pair : model) {
+    if (!log.count(pair)) result.model_only.push_back({pair.first, pair.second});
+  }
+  result.fitness = log.empty()
+                       ? 1.0
+                       : double(result.shared_relations) / double(log.size());
+  result.precision =
+      model.empty() ? 1.0
+                    : double(result.shared_relations) / double(model.size());
+  return result;
+}
+
 }  // namespace
+
+FootprintResult check_footprints(const EventLog& event_log,
+                                 const PetriNet& net) {
+  const Replayer replayer(net);
+  bool exhausted = false;
+  const auto model = model_footprint(net, replayer, exhausted);
+  return compare_footprints(log_footprint(event_log), model, exhausted);
+}
+
+FootprintResult check_footprints(const EventLog& event_log,
+                                 const ProcessTree& tree) {
+  return check_footprints(event_log, to_petri_net(tree));
+}
 
 ConformanceResult check_conformance(const EventLog& event_log,
                                     const PetriNet& net) {

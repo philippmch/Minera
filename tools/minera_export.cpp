@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(petri),
           minera::check_conformance(log, petri),
+          minera::check_footprints(log, petri),
           minera::check_alignment(log, petri)};
     };
     const std::vector<minera::ModelConformance> conformance = {

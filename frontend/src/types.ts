@@ -132,11 +132,36 @@ export interface Alignments {
   variants: VariantAlignment[];
 }
 
+/** One directly-follows succession (b follows a); indexes into activities. */
+export interface FootprintRelation {
+  source: number;
+  target: number;
+}
+
+/** Footprint (directly-follows relation) comparison of the log against a model. */
+export interface Footprints {
+  /** Share of the log's successions the model also allows, in [0, 1]. */
+  fitness: number;
+  /** Share of the model's successions the log also shows, in [0, 1]. */
+  precision: number;
+  log_relations: number;
+  model_relations: number;
+  shared_relations: number;
+  /** True when model exploration hit its bound and the relation is partial. */
+  exhausted: boolean;
+  /** Successions in the log the model forbids (fitness gaps). */
+  log_only: FootprintRelation[];
+  /** Successions the model allows the log never shows (precision gaps). */
+  model_only: FootprintRelation[];
+}
+
 /** Conformance results for one discovered model. */
 export interface ModelConformance {
   /** Whether the model's final marking is reachable — the bar for alignment. */
   sound: boolean;
   token_replay: Conformance;
+  /** Footprint comparison; absent in older exports. */
+  footprints?: Footprints;
   /** Present in CLI exports; the server omits it and serves it from /api/align. */
   alignments?: Alignments;
 }
