@@ -47,7 +47,9 @@ workflows with native performance.
   Conformance tab). **Token replay**
   measures **fitness** (how much of the log the model reproduces) and escaping
   edges measure **precision** (how little extra behavior the model allows), per
-  variant and in aggregate — alongside **generalization** (how evenly the
+  variant and in aggregate — with precision measured both over replayed states
+  and, more robustly on deviating logs, over the states the **optimal
+  alignments** visit — alongside **generalization** (how evenly the
   replay exercises the model's transitions, so a model whose parts hinge on a
   few observations scores low) and **simplicity** (how lean the net itself is,
   by mean arc degree), completing the four standard quality dimensions. **Alignment-based conformance** finds, per trace,

@@ -129,6 +129,12 @@ export interface Alignments {
   exhausted: boolean;
   /** Cost-based fitness in [0, 1]: how cheaply the log aligns to the model. */
   fitness: number;
+  /**
+   * Alignment-based escaping-edges precision in [0, 1]: how much extra
+   * behavior the model allows at the states the optimal alignments visit.
+   * Absent in exports from older minera versions.
+   */
+  precision?: number;
   fitting_traces: number;
   trace_count: number;
   /** Summed optimal alignment cost over all traces. */
