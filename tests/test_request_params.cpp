@@ -107,6 +107,10 @@ void parse_mine_params_maps_filters() {
       {"max_length", "10"},
       {"min_variant_frequency", "3"},
       {"top_variants", "5"},
+      {"rework_activity", "b"},
+      {"rework_min_occurrences", "3"},
+      {"between_start", "a"},
+      {"between_end", "c"},
   }));
   assert(params.filter.time_from == "2024-01-01");
   assert(params.filter.time_to == "2024-01-31T23:59:59");
@@ -124,6 +128,10 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.max_length == 10);
   assert(params.filter.min_variant_frequency == 3);
   assert(params.filter.top_variants == 5);
+  assert(params.filter.rework_activity == "b");
+  assert(params.filter.rework_min_occurrences == 3);
+  assert(params.filter.between_start == "a");
+  assert(params.filter.between_end == "c");
   assert(params.filter.any());
 }
 

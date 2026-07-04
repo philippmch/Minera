@@ -24,7 +24,8 @@ enum class TimeFilterMode {
 
 // Log-preprocessing options. Filters are applied in a fixed order so the result
 // is well defined when several are combined: time range, then activity
-// projection, then trace length, then endpoints, then variant frequency.
+// projection, then rework, then between-extraction, then trace length, then
+// endpoints, then variant frequency.
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -48,6 +49,21 @@ struct LogFilterOptions {
   std::vector<std::string> keep_resources;
   std::vector<std::string> remove_resources;
 
+  // Rework: keep only traces where `rework_activity` occurs at least
+  // `rework_min_occurrences` times (a repeated activity signals rework). An
+  // empty activity disables the filter; the minimum defaults to 2, the smallest
+  // count that means repetition.
+  std::string rework_activity;
+  std::uint64_t rework_min_occurrences = 2;
+
+  // Between-extraction: cut each trace into the subtraces that run from an
+  // occurrence of `between_start` to the next occurrence of `between_end`, both
+  // endpoints included. A trace can yield several subtraces (each becomes its
+  // own case, suffixed #1, #2, … when there is more than one) or none, in which
+  // case it is dropped. Both must be set together; setting only one throws.
+  std::string between_start;
+  std::string between_end;
+
   // Trace-length bounds on the projected traces (0 = unbounded).
   std::size_t min_length = 0;
   std::size_t max_length = 0;
@@ -68,6 +84,8 @@ struct LogFilterOptions {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
            !keep_resources.empty() || !remove_resources.empty() ||
+           !rework_activity.empty() || !between_start.empty() ||
+           !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || min_variant_frequency > 1 ||
            top_variants != 0;

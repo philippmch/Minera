@@ -1035,6 +1035,75 @@ void filter_applies_length_and_endpoint_constraints() {
   assert(ending_x.traces.front().events.back().activity == "x");
 }
 
+void filter_rework_keeps_cases_with_a_repeated_activity() {
+  const auto log = log_from_variants(
+      {{"a", "b", "b", "c"}, {"a", "b", "c"}, {"a", "b", "b", "b", "c"}});
+
+  minera::LogFilterOptions rework;
+  rework.rework_activity = "b";  // default minimum of 2 = any repetition
+  assert(rework.any());
+  const auto repeated = minera::filter_event_log(log, rework);
+  assert(repeated.trace_count() == 2);
+
+  rework.rework_min_occurrences = 3;
+  const auto thrice = minera::filter_event_log(log, rework);
+  assert(thrice.trace_count() == 1);
+  assert(thrice.traces.front().events.size() == 5);
+
+  // An activity the log never repeats keeps nothing.
+  rework.rework_activity = "a";
+  rework.rework_min_occurrences = 2;
+  assert(minera::filter_event_log(log, rework).trace_count() == 0);
+}
+
+void filter_between_extracts_subtraces() {
+  // One case passes a->b twice, so it yields two subcases; a case that never
+  // closes a segment yields none and vanishes.
+  const auto log = log_from_variants(
+      {{"x", "a", "m", "b", "y", "a", "n", "b"}, {"x", "a", "m"}});
+
+  minera::LogFilterOptions between;
+  between.between_start = "a";
+  between.between_end = "b";
+  assert(between.any());
+  const auto cut = minera::filter_event_log(log, between);
+  assert(cut.trace_count() == 2);
+  assert((activity_names(cut.traces[0]) ==
+          std::vector<std::string>{"a", "m", "b"}));
+  assert((activity_names(cut.traces[1]) ==
+          std::vector<std::string>{"a", "n", "b"}));
+  // Several segments from one case become distinct cases.
+  assert(cut.traces[0].case_id != cut.traces[1].case_id);
+
+  // A single segment keeps its original case id.
+  const auto single = log_from_variants({{"x", "a", "m", "b", "y"}});
+  const auto one = minera::filter_event_log(single, between);
+  assert(one.trace_count() == 1);
+  assert(one.traces.front().case_id == single.traces.front().case_id);
+  assert((activity_names(one.traces.front()) ==
+          std::vector<std::string>{"a", "m", "b"}));
+}
+
+void filter_between_handles_equal_endpoints_and_rejects_one_sided() {
+  // start == end: each segment runs from one occurrence to the next.
+  const auto log = log_from_variants({{"a", "x", "a", "y", "a"}});
+  minera::LogFilterOptions between;
+  between.between_start = "a";
+  between.between_end = "a";
+  const auto cut = minera::filter_event_log(log, between);
+  assert(cut.trace_count() == 2);
+  assert((activity_names(cut.traces[0]) ==
+          std::vector<std::string>{"a", "x", "a"}));
+  assert((activity_names(cut.traces[1]) ==
+          std::vector<std::string>{"a", "y", "a"}));
+
+  assert(throws([&] {
+    minera::LogFilterOptions one_sided;
+    one_sided.between_start = "a";
+    (void)minera::filter_event_log(log_from_variants({{"a"}}), one_sided);
+  }));
+}
+
 // A log for the time-range filter: one January case, one case straddling the
 // January/February boundary, one February case, and one untimed case.
 minera::EventLog timed_filter_log() {
@@ -1455,6 +1524,9 @@ int main() {
   filter_keeps_only_the_top_variant();
   filter_projects_activities();
   filter_applies_length_and_endpoint_constraints();
+  filter_rework_keeps_cases_with_a_repeated_activity();
+  filter_between_extracts_subtraces();
+  filter_between_handles_equal_endpoints_and_rejects_one_sided();
   filter_projects_by_resource();
   filter_time_range_trims_events();
   filter_time_range_selects_whole_traces();

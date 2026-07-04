@@ -84,6 +84,43 @@ std::optional<std::pair<double, double>> trace_time_span(const Trace& trace) {
   return span;
 }
 
+// The subtraces of `trace` that run from an occurrence of `start` to the next
+// occurrence of `end`, both included. The scan resumes after each closed
+// segment, and an unclosed segment at the trace's end is discarded rather than
+// emitted half-open. When start == end the closing event also opens the next
+// segment, so a,x,a,y,a yields every a-to-a stretch.
+std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
+                                   const std::string& end) {
+  std::vector<Trace> segments;
+  Trace current;
+  bool collecting = false;
+  for (const auto& event : trace.events) {
+    if (!collecting) {
+      if (event.activity != start) continue;
+      collecting = true;
+      current.events.clear();
+    }
+    current.events.push_back(event);
+    if (event.activity == end && (current.events.size() > 1 || start != end)) {
+      segments.push_back(std::move(current));
+      current = Trace{};
+      collecting = false;
+      if (start == end) {
+        collecting = true;
+        current.events.push_back(event);
+      }
+    }
+  }
+  // A lone segment keeps the original case id; several get a #k suffix so each
+  // subtrace remains a distinct case.
+  for (std::size_t i = 0; i < segments.size(); ++i) {
+    segments[i].case_id = segments.size() == 1
+                              ? trace.case_id
+                              : trace.case_id + "#" + std::to_string(i + 1);
+  }
+  return segments;
+}
+
 std::string variant_key(const Trace& trace) {
   std::string key;
   for (const auto& event : trace.events) {
@@ -109,6 +146,14 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const auto remove_res = to_set(options.remove_resources);
   const auto starts = to_set(options.start_activities);
   const auto ends = to_set(options.end_activities);
+
+  const bool by_between =
+      !options.between_start.empty() || !options.between_end.empty();
+  if (by_between &&
+      (options.between_start.empty() || options.between_end.empty())) {
+    throw std::invalid_argument(
+        "between filter: both a start and an end activity are required");
+  }
 
   const bool by_time = !options.time_from.empty() || !options.time_to.empty();
   const double time_from = parse_time_bound(
@@ -158,19 +203,37 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
         project_events(*source, keep, remove, keep_res, remove_res);
     if (projected.events.empty()) continue;
 
-    const std::size_t length = projected.events.size();
-    if (options.min_length != 0 && length < options.min_length) continue;
-    if (options.max_length != 0 && length > options.max_length) continue;
+    if (!options.rework_activity.empty()) {
+      std::uint64_t occurrences = 0;
+      for (const auto& event : projected.events) {
+        if (event.activity == options.rework_activity) ++occurrences;
+      }
+      if (occurrences < options.rework_min_occurrences) continue;
+    }
 
-    if (!starts.empty() &&
-        starts.find(projected.events.front().activity) == starts.end()) {
-      continue;
+    std::vector<Trace> pieces;
+    if (by_between) {
+      pieces = extract_between(projected, options.between_start,
+                               options.between_end);
+    } else {
+      pieces.push_back(std::move(projected));
     }
-    if (!ends.empty() &&
-        ends.find(projected.events.back().activity) == ends.end()) {
-      continue;
+
+    for (auto& piece : pieces) {
+      const std::size_t length = piece.events.size();
+      if (options.min_length != 0 && length < options.min_length) continue;
+      if (options.max_length != 0 && length > options.max_length) continue;
+
+      if (!starts.empty() &&
+          starts.find(piece.events.front().activity) == starts.end()) {
+        continue;
+      }
+      if (!ends.empty() &&
+          ends.find(piece.events.back().activity) == ends.end()) {
+        continue;
+      }
+      kept.push_back(std::move(piece));
     }
-    kept.push_back(std::move(projected));
   }
 
   const bool by_frequency = options.min_variant_frequency > 1;

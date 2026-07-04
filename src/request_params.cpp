@@ -110,6 +110,19 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("remove_resources"); !value.empty()) {
     params.filter.remove_resources = split_csv(value);
   }
+  if (const auto value = field("rework_activity"); !value.empty()) {
+    params.filter.rework_activity = value;
+  }
+  if (const auto value = field("rework_min_occurrences"); !value.empty()) {
+    params.filter.rework_min_occurrences =
+        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("between_start"); !value.empty()) {
+    params.filter.between_start = value;
+  }
+  if (const auto value = field("between_end"); !value.empty()) {
+    params.filter.between_end = value;
+  }
   if (const auto value = field("start_activities"); !value.empty()) {
     params.filter.start_activities = split_csv(value);
   }
