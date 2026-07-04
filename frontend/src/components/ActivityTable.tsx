@@ -3,6 +3,8 @@ import { type MineraExport, numberFormat } from "../types";
 export function ActivityTable({ data }: { data: MineraExport }) {
   const sorted = [...data.activities].sort((a, b) => b.count - a.count);
   const maxCount = sorted[0]?.count ?? 1;
+  // Older exports don't carry the rework statistic; hide the column then.
+  const hasRework = sorted.some((activity) => activity.rework_cases !== undefined);
 
   return (
     <section className="panel activities-panel reveal">
@@ -20,6 +22,11 @@ export function ActivityTable({ data }: { data: MineraExport }) {
             <th className="bar-col"></th>
             <th className="num">Starts</th>
             <th className="num">Ends</th>
+            {hasRework && (
+              <th className="num" title="Cases where this activity occurs more than once">
+                Rework
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -42,6 +49,13 @@ export function ActivityTable({ data }: { data: MineraExport }) {
               <td className="num">
                 {activity.end_count > 0 ? numberFormat.format(activity.end_count) : "·"}
               </td>
+              {hasRework && (
+                <td className="num">
+                  {(activity.rework_cases ?? 0) > 0
+                    ? numberFormat.format(activity.rework_cases ?? 0)
+                    : "·"}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

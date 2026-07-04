@@ -1,5 +1,6 @@
 #include "minera/directly_follows_graph.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -58,6 +59,12 @@ std::uint64_t DirectlyFollowsGraph::end_activity_count(
   return id ? end_activity_counts_[*id] : 0;
 }
 
+std::uint64_t DirectlyFollowsGraph::rework_case_count(
+    std::string_view activity) const {
+  const auto id = activity_id(activity);
+  return id ? rework_case_counts_[*id] : 0;
+}
+
 std::uint64_t DirectlyFollowsGraph::edge_count(
     std::string_view source,
     std::string_view target) const {
@@ -82,6 +89,7 @@ std::size_t DirectlyFollowsGraph::intern_activity(
     activity_counts_.push_back(0);
     start_activity_counts_.push_back(0);
     end_activity_counts_.push_back(0);
+    rework_case_counts_.push_back(0);
   }
   return it->second;
 }
@@ -130,6 +138,20 @@ DirectlyFollowsGraph discover_directly_follows_graph(const EventLog& event_log) 
 
     for (std::size_t i = 1; i < activity_ids.size(); ++i) {
       graph.add_edge(activity_ids[i - 1], activity_ids[i]);
+    }
+
+    // Rework: each activity that occurs more than once in this case counts
+    // the case once. Sorting groups equal ids into runs to scan.
+    std::sort(activity_ids.begin(), activity_ids.end());
+    for (std::size_t i = 0; i < activity_ids.size();) {
+      std::size_t j = i + 1;
+      while (j < activity_ids.size() && activity_ids[j] == activity_ids[i]) {
+        ++j;
+      }
+      if (j - i > 1) {
+        ++graph.rework_case_counts_[activity_ids[i]];
+      }
+      i = j;
     }
   }
 

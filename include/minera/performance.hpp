@@ -35,6 +35,10 @@ struct EdgePerformance {
 struct PerformanceMetrics {
   std::vector<EdgePerformance> edges;
   DurationStats case_duration;     // first-to-last event of each timed trace
+  // Case arrival rate: the gaps between consecutive case start instants
+  // (cases sorted by their first timed event). `mean` is the average time
+  // until the next case arrives; empty when fewer than two cases are timed.
+  DurationStats case_arrival;
   std::uint64_t timed_traces = 0;  // traces with at least two parseable instants
 };
 

@@ -147,6 +147,28 @@ void performance_takes_the_median_of_varied_waits() {
   assert(near(stats.max, 60.0));
 }
 
+void performance_measures_the_case_arrival_rate() {
+  // Cases starting at 00:00, 00:01:40, and 00:05:50 (out of order in the
+  // file): sorted arrival gaps are 100 s and 250 s — mean 175, median 175.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp\n"
+      "1,A,2026-01-01T00:05:50\n"
+      "1,B,2026-01-01T00:06:00\n"
+      "2,A,2026-01-01T00:00:00\n"
+      "2,B,2026-01-01T00:00:30\n"
+      "3,A,2026-01-01T00:01:40\n"
+      "3,B,2026-01-01T00:02:00\n");
+  const auto log = minera::import_csv_event_log(path);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto perf = minera::compute_performance_metrics(log, graph);
+
+  assert(perf.case_arrival.count == 2);
+  assert(near(perf.case_arrival.mean, 175.0));
+  assert(near(perf.case_arrival.median, 175.0));
+  assert(near(perf.case_arrival.min, 100.0));
+  assert(near(perf.case_arrival.max, 250.0));
+}
+
 void performance_ignores_untimed_logs() {
   // No timestamp column means no parseable instants, so every statistic is empty
   // rather than fabricated.
@@ -159,6 +181,7 @@ void performance_ignores_untimed_logs() {
 
   assert(perf.timed_traces == 0);
   assert(perf.case_duration.count == 0);
+  assert(perf.case_arrival.count == 0);
   assert(perf.edges.size() == 1);
   assert(perf.edges.front().stats.count == 0);
 }
@@ -390,9 +413,10 @@ void json_export_carries_performance_and_resource_contracts() {
   const auto json = minera::analysis_json("test", log, graph, nullptr, nullptr,
                                           nullptr, nullptr, &perf, &resources);
   for (const char* key : {"\"performance\"", "\"timed_traces\"",
-                          "\"case_duration\"", "\"median\"", "\"resources\"",
+                          "\"case_duration\"", "\"case_arrival\"",
+                          "\"median\"", "\"resources\"",
                           "\"total_handovers\"", "\"handovers\"",
-                          "\"event_count\""}) {
+                          "\"event_count\"", "\"rework_cases\""}) {
     assert(json.find(key) != std::string::npos);
   }
   // The per-event resource shows up in the trace dump.
@@ -421,6 +445,7 @@ int main() {
   importer_keeps_document_order_for_equal_instants();
   performance_measures_edge_waiting_and_case_duration();
   performance_takes_the_median_of_varied_waits();
+  performance_measures_the_case_arrival_rate();
   performance_ignores_untimed_logs();
   variant_durations_summarize_per_variant();
   variant_durations_empty_without_timestamps();

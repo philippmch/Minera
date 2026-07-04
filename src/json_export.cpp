@@ -280,7 +280,8 @@ void write_activity_stats(std::ostream& out,
     write_json_string(out, name);
     out << ", \"count\": " << graph.activity_count(name)
         << ", \"start_count\": " << graph.start_activity_count(name)
-        << ", \"end_count\": " << graph.end_activity_count(name) << '}'
+        << ", \"end_count\": " << graph.end_activity_count(name)
+        << ", \"rework_cases\": " << graph.rework_case_count(name) << '}'
         << (i + 1 < activities.size() ? "," : "") << '\n';
   }
   out << "  ]";
@@ -296,6 +297,8 @@ void write_performance(std::ostream& out, const PerformanceMetrics& performance)
   out << "{\"timed_traces\": " << performance.timed_traces
       << ", \"case_duration\": ";
   write_duration_stats(out, performance.case_duration);
+  out << ", \"case_arrival\": ";
+  write_duration_stats(out, performance.case_arrival);
   out << ", \"edges\": [";
   const auto& edges = performance.edges;
   for (std::size_t i = 0; i < edges.size(); ++i) {

@@ -52,6 +52,10 @@ class DirectlyFollowsGraph {
       std::string_view activity) const;
   [[nodiscard]] std::uint64_t end_activity_count(
       std::string_view activity) const;
+  // In how many cases the activity occurs more than once — the standard
+  // rework statistic, flagging repeated work per activity.
+  [[nodiscard]] std::uint64_t rework_case_count(
+      std::string_view activity) const;
   [[nodiscard]] std::uint64_t edge_count(
       std::string_view source,
       std::string_view target) const;
@@ -69,6 +73,7 @@ class DirectlyFollowsGraph {
   std::vector<std::uint64_t> activity_counts_;
   std::vector<std::uint64_t> start_activity_counts_;
   std::vector<std::uint64_t> end_activity_counts_;
+  std::vector<std::uint64_t> rework_case_counts_;
   std::vector<DirectlyFollowsEdge> edges_;
   std::unordered_map<std::uint64_t, std::size_t> edge_ids_;
   std::vector<TraceVariant> variants_;
