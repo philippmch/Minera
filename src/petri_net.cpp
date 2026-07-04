@@ -1,7 +1,10 @@
 #include "minera/petri_net.hpp"
 
+#include <algorithm>
 #include <cstddef>
+#include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace minera {
@@ -85,6 +88,7 @@ PetriNet to_petri_net(const ProcessTree& tree) {
 }
 
 PetriNet to_petri_net(const HeuristicsNet& heuristics) {
+  const std::size_t n = heuristics.activities.size();
   PetriNet net;
   net.set_activities(heuristics.activities);
   const std::size_t source = net.add_place();
@@ -92,31 +96,84 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
   net.set_source(source);
   net.set_sink(sink);
 
-  // One "ready" and one "done" place per activity; the visible transition moves
-  // a token from ready to done, i.e. fires the activity exactly once it is
-  // routed in.
-  const std::size_t count = heuristics.activities.size();
-  std::vector<std::size_t> ready(count);
-  std::vector<std::size_t> done(count);
-  for (std::size_t a = 0; a < count; ++a) {
-    ready[a] = net.add_place();
-    done[a] = net.add_place();
-    net.add_transition(a, {ready[a]}, {done[a]});
-  }
-
-  // Start activities are reachable from the source; end activities drain to the
-  // sink. Silent transitions keep the choice free (exactly one fires per token).
-  for (const std::size_t s : heuristics.start_activities) {
-    net.add_transition(std::nullopt, {source}, {ready[s]});
-  }
-  for (const std::size_t e : heuristics.end_activities) {
-    net.add_transition(std::nullopt, {done[e]}, {sink});
-  }
-
-  // Each accepted dependency edge routes a token from the predecessor's done
-  // place to the successor's ready place (self-loops route done back to ready).
+  // One place per accepted dependency edge: a token on it means the edge has
+  // been taken and the target is now enabled (or awaited).
+  std::map<std::pair<std::size_t, std::size_t>, std::size_t> edge_place;
   for (const auto& edge : heuristics.edges) {
-    net.add_transition(std::nullopt, {done[edge.source]}, {ready[edge.target]});
+    edge_place[{edge.source, edge.target}] = net.add_place();
+  }
+
+  // A hand-built net may carry no bundle information; every edge then forms
+  // its own bundle, i.e. plain XOR splits and joins.
+  const bool has_bundles = heuristics.output_bundles.size() == n &&
+                           heuristics.input_bundles.size() == n;
+
+  // The alternatives of a's split (outgoing) or join: one entry per bundle,
+  // holding the edge places the bundle touches.
+  const auto alternatives = [&](std::size_t a, bool outgoing) {
+    std::vector<std::vector<std::size_t>> alts;
+    if (has_bundles) {
+      const auto& bundles =
+          outgoing ? heuristics.output_bundles[a] : heuristics.input_bundles[a];
+      for (const auto& bundle : bundles) {
+        std::vector<std::size_t>& places = alts.emplace_back();
+        places.reserve(bundle.size());
+        for (const std::size_t other : bundle) {
+          places.push_back(outgoing ? edge_place.at({a, other})
+                                    : edge_place.at({other, a}));
+        }
+      }
+    } else {
+      for (const auto& edge : heuristics.edges) {
+        if (outgoing ? edge.source == a : edge.target == a) {
+          alts.push_back({edge_place.at({edge.source, edge.target})});
+        }
+      }
+    }
+    return alts;
+  };
+
+  // Collapses a's alternatives into the place set its transition touches. A
+  // single alternative wires directly (an AND split/join on the transition
+  // itself); several alternatives meet at a hub place with one silent
+  // transition per bundle, so exactly one bundle is taken. No alternative at
+  // all yields a fresh private place: on the input side the transition is
+  // dead (nothing routes to it), on the output side the token parks there
+  // instead of vanishing — either way the deviation stays visible to replay.
+  const auto merge = [&](std::vector<std::vector<std::size_t>> alts,
+                         bool joining) -> std::vector<std::size_t> {
+    if (alts.empty()) {
+      return {net.add_place()};
+    }
+    if (alts.size() == 1) {
+      return std::move(alts.front());
+    }
+    const std::size_t hub = net.add_place();
+    for (auto& places : alts) {
+      if (joining) {
+        net.add_transition(std::nullopt, std::move(places), {hub});
+      } else {
+        net.add_transition(std::nullopt, {hub}, std::move(places));
+      }
+    }
+    return {hub};
+  };
+
+  const auto contains = [](const std::vector<std::size_t>& list, std::size_t a) {
+    return std::find(list.begin(), list.end(), a) != list.end();
+  };
+
+  for (std::size_t a = 0; a < n; ++a) {
+    auto in_alts = alternatives(a, false);
+    if (contains(heuristics.start_activities, a)) {
+      in_alts.push_back({source});  // starting is one more way to get enabled
+    }
+    auto out_alts = alternatives(a, true);
+    if (contains(heuristics.end_activities, a)) {
+      out_alts.push_back({sink});  // finishing is one more alternative
+    }
+    net.add_transition(a, merge(std::move(in_alts), true),
+                       merge(std::move(out_alts), false));
   }
   return net;
 }
