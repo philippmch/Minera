@@ -927,6 +927,97 @@ void filter_applies_length_and_endpoint_constraints() {
   assert(ending_x.traces.front().events.back().activity == "x");
 }
 
+// A log for the time-range filter: one January case, one case straddling the
+// January/February boundary, one February case, and one untimed case.
+minera::EventLog timed_filter_log() {
+  minera::EventLog log;
+  const std::vector<std::vector<std::pair<std::string, std::string>>> cases = {
+      {{"a", "2024-01-01"}, {"b", "2024-01-02"}},
+      {{"a", "2024-01-30"}, {"b", "2024-02-02"}},
+      {{"a", "2024-02-05"}, {"b", "2024-02-06"}},
+      {{"a", ""}, {"b", ""}},
+  };
+  std::size_t case_index = 0;
+  for (const auto& events : cases) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(case_index++);
+    for (const auto& [activity, timestamp] : events) {
+      minera::Event event;
+      event.case_id = trace.case_id;
+      event.activity = activity;
+      event.timestamp = timestamp;
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+void filter_time_range_trims_events() {
+  const auto log = timed_filter_log();
+  minera::LogFilterOptions options;
+  options.time_from = "2024-01-01";
+  options.time_to = "2024-01-31";
+  assert(options.any());
+
+  // events mode keeps only the January events; the straddling case shrinks to
+  // its January prefix, and the February and untimed cases vanish entirely.
+  const auto filtered = minera::filter_event_log(log, options);
+  assert(filtered.trace_count() == 2);
+  assert((activity_names(filtered.traces[0]) ==
+          std::vector<std::string>{"a", "b"}));
+  assert((activity_names(filtered.traces[1]) == std::vector<std::string>{"a"}));
+}
+
+void filter_time_range_selects_whole_traces() {
+  const auto log = timed_filter_log();
+  minera::LogFilterOptions options;
+  options.time_from = "2024-01-01";
+  options.time_to = "2024-01-31";
+
+  // Contained: only the case that lies fully inside January survives, whole.
+  options.time_mode = minera::TimeFilterMode::traces_contained;
+  const auto contained = minera::filter_event_log(log, options);
+  assert(contained.trace_count() == 1);
+  assert(contained.traces.front().case_id == "0");
+  assert(contained.traces.front().events.size() == 2);
+
+  // Intersecting: the straddling case survives too, keeping its February tail.
+  options.time_mode = minera::TimeFilterMode::traces_intersecting;
+  const auto intersecting = minera::filter_event_log(log, options);
+  assert(intersecting.trace_count() == 2);
+  assert(intersecting.traces[1].case_id == "1");
+  assert(intersecting.traces[1].events.size() == 2);
+}
+
+void filter_time_range_bounds_are_inclusive_and_one_sided() {
+  const auto log = timed_filter_log();
+
+  minera::LogFilterOptions at_instant;
+  at_instant.time_from = "2024-01-02";
+  at_instant.time_to = "2024-01-02";
+  const auto exact = minera::filter_event_log(log, at_instant);
+  assert(exact.trace_count() == 1);
+  assert((activity_names(exact.traces.front()) ==
+          std::vector<std::string>{"b"}));
+
+  minera::LogFilterOptions from_only;
+  from_only.time_from = "2024-02-01";
+  const auto tail = minera::filter_event_log(log, from_only);
+  assert(tail.trace_count() == 2);  // the straddler's tail and the February case
+}
+
+void filter_time_range_rejects_a_malformed_bound() {
+  assert(throws([] {
+    minera::LogFilterOptions options;
+    options.time_from = "not-a-date";
+    (void)minera::filter_event_log(timed_filter_log(), options);
+  }));
+  assert((minera::parse_time_filter_mode("traces_contained") ==
+          minera::TimeFilterMode::traces_contained));
+  assert(!minera::parse_time_filter_mode("bogus"));
+}
+
 void importer_rejects_malformed_rows() {
   // Too few fields for the declared header.
   assert(throws([] {
@@ -1251,6 +1342,10 @@ int main() {
   filter_keeps_only_the_top_variant();
   filter_projects_activities();
   filter_applies_length_and_endpoint_constraints();
+  filter_time_range_trims_events();
+  filter_time_range_selects_whole_traces();
+  filter_time_range_bounds_are_inclusive_and_one_sided();
+  filter_time_range_rejects_a_malformed_bound();
   xes_importer_reads_traces_and_events();
   xes_importer_reads_a_file_from_disk();
   xes_importer_sorts_events_by_timestamp();

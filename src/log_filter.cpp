@@ -3,10 +3,15 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
@@ -29,6 +34,35 @@ Trace project_activities(const Trace& trace,
   return result;
 }
 
+// Parses a time-filter bound; an empty string means "unbounded" and yields the
+// given infinity, anything unparseable is a caller error and throws.
+double parse_time_bound(const std::string& text, double unbounded) {
+  if (text.empty()) return unbounded;
+  const auto instant = parse_timestamp(text);
+  if (!instant) {
+    throw std::invalid_argument("time filter: unrecognized timestamp '" + text +
+                                "'");
+  }
+  return *instant;
+}
+
+// The smallest and largest parsed instant in a trace, or nullopt when no event
+// carries a recognizable timestamp.
+std::optional<std::pair<double, double>> trace_time_span(const Trace& trace) {
+  std::optional<std::pair<double, double>> span;
+  for (const auto& event : trace.events) {
+    const auto instant = parse_timestamp(event.timestamp);
+    if (!instant) continue;
+    if (!span) {
+      span = {*instant, *instant};
+    } else {
+      span->first = std::min(span->first, *instant);
+      span->second = std::max(span->second, *instant);
+    }
+  }
+  return span;
+}
+
 std::string variant_key(const Trace& trace) {
   std::string key;
   for (const auto& event : trace.events) {
@@ -40,17 +74,64 @@ std::string variant_key(const Trace& trace) {
 
 }  // namespace
 
+std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
+  if (name == "events") return TimeFilterMode::events;
+  if (name == "traces_contained") return TimeFilterMode::traces_contained;
+  if (name == "traces_intersecting") return TimeFilterMode::traces_intersecting;
+  return std::nullopt;
+}
+
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
   const auto starts = to_set(options.start_activities);
   const auto ends = to_set(options.end_activities);
 
-  // Pass 1: project activities and apply per-trace structural filters.
+  const bool by_time = !options.time_from.empty() || !options.time_to.empty();
+  const double time_from = parse_time_bound(
+      options.time_from, -std::numeric_limits<double>::infinity());
+  const double time_to = parse_time_bound(
+      options.time_to, std::numeric_limits<double>::infinity());
+
+  // Pass 1: constrain to the time range, then project activities and apply
+  // per-trace structural filters.
   std::vector<Trace> kept;
   kept.reserve(log.traces.size());
   for (const auto& trace : log.traces) {
-    Trace projected = project_activities(trace, keep, remove);
+    const Trace* source = &trace;
+    Trace timed;  // only populated in events mode, which rewrites the trace
+    if (by_time) {
+      switch (options.time_mode) {
+        case TimeFilterMode::events: {
+          timed.case_id = trace.case_id;
+          for (const auto& event : trace.events) {
+            const auto instant = parse_timestamp(event.timestamp);
+            if (instant && *instant >= time_from && *instant <= time_to) {
+              timed.events.push_back(event);
+            }
+          }
+          if (timed.events.empty()) continue;
+          source = &timed;
+          break;
+        }
+        case TimeFilterMode::traces_contained: {
+          const auto span = trace_time_span(trace);
+          if (!span || span->first < time_from || span->second > time_to) {
+            continue;
+          }
+          break;
+        }
+        case TimeFilterMode::traces_intersecting: {
+          const auto span = trace_time_span(trace);
+          if (!span || span->second < time_from || span->first > time_to) {
+            continue;
+          }
+          break;
+        }
+      }
+    }
+
+    Trace projected = project_activities(*source, keep, remove);
     if (projected.events.empty()) continue;
 
     const std::size_t length = projected.events.size();

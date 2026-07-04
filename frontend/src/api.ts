@@ -7,6 +7,12 @@ export interface CsvOptions {
   delimiter?: string;
 }
 
+/** How the backend's time-range filter reads a trace. */
+export type TimeFilterMode =
+  | "events"
+  | "traces_contained"
+  | "traces_intersecting";
+
 /** Log-preprocessing filters applied by the backend before discovery. */
 export interface FilterOptions {
   topVariants?: number;
@@ -17,6 +23,10 @@ export interface FilterOptions {
   endActivities?: string[];
   minLength?: number;
   maxLength?: number;
+  /** ISO-8601 bounds, both inclusive; either side may be open. */
+  timeFrom?: string;
+  timeTo?: string;
+  timeMode?: TimeFilterMode;
 }
 
 /** Uploads a CSV event log to the local Minera backend for mining. */
@@ -45,6 +55,10 @@ export async function mineCsv(
     form.append("end_activities", options.endActivities.join(","));
   if (options.minLength) form.append("min_length", String(options.minLength));
   if (options.maxLength) form.append("max_length", String(options.maxLength));
+  if (options.timeFrom) form.append("time_from", options.timeFrom);
+  if (options.timeTo) form.append("time_to", options.timeTo);
+  if (options.timeMode && (options.timeFrom || options.timeTo))
+    form.append("time_mode", options.timeMode);
 
   let response: Response;
   try {

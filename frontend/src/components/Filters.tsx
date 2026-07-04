@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type FilterOptions } from "../api";
+import { type FilterOptions, type TimeFilterMode } from "../api";
 
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
@@ -17,6 +17,9 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
   const [open, setOpen] = useState(false);
   const [topVariants, setTopVariants] = useState("");
   const [minFrequency, setMinFrequency] = useState("");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [timeMode, setTimeMode] = useState<TimeFilterMode>("events");
   // Activities start all-selected; deselected ones are removed from the log.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
 
@@ -40,18 +43,28 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
       removeActivities: removeList.length > 0 ? removeList : undefined,
+      timeFrom: timeFrom || undefined,
+      timeTo: timeTo || undefined,
+      timeMode: timeFrom || timeTo ? timeMode : undefined,
     });
   };
 
   const reset = () => {
     setTopVariants("");
     setMinFrequency("");
+    setTimeFrom("");
+    setTimeTo("");
+    setTimeMode("events");
     setRemoved(new Set());
     onApply({});
   };
 
   const dirty =
-    topVariants !== "" || minFrequency !== "" || removed.size > 0;
+    topVariants !== "" ||
+    minFrequency !== "" ||
+    timeFrom !== "" ||
+    timeTo !== "" ||
+    removed.size > 0;
 
   return (
     <section className="filters reveal">
@@ -88,6 +101,36 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
                 value={minFrequency}
                 onChange={(e) => setMinFrequency(e.target.value)}
               />
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>From</span>
+              <input
+                type="datetime-local"
+                value={timeFrom}
+                onChange={(e) => setTimeFrom(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>To</span>
+              <input
+                type="datetime-local"
+                value={timeTo}
+                onChange={(e) => setTimeTo(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Time window keeps</span>
+              <select
+                value={timeMode}
+                onChange={(e) => setTimeMode(e.target.value as TimeFilterMode)}
+              >
+                <option value="events">events in the window</option>
+                <option value="traces_contained">cases fully inside</option>
+                <option value="traces_intersecting">cases touching it</option>
+              </select>
             </label>
           </div>
 

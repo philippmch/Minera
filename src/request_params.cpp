@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <sstream>
+#include <stdexcept>
 
 namespace minera {
 
@@ -81,6 +82,22 @@ MineParams parse_mine_params(const FieldLookup& field) {
   }
 
   // Optional log-preprocessing filters, applied before discovery.
+  if (const auto value = field("time_from"); !value.empty()) {
+    params.filter.time_from = value;
+  }
+  if (const auto value = field("time_to"); !value.empty()) {
+    params.filter.time_to = value;
+  }
+  if (const auto value = field("time_mode"); !value.empty()) {
+    const auto mode = parse_time_filter_mode(value);
+    if (!mode) {
+      throw std::invalid_argument(
+          "time_mode: expected events, traces_contained, or "
+          "traces_intersecting, got '" +
+          value + "'");
+    }
+    params.filter.time_mode = *mode;
+  }
   if (const auto value = field("keep_activities"); !value.empty()) {
     params.filter.keep_activities = split_csv(value);
   }

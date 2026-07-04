@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <map>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -93,6 +94,9 @@ void parse_mine_params_maps_csv_and_inductive_options() {
 
 void parse_mine_params_maps_filters() {
   const auto params = minera::parse_mine_params(fields({
+      {"time_from", "2024-01-01"},
+      {"time_to", "2024-01-31T23:59:59"},
+      {"time_mode", "traces_intersecting"},
       {"keep_activities", "a, b ,c"},
       {"remove_activities", "x"},
       {"start_activities", "a"},
@@ -102,6 +106,10 @@ void parse_mine_params_maps_filters() {
       {"min_variant_frequency", "3"},
       {"top_variants", "5"},
   }));
+  assert(params.filter.time_from == "2024-01-01");
+  assert(params.filter.time_to == "2024-01-31T23:59:59");
+  assert(params.filter.time_mode ==
+         minera::TimeFilterMode::traces_intersecting);
   assert((params.filter.keep_activities ==
           std::vector<std::string>{"a", "b", "c"}));
   assert((params.filter.remove_activities == std::vector<std::string>{"x"}));
@@ -112,6 +120,16 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.min_variant_frequency == 3);
   assert(params.filter.top_variants == 5);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_an_unknown_time_mode() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"time_mode", "bogus"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_ignores_blank_fields() {
@@ -137,6 +155,7 @@ int main() {
   parse_mine_params_defaults_when_empty();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
+  parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_ignores_blank_fields();
   return 0;
 }
