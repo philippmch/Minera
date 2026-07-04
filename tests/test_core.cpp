@@ -497,6 +497,39 @@ void precision_is_high_for_a_tight_model_and_low_for_a_flower() {
   assert(loose.precision < tight.precision);
 }
 
+void generalization_rewards_a_well_exercised_model() {
+  // The a -> b model has exactly two transitions, each firing once per trace.
+  // A single trace leaves both barely observed (1/sqrt(1) each), the floor of
+  // the measure; four traces halve each rarity term.
+  const auto once = log_from_variants({{"a", "b"}});
+  const auto tree = minera::discover_process_tree(once);
+  const auto sparse = minera::check_conformance(once, tree);
+  assert(sparse.generalization < 0.001);
+
+  const auto often =
+      log_from_variants({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "b"}});
+  const auto dense = minera::check_conformance(often, tree);
+  assert(dense.generalization > 0.499 && dense.generalization < 0.501);
+}
+
+void simplicity_reflects_routing_density() {
+  // A pure sequence needs no arcs beyond the two-per-node chaining baseline,
+  // so it sits at the measure's ceiling.
+  const auto sequence_log = log_from_variants({{"a", "b", "c"}});
+  const auto sequence = minera::check_conformance(
+      sequence_log, minera::discover_process_tree(sequence_log));
+  assert(sequence.simplicity > 0.999);
+
+  // The flower fallback funnels every activity through shared loop places,
+  // pushing the mean degree past the baseline.
+  const auto flower_log =
+      log_from_variants({{"a", "b"}, {"b", "c"}, {"c", "a"}});
+  const auto flower = minera::check_conformance(
+      flower_log, minera::discover_process_tree(flower_log));
+  assert(flower.simplicity < sequence.simplicity);
+  assert(flower.simplicity > 0.0);
+}
+
 void json_export_carries_the_conformance_contract() {
   // The frontend reads these keys by name, so guard them against renames. The
   // "conformance" object is keyed by miner id, each carrying a token-replay and
@@ -515,7 +548,8 @@ void json_export_carries_the_conformance_contract() {
                             &conformance);
   for (const char* key : {"\"conformance\"", "\"inductive\"", "\"sound\"",
                           "\"token_replay\"", "\"alignments\"", "\"fitness\"",
-                          "\"precision\"", "\"fitting_traces\"",
+                          "\"precision\"", "\"generalization\"",
+                          "\"simplicity\"", "\"fitting_traces\"",
                           "\"trace_count\"", "\"missing\"", "\"remaining\"",
                           "\"computed\"", "\"exhausted\"", "\"variants\""}) {
     assert(json.find(key) != std::string::npos);
@@ -1318,6 +1352,8 @@ int main() {
   conformance_counts_unmodeled_activities();
   conformance_penalizes_a_deviating_trace();
   precision_is_high_for_a_tight_model_and_low_for_a_flower();
+  generalization_rewards_a_well_exercised_model();
+  simplicity_reflects_routing_density();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
   alignment_is_perfect_for_every_operator();

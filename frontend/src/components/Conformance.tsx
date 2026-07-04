@@ -185,6 +185,24 @@ function TokenReplay({
       value: conformance.precision,
       hint: "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior).",
     },
+    ...(conformance.generalization !== undefined
+      ? [
+          {
+            label: "Generalization",
+            value: conformance.generalization,
+            hint: "How evenly the log exercises the model (lower = parts of the model hinge on a few observations).",
+          },
+        ]
+      : []),
+    ...(conformance.simplicity !== undefined
+      ? [
+          {
+            label: "Simplicity",
+            value: conformance.simplicity,
+            hint: "How lean the net itself is, by mean arc degree (lower = denser routing).",
+          },
+        ]
+      : []),
     {
       label: "Fitting traces",
       value: fittingShare,

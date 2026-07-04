@@ -1,6 +1,7 @@
 #include "minera/conformance.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -82,9 +83,12 @@ class Replayer {
 
   // Replays a trace (activity ids, std::nullopt = activity absent from the
   // model) and returns the token counts. Perfect replay yields missing == 0
-  // and remaining == 0.
+  // and remaining == 0. When `executions` is given (sized to the net's
+  // transition count) each transition the replay fires — silent routing
+  // included — is tallied into it, feeding generalization.
   [[nodiscard]] Counts replay(
-      const std::vector<std::optional<std::size_t>>& trace) const {
+      const std::vector<std::optional<std::size_t>>& trace,
+      std::vector<std::uint64_t>* executions = nullptr) const {
     Marking marking = initial_marking();
     Counts counts;
     counts.produced = 1;  // the initial token on the source place
@@ -102,6 +106,9 @@ class Replayer {
       counts.produced += result.produced;
       counts.consumed += result.consumed;
       counts.missing += result.missing;
+      if (executions) {
+        for (const std::size_t t : result.fired) ++(*executions)[t];
+      }
     }
 
     // Route whatever is left toward the sink, then consume the final token.
@@ -110,6 +117,9 @@ class Replayer {
     counts.produced += finish.produced;
     counts.consumed += finish.consumed;
     counts.missing += finish.missing;
+    if (executions) {
+      for (const std::size_t t : finish.fired) ++(*executions)[t];
+    }
     ++counts.consumed;
     if (marking[net_.sink()] > 0) {
       --marking[net_.sink()];
@@ -206,6 +216,7 @@ class Replayer {
     std::uint64_t produced = 0;
     std::uint64_t consumed = 0;
     std::uint64_t missing = 0;
+    std::vector<std::size_t> fired;  // transitions fired, silent routing included
   };
 
   struct StepKeyHash {
@@ -224,8 +235,10 @@ class Replayer {
       step.marking = marking;
       Counts counts;
       const auto& targets = transitions_by_activity_[activity];
-      route_silently(step.marking, targets, counts);
-      fire(step.marking, pick_enabled(step.marking, targets), counts);
+      route_silently(step.marking, targets, counts, &step.fired);
+      const std::size_t chosen = pick_enabled(step.marking, targets);
+      fire(step.marking, chosen, counts);
+      step.fired.push_back(chosen);
       step.produced = counts.produced;
       step.consumed = counts.consumed;
       step.missing = counts.missing;
@@ -240,7 +253,7 @@ class Replayer {
       Step& step = it->second;
       step.marking = marking;
       Counts counts;
-      route_silently_to(step.marking, net_.sink(), counts);
+      route_silently_to(step.marking, net_.sink(), counts, &step.fired);
       step.produced = counts.produced;
       step.consumed = counts.consumed;
       step.missing = counts.missing;
@@ -390,25 +403,30 @@ class Replayer {
   }
 
   // Fires silent transitions (if a no-cost path exists) so that one of
-  // `targets` becomes enabled, updating the marking and counts in place.
+  // `targets` becomes enabled, updating the marking and counts in place. The
+  // firings along the chosen path are appended to `fired` when given.
   void route_silently(Marking& marking,
                       const std::vector<std::size_t>& targets,
-                      Counts& counts) const {
+                      Counts& counts,
+                      std::vector<std::size_t>* fired = nullptr) const {
     if (any_enabled(marking, targets)) return;
     const auto path = silent_path(
         marking, [&](const Marking& m) { return any_enabled(m, targets); });
     if (!path) return;  // no silent route; the visible firing will create tokens
     for (const std::size_t s : *path) fire(marking, s, counts);
+    if (fired) fired->insert(fired->end(), path->begin(), path->end());
   }
 
   void route_silently_to(Marking& marking,
                          std::size_t place,
-                         Counts& counts) const {
+                         Counts& counts,
+                         std::vector<std::size_t>* fired = nullptr) const {
     if (marking[place] > 0) return;
     const auto path =
         silent_path(marking, [&](const Marking& m) { return m[place] > 0; });
     if (!path) return;
     for (const std::size_t s : *path) fire(marking, s, counts);
+    if (fired) fired->insert(fired->end(), path->begin(), path->end());
   }
 
   const PetriNet& net_;
@@ -524,6 +542,36 @@ double compute_precision(const std::vector<Variant>& variants,
   }
   return enabled_total == 0 ? 1.0
                             : 1.0 - double(escaping_total) / double(enabled_total);
+}
+
+// Token-replay generalization (Buijs, van Dongen & van der Aalst): a model
+// generalizes well when replaying the log spreads executions across its
+// transitions instead of leaving parts of the net exercised only once or
+// twice. Each executed transition contributes 1/sqrt(executions) — near 1 when
+// barely used, vanishing as use grows — averaged over all transitions.
+double compute_generalization(const std::vector<std::uint64_t>& executions) {
+  if (executions.empty()) return 1.0;
+  double rarity = 0.0;
+  for (const auto count : executions) {
+    if (count > 0) rarity += 1.0 / std::sqrt(double(count));
+  }
+  return 1.0 - rarity / double(executions.size());
+}
+
+// Inverse arc-degree simplicity: a workflow net needs two arcs per node just
+// to chain behaviour, so only the mean degree beyond that counts against it.
+// 1 for a plain sequence, decaying as routing density grows.
+double compute_simplicity(const PetriNet& net) {
+  const std::size_t nodes = net.place_count() + net.transitions().size();
+  if (nodes == 0) return 1.0;
+  std::size_t arcs = 0;
+  for (const auto& transition : net.transitions()) {
+    arcs += transition.inputs.size() + transition.outputs.size();
+  }
+  // Every arc joins one place and one transition, so it adds 2 to the total
+  // degree.
+  const double mean_degree = 2.0 * double(arcs) / double(nodes);
+  return 1.0 / (1.0 + std::max(mean_degree - 2.0, 0.0));
 }
 
 // Bounds the alignment search so a pathological model can never run forever; the
@@ -795,8 +843,14 @@ ConformanceResult check_conformance(const EventLog& event_log,
   result.fitness = 1.0;
   result.precision = 1.0;
 
+  std::vector<std::uint64_t> executions(net.transitions().size(), 0);
+  std::vector<std::uint64_t> variant_executions;
   for (const auto& variant : variants) {
-    const auto counts = replayer.replay(variant.ids);
+    variant_executions.assign(net.transitions().size(), 0);
+    const auto counts = replayer.replay(variant.ids, &variant_executions);
+    for (std::size_t t = 0; t < executions.size(); ++t) {
+      executions[t] += variant_executions[t] * variant.count;
+    }
     result.produced += counts.produced * variant.count;
     result.consumed += counts.consumed * variant.count;
     result.missing += counts.missing * variant.count;
@@ -817,6 +871,8 @@ ConformanceResult check_conformance(const EventLog& event_log,
   }
 
   result.precision = compute_precision(variants, replayer);
+  result.generalization = compute_generalization(executions);
+  result.simplicity = compute_simplicity(net);
 
   // Surface the least-fitting variants first; break ties by frequency so the
   // most impactful deviations lead.
