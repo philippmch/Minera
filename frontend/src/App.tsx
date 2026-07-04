@@ -20,6 +20,7 @@ import { buildDottedChart } from "./dotted-chart";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
+import { EventuallyFollows } from "./components/EventuallyFollows";
 import { Filters } from "./components/Filters";
 import { alignModel, checkModel, mineCsv, type FilterOptions } from "./api";
 import {
@@ -347,6 +348,7 @@ export default function App() {
           />
           <VariantList data={data} selected={selectedVariant} onSelect={setSelectedVariant} />
           <ActivityTable data={data} />
+          <EventuallyFollows data={data} />
         </main>
       )}
       <footer className="footer reveal">

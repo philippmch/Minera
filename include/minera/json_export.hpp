@@ -8,6 +8,7 @@
 #include "minera/conformance.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
+#include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
@@ -29,6 +30,8 @@ namespace minera {
 // work network is embedded under "resources". When `variant_durations` is
 // non-null its entries (aligned to `graph.variants()` order) add a "duration"
 // object to each emitted variant — the variant's case-throughput statistics.
+// When `eventually_follows` is non-null the eventually-follows graph is
+// embedded under "eventually_follows", shaped like "edges".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -39,7 +42,8 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<ModelConformance>* conformance = nullptr,
                          const PerformanceMetrics* performance = nullptr,
                          const ResourceNetwork* resources = nullptr,
-                         const std::vector<DurationStats>* variant_durations = nullptr);
+                         const std::vector<DurationStats>* variant_durations = nullptr,
+                         const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -51,7 +55,8 @@ void write_analysis_json(std::ostream& out,
     const std::vector<ModelConformance>* conformance = nullptr,
     const PerformanceMetrics* performance = nullptr,
     const ResourceNetwork* resources = nullptr,
-    const std::vector<DurationStats>* variant_durations = nullptr);
+    const std::vector<DurationStats>* variant_durations = nullptr,
+    const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr);
 
 // Serializes a single alignment result (the object the frontend reads as one
 // model's `alignments`), for the server's on-demand alignment endpoint.

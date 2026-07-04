@@ -16,6 +16,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
@@ -273,6 +274,7 @@ int main(int argc, char** argv) {
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
+    const auto eventually = minera::discover_eventually_follows(log, graph);
 
     // Check every discovered model both ways, keyed by miner id. The export is
     // offline, so embed the alignments too (the server defers them instead).
@@ -304,7 +306,7 @@ int main(int argc, char** argv) {
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations);
+                                  &resources, &variant_durations, &eventually);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -313,7 +315,7 @@ int main(int argc, char** argv) {
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations);
+                                  &resources, &variant_durations, &eventually);
     }
 
     // Optionally emit one discovered model as standard PNML.

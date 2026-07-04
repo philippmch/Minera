@@ -6,6 +6,7 @@
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
@@ -775,6 +776,57 @@ void xes_export_keeps_unparseable_timestamps_verbatim() {
   for (const auto& event : reread.traces[0].events) {
     assert(event.timestamp == (event.activity == "a" ? "yesterday-ish" : ""));
   }
+}
+
+std::uint64_t efg_count(const std::vector<minera::EventuallyFollowsEdge>& efg,
+                        const minera::DirectlyFollowsGraph& graph,
+                        std::string_view source, std::string_view target) {
+  const auto s = graph.activity_id(source);
+  const auto t = graph.activity_id(target);
+  assert(s && t);
+  for (const auto& edge : efg) {
+    if (edge.source == *s && edge.target == *t) return edge.count;
+  }
+  return 0;
+}
+
+void eventually_follows_counts_every_later_occurrence() {
+  // ⟨a,b,c⟩ contributes (a,b), (a,c), (b,c); ⟨a,c⟩ contributes (a,c) — so
+  // a ↝ c is 2 even though a → c is direct only once.
+  const auto log = log_from_variants({{"a", "b", "c"}, {"a", "c"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto efg = minera::discover_eventually_follows(log, graph);
+
+  assert(efg.size() == 3);
+  assert(efg_count(efg, graph, "a", "b") == 1);
+  assert(efg_count(efg, graph, "a", "c") == 2);
+  assert(efg_count(efg, graph, "b", "c") == 1);
+  // Never observed in that order.
+  assert(efg_count(efg, graph, "c", "a") == 0);
+}
+
+void eventually_follows_handles_repeated_activities() {
+  // ⟨a,a,b⟩: the position pairs are (a,a), (a,b), (a,b).
+  const auto log = log_from_variants({{"a", "a", "b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto efg = minera::discover_eventually_follows(log, graph);
+
+  assert(efg_count(efg, graph, "a", "a") == 1);
+  assert(efg_count(efg, graph, "a", "b") == 2);
+}
+
+void json_export_carries_the_eventually_follows_contract() {
+  // The frontend reads "eventually_follows" by name and expects the same
+  // {source, target, count} shape as "edges".
+  const auto log = log_from_variants({{"a", "b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto efg = minera::discover_eventually_follows(log, graph);
+  const auto json =
+      minera::analysis_json("t", log, graph, nullptr, nullptr, nullptr,
+                            nullptr, nullptr, nullptr, nullptr, &efg);
+  assert(json.find("\"eventually_follows\": [") != std::string::npos);
+  assert(json.find("{\"source\": 0, \"target\": 1, \"count\": 1}") !=
+         std::string::npos);
 }
 
 void json_export_carries_the_conformance_contract() {
@@ -1702,6 +1754,9 @@ int main() {
   parse_pnml_rejects_malformed_nets();
   xes_export_round_trips_the_log();
   xes_export_keeps_unparseable_timestamps_verbatim();
+  eventually_follows_counts_every_later_occurrence();
+  eventually_follows_handles_repeated_activities();
+  json_export_carries_the_eventually_follows_contract();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();
   alignment_is_perfect_for_every_operator();

@@ -339,7 +339,8 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<ModelConformance>* conformance,
                          const PerformanceMetrics* performance,
                          const ResourceNetwork* resources,
-                         const std::vector<DurationStats>* variant_durations) {
+                         const std::vector<DurationStats>* variant_durations,
+                         const std::vector<EventuallyFollowsEdge>* eventually_follows) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -435,6 +436,16 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"resources\": ";
     write_resources(out, *resources);
   }
+  if (eventually_follows != nullptr) {
+    out << ",\n  \"eventually_follows\": [\n";
+    for (std::size_t i = 0; i < eventually_follows->size(); ++i) {
+      const auto& edge = (*eventually_follows)[i];
+      out << "    {\"source\": " << edge.source
+          << ", \"target\": " << edge.target << ", \"count\": " << edge.count
+          << '}' << (i + 1 < eventually_follows->size() ? "," : "") << '\n';
+    }
+    out << "  ]";
+  }
   out << '\n';
   out << "}\n";
 }
@@ -448,10 +459,12 @@ std::string analysis_json(std::string_view dataset,
                           const std::vector<ModelConformance>* conformance,
                           const PerformanceMetrics* performance,
                           const ResourceNetwork* resources,
-                          const std::vector<DurationStats>* variant_durations) {
+                          const std::vector<DurationStats>* variant_durations,
+                          const std::vector<EventuallyFollowsEdge>* eventually_follows) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
-                      conformance, performance, resources, variant_durations);
+                      conformance, performance, resources, variant_durations,
+                      eventually_follows);
   return out.str();
 }
 

@@ -253,6 +253,12 @@ export interface MineraExport {
   performance?: Performance;
   /** Organizational perspective (handover-of-work network); absent in older exports. */
   resources?: ResourceNetwork;
+  /**
+   * Eventually-follows graph: for each activity pair (a, b), how often a is
+   * followed by b — directly or transitively — later in the same case. Same
+   * shape as `edges`. Absent in exports from older minera versions.
+   */
+  eventually_follows?: EdgeStat[];
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
