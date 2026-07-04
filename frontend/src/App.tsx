@@ -43,7 +43,7 @@ export default function App() {
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
   const [source, setSource] = useState<
-    { file: File; delimiter?: string; activities: string[] } | null
+    { file: File; delimiter?: string; activities: string[]; resources: string[] } | null
   >(null);
   const [filtersActive, setFiltersActive] = useState(false);
   // Alignments the backend computed on demand, cached per miner for the current
@@ -91,7 +91,12 @@ export default function App() {
       } else {
         const delimiter = delimiterForFile(file.name);
         const result = await mineCsv(file, { delimiter });
-        setSource({ file, delimiter, activities: result.activities.map((a) => a.name) });
+        setSource({
+          file,
+          delimiter,
+          activities: result.activities.map((a) => a.name),
+          resources: result.resources?.resources.map((r) => r.name) ?? [],
+        });
         setFiltersActive(false);
         openData(result);
       }
@@ -281,6 +286,7 @@ export default function App() {
         <Filters
           key={source.file.name}
           activities={source.activities}
+          resources={source.resources}
           active={filtersActive}
           mining={mining}
           onApply={applyFilters}

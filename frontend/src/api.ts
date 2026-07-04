@@ -19,6 +19,8 @@ export interface FilterOptions {
   minVariantFrequency?: number;
   keepActivities?: string[];
   removeActivities?: string[];
+  keepResources?: string[];
+  removeResources?: string[];
   startActivities?: string[];
   endActivities?: string[];
   minLength?: number;
@@ -49,6 +51,10 @@ export async function mineCsv(
     form.append("keep_activities", options.keepActivities.join(","));
   if (options.removeActivities?.length)
     form.append("remove_activities", options.removeActivities.join(","));
+  if (options.keepResources?.length)
+    form.append("keep_resources", options.keepResources.join(","));
+  if (options.removeResources?.length)
+    form.append("remove_resources", options.removeResources.join(","));
   if (options.startActivities?.length)
     form.append("start_activities", options.startActivities.join(","));
   if (options.endActivities?.length)

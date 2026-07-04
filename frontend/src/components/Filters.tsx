@@ -4,6 +4,8 @@ import { type FilterOptions, type TimeFilterMode } from "../api";
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
   activities: string[];
+  /** Resource names from the original log; empty when the log has no resources. */
+  resources: string[];
   /** Whether any filter is currently applied (drives the "active" badge). */
   active: boolean;
   mining: boolean;
@@ -13,24 +15,35 @@ interface FiltersProps {
 // A compact, collapsible filter bar. Every apply re-mines the original upload
 // with the full filter spec, so filters never compound and can always be
 // widened again.
-export function Filters({ activities, active, mining, onApply }: FiltersProps) {
+export function Filters({
+  activities,
+  resources,
+  active,
+  mining,
+  onApply,
+}: FiltersProps) {
   const [open, setOpen] = useState(false);
   const [topVariants, setTopVariants] = useState("");
   const [minFrequency, setMinFrequency] = useState("");
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [timeMode, setTimeMode] = useState<TimeFilterMode>("events");
-  // Activities start all-selected; deselected ones are removed from the log.
+  // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const [removedResources, setRemovedResources] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const toggleActivity = (name: string) => {
-    setRemoved((prev) => {
+  const toggle = (setter: typeof setRemoved) => (name: string) => {
+    setter((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
       return next;
     });
   };
+  const toggleActivity = toggle(setRemoved);
+  const toggleResource = toggle(setRemovedResources);
 
   const toInt = (value: string) => {
     const n = Number.parseInt(value, 10);
@@ -39,10 +52,13 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
 
   const apply = () => {
     const removeList = activities.filter((a) => removed.has(a));
+    const removeResourceList = resources.filter((r) => removedResources.has(r));
     onApply({
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
       removeActivities: removeList.length > 0 ? removeList : undefined,
+      removeResources:
+        removeResourceList.length > 0 ? removeResourceList : undefined,
       timeFrom: timeFrom || undefined,
       timeTo: timeTo || undefined,
       timeMode: timeFrom || timeTo ? timeMode : undefined,
@@ -56,6 +72,7 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
     setTimeTo("");
     setTimeMode("events");
     setRemoved(new Set());
+    setRemovedResources(new Set());
     onApply({});
   };
 
@@ -64,7 +81,8 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
     minFrequency !== "" ||
     timeFrom !== "" ||
     timeTo !== "" ||
-    removed.size > 0;
+    removed.size > 0 ||
+    removedResources.size > 0;
 
   return (
     <section className="filters reveal">
@@ -154,6 +172,29 @@ export function Filters({ activities, active, mining, onApply }: FiltersProps) {
               })}
             </div>
           </div>
+
+          {resources.length > 0 && (
+            <div className="filters-activities">
+              <span className="filters-field-label">
+                Resources <small>(click to drop)</small>
+              </span>
+              <div className="filters-chips">
+                {resources.map((name) => {
+                  const dropped = removedResources.has(name);
+                  return (
+                    <button
+                      key={name}
+                      className={dropped ? "filters-chip dropped" : "filters-chip"}
+                      onClick={() => toggleResource(name)}
+                      title={dropped ? `Add ${name} back` : `Drop ${name}`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="filters-actions">
             <button className="filters-apply" onClick={apply} disabled={mining}>
