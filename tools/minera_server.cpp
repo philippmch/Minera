@@ -107,6 +107,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
                                       minera::check_conformance(log, petri),
+                                      minera::check_footprints(log, petri),
                                       std::nullopt};
     };
     const std::vector<minera::ModelConformance> conformance = {

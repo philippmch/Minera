@@ -41,9 +41,13 @@ workflows with native performance.
   the cheapest sequence of synchronous, log-only, and model-only moves that
   walks the net from start to end (a uniform-cost search over the synchronous
   product) — giving exact, optimal diagnostics of *where* and *how* each trace
-  deviates, plus cost-based fitness. Token replay is robust on unsound nets;
-  alignments report that they can't be computed when a net (e.g. an Alpha net
-  with concurrency) has an unreachable final marking.
+  deviates, plus cost-based fitness. **Footprint conformance** compares the
+  directly-follows relation of the log against that of the model (found by
+  exploring the net's reachable markings): it reports how many of the log's
+  successions the model allows (fitness) and how many of the model's the log
+  shows (precision), and lists the deviating pairs. Token replay and footprints
+  are robust on unsound nets; alignments report that they can't be computed when
+  a net (e.g. an Alpha net with concurrency) has an unreachable final marking.
 - **Performance (time) perspective**: from event timestamps, Minera measures
   the waiting time on every directly-follows edge (count, mean, median, min,
   max, total) and the end-to-end throughput time of each case. An ISO-8601
@@ -131,10 +135,13 @@ events first; discovery lives in tabs:
   a **Download … as PNML** button exports the model for ProM/PM4Py,
 - **Conformance** — pick any miner and any method: fitness, precision,
   generalization, and simplicity of the log against that miner's model, plus a
-  per-variant breakdown of where traces deviate. **Token Replay** shows token counts; **Alignments** renders each
-  deviating trace move by move (synchronous, log-only, model-only). Every miner
-  is checked both ways at import; when a model isn't a sound workflow net the
-  alignment view says so rather than showing misleading numbers,
+  per-variant breakdown of where traces deviate. **Token Replay** shows token
+  counts; **Alignments** renders each deviating trace move by move (synchronous,
+  log-only, model-only); **Footprints** compares the log's and model's
+  directly-follows relations and lists the successions they disagree on. Every
+  miner is checked at import; when a model isn't a sound workflow net the
+  alignment view says so rather than showing misleading numbers (token replay
+  and footprints still apply),
 - **Resources** — when the log carries a resource attribute: the workload per
   resource and the handover-of-work network (how often a case passes from one
   resource to the next).

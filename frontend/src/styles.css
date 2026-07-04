@@ -1447,6 +1447,27 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 700;
 }
 
+/* Footprint conformance: the two deviation lists side by side. */
+.footprint-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  padding: 18px 20px;
+}
+.footprint-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.footprint-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Inline caveat above token-replay gauges when the model isn't sound. */
 .conf-inline-note {
   margin: 0 0 18px;

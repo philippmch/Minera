@@ -206,10 +206,40 @@ void write_alignments(std::ostream& out,
   out << "]}";
 }
 
+// Serializes the log↔model footprint (directly-follows relation) comparison:
+// the two headline ratios, the relation counts, and the deviating pairs as
+// activity-id pairs so the frontend can name them from the shared registry.
+void write_footprints(std::ostream& out, const FootprintResult& footprints,
+                      const DirectlyFollowsGraph& graph) {
+  const auto pairs = [&](const std::vector<FootprintRelation>& relations) {
+    out << '[';
+    for (std::size_t i = 0; i < relations.size(); ++i) {
+      const auto source = graph.activity_id(relations[i].source);
+      const auto target = graph.activity_id(relations[i].target);
+      out << "{\"source\": " << (source ? *source : 0)
+          << ", \"target\": " << (target ? *target : 0) << '}'
+          << (i + 1 < relations.size() ? ", " : "");
+    }
+    out << ']';
+  };
+  out << "{\"fitness\": " << footprints.fitness
+      << ", \"precision\": " << footprints.precision
+      << ", \"log_relations\": " << footprints.log_relations
+      << ", \"model_relations\": " << footprints.model_relations
+      << ", \"shared_relations\": " << footprints.shared_relations
+      << ", \"exhausted\": " << (footprints.exhausted ? "true" : "false")
+      << ", \"log_only\": ";
+  pairs(footprints.log_only);
+  out << ", \"model_only\": ";
+  pairs(footprints.model_only);
+  out << '}';
+}
+
 // Writes the per-miner conformance map: each miner id maps to whether its net is
-// sound, its token-replay result, and — when present — its alignment result.
-// (The server omits alignments here and serves them on demand; the CLI embeds
-// them.) This lets the frontend offer any miner against any method.
+// sound, its token-replay result, its footprint comparison, and — when present —
+// its alignment result. (The server omits alignments here and serves them on
+// demand; the CLI embeds them.) This lets the frontend offer any miner against
+// any method.
 void write_conformance_models(std::ostream& out,
                               const std::vector<ModelConformance>& models,
                               const DirectlyFollowsGraph& graph) {
@@ -219,6 +249,8 @@ void write_conformance_models(std::ostream& out,
     out << ": {\"sound\": " << (models[i].sound ? "true" : "false")
         << ", \"token_replay\": ";
     write_conformance(out, models[i].token_replay, graph);
+    out << ", \"footprints\": ";
+    write_footprints(out, models[i].footprints, graph);
     if (models[i].alignments) {
       out << ", \"alignments\": ";
       write_alignments(out, *models[i].alignments, graph);

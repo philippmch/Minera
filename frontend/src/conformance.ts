@@ -3,7 +3,7 @@
 // by appending to CONFORMANCE_METHODS, and — only for a genuinely new result
 // shape — teaching Conformance how to render that artifact.
 
-export type ConformanceArtifact = "token-replay" | "alignments";
+export type ConformanceArtifact = "token-replay" | "alignments" | "footprints";
 
 export interface ConformanceMethod {
   id: string;
@@ -38,6 +38,19 @@ export const CONFORMANCE_METHODS: ConformanceMethod[] = [
       "moves that walks the net to its end. Gives exact, optimal diagnostics " +
       "of where each trace deviates, plus cost-based fitness.",
     artifact: "alignments",
+  },
+  {
+    id: "footprints",
+    name: "Footprints",
+    tagline:
+      "Compare the directly-follows relations of the log and the model.",
+    description:
+      "Builds the footprint of the log and of the model — which activities " +
+      "can directly follow which — and compares them. Reports how many of the " +
+      "log's successions the model allows (fitness) and how many of the " +
+      "model's the log shows (precision), and lists the deviating pairs. " +
+      "Works even for an unsound net, where alignments cannot.",
+    artifact: "footprints",
   },
 ];
 
