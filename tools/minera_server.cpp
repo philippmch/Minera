@@ -28,6 +28,7 @@
 #include "minera/log_filter.hpp"
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/request_params.hpp"
@@ -300,6 +301,52 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
                        "application/xml");
 }
 
+// Simulates one model from the most recent mine into a synthetic event log,
+// served as XES. The `miner` query parameter picks the model ("inductive" |
+// "alpha" | "heuristic" | "imported", default inductive); `traces` sets how
+// many cases to generate (default 100, capped at 10000).
+void handle_playout(const httplib::Request& request,
+                    httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  const std::string miner = request.has_param("miner")
+                                ? request.get_param_value("miner")
+                                : std::string("inductive");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+
+  minera::PlayoutOptions options;
+  if (request.has_param("traces")) {
+    const auto requested = std::atoll(request.get_param_value("traces").c_str());
+    if (requested < 1 || requested > 10000) {
+      response.status = 400;
+      response.set_content(error_json("traces must be between 1 and 10000"),
+                           "application/json");
+      return;
+    }
+    options.traces = static_cast<std::size_t>(requested);
+  }
+
+  const auto log = minera::playout(it->second, options);
+  response.set_content(minera::to_xes(log, miner + " playout"),
+                       "application/xml");
+}
+
 // Exports the most recently mined event log — after any server-side filtering
 // applied at mine time — as standard XES.
 void handle_xes(const httplib::Request&, httplib::Response& response) {
@@ -374,6 +421,7 @@ int main(int argc, char** argv) {
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);
   server.Get("/api/xes", handle_xes);
+  server.Get("/api/playout", handle_playout);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;

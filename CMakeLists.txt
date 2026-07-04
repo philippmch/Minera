@@ -33,6 +33,7 @@ add_library(minera_core
   src/log_filter.cpp
   src/performance.cpp
   src/petri_net.cpp
+  src/playout.cpp
   src/pnml.cpp
   src/request_params.cpp
   src/resource_analysis.cpp
@@ -61,6 +62,12 @@ add_executable(minera_export
 )
 target_link_libraries(minera_export PRIVATE minera::core)
 target_compile_features(minera_export PRIVATE cxx_std_20)
+
+add_executable(minera_playout
+  tools/minera_playout.cpp
+)
+target_link_libraries(minera_playout PRIVATE minera::core)
+target_compile_features(minera_playout PRIVATE cxx_std_20)
 
 add_executable(minera_generate_sample
   tools/minera_generate_sample.cpp

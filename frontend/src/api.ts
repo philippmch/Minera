@@ -233,6 +233,31 @@ export async function fetchXes(): Promise<string> {
 }
 
 /**
+ * Simulates one miner's model into a synthetic event log (100 cases), served
+ * as standard XES. On a sound model every generated trace replays perfectly,
+ * so the playout doubles as a self-check and a shareable test log. Like the
+ * other model endpoints this only works for a log mined this session.
+ */
+export async function fetchPlayout(miner: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}`);
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  if (!response.ok) {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}
+
+/**
  * Fetches one miner's model from the most recently mined log as BPMN 2.0.
  * The inductive model converts from its block-structured process tree; the
  * others convert from their workflow nets server-side. Like PNML this only
