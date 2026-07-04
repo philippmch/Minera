@@ -827,6 +827,50 @@ void eventually_follows_handles_repeated_activities() {
   assert(efg_count(efg, graph, "a", "b") == 2);
 }
 
+void alignment_precision_is_perfect_for_an_exact_model() {
+  // A strict sequence model of its own log allows nothing extra at any
+  // aligned state, so alignment-based precision is exactly 1.
+  const auto log = log_from_variants({{"a", "b", "c"}});
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+  assert(alignment.fitness == 1.0);
+  assert(alignment.precision == 1.0);
+}
+
+void alignment_precision_flags_unused_model_behavior() {
+  // The model offers a choice of b or c after a, but this log only ever takes
+  // b: at the post-a state the model enables an activity the log never shows,
+  // so precision drops below 1 while fitness stays perfect.
+  const auto model_log = log_from_variants({{"a", "b"}, {"a", "c"}});
+  const auto net =
+      minera::to_petri_net(minera::discover_process_tree(model_log));
+  const auto narrow = log_from_variants({{"a", "b"}});
+  const auto alignment = minera::check_alignment(narrow, net);
+  assert(alignment.computed);
+  assert(alignment.fitness == 1.0);
+  assert(alignment.precision < 1.0);
+  assert(alignment.precision > 0.0);
+}
+
+void alignment_precision_survives_a_deviating_log() {
+  // "x" is not in the model at all; the alignment explains it as a log move
+  // and precision is still measured at the genuinely reached states.
+  const auto model_log = log_from_variants({{"a", "b"}});
+  const auto net =
+      minera::to_petri_net(minera::discover_process_tree(model_log));
+  const auto deviating = log_from_variants({{"a", "x", "b"}});
+  const auto alignment = minera::check_alignment(deviating, net);
+  assert(alignment.computed);
+  assert(alignment.fitness < 1.0);
+  assert(alignment.precision > 0.0 && alignment.precision <= 1.0);
+
+  // The JSON contract: the alignments object carries the precision by name.
+  const auto graph = minera::discover_directly_follows_graph(deviating);
+  const auto json = minera::alignment_json(alignment, graph);
+  assert(json.find("\"precision\": ") != std::string::npos);
+}
+
 void playout_generates_perfectly_fitting_logs() {
   // A model with a choice and a parallel block. Every simulated trace must
   // replay perfectly on the net it came from, and 50 cases are plenty for
@@ -1824,6 +1868,9 @@ int main() {
   graph_counts_rework_cases();
   eventually_follows_counts_every_later_occurrence();
   eventually_follows_handles_repeated_activities();
+  alignment_precision_is_perfect_for_an_exact_model();
+  alignment_precision_flags_unused_model_behavior();
+  alignment_precision_survives_a_deviating_log();
   playout_generates_perfectly_fitting_logs();
   playout_simulates_an_imported_model();
   json_export_carries_the_eventually_follows_contract();

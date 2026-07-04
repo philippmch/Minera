@@ -125,6 +125,12 @@ struct AlignmentResult {
   bool computed = true;
   bool exhausted = false;  // when !computed: true = search bound hit, false = unsound
   double fitness = 1.0;               // cost-based log fitness in [0, 1]
+  // Alignment-based escaping-edges precision: like token-replay precision it
+  // asks how much extra behaviour the model allows at the states the log
+  // visits, but the states come from each variant's optimal alignment rather
+  // than from forced token replay — so on a deviating log the markings are
+  // the trustworthy ones an optimal explanation actually reaches.
+  double precision = 1.0;
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
   std::uint64_t total_cost = 0;      // summed optimal cost over all traces

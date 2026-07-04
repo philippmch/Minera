@@ -545,6 +545,70 @@ double compute_precision(const std::vector<Variant>& variants,
                             : 1.0 - double(escaping_total) / double(enabled_total);
 }
 
+// Alignment-based escaping-edges precision (Adriansyah, Munoz-Gama, Carmona,
+// van Dongen & van der Aalst): the same prefix-automaton walk as
+// compute_precision, but each prefix's model state comes from the optimal
+// alignments rather than from forced token replay — on a deviating log the
+// replay marking can be an artifact of healed tokens, while the aligned
+// marking is one the model genuinely reaches in the cheapest explanation.
+// Variants sharing a prefix may align it to different markings; the enabled
+// sets of all of them are unioned, mirroring that any of those explanations
+// is optimal.
+double compute_alignment_precision(
+    const std::vector<Variant>& variants,
+    const std::vector<std::vector<Marking>>& variant_markings,
+    const Replayer& replayer) {
+  constexpr std::size_t kAbsent = std::numeric_limits<std::size_t>::max();
+  struct Node {
+    std::unordered_map<std::size_t, std::size_t> children;  // edge -> node
+    std::uint64_t freq = 0;
+    std::unordered_set<std::size_t> observed;  // next activities the log takes
+    std::unordered_set<Marking, MarkingHash> markings;  // aligned model states
+  };
+  std::vector<Node> nodes(1);
+  for (std::size_t v = 0; v < variants.size(); ++v) {
+    const auto& variant = variants[v];
+    const auto& markings = variant_markings[v];
+    std::size_t current = 0;
+    nodes[current].freq += variant.count;
+    nodes[current].markings.insert(markings[0]);
+    for (std::size_t d = 0; d < variant.ids.size(); ++d) {
+      const auto& id = variant.ids[d];
+      if (id) nodes[current].observed.insert(*id);
+      const auto [it, inserted] =
+          nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
+      if (inserted) nodes.emplace_back();
+      current = it->second;
+      nodes[current].freq += variant.count;
+      nodes[current].markings.insert(markings[d + 1]);
+    }
+  }
+
+  // Distinct prefixes routinely align to the same marking; cache the costly
+  // enabled-activities closure per marking.
+  std::unordered_map<Marking, std::unordered_set<std::size_t>, MarkingHash>
+      enabled_cache;
+
+  std::uint64_t enabled_total = 0;
+  std::uint64_t escaping_total = 0;
+  for (const auto& node : nodes) {
+    std::unordered_set<std::size_t> enabled;
+    for (const auto& marking : node.markings) {
+      const auto [it, inserted] = enabled_cache.try_emplace(marking);
+      if (inserted) it->second = replayer.enabled_activities(marking);
+      enabled.insert(it->second.begin(), it->second.end());
+    }
+    std::uint64_t escaping = 0;
+    for (const std::size_t a : enabled) {
+      if (node.observed.find(a) == node.observed.end()) ++escaping;
+    }
+    enabled_total += node.freq * enabled.size();
+    escaping_total += node.freq * escaping;
+  }
+  return enabled_total == 0 ? 1.0
+                            : 1.0 - double(escaping_total) / double(enabled_total);
+}
+
 // Token-replay generalization (Buijs, van Dongen & van der Aalst): a model
 // generalizes well when replaying the log spreads executions across its
 // transitions instead of leaving parts of the net exercised only once or
@@ -619,6 +683,11 @@ class Aligner {
     std::vector<AlignmentMove> moves;
     std::uint64_t cost = 0;
     bool capped = false;  // search hit its bound before reaching the goal
+    // The model marking the optimal alignment is in right before it consumes
+    // log event d (after any model/silent moves scheduled first), for
+    // d = 0..len-1, plus the final marking at index len. These are the states
+    // alignment-based precision inspects. Empty when the search was capped.
+    std::vector<Marking> prefix_markings;
   };
 
   // Optimal alignment of one trace (activity ids; std::nullopt = activity absent
@@ -761,6 +830,7 @@ class Aligner {
     }
 
     outcome.cost = entries[final_id].cost;
+    std::vector<std::uint32_t> path{final_id};
     for (std::uint32_t id = final_id; id != start_id;) {
       const Entry& entry = entries[id];
       if (!entry.silent) {
@@ -771,8 +841,27 @@ class Aligner {
                                    entry.ref)]});
       }
       id = entry.prev;
+      path.push_back(id);
     }
     std::reverse(outcome.moves.begin(), outcome.moves.end());
+    std::reverse(path.begin(), path.end());
+
+    // Prefix markings for alignment-based precision: along the optimal path,
+    // the trace position advances exactly once per consumed log event, and
+    // the state it advances from holds the model marking at that moment.
+    const auto strip = [](const State& state) {
+      return Marking(state.begin(), state.end() - 1);
+    };
+    outcome.prefix_markings.resize(len + 1);
+    for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+      const State& state = *by_id[path[i]];
+      const State& next = *by_id[path[i + 1]];
+      if (next.back() == state.back() + 1) {
+        outcome.prefix_markings[static_cast<std::size_t>(state.back())] =
+            strip(state);
+      }
+    }
+    outcome.prefix_markings[len] = strip(*by_id[path.back()]);
     return outcome;
   }
 
@@ -1002,9 +1091,11 @@ AlignmentResult check_alignment(const EventLog& event_log,
   }
 
   const auto variants = collect_variants(event_log, aligner);
+  std::vector<std::vector<Marking>> variant_markings;
+  variant_markings.reserve(variants.size());
   std::uint64_t total_worst = 0;
   for (const auto& variant : variants) {
-    const auto outcome = aligner.align(variant.ids, variant.names);
+    auto outcome = aligner.align(variant.ids, variant.names);
     if (outcome.capped) {
       // The search could not align a trace within its bound — the net is
       // reachable but unbounded or simply too large, so the results are not
@@ -1030,11 +1121,20 @@ AlignmentResult check_alignment(const EventLog& event_log,
     if (outcome.cost == 0) result.fitting_traces += variant.count;
 
     result.variants.push_back(VariantAlignment{
-        variant.names, variant.count, outcome.moves, outcome.cost, fitness});
+        variant.names, variant.count, std::move(outcome.moves), outcome.cost,
+        fitness});
+    variant_markings.push_back(std::move(outcome.prefix_markings));
   }
 
   result.fitness =
       total_worst == 0 ? 1.0 : 1.0 - double(result.total_cost) / double(total_worst);
+
+  // Precision over the aligned states. The Replayer supplies the same
+  // enabled-activities closure token-replay precision uses, so the two
+  // precision numbers differ only in where the markings come from.
+  const Replayer replayer(net);
+  result.precision =
+      compute_alignment_precision(variants, variant_markings, replayer);
 
   // Surface the costliest variants first; break ties by frequency so the most
   // impactful deviations lead.

@@ -647,6 +647,16 @@ function AlignmentResultView({
       value: alignments.fitness,
       hint: "Cost-based: how cheaply the log aligns to the model (1 = no deviation).",
     },
+    // Alignment-based precision is absent in exports from older versions.
+    ...(alignments.precision !== undefined
+      ? [
+          {
+            label: "Precision",
+            value: alignments.precision,
+            hint: "Escaping edges at the states the optimal alignments visit: how much extra behavior the model allows.",
+          },
+        ]
+      : []),
     {
       label: "Fitting traces",
       value: fittingShare,

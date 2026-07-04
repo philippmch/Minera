@@ -181,6 +181,7 @@ void write_alignments(std::ostream& out,
   out << "{\"computed\": " << (alignments.computed ? "true" : "false")
       << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false")
       << ", \"fitness\": " << alignments.fitness
+      << ", \"precision\": " << alignments.precision
       << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
       << ", \"total_cost\": " << alignments.total_cost << ", \"variants\": [";
