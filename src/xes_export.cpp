@@ -1,7 +1,5 @@
 #include "minera/xes_export.hpp"
 
-#include <cmath>
-#include <cstdio>
 #include <sstream>
 
 #include "minera/timestamp.hpp"
@@ -22,42 +20,6 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
       default: out << c;
     }
   }
-}
-
-// Formats seconds since the Unix epoch as ISO-8601 UTC with millisecond
-// precision ("2024-01-01T10:00:00.000Z"), the xs:dateTime shape XES tools
-// expect. Uses the days-to-civil-date algorithm directly so the result is
-// independent of the process locale and timezone.
-std::string format_utc(double epoch_seconds) {
-  long long milliseconds = std::llround(epoch_seconds * 1000.0);
-  long long seconds = milliseconds / 1000;
-  long long milli = milliseconds % 1000;
-  if (milli < 0) {
-    milli += 1000;
-    --seconds;
-  }
-  long long days = seconds / 86400;
-  long long of_day = seconds % 86400;
-  if (of_day < 0) {
-    of_day += 86400;
-    --days;
-  }
-
-  days += 719468;  // shift epoch from 1970-01-01 to 0000-03-01
-  const long long era = (days >= 0 ? days : days - 146096) / 146097;
-  const unsigned doe = static_cast<unsigned>(days - era * 146097);
-  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-  const unsigned mp = (5 * doy + 2) / 153;
-  const unsigned day = doy - (153 * mp + 2) / 5 + 1;
-  const unsigned month = mp < 10 ? mp + 3 : mp - 9;
-  const long long year = static_cast<long long>(yoe) + era * 400 + (month <= 2);
-
-  char buffer[40];
-  std::snprintf(buffer, sizeof(buffer),
-                "%04lld-%02u-%02uT%02lld:%02lld:%02lld.%03lldZ", year, month,
-                day, of_day / 3600, (of_day / 60) % 60, of_day % 60, milli);
-  return buffer;
 }
 
 void write_string_attribute(std::ostream& out, std::string_view indent,
@@ -110,7 +72,7 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
       if (!event.timestamp.empty()) {
         if (const auto instant = parse_timestamp(event.timestamp)) {
           out << "      <date key=\"time:timestamp\" value=\""
-              << format_utc(*instant) << "\"/>\n";
+              << format_timestamp(*instant) << "\"/>\n";
         } else {
           // Not a recognizable instant: keep the original text as a string
           // attribute rather than emitting an invalid xs:dateTime or losing

@@ -3,7 +3,7 @@ import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
-import { fetchBpmn, fetchPnml } from "../api";
+import { fetchBpmn, fetchPlayout, fetchPnml } from "../api";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
@@ -160,6 +160,7 @@ function ModelResult({
     <>
       <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
       <BpmnButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
+      <PlayoutButton minerId={minerId} dataset={data.dataset} />
     </>
   ) : null;
 
@@ -271,6 +272,47 @@ function BpmnButton({
     <span className="pnml-export">
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : `Download ${groupName} as BPMN`}
+      </button>
+      {error && <span className="pnml-error">{error}</span>}
+    </span>
+  );
+}
+
+// Simulates the shown model into a synthetic 100-case event log (XES). On a
+// sound model every trace replays perfectly, so the download doubles as a
+// self-check and a shareable test log.
+function PlayoutButton({
+  minerId,
+  dataset,
+}: {
+  minerId: string;
+  dataset: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = () => {
+    setBusy(true);
+    setError(null);
+    fetchPlayout(minerId)
+      .then((xml) => {
+        const blob = new Blob([xml], { type: "application/xml" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const base = dataset.replace(/\.[^.]+$/, "") || "model";
+        anchor.href = url;
+        anchor.download = `${base}-${minerId}-playout.xes`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="pnml-export">
+      <button className="btn-ghost" onClick={download} disabled={busy}>
+        {busy ? "Simulating…" : "Simulate log (XES)"}
       </button>
       {error && <span className="pnml-error">{error}</span>}
     </span>

@@ -12,6 +12,7 @@
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/timestamp.hpp"
@@ -824,6 +825,61 @@ void eventually_follows_handles_repeated_activities() {
 
   assert(efg_count(efg, graph, "a", "a") == 1);
   assert(efg_count(efg, graph, "a", "b") == 2);
+}
+
+void playout_generates_perfectly_fitting_logs() {
+  // A model with a choice and a parallel block. Every simulated trace must
+  // replay perfectly on the net it came from, and 50 cases are plenty for
+  // both parallel orders (or the choice branch) to show up.
+  const auto log = log_from_variants(
+      {{"a", "b", "c", "d"}, {"a", "c", "b", "d"}, {"a", "e", "d"}});
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+
+  minera::PlayoutOptions options;
+  options.traces = 50;
+  const auto generated = minera::playout(net, options);
+
+  assert(generated.trace_count() == 50);
+  assert(generated.traces.front().case_id == "case_1");
+  assert(minera::check_conformance(generated, net).fitness == 1.0);
+  const auto graph = minera::discover_directly_follows_graph(generated);
+  assert(graph.variants().size() >= 2);
+
+  // Timestamps parse and strictly increase within a case, so the generated
+  // log survives a time-ordering importer unchanged.
+  for (const auto& trace : generated.traces) {
+    double previous = -1.0;
+    for (const auto& event : trace.events) {
+      const auto instant = minera::parse_timestamp(event.timestamp);
+      assert(instant && *instant > previous);
+      previous = *instant;
+    }
+  }
+
+  // The same seed replays the same log.
+  const auto replayed = minera::playout(net, options);
+  for (std::size_t i = 0; i < generated.traces.size(); ++i) {
+    assert(generated.traces[i].events.size() ==
+           replayed.traces[i].events.size());
+    for (std::size_t j = 0; j < generated.traces[i].events.size(); ++j) {
+      assert(generated.traces[i].events[j].activity ==
+             replayed.traces[i].events[j].activity);
+    }
+  }
+}
+
+void playout_simulates_an_imported_model() {
+  // The foreign net has one visible activity and a silent router, so every
+  // simulated case is exactly ⟨"a & go"⟩.
+  const auto net = minera::parse_pnml(kForeignPnml);
+  minera::PlayoutOptions options;
+  options.traces = 5;
+  const auto generated = minera::playout(net, options);
+  assert(generated.trace_count() == 5);
+  for (const auto& trace : generated.traces) {
+    assert(trace.events.size() == 1);
+    assert(trace.events[0].activity == "a & go");
+  }
 }
 
 void json_export_carries_the_eventually_follows_contract() {
@@ -1768,6 +1824,8 @@ int main() {
   graph_counts_rework_cases();
   eventually_follows_counts_every_later_occurrence();
   eventually_follows_handles_repeated_activities();
+  playout_generates_perfectly_fitting_logs();
+  playout_simulates_an_imported_model();
   json_export_carries_the_eventually_follows_contract();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();

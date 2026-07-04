@@ -1,7 +1,9 @@
 #include "minera/timestamp.hpp"
 
 #include <cctype>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 
 namespace minera {
 namespace {
@@ -139,6 +141,39 @@ std::optional<double> parse_timestamp(std::string_view text) {
     return std::nullopt;
   }
   return seconds;
+}
+
+std::string format_timestamp(double epoch_seconds) {
+  long long milliseconds = std::llround(epoch_seconds * 1000.0);
+  long long seconds = milliseconds / 1000;
+  long long milli = milliseconds % 1000;
+  if (milli < 0) {
+    milli += 1000;
+    --seconds;
+  }
+  long long days = seconds / 86400;
+  long long of_day = seconds % 86400;
+  if (of_day < 0) {
+    of_day += 86400;
+    --days;
+  }
+
+  // The inverse of days_from_civil, by the same algorithm.
+  days += 719468;  // shift epoch from 1970-01-01 to 0000-03-01
+  const long long era = (days >= 0 ? days : days - 146096) / 146097;
+  const unsigned doe = static_cast<unsigned>(days - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const unsigned mp = (5 * doy + 2) / 153;
+  const unsigned day = doy - (153 * mp + 2) / 5 + 1;
+  const unsigned month = mp < 10 ? mp + 3 : mp - 9;
+  const long long year = static_cast<long long>(yoe) + era * 400 + (month <= 2);
+
+  char buffer[40];
+  std::snprintf(buffer, sizeof(buffer),
+                "%04lld-%02u-%02uT%02lld:%02lld:%02lld.%03lldZ", year, month,
+                day, of_day / 3600, (of_day / 60) % 60, of_day % 60, milli);
+  return buffer;
 }
 
 }  // namespace minera

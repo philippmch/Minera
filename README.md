@@ -80,6 +80,12 @@ workflows with native performance.
   from their workflow nets by token semantics — a branching place becomes an
   exclusive gateway, a forking transition a parallel gateway — readable by
   Camunda, bpmn.io, Signavio, and most BPM suites.
+- **Model playout**: simulate any workflow net — a discovered model or an
+  imported PNML — into a synthetic, timestamped event log (seeded, so runs
+  reproduce). On a sound model every generated trace replays with fitness
+  1.0, which makes the playout a self-check for discovery and a test-log
+  generator (`minera_playout model.pnml -o log.xes`, or the **Simulate log**
+  button on any mined model).
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
   resource (performer) projection, rework (keep only cases where an activity
@@ -156,9 +162,10 @@ events first; discovery lives in tabs:
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
   graph) and explore the resulting model; the Heuristic Miner's dependency and
-  frequency thresholds are live sliders that re-mine the net in the browser, and
+  frequency thresholds are live sliders that re-mine the net in the browser,
   **Download … as PNML / as BPMN** buttons export any miner's model for
-  ProM/PM4Py or a BPM suite,
+  ProM/PM4Py or a BPM suite, and **Simulate log (XES)** plays the model out
+  into a synthetic 100-case log,
 - **Conformance** — pick any miner (or upload a PNML workflow net from another
   tool) and any method: fitness, precision, generalization, and simplicity of
   the log against that model, plus a per-variant breakdown of where traces
