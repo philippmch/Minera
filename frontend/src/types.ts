@@ -3,6 +3,11 @@ export interface ActivityStat {
   count: number;
   start_count: number;
   end_count: number;
+  /**
+   * In how many cases this activity occurs more than once (rework). Absent
+   * in exports from older minera versions.
+   */
+  rework_cases?: number;
 }
 
 export interface EdgeStat {
@@ -192,6 +197,11 @@ export interface Performance {
   timed_traces: number;
   /** First-to-last event duration across timed traces. */
   case_duration: DurationStats;
+  /**
+   * Gaps between consecutive case start instants — the case arrival rate.
+   * Absent in exports from older minera versions.
+   */
+  case_arrival?: DurationStats;
   /** Edge timings, in the same order as MineraExport.edges. */
   edges: EdgePerformance[];
 }

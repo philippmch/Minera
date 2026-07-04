@@ -49,6 +49,7 @@ PerformanceMetrics compute_performance_metrics(
     const DirectlyFollowsGraph& graph) {
   std::unordered_map<std::uint64_t, std::vector<double>> edge_durations;
   std::vector<double> case_durations;
+  std::vector<double> case_starts;
 
   for (const auto& trace : log.traces) {
     std::optional<double> previous;
@@ -81,11 +82,26 @@ PerformanceMetrics compute_performance_metrics(
     if (first && last) {
       case_durations.push_back(*last - *first);
     }
+    if (first) {
+      case_starts.push_back(*first);
+    }
   }
 
   PerformanceMetrics metrics;
   metrics.timed_traces = case_durations.size();
   metrics.case_duration = summarize(case_durations);
+
+  // Case arrival rate: order the cases by start instant and summarize the
+  // gaps between consecutive arrivals.
+  std::sort(case_starts.begin(), case_starts.end());
+  std::vector<double> arrival_gaps;
+  if (case_starts.size() > 1) {
+    arrival_gaps.reserve(case_starts.size() - 1);
+    for (std::size_t i = 1; i < case_starts.size(); ++i) {
+      arrival_gaps.push_back(case_starts[i] - case_starts[i - 1]);
+    }
+  }
+  metrics.case_arrival = summarize(std::move(arrival_gaps));
 
   // Emit edge timings in the graph's edge order so the two line up by index.
   metrics.edges.reserve(graph.edges().size());

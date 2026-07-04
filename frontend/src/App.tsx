@@ -345,6 +345,7 @@ export default function App() {
             onThresholdChange={setThreshold}
             selection={selection}
             caseDuration={data.performance?.case_duration}
+            caseArrival={data.performance?.case_arrival}
           />
           <VariantList data={data} selected={selectedVariant} onSelect={setSelectedVariant} />
           <ActivityTable data={data} />

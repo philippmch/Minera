@@ -18,6 +18,8 @@ interface ProcessMapProps {
   selection: Highlight | null;
   /** Case throughput stats, when the log is timed; enables the time view. */
   caseDuration?: DurationStats;
+  /** Gaps between consecutive case starts — the case arrival rate. */
+  caseArrival?: DurationStats;
 }
 
 export function ProcessMap({
@@ -27,6 +29,7 @@ export function ProcessMap({
   onThresholdChange,
   selection,
   caseDuration,
+  caseArrival,
 }: ProcessMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
@@ -125,6 +128,14 @@ export function ProcessMap({
             <span className="map-stat" title="Median / mean case throughput time">
               case ≈ {formatDuration(caseDuration.median)} ·{" "}
               {formatDuration(caseDuration.mean)} avg
+            </span>
+          )}
+          {showTime && (caseArrival?.count ?? 0) > 0 && caseArrival && (
+            <span
+              className="map-stat"
+              title="Mean gap between consecutive case starts (case arrival rate)"
+            >
+              new case ≈ every {formatDuration(caseArrival.mean)}
             </span>
           )}
           <label className="threshold">

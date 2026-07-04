@@ -778,6 +778,17 @@ void xes_export_keeps_unparseable_timestamps_verbatim() {
   }
 }
 
+void graph_counts_rework_cases() {
+  // a repeats in the first case only, b in the second only; the third case
+  // has no repeats at all.
+  const auto log = log_from_variants(
+      {{"a", "a", "b"}, {"a", "b", "b", "b"}, {"a", "b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  assert(graph.rework_case_count("a") == 1);
+  assert(graph.rework_case_count("b") == 1);
+  assert(graph.rework_case_count("unknown") == 0);
+}
+
 std::uint64_t efg_count(const std::vector<minera::EventuallyFollowsEdge>& efg,
                         const minera::DirectlyFollowsGraph& graph,
                         std::string_view source, std::string_view target) {
@@ -1754,6 +1765,7 @@ int main() {
   parse_pnml_rejects_malformed_nets();
   xes_export_round_trips_the_log();
   xes_export_keeps_unparseable_timestamps_verbatim();
+  graph_counts_rework_cases();
   eventually_follows_counts_every_later_occurrence();
   eventually_follows_handles_repeated_activities();
   json_export_carries_the_eventually_follows_contract();

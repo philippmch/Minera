@@ -18,6 +18,10 @@ workflows with native performance.
 - Eventually-follows graph discovery: for every activity pair, how often one
   is followed by the other — directly or transitively — later in the same
   case, surfacing long-range dependencies the directly-follows edges miss.
+- Rework statistics: per activity, the number of cases where it executes more
+  than once — repeated work that a frequency count alone hides.
+- Case arrival rate: summary statistics over the gaps between consecutive
+  case starts, alongside the existing case-throughput and edge waiting times.
 - Process-model discovery with the **Heuristic Miner**: a dependency measure
   weighs how often one activity follows another against the reverse, and only
   edges above a dependency and frequency threshold are kept — yielding a
