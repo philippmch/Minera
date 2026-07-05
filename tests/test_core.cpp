@@ -1224,15 +1224,15 @@ void alignment_flags_an_unsound_net() {
   assert(alignment.variants.empty());
 }
 
-void alignment_flags_an_exhausted_search_on_an_unbounded_net() {
+void alignment_prunes_an_unbounded_net_with_dead_growth() {
   // A reachable but unbounded net: a silent transition consumes the source and
   // produces the source back plus a token on an auxiliary place, so it can fire
-  // forever, growing the marking without bound. The sink is still reachable (a
+  // forever, growing the marking without bound. The sink stays reachable (a
   // second silent transition drains the source to it), so the net clears the
-  // soundness gate — but aligning a trace floods the search with infinitely many
-  // zero-cost markings before the goal's positive cost is ever reached. The
-  // aligner must hit its bound and report `exhausted` (distinct from an unsound
-  // net) rather than spin forever or emit a fabricated score.
+  // soundness gate. The flooded markings can never reach the final marking (the
+  // auxiliary tokens have no consumer), so the marking-equation heuristic
+  // prunes every one of them and the alignment computes despite the flood —
+  // plain Dijkstra used to exhaust its bound here.
   minera::PetriNet net;
   const auto source = net.add_place();
   const auto sink = net.add_place();
@@ -1242,6 +1242,41 @@ void alignment_flags_an_exhausted_search_on_an_unbounded_net() {
   net.set_activities({});
   net.add_transition(std::nullopt, {source}, {source, aux});  // unbounded growth
   net.add_transition(std::nullopt, {source}, {sink});          // reaches the sink
+
+  const auto log = log_from_variants({{"x"}});
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+  assert(!alignment.exhausted);
+  // The best alignment is one log move for the unknown "x" plus the silent
+  // model run to the sink.
+  assert(alignment.total_cost == 1);
+}
+
+void alignment_flags_an_exhausted_search_on_an_unbounded_net() {
+  // The pathological case even the marking-equation heuristic cannot prune: a
+  // token-borrowing transition (gate -> gate + gate) makes the equation
+  // believe the visible "x" is reachable at zero cost from every marking (its
+  // incidence can conjure gate tokens that firing never could, since the gate
+  // starts empty), while a source-preserving flood transition grows the
+  // marking without bound and a drain keeps the flooded markings equation-
+  // feasible. The whole flood sits at estimated cost zero ahead of the real
+  // cost-one goal, so the aligner must hit its bound and report `exhausted`
+  // (distinct from an unsound net) rather than spin forever or emit a
+  // fabricated score.
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  const auto aux = net.add_place();
+  const auto gate = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"x"});
+  net.add_transition(std::nullopt, {source}, {source, aux});  // unbounded growth
+  net.add_transition(std::nullopt, {aux}, {});     // keeps the flood feasible
+  net.add_transition(std::nullopt, {source}, {});  // balances the source
+  net.add_transition(std::nullopt, {source}, {sink});  // reaches the sink
+  net.add_transition(std::nullopt, {gate}, {gate, gate});  // fools the equation
+  net.add_transition(0, {gate}, {sink});  // "x": never actually enabled
 
   const auto log = log_from_variants({{"x"}});
   const auto alignment = minera::check_alignment(log, net);
@@ -2020,6 +2055,7 @@ int main() {
   final_marking_reachable_distinguishes_sound_nets();
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
+  alignment_prunes_an_unbounded_net_with_dead_growth();
   alignment_flags_an_exhausted_search_on_an_unbounded_net();
   alignment_handles_an_empty_log();
   alignment_treats_an_empty_log_as_perfect_for_every_model();
