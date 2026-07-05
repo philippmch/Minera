@@ -1988,6 +1988,85 @@ void heuristic_miner_handles_an_empty_log() {
   assert(net.end_activities.empty());
 }
 
+void heuristic_miner_and_threshold_controls_split_semantics() {
+  // b and c are concurrent between a and d: they follow each other as often as
+  // a splits to them, giving an AND measure of 12/(6+6+1) ≈ 0.923.
+  // A threshold at 0.9 keeps the AND bundle; 0.95 breaks it into XOR branches.
+  std::vector<std::vector<std::string>> variants(6, {"a", "b", "c", "d"});
+  for (int i = 0; i < 6; ++i) variants.push_back({"a", "c", "b", "d"});
+  const auto log = log_of(variants);
+
+  minera::HeuristicMinerOptions and_opts;
+  and_opts.and_threshold = 0.9;  // below 0.923 — should produce an AND bundle
+  const auto and_net = minera::discover_heuristics_net(log, and_opts);
+  const auto a_id_and = net_activity(and_net, "a");
+  // Under AND semantics a fires into two parallel bundles.
+  assert(and_net.output_bundles[a_id_and].size() == 1);
+  assert(and_net.output_bundles[a_id_and][0].size() == 2);
+
+  minera::HeuristicMinerOptions xor_opts;
+  xor_opts.and_threshold = 0.95;  // above 0.923 — should produce separate XOR bundles
+  const auto xor_net = minera::discover_heuristics_net(log, xor_opts);
+  const auto a_id_xor = net_activity(xor_net, "a");
+  assert(xor_net.output_bundles[a_id_xor].size() == 2);
+  for (const auto& bundle : xor_net.output_bundles[a_id_xor]) {
+    assert(bundle.size() == 1);
+  }
+}
+
+void heuristic_miner_min_frequency_drops_rare_edges() {
+  // A has one dominant successor B (10 traces) and one rare successor C (1
+  // trace). Both have a positive dependency measure, but with min_frequency=2
+  // the single A->C occurrence falls below the cutoff and is dropped.
+  // connect_all still gives every activity its strongest edge, so C is
+  // re-attached via a forced A->C (its only option), while B stays accepted.
+  std::vector<std::vector<std::string>> traces(10, {"A", "B"});
+  traces.push_back({"A", "C"});
+  const auto log = log_of(traces);
+
+  minera::HeuristicMinerOptions opts;
+  opts.dependency_threshold = 0.0;
+  opts.min_frequency = 2;
+  const auto net = minera::discover_heuristics_net(log, opts);
+
+  // A->B cleared the frequency cutoff via the threshold pass.
+  assert(net_edge(net, "A", "B") != nullptr);
+  assert(net_edge(net, "A", "B")->frequency == 10);
+
+  // A->C was below min_frequency; connect_all forced it back for C's
+  // connectivity. Either way C must have exactly one incoming edge.
+  std::size_t c_in = 0;
+  const auto c = net_activity(net, "C");
+  for (const auto& e : net.edges) { if (e.target == c) ++c_in; }
+  assert(c_in == 1);
+}
+
+void heuristic_miner_connect_all_false_may_leave_gaps() {
+  // With only 5 traces the dependency A->B equals 5/6 ≈ 0.833, which falls
+  // below the default 0.9 threshold, so A gets no accepted outgoing edge.
+  // A is a start activity but never an end activity, so connect_all is
+  // permitted to force an edge for it.
+  const auto log = log_of(std::vector<std::vector<std::string>>(
+      5, {"A", "B", "C"}));
+
+  minera::HeuristicMinerOptions opts;
+  opts.connect_all = false;  // nothing forced
+  const auto net = minera::discover_heuristics_net(log, opts);
+
+  const auto a = net_activity(net, "A");
+  std::size_t a_out = 0;
+  for (const auto& e : net.edges) { if (e.source == a) ++a_out; }
+  assert(a_out == 0);
+
+  // With connect_all enabled A must get at least its strongest outgoing edge.
+  opts.connect_all = true;
+  const auto connected = minera::discover_heuristics_net(log, opts);
+  const auto a2 = net_activity(connected, "A");
+  std::size_t a2_out = 0;
+  for (const auto& e : connected.edges) { if (e.source == a2) ++a2_out; }
+  assert(a2_out == 1);
+}
+
 }  // namespace
 
 int main() {
@@ -2090,5 +2169,8 @@ int main() {
   heuristic_miner_filters_noisy_reverse_edges();
   heuristic_miner_detects_self_loops();
   heuristic_miner_handles_an_empty_log();
+  heuristic_miner_and_threshold_controls_split_semantics();
+  heuristic_miner_min_frequency_drops_rare_edges();
+  heuristic_miner_connect_all_false_may_leave_gaps();
   return 0;
 }
