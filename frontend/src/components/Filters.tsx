@@ -1,20 +1,24 @@
 import { useState } from "react";
-import { type FilterOptions, type TimeFilterMode } from "../api";
+import {
+  type FilterOptions,
+  type MinerOptions,
+  type TimeFilterMode,
+} from "../api";
 
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
   activities: string[];
   /** Resource names from the original log; empty when the log has no resources. */
   resources: string[];
-  /** Whether any filter is currently applied (drives the "active" badge). */
+  /** Whether any filter or miner setting is applied (drives the badge). */
   active: boolean;
   mining: boolean;
-  onApply: (filters: FilterOptions) => void;
+  onApply: (options: FilterOptions & MinerOptions) => void;
 }
 
-// A compact, collapsible filter bar. Every apply re-mines the original upload
-// with the full filter spec, so filters never compound and can always be
-// widened again.
+// A compact, collapsible bar for the log filters and the miner settings.
+// Every apply re-mines the original upload with the full spec, so nothing
+// compounds and every setting can always be widened again.
 export function Filters({
   activities,
   resources,
@@ -37,6 +41,13 @@ export function Filters({
   const [removedResources, setRemovedResources] = useState<Set<string>>(
     new Set(),
   );
+  // Miner settings; an empty field leaves the backend default in charge.
+  const [noiseThreshold, setNoiseThreshold] = useState("");
+  const [inductiveVariant, setInductiveVariant] = useState<"log" | "dfg">("log");
+  const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("plus");
+  const [dependencyThreshold, setDependencyThreshold] = useState("");
+  const [andThreshold, setAndThreshold] = useState("");
+  const [minEdgeFrequency, setMinEdgeFrequency] = useState("");
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -52,6 +63,10 @@ export function Filters({
   const toInt = (value: string) => {
     const n = Number.parseInt(value, 10);
     return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const toFloat = (value: string) => {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : undefined;
   };
 
   const apply = () => {
@@ -70,6 +85,12 @@ export function Filters({
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
       betweenEnd: betweenStart && betweenEnd ? betweenEnd : undefined,
+      noiseThreshold: toFloat(noiseThreshold),
+      inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
+      alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
+      dependencyThreshold: toFloat(dependencyThreshold),
+      andThreshold: toFloat(andThreshold),
+      minEdgeFrequency: toInt(minEdgeFrequency),
     });
   };
 
@@ -85,6 +106,12 @@ export function Filters({
     setBetweenEnd("");
     setRemoved(new Set());
     setRemovedResources(new Set());
+    setNoiseThreshold("");
+    setInductiveVariant("log");
+    setAlphaVariant("plus");
+    setDependencyThreshold("");
+    setAndThreshold("");
+    setMinEdgeFrequency("");
     onApply({});
   };
 
@@ -97,7 +124,13 @@ export function Filters({
     betweenStart !== "" ||
     betweenEnd !== "" ||
     removed.size > 0 ||
-    removedResources.size > 0;
+    removedResources.size > 0 ||
+    noiseThreshold !== "" ||
+    inductiveVariant !== "log" ||
+    alphaVariant !== "plus" ||
+    dependencyThreshold !== "" ||
+    andThreshold !== "" ||
+    minEdgeFrequency !== "";
 
   return (
     <section className="filters reveal">
@@ -106,7 +139,8 @@ export function Filters({
           className={open ? "filters-toggle open" : "filters-toggle"}
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="filters-caret">{open ? "▾" : "▸"}</span> Filter log
+          <span className="filters-caret">{open ? "▾" : "▸"}</span> Filters &
+          miner settings
           {active && <span className="filters-dot" aria-label="filters applied" />}
         </button>
         {mining && <span className="filters-status">re-mining…</span>}
@@ -266,6 +300,85 @@ export function Filters({
               </div>
             </div>
           )}
+
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Miner settings <small>(empty = default)</small>
+            </span>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Inductive: noise threshold</span>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                placeholder="0 = exact"
+                value={noiseThreshold}
+                onChange={(e) => setNoiseThreshold(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Inductive: recursion</span>
+              <select
+                value={inductiveVariant}
+                onChange={(e) =>
+                  setInductiveVariant(e.target.value as "log" | "dfg")
+                }
+              >
+                <option value="log">split the log (default)</option>
+                <option value="dfg">graph only (IMd, huge logs)</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Alpha variant</span>
+              <select
+                value={alphaVariant}
+                onChange={(e) =>
+                  setAlphaVariant(e.target.value as "plus" | "classic")
+                }
+              >
+                <option value="plus">Alpha+ (short loops, default)</option>
+                <option value="classic">classic (textbook)</option>
+              </select>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Heuristic: dependency threshold</span>
+              <input
+                type="number"
+                min={-1}
+                max={1}
+                step={0.05}
+                placeholder="0.9"
+                value={dependencyThreshold}
+                onChange={(e) => setDependencyThreshold(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Heuristic: AND threshold</span>
+              <input
+                type="number"
+                min={0}
+                step={0.05}
+                placeholder="0.65"
+                value={andThreshold}
+                onChange={(e) => setAndThreshold(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Heuristic: min edge frequency</span>
+              <input
+                type="number"
+                min={1}
+                placeholder="1"
+                value={minEdgeFrequency}
+                onChange={(e) => setMinEdgeFrequency(e.target.value)}
+              />
+            </label>
+          </div>
 
           <div className="filters-actions">
             <button className="filters-apply" onClick={apply} disabled={mining}>

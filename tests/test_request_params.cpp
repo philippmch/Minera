@@ -86,6 +86,9 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
+      {"dependency_threshold", "0.75"},
+      {"and_threshold", "0.5"},
+      {"min_edge_frequency", "3"},
   }));
   assert(params.csv.case_id_column == "Case");
   assert(params.csv.activity_column == "Act");
@@ -95,6 +98,9 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
   assert(!params.alpha.short_loops);
+  assert(params.heuristic.dependency_threshold == 0.75);
+  assert(params.heuristic.and_threshold == 0.5);
+  assert(params.heuristic.min_frequency == 3);
 }
 
 void parse_mine_params_rejects_an_unknown_inductive_variant() {

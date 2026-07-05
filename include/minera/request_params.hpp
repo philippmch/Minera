@@ -7,6 +7,7 @@
 
 #include "minera/alpha_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_filter.hpp"
 
@@ -39,6 +40,7 @@ struct MineParams {
   LogFilterOptions filter;
   InductiveMinerOptions inductive;
   AlphaMinerOptions alpha;
+  HeuristicMinerOptions heuristic;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.

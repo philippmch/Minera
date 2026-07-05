@@ -22,10 +22,17 @@ import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { EventuallyFollows } from "./components/EventuallyFollows";
 import { Filters } from "./components/Filters";
-import { alignModel, checkModel, mineCsv, type FilterOptions } from "./api";
+import {
+  alignModel,
+  checkModel,
+  mineCsv,
+  type FilterOptions,
+  type MinerOptions,
+} from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
+  hasActiveMinerOptions,
   initialTab,
   isJsonExport,
   maxEdgeCount,
@@ -128,11 +135,11 @@ export default function App() {
       .catch(() => setError("Could not load the bundled sample dataset."));
   };
 
-  // Re-mines the original upload with the given filters, keeping the active
-  // tab. Always filters from source.file so filters never compound.
-  const applyFilters = (filters: FilterOptions) => {
+  // Re-mines the original upload with the given filters and miner settings,
+  // keeping the active tab. Always mines from source.file so nothing compounds.
+  const applyFilters = (filters: FilterOptions & MinerOptions) => {
     if (!source) return;
-    setFiltersActive(hasActiveFilters(filters));
+    setFiltersActive(hasActiveFilters(filters) || hasActiveMinerOptions(filters));
     setMining(true);
     mineCsv(source.file, { delimiter: source.delimiter, ...filters })
       .then((result) => {

@@ -160,6 +160,16 @@ MineParams parse_mine_params(const FieldLookup& field) {
     }
     params.alpha.short_loops = value == "plus";
   }
+  if (const auto value = field("dependency_threshold"); !value.empty()) {
+    params.heuristic.dependency_threshold = std::atof(value.c_str());
+  }
+  if (const auto value = field("and_threshold"); !value.empty()) {
+    params.heuristic.and_threshold = std::atof(value.c_str());
+  }
+  if (const auto value = field("min_edge_frequency"); !value.empty()) {
+    params.heuristic.min_frequency =
+        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  }
 
   return params;
 }

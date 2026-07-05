@@ -1,4 +1,4 @@
-import { type FilterOptions } from "./api";
+import { type FilterOptions, type MinerOptions } from "./api";
 import { type MineraExport } from "./types";
 
 export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resources";
@@ -11,6 +11,22 @@ export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resource
  */
 export function initialTab(data: MineraExport): Tab {
   return data.traces && data.traces.length > 0 ? "log" : "dfg";
+}
+
+/**
+ * Whether any miner setting deviates from the backend defaults; drives the
+ * same "active" badge as the filters. Zero is a meaningful threshold for the
+ * heuristic settings, so for those only absence means default.
+ */
+export function hasActiveMinerOptions(options: MinerOptions): boolean {
+  return Boolean(
+    options.noiseThreshold ||
+      (options.inductiveVariant && options.inductiveVariant !== "log") ||
+      (options.alphaVariant && options.alphaVariant !== "plus") ||
+      options.dependencyThreshold !== undefined ||
+      options.andThreshold !== undefined ||
+      options.minEdgeFrequency !== undefined,
+  );
 }
 
 /** Whether any filter constraint is set; drives the "filtered" badge. */
