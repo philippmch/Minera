@@ -266,7 +266,14 @@ without arguments to see usage. The same filters are available on
 
 Pass `--noise-threshold <f>` (0–1) to run the Inductive Miner's infrequent
 variant (IMf) during discovery; `0` is the classic miner. The same value is
-accepted on `POST /api/mine` as the `noise_threshold` form field.
+accepted on `POST /api/mine` as the `noise_threshold` form field. The other
+miner settings travel the same two routes: `--inductive-variant log|dfg` /
+`inductive_variant`, `--alpha-variant plus|classic` / `alpha_variant`, and the
+Heuristic Miner's `--dependency-threshold` / `dependency_threshold` (default
+0.9), `--and-threshold` / `and_threshold` (default 0.65), and
+`--min-edge-frequency` / `min_edge_frequency` (default 1). In the frontend all
+of them live in the **Filters & miner settings** panel, where every apply
+re-mines the original upload — so a threshold can always be relaxed again.
 
 The JSON export also carries the performance (`performance`) and resource
 (`resources`) perspectives. To additionally write a model as PNML, pass

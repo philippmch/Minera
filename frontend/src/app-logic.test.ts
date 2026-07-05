@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type FilterOptions } from "./api";
+import { mineFormEntries, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
+  hasActiveMinerOptions,
   initialTab,
   isJsonExport,
   maxEdgeCount,
@@ -95,5 +96,73 @@ describe("file routing", () => {
     expect(delimiterForFile("LOG.TSV")).toBe("\t");
     expect(delimiterForFile("log.csv")).toBeUndefined();
     expect(delimiterForFile("log")).toBeUndefined();
+  });
+});
+
+describe("hasActiveMinerOptions", () => {
+  it("is false for defaults", () => {
+    expect(hasActiveMinerOptions({})).toBe(false);
+    expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
+    expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
+    expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(false);
+  });
+
+  it("is true when any setting deviates", () => {
+    expect(hasActiveMinerOptions({ noiseThreshold: 0.2 })).toBe(true);
+    expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(true);
+    // Zero is a meaningful heuristic threshold, not "off".
+    expect(hasActiveMinerOptions({ dependencyThreshold: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ andThreshold: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ minEdgeFrequency: 3 })).toBe(true);
+  });
+});
+
+describe("mineFormEntries", () => {
+  it("sends nothing for empty options", () => {
+    expect(mineFormEntries({})).toEqual([]);
+  });
+
+  it("maps miner settings to the backend's form fields", () => {
+    const entries = mineFormEntries({
+      noiseThreshold: 0.2,
+      inductiveVariant: "dfg",
+      alphaVariant: "classic",
+      dependencyThreshold: 0.75,
+      andThreshold: 0,
+      minEdgeFrequency: 2,
+    });
+    expect(entries).toEqual([
+      ["noise_threshold", "0.2"],
+      ["inductive_variant", "dfg"],
+      ["alpha_variant", "classic"],
+      ["dependency_threshold", "0.75"],
+      ["and_threshold", "0"],
+      ["min_edge_frequency", "2"],
+    ]);
+  });
+
+  it("keeps the filter mappings intact", () => {
+    const entries = mineFormEntries({
+      topVariants: 5,
+      removeActivities: ["a", "b"],
+      timeFrom: "2024-01-01",
+      timeMode: "events",
+      reworkActivity: "check",
+      reworkMin: 3,
+    });
+    expect(entries).toEqual([
+      ["top_variants", "5"],
+      ["remove_activities", "a,b"],
+      ["rework_activity", "check"],
+      ["rework_min_occurrences", "3"],
+      ["time_from", "2024-01-01"],
+      ["time_mode", "events"],
+    ]);
+  });
+
+  it("drops a time mode without bounds and a rework minimum without activity", () => {
+    expect(mineFormEntries({ timeMode: "traces_contained" })).toEqual([]);
+    expect(mineFormEntries({ reworkMin: 3 })).toEqual([]);
   });
 });

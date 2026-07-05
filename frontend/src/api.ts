@@ -43,49 +43,94 @@ export interface FilterOptions {
   timeMode?: TimeFilterMode;
 }
 
+/** Discovery options for the miners themselves, applied at mine time. */
+export interface MinerOptions {
+  /** Inductive Miner – infrequent noise threshold in [0, 1]; 0 is classic. */
+  noiseThreshold?: number;
+  /** "log" (default) splits sublogs; "dfg" recurses on the graph (IMd). */
+  inductiveVariant?: "log" | "dfg";
+  /** "plus" (default) handles short loops; "classic" is the textbook Alpha. */
+  alphaVariant?: "plus" | "classic";
+  /** Heuristic Miner: minimum dependency measure for an edge (default 0.9). */
+  dependencyThreshold?: number;
+  /** Heuristic Miner: minimum AND measure for a parallel split (default 0.65). */
+  andThreshold?: number;
+  /** Heuristic Miner: direct successions an edge needs (default 1). */
+  minEdgeFrequency?: number;
+}
+
+export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
+
+/**
+ * The form fields a mine request sends for the given options, as name/value
+ * pairs. Pure so the option-to-field mapping is unit-testable; absent or
+ * default-signalling options produce no field, leaving the backend defaults
+ * in charge. Activity lists are comma-joined to match the backend's parser.
+ */
+export function mineFormEntries(options: MineOptions): Array<[string, string]> {
+  const entries: Array<[string, string]> = [];
+  const add = (name: string, value: string) => entries.push([name, value]);
+
+  if (options.caseColumn) add("case_column", options.caseColumn);
+  if (options.activityColumn) add("activity_column", options.activityColumn);
+  if (options.timestampColumn) add("timestamp_column", options.timestampColumn);
+  if (options.delimiter) add("delimiter", options.delimiter);
+
+  if (options.topVariants) add("top_variants", String(options.topVariants));
+  if (options.minVariantFrequency)
+    add("min_variant_frequency", String(options.minVariantFrequency));
+  if (options.keepActivities?.length)
+    add("keep_activities", options.keepActivities.join(","));
+  if (options.removeActivities?.length)
+    add("remove_activities", options.removeActivities.join(","));
+  if (options.keepResources?.length)
+    add("keep_resources", options.keepResources.join(","));
+  if (options.removeResources?.length)
+    add("remove_resources", options.removeResources.join(","));
+  if (options.startActivities?.length)
+    add("start_activities", options.startActivities.join(","));
+  if (options.endActivities?.length)
+    add("end_activities", options.endActivities.join(","));
+  if (options.reworkActivity) {
+    add("rework_activity", options.reworkActivity);
+    if (options.reworkMin)
+      add("rework_min_occurrences", String(options.reworkMin));
+  }
+  if (options.betweenStart && options.betweenEnd) {
+    add("between_start", options.betweenStart);
+    add("between_end", options.betweenEnd);
+  }
+  if (options.minLength) add("min_length", String(options.minLength));
+  if (options.maxLength) add("max_length", String(options.maxLength));
+  if (options.timeFrom) add("time_from", options.timeFrom);
+  if (options.timeTo) add("time_to", options.timeTo);
+  if (options.timeMode && (options.timeFrom || options.timeTo))
+    add("time_mode", options.timeMode);
+
+  // Miner settings. Zero is a meaningful heuristic threshold (unlike the
+  // filters above, where zero means "off"), so these send whenever set.
+  if (options.noiseThreshold !== undefined)
+    add("noise_threshold", String(options.noiseThreshold));
+  if (options.inductiveVariant) add("inductive_variant", options.inductiveVariant);
+  if (options.alphaVariant) add("alpha_variant", options.alphaVariant);
+  if (options.dependencyThreshold !== undefined)
+    add("dependency_threshold", String(options.dependencyThreshold));
+  if (options.andThreshold !== undefined)
+    add("and_threshold", String(options.andThreshold));
+  if (options.minEdgeFrequency !== undefined)
+    add("min_edge_frequency", String(options.minEdgeFrequency));
+
+  return entries;
+}
+
 /** Uploads a CSV event log to the local Minera backend for mining. */
 export async function mineCsv(
   file: File,
-  options: CsvOptions & FilterOptions = {},
+  options: MineOptions = {},
 ): Promise<MineraExport> {
   const form = new FormData();
   form.append("log", file, file.name);
-  if (options.caseColumn) form.append("case_column", options.caseColumn);
-  if (options.activityColumn) form.append("activity_column", options.activityColumn);
-  if (options.timestampColumn) form.append("timestamp_column", options.timestampColumn);
-  if (options.delimiter) form.append("delimiter", options.delimiter);
-
-  // Filters. Activity lists are comma-joined to match the backend's parser.
-  if (options.topVariants) form.append("top_variants", String(options.topVariants));
-  if (options.minVariantFrequency)
-    form.append("min_variant_frequency", String(options.minVariantFrequency));
-  if (options.keepActivities?.length)
-    form.append("keep_activities", options.keepActivities.join(","));
-  if (options.removeActivities?.length)
-    form.append("remove_activities", options.removeActivities.join(","));
-  if (options.keepResources?.length)
-    form.append("keep_resources", options.keepResources.join(","));
-  if (options.removeResources?.length)
-    form.append("remove_resources", options.removeResources.join(","));
-  if (options.startActivities?.length)
-    form.append("start_activities", options.startActivities.join(","));
-  if (options.endActivities?.length)
-    form.append("end_activities", options.endActivities.join(","));
-  if (options.reworkActivity) {
-    form.append("rework_activity", options.reworkActivity);
-    if (options.reworkMin)
-      form.append("rework_min_occurrences", String(options.reworkMin));
-  }
-  if (options.betweenStart && options.betweenEnd) {
-    form.append("between_start", options.betweenStart);
-    form.append("between_end", options.betweenEnd);
-  }
-  if (options.minLength) form.append("min_length", String(options.minLength));
-  if (options.maxLength) form.append("max_length", String(options.maxLength));
-  if (options.timeFrom) form.append("time_from", options.timeFrom);
-  if (options.timeTo) form.append("time_to", options.timeTo);
-  if (options.timeMode && (options.timeFrom || options.timeTo))
-    form.append("time_mode", options.timeMode);
+  for (const [name, value] of mineFormEntries(options)) form.append(name, value);
 
   let response: Response;
   try {

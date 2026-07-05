@@ -72,6 +72,13 @@ int usage(const char* program) {
                "  --alpha-variant <id>      plus (default: short loops become\n"
                "                            self loops and two-way causality)\n"
                "                            or classic (the textbook Alpha)\n"
+               "  --dependency-threshold <f>  Heuristic Miner: minimum dependency\n"
+               "                            measure for an edge (default: 0.9)\n"
+               "  --and-threshold <f>       Heuristic Miner: minimum AND measure\n"
+               "                            for a parallel split/join (default:\n"
+               "                            0.65)\n"
+               "  --min-edge-frequency <n>  Heuristic Miner: direct successions\n"
+               "                            an edge needs (default: 1)\n"
                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --check-pnml <path>       Also check the log against the\n"
                "                            workflow net in this PNML file\n"
@@ -123,6 +130,7 @@ int main(int argc, char** argv) {
   minera::LogFilterOptions filter;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
+  minera::HeuristicMinerOptions heuristic_options;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -192,6 +200,19 @@ int main(int argc, char** argv) {
       const std::string_view variant = value;
       if (variant != "classic" && variant != "plus") return usage(argv[0]);
       alpha_options.short_loops = variant == "plus";
+    } else if (arg == "--dependency-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.dependency_threshold = std::atof(value);
+    } else if (arg == "--and-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.and_threshold = std::atof(value);
+    } else if (arg == "--min-edge-frequency") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.min_frequency =
+          static_cast<std::uint64_t>(std::atoll(value));
     } else if (arg == "--delimiter") {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
@@ -297,7 +318,8 @@ int main(int argc, char** argv) {
     auto graph = minera::discover_directly_follows_graph(log);
     const auto tree = minera::discover_process_tree(log, inductive_options);
     const auto net = minera::discover_petri_net(log, alpha_options);
-    const auto heuristics = minera::discover_heuristics_net(log);
+    const auto heuristics =
+        minera::discover_heuristics_net(log, heuristic_options);
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
