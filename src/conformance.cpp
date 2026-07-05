@@ -703,16 +703,31 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
     basis[row] = col;
   };
 
-  // Bland's rule: enter the lowest-index column with a negative reduced cost;
-  // leave on the tightest ratio, ties broken by the lowest basis index.
+  // Dantzig pricing (steepest reduced cost) converges in far fewer pivots
+  // than Bland's rule; after a run of degenerate pivots the entering rule
+  // falls back to Bland's until progress resumes, which breaks cycles in
+  // practice — and the iteration guard (whose trip the caller treats as "no
+  // usable bound") backstops the pathological remainder. Leaving rows tie-
+  // break on the lowest basis index either way.
   std::size_t iterations_left = 200 + 50 * (m + n);
+  std::size_t degenerate = 0;
   const auto iterate = [&](std::size_t allowed_cols) -> bool {
     while (iterations_left-- > 0) {
       std::size_t enter = allowed_cols;
-      for (std::size_t j = 0; j < allowed_cols; ++j) {
-        if (z[j] < -1e-7) {
-          enter = j;
-          break;
+      if (degenerate < 24) {
+        double best = -1e-7;
+        for (std::size_t j = 0; j < allowed_cols; ++j) {
+          if (z[j] < best) {
+            best = z[j];
+            enter = j;
+          }
+        }
+      } else {
+        for (std::size_t j = 0; j < allowed_cols; ++j) {
+          if (z[j] < -1e-7) {
+            enter = j;
+            break;
+          }
         }
       }
       if (enter == allowed_cols) return true;  // optimal
@@ -728,6 +743,11 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
         }
       }
       if (leave == m) return true;  // unbounded: impossible for our costs
+      if (tab[leave][cols] < kEps) {
+        ++degenerate;
+      } else {
+        degenerate = 0;
+      }
       pivot(leave, enter);
     }
     return false;  // iteration guard tripped
@@ -846,12 +866,17 @@ class Aligner {
   };
 
   // Optimal alignment of one trace (activity ids; std::nullopt = activity absent
-  // from the model) carrying the matching activity names for display.
+  // from the model) carrying the matching activity names for display. Runs a
+  // cheap plain-Dijkstra pass first — most traces align within a handful of
+  // expansions and never pay for an LP — and only when its budget runs out
+  // restarts with the marking-equation heuristic, whose pruning is what keeps
+  // concurrent or badly fitting nets tractable.
   [[nodiscard]] Outcome align(
       const std::vector<std::optional<std::size_t>>& ids,
       const std::vector<std::string>& names) const {
     const std::size_t len = ids.size();
     const std::size_t pc = net_.place_count();
+    const std::size_t tcount = net_.transitions().size();
 
     // A search state is the marking with the trace position appended at index
     // `pc`, so the same flat vector is both the search node and its hash-map key
@@ -865,59 +890,12 @@ class Aligner {
     State final_key = final_;
     final_key.push_back(static_cast<int>(len));
 
-    // States are interned: the hash map owns each state once and hands out a
-    // dense id, so back-pointers, the frontier, and the cost table are plain
-    // integers rather than copies of the state vector (and the move label is
-    // reconstructed from an id at the end rather than stored as a string per
-    // state). Map nodes are stable, so by_id can point into the map.
-    struct Entry {
-      std::uint64_t cost = 0;       // g: cheapest known cost to reach the state
-      std::uint64_t heuristic = 0;  // h: admissible lower bound to the goal
-      std::uint32_t prev = 0;
-      AlignmentMoveType type = AlignmentMoveType::kModel;
-      std::int32_t ref = -1;  // kLog: trace position; otherwise: activity id
-      bool silent = false;
-      bool exact = false;   // h comes from an LP solve, not an inherited bound
-      bool closed = false;  // expanded with an exact h: g is final
-    };
-
-    struct Node {
-      std::uint64_t f;    // g + h at push time
-      std::uint64_t g;
-      std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
-      std::uint32_t state;
-      bool operator>(const Node& other) const {
-        if (f != other.f) return f > other.f;
-        if (g != other.g) return g < other.g;  // prefer deeper states on ties
-        return seq > other.seq;
-      }
-    };
-
-    constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
-    std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
-    std::unordered_map<State, std::uint32_t, MarkingHash> index;
-    std::vector<const State*> by_id;
-    std::vector<Entry> entries;
-    std::uint64_t seq = 0;
-    std::uint32_t final_id = kNone;
-
-    const auto intern = [&](State state) {
-      const auto [it, inserted] =
-          index.try_emplace(std::move(state), std::uint32_t(entries.size()));
-      if (inserted) {
-        by_id.push_back(&it->first);
-        entries.emplace_back();
-        if (it->first == final_key) final_id = it->second;
-      }
-      return std::make_pair(it->second, inserted);
-    };
-
     // Transitions whose label matches each trace event, for the heuristic's
     // synchronous-move columns.
     std::vector<std::vector<std::size_t>> matches(len);
     for (std::size_t d = 0; d < len; ++d) {
       if (!ids[d]) continue;
-      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+      for (std::size_t t = 0; t < tcount; ++t) {
         const auto& transition = net_.transitions()[t];
         if (!transition.silent() && *transition.activity == *ids[d]) {
           matches[d].push_back(t);
@@ -929,17 +907,20 @@ class Aligner {
     // below by relaxing it to the LP  min c·x  s.t.  N·x = m_final - m  over
     // continuous move counts x >= 0. Columns are the net's transitions fired
     // as model moves, plus one log move and the matching synchronous moves per
-    // remaining trace position (each position must advance exactly once).
-    // Every real completion is a feasible integer solution, so the LP optimum
-    // never overestimates; costs are integral, so its ceiling is still a lower
+    // remaining trace position (each position must advance exactly once) — so
+    // a move out of `state` is column t (model), tcount (log at the current
+    // position), or tcount + 1 + k (sync with matches[pos][k]). Every real
+    // completion is a feasible integer solution, so the LP optimum never
+    // overestimates; costs are integral, so its ceiling is still a lower
     // bound. Infeasible means the final marking is unreachable from this
     // state: the branch can be pruned outright.
-    const auto heuristic =
-        [&](const State& state) -> std::optional<std::uint64_t> {
+    struct LpBound {
+      std::uint64_t bound = 0;
+      std::vector<double> solution;  // empty when the solve was aborted
+    };
+    const auto heuristic = [&](const State& state) -> std::optional<LpBound> {
       const std::size_t pos = static_cast<std::size_t>(state.back());
-      const std::size_t remaining = len - pos;
-      const std::size_t tcount = net_.transitions().size();
-      const std::size_t rows = pc + remaining;
+      const std::size_t rows = pc + (len - pos);
       std::size_t vars = tcount;
       for (std::size_t d = pos; d < len; ++d) vars += 1 + matches[d].size();
 
@@ -967,11 +948,12 @@ class Aligner {
         }
       }
 
-      const auto lp = solve_lp(std::move(a), std::move(b), c);
-      if (lp.aborted) return 0;  // no usable bound, but nothing provably dead
+      auto lp = solve_lp(std::move(a), std::move(b), c);
+      if (lp.aborted) return LpBound{};  // no usable bound, nothing provably dead
       if (!lp.feasible) return std::nullopt;
-      return static_cast<std::uint64_t>(
-          std::ceil(std::max(lp.objective, 0.0) - 1e-6));
+      return LpBound{static_cast<std::uint64_t>(
+                         std::ceil(std::max(lp.objective, 0.0) - 1e-6)),
+                     std::move(lp.solution)};
     };
 
     // A state whose marking equation is infeasible can never reach the goal;
@@ -979,162 +961,240 @@ class Aligner {
     constexpr std::uint64_t kDeadEnd =
         std::numeric_limits<std::uint64_t>::max() / 4;
 
-    const std::uint32_t start_id = intern(start_key).first;
-    if (const auto h0 = heuristic(start_key)) {
-      entries[start_id].heuristic = *h0;
-      entries[start_id].exact = true;
-      frontier.push({*h0, 0, seq++, start_id});
-    }
+    // One bounded best-first search; nullopt when the goal was not reached
+    // within `budget` expansions. Without the LP every state is treated as
+    // exactly bounded by zero, which is plain Dijkstra.
+    const auto run = [&](bool use_lp,
+                         std::size_t budget) -> std::optional<Outcome> {
+      // States are interned: the hash map owns each state once and hands out a
+      // dense id, so back-pointers, the frontier, and the cost table are plain
+      // integers rather than copies of the state vector. Map nodes are stable,
+      // so by_id can point into the map.
+      struct Entry {
+        std::uint64_t cost = 0;       // g: cheapest known cost to the state
+        std::uint64_t heuristic = 0;  // h: admissible lower bound to the goal
+        std::uint32_t prev = 0;
+        AlignmentMoveType type = AlignmentMoveType::kModel;
+        std::int32_t ref = -1;  // kLog: trace position; otherwise: activity id
+        bool silent = false;
+        bool exact = false;   // h is the LP value, not an inherited bound
+        bool closed = false;  // expanded with an exact h: g is final
+      };
 
-    const auto relax = [&](State next, std::uint64_t cost, std::uint32_t prev,
-                           AlignmentMoveType type, std::int32_t ref,
-                           bool silent, std::uint64_t bound) {
-      const auto [id, inserted] = intern(std::move(next));
-      Entry& entry = entries[id];
-      // The inherited bound max(h_parent - cost, 0) is admissible for the
-      // child too, so keep whichever lower bound is tighter.
-      if (!entry.exact && bound > entry.heuristic) entry.heuristic = bound;
-      if (!inserted && entry.cost <= cost) return;
-      entry.cost = cost;
-      entry.prev = prev;
-      entry.type = type;
-      entry.ref = ref;
-      entry.silent = silent;
-      frontier.push({cost + entry.heuristic, cost, seq++, id});
-    };
+      struct Node {
+        std::uint64_t f;    // g + h at push time
+        std::uint64_t g;
+        std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
+        std::uint32_t state;
+        bool operator>(const Node& other) const {
+          if (f != other.f) return f > other.f;
+          if (g != other.g) return g < other.g;  // prefer deeper states on ties
+          return seq > other.seq;
+        }
+      };
 
-    bool reached = false;
-    std::size_t expanded = 0;
-    while (!frontier.empty() && expanded < kAlignSearchCap) {
-      const Node node = frontier.top();
-      frontier.pop();
-      {
-        const Entry& entry = entries[node.state];
-        if (node.g > entry.cost || entry.closed) continue;  // stale
-        if (node.f < entry.cost + entry.heuristic) {
-          // The bound tightened after this queue entry was pushed: re-queue at
-          // the honest priority instead of expanding too early.
-          frontier.push({entry.cost + entry.heuristic, node.g, seq++,
-                         node.state});
-          continue;
+      constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
+      std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
+      std::unordered_map<State, std::uint32_t, MarkingHash> index;
+      std::vector<const State*> by_id;
+      std::vector<Entry> entries;
+      std::uint64_t seq = 0;
+      std::uint32_t final_id = kNone;
+
+      const auto intern = [&](State state) {
+        const auto [it, inserted] =
+            index.try_emplace(std::move(state), std::uint32_t(entries.size()));
+        if (inserted) {
+          by_id.push_back(&it->first);
+          entries.emplace_back();
+          if (it->first == final_key) final_id = it->second;
+        }
+        return std::make_pair(it->second, inserted);
+      };
+
+      // The start carries no bound yet: its first pop solves the LP (in LP
+      // mode), so the expansion right after has the solution in hand.
+      const std::uint32_t start_id = intern(start_key).first;
+      entries[start_id].exact = !use_lp;
+      frontier.push({0, 0, seq++, start_id});
+
+      const auto relax = [&](State next, std::uint64_t cost, std::uint32_t prev,
+                             AlignmentMoveType type, std::int32_t ref,
+                             bool silent, std::uint64_t bound,
+                             bool bound_exact) {
+        const auto [id, inserted] = intern(std::move(next));
+        Entry& entry = entries[id];
+        // Inherited bounds are admissible for the child too, so keep whichever
+        // lower bound is tighter; a bound the parent's LP solution walked is
+        // the child's exact LP value and spares the child its own solve.
+        if (bound > entry.heuristic) entry.heuristic = bound;
+        if (bound_exact) entry.exact = true;
+        if (!inserted && entry.cost <= cost) return;
+        entry.cost = cost;
+        entry.prev = prev;
+        entry.type = type;
+        entry.ref = ref;
+        entry.silent = silent;
+        frontier.push({cost + entry.heuristic, cost, seq++, id});
+      };
+
+      bool reached = false;
+      std::size_t expanded = 0;
+      while (!frontier.empty() && expanded < budget) {
+        const Node node = frontier.top();
+        frontier.pop();
+        {
+          const Entry& entry = entries[node.state];
+          if (node.g > entry.cost || entry.closed) continue;  // stale
+          if (node.f < entry.cost + entry.heuristic) {
+            // The bound tightened after this queue entry was pushed: re-queue
+            // at the honest priority instead of expanding too early.
+            frontier.push({entry.cost + entry.heuristic, node.g, seq++,
+                           node.state});
+            continue;
+          }
+        }
+
+        if (node.state == final_id) {
+          reached = true;
+          break;
+        }
+
+        // Lazy exactness: states carry inherited bounds until they are
+        // actually popped, so the LP runs only for states the search truly
+        // visits — and the solution just computed marks the children on its
+        // predicted path exact, sparing them their own solve.
+        const std::vector<double>* solution = nullptr;
+        std::vector<double> solved_solution;
+        if (!entries[node.state].exact) {
+          auto solved = heuristic(*by_id[node.state]);
+          Entry& entry = entries[node.state];
+          entry.exact = true;
+          if (!solved) {
+            entry.heuristic = kDeadEnd;
+            continue;
+          }
+          if (solved->bound > entry.heuristic) {
+            entry.heuristic = solved->bound;
+            if (entry.cost + entry.heuristic > node.f) {
+              frontier.push({entry.cost + entry.heuristic, node.g, seq++,
+                             node.state});
+              continue;  // wait for its turn under the tightened bound
+            }
+          }
+          solved_solution = std::move(solved->solution);
+          if (!solved_solution.empty()) solution = &solved_solution;
+        }
+
+        entries[node.state].closed = true;
+        ++expanded;
+
+        const std::uint64_t g = entries[node.state].cost;
+        const std::uint64_t h = entries[node.state].heuristic;
+        const std::uint64_t h_less_one = h > 0 ? h - 1 : 0;
+        const State& state = *by_id[node.state];
+        const std::size_t pos = static_cast<std::size_t>(state.back());
+        const auto walked = [&](std::size_t var) {
+          return solution != nullptr && (*solution)[var] >= 1.0 - 1e-6;
+        };
+
+        // Log move: the trace advances while the model stands still.
+        if (pos < len) {
+          State next = state;
+          next.back() = static_cast<int>(pos + 1);
+          relax(std::move(next), g + 1, node.state, AlignmentMoveType::kLog,
+                static_cast<std::int32_t>(pos), false, h_less_one,
+                !use_lp || walked(tcount));
+        }
+
+        // Model moves (and the synchronous move when the labels agree).
+        for (std::size_t t = 0; t < tcount; ++t) {
+          if (!enabled(state, t)) continue;
+          const auto& transition = net_.transitions()[t];
+          State fired = state;
+          for (const std::size_t place : transition.inputs) --fired[place];
+          for (const std::size_t place : transition.outputs) ++fired[place];
+          if (transition.silent()) {
+            relax(std::move(fired), g, node.state, AlignmentMoveType::kModel,
+                  -1, true, h, !use_lp || walked(t));
+            continue;
+          }
+          const auto activity = static_cast<std::int32_t>(*transition.activity);
+          const bool sync = pos < len && ids[pos] &&
+                            *ids[pos] == *transition.activity;
+          if (sync) {
+            const std::size_t k = static_cast<std::size_t>(
+                std::find(matches[pos].begin(), matches[pos].end(), t) -
+                matches[pos].begin());
+            State synced = fired;
+            synced.back() = static_cast<int>(pos + 1);
+            relax(std::move(fired), g + 1, node.state,
+                  AlignmentMoveType::kModel, activity, false, h_less_one,
+                  !use_lp || walked(t));
+            relax(std::move(synced), g, node.state,
+                  AlignmentMoveType::kSynchronous, activity, false, h,
+                  !use_lp || walked(tcount + 1 + k));
+          } else {
+            relax(std::move(fired), g + 1, node.state,
+                  AlignmentMoveType::kModel, activity, false, h_less_one,
+                  !use_lp || walked(t));
+          }
         }
       }
 
-      if (node.state == final_id) {
-        reached = true;
-        break;
-      }
+      if (!reached) return std::nullopt;
 
-      // Lazy exactness: states carry inherited bounds until they are actually
-      // popped, so the LP runs only for states the search truly visits.
-      if (!entries[node.state].exact) {
-        const auto solved = heuristic(*by_id[node.state]);
-        Entry& entry = entries[node.state];
-        entry.exact = true;
-        if (!solved) {
-          entry.heuristic = kDeadEnd;
-          continue;
+      Outcome outcome;
+      outcome.cost = entries[final_id].cost;
+      std::vector<std::uint32_t> path{final_id};
+      for (std::uint32_t id = final_id; id != start_id;) {
+        const Entry& entry = entries[id];
+        if (!entry.silent) {
+          outcome.moves.push_back(
+              {entry.type, entry.type == AlignmentMoveType::kLog
+                               ? names[static_cast<std::size_t>(entry.ref)]
+                               : net_.activities()[static_cast<std::size_t>(
+                                     entry.ref)]});
         }
-        if (*solved > entry.heuristic) {
-          entry.heuristic = *solved;
-          frontier.push({entry.cost + entry.heuristic, node.g, seq++,
-                         node.state});
-          continue;  // wait for its turn under the tightened bound
-        }
+        id = entry.prev;
+        path.push_back(id);
       }
+      std::reverse(outcome.moves.begin(), outcome.moves.end());
+      std::reverse(path.begin(), path.end());
 
-      entries[node.state].closed = true;
-      ++expanded;
-
-      const std::uint64_t g = entries[node.state].cost;
-      const std::uint64_t h = entries[node.state].heuristic;
-      const std::uint64_t h_less_one = h > 0 ? h - 1 : 0;
-      const State& state = *by_id[node.state];
-      const std::size_t pos = static_cast<std::size_t>(state.back());
-
-      // Log move: the trace advances while the model stands still.
-      if (pos < len) {
-        State next = state;
-        next.back() = static_cast<int>(pos + 1);
-        relax(std::move(next), g + 1, node.state, AlignmentMoveType::kLog,
-              static_cast<std::int32_t>(pos), false, h_less_one);
-      }
-
-      // Model moves (and the synchronous move when the labels agree).
-      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
-        if (!enabled(state, t)) continue;
-        const auto& transition = net_.transitions()[t];
-        State fired = state;
-        for (const std::size_t place : transition.inputs) --fired[place];
-        for (const std::size_t place : transition.outputs) ++fired[place];
-        if (transition.silent()) {
-          relax(std::move(fired), g, node.state, AlignmentMoveType::kModel, -1,
-                true, h);
-          continue;
-        }
-        const auto activity = static_cast<std::int32_t>(*transition.activity);
-        const bool sync = pos < len && ids[pos] &&
-                          *ids[pos] == *transition.activity;
-        if (sync) {
-          State synced = fired;
-          synced.back() = static_cast<int>(pos + 1);
-          relax(std::move(fired), g + 1, node.state, AlignmentMoveType::kModel,
-                activity, false, h_less_one);
-          relax(std::move(synced), g, node.state,
-                AlignmentMoveType::kSynchronous, activity, false, h);
-        } else {
-          relax(std::move(fired), g + 1, node.state, AlignmentMoveType::kModel,
-                activity, false, h_less_one);
+      // Prefix markings for alignment-based precision: along the optimal path,
+      // the trace position advances exactly once per consumed log event, and
+      // the state it advances from holds the model marking at that moment.
+      const auto strip = [](const State& state) {
+        return Marking(state.begin(), state.end() - 1);
+      };
+      outcome.prefix_markings.resize(len + 1);
+      for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+        const State& state = *by_id[path[i]];
+        const State& next = *by_id[path[i + 1]];
+        if (next.back() == state.back() + 1) {
+          outcome.prefix_markings[static_cast<std::size_t>(state.back())] =
+              strip(state);
         }
       }
-    }
-
-    Outcome outcome;
-    if (!reached) {
-      // Search capped out (only possible for unsound models): fall back to the
-      // worst-case alignment so callers still get a well-formed result, and flag
-      // that the numbers are not trustworthy.
-      for (std::size_t i = 0; i < len; ++i) {
-        outcome.moves.push_back({AlignmentMoveType::kLog, names[i]});
-      }
-      outcome.cost = static_cast<std::uint64_t>(len) + empty_run_cost_;
-      outcome.capped = true;
+      outcome.prefix_markings[len] = strip(*by_id[path.back()]);
       return outcome;
-    }
-
-    outcome.cost = entries[final_id].cost;
-    std::vector<std::uint32_t> path{final_id};
-    for (std::uint32_t id = final_id; id != start_id;) {
-      const Entry& entry = entries[id];
-      if (!entry.silent) {
-        outcome.moves.push_back(
-            {entry.type, entry.type == AlignmentMoveType::kLog
-                             ? names[static_cast<std::size_t>(entry.ref)]
-                             : net_.activities()[static_cast<std::size_t>(
-                                   entry.ref)]});
-      }
-      id = entry.prev;
-      path.push_back(id);
-    }
-    std::reverse(outcome.moves.begin(), outcome.moves.end());
-    std::reverse(path.begin(), path.end());
-
-    // Prefix markings for alignment-based precision: along the optimal path,
-    // the trace position advances exactly once per consumed log event, and
-    // the state it advances from holds the model marking at that moment.
-    const auto strip = [](const State& state) {
-      return Marking(state.begin(), state.end() - 1);
     };
-    outcome.prefix_markings.resize(len + 1);
-    for (std::size_t i = 0; i + 1 < path.size(); ++i) {
-      const State& state = *by_id[path[i]];
-      const State& next = *by_id[path[i + 1]];
-      if (next.back() == state.back() + 1) {
-        outcome.prefix_markings[static_cast<std::size_t>(state.back())] =
-            strip(state);
-      }
+
+    const std::size_t quick =
+        std::min<std::size_t>(kAlignSearchCap, 8 * (len + 1) + 256);
+    if (auto outcome = run(false, quick)) return *outcome;
+    if (auto outcome = run(true, kAlignSearchCap)) return *outcome;
+
+    // Search capped out: fall back to the worst-case alignment so callers
+    // still get a well-formed result, and flag that the numbers are not
+    // trustworthy.
+    Outcome outcome;
+    for (std::size_t i = 0; i < len; ++i) {
+      outcome.moves.push_back({AlignmentMoveType::kLog, names[i]});
     }
-    outcome.prefix_markings[len] = strip(*by_id[path.back()]);
+    outcome.cost = static_cast<std::uint64_t>(len) + empty_run_cost_;
+    outcome.capped = true;
     return outcome;
   }
 
