@@ -79,9 +79,10 @@ workflows with native performance.
   few observations scores low) and **simplicity** (how lean the net itself is,
   by mean arc degree), completing the four standard quality dimensions. **Alignment-based conformance** finds, per trace,
   the cheapest sequence of synchronous, log-only, and model-only moves that
-  walks the net from start to end (a uniform-cost search over the synchronous
-  product) — giving exact, optimal diagnostics of *where* and *how* each trace
-  deviates, plus cost-based fitness. **Footprint conformance** compares the
+  walks the net from start to end (an A\* search over the synchronous product,
+  guided by the marking-equation lower bound so even highly concurrent models
+  stay alignable) — giving exact, optimal diagnostics of *where* and *how* each
+  trace deviates, plus cost-based fitness. **Footprint conformance** compares the
   directly-follows relation of the log against that of the model (found by
   exploring the net's reachable markings): it reports how many of the log's
   successions the model allows (fitness) and how many of the model's the log

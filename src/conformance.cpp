@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "minera/petri_net.hpp"
@@ -644,12 +645,149 @@ double compute_simplicity(const PetriNet& net) {
 // marking well within this many state expansions.
 constexpr std::size_t kAlignSearchCap = 200000;
 
-// Computes optimal alignments by a uniform-cost (Dijkstra) search over the
-// synchronous product of the trace and the workflow net. A search state is a
-// (marking, trace-position) pair; the goal is the final marking with the whole
-// trace consumed. Edge costs follow the standard alignment cost function:
-// synchronous and silent moves are free, log-only and visible model-only moves
-// cost one each.
+// --- Linear program for the marking-equation heuristic ----------------------
+
+struct LpResult {
+  bool feasible = false;
+  bool aborted = false;  // iteration guard tripped: no usable bound, prune nothing
+  double objective = 0.0;
+  std::vector<double> solution;  // per variable; empty when infeasible
+};
+
+// Minimal dense two-phase primal simplex for `min c·x  s.t.  A·x = b, x >= 0`.
+// Sized for alignment heuristics (tens of rows and columns) and tuned for
+// robustness over speed: Bland's rule prevents cycling, and if the iteration
+// guard ever trips the caller falls back to a heuristic of zero rather than
+// risking an overestimate from an unfinished minimization.
+LpResult solve_lp(std::vector<std::vector<double>> a,
+                  std::vector<double> b,
+                  const std::vector<double>& c) {
+  constexpr double kEps = 1e-9;
+  const std::size_t m = b.size();
+  const std::size_t n = c.size();
+
+  // Normalize to b >= 0 so the artificial basis is feasible.
+  for (std::size_t i = 0; i < m; ++i) {
+    if (b[i] < 0.0) {
+      for (auto& v : a[i]) v = -v;
+      b[i] = -b[i];
+    }
+  }
+
+  // Tableau: constraint rows over [real vars | artificials | rhs], plus the
+  // reduced-cost row z (z[cols] holds minus the current objective).
+  const std::size_t cols = n + m;
+  std::vector<std::vector<double>> tab(m, std::vector<double>(cols + 1, 0.0));
+  std::vector<std::size_t> basis(m);
+  for (std::size_t i = 0; i < m; ++i) {
+    for (std::size_t j = 0; j < n; ++j) tab[i][j] = a[i][j];
+    tab[i][n + i] = 1.0;
+    tab[i][cols] = b[i];
+    basis[i] = n + i;
+  }
+
+  std::vector<double> z(cols + 1, 0.0);
+
+  const auto pivot = [&](std::size_t row, std::size_t col) {
+    const double p = tab[row][col];
+    for (auto& v : tab[row]) v /= p;
+    for (std::size_t i = 0; i < m; ++i) {
+      if (i == row || std::abs(tab[i][col]) < kEps) continue;
+      const double factor = tab[i][col];
+      for (std::size_t j = 0; j <= cols; ++j) tab[i][j] -= factor * tab[row][j];
+    }
+    const double zf = z[col];
+    if (std::abs(zf) > 0.0) {
+      for (std::size_t j = 0; j <= cols; ++j) z[j] -= zf * tab[row][j];
+    }
+    basis[row] = col;
+  };
+
+  // Bland's rule: enter the lowest-index column with a negative reduced cost;
+  // leave on the tightest ratio, ties broken by the lowest basis index.
+  std::size_t iterations_left = 200 + 50 * (m + n);
+  const auto iterate = [&](std::size_t allowed_cols) -> bool {
+    while (iterations_left-- > 0) {
+      std::size_t enter = allowed_cols;
+      for (std::size_t j = 0; j < allowed_cols; ++j) {
+        if (z[j] < -1e-7) {
+          enter = j;
+          break;
+        }
+      }
+      if (enter == allowed_cols) return true;  // optimal
+      std::size_t leave = m;
+      double best_ratio = 0.0;
+      for (std::size_t i = 0; i < m; ++i) {
+        if (tab[i][enter] <= kEps) continue;
+        const double ratio = tab[i][cols] / tab[i][enter];
+        if (leave == m || ratio < best_ratio - kEps ||
+            (ratio < best_ratio + kEps && basis[i] < basis[leave])) {
+          leave = i;
+          best_ratio = ratio;
+        }
+      }
+      if (leave == m) return true;  // unbounded: impossible for our costs
+      pivot(leave, enter);
+    }
+    return false;  // iteration guard tripped
+  };
+
+  // Phase 1: minimize the artificial sum. Reduced costs under the artificial
+  // basis are 0 - sum of each column; the rhs entry starts at -sum(b).
+  for (std::size_t j = 0; j <= cols; ++j) {
+    double sum = 0.0;
+    for (std::size_t i = 0; i < m; ++i) sum += tab[i][j];
+    z[j] = (j >= n && j < cols ? 1.0 : 0.0) - sum;
+  }
+  LpResult aborted;
+  aborted.aborted = true;
+  if (!iterate(cols)) return aborted;
+  if (-z[cols] > 1e-6) return {};  // artificials cannot vanish: infeasible
+
+  // Pivot any degenerate artificial out of the basis where possible so phase 2
+  // can bar the artificial columns entirely.
+  for (std::size_t i = 0; i < m; ++i) {
+    if (basis[i] < n) continue;
+    for (std::size_t j = 0; j < n; ++j) {
+      if (std::abs(tab[i][j]) > kEps) {
+        pivot(i, j);
+        break;
+      }
+    }
+  }
+
+  // Phase 2: minimize the real objective from the phase-1 basis.
+  std::fill(z.begin(), z.end(), 0.0);
+  for (std::size_t j = 0; j < n; ++j) z[j] = c[j];
+  for (std::size_t i = 0; i < m; ++i) {
+    const double cb = basis[i] < n ? c[basis[i]] : 0.0;
+    if (cb == 0.0) continue;
+    for (std::size_t j = 0; j <= cols; ++j) z[j] -= cb * tab[i][j];
+  }
+  if (!iterate(n)) return aborted;
+
+  LpResult result;
+  result.feasible = true;
+  result.objective = -z[cols];
+  result.solution.assign(n, 0.0);
+  for (std::size_t i = 0; i < m; ++i) {
+    if (basis[i] < n) result.solution[basis[i]] = tab[i][cols];
+  }
+  return result;
+}
+
+// Computes optimal alignments by an A* search over the synchronous product of
+// the trace and the workflow net. A search state is a (marking, trace-position)
+// pair; the goal is the final marking with the whole trace consumed. Edge costs
+// follow the standard alignment cost function: synchronous and silent moves are
+// free, log-only and visible model-only moves cost one each. The heuristic is
+// the marking-equation lower bound (van Dongen), solved lazily: children
+// inherit max(h - cost, 0) from their parent and the LP runs only when a state
+// with an inherited bound is actually popped — so the search stays optimal
+// while expanding a fraction of the states plain Dijkstra visits, which is what
+// makes concurrent nets (parallel branches multiply the marking space)
+// alignable within the search cap.
 class Aligner {
  public:
   explicit Aligner(const PetriNet& net) : net_(net) {
@@ -658,6 +796,23 @@ class Aligner {
     }
     final_ = Marking(net_.place_count(), 0);
     final_[net_.sink()] = 1;
+
+    // Net incidence (tokens produced minus consumed per place) as sparse
+    // columns for the marking-equation heuristic.
+    incidence_.resize(net_.transitions().size());
+    for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+      std::unordered_map<std::size_t, double> column;
+      for (const std::size_t place : net_.transitions()[t].inputs) {
+        column[place] -= 1.0;
+      }
+      for (const std::size_t place : net_.transitions()[t].outputs) {
+        column[place] += 1.0;
+      }
+      for (const auto& [place, coef] : column) {
+        if (coef != 0.0) incidence_[t].emplace_back(place, coef);
+      }
+    }
+
     if (const auto cost = shortest_model_run()) {
       reachable_ = true;
       empty_run_cost_ = *cost;
@@ -716,19 +871,25 @@ class Aligner {
     // reconstructed from an id at the end rather than stored as a string per
     // state). Map nodes are stable, so by_id can point into the map.
     struct Entry {
-      std::uint64_t cost = 0;
+      std::uint64_t cost = 0;       // g: cheapest known cost to reach the state
+      std::uint64_t heuristic = 0;  // h: admissible lower bound to the goal
       std::uint32_t prev = 0;
       AlignmentMoveType type = AlignmentMoveType::kModel;
       std::int32_t ref = -1;  // kLog: trace position; otherwise: activity id
       bool silent = false;
+      bool exact = false;   // h comes from an LP solve, not an inherited bound
+      bool closed = false;  // expanded with an exact h: g is final
     };
 
     struct Node {
-      std::uint64_t cost;
+      std::uint64_t f;    // g + h at push time
+      std::uint64_t g;
       std::uint64_t seq;  // FIFO tie-break keeps the search deterministic
       std::uint32_t state;
       bool operator>(const Node& other) const {
-        return cost != other.cost ? cost > other.cost : seq > other.seq;
+        if (f != other.f) return f > other.f;
+        if (g != other.g) return g < other.g;  // prefer deeper states on ties
+        return seq > other.seq;
       }
     };
 
@@ -751,16 +912,95 @@ class Aligner {
       return std::make_pair(it->second, inserted);
     };
 
+    // Transitions whose label matches each trace event, for the heuristic's
+    // synchronous-move columns.
+    std::vector<std::vector<std::size_t>> matches(len);
+    for (std::size_t d = 0; d < len; ++d) {
+      if (!ids[d]) continue;
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        const auto& transition = net_.transitions()[t];
+        if (!transition.silent() && *transition.activity == *ids[d]) {
+          matches[d].push_back(t);
+        }
+      }
+    }
+
+    // Marking-equation heuristic: the remaining alignment cost is bounded from
+    // below by relaxing it to the LP  min c·x  s.t.  N·x = m_final - m  over
+    // continuous move counts x >= 0. Columns are the net's transitions fired
+    // as model moves, plus one log move and the matching synchronous moves per
+    // remaining trace position (each position must advance exactly once).
+    // Every real completion is a feasible integer solution, so the LP optimum
+    // never overestimates; costs are integral, so its ceiling is still a lower
+    // bound. Infeasible means the final marking is unreachable from this
+    // state: the branch can be pruned outright.
+    const auto heuristic =
+        [&](const State& state) -> std::optional<std::uint64_t> {
+      const std::size_t pos = static_cast<std::size_t>(state.back());
+      const std::size_t remaining = len - pos;
+      const std::size_t tcount = net_.transitions().size();
+      const std::size_t rows = pc + remaining;
+      std::size_t vars = tcount;
+      for (std::size_t d = pos; d < len; ++d) vars += 1 + matches[d].size();
+
+      std::vector<std::vector<double>> a(rows, std::vector<double>(vars, 0.0));
+      std::vector<double> b(rows, 0.0);
+      std::vector<double> c(vars, 0.0);
+      for (std::size_t p = 0; p < pc; ++p) {
+        b[p] = static_cast<double>(final_[p]) - static_cast<double>(state[p]);
+      }
+      for (std::size_t t = 0; t < tcount; ++t) {
+        for (const auto& [place, coef] : incidence_[t]) a[place][t] = coef;
+        c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
+      }
+      std::size_t col = tcount;
+      for (std::size_t d = pos; d < len; ++d) {
+        const std::size_t row = pc + (d - pos);
+        b[row] = 1.0;
+        a[row][col] = 1.0;  // log move: advances the trace, costs one
+        c[col] = 1.0;
+        ++col;
+        for (const std::size_t t : matches[d]) {  // synchronous moves: free
+          for (const auto& [place, coef] : incidence_[t]) a[place][col] = coef;
+          a[row][col] = 1.0;
+          ++col;
+        }
+      }
+
+      const auto lp = solve_lp(std::move(a), std::move(b), c);
+      if (lp.aborted) return 0;  // no usable bound, but nothing provably dead
+      if (!lp.feasible) return std::nullopt;
+      return static_cast<std::uint64_t>(
+          std::ceil(std::max(lp.objective, 0.0) - 1e-6));
+    };
+
+    // A state whose marking equation is infeasible can never reach the goal;
+    // an effectively infinite h keeps it buried without special-casing.
+    constexpr std::uint64_t kDeadEnd =
+        std::numeric_limits<std::uint64_t>::max() / 4;
+
     const std::uint32_t start_id = intern(start_key).first;
-    frontier.push({0, seq++, start_id});
+    if (const auto h0 = heuristic(start_key)) {
+      entries[start_id].heuristic = *h0;
+      entries[start_id].exact = true;
+      frontier.push({*h0, 0, seq++, start_id});
+    }
 
     const auto relax = [&](State next, std::uint64_t cost, std::uint32_t prev,
                            AlignmentMoveType type, std::int32_t ref,
-                           bool silent) {
+                           bool silent, std::uint64_t bound) {
       const auto [id, inserted] = intern(std::move(next));
-      if (!inserted && entries[id].cost <= cost) return;
-      entries[id] = Entry{cost, prev, type, ref, silent};
-      frontier.push({cost, seq++, id});
+      Entry& entry = entries[id];
+      // The inherited bound max(h_parent - cost, 0) is admissible for the
+      // child too, so keep whichever lower bound is tighter.
+      if (!entry.exact && bound > entry.heuristic) entry.heuristic = bound;
+      if (!inserted && entry.cost <= cost) return;
+      entry.cost = cost;
+      entry.prev = prev;
+      entry.type = type;
+      entry.ref = ref;
+      entry.silent = silent;
+      frontier.push({cost + entry.heuristic, cost, seq++, id});
     };
 
     bool reached = false;
@@ -768,14 +1008,47 @@ class Aligner {
     while (!frontier.empty() && expanded < kAlignSearchCap) {
       const Node node = frontier.top();
       frontier.pop();
-      if (node.cost > entries[node.state].cost) continue;  // stale
-      ++expanded;
+      {
+        const Entry& entry = entries[node.state];
+        if (node.g > entry.cost || entry.closed) continue;  // stale
+        if (node.f < entry.cost + entry.heuristic) {
+          // The bound tightened after this queue entry was pushed: re-queue at
+          // the honest priority instead of expanding too early.
+          frontier.push({entry.cost + entry.heuristic, node.g, seq++,
+                         node.state});
+          continue;
+        }
+      }
 
       if (node.state == final_id) {
         reached = true;
         break;
       }
 
+      // Lazy exactness: states carry inherited bounds until they are actually
+      // popped, so the LP runs only for states the search truly visits.
+      if (!entries[node.state].exact) {
+        const auto solved = heuristic(*by_id[node.state]);
+        Entry& entry = entries[node.state];
+        entry.exact = true;
+        if (!solved) {
+          entry.heuristic = kDeadEnd;
+          continue;
+        }
+        if (*solved > entry.heuristic) {
+          entry.heuristic = *solved;
+          frontier.push({entry.cost + entry.heuristic, node.g, seq++,
+                         node.state});
+          continue;  // wait for its turn under the tightened bound
+        }
+      }
+
+      entries[node.state].closed = true;
+      ++expanded;
+
+      const std::uint64_t g = entries[node.state].cost;
+      const std::uint64_t h = entries[node.state].heuristic;
+      const std::uint64_t h_less_one = h > 0 ? h - 1 : 0;
       const State& state = *by_id[node.state];
       const std::size_t pos = static_cast<std::size_t>(state.back());
 
@@ -783,8 +1056,8 @@ class Aligner {
       if (pos < len) {
         State next = state;
         next.back() = static_cast<int>(pos + 1);
-        relax(std::move(next), node.cost + 1, node.state,
-              AlignmentMoveType::kLog, static_cast<std::int32_t>(pos), false);
+        relax(std::move(next), g + 1, node.state, AlignmentMoveType::kLog,
+              static_cast<std::int32_t>(pos), false, h_less_one);
       }
 
       // Model moves (and the synchronous move when the labels agree).
@@ -795,8 +1068,8 @@ class Aligner {
         for (const std::size_t place : transition.inputs) --fired[place];
         for (const std::size_t place : transition.outputs) ++fired[place];
         if (transition.silent()) {
-          relax(std::move(fired), node.cost, node.state,
-                AlignmentMoveType::kModel, -1, true);
+          relax(std::move(fired), g, node.state, AlignmentMoveType::kModel, -1,
+                true, h);
           continue;
         }
         const auto activity = static_cast<std::int32_t>(*transition.activity);
@@ -805,13 +1078,13 @@ class Aligner {
         if (sync) {
           State synced = fired;
           synced.back() = static_cast<int>(pos + 1);
-          relax(std::move(fired), node.cost + 1, node.state,
-                AlignmentMoveType::kModel, activity, false);
-          relax(std::move(synced), node.cost, node.state,
-                AlignmentMoveType::kSynchronous, activity, false);
+          relax(std::move(fired), g + 1, node.state, AlignmentMoveType::kModel,
+                activity, false, h_less_one);
+          relax(std::move(synced), g, node.state,
+                AlignmentMoveType::kSynchronous, activity, false, h);
         } else {
-          relax(std::move(fired), node.cost + 1, node.state,
-                AlignmentMoveType::kModel, activity, false);
+          relax(std::move(fired), g + 1, node.state, AlignmentMoveType::kModel,
+                activity, false, h_less_one);
         }
       }
     }
@@ -919,6 +1192,9 @@ class Aligner {
   Marking final_;
   bool reachable_ = false;
   std::uint64_t empty_run_cost_ = 0;
+  // Per-transition sparse LP column for the marking-equation heuristic:
+  // produced minus consumed tokens per place.
+  std::vector<std::vector<std::pair<std::size_t, double>>> incidence_;
 };
 
 // Bounds the model-footprint exploration so a highly concurrent net cannot
@@ -944,31 +1220,127 @@ Relation log_footprint(const EventLog& log) {
 // and for every activity a enabled at a marking, record a->b for each activity
 // b enabled right after a fires. `exhausted` is set when the marking budget runs
 // out before the reachable space is covered.
-Relation model_footprint(const PetriNet& net, const Replayer& replayer,
-                         bool& exhausted) {
-  Relation relation;
+// The model's directly-follows relation: a > b iff some reachable marking
+// fires a and can then fire b after silent moves only. One bounded pass
+// expands every reachable marking once over all transitions; the visible
+// labels observable at each marking are then propagated backwards over the
+// silent edges to a fixpoint, so every marking's silent closure is computed
+// once for the whole graph rather than re-searched per query — which is what
+// keeps concurrent nets (whose marking spaces are large) tractable.
+Relation model_footprint(const PetriNet& net, bool& exhausted) {
   const auto& names = net.activities();
-  const Marking start = replayer.initial_marking();
+  const std::size_t acts = names.size();
+  const std::size_t words = (acts + 63) / 64;
 
-  std::unordered_set<Marking, MarkingHash> seen{start};
-  std::queue<Marking> frontier;
-  frontier.push(start);
+  std::unordered_map<Marking, std::uint32_t, MarkingHash> index;
+  std::vector<const Marking*> by_id;  // map nodes are stable
+  const auto intern = [&](Marking m) {
+    const auto [it, inserted] =
+        index.try_emplace(std::move(m), static_cast<std::uint32_t>(index.size()));
+    if (inserted) by_id.push_back(&it->first);
+    return std::make_pair(it->second, inserted);
+  };
+
+  const auto enabled = [&](const Marking& m, const PetriTransition& t) {
+    for (const std::size_t place : t.inputs) {
+      if (m[place] <= 0) return false;
+    }
+    return true;
+  };
+  const auto fire = [&](const Marking& m, const PetriTransition& t) {
+    Marking next = m;
+    for (const std::size_t place : t.inputs) --next[place];
+    for (const std::size_t place : t.outputs) ++next[place];
+    return next;
+  };
+
+  Marking start(net.place_count(), 0);
+  start[net.source()] = 1;
+
+  // Bounded breadth-first exploration. Only the silent edges are stored (for
+  // the label propagation); visible successors are re-fired in the final pass
+  // so the usually far larger visible edge set never has to be kept.
+  std::vector<std::pair<std::uint32_t, std::uint32_t>> silent_edges;
+  std::vector<char> was_expanded;
+  std::queue<std::uint32_t> frontier;
+  frontier.push(intern(std::move(start)).first);
   std::size_t expanded = 0;
   while (!frontier.empty()) {
     if (expanded++ >= kFootprintCap) {
       exhausted = true;
       break;
     }
-    const Marking current = std::move(frontier.front());
+    const std::uint32_t id = frontier.front();
     frontier.pop();
-    const auto enabled = replayer.enabled_activities(current);
-    for (const std::size_t a : enabled) {
-      Marking after = current;
-      replayer.advance(after, a);
-      for (const std::size_t b : replayer.enabled_activities(after)) {
-        relation.emplace(names[a], names[b]);
+    if (was_expanded.size() < by_id.size()) was_expanded.resize(by_id.size(), 0);
+    was_expanded[id] = 1;
+    const Marking& current = *by_id[id];
+    for (const auto& transition : net.transitions()) {
+      if (!enabled(current, transition)) continue;
+      const auto [next, inserted] = intern(fire(current, transition));
+      if (transition.silent()) silent_edges.emplace_back(id, next);
+      if (inserted) frontier.push(next);
+    }
+  }
+
+  const std::size_t count = by_id.size();
+  was_expanded.resize(count, 0);
+
+  // labels[m]: bitset of activities enabled at m after silent moves only.
+  // Seed with each marking's directly enabled visible transitions, then close
+  // backwards over silent edges (u -> v silently implies labels(v) ⊆
+  // labels(u)) with a worklist until stable.
+  std::vector<std::uint64_t> labels(count * words, 0);
+  const auto label_or = [&](std::uint32_t dst, std::uint32_t src) {
+    bool changed = false;
+    for (std::size_t w = 0; w < words; ++w) {
+      const std::uint64_t merged = labels[dst * words + w] | labels[src * words + w];
+      changed |= merged != labels[dst * words + w];
+      labels[dst * words + w] = merged;
+    }
+    return changed;
+  };
+  for (std::uint32_t id = 0; id < count; ++id) {
+    const Marking& current = *by_id[id];
+    for (const auto& transition : net.transitions()) {
+      if (transition.silent() || !enabled(current, transition)) continue;
+      labels[id * words + *transition.activity / 64] |=
+          std::uint64_t{1} << (*transition.activity % 64);
+    }
+  }
+  std::vector<std::vector<std::uint32_t>> silent_preds(count);
+  for (const auto& [from, to] : silent_edges) silent_preds[to].push_back(from);
+  std::queue<std::uint32_t> work;
+  std::vector<char> queued(count, 1);
+  for (std::uint32_t id = 0; id < count; ++id) work.push(id);
+  while (!work.empty()) {
+    const std::uint32_t id = work.front();
+    work.pop();
+    queued[id] = 0;
+    for (const std::uint32_t pred : silent_preds[id]) {
+      if (label_or(pred, id) && !queued[pred]) {
+        queued[pred] = 1;
+        work.push(pred);
       }
-      if (seen.insert(after).second) frontier.push(after);
+    }
+  }
+
+  // Emit the relation: for every visible edge m -a-> m', a is directly
+  // followed by everything observable at m'.
+  Relation relation;
+  for (std::uint32_t id = 0; id < count; ++id) {
+    if (!was_expanded[id]) continue;
+    const Marking& current = *by_id[id];
+    for (const auto& transition : net.transitions()) {
+      if (transition.silent() || !enabled(current, transition)) continue;
+      const auto found = index.find(fire(current, transition));
+      if (found == index.end()) continue;
+      const std::uint32_t next = found->second;
+      for (std::size_t b = 0; b < acts; ++b) {
+        if (labels[next * words + b / 64] & (std::uint64_t{1} << (b % 64))) {
+          relation.emplace(names[*transition.activity], names[b]);
+        }
+      }
     }
   }
   return relation;
@@ -1003,9 +1375,8 @@ FootprintResult compare_footprints(const Relation& log, const Relation& model,
 
 FootprintResult check_footprints(const EventLog& event_log,
                                  const PetriNet& net) {
-  const Replayer replayer(net);
   bool exhausted = false;
-  const auto model = model_footprint(net, replayer, exhausted);
+  const auto model = model_footprint(net, exhausted);
   return compare_footprints(log_footprint(event_log), model, exhausted);
 }
 
