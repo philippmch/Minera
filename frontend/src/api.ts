@@ -19,6 +19,9 @@ export type TimeFilterMode =
   | "traces_contained"
   | "traces_intersecting";
 
+/** How the backend's attribute filter applies: to events or to whole cases. */
+export type AttributeFilterMode = "events" | "traces";
+
 /** Log-preprocessing filters applied by the backend before discovery. */
 export interface FilterOptions {
   topVariants?: number;
@@ -41,6 +44,12 @@ export interface FilterOptions {
   timeFrom?: string;
   timeTo?: string;
   timeMode?: TimeFilterMode;
+  /** Generic event-attribute filter: the key, its value constraints, and
+   * whether it filters events or whole cases. */
+  attributeKey?: string;
+  keepAttributeValues?: string[];
+  removeAttributeValues?: string[];
+  attributeMode?: AttributeFilterMode;
 }
 
 /** Discovery options for the miners themselves, applied at mine time. */
@@ -106,6 +115,15 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.timeTo) add("time_to", options.timeTo);
   if (options.timeMode && (options.timeFrom || options.timeTo))
     add("time_mode", options.timeMode);
+  if (options.attributeKey) {
+    add("attribute_key", options.attributeKey);
+    if (options.keepAttributeValues?.length)
+      add("keep_attribute_values", options.keepAttributeValues.join(","));
+    if (options.removeAttributeValues?.length)
+      add("remove_attribute_values", options.removeAttributeValues.join(","));
+    if (options.attributeMode)
+      add("attribute_mode", options.attributeMode);
+  }
 
   // Miner settings. Zero is a meaningful heuristic threshold (unlike the
   // filters above, where zero means "off"), so these send whenever set.

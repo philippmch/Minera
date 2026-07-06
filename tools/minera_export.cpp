@@ -100,6 +100,16 @@ int usage(const char* program) {
                "  --remove-activities <a,b> Drop these activities\n"
                "  --keep-resources <a,b>    Keep only events by these resources\n"
                "  --remove-resources <a,b>  Drop events by these resources\n"
+               "  --attribute-key <k>       Filter on this event attribute (an\n"
+               "                            extra CSV column or non-standard\n"
+               "                            XES key); alone it keeps only\n"
+               "                            events carrying the attribute\n"
+               "  --keep-attribute-values <a,b>   Keep only events whose\n"
+               "                            attribute has one of these values\n"
+               "  --remove-attribute-values <a,b> Drop events with these values\n"
+               "  --attribute-mode <mode>   events (default: filter events) or\n"
+               "                            traces (keep/drop whole cases by\n"
+               "                            the same attribute match)\n"
                "  --rework-activity <a>     Keep only traces where <a> repeats\n"
                "  --rework-min <n>          Repetitions that count as rework\n"
                "                            (default: 2)\n"
@@ -252,6 +262,28 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.remove_resources = split_csv(value);
+    } else if (arg == "--attribute-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.attribute_key = value;
+    } else if (arg == "--keep-attribute-values") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_attribute_values = split_csv(value);
+    } else if (arg == "--remove-attribute-values") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_attribute_values = split_csv(value);
+    } else if (arg == "--attribute-mode") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto mode = minera::parse_attribute_filter_mode(value);
+      if (!mode) {
+        std::cerr << "error: unknown --attribute-mode '" << value
+                  << "' (expected events or traces)\n";
+        return 2;
+      }
+      filter.attribute_mode = *mode;
     } else if (arg == "--rework-activity") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

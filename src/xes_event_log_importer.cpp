@@ -6,6 +6,7 @@
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -13,6 +14,22 @@
 #include <vector>
 
 namespace minera {
+namespace {
+
+// The XES attribute element names and the kind each maps to. Anything else
+// under an <event> (e.g. <list>, <container>, or an extension element) is not
+// a scalar attribute and is skipped.
+std::optional<AttributeKind> attribute_kind_of(std::string_view element) {
+  if (element == "string") return AttributeKind::kString;
+  if (element == "date") return AttributeKind::kDate;
+  if (element == "int") return AttributeKind::kInt;
+  if (element == "float") return AttributeKind::kFloat;
+  if (element == "boolean") return AttributeKind::kBoolean;
+  if (element == "id") return AttributeKind::kId;
+  return std::nullopt;
+}
+
+}  // namespace
 
 EventLog import_xes_event_log(
     std::istream& input,
@@ -99,6 +116,11 @@ EventLog import_xes_event_log(
               saw_timestamp = true;
             } else if (*key == options.resource_attribute) {
               current_event.resource = *value;
+            } else if (const auto kind = attribute_kind_of(token.name)) {
+              // Any other scalar attribute is kept generically, with its XES
+              // type so an export can round-trip it faithfully.
+              current_event.attributes.push_back(
+                  EventAttribute{*key, *value, *kind});
             }
           }
         }

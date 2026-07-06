@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <map>
 #include <numeric>
 #include <sstream>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "minera/version.hpp"
@@ -288,6 +292,56 @@ void write_activity_stats(std::ostream& out,
   out << "  ]";
 }
 
+// Aggregates the log's generic event attributes into a whole
+// `"event_attributes"` field (including its leading separator): per key
+// (alphabetical), how many events carry it and its values by frequency. The
+// listed values are capped so a high-cardinality attribute (an amount, a
+// note) cannot bloat the export; `distinct_values` still reports the full
+// count. Writes nothing on a log without generic attributes, so old-style
+// documents stay unchanged.
+void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
+  struct KeyStats {
+    std::uint64_t events = 0;
+    std::unordered_map<std::string, std::uint64_t> value_counts;
+  };
+  std::map<std::string, KeyStats> keys;  // ordered, for a stable export
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      for (const auto& attribute : event.attributes) {
+        auto& stats = keys[attribute.key];
+        ++stats.events;
+        ++stats.value_counts[attribute.value];
+      }
+    }
+  }
+  if (keys.empty()) return;
+
+  constexpr std::size_t kMaxListedValues = 25;
+  out << ",\n  \"event_attributes\": [\n";
+  std::size_t written = 0;
+  for (const auto& [key, stats] : keys) {
+    std::vector<std::pair<std::string, std::uint64_t>> values(
+        stats.value_counts.begin(), stats.value_counts.end());
+    std::sort(values.begin(), values.end(), [](const auto& a, const auto& b) {
+      return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+
+    out << "    {\"key\": ";
+    write_json_string(out, key);
+    out << ", \"events\": " << stats.events
+        << ", \"distinct_values\": " << values.size() << ", \"values\": [";
+    const auto listed = std::min(values.size(), kMaxListedValues);
+    for (std::size_t i = 0; i < listed; ++i) {
+      out << "{\"value\": ";
+      write_json_string(out, values[i].first);
+      out << ", \"count\": " << values[i].second << '}'
+          << (i + 1 < listed ? ", " : "");
+    }
+    out << "]}" << (++written < keys.size() ? "," : "") << '\n';
+  }
+  out << "  ]";
+}
+
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
   out << "{\"count\": " << stats.count << ", \"total\": " << stats.total
       << ", \"mean\": " << stats.mean << ", \"median\": " << stats.median
@@ -369,6 +423,18 @@ void write_analysis_json(std::ostream& out,
         out << ", \"resource\": ";
         write_json_string(out, event.resource);
       }
+      if (!event.attributes.empty()) {
+        // Generic attributes as one object; a duplicate key (legal in XES,
+        // rare in practice) keeps the last value.
+        out << ", \"attributes\": {";
+        for (std::size_t k = 0; k < event.attributes.size(); ++k) {
+          write_json_string(out, event.attributes[k].key);
+          out << ": ";
+          write_json_string(out, event.attributes[k].value);
+          out << (k + 1 < event.attributes.size() ? ", " : "");
+        }
+        out << '}';
+      }
       out << '}' << (j + 1 < trace.events.size() ? ", " : "");
     }
     out << "]}" << (i + 1 < log.traces.size() ? "," : "") << '\n';
@@ -415,6 +481,8 @@ void write_analysis_json(std::ostream& out,
     out << '}' << (i + 1 < variant_order.size() ? "," : "") << '\n';
   }
   out << "  ]";
+
+  write_event_attribute_stats(out, log);
 
   if (tree != nullptr) {
     out << ",\n  \"process_tree\": ";

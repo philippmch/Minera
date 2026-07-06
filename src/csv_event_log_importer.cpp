@@ -120,8 +120,9 @@ EventLog import_csv_event_log(
     line.erase(0, 3);
   }
 
-  auto columns = header_index(
-      parse_csv_row(line, options.delimiter, options.trim_fields));
+  const auto header =
+      parse_csv_row(line, options.delimiter, options.trim_fields);
+  auto columns = header_index(header);
   const auto case_index = required_column(columns, options.case_id_column);
   const auto activity_index = required_column(columns, options.activity_column);
   auto timestamp_index = optional_column(columns, options.timestamp_column);
@@ -130,6 +131,17 @@ EventLog import_csv_event_log(
         "CSV column not found: " + options.timestamp_column);
   }
   auto resource_index = optional_column(columns, options.resource_column);
+
+  // Every remaining named column becomes a generic event attribute, keyed by
+  // its header, so domain data (channel, amount, region, …) survives import.
+  std::vector<std::size_t> attribute_indices;
+  for (std::size_t i = 0; i < header.size(); ++i) {
+    if (i == case_index || i == activity_index) continue;
+    if (timestamp_index && i == *timestamp_index) continue;
+    if (resource_index && i == *resource_index) continue;
+    if (header[i].empty()) continue;
+    attribute_indices.push_back(i);
+  }
 
   std::unordered_map<std::string, std::size_t> trace_ids;
   EventLog log;
@@ -166,8 +178,15 @@ EventLog import_csv_event_log(
       log.traces.push_back(Trace{case_id, {}});
     }
 
-    log.traces[it->second].events.push_back(
-        Event{case_id, activity, timestamp, resource, input_order++});
+    Event event{case_id, activity, timestamp, resource, input_order++};
+    for (const auto index : attribute_indices) {
+      // A blank cell means the event simply has no such attribute; a short row
+      // reads the same way rather than erroring, since these columns are extra.
+      if (index >= fields.size() || fields[index].empty()) continue;
+      event.attributes.push_back(
+          EventAttribute{header[index], fields[index], AttributeKind::kString});
+    }
+    log.traces[it->second].events.push_back(std::move(event));
   }
 
   if (timestamp_index) {

@@ -110,6 +110,23 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("remove_resources"); !value.empty()) {
     params.filter.remove_resources = split_csv(value);
   }
+  if (const auto value = field("attribute_key"); !value.empty()) {
+    params.filter.attribute_key = value;
+  }
+  if (const auto value = field("keep_attribute_values"); !value.empty()) {
+    params.filter.keep_attribute_values = split_csv(value);
+  }
+  if (const auto value = field("remove_attribute_values"); !value.empty()) {
+    params.filter.remove_attribute_values = split_csv(value);
+  }
+  if (const auto value = field("attribute_mode"); !value.empty()) {
+    const auto mode = parse_attribute_filter_mode(value);
+    if (!mode) {
+      throw std::invalid_argument(
+          "attribute_mode: expected events or traces, got '" + value + "'");
+    }
+    params.filter.attribute_mode = *mode;
+  }
   if (const auto value = field("rework_activity"); !value.empty()) {
     params.filter.rework_activity = value;
   }

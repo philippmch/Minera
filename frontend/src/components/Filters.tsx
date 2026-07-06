@@ -1,15 +1,19 @@
 import { useState } from "react";
 import {
+  type AttributeFilterMode,
   type FilterOptions,
   type MinerOptions,
   type TimeFilterMode,
 } from "../api";
+import { type EventAttributeStat } from "../types";
 
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
   activities: string[];
   /** Resource names from the original log; empty when the log has no resources. */
   resources: string[];
+  /** Generic event attributes of the original log; empty when it has none. */
+  attributes: EventAttributeStat[];
   /** Whether any filter or miner setting is applied (drives the badge). */
   active: boolean;
   mining: boolean;
@@ -22,6 +26,7 @@ interface FiltersProps {
 export function Filters({
   activities,
   resources,
+  attributes,
   active,
   mining,
   onApply,
@@ -41,6 +46,12 @@ export function Filters({
   const [removedResources, setRemovedResources] = useState<Set<string>>(
     new Set(),
   );
+  // Attribute filter: one key, its dropped values, and whether dropping acts
+  // on events or whole cases. Values start all-selected, like the chips above.
+  const [attributeKey, setAttributeKey] = useState("");
+  const [removedValues, setRemovedValues] = useState<Set<string>>(new Set());
+  const [attributeMode, setAttributeMode] =
+    useState<AttributeFilterMode>("events");
   // Miner settings; an empty field leaves the backend default in charge.
   const [noiseThreshold, setNoiseThreshold] = useState("");
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "dfg">("log");
@@ -59,6 +70,13 @@ export function Filters({
   };
   const toggleActivity = toggle(setRemoved);
   const toggleResource = toggle(setRemovedResources);
+  const toggleValue = toggle(setRemovedValues);
+
+  const pickAttributeKey = (key: string) => {
+    setAttributeKey(key);
+    setRemovedValues(new Set());
+  };
+  const selectedAttribute = attributes.find((a) => a.key === attributeKey);
 
   const toInt = (value: string) => {
     const n = Number.parseInt(value, 10);
@@ -72,6 +90,12 @@ export function Filters({
   const apply = () => {
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
+    // Only an actually dropped value activates the attribute filter; a picked
+    // key alone is just browsing its values and must not change the mine.
+    const removeValueList =
+      selectedAttribute?.values
+        .map((v) => v.value)
+        .filter((v) => removedValues.has(v)) ?? [];
     onApply({
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
@@ -85,6 +109,13 @@ export function Filters({
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
       betweenEnd: betweenStart && betweenEnd ? betweenEnd : undefined,
+      attributeKey: removeValueList.length > 0 ? attributeKey : undefined,
+      removeAttributeValues:
+        removeValueList.length > 0 ? removeValueList : undefined,
+      attributeMode:
+        removeValueList.length > 0 && attributeMode !== "events"
+          ? attributeMode
+          : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
       alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
@@ -106,6 +137,9 @@ export function Filters({
     setBetweenEnd("");
     setRemoved(new Set());
     setRemovedResources(new Set());
+    setAttributeKey("");
+    setRemovedValues(new Set());
+    setAttributeMode("events");
     setNoiseThreshold("");
     setInductiveVariant("log");
     setAlphaVariant("plus");
@@ -125,6 +159,7 @@ export function Filters({
     betweenEnd !== "" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
+    attributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
     alphaVariant !== "plus" ||
@@ -299,6 +334,76 @@ export function Filters({
                 })}
               </div>
             </div>
+          )}
+
+          {attributes.length > 0 && (
+            <>
+              <div className="filters-row">
+                <label className="filters-field">
+                  <span>Attribute</span>
+                  <select
+                    value={attributeKey}
+                    onChange={(e) => pickAttributeKey(e.target.value)}
+                  >
+                    <option value="">off</option>
+                    {attributes.map((attribute) => (
+                      <option key={attribute.key} value={attribute.key}>
+                        {attribute.key}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedAttribute && (
+                  <label className="filters-field">
+                    <span>Dropping a value removes</span>
+                    <select
+                      value={attributeMode}
+                      onChange={(e) =>
+                        setAttributeMode(e.target.value as AttributeFilterMode)
+                      }
+                    >
+                      <option value="events">the matching events</option>
+                      <option value="traces">whole cases with a match</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+              {selectedAttribute && (
+                <div className="filters-activities">
+                  <span className="filters-field-label">
+                    {selectedAttribute.key} values{" "}
+                    <small>
+                      (click to drop
+                      {selectedAttribute.values.length <
+                        selectedAttribute.distinct_values &&
+                        `; top ${selectedAttribute.values.length} of ${selectedAttribute.distinct_values} shown`}
+                      )
+                    </small>
+                  </span>
+                  <div className="filters-chips">
+                    {selectedAttribute.values.map(({ value, count }) => {
+                      const dropped = removedValues.has(value);
+                      return (
+                        <button
+                          key={value}
+                          className={
+                            dropped ? "filters-chip dropped" : "filters-chip"
+                          }
+                          onClick={() => toggleValue(value)}
+                          title={
+                            dropped
+                              ? `Add ${value} back`
+                              : `Drop ${value} (${count} events)`
+                          }
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <div className="filters-activities">

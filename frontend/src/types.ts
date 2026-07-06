@@ -236,6 +236,24 @@ export interface TraceEvent {
   timestamp: string;
   /** Performing resource; present only when the log carries one. */
   resource?: string;
+  /** Generic event attributes (extra CSV columns, non-standard XES keys). */
+  attributes?: Record<string, string>;
+}
+
+/** One observed value of a generic event attribute. */
+export interface AttributeValueStat {
+  value: string;
+  count: number;
+}
+
+/** Per-key summary of a generic event attribute across the log. */
+export interface EventAttributeStat {
+  key: string;
+  /** Events carrying the key. */
+  events: number;
+  /** Total distinct values; `values` lists only the most frequent ones. */
+  distinct_values: number;
+  values: AttributeValueStat[];
 }
 
 export interface Trace {
@@ -275,6 +293,11 @@ export interface MineraExport {
    * shape as `edges`. Absent in exports from older minera versions.
    */
   eventually_follows?: EdgeStat[];
+  /**
+   * Generic event attributes by key, with each key's most frequent values.
+   * Absent when the log has none and in exports from older minera versions.
+   */
+  event_attributes?: EventAttributeStat[];
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

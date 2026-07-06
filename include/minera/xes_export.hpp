@@ -16,7 +16,9 @@ namespace minera {
 // Timestamps that parse as instants are normalized to ISO-8601 UTC and
 // written as <date> attributes; a non-empty timestamp in an unrecognized
 // format is preserved verbatim as a <string> so no data is lost, and an
-// empty one is omitted. `name` becomes the log's own `concept:name`.
+// empty one is omitted. Generic event attributes are written under the XES
+// type each was imported with (CSV columns as strings), so extra data
+// round-trips. `name` becomes the log's own `concept:name`.
 void write_xes(std::ostream& out,
                const EventLog& log,
                std::string_view name = "log");
