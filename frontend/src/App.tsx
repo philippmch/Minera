@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
+  type EventAttributeStat,
   type MineraExport,
   isMineraExport,
   numberFormat,
@@ -50,9 +51,13 @@ export default function App() {
   const [mining, setMining] = useState(false);
   // The CSV upload behind the current view, kept so filters can re-mine it.
   // null when the data came from a pre-mined JSON export (not re-minable).
-  const [source, setSource] = useState<
-    { file: File; delimiter?: string; activities: string[]; resources: string[] } | null
-  >(null);
+  const [source, setSource] = useState<{
+    file: File;
+    delimiter?: string;
+    activities: string[];
+    resources: string[];
+    attributes: EventAttributeStat[];
+  } | null>(null);
   const [filtersActive, setFiltersActive] = useState(false);
   // Alignments the backend computed on demand, cached per miner for the current
   // analysis so revisiting a model never refetches. Reset whenever data changes.
@@ -113,6 +118,7 @@ export default function App() {
           delimiter,
           activities: result.activities.map((a) => a.name),
           resources: result.resources?.resources.map((r) => r.name) ?? [],
+          attributes: result.event_attributes ?? [],
         });
         setFiltersActive(false);
         openData(result);
@@ -304,6 +310,7 @@ export default function App() {
           key={source.file.name}
           activities={source.activities}
           resources={source.resources}
+          attributes={source.attributes}
           active={filtersActive}
           mining={mining}
           onApply={applyFilters}

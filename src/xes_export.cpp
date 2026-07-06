@@ -24,8 +24,44 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
 
 void write_string_attribute(std::ostream& out, std::string_view indent,
                             std::string_view key, std::string_view value) {
-  out << indent << "<string key=\"" << key << "\" value=\"";
+  out << indent << "<string key=\"";
+  write_xml_escaped(out, key);
+  out << "\" value=\"";
   write_xml_escaped(out, value);
+  out << "\"/>\n";
+}
+
+std::string_view element_name(AttributeKind kind) {
+  switch (kind) {
+    case AttributeKind::kString: return "string";
+    case AttributeKind::kDate: return "date";
+    case AttributeKind::kInt: return "int";
+    case AttributeKind::kFloat: return "float";
+    case AttributeKind::kBoolean: return "boolean";
+    case AttributeKind::kId: return "id";
+  }
+  return "string";
+}
+
+// Writes a generic event attribute under its imported XES type, normalizing
+// dates like the timestamp; a date that no longer parses degrades to a
+// string attribute rather than emitting an invalid xs:dateTime.
+void write_event_attribute(std::ostream& out, std::string_view indent,
+                           const EventAttribute& attribute) {
+  if (attribute.kind == AttributeKind::kDate) {
+    if (const auto instant = parse_timestamp(attribute.value)) {
+      out << indent << "<date key=\"";
+      write_xml_escaped(out, attribute.key);
+      out << "\" value=\"" << format_timestamp(*instant) << "\"/>\n";
+      return;
+    }
+    write_string_attribute(out, indent, attribute.key, attribute.value);
+    return;
+  }
+  out << indent << '<' << element_name(attribute.kind) << " key=\"";
+  write_xml_escaped(out, attribute.key);
+  out << "\" value=\"";
+  write_xml_escaped(out, attribute.value);
   out << "\"/>\n";
 }
 
@@ -83,6 +119,9 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
       }
       if (!event.resource.empty()) {
         write_string_attribute(out, "      ", "org:resource", event.resource);
+      }
+      for (const auto& attribute : event.attributes) {
+        write_event_attribute(out, "      ", attribute);
       }
       out << "    </event>\n";
     }

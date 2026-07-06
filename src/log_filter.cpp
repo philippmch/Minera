@@ -20,16 +20,57 @@ std::unordered_set<std::string> to_set(const std::vector<std::string>& values) {
   return {values.begin(), values.end()};
 }
 
-// Projects a trace's events on the activity and resource attributes at once,
-// dropping events outside a keep-set or inside a remove-set and preserving
-// order. An event with no resource is never kept by a resource keep-set and
-// never dropped by a resource remove-set, so a resource filter only ever acts
-// on events that actually name a performer.
+// The attribute constraint shared by both attribute-filter modes: the key
+// (empty = filter off) and the value keep/remove sets.
+struct AttributeMatcher {
+  std::string key;
+  std::unordered_set<std::string> keep;
+  std::unordered_set<std::string> remove;
+
+  [[nodiscard]] bool active() const { return !key.empty(); }
+
+  // Event-mode survival. Events without the key follow the resource filter's
+  // rule — never kept by a keep-set, never dropped by a remove-set — except
+  // that a bare key (no value sets) keeps only the events carrying it.
+  [[nodiscard]] bool keeps_event(const Event& event) const {
+    const auto* value = event.attribute(key);
+    if (value == nullptr) return keep.empty() && !remove.empty();
+    if (!keep.empty() && keep.find(*value) == keep.end()) return false;
+    if (!remove.empty() && remove.find(*value) != remove.end()) return false;
+    return true;
+  }
+
+  // Trace-mode survival: a remove-set drops the trace as soon as any event
+  // carries a removed value, a keep-set requires some event to carry a kept
+  // one, and a bare key requires some event to carry the key at all.
+  [[nodiscard]] bool keeps_trace(const Trace& trace) const {
+    bool kept_value_seen = false;
+    bool key_seen = false;
+    for (const auto& event : trace.events) {
+      const auto* value = event.attribute(key);
+      if (value == nullptr) continue;
+      key_seen = true;
+      if (!remove.empty() && remove.find(*value) != remove.end()) return false;
+      if (!keep.empty() && keep.find(*value) != keep.end()) kept_value_seen = true;
+    }
+    if (!keep.empty()) return kept_value_seen;
+    if (!remove.empty()) return true;
+    return key_seen;
+  }
+};
+
+// Projects a trace's events on the activity, resource, and — when `attribute`
+// is non-null — generic-attribute constraints at once, dropping events outside
+// a keep-set or inside a remove-set and preserving order. An event with no
+// resource is never kept by a resource keep-set and never dropped by a
+// resource remove-set, so a resource filter only ever acts on events that
+// actually name a performer.
 Trace project_events(const Trace& trace,
                      const std::unordered_set<std::string>& keep_activities,
                      const std::unordered_set<std::string>& remove_activities,
                      const std::unordered_set<std::string>& keep_resources,
-                     const std::unordered_set<std::string>& remove_resources) {
+                     const std::unordered_set<std::string>& remove_resources,
+                     const AttributeMatcher* attribute) {
   Trace result;
   result.case_id = trace.case_id;
   for (const auto& event : trace.events) {
@@ -48,6 +89,9 @@ Trace project_events(const Trace& trace,
     }
     if (!remove_resources.empty() && !event.resource.empty() &&
         remove_resources.find(event.resource) != remove_resources.end()) {
+      continue;
+    }
+    if (attribute != nullptr && !attribute->keeps_event(event)) {
       continue;
     }
     result.events.push_back(event);
@@ -139,6 +183,13 @@ std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
   return std::nullopt;
 }
 
+std::optional<AttributeFilterMode> parse_attribute_filter_mode(
+    std::string_view name) {
+  if (name == "events") return AttributeFilterMode::events;
+  if (name == "traces") return AttributeFilterMode::traces;
+  return std::nullopt;
+}
+
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
@@ -146,6 +197,19 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const auto remove_res = to_set(options.remove_resources);
   const auto starts = to_set(options.start_activities);
   const auto ends = to_set(options.end_activities);
+
+  const AttributeMatcher attribute{options.attribute_key,
+                                   to_set(options.keep_attribute_values),
+                                   to_set(options.remove_attribute_values)};
+  if (!attribute.active() &&
+      (!attribute.keep.empty() || !attribute.remove.empty())) {
+    throw std::invalid_argument(
+        "attribute filter: value lists require an attribute key");
+  }
+  const AttributeMatcher* event_attribute =
+      attribute.active() && options.attribute_mode == AttributeFilterMode::events
+          ? &attribute
+          : nullptr;
 
   const bool by_between =
       !options.between_start.empty() || !options.between_end.empty();
@@ -199,9 +263,15 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       }
     }
 
-    Trace projected =
-        project_events(*source, keep, remove, keep_res, remove_res);
+    Trace projected = project_events(*source, keep, remove, keep_res,
+                                     remove_res, event_attribute);
     if (projected.events.empty()) continue;
+
+    if (attribute.active() &&
+        options.attribute_mode == AttributeFilterMode::traces &&
+        !attribute.keeps_trace(projected)) {
+      continue;
+    }
 
     if (!options.rework_activity.empty()) {
       std::uint64_t occurrences = 0;

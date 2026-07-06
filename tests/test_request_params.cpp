@@ -142,6 +142,10 @@ void parse_mine_params_maps_filters() {
       {"rework_min_occurrences", "3"},
       {"between_start", "a"},
       {"between_end", "c"},
+      {"attribute_key", "channel"},
+      {"keep_attribute_values", "web, phone"},
+      {"remove_attribute_values", "fax"},
+      {"attribute_mode", "traces"},
   }));
   assert(params.filter.time_from == "2024-01-01");
   assert(params.filter.time_to == "2024-01-31T23:59:59");
@@ -163,7 +167,23 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.rework_min_occurrences == 3);
   assert(params.filter.between_start == "a");
   assert(params.filter.between_end == "c");
+  assert(params.filter.attribute_key == "channel");
+  assert((params.filter.keep_attribute_values ==
+          std::vector<std::string>{"web", "phone"}));
+  assert((params.filter.remove_attribute_values ==
+          std::vector<std::string>{"fax"}));
+  assert(params.filter.attribute_mode == minera::AttributeFilterMode::traces);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_an_unknown_attribute_mode() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"attribute_mode", "bogus"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_an_unknown_time_mode() {
@@ -200,6 +220,7 @@ int main() {
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_an_unknown_time_mode();
+  parse_mine_params_rejects_an_unknown_attribute_mode();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_ignores_blank_fields();

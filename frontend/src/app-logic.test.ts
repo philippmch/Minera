@@ -64,6 +64,7 @@ describe("hasActiveFilters", () => {
       { timeTo: "2024-01-31T23:59" },
       { reworkActivity: "a" },
       { betweenStart: "a", betweenEnd: "b" },
+      { attributeKey: "channel" },
     ];
     for (const filters of cases) expect(hasActiveFilters(filters)).toBe(true);
   });
@@ -164,5 +165,34 @@ describe("mineFormEntries", () => {
   it("drops a time mode without bounds and a rework minimum without activity", () => {
     expect(mineFormEntries({ timeMode: "traces_contained" })).toEqual([]);
     expect(mineFormEntries({ reworkMin: 3 })).toEqual([]);
+  });
+
+  it("maps the attribute filter and requires its key", () => {
+    const entries = mineFormEntries({
+      attributeKey: "channel",
+      removeAttributeValues: ["fax", "mail"],
+      attributeMode: "traces",
+    });
+    expect(entries).toEqual([
+      ["attribute_key", "channel"],
+      ["remove_attribute_values", "fax,mail"],
+      ["attribute_mode", "traces"],
+    ]);
+    expect(
+      mineFormEntries({
+        attributeKey: "channel",
+        keepAttributeValues: ["web"],
+      }),
+    ).toEqual([
+      ["attribute_key", "channel"],
+      ["keep_attribute_values", "web"],
+    ]);
+    // Value lists or a mode without a key send nothing.
+    expect(
+      mineFormEntries({
+        removeAttributeValues: ["fax"],
+        attributeMode: "traces",
+      }),
+    ).toEqual([]);
   });
 });

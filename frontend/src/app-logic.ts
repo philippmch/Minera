@@ -45,6 +45,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.timeFrom ||
       filters.timeTo ||
       filters.reworkActivity ||
+      filters.attributeKey ||
       (filters.betweenStart && filters.betweenEnd),
   );
 }

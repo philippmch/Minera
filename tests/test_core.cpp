@@ -1875,6 +1875,220 @@ void xes_importer_decodes_entities_and_ignores_nesting() {
   assert(log.traces[0].events[0].activity == "Pay <50>");
 }
 
+void csv_importer_captures_extra_columns_as_attributes() {
+  // Columns beyond case/activity/timestamp/resource become generic event
+  // attributes keyed by their header; blank cells mean "no attribute".
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp,resource,channel,amount\n"
+      "1,A,2026-01-01T00:00:00,alice,web,100\n"
+      "1,B,2026-01-01T00:01:00,bob,,250\n");
+
+  const auto log = minera::import_csv_event_log(path);
+  const auto& events = log.traces.front().events;
+  assert(events[0].attributes.size() == 2);
+  assert(events[0].attributes[0].key == "channel");
+  assert(events[0].attributes[0].value == "web");
+  assert(events[0].attributes[0].kind == minera::AttributeKind::kString);
+  assert(*events[0].attribute("amount") == "100");
+  // The blank channel cell leaves only the amount on the second event, and
+  // the first-class fields never double as generic attributes.
+  assert(events[1].attributes.size() == 1);
+  assert(events[1].attribute("channel") == nullptr);
+  assert(*events[1].attribute("amount") == "250");
+  assert(events[1].attribute("resource") == nullptr);
+  assert(events[1].resource == "bob");
+}
+
+void xes_importer_captures_generic_event_attributes() {
+  // Scalar event attributes beyond the standard activity/timestamp/resource
+  // keys are kept with their XES type; nested sub-attributes and trace-level
+  // attributes are not event attributes.
+  const auto log = import_xes(
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"c\"/>\n"
+      "    <string key=\"customer\" value=\"trace-level\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "      <string key=\"org:resource\" value=\"clerk\"/>\n"
+      "      <string key=\"channel\" value=\"web\">\n"
+      "        <string key=\"nested\" value=\"ignored\"/>\n"
+      "      </string>\n"
+      "      <int key=\"amount\" value=\"100\"/>\n"
+      "      <boolean key=\"approved\" value=\"true\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  const auto& event = log.traces.front().events.front();
+  assert(event.activity == "A");
+  assert(event.resource == "clerk");
+  assert(event.attributes.size() == 3);
+  assert(event.attributes[0].key == "channel");
+  assert(event.attributes[0].kind == minera::AttributeKind::kString);
+  assert(event.attributes[1].key == "amount");
+  assert(event.attributes[1].value == "100");
+  assert(event.attributes[1].kind == minera::AttributeKind::kInt);
+  assert(event.attributes[2].key == "approved");
+  assert(event.attributes[2].kind == minera::AttributeKind::kBoolean);
+  assert(event.attribute("nested") == nullptr);
+  assert(event.attribute("customer") == nullptr);
+}
+
+void xes_export_round_trips_generic_attributes() {
+  // Attributes survive an export/import cycle with their XES types, so an
+  // <int> stays an <int>; a date that no longer parses degrades to a string
+  // instead of emitting an invalid xs:dateTime.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "c1";
+  minera::Event event;
+  event.case_id = "c1";
+  event.activity = "a";
+  event.attributes.push_back({"amount", "100", minera::AttributeKind::kInt});
+  event.attributes.push_back(
+      {"channel <&>", "web \"x\"", minera::AttributeKind::kString});
+  event.attributes.push_back(
+      {"due", "2026-03-01T10:00:00Z", minera::AttributeKind::kDate});
+  event.attributes.push_back(
+      {"odd-date", "someday", minera::AttributeKind::kDate});
+  trace.events.push_back(event);
+  log.traces.push_back(trace);
+
+  const auto xes = minera::to_xes(log);
+  assert(xes.find("<int key=\"amount\" value=\"100\"/>") != std::string::npos);
+  assert(xes.find("<date key=\"due\" value=\"2026-03-01T10:00:00.000Z\"/>") !=
+         std::string::npos);
+  assert(xes.find("<string key=\"odd-date\" value=\"someday\"/>") !=
+         std::string::npos);
+
+  std::istringstream input(xes);
+  const auto reread = minera::import_xes_event_log(input);
+  const auto& back = reread.traces.front().events.front();
+  assert(back.attributes.size() == 4);
+  assert(back.attributes[0].kind == minera::AttributeKind::kInt);
+  assert(back.attributes[0].value == "100");
+  assert(*back.attribute("channel <&>") == "web \"x\"");
+  assert(back.attributes[2].kind == minera::AttributeKind::kDate);
+  // The unparseable date came back as the string it was written as.
+  assert(back.attributes[3].kind == minera::AttributeKind::kString);
+  assert(back.attributes[3].value == "someday");
+}
+
+// A three-event trace with a channel attribute on two events: web on a,
+// phone on b, nothing on c.
+minera::EventLog attribute_filter_log() {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "1";
+  trace.events.push_back(
+      minera::Event{"1", "a", "", "", 0, {{"channel", "web", {}}}});
+  trace.events.push_back(
+      minera::Event{"1", "b", "", "", 1, {{"channel", "phone", {}}}});
+  trace.events.push_back(minera::Event{"1", "c", "", "", 2});
+  log.traces.push_back(trace);
+  return log;
+}
+
+void filter_attribute_events_mode_keeps_and_removes() {
+  const auto log = attribute_filter_log();
+
+  minera::LogFilterOptions keep;
+  keep.attribute_key = "channel";
+  keep.keep_attribute_values = {"web"};
+  assert(keep.any());
+  const auto only_web = minera::filter_event_log(log, keep);
+  // Only the web event survives a keep-set; the attribute-less event drops.
+  assert((activity_names(only_web.traces.front()) ==
+          std::vector<std::string>{"a"}));
+
+  minera::LogFilterOptions remove;
+  remove.attribute_key = "channel";
+  remove.remove_attribute_values = {"phone"};
+  const auto no_phone = minera::filter_event_log(log, remove);
+  // The phone event goes; the attribute-less event is never dropped by a
+  // remove-set.
+  assert((activity_names(no_phone.traces.front()) ==
+          std::vector<std::string>{"a", "c"}));
+
+  minera::LogFilterOptions carriers;
+  carriers.attribute_key = "channel";
+  const auto with_key = minera::filter_event_log(log, carriers);
+  // A bare key keeps only the events that carry the attribute at all.
+  assert((activity_names(with_key.traces.front()) ==
+          std::vector<std::string>{"a", "b"}));
+}
+
+void filter_attribute_traces_mode_selects_cases() {
+  auto log = attribute_filter_log();
+  minera::Trace other;
+  other.case_id = "2";
+  other.events.push_back(
+      minera::Event{"2", "a", "", "", 0, {{"channel", "phone", {}}}});
+  log.traces.push_back(other);
+  minera::Trace plain;
+  plain.case_id = "3";
+  plain.events.push_back(minera::Event{"3", "a", "", "", 0});
+  log.traces.push_back(plain);
+
+  minera::LogFilterOptions keep;
+  keep.attribute_key = "channel";
+  keep.keep_attribute_values = {"web"};
+  keep.attribute_mode = minera::AttributeFilterMode::traces;
+  const auto web_cases = minera::filter_event_log(log, keep);
+  // Case 1 has a web event somewhere, so it survives whole.
+  assert(web_cases.trace_count() == 1);
+  assert(web_cases.traces.front().events.size() == 3);
+
+  minera::LogFilterOptions remove;
+  remove.attribute_key = "channel";
+  remove.remove_attribute_values = {"phone"};
+  remove.attribute_mode = minera::AttributeFilterMode::traces;
+  const auto no_phone_cases = minera::filter_event_log(log, remove);
+  // Both cases touching phone drop; the attribute-less case survives.
+  assert(no_phone_cases.trace_count() == 1);
+  assert(no_phone_cases.traces.front().case_id == "3");
+
+  minera::LogFilterOptions carriers;
+  carriers.attribute_key = "channel";
+  carriers.attribute_mode = minera::AttributeFilterMode::traces;
+  const auto with_key = minera::filter_event_log(log, carriers);
+  // A bare key keeps the cases where the attribute appears at all.
+  assert(with_key.trace_count() == 2);
+}
+
+void filter_attribute_values_require_a_key() {
+  assert(throws([] {
+    minera::LogFilterOptions options;
+    options.keep_attribute_values = {"web"};
+    assert(options.any());
+    (void)minera::filter_event_log(attribute_filter_log(), options);
+  }));
+}
+
+void json_export_carries_event_attributes() {
+  const auto log = attribute_filter_log();
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto json = minera::analysis_json("test", log, graph);
+
+  // Per-event attributes ride along in the traces block.
+  assert(json.find("\"attributes\": {\"channel\": \"web\"}") !=
+         std::string::npos);
+  // The summary lists the key with its event count and value frequencies.
+  assert(json.find("\"event_attributes\": [") != std::string::npos);
+  assert(json.find("{\"key\": \"channel\", \"events\": 2, "
+                   "\"distinct_values\": 2, \"values\": [") !=
+         std::string::npos);
+  assert(json.find("{\"value\": \"phone\", \"count\": 1}") !=
+         std::string::npos);
+
+  // A log without generic attributes omits the field entirely.
+  const auto plain = log_from_variants({{"a", "b"}});
+  const auto plain_graph = minera::discover_directly_follows_graph(plain);
+  const auto plain_json = minera::analysis_json("test", plain, plain_graph);
+  assert(plain_json.find("event_attributes") == std::string::npos);
+}
+
 void xes_importer_rejects_malformed_logs() {
   // Trace without a case attribute.
   assert(throws([] {
@@ -2160,6 +2374,13 @@ int main() {
   filter_time_range_selects_whole_traces();
   filter_time_range_bounds_are_inclusive_and_one_sided();
   filter_time_range_rejects_a_malformed_bound();
+  csv_importer_captures_extra_columns_as_attributes();
+  xes_importer_captures_generic_event_attributes();
+  xes_export_round_trips_generic_attributes();
+  filter_attribute_events_mode_keeps_and_removes();
+  filter_attribute_traces_mode_selects_cases();
+  filter_attribute_values_require_a_key();
+  json_export_carries_event_attributes();
   xes_importer_reads_traces_and_events();
   xes_importer_reads_a_file_from_disk();
   xes_importer_sorts_events_by_timestamp();

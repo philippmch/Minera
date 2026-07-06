@@ -114,12 +114,19 @@ workflows with native performance.
   1.0, which makes the playout a self-check for discovery and a test-log
   generator (`minera_playout model.pnml -o log.xes`, or the **Simulate log**
   button on any mined model).
+- **Generic event attributes**: extra CSV columns and non-standard XES event
+  attributes (channel, region, amount, …) are imported alongside the
+  case/activity/timestamp/resource fields, keep their XES types through an
+  export round-trip, and are summarized per key (event count, value
+  frequencies) in every analysis.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
-  resource (performer) projection, rework (keep only cases where an activity
-  repeats), between-extraction (cut each case into the subtraces running from
-  one activity to another — e.g. every loop iteration), trace length, start/end
-  activities, and variant frequency (minimum count or top-N) before discovery.
+  resource (performer) projection, attribute values (drop or keep matching
+  events, or whole cases with a match), rework (keep only cases where an
+  activity repeats), between-extraction (cut each case into the subtraces
+  running from one activity to another — e.g. every loop iteration), trace
+  length, start/end activities, and variant frequency (minimum count or top-N)
+  before discovery.
 - `minera_server`, a local application server: it serves the frontend and
   mines uploaded CSV event logs with the native core (`POST /api/mine`),
   returning the event log, the directly-follows graph, the process tree, and
@@ -211,8 +218,10 @@ A **Filter log** bar above the tabs re-mines the original upload focused on the
 most frequent variants (top-N or a minimum frequency), a time window (keeping
 the events inside it, or the cases contained in / touching it), rework (only
 cases where a chosen activity repeats), a between cut (each case reduced to its
-stretches from one activity to another), or a subset of activities; every view
-— log, graph, model, conformance, and resources — updates together.
+stretches from one activity to another), a subset of activities or resources,
+or an event attribute's values (dropping the matching events, or whole cases
+with a match); every view — log, graph, model, conformance, and resources —
+updates together.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:
@@ -250,6 +259,11 @@ out.bpmn` writes a discovered model as BPMN 2.0, with `--bpmn-miner`
 Other filters include `--min-variant-frequency`, `--keep-activities`,
 `--remove-activities`, `--keep-resources`, `--remove-resources`,
 `--start-activities`, `--end-activities`, `--min-length`, and `--max-length`.
+`--attribute-key` filters on a generic event attribute (an extra CSV column or
+non-standard XES key): `--keep-attribute-values` / `--remove-attribute-values`
+constrain its values, the bare key keeps only events carrying the attribute,
+and `--attribute-mode traces` switches from filtering events to keeping or
+dropping whole cases by the same match.
 `--rework-activity` (with `--rework-min`, default 2) keeps only cases where an
 activity repeats; `--between-start` / `--between-end` cut each case into the
 subtraces running from one activity to the next occurrence of the other, both

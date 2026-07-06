@@ -2,9 +2,23 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace minera {
+
+// The XES attribute type an event attribute round-trips as. CSV columns and
+// unknown XES elements read as strings; the value itself always stays text.
+enum class AttributeKind { kString, kDate, kInt, kFloat, kBoolean, kId };
+
+// One generic event attribute beyond the four first-class fields: any extra
+// CSV column, or any XES event attribute other than the activity, timestamp,
+// and resource keys.
+struct EventAttribute {
+  std::string key;
+  std::string value;
+  AttributeKind kind = AttributeKind::kString;
+};
 
 struct Event {
   std::string case_id;
@@ -12,6 +26,16 @@ struct Event {
   std::string timestamp;
   std::string resource;  // who performed the activity; empty when unknown
   std::size_t input_order = 0;
+  std::vector<EventAttribute> attributes;  // in input order
+
+  // The value of the named generic attribute, or nullptr when the event does
+  // not carry it. Linear, but events carry only a handful of attributes.
+  [[nodiscard]] const std::string* attribute(std::string_view key) const {
+    for (const auto& entry : attributes) {
+      if (entry.key == key) return &entry.value;
+    }
+    return nullptr;
+  }
 };
 
 struct Trace {

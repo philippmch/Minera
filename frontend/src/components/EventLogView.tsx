@@ -12,10 +12,12 @@ function CaseRow({
   trace,
   data,
   showResource,
+  showAttributes,
 }: {
   trace: Trace;
   data: MineraExport;
   showResource: boolean;
+  showAttributes: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const first = trace.events[0]?.timestamp;
@@ -52,6 +54,15 @@ function CaseRow({
                 <td>{data.activities[event.activity].name}</td>
                 {showResource && (
                   <td className="case-event-resource">{event.resource ?? "—"}</td>
+                )}
+                {showAttributes && (
+                  <td className="case-event-attrs">
+                    {event.attributes
+                      ? Object.entries(event.attributes)
+                          .map(([key, value]) => `${key}: ${value}`)
+                          .join(" · ")
+                      : "—"}
+                  </td>
                 )}
                 <td className="case-event-time">{formatTimestamp(event.timestamp)}</td>
               </tr>
@@ -104,9 +115,14 @@ export function EventLogView({ data }: { data: MineraExport }) {
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
 
-  // Show the resource column only when the log actually carries one.
+  // Show the resource and attribute columns only when the log carries them.
   const showResource = useMemo(
     () => traces.some((trace) => trace.events.some((event) => event.resource)),
+    [traces],
+  );
+  const showAttributes = useMemo(
+    () =>
+      traces.some((trace) => trace.events.some((event) => event.attributes)),
     [traces],
   );
 
@@ -160,6 +176,7 @@ export function EventLogView({ data }: { data: MineraExport }) {
             trace={trace}
             data={data}
             showResource={showResource}
+            showAttributes={showAttributes}
           />
         ))}
       </ol>

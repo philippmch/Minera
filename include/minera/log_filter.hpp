@@ -22,10 +22,22 @@ enum class TimeFilterMode {
   traces_intersecting,
 };
 
+// How an attribute filter treats a trace.
+enum class AttributeFilterMode {
+  // Keep only the events that satisfy the attribute constraint; traces left
+  // empty are dropped.
+  events,
+  // Keep whole traces by their events' attributes: a keep-set requires some
+  // event to match, a remove-set drops the trace when any event matches, and
+  // a bare key requires some event to carry it.
+  traces,
+};
+
 // Log-preprocessing options. Filters are applied in a fixed order so the result
-// is well defined when several are combined: time range, then activity
-// projection, then rework, then between-extraction, then trace length, then
-// endpoints, then variant frequency.
+// is well defined when several are combined: time range, then activity /
+// resource / event-attribute projection, then the case-level attribute filter,
+// then rework, then between-extraction, then trace length, then endpoints,
+// then variant frequency.
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -48,6 +60,20 @@ struct LogFilterOptions {
   // by `remove_resources`. Empty lists mean "no constraint".
   std::vector<std::string> keep_resources;
   std::vector<std::string> remove_resources;
+
+  // Generic attribute filter on one event-attribute key (any extra CSV column
+  // or non-standard XES attribute). With `attribute_key` set: a non-empty
+  // `keep_attribute_values` keeps only events carrying the key with a listed
+  // value; `remove_attribute_values` then drops events whose value is listed
+  // (events without the key are never kept by a keep-set and never dropped by
+  // a remove-set, like the resource filter); with both lists empty, only
+  // events carrying the key at all survive. `attribute_mode` switches from
+  // filtering events to keeping/dropping whole cases by the same match.
+  // Value lists without a key are a caller error and throw.
+  std::string attribute_key;
+  std::vector<std::string> keep_attribute_values;
+  std::vector<std::string> remove_attribute_values;
+  AttributeFilterMode attribute_mode = AttributeFilterMode::events;
 
   // Rework: keep only traces where `rework_activity` occurs at least
   // `rework_min_occurrences` times (a repeated activity signals rework). An
@@ -84,6 +110,8 @@ struct LogFilterOptions {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
            !keep_resources.empty() || !remove_resources.empty() ||
+           !attribute_key.empty() || !keep_attribute_values.empty() ||
+           !remove_attribute_values.empty() ||
            !rework_activity.empty() || !between_start.empty() ||
            !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
@@ -96,6 +124,11 @@ struct LogFilterOptions {
 // "traces_intersecting") to the mode, or nullopt when the name is not one of
 // the three.
 [[nodiscard]] std::optional<TimeFilterMode> parse_time_filter_mode(
+    std::string_view name);
+
+// Maps an attribute-filter mode name ("events" or "traces") to the mode, or
+// nullopt when the name is neither.
+[[nodiscard]] std::optional<AttributeFilterMode> parse_attribute_filter_mode(
     std::string_view name);
 
 // Returns a new event log containing the traces and events that survive the
