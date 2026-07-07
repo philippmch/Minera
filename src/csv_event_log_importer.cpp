@@ -133,14 +133,25 @@ EventLog import_csv_event_log(
   auto resource_index = optional_column(columns, options.resource_column);
 
   // Every remaining named column becomes a generic event attribute, keyed by
-  // its header, so domain data (channel, amount, region, …) survives import.
+  // its header, so domain data (channel, amount, region, …) survives import —
+  // except columns prefixed `case:`, which are case attributes: constant per
+  // case (a repeated flat-file export of e.g. a requested amount), stored once
+  // on the trace under the unprefixed key.
+  constexpr std::string_view kCasePrefix = "case:";
   std::vector<std::size_t> attribute_indices;
+  std::vector<std::size_t> case_attribute_indices;
   for (std::size_t i = 0; i < header.size(); ++i) {
     if (i == case_index || i == activity_index) continue;
     if (timestamp_index && i == *timestamp_index) continue;
     if (resource_index && i == *resource_index) continue;
     if (header[i].empty()) continue;
-    attribute_indices.push_back(i);
+    if (header[i].size() > kCasePrefix.size() &&
+        std::string_view(header[i]).substr(0, kCasePrefix.size()) ==
+            kCasePrefix) {
+      case_attribute_indices.push_back(i);
+    } else {
+      attribute_indices.push_back(i);
+    }
   }
 
   std::unordered_map<std::string, std::size_t> trace_ids;
@@ -175,7 +186,18 @@ EventLog import_csv_event_log(
 
     auto [it, inserted] = trace_ids.emplace(case_id, log.traces.size());
     if (inserted) {
-      log.traces.push_back(Trace{case_id, {}});
+      log.traces.push_back(Trace{case_id, {}, {}});
+    }
+
+    auto& trace = log.traces[it->second];
+    for (const auto index : case_attribute_indices) {
+      // The first row carrying a value sets it; later rows of the same case
+      // repeat it in a flat file, so they are ignored (as is a conflict).
+      if (index >= fields.size() || fields[index].empty()) continue;
+      const std::string key = header[index].substr(kCasePrefix.size());
+      if (trace.attribute(key) != nullptr) continue;
+      trace.attributes.push_back(
+          EventAttribute{key, fields[index], AttributeKind::kString});
     }
 
     Event event{case_id, activity, timestamp, resource, input_order++};

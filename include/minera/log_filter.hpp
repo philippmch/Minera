@@ -34,10 +34,10 @@ enum class AttributeFilterMode {
 };
 
 // Log-preprocessing options. Filters are applied in a fixed order so the result
-// is well defined when several are combined: time range, then activity /
-// resource / event-attribute projection, then the case-level attribute filter,
-// then rework, then between-extraction, then trace length, then endpoints,
-// then variant frequency.
+// is well defined when several are combined: the case-attribute filter, then
+// time range, then activity / resource / event-attribute projection, then the
+// case-level event-attribute filter, then rework, then between-extraction,
+// then trace length, then endpoints, then variant frequency.
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -74,6 +74,18 @@ struct LogFilterOptions {
   std::vector<std::string> keep_attribute_values;
   std::vector<std::string> remove_attribute_values;
   AttributeFilterMode attribute_mode = AttributeFilterMode::events;
+
+  // Case-attribute filter on one trace-attribute key (a scalar XES trace
+  // attribute, or a `case:` CSV column). Always trace-level: with
+  // `case_attribute_key` set, a non-empty `keep_case_attribute_values` keeps
+  // only cases carrying the key with a listed value;
+  // `remove_case_attribute_values` then drops cases whose value is listed
+  // (cases without the key are never kept by a keep-set and never dropped by
+  // a remove-set); with both lists empty, only cases carrying the key at all
+  // survive. Value lists without a key are a caller error and throw.
+  std::string case_attribute_key;
+  std::vector<std::string> keep_case_attribute_values;
+  std::vector<std::string> remove_case_attribute_values;
 
   // Rework: keep only traces where `rework_activity` occurs at least
   // `rework_min_occurrences` times (a repeated activity signals rework). An
@@ -112,6 +124,9 @@ struct LogFilterOptions {
            !keep_resources.empty() || !remove_resources.empty() ||
            !attribute_key.empty() || !keep_attribute_values.empty() ||
            !remove_attribute_values.empty() ||
+           !case_attribute_key.empty() ||
+           !keep_case_attribute_values.empty() ||
+           !remove_case_attribute_values.empty() ||
            !rework_activity.empty() || !between_start.empty() ||
            !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||

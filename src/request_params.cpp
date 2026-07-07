@@ -119,6 +119,15 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("remove_attribute_values"); !value.empty()) {
     params.filter.remove_attribute_values = split_csv(value);
   }
+  if (const auto value = field("case_attribute_key"); !value.empty()) {
+    params.filter.case_attribute_key = value;
+  }
+  if (const auto value = field("keep_case_attribute_values"); !value.empty()) {
+    params.filter.keep_case_attribute_values = split_csv(value);
+  }
+  if (const auto value = field("remove_case_attribute_values"); !value.empty()) {
+    params.filter.remove_case_attribute_values = split_csv(value);
+  }
   if (const auto value = field("attribute_mode"); !value.empty()) {
     const auto mode = parse_attribute_filter_mode(value);
     if (!mode) {

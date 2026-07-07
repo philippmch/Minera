@@ -1096,6 +1096,14 @@ input[type="range"]::-moz-range-thumb {
   overflow-wrap: anywhere;
 }
 
+.case-attrs {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-45);
+  overflow-wrap: anywhere;
+  padding: 4px 12px 0 34px;
+}
+
 .case-more {
   margin-top: 16px;
 }

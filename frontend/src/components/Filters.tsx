@@ -5,7 +5,7 @@ import {
   type MinerOptions,
   type TimeFilterMode,
 } from "../api";
-import { type EventAttributeStat } from "../types";
+import { type CaseAttributeStat, type EventAttributeStat } from "../types";
 
 interface FiltersProps {
   /** Activity names from the original, unfiltered log. */
@@ -14,6 +14,8 @@ interface FiltersProps {
   resources: string[];
   /** Generic event attributes of the original log; empty when it has none. */
   attributes: EventAttributeStat[];
+  /** Case attributes of the original log; empty when it has none. */
+  caseAttributes: CaseAttributeStat[];
   /** Whether any filter or miner setting is applied (drives the badge). */
   active: boolean;
   mining: boolean;
@@ -27,6 +29,7 @@ export function Filters({
   activities,
   resources,
   attributes,
+  caseAttributes,
   active,
   mining,
   onApply,
@@ -52,6 +55,12 @@ export function Filters({
   const [removedValues, setRemovedValues] = useState<Set<string>>(new Set());
   const [attributeMode, setAttributeMode] =
     useState<AttributeFilterMode>("events");
+  // Case-attribute filter: one key and its dropped values. Dropping a value
+  // always removes the whole case — the attribute lives on the case itself.
+  const [caseAttributeKey, setCaseAttributeKey] = useState("");
+  const [removedCaseValues, setRemovedCaseValues] = useState<Set<string>>(
+    new Set(),
+  );
   // Miner settings; an empty field leaves the backend default in charge.
   const [noiseThreshold, setNoiseThreshold] = useState("");
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "dfg">("log");
@@ -71,12 +80,21 @@ export function Filters({
   const toggleActivity = toggle(setRemoved);
   const toggleResource = toggle(setRemovedResources);
   const toggleValue = toggle(setRemovedValues);
+  const toggleCaseValue = toggle(setRemovedCaseValues);
 
   const pickAttributeKey = (key: string) => {
     setAttributeKey(key);
     setRemovedValues(new Set());
   };
   const selectedAttribute = attributes.find((a) => a.key === attributeKey);
+
+  const pickCaseAttributeKey = (key: string) => {
+    setCaseAttributeKey(key);
+    setRemovedCaseValues(new Set());
+  };
+  const selectedCaseAttribute = caseAttributes.find(
+    (a) => a.key === caseAttributeKey,
+  );
 
   const toInt = (value: string) => {
     const n = Number.parseInt(value, 10);
@@ -96,6 +114,10 @@ export function Filters({
       selectedAttribute?.values
         .map((v) => v.value)
         .filter((v) => removedValues.has(v)) ?? [];
+    const removeCaseValueList =
+      selectedCaseAttribute?.values
+        .map((v) => v.value)
+        .filter((v) => removedCaseValues.has(v)) ?? [];
     onApply({
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
@@ -116,6 +138,10 @@ export function Filters({
         removeValueList.length > 0 && attributeMode !== "events"
           ? attributeMode
           : undefined,
+      caseAttributeKey:
+        removeCaseValueList.length > 0 ? caseAttributeKey : undefined,
+      removeCaseAttributeValues:
+        removeCaseValueList.length > 0 ? removeCaseValueList : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
       alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
@@ -140,6 +166,8 @@ export function Filters({
     setAttributeKey("");
     setRemovedValues(new Set());
     setAttributeMode("events");
+    setCaseAttributeKey("");
+    setRemovedCaseValues(new Set());
     setNoiseThreshold("");
     setInductiveVariant("log");
     setAlphaVariant("plus");
@@ -160,6 +188,7 @@ export function Filters({
     removed.size > 0 ||
     removedResources.size > 0 ||
     attributeKey !== "" ||
+    caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
     alphaVariant !== "plus" ||
@@ -394,6 +423,62 @@ export function Filters({
                             dropped
                               ? `Add ${value} back`
                               : `Drop ${value} (${count} events)`
+                          }
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {caseAttributes.length > 0 && (
+            <>
+              <div className="filters-row">
+                <label className="filters-field">
+                  <span>Case attribute</span>
+                  <select
+                    value={caseAttributeKey}
+                    onChange={(e) => pickCaseAttributeKey(e.target.value)}
+                  >
+                    <option value="">off</option>
+                    {caseAttributes.map((attribute) => (
+                      <option key={attribute.key} value={attribute.key}>
+                        {attribute.key}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {selectedCaseAttribute && (
+                <div className="filters-activities">
+                  <span className="filters-field-label">
+                    {selectedCaseAttribute.key} values{" "}
+                    <small>
+                      (click to drop the cases
+                      {selectedCaseAttribute.values.length <
+                        selectedCaseAttribute.distinct_values &&
+                        `; top ${selectedCaseAttribute.values.length} of ${selectedCaseAttribute.distinct_values} shown`}
+                      )
+                    </small>
+                  </span>
+                  <div className="filters-chips">
+                    {selectedCaseAttribute.values.map(({ value, count }) => {
+                      const dropped = removedCaseValues.has(value);
+                      return (
+                        <button
+                          key={value}
+                          className={
+                            dropped ? "filters-chip dropped" : "filters-chip"
+                          }
+                          onClick={() => toggleCaseValue(value)}
+                          title={
+                            dropped
+                              ? `Add ${value} back`
+                              : `Drop ${value} (${count} cases)`
                           }
                         >
                           {value}

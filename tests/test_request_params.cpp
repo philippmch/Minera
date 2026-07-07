@@ -146,6 +146,9 @@ void parse_mine_params_maps_filters() {
       {"keep_attribute_values", "web, phone"},
       {"remove_attribute_values", "fax"},
       {"attribute_mode", "traces"},
+      {"case_attribute_key", "region"},
+      {"keep_case_attribute_values", "north, east"},
+      {"remove_case_attribute_values", "south"},
   }));
   assert(params.filter.time_from == "2024-01-01");
   assert(params.filter.time_to == "2024-01-31T23:59:59");
@@ -173,6 +176,11 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.remove_attribute_values ==
           std::vector<std::string>{"fax"}));
   assert(params.filter.attribute_mode == minera::AttributeFilterMode::traces);
+  assert(params.filter.case_attribute_key == "region");
+  assert((params.filter.keep_case_attribute_values ==
+          std::vector<std::string>{"north", "east"}));
+  assert((params.filter.remove_case_attribute_values ==
+          std::vector<std::string>{"south"}));
   assert(params.filter.any());
 }
 

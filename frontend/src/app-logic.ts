@@ -46,6 +46,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.timeTo ||
       filters.reworkActivity ||
       filters.attributeKey ||
+      filters.caseAttributeKey ||
       (filters.betweenStart && filters.betweenEnd),
   );
 }

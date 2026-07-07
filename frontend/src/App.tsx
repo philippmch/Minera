@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
+  type CaseAttributeStat,
   type EventAttributeStat,
   type MineraExport,
   isMineraExport,
@@ -57,6 +58,7 @@ export default function App() {
     activities: string[];
     resources: string[];
     attributes: EventAttributeStat[];
+    caseAttributes: CaseAttributeStat[];
   } | null>(null);
   const [filtersActive, setFiltersActive] = useState(false);
   // Alignments the backend computed on demand, cached per miner for the current
@@ -119,6 +121,7 @@ export default function App() {
           activities: result.activities.map((a) => a.name),
           resources: result.resources?.resources.map((r) => r.name) ?? [],
           attributes: result.event_attributes ?? [],
+          caseAttributes: result.case_attributes ?? [],
         });
         setFiltersActive(false);
         openData(result);
@@ -311,6 +314,7 @@ export default function App() {
           activities={source.activities}
           resources={source.resources}
           attributes={source.attributes}
+          caseAttributes={source.caseAttributes}
           active={filtersActive}
           mining={mining}
           onApply={applyFilters}

@@ -65,6 +65,7 @@ describe("hasActiveFilters", () => {
       { reworkActivity: "a" },
       { betweenStart: "a", betweenEnd: "b" },
       { attributeKey: "channel" },
+      { caseAttributeKey: "region" },
     ];
     for (const filters of cases) expect(hasActiveFilters(filters)).toBe(true);
   });
@@ -193,6 +194,30 @@ describe("mineFormEntries", () => {
         removeAttributeValues: ["fax"],
         attributeMode: "traces",
       }),
+    ).toEqual([]);
+  });
+
+  it("maps the case-attribute filter and requires its key", () => {
+    const entries = mineFormEntries({
+      caseAttributeKey: "region",
+      removeCaseAttributeValues: ["south", "west"],
+    });
+    expect(entries).toEqual([
+      ["case_attribute_key", "region"],
+      ["remove_case_attribute_values", "south,west"],
+    ]);
+    expect(
+      mineFormEntries({
+        caseAttributeKey: "region",
+        keepCaseAttributeValues: ["north"],
+      }),
+    ).toEqual([
+      ["case_attribute_key", "region"],
+      ["keep_case_attribute_values", "north"],
+    ]);
+    // Value lists without a key send nothing.
+    expect(
+      mineFormEntries({ removeCaseAttributeValues: ["south"] }),
     ).toEqual([]);
   });
 });
