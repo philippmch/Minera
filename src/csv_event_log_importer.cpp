@@ -131,6 +131,7 @@ EventLog import_csv_event_log(
         "CSV column not found: " + options.timestamp_column);
   }
   auto resource_index = optional_column(columns, options.resource_column);
+  auto lifecycle_index = optional_column(columns, options.lifecycle_column);
 
   // Every remaining named column becomes a generic event attribute, keyed by
   // its header, so domain data (channel, amount, region, …) survives import —
@@ -144,6 +145,7 @@ EventLog import_csv_event_log(
     if (i == case_index || i == activity_index) continue;
     if (timestamp_index && i == *timestamp_index) continue;
     if (resource_index && i == *resource_index) continue;
+    if (lifecycle_index && i == *lifecycle_index) continue;
     if (header[i].empty()) continue;
     if (header[i].size() > kCasePrefix.size() &&
         std::string_view(header[i]).substr(0, kCasePrefix.size()) ==
@@ -201,6 +203,9 @@ EventLog import_csv_event_log(
     }
 
     Event event{case_id, activity, timestamp, resource, input_order++};
+    if (lifecycle_index) {
+      event.lifecycle = field_at(fields, *lifecycle_index, line_number);
+    }
     for (const auto index : attribute_indices) {
       // A blank cell means the event simply has no such attribute; a short row
       // reads the same way rather than erroring, since these columns are extra.

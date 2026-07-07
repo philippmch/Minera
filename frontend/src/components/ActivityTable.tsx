@@ -1,10 +1,18 @@
-import { type MineraExport, numberFormat } from "../types";
+import { type MineraExport, formatDuration, numberFormat } from "../types";
 
 export function ActivityTable({ data }: { data: MineraExport }) {
   const sorted = [...data.activities].sort((a, b) => b.count - a.count);
   const maxCount = sorted[0]?.count ?? 1;
   // Older exports don't carry the rework statistic; hide the column then.
   const hasRework = sorted.some((activity) => activity.rework_cases !== undefined);
+  // Mean service time per activity name, from lifecycle start/complete pairs.
+  // The column only appears when the log recorded any — atomic logs stay as is.
+  const serviceTimes = new Map<string, number>(
+    (data.performance?.activities ?? []).map(({ activity, stats }) => [
+      data.activities[activity].name,
+      stats.mean,
+    ]),
+  );
 
   return (
     <section className="panel activities-panel reveal">
@@ -25,6 +33,14 @@ export function ActivityTable({ data }: { data: MineraExport }) {
             {hasRework && (
               <th className="num" title="Cases where this activity occurs more than once">
                 Rework
+              </th>
+            )}
+            {serviceTimes.size > 0 && (
+              <th
+                className="num"
+                title="Mean time between an activity's lifecycle start and complete events"
+              >
+                Service time
               </th>
             )}
           </tr>
@@ -53,6 +69,13 @@ export function ActivityTable({ data }: { data: MineraExport }) {
                 <td className="num">
                   {(activity.rework_cases ?? 0) > 0
                     ? numberFormat.format(activity.rework_cases ?? 0)
+                    : "·"}
+                </td>
+              )}
+              {serviceTimes.size > 0 && (
+                <td className="num">
+                  {serviceTimes.has(activity.name)
+                    ? formatDuration(serviceTimes.get(activity.name) ?? 0)
                     : "·"}
                 </td>
               )}

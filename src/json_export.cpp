@@ -401,6 +401,15 @@ void write_performance(std::ostream& out, const PerformanceMetrics& performance)
     write_duration_stats(out, edges[i].stats);
     out << '}' << (i + 1 < edges.size() ? ", " : "");
   }
+  out << "], \"activities\": [";
+  // Service times from lifecycle start/complete pairs; sparse, so a log of
+  // atomic events emits an empty list.
+  const auto& service = performance.activity_service;
+  for (std::size_t i = 0; i < service.size(); ++i) {
+    out << "{\"activity\": " << service[i].activity << ", \"stats\": ";
+    write_duration_stats(out, service[i].stats);
+    out << '}' << (i + 1 < service.size() ? ", " : "");
+  }
   out << "]}";
 }
 
@@ -465,6 +474,10 @@ void write_analysis_json(std::ostream& out,
       if (!event.resource.empty()) {
         out << ", \"resource\": ";
         write_json_string(out, event.resource);
+      }
+      if (!event.lifecycle.empty()) {
+        out << ", \"lifecycle\": ";
+        write_json_string(out, event.lifecycle);
       }
       if (!event.attributes.empty()) {
         out << ", \"attributes\": ";

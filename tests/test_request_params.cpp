@@ -82,6 +82,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"activity_column", "Act"},
       {"timestamp_column", "Time"},
       {"resource_column", "Who"},
+      {"lifecycle_column", "Phase"},
       {"delimiter", ";"},
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
@@ -94,6 +95,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.csv.activity_column == "Act");
   assert(params.csv.timestamp_column == "Time");
   assert(params.csv.resource_column == "Who");
+  assert(params.csv.lifecycle_column == "Phase");
   assert(params.csv.delimiter == ';');  // only the first char is taken
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
@@ -132,6 +134,8 @@ void parse_mine_params_maps_filters() {
       {"remove_activities", "x"},
       {"keep_resources", "Alice, Bob"},
       {"remove_resources", "Carol"},
+      {"keep_lifecycles", "complete"},
+      {"remove_lifecycles", "schedule, suspend"},
       {"start_activities", "a"},
       {"end_activities", "c"},
       {"min_length", "2"},
@@ -160,6 +164,10 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.keep_resources ==
           std::vector<std::string>{"Alice", "Bob"}));
   assert((params.filter.remove_resources == std::vector<std::string>{"Carol"}));
+  assert((params.filter.keep_lifecycles ==
+          std::vector<std::string>{"complete"}));
+  assert((params.filter.remove_lifecycles ==
+          std::vector<std::string>{"schedule", "suspend"}));
   assert((params.filter.start_activities == std::vector<std::string>{"a"}));
   assert((params.filter.end_activities == std::vector<std::string>{"c"}));
   assert(params.filter.min_length == 2);

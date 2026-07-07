@@ -12,11 +12,13 @@ function CaseRow({
   trace,
   data,
   showResource,
+  showLifecycle,
   showAttributes,
 }: {
   trace: Trace;
   data: MineraExport;
   showResource: boolean;
+  showLifecycle: boolean;
   showAttributes: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,6 +61,11 @@ function CaseRow({
               <tr key={i}>
                 <td className="num">{i + 1}</td>
                 <td>{data.activities[event.activity].name}</td>
+                {showLifecycle && (
+                  <td className="case-event-lifecycle">
+                    {event.lifecycle ?? "—"}
+                  </td>
+                )}
                 {showResource && (
                   <td className="case-event-resource">{event.resource ?? "—"}</td>
                 )}
@@ -127,6 +134,10 @@ export function EventLogView({ data }: { data: MineraExport }) {
     () => traces.some((trace) => trace.events.some((event) => event.resource)),
     [traces],
   );
+  const showLifecycle = useMemo(
+    () => traces.some((trace) => trace.events.some((event) => event.lifecycle)),
+    [traces],
+  );
   const showAttributes = useMemo(
     () =>
       traces.some((trace) => trace.events.some((event) => event.attributes)),
@@ -183,6 +194,7 @@ export function EventLogView({ data }: { data: MineraExport }) {
             trace={trace}
             data={data}
             showResource={showResource}
+            showLifecycle={showLifecycle}
             showAttributes={showAttributes}
           />
         ))}

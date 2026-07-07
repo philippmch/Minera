@@ -1,10 +1,13 @@
 #include "minera/performance.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <deque>
 #include <limits>
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -12,6 +15,18 @@
 
 namespace minera {
 namespace {
+
+// Case-insensitive lifecycle comparison: the XES standard spells the
+// transitions lowercase, but real logs (e.g. BPI 2012) ship them uppercase.
+bool lifecycle_is(std::string_view value, std::string_view expected) {
+  if (value.size() != expected.size()) return false;
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(value[i])) != expected[i]) {
+      return false;
+    }
+  }
+  return true;
+}
 
 std::uint64_t edge_key(std::size_t source, std::size_t target) {
   return (static_cast<std::uint64_t>(source) << 32U) |
@@ -48,6 +63,7 @@ PerformanceMetrics compute_performance_metrics(
     const EventLog& log,
     const DirectlyFollowsGraph& graph) {
   std::unordered_map<std::uint64_t, std::vector<double>> edge_durations;
+  std::map<std::size_t, std::vector<double>> service_durations;
   std::vector<double> case_durations;
   std::vector<double> case_starts;
 
@@ -56,6 +72,9 @@ PerformanceMetrics compute_performance_metrics(
     std::size_t previous_activity = 0;
     std::optional<double> first;
     std::optional<double> last;
+    // Unmatched lifecycle starts per activity, paired first-in-first-out with
+    // the activity's next complete (events are time-ordered within a trace).
+    std::unordered_map<std::size_t, std::deque<double>> pending_starts;
 
     for (const auto& event : trace.events) {
       const auto instant = parse_timestamp(event.timestamp);
@@ -76,6 +95,21 @@ PerformanceMetrics compute_performance_metrics(
         }
         previous = *instant;
         previous_activity = *activity;
+
+        if (lifecycle_is(event.lifecycle, "start")) {
+          pending_starts[*activity].push_back(*instant);
+        } else if (lifecycle_is(event.lifecycle, "complete")) {
+          // A complete without a pending start is an atomic observation and
+          // contributes no service time, like an untimed event elsewhere.
+          auto it = pending_starts.find(*activity);
+          if (it != pending_starts.end() && !it->second.empty()) {
+            const double duration = *instant - it->second.front();
+            it->second.pop_front();
+            if (duration >= 0.0) {
+              service_durations[*activity].push_back(duration);
+            }
+          }
+        }
       }
     }
 
@@ -114,6 +148,15 @@ PerformanceMetrics compute_performance_metrics(
       performance.stats = summarize(std::move(it->second));
     }
     metrics.edges.push_back(std::move(performance));
+  }
+
+  // Activity service times, sparse and in activity-id order (the map is
+  // ordered): only activities with at least one paired start/complete appear.
+  for (auto& [activity, durations] : service_durations) {
+    ActivityPerformance performance;
+    performance.activity = activity;
+    performance.stats = summarize(std::move(durations));
+    metrics.activity_service.push_back(std::move(performance));
   }
 
   return metrics;

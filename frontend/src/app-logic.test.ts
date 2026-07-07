@@ -6,6 +6,7 @@ import {
   hasActiveMinerOptions,
   initialTab,
   isJsonExport,
+  logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
 import { type EdgeStat, type MineraExport, type Trace } from "./types";
@@ -66,8 +67,40 @@ describe("hasActiveFilters", () => {
       { betweenStart: "a", betweenEnd: "b" },
       { attributeKey: "channel" },
       { caseAttributeKey: "region" },
+      { removeLifecycles: ["start"] },
+      { keepLifecycles: ["complete"] },
     ];
     for (const filters of cases) expect(hasActiveFilters(filters)).toBe(true);
+  });
+});
+
+describe("logLifecycles", () => {
+  it("collects distinct transitions in first-seen order", () => {
+    const data = exp({
+      traces: [
+        {
+          case_id: "1",
+          events: [
+            { activity: 0, timestamp: "", lifecycle: "start" },
+            { activity: 0, timestamp: "", lifecycle: "complete" },
+            { activity: 1, timestamp: "" },
+            { activity: 1, timestamp: "", lifecycle: "start" },
+          ],
+        },
+      ],
+    });
+    expect(logLifecycles(data)).toEqual(["start", "complete"]);
+  });
+
+  it("is empty for atomic and trace-less logs", () => {
+    expect(logLifecycles(exp())).toEqual([]);
+    expect(
+      logLifecycles(
+        exp({
+          traces: [{ case_id: "1", events: [{ activity: 0, timestamp: "" }] }],
+        }),
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -195,6 +228,18 @@ describe("mineFormEntries", () => {
         attributeMode: "traces",
       }),
     ).toEqual([]);
+  });
+
+  it("maps the lifecycle projection", () => {
+    expect(
+      mineFormEntries({
+        keepLifecycles: ["complete"],
+        removeLifecycles: ["schedule", "suspend"],
+      }),
+    ).toEqual([
+      ["keep_lifecycles", "complete"],
+      ["remove_lifecycles", "schedule,suspend"],
+    ]);
   });
 
   it("maps the case-attribute filter and requires its key", () => {

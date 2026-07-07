@@ -100,6 +100,11 @@ int usage(const char* program) {
                "  --remove-activities <a,b> Drop these activities\n"
                "  --keep-resources <a,b>    Keep only events by these resources\n"
                "  --remove-resources <a,b>  Drop events by these resources\n"
+               "  --keep-lifecycles <a,b>   Keep only events with one of these\n"
+               "                            lifecycle transitions (e.g.\n"
+               "                            complete, to make a start/complete\n"
+               "                            log atomic for discovery)\n"
+               "  --remove-lifecycles <a,b> Drop events with these transitions\n"
                "  --attribute-key <k>       Filter on this event attribute (an\n"
                "                            extra CSV column or non-standard\n"
                "                            XES key); alone it keeps only\n"
@@ -270,6 +275,14 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.remove_resources = split_csv(value);
+    } else if (arg == "--keep-lifecycles") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_lifecycles = split_csv(value);
+    } else if (arg == "--remove-lifecycles") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_lifecycles = split_csv(value);
     } else if (arg == "--attribute-key") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

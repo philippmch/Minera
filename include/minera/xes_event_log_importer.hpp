@@ -23,6 +23,8 @@ struct XesImportOptions {
   std::string timestamp_attribute = "time:timestamp";
   // Event-level attribute that names the performing resource (org perspective).
   std::string resource_attribute = "org:resource";
+  // Event-level attribute for the lifecycle transition ("start", "complete").
+  std::string lifecycle_attribute = "lifecycle:transition";
   // When set, a log whose events never carry the timestamp attribute is
   // rejected instead of imported with empty timestamps.
   bool require_timestamp = false;

@@ -37,6 +37,7 @@ import {
   hasActiveMinerOptions,
   initialTab,
   isJsonExport,
+  logLifecycles,
   maxEdgeCount,
   type Tab,
 } from "./app-logic";
@@ -57,6 +58,7 @@ export default function App() {
     delimiter?: string;
     activities: string[];
     resources: string[];
+    lifecycles: string[];
     attributes: EventAttributeStat[];
     caseAttributes: CaseAttributeStat[];
   } | null>(null);
@@ -120,6 +122,7 @@ export default function App() {
           delimiter,
           activities: result.activities.map((a) => a.name),
           resources: result.resources?.resources.map((r) => r.name) ?? [],
+          lifecycles: logLifecycles(result),
           attributes: result.event_attributes ?? [],
           caseAttributes: result.case_attributes ?? [],
         });
@@ -313,6 +316,7 @@ export default function App() {
           key={source.file.name}
           activities={source.activities}
           resources={source.resources}
+          lifecycles={source.lifecycles}
           attributes={source.attributes}
           caseAttributes={source.caseAttributes}
           active={filtersActive}
