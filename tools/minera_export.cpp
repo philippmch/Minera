@@ -110,6 +110,14 @@ int usage(const char* program) {
                "  --attribute-mode <mode>   events (default: filter events) or\n"
                "                            traces (keep/drop whole cases by\n"
                "                            the same attribute match)\n"
+               "  --case-attribute-key <k>  Filter cases on this case attribute\n"
+               "                            (an XES trace attribute or a\n"
+               "                            `case:` CSV column); alone it keeps\n"
+               "                            only cases carrying the attribute\n"
+               "  --keep-case-attribute-values <a,b>   Keep only cases whose\n"
+               "                            attribute has one of these values\n"
+               "  --remove-case-attribute-values <a,b> Drop cases with these\n"
+               "                            values\n"
                "  --rework-activity <a>     Keep only traces where <a> repeats\n"
                "  --rework-min <n>          Repetitions that count as rework\n"
                "                            (default: 2)\n"
@@ -284,6 +292,18 @@ int main(int argc, char** argv) {
         return 2;
       }
       filter.attribute_mode = *mode;
+    } else if (arg == "--case-attribute-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.case_attribute_key = value;
+    } else if (arg == "--keep-case-attribute-values") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_case_attribute_values = split_csv(value);
+    } else if (arg == "--remove-case-attribute-values") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_case_attribute_values = split_csv(value);
     } else if (arg == "--rework-activity") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

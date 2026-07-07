@@ -41,6 +41,18 @@ struct Event {
 struct Trace {
   std::string case_id;
   std::vector<Event> events;
+  // Case-level attributes beyond the id: any other scalar XES trace attribute,
+  // or a `case:`-prefixed CSV column (constant per case, first value wins).
+  std::vector<EventAttribute> attributes;
+
+  // The value of the named case attribute, or nullptr when the trace does not
+  // carry it. Linear, but traces carry only a handful of attributes.
+  [[nodiscard]] const std::string* attribute(std::string_view key) const {
+    for (const auto& entry : attributes) {
+      if (entry.key == key) return &entry.value;
+    }
+    return nullptr;
+  }
 };
 
 // Orders a trace's events by their parsed timestamp instant (normalized to UTC

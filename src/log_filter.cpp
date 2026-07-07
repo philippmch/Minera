@@ -40,6 +40,17 @@ struct AttributeMatcher {
     return true;
   }
 
+  // Case-attribute survival, judged on the trace's own attributes: same rule
+  // as keeps_event, so a case without the key is never kept by a keep-set,
+  // never dropped by a remove-set, and dropped by a bare key.
+  [[nodiscard]] bool keeps_case(const Trace& trace) const {
+    const auto* value = trace.attribute(key);
+    if (value == nullptr) return keep.empty() && !remove.empty();
+    if (!keep.empty() && keep.find(*value) == keep.end()) return false;
+    if (!remove.empty() && remove.find(*value) != remove.end()) return false;
+    return true;
+  }
+
   // Trace-mode survival: a remove-set drops the trace as soon as any event
   // carries a removed value, a keep-set requires some event to carry a kept
   // one, and a bare key requires some event to carry the key at all.
@@ -73,6 +84,7 @@ Trace project_events(const Trace& trace,
                      const AttributeMatcher* attribute) {
   Trace result;
   result.case_id = trace.case_id;
+  result.attributes = trace.attributes;
   for (const auto& event : trace.events) {
     if (!keep_activities.empty() &&
         keep_activities.find(event.activity) == keep_activities.end()) {
@@ -156,11 +168,12 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
     }
   }
   // A lone segment keeps the original case id; several get a #k suffix so each
-  // subtrace remains a distinct case.
+  // subtrace remains a distinct case. All inherit the case's attributes.
   for (std::size_t i = 0; i < segments.size(); ++i) {
     segments[i].case_id = segments.size() == 1
                               ? trace.case_id
                               : trace.case_id + "#" + std::to_string(i + 1);
+    segments[i].attributes = trace.attributes;
   }
   return segments;
 }
@@ -211,6 +224,16 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
           ? &attribute
           : nullptr;
 
+  const AttributeMatcher case_attribute{
+      options.case_attribute_key,
+      to_set(options.keep_case_attribute_values),
+      to_set(options.remove_case_attribute_values)};
+  if (!case_attribute.active() &&
+      (!case_attribute.keep.empty() || !case_attribute.remove.empty())) {
+    throw std::invalid_argument(
+        "case-attribute filter: value lists require an attribute key");
+  }
+
   const bool by_between =
       !options.between_start.empty() || !options.between_end.empty();
   if (by_between &&
@@ -230,12 +253,16 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   std::vector<Trace> kept;
   kept.reserve(log.traces.size());
   for (const auto& trace : log.traces) {
+    if (case_attribute.active() && !case_attribute.keeps_case(trace)) {
+      continue;
+    }
     const Trace* source = &trace;
     Trace timed;  // only populated in events mode, which rewrites the trace
     if (by_time) {
       switch (options.time_mode) {
         case TimeFilterMode::events: {
           timed.case_id = trace.case_id;
+          timed.attributes = trace.attributes;
           for (const auto& event : trace.events) {
             const auto instant = parse_timestamp(event.timestamp);
             if (instant && *instant >= time_from && *instant <= time_to) {

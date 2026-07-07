@@ -256,9 +256,21 @@ export interface EventAttributeStat {
   values: AttributeValueStat[];
 }
 
+/** Per-key summary of a case attribute across the log. */
+export interface CaseAttributeStat {
+  key: string;
+  /** Cases carrying the key. */
+  cases: number;
+  /** Total distinct values; `values` lists only the most frequent ones. */
+  distinct_values: number;
+  values: AttributeValueStat[];
+}
+
 export interface Trace {
   case_id: string;
   events: TraceEvent[];
+  /** Case attributes (XES trace attributes, `case:` CSV columns). */
+  attributes?: Record<string, string>;
 }
 
 export interface MineraExport {
@@ -298,6 +310,11 @@ export interface MineraExport {
    * Absent when the log has none and in exports from older minera versions.
    */
   event_attributes?: EventAttributeStat[];
+  /**
+   * Case attributes by key, with each key's most frequent values. Absent when
+   * the log has none and in exports from older minera versions.
+   */
+  case_attributes?: CaseAttributeStat[];
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

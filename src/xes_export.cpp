@@ -43,10 +43,10 @@ std::string_view element_name(AttributeKind kind) {
   return "string";
 }
 
-// Writes a generic event attribute under its imported XES type, normalizing
-// dates like the timestamp; a date that no longer parses degrades to a
-// string attribute rather than emitting an invalid xs:dateTime.
-void write_event_attribute(std::ostream& out, std::string_view indent,
+// Writes a generic event or case attribute under its imported XES type,
+// normalizing dates like the timestamp; a date that no longer parses degrades
+// to a string attribute rather than emitting an invalid xs:dateTime.
+void write_typed_attribute(std::ostream& out, std::string_view indent,
                            const EventAttribute& attribute) {
   if (attribute.kind == AttributeKind::kDate) {
     if (const auto instant = parse_timestamp(attribute.value)) {
@@ -102,6 +102,9 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
   for (const auto& trace : log.traces) {
     out << "  <trace>\n";
     write_string_attribute(out, "    ", "concept:name", trace.case_id);
+    for (const auto& attribute : trace.attributes) {
+      write_typed_attribute(out, "    ", attribute);
+    }
     for (const auto& event : trace.events) {
       out << "    <event>\n";
       write_string_attribute(out, "      ", "concept:name", event.activity);
@@ -121,7 +124,7 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
         write_string_attribute(out, "      ", "org:resource", event.resource);
       }
       for (const auto& attribute : event.attributes) {
-        write_event_attribute(out, "      ", attribute);
+        write_typed_attribute(out, "      ", attribute);
       }
       out << "    </event>\n";
     }

@@ -119,10 +119,17 @@ workflows with native performance.
   case/activity/timestamp/resource fields, keep their XES types through an
   export round-trip, and are summarized per key (event count, value
   frequencies) in every analysis.
+- **Case attributes**: scalar XES trace attributes beyond the case id (e.g.
+  the BPI Challenge 2012's `AMOUNT_REQ`) and `case:`-prefixed CSV columns
+  land on the case itself, keep their XES types through an export
+  round-trip, are summarized per key (case count, value frequencies), and
+  filter the log at case granularity — keep or drop whole cases by attribute
+  value.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
   resource (performer) projection, attribute values (drop or keep matching
-  events, or whole cases with a match), rework (keep only cases where an
+  events, or whole cases with a match), case-attribute values (keep or drop
+  whole cases by their own attributes), rework (keep only cases where an
   activity repeats), between-extraction (cut each case into the subtraces
   running from one activity to another — e.g. every loop iteration), trace
   length, start/end activities, and variant frequency (minimum count or top-N)
@@ -183,9 +190,9 @@ importer by extension/content, then imports and mines it in memory — the log
 never leaves your machine. An opened log shows the raw
 events first; discovery lives in tabs:
 
-- **Event Log** — the imported cases with their event sequences and
-  timestamps, filterable by case id, with a **Download log as XES** button
-  that exports the log exactly as mined (filters included),
+- **Event Log** — the imported cases with their event sequences, timestamps,
+  and case attributes, filterable by case id, with a **Download log as XES**
+  button that exports the log exactly as mined (filters included),
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)
@@ -219,9 +226,9 @@ most frequent variants (top-N or a minimum frequency), a time window (keeping
 the events inside it, or the cases contained in / touching it), rework (only
 cases where a chosen activity repeats), a between cut (each case reduced to its
 stretches from one activity to another), a subset of activities or resources,
-or an event attribute's values (dropping the matching events, or whole cases
-with a match); every view — log, graph, model, conformance, and resources —
-updates together.
+an event attribute's values (dropping the matching events, or whole cases
+with a match), or a case attribute's values (dropping whole cases); every
+view — log, graph, model, conformance, and resources — updates together.
 
 For frontend development, run the Vite dev server alongside the backend; it
 proxies `/api` to `localhost:8484`:

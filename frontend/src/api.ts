@@ -50,6 +50,11 @@ export interface FilterOptions {
   keepAttributeValues?: string[];
   removeAttributeValues?: string[];
   attributeMode?: AttributeFilterMode;
+  /** Case-attribute filter: the key and its value constraints; always
+   * keeps or drops whole cases. */
+  caseAttributeKey?: string;
+  keepCaseAttributeValues?: string[];
+  removeCaseAttributeValues?: string[];
 }
 
 /** Discovery options for the miners themselves, applied at mine time. */
@@ -123,6 +128,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("remove_attribute_values", options.removeAttributeValues.join(","));
     if (options.attributeMode)
       add("attribute_mode", options.attributeMode);
+  }
+  if (options.caseAttributeKey) {
+    add("case_attribute_key", options.caseAttributeKey);
+    if (options.keepCaseAttributeValues?.length)
+      add("keep_case_attribute_values", options.keepCaseAttributeValues.join(","));
+    if (options.removeCaseAttributeValues?.length)
+      add(
+        "remove_case_attribute_values",
+        options.removeCaseAttributeValues.join(","),
+      );
   }
 
   // Miner settings. Zero is a meaningful heuristic threshold (unlike the

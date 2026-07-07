@@ -45,6 +45,13 @@ function CaseRow({
           ))}
         </span>
       </div>
+      {open && trace.attributes && (
+        <div className="case-attrs">
+          {Object.entries(trace.attributes)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(" · ")}
+        </div>
+      )}
       {open && (
         <table className="case-events-table">
           <tbody>

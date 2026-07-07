@@ -2089,6 +2089,180 @@ void json_export_carries_event_attributes() {
   assert(plain_json.find("event_attributes") == std::string::npos);
 }
 
+void csv_importer_maps_case_columns_to_case_attributes() {
+  // A `case:`-prefixed column is a case attribute: stored once on the trace
+  // under the unprefixed key (first value wins, blanks skipped), and never
+  // doubled as an event attribute.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp,case:region,amount\n"
+      "1,A,2026-01-01T00:00:00,,100\n"
+      "1,B,2026-01-01T00:01:00,north,250\n"
+      "1,C,2026-01-01T00:02:00,south,300\n"
+      "2,A,2026-01-01T00:03:00,east,\n");
+
+  const auto log = minera::import_csv_event_log(path);
+  const auto& first = log.traces[0];
+  // The blank first cell is skipped; the first non-empty value sticks and the
+  // later conflicting one is ignored.
+  assert(first.attributes.size() == 1);
+  assert(first.attributes[0].key == "region");
+  assert(*first.attribute("region") == "north");
+  assert(first.attributes[0].kind == minera::AttributeKind::kString);
+  assert(*log.traces[1].attribute("region") == "east");
+  // The column feeds the trace, not the events; other columns still do.
+  assert(first.events[0].attribute("region") == nullptr);
+  assert(first.events[0].attribute("case:region") == nullptr);
+  assert(*first.events[0].attribute("amount") == "100");
+}
+
+void xes_importer_captures_case_attributes() {
+  // Scalar trace attributes beyond concept:name are case attributes, kept
+  // with their XES type; nested sub-attributes are ignored and the case id
+  // itself is never doubled.
+  const auto log = import_xes(
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"c\"/>\n"
+      "    <int key=\"AMOUNT_REQ\" value=\"20000\"/>\n"
+      "    <string key=\"customer\" value=\"acme\">\n"
+      "      <string key=\"nested\" value=\"ignored\"/>\n"
+      "    </string>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+
+  const auto& trace = log.traces.front();
+  assert(trace.case_id == "c");
+  assert(trace.attributes.size() == 2);
+  assert(trace.attributes[0].key == "AMOUNT_REQ");
+  assert(trace.attributes[0].value == "20000");
+  assert(trace.attributes[0].kind == minera::AttributeKind::kInt);
+  assert(*trace.attribute("customer") == "acme");
+  assert(trace.attribute("nested") == nullptr);
+  assert(trace.attribute("concept:name") == nullptr);
+  // The trace-level attributes never leak onto the events.
+  assert(trace.events.front().attributes.empty());
+}
+
+void xes_export_round_trips_case_attributes() {
+  // Case attributes survive an export/import cycle with their XES types,
+  // exactly like the generic event attributes.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "c1";
+  trace.attributes.push_back(
+      {"AMOUNT_REQ", "20000", minera::AttributeKind::kInt});
+  trace.attributes.push_back(
+      {"customer <&>", "acme \"x\"", minera::AttributeKind::kString});
+  trace.events.push_back(minera::Event{"c1", "a", "", "", 0});
+  log.traces.push_back(trace);
+
+  const auto xes = minera::to_xes(log);
+  assert(xes.find("<int key=\"AMOUNT_REQ\" value=\"20000\"/>") !=
+         std::string::npos);
+
+  std::istringstream input(xes);
+  const auto reread = minera::import_xes_event_log(input);
+  const auto& back = reread.traces.front();
+  assert(back.attributes.size() == 2);
+  assert(back.attributes[0].kind == minera::AttributeKind::kInt);
+  assert(*back.attribute("AMOUNT_REQ") == "20000");
+  assert(*back.attribute("customer <&>") == "acme \"x\"");
+}
+
+// Three one-event cases: region north on 1, south on 2, none on 3.
+minera::EventLog case_attribute_filter_log() {
+  minera::EventLog log;
+  for (const auto& [id, region] :
+       std::vector<std::pair<std::string, std::string>>{
+           {"1", "north"}, {"2", "south"}, {"3", ""}}) {
+    minera::Trace trace;
+    trace.case_id = id;
+    if (!region.empty()) {
+      trace.attributes.push_back(
+          {"region", region, minera::AttributeKind::kString});
+    }
+    trace.events.push_back(minera::Event{id, "a", "", "", 0});
+    trace.events.push_back(minera::Event{id, "b", "", "", 1});
+    log.traces.push_back(trace);
+  }
+  return log;
+}
+
+void filter_case_attribute_selects_cases() {
+  const auto log = case_attribute_filter_log();
+
+  minera::LogFilterOptions keep;
+  keep.case_attribute_key = "region";
+  keep.keep_case_attribute_values = {"north"};
+  assert(keep.any());
+  const auto north = minera::filter_event_log(log, keep);
+  // Only the north case survives a keep-set; the attribute-less case drops.
+  assert(north.trace_count() == 1);
+  assert(north.traces.front().case_id == "1");
+  // The surviving trace still carries its case attributes.
+  assert(*north.traces.front().attribute("region") == "north");
+
+  minera::LogFilterOptions remove;
+  remove.case_attribute_key = "region";
+  remove.remove_case_attribute_values = {"south"};
+  const auto no_south = minera::filter_event_log(log, remove);
+  // The south case goes; the attribute-less case is never dropped by a
+  // remove-set.
+  assert(no_south.trace_count() == 2);
+  assert(no_south.traces[0].case_id == "1");
+  assert(no_south.traces[1].case_id == "3");
+
+  minera::LogFilterOptions carriers;
+  carriers.case_attribute_key = "region";
+  const auto with_key = minera::filter_event_log(log, carriers);
+  // A bare key keeps only the cases that carry the attribute at all.
+  assert(with_key.trace_count() == 2);
+
+  // Case attributes ride through the other filters: an activity projection
+  // rewrites the trace but keeps its attributes.
+  minera::LogFilterOptions project;
+  project.keep_activities = {"a"};
+  const auto projected = minera::filter_event_log(log, project);
+  assert(projected.trace_count() == 3);
+  assert(*projected.traces.front().attribute("region") == "north");
+  assert(projected.traces.front().events.size() == 1);
+}
+
+void filter_case_attribute_values_require_a_key() {
+  assert(throws([] {
+    minera::LogFilterOptions options;
+    options.keep_case_attribute_values = {"north"};
+    assert(options.any());
+    (void)minera::filter_event_log(case_attribute_filter_log(), options);
+  }));
+}
+
+void json_export_carries_case_attributes() {
+  const auto log = case_attribute_filter_log();
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto json = minera::analysis_json("test", log, graph);
+
+  // Per-case attributes ride along in the traces block.
+  assert(json.find("\"attributes\": {\"region\": \"north\"}") !=
+         std::string::npos);
+  // The summary lists the key with its case count and value frequencies.
+  assert(json.find("\"case_attributes\": [") != std::string::npos);
+  assert(json.find("{\"key\": \"region\", \"cases\": 2, "
+                   "\"distinct_values\": 2, \"values\": [") !=
+         std::string::npos);
+  assert(json.find("{\"value\": \"north\", \"count\": 1}") !=
+         std::string::npos);
+
+  // A log without case attributes omits the field entirely.
+  const auto plain = log_from_variants({{"a", "b"}});
+  const auto plain_graph = minera::discover_directly_follows_graph(plain);
+  const auto plain_json = minera::analysis_json("test", plain, plain_graph);
+  assert(plain_json.find("case_attributes") == std::string::npos);
+}
+
 void xes_importer_rejects_malformed_logs() {
   // Trace without a case attribute.
   assert(throws([] {
@@ -2381,6 +2555,12 @@ int main() {
   filter_attribute_traces_mode_selects_cases();
   filter_attribute_values_require_a_key();
   json_export_carries_event_attributes();
+  csv_importer_maps_case_columns_to_case_attributes();
+  xes_importer_captures_case_attributes();
+  xes_export_round_trips_case_attributes();
+  filter_case_attribute_selects_cases();
+  filter_case_attribute_values_require_a_key();
+  json_export_carries_case_attributes();
   xes_importer_reads_traces_and_events();
   xes_importer_reads_a_file_from_disk();
   xes_importer_sorts_events_by_timestamp();

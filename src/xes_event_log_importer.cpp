@@ -126,9 +126,15 @@ EventLog import_xes_event_log(
         }
       } else if (in_trace && !in_event && parent == "trace") {
         if (const auto* key = detail::attribute(token.attributes, "key")) {
-          if (*key == options.case_attribute) {
-            if (const auto* value = detail::attribute(token.attributes, "value")) {
+          if (const auto* value = detail::attribute(token.attributes, "value")) {
+            if (*key == options.case_attribute) {
               case_id = *value;
+            } else if (const auto kind = attribute_kind_of(token.name)) {
+              // Any other scalar trace attribute is a case attribute (e.g.
+              // BPI 2012's AMOUNT_REQ), kept with its XES type like the
+              // generic event attributes.
+              current_trace.attributes.push_back(
+                  EventAttribute{*key, *value, *kind});
             }
           }
         }

@@ -292,32 +292,41 @@ void write_activity_stats(std::ostream& out,
   out << "  ]";
 }
 
-// Aggregates the log's generic event attributes into a whole
-// `"event_attributes"` field (including its leading separator): per key
-// (alphabetical), how many events carry it and its values by frequency. The
-// listed values are capped so a high-cardinality attribute (an amount, a
-// note) cannot bloat the export; `distinct_values` still reports the full
-// count. Writes nothing on a log without generic attributes, so old-style
-// documents stay unchanged.
-void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
-  struct KeyStats {
-    std::uint64_t events = 0;
-    std::unordered_map<std::string, std::uint64_t> value_counts;
-  };
-  std::map<std::string, KeyStats> keys;  // ordered, for a stable export
-  for (const auto& trace : log.traces) {
-    for (const auto& event : trace.events) {
-      for (const auto& attribute : event.attributes) {
-        auto& stats = keys[attribute.key];
-        ++stats.events;
-        ++stats.value_counts[attribute.value];
-      }
-    }
+// Writes a list of generic attributes as one JSON object; a duplicate key
+// (legal in XES, rare in practice) keeps the last value.
+void write_attribute_object(std::ostream& out,
+                            const std::vector<EventAttribute>& attributes) {
+  out << '{';
+  for (std::size_t i = 0; i < attributes.size(); ++i) {
+    write_json_string(out, attributes[i].key);
+    out << ": ";
+    write_json_string(out, attributes[i].value);
+    out << (i + 1 < attributes.size() ? ", " : "");
   }
+  out << '}';
+}
+
+// Per-key tally of a generic attribute: how many carriers (events or cases)
+// have it, and how often each value occurs.
+struct AttributeKeyStats {
+  std::uint64_t carriers = 0;
+  std::unordered_map<std::string, std::uint64_t> value_counts;
+};
+
+// Writes one aggregated attribute field (including its leading separator):
+// per key (alphabetical), how many carriers have it — under `carrier_name`,
+// "events" or "cases" — and its values by frequency. The listed values are
+// capped so a high-cardinality attribute (an amount, a note) cannot bloat the
+// export; `distinct_values` still reports the full count. Writes nothing when
+// there are no keys, so old-style documents stay unchanged.
+void write_attribute_stats(std::ostream& out,
+                           std::string_view field_name,
+                           std::string_view carrier_name,
+                           const std::map<std::string, AttributeKeyStats>& keys) {
   if (keys.empty()) return;
 
   constexpr std::size_t kMaxListedValues = 25;
-  out << ",\n  \"event_attributes\": [\n";
+  out << ",\n  \"" << field_name << "\": [\n";
   std::size_t written = 0;
   for (const auto& [key, stats] : keys) {
     std::vector<std::pair<std::string, std::uint64_t>> values(
@@ -328,7 +337,7 @@ void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
 
     out << "    {\"key\": ";
     write_json_string(out, key);
-    out << ", \"events\": " << stats.events
+    out << ", \"" << carrier_name << "\": " << stats.carriers
         << ", \"distinct_values\": " << values.size() << ", \"values\": [";
     const auto listed = std::min(values.size(), kMaxListedValues);
     for (std::size_t i = 0; i < listed; ++i) {
@@ -340,6 +349,36 @@ void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
     out << "]}" << (++written < keys.size() ? "," : "") << '\n';
   }
   out << "  ]";
+}
+
+// Aggregates the log's generic event attributes into an `"event_attributes"`
+// field: per key, how many events carry it and its values by frequency.
+void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
+  std::map<std::string, AttributeKeyStats> keys;  // ordered, stable export
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      for (const auto& attribute : event.attributes) {
+        auto& stats = keys[attribute.key];
+        ++stats.carriers;
+        ++stats.value_counts[attribute.value];
+      }
+    }
+  }
+  write_attribute_stats(out, "event_attributes", "events", keys);
+}
+
+// Aggregates the log's case attributes into a `"case_attributes"` field: per
+// key, how many cases carry it and its values by frequency.
+void write_case_attribute_stats(std::ostream& out, const EventLog& log) {
+  std::map<std::string, AttributeKeyStats> keys;  // ordered, stable export
+  for (const auto& trace : log.traces) {
+    for (const auto& attribute : trace.attributes) {
+      auto& stats = keys[attribute.key];
+      ++stats.carriers;
+      ++stats.value_counts[attribute.value];
+    }
+  }
+  write_attribute_stats(out, "case_attributes", "cases", keys);
 }
 
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
@@ -413,6 +452,10 @@ void write_analysis_json(std::ostream& out,
     const auto& trace = log.traces[i];
     out << "    {\"case_id\": ";
     write_json_string(out, trace.case_id);
+    if (!trace.attributes.empty()) {
+      out << ", \"attributes\": ";
+      write_attribute_object(out, trace.attributes);
+    }
     out << ", \"events\": [";
     for (std::size_t j = 0; j < trace.events.size(); ++j) {
       const auto& event = trace.events[j];
@@ -424,16 +467,8 @@ void write_analysis_json(std::ostream& out,
         write_json_string(out, event.resource);
       }
       if (!event.attributes.empty()) {
-        // Generic attributes as one object; a duplicate key (legal in XES,
-        // rare in practice) keeps the last value.
-        out << ", \"attributes\": {";
-        for (std::size_t k = 0; k < event.attributes.size(); ++k) {
-          write_json_string(out, event.attributes[k].key);
-          out << ": ";
-          write_json_string(out, event.attributes[k].value);
-          out << (k + 1 < event.attributes.size() ? ", " : "");
-        }
-        out << '}';
+        out << ", \"attributes\": ";
+        write_attribute_object(out, event.attributes);
       }
       out << '}' << (j + 1 < trace.events.size() ? ", " : "");
     }
@@ -483,6 +518,7 @@ void write_analysis_json(std::ostream& out,
   out << "  ]";
 
   write_event_attribute_stats(out, log);
+  write_case_attribute_stats(out, log);
 
   if (tree != nullptr) {
     out << ",\n  \"process_tree\": ";
