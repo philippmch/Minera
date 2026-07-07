@@ -197,6 +197,13 @@ export interface EdgePerformance {
   stats: DurationStats;
 }
 
+/** Service-time statistics for one activity (lifecycle start/complete pairs). */
+export interface ActivityPerformance {
+  /** Index into MineraExport.activities. */
+  activity: number;
+  stats: DurationStats;
+}
+
 /** The time perspective: per-edge waiting times and case throughput. */
 export interface Performance {
   /** Traces with at least two parseable timestamps. */
@@ -210,6 +217,11 @@ export interface Performance {
   case_arrival?: DurationStats;
   /** Edge timings, in the same order as MineraExport.edges. */
   edges: EdgePerformance[];
+  /**
+   * Activity service times from lifecycle start/complete pairs; sparse (only
+   * paired activities appear) and absent in exports from older versions.
+   */
+  activities?: ActivityPerformance[];
 }
 
 export interface ResourceStat {
@@ -236,6 +248,8 @@ export interface TraceEvent {
   timestamp: string;
   /** Performing resource; present only when the log carries one. */
   resource?: string;
+  /** Lifecycle transition ("start", "complete", …); present when recorded. */
+  lifecycle?: string;
   /** Generic event attributes (extra CSV columns, non-standard XES keys). */
   attributes?: Record<string, string>;
 }

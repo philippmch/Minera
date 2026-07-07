@@ -61,6 +61,16 @@ struct LogFilterOptions {
   std::vector<std::string> keep_resources;
   std::vector<std::string> remove_resources;
 
+  // Lifecycle projection, applied like the resource projection but on each
+  // event's lifecycle transition (exact match, so filter with the log's own
+  // spelling): `keep_lifecycles` keeps only events with a listed transition —
+  // e.g. {"complete"} reduces a start/complete log to atomic events for
+  // discovery — and `remove_lifecycles` then drops events with a listed one.
+  // An event without a lifecycle is never kept by `keep_lifecycles` and never
+  // dropped by `remove_lifecycles`. Empty lists mean "no constraint".
+  std::vector<std::string> keep_lifecycles;
+  std::vector<std::string> remove_lifecycles;
+
   // Generic attribute filter on one event-attribute key (any extra CSV column
   // or non-standard XES attribute). With `attribute_key` set: a non-empty
   // `keep_attribute_values` keeps only events carrying the key with a listed
@@ -122,6 +132,7 @@ struct LogFilterOptions {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
            !keep_resources.empty() || !remove_resources.empty() ||
+           !keep_lifecycles.empty() || !remove_lifecycles.empty() ||
            !attribute_key.empty() || !keep_attribute_values.empty() ||
            !remove_attribute_values.empty() ||
            !case_attribute_key.empty() ||

@@ -94,6 +94,15 @@ workflows with native performance.
   max, total) and the end-to-end throughput time of each case. An ISO-8601
   timestamp parser normalizes instants (handling `T`/space separators,
   fractional seconds, and `Z`/±HH:MM offsets); untimed events are simply skipped.
+  When the log records **lifecycle transitions** (the XES
+  `lifecycle:transition` attribute or a CSV `lifecycle` column), Minera also
+  measures each activity's **service time** — how long work actually takes
+  *inside* the activity, from its `start` event to its `complete` event
+  (matched first-in-first-out per case and activity, case-insensitively, so
+  BPI-style `START`/`COMPLETE` logs work) — separating working time from the
+  waiting time the edges show. A **lifecycle filter** projects the log onto
+  chosen transitions, e.g. keep only `complete` to make a start/complete log
+  atomic for discovery instead of every activity appearing twice.
 - **Organizational (resource) perspective**: with a resource attribute (a CSV
   `resource` column or the XES `org:resource` attribute), Minera builds the
   handover-of-work social network — how often work passes from one resource to
@@ -127,7 +136,7 @@ workflows with native performance.
   value.
 - Log preprocessing: filter an event log by time range (keep the events inside
   a window, or the cases contained in / intersecting it), activity projection,
-  resource (performer) projection, attribute values (drop or keep matching
+  resource (performer) projection, lifecycle projection, attribute values (drop or keep matching
   events, or whole cases with a match), case-attribute values (keep or drop
   whole cases by their own attributes), rework (keep only cases where an
   activity repeats), between-extraction (cut each case into the subtraces
@@ -166,10 +175,11 @@ auto count = graph.edge_count("Register request", "Check ticket");
 ```
 
 By default, Minera expects CSV columns named `case_id`, `activity`, and
-optionally `timestamp` and `resource`. If `timestamp` is present, events inside
-each trace are sorted lexicographically by timestamp, which fits ISO-8601
-exports, and feeds the performance perspective; if `resource` is present it
-feeds the organizational perspective.
+optionally `timestamp`, `resource`, and `lifecycle`. If `timestamp` is present,
+events inside each trace are sorted lexicographically by timestamp, which fits
+ISO-8601 exports, and feeds the performance perspective; if `resource` is
+present it feeds the organizational perspective; if `lifecycle` is present its
+start/complete pairs feed the activity service times.
 
 ## Frontend
 
@@ -197,7 +207,8 @@ events first; discovery lives in tabs:
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)
   when the log is timed, a variant explorer that highlights paths on the map,
-  per-activity frequency, entry, and exit statistics, and an
+  per-activity frequency, entry, and exit statistics (plus a mean service
+  time per activity when the log records lifecycle start/complete pairs), and an
   **eventually-follows matrix** — a heatmap of how often each activity is
   eventually followed by each other, exposing long-range order the map's
   local edges don't show,

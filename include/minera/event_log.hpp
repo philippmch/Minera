@@ -27,6 +27,10 @@ struct Event {
   std::string resource;  // who performed the activity; empty when unknown
   std::size_t input_order = 0;
   std::vector<EventAttribute> attributes;  // in input order
+  // XES lifecycle:transition ("start", "complete", …); empty when the log
+  // records atomic events. Kept last so aggregate initializers without it
+  // stay valid.
+  std::string lifecycle;
 
   // The value of the named generic attribute, or nullptr when the event does
   // not carry it. Linear, but events carry only a handful of attributes.

@@ -30,6 +30,10 @@ export interface FilterOptions {
   removeActivities?: string[];
   keepResources?: string[];
   removeResources?: string[];
+  /** Lifecycle projection: e.g. keepLifecycles: ["complete"] reduces a
+   * start/complete log to atomic events for discovery. */
+  keepLifecycles?: string[];
+  removeLifecycles?: string[];
   startActivities?: string[];
   endActivities?: string[];
   /** Keep only cases where this activity occurs at least reworkMin times. */
@@ -101,6 +105,10 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("keep_resources", options.keepResources.join(","));
   if (options.removeResources?.length)
     add("remove_resources", options.removeResources.join(","));
+  if (options.keepLifecycles?.length)
+    add("keep_lifecycles", options.keepLifecycles.join(","));
+  if (options.removeLifecycles?.length)
+    add("remove_lifecycles", options.removeLifecycles.join(","));
   if (options.startActivities?.length)
     add("start_activities", options.startActivities.join(","));
   if (options.endActivities?.length)

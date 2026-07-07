@@ -187,6 +187,49 @@ void performance_ignores_untimed_logs() {
   assert(perf.edges.front().stats.count == 0);
 }
 
+void service_times_pair_lifecycle_starts_and_completes() {
+  // Case 1 works on A for 30 s; case 2 opens two A instances that finish in
+  // arrival order (FIFO), 40 s each — and spells its transitions uppercase,
+  // as BPI-style logs do. B never has both a start and a complete, so it
+  // contributes no service time.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp,lifecycle\n"
+      "1,A,2026-01-01T00:00:00,start\n"
+      "1,A,2026-01-01T00:00:30,complete\n"
+      "1,B,2026-01-01T00:01:00,complete\n"
+      "2,A,2026-01-01T00:00:00,START\n"
+      "2,A,2026-01-01T00:00:10,start\n"
+      "2,A,2026-01-01T00:00:40,COMPLETE\n"
+      "2,A,2026-01-01T00:00:50,complete\n"
+      "2,B,2026-01-01T00:01:00,start\n");
+  const auto log = minera::import_csv_event_log(path);
+  assert(log.traces.front().events.front().lifecycle == "start");
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto perf = minera::compute_performance_metrics(log, graph);
+
+  // Only A ever pairs; the unmatched B events are atomic observations.
+  assert(perf.activity_service.size() == 1);
+  const auto& service = perf.activity_service.front();
+  assert(service.activity == *graph.activity_id("A"));
+  assert(service.stats.count == 3);
+  assert(near(service.stats.min, 30.0));
+  assert(near(service.stats.max, 40.0));
+  assert(near(service.stats.median, 40.0));
+  assert(near(service.stats.mean, 110.0 / 3.0));
+}
+
+void service_times_absent_for_atomic_logs() {
+  // A log without lifecycle transitions yields no service times at all.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp\n"
+      "1,A,2026-01-01T00:00:00\n"
+      "1,B,2026-01-01T00:01:00\n");
+  const auto log = minera::import_csv_event_log(path);
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto perf = minera::compute_performance_metrics(log, graph);
+  assert(perf.activity_service.empty());
+}
+
 void variant_durations_summarize_per_variant() {
   // Two cases share the variant A->B->C (spanning 120 s and 60 s) and one case
   // is the variant A->C (spanning 30 s). Throughput must be summarized per
@@ -461,6 +504,25 @@ void json_export_carries_performance_and_resource_contracts() {
   // The per-event resource shows up in the trace dump.
   assert(json.find("\"resource\": \"alice\"") != std::string::npos);
 
+  // A lifecycle log additionally carries per-event transitions and the
+  // service-time block inside performance.
+  const auto lifecycle_path = write_temp_log(
+      "case_id,activity,timestamp,lifecycle\n"
+      "1,A,2026-01-01T00:00:00,start\n"
+      "1,A,2026-01-01T00:00:30,complete\n");
+  const auto lifecycle_log = minera::import_csv_event_log(lifecycle_path);
+  const auto lifecycle_graph =
+      minera::discover_directly_follows_graph(lifecycle_log);
+  const auto lifecycle_perf =
+      minera::compute_performance_metrics(lifecycle_log, lifecycle_graph);
+  const auto lifecycle_json =
+      minera::analysis_json("test", lifecycle_log, lifecycle_graph, nullptr,
+                            nullptr, nullptr, nullptr, &lifecycle_perf);
+  assert(lifecycle_json.find("\"lifecycle\": \"start\"") != std::string::npos);
+  assert(lifecycle_json.find("\"activities\": [{\"activity\": 0, \"stats\": "
+                             "{\"count\": 1, \"total\": 30") !=
+         std::string::npos);
+
   // Both sections are omitted when not supplied (older-export compatibility).
   const auto without = minera::analysis_json("test", log, graph);
   assert(without.find("\"performance\"") == std::string::npos);
@@ -486,6 +548,8 @@ int main() {
   performance_takes_the_median_of_varied_waits();
   performance_measures_the_case_arrival_rate();
   performance_ignores_untimed_logs();
+  service_times_pair_lifecycle_starts_and_completes();
+  service_times_absent_for_atomic_logs();
   variant_durations_summarize_per_variant();
   variant_durations_empty_without_timestamps();
   resource_network_counts_handovers();

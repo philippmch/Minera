@@ -12,6 +12,8 @@ interface FiltersProps {
   activities: string[];
   /** Resource names from the original log; empty when the log has no resources. */
   resources: string[];
+  /** Lifecycle transitions of the original log; empty for atomic events. */
+  lifecycles: string[];
   /** Generic event attributes of the original log; empty when it has none. */
   attributes: EventAttributeStat[];
   /** Case attributes of the original log; empty when it has none. */
@@ -28,6 +30,7 @@ interface FiltersProps {
 export function Filters({
   activities,
   resources,
+  lifecycles,
   attributes,
   caseAttributes,
   active,
@@ -47,6 +50,9 @@ export function Filters({
   // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [removedResources, setRemovedResources] = useState<Set<string>>(
+    new Set(),
+  );
+  const [removedLifecycles, setRemovedLifecycles] = useState<Set<string>>(
     new Set(),
   );
   // Attribute filter: one key, its dropped values, and whether dropping acts
@@ -79,6 +85,7 @@ export function Filters({
   };
   const toggleActivity = toggle(setRemoved);
   const toggleResource = toggle(setRemovedResources);
+  const toggleLifecycle = toggle(setRemovedLifecycles);
   const toggleValue = toggle(setRemovedValues);
   const toggleCaseValue = toggle(setRemovedCaseValues);
 
@@ -108,6 +115,9 @@ export function Filters({
   const apply = () => {
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
+    const removeLifecycleList = lifecycles.filter((l) =>
+      removedLifecycles.has(l),
+    );
     // Only an actually dropped value activates the attribute filter; a picked
     // key alone is just browsing its values and must not change the mine.
     const removeValueList =
@@ -124,6 +134,8 @@ export function Filters({
       removeActivities: removeList.length > 0 ? removeList : undefined,
       removeResources:
         removeResourceList.length > 0 ? removeResourceList : undefined,
+      removeLifecycles:
+        removeLifecycleList.length > 0 ? removeLifecycleList : undefined,
       timeFrom: timeFrom || undefined,
       timeTo: timeTo || undefined,
       timeMode: timeFrom || timeTo ? timeMode : undefined,
@@ -163,6 +175,7 @@ export function Filters({
     setBetweenEnd("");
     setRemoved(new Set());
     setRemovedResources(new Set());
+    setRemovedLifecycles(new Set());
     setAttributeKey("");
     setRemovedValues(new Set());
     setAttributeMode("events");
@@ -187,6 +200,7 @@ export function Filters({
     betweenEnd !== "" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
+    removedLifecycles.size > 0 ||
     attributeKey !== "" ||
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
@@ -355,6 +369,31 @@ export function Filters({
                       key={name}
                       className={dropped ? "filters-chip dropped" : "filters-chip"}
                       onClick={() => toggleResource(name)}
+                      title={dropped ? `Add ${name} back` : `Drop ${name}`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {lifecycles.length > 0 && (
+            <div className="filters-activities">
+              <span className="filters-field-label">
+                Lifecycle transitions{" "}
+                <small>(click to drop; keep only “complete” to make a
+                start/complete log atomic)</small>
+              </span>
+              <div className="filters-chips">
+                {lifecycles.map((name) => {
+                  const dropped = removedLifecycles.has(name);
+                  return (
+                    <button
+                      key={name}
+                      className={dropped ? "filters-chip dropped" : "filters-chip"}
+                      onClick={() => toggleLifecycle(name)}
                       title={dropped ? `Add ${name} back` : `Drop ${name}`}
                     >
                       {name}

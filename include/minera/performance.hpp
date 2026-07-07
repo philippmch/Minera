@@ -28,12 +28,28 @@ struct EdgePerformance {
   DurationStats stats;
 };
 
+// Service-time statistics for one activity: how long work actually takes
+// inside the activity, measured between its lifecycle start and complete
+// events. Identified by the DirectlyFollowsGraph's activity id.
+struct ActivityPerformance {
+  std::size_t activity = 0;
+  DurationStats stats;
+};
+
 // The performance (time) perspective of a log: how long the process waits on
 // each directly-follows edge and how long whole cases take end to end. Edge
 // timings are keyed by activity id and emitted in the same order as the
 // directly-follows graph's edges, so a frontend can zip the two together.
 struct PerformanceMetrics {
   std::vector<EdgePerformance> edges;
+  // Activity service times from lifecycle start/complete pairs (matched
+  // first-in-first-out per case and activity, case-insensitively, so BPI-style
+  // "START"/"COMPLETE" logs work). Only activities with at least one pair
+  // appear, in activity-id order; a log of atomic events yields an empty
+  // vector. Other transitions (schedule, suspend, resume) are ignored, so a
+  // suspended activity's service time spans start to complete including the
+  // suspension.
+  std::vector<ActivityPerformance> activity_service;
   DurationStats case_duration;     // first-to-last event of each timed trace
   // Case arrival rate: the gaps between consecutive case start instants
   // (cases sorted by their first timed event). `mean` is the average time

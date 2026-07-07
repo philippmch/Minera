@@ -38,6 +38,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.keepActivities?.length ||
       filters.removeResources?.length ||
       filters.keepResources?.length ||
+      filters.removeLifecycles?.length ||
+      filters.keepLifecycles?.length ||
       filters.startActivities?.length ||
       filters.endActivities?.length ||
       filters.minLength ||
@@ -49,6 +51,22 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.caseAttributeKey ||
       (filters.betweenStart && filters.betweenEnd),
   );
+}
+
+/**
+ * Distinct lifecycle transitions the log's events carry, in first-seen order.
+ * Empty for a log of atomic events; feeds the lifecycle filter chips.
+ */
+export function logLifecycles(data: MineraExport): string[] {
+  const seen: string[] = [];
+  for (const trace of data.traces ?? []) {
+    for (const event of trace.events) {
+      if (event.lifecycle && !seen.includes(event.lifecycle)) {
+        seen.push(event.lifecycle);
+      }
+    }
+  }
+  return seen;
 }
 
 /**

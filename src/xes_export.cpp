@@ -69,14 +69,13 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
 
 void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
   bool any_resource = false;
+  bool any_lifecycle = false;
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
-      if (!event.resource.empty()) {
-        any_resource = true;
-        break;
-      }
+      any_resource = any_resource || !event.resource.empty();
+      any_lifecycle = any_lifecycle || !event.lifecycle.empty();
     }
-    if (any_resource) break;
+    if (any_resource && any_lifecycle) break;
   }
 
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -89,6 +88,10 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
   if (any_resource) {
     out << "  <extension name=\"Organizational\" prefix=\"org\" "
            "uri=\"http://www.xes-standard.org/org.xesext\"/>\n";
+  }
+  if (any_lifecycle) {
+    out << "  <extension name=\"Lifecycle\" prefix=\"lifecycle\" "
+           "uri=\"http://www.xes-standard.org/lifecycle.xesext\"/>\n";
   }
   out << "  <global scope=\"trace\">\n"
          "    <string key=\"concept:name\" value=\"\"/>\n"
@@ -122,6 +125,10 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
       }
       if (!event.resource.empty()) {
         write_string_attribute(out, "      ", "org:resource", event.resource);
+      }
+      if (!event.lifecycle.empty()) {
+        write_string_attribute(out, "      ", "lifecycle:transition",
+                               event.lifecycle);
       }
       for (const auto& attribute : event.attributes) {
         write_typed_attribute(out, "      ", attribute);

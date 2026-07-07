@@ -77,6 +77,9 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("resource_column"); !value.empty()) {
     params.csv.resource_column = value;
   }
+  if (const auto value = field("lifecycle_column"); !value.empty()) {
+    params.csv.lifecycle_column = value;
+  }
   if (const auto value = field("delimiter"); !value.empty()) {
     params.csv.delimiter = value.front();
   }
@@ -109,6 +112,12 @@ MineParams parse_mine_params(const FieldLookup& field) {
   }
   if (const auto value = field("remove_resources"); !value.empty()) {
     params.filter.remove_resources = split_csv(value);
+  }
+  if (const auto value = field("keep_lifecycles"); !value.empty()) {
+    params.filter.keep_lifecycles = split_csv(value);
+  }
+  if (const auto value = field("remove_lifecycles"); !value.empty()) {
+    params.filter.remove_lifecycles = split_csv(value);
   }
   if (const auto value = field("attribute_key"); !value.empty()) {
     params.filter.attribute_key = value;

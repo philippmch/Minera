@@ -116,6 +116,8 @@ EventLog import_xes_event_log(
               saw_timestamp = true;
             } else if (*key == options.resource_attribute) {
               current_event.resource = *value;
+            } else if (*key == options.lifecycle_attribute) {
+              current_event.lifecycle = *value;
             } else if (const auto kind = attribute_kind_of(token.name)) {
               // Any other scalar attribute is kept generically, with its XES
               // type so an export can round-trip it faithfully.

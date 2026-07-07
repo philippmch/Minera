@@ -2089,6 +2089,88 @@ void json_export_carries_event_attributes() {
   assert(plain_json.find("event_attributes") == std::string::npos);
 }
 
+void importers_read_lifecycle_transitions() {
+  // The CSV `lifecycle` column and the XES lifecycle:transition attribute
+  // both land on the first-class lifecycle field, never on the generic
+  // event attributes.
+  const auto path = write_temp_log(
+      "case_id,activity,timestamp,lifecycle,channel\n"
+      "1,A,2026-01-01T00:00:00,start,web\n"
+      "1,A,2026-01-01T00:00:30,complete,web\n");
+  const auto csv_log = minera::import_csv_event_log(path);
+  const auto& csv_events = csv_log.traces.front().events;
+  assert(csv_events[0].lifecycle == "start");
+  assert(csv_events[1].lifecycle == "complete");
+  assert(csv_events[0].attribute("lifecycle") == nullptr);
+  assert(*csv_events[0].attribute("channel") == "web");
+
+  const auto xes_log = import_xes(
+      "<log>\n"
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"c\"/>\n"
+      "    <event>\n"
+      "      <string key=\"concept:name\" value=\"A\"/>\n"
+      "      <string key=\"lifecycle:transition\" value=\"start\"/>\n"
+      "    </event>\n"
+      "  </trace>\n"
+      "</log>\n");
+  const auto& xes_event = xes_log.traces.front().events.front();
+  assert(xes_event.lifecycle == "start");
+  assert(xes_event.attribute("lifecycle:transition") == nullptr);
+}
+
+void xes_export_round_trips_lifecycle() {
+  // Lifecycle transitions survive an export/import cycle, and the export
+  // declares the Lifecycle extension only when the log uses one.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "c1";
+  trace.events.push_back(minera::Event{"c1", "a", "", "", 0, {}, "start"});
+  trace.events.push_back(minera::Event{"c1", "a", "", "", 1, {}, "complete"});
+  log.traces.push_back(trace);
+
+  const auto xes = minera::to_xes(log);
+  assert(xes.find("lifecycle.xesext") != std::string::npos);
+  assert(xes.find("<string key=\"lifecycle:transition\" value=\"start\"/>") !=
+         std::string::npos);
+
+  std::istringstream input(xes);
+  const auto reread = minera::import_xes_event_log(input);
+  assert(reread.traces.front().events[0].lifecycle == "start");
+  assert(reread.traces.front().events[1].lifecycle == "complete");
+
+  // An atomic log declares no Lifecycle extension.
+  const auto atomic = minera::to_xes(log_from_variants({{"a"}}));
+  assert(atomic.find("lifecycle.xesext") == std::string::npos);
+}
+
+void filter_projects_by_lifecycle() {
+  // One case: a start, a complete, and an atomic b without a lifecycle.
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "1";
+  trace.events.push_back(minera::Event{"1", "a", "", "", 0, {}, "start"});
+  trace.events.push_back(minera::Event{"1", "a", "", "", 1, {}, "complete"});
+  trace.events.push_back(minera::Event{"1", "b", "", "", 2});
+  log.traces.push_back(trace);
+
+  minera::LogFilterOptions keep;
+  keep.keep_lifecycles = {"complete"};
+  assert(keep.any());
+  const auto completes = minera::filter_event_log(log, keep);
+  // Only the complete survives; the lifecycle-less event is never kept by a
+  // keep-set — this is the projection that makes a start/complete log atomic.
+  assert(completes.traces.front().events.size() == 1);
+  assert(completes.traces.front().events.front().lifecycle == "complete");
+
+  minera::LogFilterOptions remove;
+  remove.remove_lifecycles = {"start"};
+  const auto no_starts = minera::filter_event_log(log, remove);
+  // The start goes; the lifecycle-less event is never dropped by a remove-set.
+  assert((activity_names(no_starts.traces.front()) ==
+          std::vector<std::string>{"a", "b"}));
+}
+
 void csv_importer_maps_case_columns_to_case_attributes() {
   // A `case:`-prefixed column is a case attribute: stored once on the trace
   // under the unprefixed key (first value wins, blanks skipped), and never
@@ -2555,6 +2637,9 @@ int main() {
   filter_attribute_traces_mode_selects_cases();
   filter_attribute_values_require_a_key();
   json_export_carries_event_attributes();
+  importers_read_lifecycle_transitions();
+  xes_export_round_trips_lifecycle();
+  filter_projects_by_lifecycle();
   csv_importer_maps_case_columns_to_case_attributes();
   xes_importer_captures_case_attributes();
   xes_export_round_trips_case_attributes();

@@ -70,9 +70,9 @@ struct AttributeMatcher {
   }
 };
 
-// Projects a trace's events on the activity, resource, and — when `attribute`
-// is non-null — generic-attribute constraints at once, dropping events outside
-// a keep-set or inside a remove-set and preserving order. An event with no
+// Projects a trace's events on the activity, resource, lifecycle, and — when
+// `attribute` is non-null — generic-attribute constraints at once, dropping
+// events outside a keep-set or inside a remove-set and preserving order. An event with no
 // resource is never kept by a resource keep-set and never dropped by a
 // resource remove-set, so a resource filter only ever acts on events that
 // actually name a performer.
@@ -81,6 +81,8 @@ Trace project_events(const Trace& trace,
                      const std::unordered_set<std::string>& remove_activities,
                      const std::unordered_set<std::string>& keep_resources,
                      const std::unordered_set<std::string>& remove_resources,
+                     const std::unordered_set<std::string>& keep_lifecycles,
+                     const std::unordered_set<std::string>& remove_lifecycles,
                      const AttributeMatcher* attribute) {
   Trace result;
   result.case_id = trace.case_id;
@@ -101,6 +103,15 @@ Trace project_events(const Trace& trace,
     }
     if (!remove_resources.empty() && !event.resource.empty() &&
         remove_resources.find(event.resource) != remove_resources.end()) {
+      continue;
+    }
+    if (!keep_lifecycles.empty() &&
+        (event.lifecycle.empty() ||
+         keep_lifecycles.find(event.lifecycle) == keep_lifecycles.end())) {
+      continue;
+    }
+    if (!remove_lifecycles.empty() && !event.lifecycle.empty() &&
+        remove_lifecycles.find(event.lifecycle) != remove_lifecycles.end()) {
       continue;
     }
     if (attribute != nullptr && !attribute->keeps_event(event)) {
@@ -208,6 +219,8 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const auto remove = to_set(options.remove_activities);
   const auto keep_res = to_set(options.keep_resources);
   const auto remove_res = to_set(options.remove_resources);
+  const auto keep_life = to_set(options.keep_lifecycles);
+  const auto remove_life = to_set(options.remove_lifecycles);
   const auto starts = to_set(options.start_activities);
   const auto ends = to_set(options.end_activities);
 
@@ -291,7 +304,8 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     }
 
     Trace projected = project_events(*source, keep, remove, keep_res,
-                                     remove_res, event_attribute);
+                                     remove_res, keep_life, remove_life,
+                                     event_attribute);
     if (projected.events.empty()) continue;
 
     if (attribute.active() &&
