@@ -24,6 +24,7 @@ add_library(minera_core
   src/bpmn.cpp
   src/conformance.cpp
   src/csv_event_log_importer.cpp
+  src/decision_mining.cpp
   src/directly_follows_graph.cpp
   src/event_ordering.cpp
   src/eventually_follows.cpp

@@ -236,6 +236,43 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+// On-demand decision mining of one model from the most recent mine: which
+// attribute values steer a case down which branch of the net. Expects a
+// `miner` query parameter like /api/align.
+void handle_decide(const httplib::Request& request,
+                   httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  const std::string miner = request.get_param_value("miner");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+
+  try {
+    auto decisions = minera::mine_decisions(session->log, it->second);
+    decisions.miner = miner;
+    response.set_content(minera::decisions_json(decisions),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // Exports one model from the most recent mine as standard PNML. Expects a
 // `miner` query parameter ("inductive" | "alpha" | "heuristic").
 void handle_pnml(const httplib::Request& request, httplib::Response& response) {
@@ -413,10 +450,12 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
+  server.Options("/api/decide", preflight);
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Post("/api/decide", handle_decide);
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);

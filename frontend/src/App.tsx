@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
   type CaseAttributeStat,
+  type Decisions,
   type EventAttributeStat,
   type MineraExport,
   isMineraExport,
@@ -27,6 +28,7 @@ import { Filters } from "./components/Filters";
 import {
   alignModel,
   checkModel,
+  decideModel,
   mineCsv,
   type FilterOptions,
   type MinerOptions,
@@ -66,6 +68,8 @@ export default function App() {
   // Alignments the backend computed on demand, cached per miner for the current
   // analysis so revisiting a model never refetches. Reset whenever data changes.
   const alignCache = useRef<Record<string, Alignments>>({});
+  // Decision mining, deferred and cached the same way.
+  const decideCache = useRef<Record<string, Decisions>>({});
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -86,18 +90,31 @@ export default function App() {
     [data],
   );
 
+  // Decision mining for a model, fetched on demand and cached like alignments.
+  const requestDecisions = useCallback(async (minerId: string): Promise<Decisions> => {
+    const cached = decideCache.current[minerId];
+    if (cached) return cached;
+    const result = await decideModel(minerId);
+    decideCache.current = { ...decideCache.current, [minerId]: result };
+    return result;
+  }, []);
+
   // Checks an uploaded PNML model against the mined log. A new upload replaces
-  // the server's cached "imported" net, so its stale alignments are dropped.
+  // the server's cached "imported" net, so its stale alignments and decisions
+  // are dropped.
   const requestModelCheck = useCallback(async (file: File) => {
     const result = await checkModel(file);
     const { imported: _dropped, ...rest } = alignCache.current;
     alignCache.current = rest;
+    const { imported: _droppedDecisions, ...restDecisions } = decideCache.current;
+    decideCache.current = restDecisions;
     return result;
   }, []);
 
   const openData = (parsed: MineraExport) => {
     setData(parsed);
     alignCache.current = {};
+    decideCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -156,6 +173,10 @@ export default function App() {
     mineCsv(source.file, { delimiter: source.delimiter, ...filters })
       .then((result) => {
         setData(result);
+        // The re-mine replaced the server session, so cached on-demand
+        // results belong to the previous analysis.
+        alignCache.current = {};
+        decideCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
@@ -349,6 +370,7 @@ export default function App() {
           <Conformance
             data={data}
             onRequestAlignment={requestAlignment}
+            onRequestDecisions={source ? requestDecisions : undefined}
             onCheckModel={requestModelCheck}
           />
         </main>

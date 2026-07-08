@@ -381,6 +381,77 @@ void write_case_attribute_stats(std::ostream& out, const EventLog& log) {
   write_attribute_stats(out, "case_attributes", "cases", keys);
 }
 
+void write_decision_counts(std::ostream& out,
+                           const std::vector<std::uint64_t>& counts) {
+  out << '[';
+  for (std::size_t i = 0; i < counts.size(); ++i) {
+    out << counts[i] << (i + 1 < counts.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+// One decision-tree node, recursively: an internal node carries its split test
+// and both subtrees, a leaf its predicted branch; both carry the per-branch
+// observation counts the node saw.
+void write_decision_node(std::ostream& out,
+                         const std::vector<DecisionNode>& nodes,
+                         std::size_t index) {
+  const auto& node = nodes[index];
+  out << "{\"counts\": ";
+  write_decision_counts(out, node.branch_counts);
+  if (node.then_child < 0) {
+    const auto majority = static_cast<std::size_t>(
+        std::max_element(node.branch_counts.begin(), node.branch_counts.end()) -
+        node.branch_counts.begin());
+    out << ", \"branch\": " << majority << '}';
+    return;
+  }
+  out << ", \"key\": ";
+  write_json_string(out, node.split.key);
+  if (node.split.numeric) {
+    out << ", \"threshold\": " << node.split.threshold;
+  } else {
+    out << ", \"value\": ";
+    write_json_string(out, node.split.value);
+  }
+  out << ", \"then\": ";
+  write_decision_node(out, nodes, static_cast<std::size_t>(node.then_child));
+  out << ", \"else\": ";
+  write_decision_node(out, nodes, static_cast<std::size_t>(node.else_child));
+  out << '}';
+}
+
+void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
+  out << '{';
+  if (!decisions.miner.empty()) {
+    out << "\"miner\": ";
+    write_json_string(out, decisions.miner);
+    out << ", ";
+  }
+  out << "\"observed_traces\": " << decisions.observed_traces
+      << ", \"trace_count\": " << decisions.trace_count
+      << ", \"decision_points\": [";
+  for (std::size_t i = 0; i < decisions.decision_points.size(); ++i) {
+    const auto& point = decisions.decision_points[i];
+    const auto& root = point.nodes.front().branch_counts;
+    out << "{\"place\": " << point.place
+        << ", \"observations\": " << point.observations
+        << ", \"accuracy\": " << point.accuracy
+        << ", \"majority_share\": " << point.majority_share
+        << ", \"branches\": [";
+    for (std::size_t b = 0; b < point.branches.size(); ++b) {
+      out << "{\"label\": ";
+      write_json_string(out, point.branches[b]);
+      out << ", \"count\": " << root[b] << '}'
+          << (b + 1 < point.branches.size() ? ", " : "");
+    }
+    out << "], \"tree\": ";
+    write_decision_node(out, point.nodes, 0);
+    out << '}' << (i + 1 < decisions.decision_points.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
   out << "{\"count\": " << stats.count << ", \"total\": " << stats.total
       << ", \"mean\": " << stats.mean << ", \"median\": " << stats.median
@@ -446,7 +517,8 @@ void write_analysis_json(std::ostream& out,
                          const PerformanceMetrics* performance,
                          const ResourceNetwork* resources,
                          const std::vector<DurationStats>* variant_durations,
-                         const std::vector<EventuallyFollowsEdge>* eventually_follows) {
+                         const std::vector<EventuallyFollowsEdge>* eventually_follows,
+                         const DecisionMiningResult* decisions) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -567,6 +639,10 @@ void write_analysis_json(std::ostream& out,
     }
     out << "  ]";
   }
+  if (decisions != nullptr) {
+    out << ",\n  \"decisions\": ";
+    write_decisions(out, *decisions);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -581,11 +657,18 @@ std::string analysis_json(std::string_view dataset,
                           const PerformanceMetrics* performance,
                           const ResourceNetwork* resources,
                           const std::vector<DurationStats>* variant_durations,
-                          const std::vector<EventuallyFollowsEdge>* eventually_follows) {
+                          const std::vector<EventuallyFollowsEdge>* eventually_follows,
+                          const DecisionMiningResult* decisions) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
-                      eventually_follows);
+                      eventually_follows, decisions);
+  return out.str();
+}
+
+std::string decisions_json(const DecisionMiningResult& decisions) {
+  std::ostringstream out;
+  write_decisions(out, decisions);
   return out.str();
 }
 

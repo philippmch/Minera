@@ -134,6 +134,40 @@ class Replayer {
     return counts;
   }
 
+  // Like replay(), but only for traces that replay cleanly, and returning what
+  // fired instead of token counts: one entry per consumed event holding the
+  // transitions fired for it — silent routing first, the event's visible
+  // transition last — plus one final entry for the routing to the sink.
+  // nullopt as soon as the replay deviates (an activity the net lacks, a
+  // missing token, or leftover tokens at the end), because a forced replay's
+  // firing sequence would not be a real path through the model.
+  [[nodiscard]] std::optional<std::vector<std::vector<std::size_t>>>
+  clean_firing_sequence(
+      const std::vector<std::optional<std::size_t>>& trace) const {
+    Marking marking = initial_marking();
+    std::vector<std::vector<std::size_t>> steps;
+    steps.reserve(trace.size() + 1);
+    for (const auto& step : trace) {
+      if (!step || transitions_by_activity_[*step].empty()) {
+        return std::nullopt;
+      }
+      const Step& result = cached_step(marking, *step);
+      if (result.missing != 0) return std::nullopt;
+      marking = result.marking;
+      steps.push_back(result.fired);
+    }
+    const Step& finish = cached_finish(marking);
+    if (finish.missing != 0) return std::nullopt;
+    marking = finish.marking;
+    if (marking[net_.sink()] <= 0) return std::nullopt;
+    --marking[net_.sink()];
+    for (const int tokens : marking) {
+      if (tokens > 0) return std::nullopt;
+    }
+    steps.push_back(finish.fired);
+    return steps;
+  }
+
   // The marking replay starts from: one token on the source place.
   [[nodiscard]] Marking initial_marking() const {
     Marking marking(net_.place_count(), 0);
@@ -1582,6 +1616,23 @@ AlignmentResult check_alignment(const EventLog& event_log,
   // A process tree always translates to a sound workflow net, so this path
   // never reports computed == false.
   return check_alignment(event_log, to_petri_net(tree));
+}
+
+std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
+replay_firing_sequences(const PetriNet& net,
+                        const std::vector<std::vector<std::string>>& variants) {
+  const Replayer replayer(net);
+  std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result;
+  result.reserve(variants.size());
+  for (const auto& variant : variants) {
+    std::vector<std::optional<std::size_t>> ids;
+    ids.reserve(variant.size());
+    for (const auto& name : variant) {
+      ids.push_back(replayer.activity_id(name));
+    }
+    result.push_back(replayer.clean_firing_sequence(ids));
+  }
+  return result;
 }
 
 bool final_marking_reachable(const PetriNet& net) {

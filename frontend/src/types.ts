@@ -287,6 +287,51 @@ export interface Trace {
   attributes?: Record<string, string>;
 }
 
+/**
+ * A node of a mined decision tree. A split node carries `key` plus either
+ * `value` (equality) or `threshold` (numeric ≤) and both subtrees; a leaf
+ * carries `branch`, the predicted branch index. Both carry the per-branch
+ * observation counts the node saw.
+ */
+export interface DecisionTreeNode {
+  counts: number[];
+  branch?: number;
+  key?: string;
+  value?: string;
+  threshold?: number;
+  then?: DecisionTreeNode;
+  else?: DecisionTreeNode;
+}
+
+/** One alternative of a decision point, with its observed frequency. */
+export interface DecisionBranch {
+  label: string;
+  count: number;
+}
+
+/** One place of the net where replay must choose among several transitions. */
+export interface DecisionPoint {
+  place: number;
+  observations: number;
+  /** Share of observations the mined tree predicts correctly. */
+  accuracy: number;
+  /** Baseline: always guessing the most frequent branch. */
+  majority_share: number;
+  branches: DecisionBranch[];
+  tree: DecisionTreeNode;
+}
+
+/** Decision mining of one model: which attributes steer each choice. */
+export interface Decisions {
+  /** Miner id the decisions belong to; absent in on-demand server responses
+   * from older versions. */
+  miner?: string;
+  /** Traces that replayed cleanly and contributed observations. */
+  observed_traces: number;
+  trace_count: number;
+  decision_points: DecisionPoint[];
+}
+
 export interface MineraExport {
   dataset: string;
   generator?: string;
@@ -329,6 +374,11 @@ export interface MineraExport {
    * the log has none and in exports from older minera versions.
    */
   case_attributes?: CaseAttributeStat[];
+  /**
+   * Decision mining of one model (its id in `decisions.miner`), embedded by
+   * the CLI's --decisions flag; the server serves it on demand instead.
+   */
+  decisions?: Decisions;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {

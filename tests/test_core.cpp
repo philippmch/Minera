@@ -5,6 +5,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -2171,6 +2172,170 @@ void filter_projects_by_lifecycle() {
           std::vector<std::string>{"a", "b"}));
 }
 
+void replay_firing_sequences_walk_fitting_variants() {
+  const auto tree = minera::discover_process_tree(log_from_variants({{"a", "b"}}));
+  const auto net = minera::to_petri_net(tree);
+  const auto sequences =
+      minera::replay_firing_sequences(net, {{"a", "b"}, {"a", "x"}, {"b"}});
+  assert(sequences.size() == 3);
+
+  // The fitting variant yields one entry per event plus the finish routing,
+  // each event entry ending with its visible transition.
+  assert(sequences[0]);
+  assert(sequences[0]->size() == 3);
+  for (std::size_t i = 0; i < 2; ++i) {
+    const auto& fired = (*sequences[0])[i];
+    assert(!fired.empty());
+    const auto& last = net.transitions()[fired.back()];
+    assert(!last.silent());
+    assert(net.activities()[*last.activity] == (i == 0 ? "a" : "b"));
+  }
+
+  // An unknown activity and a missing-token replay both disqualify.
+  assert(!sequences[1]);
+  assert(!sequences[2]);
+}
+
+// Register → (Approve | Reject) → Notify, with a numeric case attribute
+// `amount` deciding the branch: 12 approvals at 500, 8 rejections at 2000.
+minera::EventLog decision_amount_log() {
+  minera::EventLog log;
+  for (std::size_t c = 0; c < 20; ++c) {
+    const bool approve = c < 12;
+    minera::Trace trace;
+    trace.case_id = std::to_string(c + 1);
+    trace.attributes.push_back({"amount", approve ? "500" : "2000",
+                                minera::AttributeKind::kInt});
+    std::size_t order = 0;
+    for (const char* activity :
+         {"Register", approve ? "Approve" : "Reject", "Notify"}) {
+      trace.events.push_back(
+          minera::Event{trace.case_id, activity, "", "", order++});
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+void decision_mining_recovers_a_numeric_rule() {
+  const auto log = decision_amount_log();
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+  const auto decisions = minera::mine_decisions(log, net);
+
+  // The inductive model fits its own log perfectly: every trace contributes.
+  assert(decisions.observed_traces == 20);
+  assert(decisions.trace_count == 20);
+  assert(decisions.decision_points.size() == 1);
+
+  const auto& point = decisions.decision_points.front();
+  assert(point.observations == 20);
+  assert(point.branches.size() == 2);
+  const bool approve_first = point.branches[0] == "Approve";
+  assert(point.branches[approve_first ? 0 : 1] == "Approve");
+  assert(point.branches[approve_first ? 1 : 0] == "Reject");
+
+  // The mined rule is a threshold on the amount, separating 500 from 2000.
+  const auto& root = point.nodes.front();
+  assert(root.then_child >= 0);
+  assert(root.split.key == "amount");
+  assert(root.split.numeric);
+  assert(root.split.threshold > 500.0 && root.split.threshold < 2000.0);
+  assert(point.accuracy == 1.0);
+  assert(point.majority_share == 0.6);
+}
+
+void decision_mining_uses_prior_event_attributes_only() {
+  // The channel is written by Register — one step before the choice — so it
+  // is in scope and separates the branches. A second run tags the *choice
+  // event itself* instead: information that does not exist yet when the
+  // token leaves the decision place, so no rule may use it.
+  const auto build = [](bool on_register) {
+    minera::EventLog log;
+    for (std::size_t c = 0; c < 20; ++c) {
+      const bool web = c < 12;
+      minera::Trace trace;
+      trace.case_id = std::to_string(c + 1);
+      std::size_t order = 0;
+      minera::Event reg{trace.case_id, "Register", "", "", order++};
+      minera::Event check{trace.case_id,
+                          web ? "AutoCheck" : "ManualCheck", "", "", order++};
+      minera::EventAttribute channel{
+          "channel", web ? "web" : "phone", minera::AttributeKind::kString};
+      (on_register ? reg : check).attributes.push_back(channel);
+      trace.events.push_back(std::move(reg));
+      trace.events.push_back(std::move(check));
+      trace.events.push_back(
+          minera::Event{trace.case_id, "Done", "", "", order++});
+      log.traces.push_back(std::move(trace));
+    }
+    return log;
+  };
+
+  const auto in_scope = build(true);
+  const auto net = minera::to_petri_net(minera::discover_process_tree(in_scope));
+  const auto found = minera::mine_decisions(in_scope, net);
+  assert(found.decision_points.size() == 1);
+  const auto& rule = found.decision_points.front();
+  assert(rule.nodes.front().then_child >= 0);
+  assert(rule.nodes.front().split.key == "channel");
+  assert(!rule.nodes.front().split.numeric);
+  assert(rule.nodes.front().split.value == "web");
+  assert(rule.accuracy == 1.0);
+
+  const auto too_late = build(false);
+  const auto blind = minera::mine_decisions(too_late, net);
+  assert(blind.decision_points.size() == 1);
+  // Single-leaf tree: the attribute arrives with the choice, not before it.
+  assert(blind.decision_points.front().nodes.size() == 1);
+  assert(blind.decision_points.front().accuracy ==
+         blind.decision_points.front().majority_share);
+}
+
+void decision_mining_skips_deviating_traces() {
+  auto log = decision_amount_log();
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+
+  // A trace with an activity the model lacks cannot replay cleanly, so its
+  // choices are not observed.
+  minera::Trace rogue;
+  rogue.case_id = "rogue";
+  rogue.events.push_back(minera::Event{"rogue", "Register", "", "", 0});
+  rogue.events.push_back(minera::Event{"rogue", "Zap", "", "", 1});
+  log.traces.push_back(std::move(rogue));
+
+  const auto decisions = minera::mine_decisions(log, net);
+  assert(decisions.trace_count == 21);
+  assert(decisions.observed_traces == 20);
+  assert(decisions.decision_points.size() == 1);
+  assert(decisions.decision_points.front().observations == 20);
+}
+
+void json_export_carries_the_decisions_contract() {
+  const auto log = decision_amount_log();
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+  auto decisions = minera::mine_decisions(log, net);
+  decisions.miner = "inductive";
+
+  const auto json = minera::analysis_json(
+      "test", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, &decisions);
+  for (const char* key :
+       {"\"decisions\"", "\"miner\": \"inductive\"", "\"observed_traces\": 20",
+        "\"decision_points\"", "\"branches\"", "\"tree\"",
+        "\"key\": \"amount\"", "\"threshold\"", "\"branch\"",
+        "\"accuracy\"", "\"majority_share\""}) {
+    assert(json.find(key) != std::string::npos);
+  }
+  // Omitted entirely when not supplied.
+  const auto without = minera::analysis_json("test", log, graph);
+  assert(without.find("\"decisions\"") == std::string::npos);
+
+  // The standalone writer serves the same object for the server endpoint.
+  const auto standalone = minera::decisions_json(decisions);
+  assert(standalone.find("\"decision_points\"") != std::string::npos);
+}
+
 void csv_importer_maps_case_columns_to_case_attributes() {
   // A `case:`-prefixed column is a case attribute: stored once on the trace
   // under the unprefixed key (first value wins, blanks skipped), and never
@@ -2637,6 +2802,11 @@ int main() {
   filter_attribute_traces_mode_selects_cases();
   filter_attribute_values_require_a_key();
   json_export_carries_event_attributes();
+  replay_firing_sequences_walk_fitting_variants();
+  decision_mining_recovers_a_numeric_rule();
+  decision_mining_uses_prior_event_attributes_only();
+  decision_mining_skips_deviating_traces();
+  json_export_carries_the_decisions_contract();
   importers_read_lifecycle_transitions();
   xes_export_round_trips_lifecycle();
   filter_projects_by_lifecycle();

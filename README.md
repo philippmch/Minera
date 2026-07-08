@@ -89,6 +89,21 @@ workflows with native performance.
   shows (precision), and lists the deviating pairs. Token replay and footprints
   are robust on unsound nets; alignments report that they can't be computed when
   a net (e.g. an Alpha net with concurrency) has an unreachable final marking.
+- **Decision mining** (Rozinat & van der Aalst): where a model offers
+  alternatives — a place in the workflow net with several outgoing
+  transitions — Minera learns *which attribute values steer a case down which
+  branch*. Every trace that replays cleanly contributes its choices, each
+  observed together with the attributes in scope at that moment (the case
+  attributes plus the latest value of every event attribute and the
+  performing resource seen strictly before the event that triggered the
+  choice — information that arrives *with* the choice is never used to
+  explain it). A small CART-style decision tree (Gini impurity, binary
+  categorical-equality and numeric-threshold splits, missing values falling
+  to the else side) is grown per decision point and reported as readable
+  rules — `amount ≤ 1150 → Approve` — with each tree's accuracy against the
+  always-guess-the-majority baseline, so an uninformative rule is visible as
+  such. Works on any miner's model: CLI `--decisions <miner>`, or the
+  Conformance tab's **Decisions** method, mined on demand like alignments.
 - **Performance (time) perspective**: from event timestamps, Minera measures
   the waiting time on every directly-follows edge (count, mean, median, min,
   max, total) and the end-to-end throughput time of each case. An ISO-8601
@@ -225,7 +240,10 @@ events first; discovery lives in tabs:
   deviate. **Token Replay** shows token counts; **Alignments** renders each
   deviating trace move by move (synchronous, log-only, model-only);
   **Footprints** compares the log's and model's directly-follows relations and
-  lists the successions they disagree on. Every miner is checked at import;
+  lists the successions they disagree on; **Decisions** mines, from the
+  cleanly replaying cases, which attribute values steer a case down which
+  branch of the model — readable rules with their accuracy against the
+  majority baseline. Every miner is checked at import;
   when a model isn't a sound workflow net the alignment view says so rather
   than showing misleading numbers (token replay and footprints still apply),
 - **Resources** — when the log carries a resource attribute: the workload per
@@ -267,6 +285,10 @@ column names and delimiters, plus log-filtering flags applied before discovery
 `--check-pnml model.pnml` additionally checks the log against the workflow net
 in that PNML file; its results appear in the export under the conformance id
 `imported`, next to the discovered models.
+
+`--decisions <miner>` additionally mines the decision points of one
+discovered model — which attribute values steer a case down which branch —
+and embeds the rules in the export under `decisions`.
 
 `--xes out.xes` additionally writes the event log — after any filtering — as
 standard XES, making the CLI double as a CSV-to-XES converter. `--bpmn
