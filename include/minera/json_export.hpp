@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
 #include "minera/eventually_follows.hpp"
@@ -32,6 +33,8 @@ namespace minera {
 // object to each emitted variant — the variant's case-throughput statistics.
 // When `eventually_follows` is non-null the eventually-follows graph is
 // embedded under "eventually_follows", shaped like "edges".
+// When `decisions` is non-null the decision-mining result is embedded under
+// "decisions".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -43,7 +46,8 @@ void write_analysis_json(std::ostream& out,
                          const PerformanceMetrics* performance = nullptr,
                          const ResourceNetwork* resources = nullptr,
                          const std::vector<DurationStats>* variant_durations = nullptr,
-                         const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr);
+                         const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
+                         const DecisionMiningResult* decisions = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -56,7 +60,13 @@ void write_analysis_json(std::ostream& out,
     const PerformanceMetrics* performance = nullptr,
     const ResourceNetwork* resources = nullptr,
     const std::vector<DurationStats>* variant_durations = nullptr,
-    const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr);
+    const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
+    const DecisionMiningResult* decisions = nullptr);
+
+// Serializes a decision-mining result — per decision point, the branch
+// frequencies and the mined rule tree — as one standalone object: the same
+// shape embedded under "decisions", for the server's on-demand endpoint.
+[[nodiscard]] std::string decisions_json(const DecisionMiningResult& decisions);
 
 // Serializes a single alignment result (the object the frontend reads as one
 // model's `alignments`), for the server's on-demand alignment endpoint.

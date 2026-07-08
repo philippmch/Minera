@@ -1,12 +1,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   type Alignments as AlignmentsResult,
+  type Decisions as DecisionsResult,
+  type DecisionPoint,
   type MineraExport,
   type ModelConformance,
   numberFormat,
 } from "../types";
 import { type ImportedModelCheck } from "../api";
-import { CONFORMANCE_METHODS } from "../conformance";
+import { CONFORMANCE_METHODS, flattenDecisionRules } from "../conformance";
 import { MINER_GROUPS } from "../miners";
 
 type Step = "miner" | "method" | "result";
@@ -29,10 +31,12 @@ const grade = (value: number) =>
 export function Conformance({
   data,
   onRequestAlignment,
+  onRequestDecisions,
   onCheckModel,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
+  onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
   onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
 }) {
   const [step, setStep] = useState<Step>("miner");
@@ -224,6 +228,13 @@ export function Conformance({
               data={viewData}
               footprints={models.footprints}
               minerName={minerName}
+            />
+          ) : method.artifact === "decisions" ? (
+            <DecisionsView
+              data={viewData}
+              minerId={minerId}
+              minerName={minerName}
+              onRequestDecisions={onRequestDecisions}
             />
           ) : (
             <TokenReplay
@@ -503,6 +514,203 @@ function Footprints({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Decision mining is deferred like alignments: this wrapper uses the embedded
+// result when a CLI export carries one for the selected miner, and otherwise
+// fetches it on demand from the backend.
+function DecisionsView({
+  data,
+  minerId,
+  minerName,
+  onRequestDecisions,
+}: {
+  data: MineraExport;
+  minerId: string;
+  minerName: string;
+  onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
+}) {
+  const embedded =
+    data.decisions && data.decisions.miner === minerId
+      ? data.decisions
+      : undefined;
+  const [fetched, setFetched] = useState<DecisionsResult | null>(
+    embedded ?? null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const requestRef = useRef(onRequestDecisions);
+  requestRef.current = onRequestDecisions;
+
+  useEffect(() => {
+    if (embedded) {
+      setFetched(embedded);
+      return;
+    }
+    if (!requestRef.current) return;
+    let cancelled = false;
+    setFetched(null);
+    setError(null);
+    setLoading(true);
+    requestRef
+      .current(minerId)
+      .then((result) => !cancelled && setFetched(result))
+      .catch(
+        (cause) =>
+          !cancelled &&
+          setError(cause instanceof Error ? cause.message : String(cause)),
+      )
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [minerId, embedded]);
+
+  if (!embedded && !onRequestDecisions) {
+    return (
+      <section className="panel map-panel">
+        <div className="model-empty">
+          No decision mining for the {minerName} model in this export. Produce
+          it with <code>minera_export --decisions {minerId}</code>, or open the
+          raw event log so it can be mined on demand.
+        </div>
+      </section>
+    );
+  }
+  if (error) {
+    return (
+      <section className="panel conf-panel">
+        <div className="conf-notice">
+          <span className="conf-notice-mark">⚠</span>
+          <div>
+            <h3>Couldn't mine decisions</h3>
+            <p>{error}</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (loading || !fetched) {
+    return (
+      <section className="panel conf-panel">
+        <p className="conf-loading">Mining decision points</p>
+      </section>
+    );
+  }
+  return <DecisionsResultView decisions={fetched} minerName={minerName} />;
+}
+
+// One readable rule per leaf of the mined tree: the conjunction of conditions
+// on the path down, the branch the tree predicts there, and its support.
+function DecisionRules({
+  point,
+}: {
+  point: DecisionPoint;
+}) {
+  return (
+    <div className="decision-tree">
+      {flattenDecisionRules(point.tree).map((rule, index) => (
+        <div className="decision-rule" key={index}>
+          <span className="decision-rule-prefix">
+            {rule.conditions.length > 0
+              ? `if ${rule.conditions.join(" and ")}`
+              : "always"}{" "}
+            →
+          </span>
+          <span className="decision-rule-branch">
+            {point.branches[rule.branch]?.label ?? "?"}
+          </span>
+          <span className="decision-rule-support">
+            {numberFormat.format(rule.hit)} of {numberFormat.format(rule.total)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The mined decision points, most-consulted first: each shows its branch
+// frequencies and the attribute rules that explain the choice, with the
+// tree's accuracy against the always-guess-the-majority baseline.
+function DecisionsResultView({
+  decisions,
+  minerName,
+}: {
+  decisions: DecisionsResult;
+  minerName: string;
+}) {
+  if (decisions.decision_points.length === 0) {
+    return (
+      <section className="panel map-panel">
+        <div className="model-empty">
+          The {minerName} model has no observed decision points —
+          {decisions.observed_traces === 0
+            ? " no trace replays cleanly against it, so no choice can be trusted."
+            : " it offers no choices along the paths the log takes."}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div className="conformance reveal">
+      {decisions.observed_traces < decisions.trace_count && (
+        <p className="conf-inline-note">
+          Mined from the {numberFormat.format(decisions.observed_traces)} of{" "}
+          {numberFormat.format(decisions.trace_count)} cases that replay
+          cleanly against the {minerName} model — a deviating case's choices
+          can't be trusted, so it contributes none.
+        </p>
+      )}
+      {decisions.decision_points.map((point, index) => {
+        const explains = point.accuracy > point.majority_share + 1e-9;
+        return (
+          <section className="panel conf-panel" key={point.place}>
+            <div className="panel-head">
+              <h2>Decision point {index + 1}</h2>
+              <span className="panel-meta">
+                {numberFormat.format(point.observations)} observations ·{" "}
+                {point.branches.length} branches
+              </span>
+            </div>
+            <div className="decision-branches">
+              {point.branches.map((branch) => (
+                <span className="decision-branch" key={branch.label}>
+                  <span className="decision-branch-label">{branch.label}</span>
+                  <span className="decision-branch-count">
+                    {numberFormat.format(branch.count)}
+                    <small>
+                      {" "}
+                      ·{" "}
+                      {point.observations > 0
+                        ? `${((branch.count / point.observations) * 100).toFixed(1)}%`
+                        : "—"}
+                    </small>
+                  </span>
+                </span>
+              ))}
+            </div>
+            {explains ? (
+              <>
+                <DecisionRules point={point} />
+                <p className="decision-accuracy">
+                  These rules predict {percent(point.accuracy)} of the
+                  observations; always guessing the most frequent branch gets{" "}
+                  {percent(point.majority_share)}.
+                </p>
+              </>
+            ) : (
+              <p className="decision-accuracy">
+                No attribute in scope separates these branches better than
+                always guessing the most frequent one (
+                {percent(point.majority_share)}).
+              </p>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

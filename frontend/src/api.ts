@@ -1,6 +1,7 @@
 import {
   type ActivityStat,
   type Alignments,
+  type Decisions,
   type MineraExport,
   type ModelConformance,
   isMineraExport,
@@ -223,6 +224,41 @@ export async function alignModel(miner: string): Promise<Alignments> {
     throw new Error("the Minera backend returned an invalid alignment");
   }
   return parsed as Alignments;
+}
+
+/**
+ * Asks the backend to mine the decision points of one miner's model: which
+ * attribute values steer a case down which branch. Like alignments this is
+ * deferred to an on-demand request, so a mine never pays for decisions the
+ * user may not open.
+ */
+export async function decideModel(miner: string): Promise<Decisions> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/decide?miner=${encodeURIComponent(miner)}`, {
+      method: "POST",
+    });
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+    throw new Error(String((parsed as { error: unknown }).error));
+  }
+  if (!response.ok) {
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    !("decision_points" in parsed)
+  ) {
+    throw new Error("the Minera backend returned an invalid decision mining");
+  }
+  return parsed as Decisions;
 }
 
 /** The backend's answer to checking an uploaded PNML model against the log. */

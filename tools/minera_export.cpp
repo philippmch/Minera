@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -90,6 +92,11 @@ int usage(const char* program) {
                "                            inductive (default), alpha, or heuristic\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
+               "  --decisions <miner>       Mine the decision points of one\n"
+               "                            model (inductive, alpha, or\n"
+               "                            heuristic): which attribute values\n"
+               "                            steer a case down which branch;\n"
+               "                            embedded under \"decisions\"\n"
                "\n  Log filtering (applied before discovery):\n"
                "  --time-from <iso8601>     Keep only behaviour at/after this instant\n"
                "  --time-to <iso8601>       Keep only behaviour at/before this instant\n"
@@ -149,6 +156,7 @@ int main(int argc, char** argv) {
   std::filesystem::path xes_output;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
+  std::string decisions_miner;  // empty = no decision mining
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   minera::InductiveMinerOptions inductive_options;
@@ -205,6 +213,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       bpmn_miner = value;
+    } else if (arg == "--decisions") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      decisions_miner = value;
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -418,10 +430,32 @@ int main(int argc, char** argv) {
     }
     const auto dataset = input.filename().string();
 
+    // Optionally mine the decision points of one model's net.
+    std::optional<minera::DecisionMiningResult> decisions;
+    if (!decisions_miner.empty()) {
+      const minera::PetriNet* selected = nullptr;
+      if (decisions_miner == "inductive") {
+        selected = &inductive_net;
+      } else if (decisions_miner == "alpha") {
+        selected = &net;
+      } else if (decisions_miner == "heuristic") {
+        selected = &heuristic_net;
+      } else {
+        std::cerr << "error: unknown --decisions miner '" << decisions_miner
+                  << "' (expected inductive, alpha, or heuristic)\n";
+        return 2;
+      }
+      decisions = minera::mine_decisions(log, *selected);
+      decisions->miner = decisions_miner;
+    }
+    const minera::DecisionMiningResult* decisions_ptr =
+        decisions ? &*decisions : nullptr;
+
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations, &eventually);
+                                  &resources, &variant_durations, &eventually,
+                                  decisions_ptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -430,7 +464,8 @@ int main(int argc, char** argv) {
       }
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations, &eventually);
+                                  &resources, &variant_durations, &eventually,
+                                  decisions_ptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

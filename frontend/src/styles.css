@@ -1096,6 +1096,64 @@ input[type="range"]::-moz-range-thumb {
   overflow-wrap: anywhere;
 }
 
+.decision-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px 4px;
+}
+
+.decision-branch {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.decision-branch-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-45);
+}
+
+.decision-tree {
+  padding: 8px 16px 0;
+}
+
+.decision-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.decision-rule-prefix {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-45);
+}
+
+.decision-rule-branch {
+  font-weight: 600;
+}
+
+.decision-rule-support {
+  font-size: 12px;
+  color: var(--ink-45);
+  font-variant-numeric: tabular-nums;
+}
+
+.decision-accuracy {
+  padding: 8px 16px 14px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-45);
+}
+
 .case-event-lifecycle {
   font-family: var(--font-mono);
   font-size: 11px;

@@ -137,6 +137,18 @@ struct AlignmentResult {
   std::vector<VariantAlignment> variants;  // worst-fitting first
 };
 
+// Replays each trace variant (a sequence of activity names) against the net
+// and returns, per variant, the transitions its clean token replay fires: one
+// inner list per consumed event — silent routing first, the event's visible
+// transition last — plus one final list for the routing to the sink. A variant
+// that does not replay cleanly (an activity the net lacks, a missing token, or
+// leftover tokens at the end) yields nullopt instead, because a forced
+// replay's firings would not be a real path through the model. Feeds decision
+// mining, which must know which transition consumed which place's token.
+[[nodiscard]] std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
+replay_firing_sequences(const PetriNet& net,
+                        const std::vector<std::vector<std::string>>& variants);
+
 // Whether `net`'s final marking is reachable from its initial marking — the
 // practical bar for being a sound workflow net, and the precondition for
 // alignment. Cheap: a single shortest-run search. The Alpha Miner can produce

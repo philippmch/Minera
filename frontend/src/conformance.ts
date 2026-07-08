@@ -3,7 +3,13 @@
 // by appending to CONFORMANCE_METHODS, and — only for a genuinely new result
 // shape — teaching Conformance how to render that artifact.
 
-export type ConformanceArtifact = "token-replay" | "alignments" | "footprints";
+import { type DecisionTreeNode } from "./types";
+
+export type ConformanceArtifact =
+  | "token-replay"
+  | "alignments"
+  | "footprints"
+  | "decisions";
 
 export interface ConformanceMethod {
   id: string;
@@ -52,6 +58,55 @@ export const CONFORMANCE_METHODS: ConformanceMethod[] = [
       "Works even for an unsound net, where alignments cannot.",
     artifact: "footprints",
   },
+  {
+    id: "decisions",
+    name: "Decisions",
+    tagline:
+      "Learn which attribute values steer a case down which branch.",
+    description:
+      "Finds the model's decision points — places where replay must choose " +
+      "among several transitions — and mines, from the traces that replay " +
+      "cleanly, rules over the case and event attributes in scope at each " +
+      "choice: e.g. amount ≤ 1000 → Approve. Reports each rule's accuracy " +
+      "against the always-guess-the-majority baseline.",
+    artifact: "decisions",
+  },
 ];
 
 export const DEFAULT_METHOD = CONFORMANCE_METHODS[0];
+
+/** One flattened decision rule: the conditions on the path to a leaf, the
+ * branch the leaf predicts, and how many of its observations that covers. */
+export interface DecisionRule {
+  conditions: string[];
+  branch: number;
+  hit: number;
+  total: number;
+}
+
+/** Renders one split's condition: "amount ≤ 1150" or "channel = web". */
+export function splitCondition(node: DecisionTreeNode): string {
+  if (node.threshold !== undefined) return `${node.key} ≤ ${node.threshold}`;
+  return `${node.key} = ${node.value}`;
+}
+
+/**
+ * Flattens a mined decision tree into one readable rule per leaf, in tree
+ * order: then-subtree first, each else-path condition negated. A lone leaf
+ * yields a single rule with no conditions.
+ */
+export function flattenDecisionRules(
+  node: DecisionTreeNode,
+  conditions: string[] = [],
+): DecisionRule[] {
+  if (node.branch !== undefined || !node.then || !node.else) {
+    const total = node.counts.reduce((sum, count) => sum + count, 0);
+    const branch = node.branch ?? 0;
+    return [{ conditions, branch, hit: node.counts[branch] ?? 0, total }];
+  }
+  const condition = splitCondition(node);
+  return [
+    ...flattenDecisionRules(node.then, [...conditions, condition]),
+    ...flattenDecisionRules(node.else, [...conditions, `not ${condition}`]),
+  ];
+}
