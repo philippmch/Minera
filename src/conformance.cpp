@@ -1618,6 +1618,47 @@ AlignmentResult check_alignment(const EventLog& event_log,
   return check_alignment(event_log, to_petri_net(tree));
 }
 
+std::vector<ActivityDeviation> summarize_alignment_moves(
+    const AlignmentResult& alignment) {
+  std::unordered_map<std::string, ActivityDeviation> by_activity;
+  for (const auto& variant : alignment.variants) {
+    for (const auto& move : variant.moves) {
+      auto& tally = by_activity[move.activity];
+      if (tally.activity.empty()) tally.activity = move.activity;
+      switch (move.type) {
+        case AlignmentMoveType::kSynchronous:
+          tally.synchronous += variant.count;
+          break;
+        case AlignmentMoveType::kLog:
+          tally.log_moves += variant.count;
+          break;
+        case AlignmentMoveType::kModel:
+          tally.model_moves += variant.count;
+          break;
+      }
+    }
+  }
+
+  std::vector<ActivityDeviation> result;
+  result.reserve(by_activity.size());
+  for (auto& [name, tally] : by_activity) {
+    result.push_back(std::move(tally));
+  }
+  std::sort(result.begin(), result.end(),
+            [](const ActivityDeviation& a, const ActivityDeviation& b) {
+              const auto deviations_a = a.log_moves + a.model_moves;
+              const auto deviations_b = b.log_moves + b.model_moves;
+              if (deviations_a != deviations_b) {
+                return deviations_a > deviations_b;
+              }
+              if (a.synchronous != b.synchronous) {
+                return a.synchronous > b.synchronous;
+              }
+              return a.activity < b.activity;
+            });
+  return result;
+}
+
 std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants) {

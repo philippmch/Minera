@@ -208,6 +208,19 @@ void write_alignments(std::ostream& out,
     }
     out << "]}" << (i + 1 < variants.size() ? ", " : "");
   }
+  out << "], \"activity_deviations\": [";
+  // The log-level aggregate of the moves above: which activities the model
+  // gets wrong, and how, weighted by trace counts.
+  const auto deviations = summarize_alignment_moves(alignments);
+  for (std::size_t i = 0; i < deviations.size(); ++i) {
+    const auto& entry = deviations[i];
+    const auto id = graph.activity_id(entry.activity);
+    out << "{\"activity\": " << (id ? *id : 0)
+        << ", \"synchronous\": " << entry.synchronous
+        << ", \"log_moves\": " << entry.log_moves
+        << ", \"model_moves\": " << entry.model_moves << '}'
+        << (i + 1 < deviations.size() ? ", " : "");
+  }
   out << "]}";
 }
 

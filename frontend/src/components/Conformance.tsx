@@ -8,7 +8,11 @@ import {
   numberFormat,
 } from "../types";
 import { type ImportedModelCheck } from "../api";
-import { CONFORMANCE_METHODS, flattenDecisionRules } from "../conformance";
+import {
+  CONFORMANCE_METHODS,
+  deviatingActivities,
+  flattenDecisionRules,
+} from "../conformance";
 import { MINER_GROUPS } from "../miners";
 
 type Step = "miner" | "method" | "result";
@@ -848,6 +852,7 @@ function AlignmentResultView({
       ? alignments.fitting_traces / alignments.trace_count
       : 1;
   const deviating = alignments.variants.filter((v) => v.cost > 0);
+  const deviationRows = deviatingActivities(alignments.activity_deviations);
 
   const metrics: { label: string; value: number; hint: string }[] = [
     {
@@ -885,6 +890,65 @@ function AlignmentResultView({
           </div>
         ))}
       </section>
+
+      {deviationRows.length > 0 && (
+        <section className="panel conf-panel">
+          <div className="panel-head">
+            <h2>Deviating activities</h2>
+            <span className="panel-meta">
+              across all {numberFormat.format(alignments.trace_count)} cases,
+              worst first
+            </span>
+          </div>
+          <table className="activity-table deviation-table">
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th
+                  className="num"
+                  title="Log and model agree on this activity"
+                >
+                  Synchronous
+                </th>
+                <th
+                  className="num"
+                  title="Log move: the log shows the activity where the model has no step for it"
+                >
+                  Inserted
+                </th>
+                <th
+                  className="num"
+                  title="Model move: the model requires the activity where the log lacks it"
+                >
+                  Skipped
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {deviationRows.map((row) => (
+                <tr key={row.activity}>
+                  <td>{data.activities[row.activity]?.name ?? "?"}</td>
+                  <td className="num">
+                    {row.synchronous > 0
+                      ? numberFormat.format(row.synchronous)
+                      : "·"}
+                  </td>
+                  <td className="num">
+                    {row.log_moves > 0
+                      ? numberFormat.format(row.log_moves)
+                      : "·"}
+                  </td>
+                  <td className="num">
+                    {row.model_moves > 0
+                      ? numberFormat.format(row.model_moves)
+                      : "·"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="panel conf-panel">
         <div className="panel-head">
