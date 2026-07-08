@@ -149,6 +149,27 @@ struct AlignmentResult {
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants);
 
+// Per-activity tally of alignment moves across the whole log — the aggregate
+// behind the per-variant alignments: how often the activity aligned
+// synchronously, was inserted (a log move: the log shows it where the model
+// has no step for it), or was skipped (a model move: the model requires it
+// where the log lacks it), each weighted by how many traces the variant
+// stands for.
+struct ActivityDeviation {
+  std::string activity;
+  std::uint64_t synchronous = 0;
+  std::uint64_t log_moves = 0;
+  std::uint64_t model_moves = 0;
+};
+
+// Aggregates an alignment result's per-variant moves into per-activity
+// deviation counts, most deviating activities (log + model moves) first, ties
+// most frequent first and then alphabetical. Empty when the alignment was not
+// computed. This is the log-level answer to "which activities does the model
+// get wrong", which the per-variant listing buries on a many-variant log.
+[[nodiscard]] std::vector<ActivityDeviation> summarize_alignment_moves(
+    const AlignmentResult& alignment);
+
 // Whether `net`'s final marking is reachable from its initial marking — the
 // practical bar for being a sound workflow net, and the precondition for
 // alignment. Cheap: a single shortest-run search. The Alpha Miner can produce

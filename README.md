@@ -82,7 +82,11 @@ workflows with native performance.
   walks the net from start to end (an A\* search over the synchronous product,
   guided by the marking-equation lower bound so even highly concurrent models
   stay alignable) — giving exact, optimal diagnostics of *where* and *how* each
-  trace deviates, plus cost-based fitness. **Footprint conformance** compares the
+  trace deviates, plus cost-based fitness. The moves are also aggregated per
+  activity across the whole log — how often each activity aligns
+  synchronously, is inserted (in the log with no model step), or is skipped
+  (required by the model, missing from the log), weighted by trace counts —
+  so the systemic deviations stand out from the per-trace detail. **Footprint conformance** compares the
   directly-follows relation of the log against that of the model (found by
   exploring the net's reachable markings): it reports how many of the log's
   successions the model allows (fitness) and how many of the model's the log
@@ -238,7 +242,9 @@ events first; discovery lives in tabs:
   tool) and any method: fitness, precision, generalization, and simplicity of
   the log against that model, plus a per-variant breakdown of where traces
   deviate. **Token Replay** shows token counts; **Alignments** renders each
-  deviating trace move by move (synchronous, log-only, model-only);
+  deviating trace move by move (synchronous, log-only, model-only) with a
+  per-activity deviation table — inserted and skipped counts across all
+  cases, worst first;
   **Footprints** compares the log's and model's directly-follows relations and
   lists the successions they disagree on; **Decisions** mines, from the
   cleanly replaying cases, which attribute values steer a case down which

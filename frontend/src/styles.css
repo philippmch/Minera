@@ -1096,6 +1096,11 @@ input[type="range"]::-moz-range-thumb {
   overflow-wrap: anywhere;
 }
 
+.deviation-table {
+  width: calc(100% - 32px);
+  margin: 6px 16px 14px;
+}
+
 .decision-branches {
   display: flex;
   flex-wrap: wrap;

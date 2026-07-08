@@ -2172,6 +2172,56 @@ void filter_projects_by_lifecycle() {
           std::vector<std::string>{"a", "b"}));
 }
 
+void alignment_summary_tallies_moves_per_activity() {
+  // Model: a → b → c. Log: three clean traces, two skipping b (a model move
+  // each), one inserting an unknown x (a log move). The aggregate must weigh
+  // each variant by its trace count and rank deviating activities first.
+  const auto tree =
+      minera::discover_process_tree(log_from_variants({{"a", "b", "c"}}));
+  const auto net = minera::to_petri_net(tree);
+  const auto log = log_from_variants({{"a", "b", "c"},
+                                      {"a", "b", "c"},
+                                      {"a", "b", "c"},
+                                      {"a", "c"},
+                                      {"a", "c"},
+                                      {"a", "b", "x", "c"}});
+  const auto alignment = minera::check_alignment(log, net);
+  assert(alignment.computed);
+
+  const auto summary = minera::summarize_alignment_moves(alignment);
+  assert(summary.size() == 4);
+  // b: skipped twice, otherwise synchronous — the most deviating activity.
+  assert(summary[0].activity == "b");
+  assert(summary[0].synchronous == 4);
+  assert(summary[0].log_moves == 0);
+  assert(summary[0].model_moves == 2);
+  // x: inserted once; the model has no step for it at all.
+  assert(summary[1].activity == "x");
+  assert(summary[1].synchronous == 0);
+  assert(summary[1].log_moves == 1);
+  assert(summary[1].model_moves == 0);
+  // a and c never deviate; equal tallies fall back to alphabetical order.
+  assert(summary[2].activity == "a");
+  assert(summary[2].synchronous == 6);
+  assert(summary[3].activity == "c");
+  assert(summary[3].synchronous == 6);
+  assert(summary[2].log_moves + summary[2].model_moves == 0);
+
+  // The aggregate rides inside the alignments JSON as activity ids.
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto json = minera::alignment_json(alignment, graph);
+  assert(json.find("\"activity_deviations\": [") != std::string::npos);
+  const std::string b_entry =
+      "{\"activity\": " + std::to_string(*graph.activity_id("b")) +
+      ", \"synchronous\": 4, \"log_moves\": 0, \"model_moves\": 2}";
+  assert(json.find(b_entry) != std::string::npos);
+
+  // An uncomputable alignment aggregates to nothing.
+  assert(minera::summarize_alignment_moves(minera::AlignmentResult{
+                                               false, false})
+             .empty());
+}
+
 void replay_firing_sequences_walk_fitting_variants() {
   const auto tree = minera::discover_process_tree(log_from_variants({{"a", "b"}}));
   const auto net = minera::to_petri_net(tree);
@@ -2802,6 +2852,7 @@ int main() {
   filter_attribute_traces_mode_selects_cases();
   filter_attribute_values_require_a_key();
   json_export_carries_event_attributes();
+  alignment_summary_tallies_moves_per_activity();
   replay_firing_sequences_walk_fitting_variants();
   decision_mining_recovers_a_numeric_rule();
   decision_mining_uses_prior_event_attributes_only();

@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { flattenDecisionRules, splitCondition } from "./conformance";
+import {
+  deviatingActivities,
+  flattenDecisionRules,
+  splitCondition,
+} from "./conformance";
 import { type DecisionTreeNode } from "./types";
+
+describe("deviatingActivities", () => {
+  it("keeps only rows with deviations, preserving the backend order", () => {
+    const rows = [
+      { activity: 1, synchronous: 4, log_moves: 0, model_moves: 2 },
+      { activity: 3, synchronous: 0, log_moves: 1, model_moves: 0 },
+      { activity: 0, synchronous: 6, log_moves: 0, model_moves: 0 },
+    ];
+    expect(deviatingActivities(rows)).toEqual([rows[0], rows[1]]);
+  });
+
+  it("is empty for missing or all-synchronous tallies", () => {
+    expect(deviatingActivities(undefined)).toEqual([]);
+    expect(
+      deviatingActivities([
+        { activity: 0, synchronous: 9, log_moves: 0, model_moves: 0 },
+      ]),
+    ).toEqual([]);
+  });
+});
 
 describe("splitCondition", () => {
   it("renders numeric splits as thresholds and categorical ones as equality", () => {

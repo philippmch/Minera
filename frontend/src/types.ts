@@ -141,6 +141,11 @@ export interface Alignments {
   total_cost: number;
   /** Variants worst-fitting first. */
   variants: VariantAlignment[];
+  /**
+   * Per-activity move tallies across the log, most deviating first. Absent
+   * in exports from older minera versions.
+   */
+  activity_deviations?: ActivityDeviation[];
 }
 
 /** One directly-follows succession (b follows a); indexes into activities. */
@@ -285,6 +290,19 @@ export interface Trace {
   events: TraceEvent[];
   /** Case attributes (XES trace attributes, `case:` CSV columns). */
   attributes?: Record<string, string>;
+}
+
+/**
+ * Per-activity tally of alignment moves across the whole log: how often the
+ * activity aligned synchronously, was inserted (log move), or skipped (model
+ * move), weighted by trace counts. Most deviating first.
+ */
+export interface ActivityDeviation {
+  /** Index into MineraExport.activities. */
+  activity: number;
+  synchronous: number;
+  log_moves: number;
+  model_moves: number;
 }
 
 /**

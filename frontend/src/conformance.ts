@@ -3,7 +3,7 @@
 // by appending to CONFORMANCE_METHODS, and — only for a genuinely new result
 // shape — teaching Conformance how to render that artifact.
 
-import { type DecisionTreeNode } from "./types";
+import { type ActivityDeviation, type DecisionTreeNode } from "./types";
 
 export type ConformanceArtifact =
   | "token-replay"
@@ -74,6 +74,20 @@ export const CONFORMANCE_METHODS: ConformanceMethod[] = [
 ];
 
 export const DEFAULT_METHOD = CONFORMANCE_METHODS[0];
+
+/**
+ * The activities whose alignments actually deviate — at least one inserted
+ * (log) or skipped (model) move — keeping the backend's most-deviating-first
+ * order. Activities that only ever align synchronously are noise in a
+ * deviation table, so they are dropped.
+ */
+export function deviatingActivities(
+  deviations: ActivityDeviation[] | undefined,
+): ActivityDeviation[] {
+  return (deviations ?? []).filter(
+    (entry) => entry.log_moves + entry.model_moves > 0,
+  );
+}
 
 /** One flattened decision rule: the conditions on the path to a leaf, the
  * branch the leaf predicts, and how many of its observations that covers. */
