@@ -67,10 +67,11 @@ workflows with native performance.
   is translated to a workflow net (the Inductive Miner's process tree, the Alpha
   Miner's net directly, and the Heuristic Miner's dependency graph with its
   AND/XOR split and join semantics) — or against a **user-supplied model**: a PNML
-  importer reads a workflow net discovered or drawn in another tool, and a
-  BPMN importer reads a BPMN 2.0 process from any modeler, so the
-  same checks run on either (CLI `--check-pnml` / `--check-bpmn`, or upload
-  the file in the frontend's Conformance tab). **Token replay**
+  importer reads a workflow net discovered or drawn in another tool, a
+  BPMN importer reads a BPMN 2.0 process from any modeler, and a PTML
+  importer reads a process tree, so the
+  same checks run on any of them (CLI `--check-pnml` / `--check-bpmn` /
+  `--check-ptml`, or upload the file in the frontend's Conformance tab). **Token replay**
   measures **fitness** (how much of the log the model reproduces) and escaping
   edges measure **precision** (how little extra behavior the model allows), per
   variant and in aggregate — with precision measured both over replayed states
@@ -141,6 +142,13 @@ workflows with native performance.
   PM4Py — and a PNML workflow net from any of those tools can be read back for
   conformance checking. Every miner reuses the same workflow-net translation
   used for conformance, so the exported net is exactly what Minera checks.
+- **Process-tree PTML export and import**: the Inductive Miner's
+  block-structured tree writes as PTML — the process-tree interchange format
+  other process-mining tools read (one element per node, loops in the
+  three-child body/redo/exit shape they expect) — and a PTML tree from any of
+  them reads back for conformance checking, playout, or re-export. A loop's
+  non-silent exit child converts as "run once after the loop", so the checked
+  net means exactly what the tree says.
 - **BPMN 2.0 export and import**: every miner exports — the inductive model
   converts block by block from its process tree, and the Alpha and Heuristic
   models convert from their workflow nets by token semantics — a branching
@@ -154,13 +162,13 @@ workflows with native performance.
   out, or re-exported like a discovered model. Constructs with no faithful
   workflow-net reading (inclusive and complex gateways, boundary events) are
   rejected with a clear error rather than checked approximately.
-- **Model playout**: simulate any workflow net — a discovered model, an
-  imported PNML net, or an imported BPMN process — into a synthetic,
+- **Model playout**: simulate any workflow net — a discovered model, or an
+  imported PNML net, BPMN process, or PTML tree — into a synthetic,
   timestamped event log (seeded, so runs reproduce). On a sound model every
   generated trace replays with fitness 1.0, which makes the playout a
   self-check for discovery and a test-log generator (`minera_playout
-  model.pnml -o log.xes`, `model.bpmn` likewise, or the **Simulate log**
-  button on any mined model).
+  model.pnml -o log.xes`, `model.bpmn` and `model.ptml` likewise, or the
+  **Simulate log** button on any mined model).
 - **Generic event attributes**: extra CSV columns and non-standard XES event
   attributes (channel, region, amount, …) are imported alongside the
   case/activity/timestamp/resource fields, keep their XES types through an
@@ -263,10 +271,10 @@ events first; discovery lives in tabs:
   the replay covers; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser,
   **Download … as PNML / as BPMN** buttons export any miner's model for
-  ProM/PM4Py or a BPM suite, and **Simulate log (XES)** plays the model out
+  ProM/PM4Py or a BPM suite (the inductive tree also **as PTML**), and **Simulate log (XES)** plays the model out
   into a synthetic 100-case log,
-- **Conformance** — pick any miner (or upload a PNML workflow net or a BPMN
-  2.0 process from another tool) and any method: fitness, precision, generalization, and simplicity of
+- **Conformance** — pick any miner (or upload a PNML workflow net, a BPMN
+  2.0 process, or a PTML process tree from another tool) and any method: fitness, precision, generalization, and simplicity of
   the log against that model, plus a per-variant breakdown of where traces
   deviate. **Token Replay** shows token counts; **Alignments** renders each
   deviating trace move by move (synchronous, log-only, model-only) with a
@@ -321,9 +329,12 @@ column names and delimiters, plus log-filtering flags applied before discovery
 
 `--check-pnml model.pnml` additionally checks the log against the workflow net
 in that PNML file; its results appear in the export under the conformance id
-`imported`, next to the discovered models. `--check-bpmn model.bpmn` does the
-same for a BPMN 2.0 process (the two flags share the `imported` id, so pass
-one or the other).
+`imported`, next to the discovered models. `--check-bpmn model.bpmn` and
+`--check-ptml model.ptml` do the same for a BPMN 2.0 process and a PTML
+process tree (the three flags share the `imported` id, so pass only one).
+`--ptml <path>` writes the inductive process tree as PTML, next to the
+`--pnml` / `--bpmn` model exports; the running server serves the same at
+`GET /api/ptml`.
 
 `--decisions <miner>` additionally mines the decision points of one
 discovered model — which attribute values steer a case down which branch —

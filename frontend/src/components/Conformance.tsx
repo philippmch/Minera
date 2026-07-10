@@ -158,7 +158,7 @@ export function Conformance({
             {imported || data.conformance?.[IMPORTED] ? (
               <button className="miner-card" onClick={() => chooseMiner(IMPORTED)}>
                 <span className="miner-card-name">Imported model</span>
-                <span className="miner-card-count">PNML / BPMN</span>
+                <span className="miner-card-count">PNML / BPMN / PTML</span>
                 <p className="miner-card-desc">
                   A model you supplied, checked against this log.
                 </p>
@@ -167,10 +167,11 @@ export function Conformance({
             ) : (
               <label className="miner-card miner-card-upload">
                 <span className="miner-card-name">Your model</span>
-                <span className="miner-card-count">PNML / BPMN</span>
+                <span className="miner-card-count">PNML / BPMN / PTML</span>
                 <p className="miner-card-desc">
                   Check the log against a model from another tool — upload a
-                  PNML workflow net or a BPMN 2.0 process.
+                  PNML workflow net, a BPMN 2.0 process, or a PTML process
+                  tree.
                 </p>
                 <span className="miner-card-go">
                   {importing ? "Checking…" : "Upload →"}
@@ -180,7 +181,7 @@ export function Conformance({
                 )}
                 <input
                   type="file"
-                  accept=".pnml,.bpmn,.xml"
+                  accept=".pnml,.bpmn,.ptml,.xml"
                   hidden
                   disabled={importing}
                   onChange={(e) => {

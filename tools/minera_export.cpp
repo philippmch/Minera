@@ -26,6 +26,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/pnml.hpp"
+#include "minera/ptml.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
@@ -94,6 +95,11 @@ int usage(const char* program) {
                "                            (conformance id: imported)\n"
                "  --bpmn-miner <id>         Which model to export as BPMN:\n"
                "                            inductive (default), alpha, or heuristic\n"
+               "  --ptml <path>             Also write the inductive process\n"
+               "                            tree as PTML to <path>\n"
+               "  --check-ptml <path>       Also check the log against the\n"
+               "                            process tree in this PTML file\n"
+               "                            (conformance id: imported)\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
                "  --decisions <miner>       Mine the decision points of one\n"
@@ -176,6 +182,8 @@ int main(int argc, char** argv) {
   std::filesystem::path check_pnml;
   std::filesystem::path check_bpmn;
   std::filesystem::path bpmn_output;
+  std::filesystem::path ptml_output;
+  std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
@@ -235,6 +243,14 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       check_bpmn = value;
+    } else if (arg == "--ptml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      ptml_output = value;
+    } else if (arg == "--check-ptml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      check_ptml = value;
     } else if (arg == "--bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -485,19 +501,25 @@ int main(int argc, char** argv) {
         model("heuristic", heuristic_net)};
 
     // Optionally check the log against a user-supplied model too — a PNML
-    // workflow net or a BPMN 2.0 process, both landing under the single
-    // "imported" conformance id. Its activities are registered in the id
-    // registry first, so the ones the log never shows still resolve to names
-    // in the export.
-    if (!check_pnml.empty() && !check_bpmn.empty()) {
-      std::cerr << "error: pass either --check-pnml or --check-bpmn, not "
-                   "both (they share the conformance id \"imported\")\n";
+    // workflow net, a BPMN 2.0 process, or a PTML process tree, all landing
+    // under the single "imported" conformance id. Its activities are
+    // registered in the id registry first, so the ones the log never shows
+    // still resolve to names in the export.
+    const int check_flags = (check_pnml.empty() ? 0 : 1) +
+                            (check_bpmn.empty() ? 0 : 1) +
+                            (check_ptml.empty() ? 0 : 1);
+    if (check_flags > 1) {
+      std::cerr << "error: pass only one of --check-pnml, --check-bpmn, and "
+                   "--check-ptml (they share the conformance id "
+                   "\"imported\")\n";
       return 2;
     }
-    if (!check_pnml.empty() || !check_bpmn.empty()) {
-      const auto imported = check_pnml.empty()
-                                ? minera::import_bpmn(check_bpmn)
-                                : minera::import_pnml(check_pnml);
+    if (check_flags == 1) {
+      const auto imported =
+          !check_pnml.empty()   ? minera::import_pnml(check_pnml)
+          : !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
+                                : minera::to_petri_net(
+                                      minera::import_ptml(check_ptml));
       for (const auto& activity : imported.activities()) {
         graph.ensure_activity(activity);
       }
@@ -590,6 +612,18 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, or heuristic)\n";
         return 1;
       }
+    }
+
+    // Optionally emit the inductive process tree as PTML — the only miner
+    // that produces a block-structured tree.
+    if (!ptml_output.empty()) {
+      std::ofstream ptml_file(ptml_output);
+      if (!ptml_file) {
+        std::cerr << "error: cannot open PTML output file " << ptml_output
+                  << '\n';
+        return 1;
+      }
+      minera::write_ptml(ptml_file, tree, dataset);
     }
 
     // Optionally emit the (filtered) event log as standard XES, making the
