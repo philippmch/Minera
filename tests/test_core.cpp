@@ -3,6 +3,7 @@
 #undef NDEBUG
 
 #include "minera/alpha_miner.hpp"
+#include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/decision_mining.hpp"
@@ -791,6 +792,175 @@ void parse_pnml_rejects_malformed_nets() {
   }));
   // No net at all.
   assert(throws([] { (void)minera::parse_pnml("<pnml></pnml>"); }));
+}
+
+void bpmn_round_trip_preserves_replay_behavior() {
+  const auto log = log_from_variants(
+      {{"a", "b", "c", "d"}, {"a", "c", "b", "d"}, {"a", "e", "d"}});
+  const auto tree = minera::discover_process_tree(log);
+  const auto net = minera::to_petri_net(tree);
+
+  // The inductive model fits the log perfectly; written as BPMN by either
+  // exporter (from the tree or from its net) and read back by parse_bpmn, it
+  // must still fit perfectly, by replay and by optimal alignment.
+  for (const auto& xml : {minera::to_bpmn(tree), minera::to_bpmn(net)}) {
+    assert(minera::looks_like_bpmn(xml));
+    const auto reread = minera::parse_bpmn(xml);
+    assert(minera::final_marking_reachable(reread));
+    assert(minera::check_conformance(log, reread).fitness == 1.0);
+    assert(minera::check_footprints(log, reread).fitness == 1.0);
+    assert(minera::check_alignment(log, reread).fitness == 1.0);
+  }
+  assert(!minera::looks_like_bpmn(minera::to_pnml(net)));
+
+  // The other miners' nets need not fit the log (nor be sound), but the trip
+  // through BPMN must preserve their language — visible in the footprint the
+  // reachable markings induce.
+  const auto alpha = minera::discover_petri_net(log);
+  const auto heuristic =
+      minera::to_petri_net(minera::discover_heuristics_net(log));
+  for (const auto* model : {&alpha, &heuristic}) {
+    const auto reread = minera::parse_bpmn(minera::to_bpmn(*model));
+    const auto before = minera::check_footprints(log, *model);
+    const auto after = minera::check_footprints(log, reread);
+    assert(before.fitness == after.fitness);
+    assert(before.precision == after.precision);
+    assert(before.model_relations == after.model_relations);
+  }
+}
+
+// A hand-written BPMN model the way modelers export it: every element
+// namespace-qualified, a parallel block between two gateways, an exclusive
+// choice, an escaped label, and a diagram section to ignore.
+constexpr const char* kForeignBpmn = R"(<?xml version="1.0"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" id="defs">
+  <bpmn2:process id="p1" isExecutable="false">
+    <bpmn2:startEvent id="start"/>
+    <bpmn2:task id="reg" name="register &amp; file"/>
+    <bpmn2:parallelGateway id="split"/>
+    <bpmn2:userTask id="check" name="check"/>
+    <bpmn2:serviceTask id="notify" name="notify"/>
+    <bpmn2:parallelGateway id="join"/>
+    <bpmn2:exclusiveGateway id="choice"/>
+    <bpmn2:task id="approve" name="approve"/>
+    <bpmn2:task id="reject" name="reject"/>
+    <bpmn2:exclusiveGateway id="merge"/>
+    <bpmn2:endEvent id="end"/>
+    <bpmn2:sequenceFlow id="f1" sourceRef="start" targetRef="reg"/>
+    <bpmn2:sequenceFlow id="f2" sourceRef="reg" targetRef="split"/>
+    <bpmn2:sequenceFlow id="f3" sourceRef="split" targetRef="check"/>
+    <bpmn2:sequenceFlow id="f4" sourceRef="split" targetRef="notify"/>
+    <bpmn2:sequenceFlow id="f5" sourceRef="check" targetRef="join"/>
+    <bpmn2:sequenceFlow id="f6" sourceRef="notify" targetRef="join"/>
+    <bpmn2:sequenceFlow id="f7" sourceRef="join" targetRef="choice"/>
+    <bpmn2:sequenceFlow id="f8" sourceRef="choice" targetRef="approve"/>
+    <bpmn2:sequenceFlow id="f9" sourceRef="choice" targetRef="reject"/>
+    <bpmn2:sequenceFlow id="f10" sourceRef="approve" targetRef="merge"/>
+    <bpmn2:sequenceFlow id="f11" sourceRef="reject" targetRef="merge"/>
+    <bpmn2:sequenceFlow id="f12" sourceRef="merge" targetRef="end"/>
+  </bpmn2:process>
+  <bpmndi:BPMNDiagram id="diagram"/>
+</bpmn2:definitions>)";
+
+void parse_bpmn_reads_a_foreign_model() {
+  const auto net = minera::parse_bpmn(kForeignBpmn);
+  assert((net.activities() == std::vector<std::string>{
+              "register & file", "check", "notify", "approve", "reject"}));
+  assert(minera::final_marking_reachable(net));
+
+  // The parallel gateways admit both interleavings, the exclusive gateway
+  // exactly one of its branches.
+  const auto fitting = log_from_variants(
+      {{"register & file", "check", "notify", "approve"},
+       {"register & file", "notify", "check", "reject"}});
+  assert(minera::check_conformance(fitting, net).fitness == 1.0);
+  assert(minera::check_alignment(fitting, net).fitness == 1.0);
+
+  // Skipping one parallel branch or running both choice branches deviates.
+  const auto broken = log_from_variants(
+      {{"register & file", "check", "approve"},
+       {"register & file", "check", "notify", "approve", "reject"}});
+  assert(minera::check_alignment(broken, net).fitness < 1.0);
+}
+
+void parse_bpmn_keeps_disconnected_tasks() {
+  // An activity that is disconnected in the mined net exports as a task no
+  // sequence flow reaches; reading it back must keep it a dead transition —
+  // absent from replayed behaviour but still counted against the log that
+  // uses it — instead of failing the whole import.
+  const auto net = minera::parse_bpmn(R"(<definitions>
+    <process id="p">
+      <startEvent id="s"/>
+      <task id="a" name="a"/>
+      <task id="orphan" name="orphan"/>
+      <endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <sequenceFlow id="f2" sourceRef="a" targetRef="e"/>
+    </process>
+  </definitions>)");
+  assert((net.activities() == std::vector<std::string>{"a", "orphan"}));
+  assert(minera::final_marking_reachable(net));
+  assert(minera::check_conformance(log_from_variants({{"a"}}), net).fitness ==
+         1.0);
+  assert(minera::check_conformance(log_from_variants({{"a", "orphan"}}), net)
+             .fitness < 1.0);
+}
+
+void parse_bpmn_reads_subprocesses() {
+  // An expanded subprocess converts recursively between its own start and
+  // end events; a collapsed (childless) one behaves as an atomic task.
+  const auto net = minera::parse_bpmn(R"(<definitions>
+    <process id="p">
+      <startEvent id="s"/>
+      <task id="a" name="a"/>
+      <subProcess id="sub" name="handle">
+        <startEvent id="ss"/>
+        <task id="b" name="b"/>
+        <endEvent id="se"/>
+        <sequenceFlow id="g1" sourceRef="ss" targetRef="b"/>
+        <sequenceFlow id="g2" sourceRef="b" targetRef="se"/>
+      </subProcess>
+      <subProcess id="atom" name="archive"/>
+      <endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <sequenceFlow id="f2" sourceRef="a" targetRef="sub"/>
+      <sequenceFlow id="f3" sourceRef="sub" targetRef="atom"/>
+      <sequenceFlow id="f4" sourceRef="atom" targetRef="e"/>
+    </process>
+  </definitions>)");
+  assert((net.activities() ==
+          std::vector<std::string>{"a", "b", "archive"}));
+  const auto log = log_from_variants({{"a", "b", "archive"}});
+  assert(minera::check_conformance(log, net).fitness == 1.0);
+  assert(minera::check_alignment(log, net).fitness == 1.0);
+}
+
+void parse_bpmn_rejects_unsupported_models() {
+  // An inclusive gateway has no faithful workflow-net reading.
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><inclusiveGateway id="g"/><endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="g"/>
+      <sequenceFlow id="f2" sourceRef="g" targetRef="e"/>
+    </process></definitions>)");
+  }));
+  // A sequence flow referencing a node that does not exist.
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="ghost"/>
+    </process></definitions>)");
+  }));
+  // A process without a start or end event cannot be replayed source-to-sink.
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <task id="a" name="a"/><endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="a" targetRef="e"/>
+    </process></definitions>)");
+  }));
+  // No process at all.
+  assert(throws([] { (void)minera::parse_bpmn("<definitions/>"); }));
 }
 
 void xes_export_round_trips_the_log() {
@@ -2799,6 +2969,11 @@ int main() {
   parse_pnml_reads_a_foreign_net();
   parse_pnml_infers_missing_markings();
   parse_pnml_rejects_malformed_nets();
+  bpmn_round_trip_preserves_replay_behavior();
+  parse_bpmn_reads_a_foreign_model();
+  parse_bpmn_keeps_disconnected_tasks();
+  parse_bpmn_reads_subprocesses();
+  parse_bpmn_rejects_unsupported_models();
   xes_export_round_trips_the_log();
   xes_export_keeps_unparseable_timestamps_verbatim();
   graph_counts_rework_cases();

@@ -146,9 +146,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
-// Checks the most recently mined log against a user-supplied PNML workflow
-// net (multipart field `model`, or the raw body). The imported net joins the
-// cached session under the id "imported", so POST /api/align?miner=imported
+// Checks the most recently mined log against a user-supplied model — a PNML
+// workflow net or a BPMN 2.0 process, told apart by the document's root
+// element (multipart field `model`, or the raw body). The imported net joins
+// the cached session under the id "imported", so POST /api/align?miner=imported
 // can align against it on demand like any discovered model; the session's
 // registry is extended with the net's activities so ids stay resolvable.
 void handle_check_model(const httplib::Request& request,
@@ -166,16 +167,18 @@ void handle_check_model(const httplib::Request& request,
   }
 
   try {
-    const std::string pnml = request.has_file("model")
-                                 ? request.get_file_value("model").content
-                                 : request.body;
-    if (pnml.empty()) {
+    const std::string model_xml = request.has_file("model")
+                                      ? request.get_file_value("model").content
+                                      : request.body;
+    if (model_xml.empty()) {
       response.status = 400;
       response.set_content(error_json("missing form field: model"),
                            "application/json");
       return;
     }
-    const auto imported = minera::parse_pnml(pnml);
+    const auto imported = minera::looks_like_bpmn(model_xml)
+                              ? minera::parse_bpmn(model_xml)
+                              : minera::parse_pnml(model_xml);
 
     auto next_session = std::make_shared<MinedSession>(*session);
     for (const auto& activity : imported.activities()) {

@@ -88,6 +88,9 @@ int usage(const char* program) {
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, or heuristic\n"
                "  --bpmn <path>             Also write a model as BPMN 2.0 to <path>\n"
+               "  --check-bpmn <path>       Also check the log against the\n"
+               "                            BPMN 2.0 model in this file\n"
+               "                            (conformance id: imported)\n"
                "  --bpmn-miner <id>         Which model to export as BPMN:\n"
                "                            inductive (default), alpha, or heuristic\n"
                "  --xes <path>              Also write the event log (after any\n"
@@ -152,6 +155,7 @@ int main(int argc, char** argv) {
   std::filesystem::path output;
   std::filesystem::path pnml_output;
   std::filesystem::path check_pnml;
+  std::filesystem::path check_bpmn;
   std::filesystem::path bpmn_output;
   std::filesystem::path xes_output;
   std::string pnml_miner = "inductive";
@@ -197,6 +201,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       check_pnml = value;
+    } else if (arg == "--check-bpmn") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      check_bpmn = value;
     } else if (arg == "--bpmn") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -418,11 +426,20 @@ int main(int argc, char** argv) {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net)};
 
-    // Optionally check the log against a user-supplied workflow net too. Its
-    // activities are registered in the id registry first, so the ones the log
-    // never shows still resolve to names in the export.
-    if (!check_pnml.empty()) {
-      const auto imported = minera::import_pnml(check_pnml);
+    // Optionally check the log against a user-supplied model too — a PNML
+    // workflow net or a BPMN 2.0 process, both landing under the single
+    // "imported" conformance id. Its activities are registered in the id
+    // registry first, so the ones the log never shows still resolve to names
+    // in the export.
+    if (!check_pnml.empty() && !check_bpmn.empty()) {
+      std::cerr << "error: pass either --check-pnml or --check-bpmn, not "
+                   "both (they share the conformance id \"imported\")\n";
+      return 2;
+    }
+    if (!check_pnml.empty() || !check_bpmn.empty()) {
+      const auto imported = check_pnml.empty()
+                                ? minera::import_bpmn(check_bpmn)
+                                : minera::import_pnml(check_pnml);
       for (const auto& activity : imported.activities()) {
         graph.ensure_activity(activity);
       }
