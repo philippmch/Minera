@@ -37,6 +37,7 @@ add_library(minera_core
   src/petri_net.cpp
   src/playout.cpp
   src/pnml.cpp
+  src/ptml.cpp
   src/request_params.cpp
   src/resource_analysis.cpp
   src/timestamp.cpp

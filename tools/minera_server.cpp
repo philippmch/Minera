@@ -31,6 +31,7 @@
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/request_params.hpp"
 #include "minera/resource_analysis.hpp"
@@ -152,8 +153,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 }
 
 // Checks the most recently mined log against a user-supplied model — a PNML
-// workflow net or a BPMN 2.0 process, told apart by the document's root
-// element (multipart field `model`, or the raw body). The imported net joins
+// workflow net, a BPMN 2.0 process, or a PTML process tree, told apart by the
+// document's root element (multipart field `model`, or the raw body). The imported net joins
 // the cached session under the id "imported", so POST /api/align?miner=imported
 // can align against it on demand like any discovered model; the session's
 // registry is extended with the net's activities so ids stay resolvable.
@@ -181,9 +182,11 @@ void handle_check_model(const httplib::Request& request,
                            "application/json");
       return;
     }
-    const auto imported = minera::looks_like_bpmn(model_xml)
-                              ? minera::parse_bpmn(model_xml)
-                              : minera::parse_pnml(model_xml);
+    const auto imported =
+        minera::looks_like_bpmn(model_xml) ? minera::parse_bpmn(model_xml)
+        : minera::looks_like_ptml(model_xml)
+            ? minera::to_petri_net(minera::parse_ptml(model_xml))
+            : minera::parse_pnml(model_xml);
 
     auto next_session = std::make_shared<MinedSession>(*session);
     for (const auto& activity : imported.activities()) {
@@ -314,6 +317,24 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
 // its block-structured process tree, which maps cleanly onto BPMN; any other
 // model ("alpha" | "heuristic" | "imported") converts from its workflow net
 // by the net's token semantics.
+// Exports the most recent mine's inductive process tree as PTML — the only
+// miner producing a block-structured tree, so no `miner` parameter.
+void handle_ptml(const httplib::Request&, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;  // nothing mined yet this run
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  response.set_content(minera::to_ptml(session->tree, session->dataset),
+                       "application/xml");
+}
+
 void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
@@ -467,6 +488,7 @@ int main(int argc, char** argv) {
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);
+  server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
   server.Get("/api/playout", handle_playout);
 

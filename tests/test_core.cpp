@@ -17,6 +17,7 @@
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/xes_event_log_importer.hpp"
@@ -1050,6 +1051,113 @@ void decorate_model_skips_deviating_and_untimed_traces() {
   for (const auto& wait : decoration.place_waits) {
     assert(wait.count == 0);  // log_from_variants carries no timestamps
   }
+}
+
+void ptml_round_trip_preserves_replay_behavior() {
+  // A mined tree written as PTML and read back must accept the same language:
+  // the perfectly fitting log still fits, by replay and by alignment.
+  const auto log = log_from_variants(
+      {{"a", "b", "c", "d"}, {"a", "c", "b", "d"}, {"a", "e", "d"}});
+  const auto tree = minera::discover_process_tree(log);
+  const auto ptml = minera::to_ptml(tree);
+  assert(minera::looks_like_ptml(ptml));
+  assert(!minera::looks_like_ptml(minera::to_bpmn(tree)));
+
+  const auto reread = minera::parse_ptml(ptml);
+  const auto net = minera::to_petri_net(reread);
+  assert(minera::final_marking_reachable(net));
+  assert(minera::check_conformance(log, net).fitness == 1.0);
+  assert(minera::check_footprints(log, net).fitness == 1.0);
+  assert(minera::check_alignment(log, net).fitness == 1.0);
+
+  // A loop with several redo alternatives survives the three-child export
+  // shape (the redos come back bundled under one exclusive choice).
+  minera::ProcessTreeNode loop;
+  loop.op = minera::ProcessTreeOperator::kLoop;
+  loop.children.push_back(minera::ProcessTreeNode::leaf(0));
+  loop.children.push_back(minera::ProcessTreeNode::leaf(1));
+  loop.children.push_back(minera::ProcessTreeNode::leaf(2));
+  const minera::ProcessTree looped({"work", "redo", "escalate"}, loop);
+  const auto reread_loop = minera::parse_ptml(minera::to_ptml(looped));
+  const auto loop_net = minera::to_petri_net(reread_loop);
+  const auto loop_log = log_from_variants(
+      {{"work"},
+       {"work", "redo", "work"},
+       {"work", "escalate", "work", "redo", "work"}});
+  assert(minera::check_alignment(loop_log, loop_net).fitness == 1.0);
+}
+
+// A hand-written PTML the way other tools export it: a root attribute, the
+// three-child loop shape with a non-silent exit, and an escaped label.
+constexpr const char* kForeignPtml = R"(<?xml version="1.0"?>
+<ptml>
+  <processTree id="t" name="foreign" root="n0">
+    <sequence id="n0" name=""/>
+    <manualTask id="n1" name="register &amp; file"/>
+    <xorLoop id="n2" name=""/>
+    <manualTask id="n3" name="work"/>
+    <manualTask id="n4" name="redo"/>
+    <manualTask id="n5" name="close"/>
+    <parentsNode id="e0" sourceId="n0" targetId="n1"/>
+    <parentsNode id="e1" sourceId="n0" targetId="n2"/>
+    <parentsNode id="e2" sourceId="n2" targetId="n3"/>
+    <parentsNode id="e3" sourceId="n2" targetId="n4"/>
+    <parentsNode id="e4" sourceId="n2" targetId="n5"/>
+  </processTree>
+</ptml>)";
+
+void parse_ptml_reads_a_foreign_tree() {
+  const auto tree = minera::parse_ptml(kForeignPtml);
+  assert((tree.activities() == std::vector<std::string>{
+              "register & file", "work", "redo", "close"}));
+
+  // The loop's non-silent exit runs once when the loop ends: register, then
+  // work (redo work)*, then close.
+  const auto net = minera::to_petri_net(tree);
+  const auto fitting = log_from_variants(
+      {{"register & file", "work", "close"},
+       {"register & file", "work", "redo", "work", "close"}});
+  assert(minera::check_conformance(fitting, net).fitness == 1.0);
+  assert(minera::check_alignment(fitting, net).fitness == 1.0);
+
+  // Leaving the loop without its exit deviates.
+  const auto broken = log_from_variants({{"register & file", "work"}});
+  assert(minera::check_alignment(broken, net).fitness < 1.0);
+}
+
+void parse_ptml_rejects_malformed_trees() {
+  // A node kind with no equivalent here.
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <or id="n0" name=""/><manualTask id="n1" name="a"/>
+      <parentsNode id="e0" sourceId="n0" targetId="n1"/>
+    </processTree></ptml>)");
+  }));
+  // An edge referencing a node that does not exist.
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <sequence id="n0" name=""/><manualTask id="n1" name="a"/>
+      <parentsNode id="e0" sourceId="n0" targetId="ghost"/>
+    </processTree></ptml>)");
+  }));
+  // A node with two parents is not a tree.
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <sequence id="n0" name=""/><xor id="n1" name=""/>
+      <manualTask id="n2" name="a"/>
+      <parentsNode id="e0" sourceId="n0" targetId="n1"/>
+      <parentsNode id="e1" sourceId="n0" targetId="n2"/>
+      <parentsNode id="e2" sourceId="n1" targetId="n2"/>
+    </processTree></ptml>)");
+  }));
+  // An operator with no children.
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <sequence id="n0" name=""/>
+    </processTree></ptml>)");
+  }));
+  // No tree at all.
+  assert(throws([] { (void)minera::parse_ptml("<ptml/>"); }));
 }
 
 void xes_export_round_trips_the_log() {
@@ -3171,6 +3279,9 @@ int main() {
   parse_bpmn_rejects_unsupported_models();
   decorate_model_counts_firings_and_waits();
   decorate_model_skips_deviating_and_untimed_traces();
+  ptml_round_trip_preserves_replay_behavior();
+  parse_ptml_reads_a_foreign_tree();
+  parse_ptml_rejects_malformed_trees();
   xes_export_round_trips_the_log();
   xes_export_keeps_unparseable_timestamps_verbatim();
   graph_counts_rework_cases();

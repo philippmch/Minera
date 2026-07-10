@@ -10,15 +10,17 @@
 #include <string_view>
 
 #include "minera/bpmn.hpp"
+#include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/ptml.hpp"
 #include "minera/xes_export.hpp"
 
 namespace {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " <model.pnml|model.bpmn> [options]\n"
+            << " <model.pnml|model.bpmn|model.ptml> [options]\n"
                "  Simulates the workflow net and writes the traces as XES.\n"
                "  -o <path>          Write XES to <path> instead of stdout\n"
                "  --traces <n>       Cases to generate (default: 100)\n"
@@ -69,9 +71,11 @@ int main(int argc, char** argv) {
   }
 
   try {
-    const auto net = input.extension() == ".bpmn"
-                         ? minera::import_bpmn(input)
-                         : minera::import_pnml(input);
+    const auto net =
+        input.extension() == ".bpmn" ? minera::import_bpmn(input)
+        : input.extension() == ".ptml"
+            ? minera::to_petri_net(minera::import_ptml(input))
+            : minera::import_pnml(input);
     const auto log = minera::playout(net, options);
     const auto name = input.stem().string() + " playout";
 
