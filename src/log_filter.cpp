@@ -189,6 +189,37 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
   return segments;
 }
 
+// Whether some listed succession appears in the trace with the successor as
+// the very next event.
+bool has_directly_follows(const Trace& trace,
+                          const std::vector<ActivityPair>& pairs) {
+  for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
+    for (const auto& pair : pairs) {
+      if (trace.events[i].activity == pair.predecessor &&
+          trace.events[i + 1].activity == pair.successor) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Whether some listed succession appears in the trace with the successor
+// anywhere after the predecessor. The predecessor is registered after the
+// successor check, so an event never follows itself — a pair (a, a) needs a
+// genuine second occurrence.
+bool has_eventually_follows(const Trace& trace,
+                            const std::vector<ActivityPair>& pairs) {
+  for (const auto& pair : pairs) {
+    bool seen_predecessor = false;
+    for (const auto& event : trace.events) {
+      if (seen_predecessor && event.activity == pair.successor) return true;
+      if (event.activity == pair.predecessor) seen_predecessor = true;
+    }
+  }
+  return false;
+}
+
 std::string variant_key(const Trace& trace) {
   std::string key;
   for (const auto& event : trace.events) {
@@ -212,6 +243,39 @@ std::optional<AttributeFilterMode> parse_attribute_filter_mode(
   if (name == "events") return AttributeFilterMode::events;
   if (name == "traces") return AttributeFilterMode::traces;
   return std::nullopt;
+}
+
+std::vector<ActivityPair> parse_activity_pairs(std::string_view text) {
+  const auto trim = [](std::string_view value) {
+    const auto begin = value.find_first_not_of(' ');
+    if (begin == std::string_view::npos) return std::string_view{};
+    const auto end = value.find_last_not_of(' ');
+    return value.substr(begin, end - begin + 1);
+  };
+
+  std::vector<ActivityPair> pairs;
+  std::size_t start = 0;
+  for (std::size_t i = 0; i <= text.size(); ++i) {
+    if (i != text.size() && text[i] != ',') continue;
+    const auto entry = trim(text.substr(start, i - start));
+    start = i + 1;
+    if (entry.empty()) continue;  // stray comma or trailing whitespace
+    const auto arrow = entry.find("->");
+    if (arrow == std::string_view::npos) {
+      throw std::invalid_argument(
+          "succession filter: expected 'a -> b', got '" + std::string(entry) +
+          "'");
+    }
+    const auto predecessor = trim(entry.substr(0, arrow));
+    const auto successor = trim(entry.substr(arrow + 2));
+    if (predecessor.empty() || successor.empty()) {
+      throw std::invalid_argument(
+          "succession filter: an activity is missing in '" +
+          std::string(entry) + "'");
+    }
+    pairs.push_back({std::string(predecessor), std::string(successor)});
+  }
+  return pairs;
 }
 
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
@@ -253,6 +317,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       (options.between_start.empty() || options.between_end.empty())) {
     throw std::invalid_argument(
         "between filter: both a start and an end activity are required");
+  }
+
+  if (options.variant_coverage < 0.0 || options.variant_coverage > 1.0) {
+    throw std::invalid_argument(
+        "variant coverage: expected a share in (0, 1]");
   }
 
   const bool by_time = !options.time_from.empty() || !options.time_to.empty();
@@ -322,6 +391,44 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       if (occurrences < options.rework_min_occurrences) continue;
     }
 
+    if (!options.keep_directly_follows.empty() &&
+        !has_directly_follows(projected, options.keep_directly_follows)) {
+      continue;
+    }
+    if (!options.remove_directly_follows.empty() &&
+        has_directly_follows(projected, options.remove_directly_follows)) {
+      continue;
+    }
+    if (!options.keep_eventually_follows.empty() &&
+        !has_eventually_follows(projected, options.keep_eventually_follows)) {
+      continue;
+    }
+    if (!options.remove_eventually_follows.empty() &&
+        has_eventually_follows(projected, options.remove_eventually_follows)) {
+      continue;
+    }
+
+    // Prefix/suffix cuts anchor on the first occurrence; a case without the
+    // anchor is dropped rather than passed through whole.
+    if (!options.prefix_activity.empty()) {
+      const auto anchor =
+          std::find_if(projected.events.begin(), projected.events.end(),
+                       [&](const Event& event) {
+                         return event.activity == options.prefix_activity;
+                       });
+      if (anchor == projected.events.end()) continue;
+      projected.events.erase(anchor + 1, projected.events.end());
+    }
+    if (!options.suffix_activity.empty()) {
+      const auto anchor =
+          std::find_if(projected.events.begin(), projected.events.end(),
+                       [&](const Event& event) {
+                         return event.activity == options.suffix_activity;
+                       });
+      if (anchor == projected.events.end()) continue;
+      projected.events.erase(projected.events.begin(), anchor);
+    }
+
     std::vector<Trace> pieces;
     if (by_between) {
       pieces = extract_between(projected, options.between_start,
@@ -349,14 +456,16 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
 
   const bool by_frequency = options.min_variant_frequency > 1;
   const bool by_rank = options.top_variants != 0;
-  if (!by_frequency && !by_rank) {
+  const bool by_coverage = options.variant_coverage > 0.0;
+  if (!by_frequency && !by_rank && !by_coverage) {
     EventLog result;
     result.traces = std::move(kept);
     return result;
   }
 
   // Pass 2: count variants on the surviving traces, then decide which variants
-  // are allowed by frequency and rank.
+  // are allowed. A variant must satisfy every active constraint: frequency,
+  // rank, and membership in the cumulative-coverage prefix.
   std::unordered_map<std::string, std::uint64_t> counts;
   std::vector<std::string> order;  // first-seen order, for deterministic ranking
   for (const auto& trace : kept) {
@@ -365,21 +474,34 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     ++counts[key];
   }
 
-  std::unordered_set<std::string> allowed;
-  if (by_rank) {
+  if (by_rank || by_coverage) {
     std::stable_sort(order.begin(), order.end(),
                      [&](const std::string& a, const std::string& b) {
                        return counts[a] > counts[b];
                      });
-    for (std::size_t i = 0; i < order.size() && i < options.top_variants; ++i) {
-      if (counts[order[i]] >= options.min_variant_frequency) {
-        allowed.insert(order[i]);
-      }
+  }
+
+  // Coverage prefix: the most frequent variants until together they reach the
+  // requested share of the surviving cases (so it always holds at least the
+  // single most frequent variant).
+  std::unordered_set<std::string> covered;
+  if (by_coverage) {
+    const double target =
+        options.variant_coverage * static_cast<double>(kept.size());
+    double cumulative = 0.0;
+    for (const auto& key : order) {
+      covered.insert(key);
+      cumulative += static_cast<double>(counts[key]);
+      if (cumulative >= target) break;
     }
-  } else {
-    for (const auto& [key, count] : counts) {
-      if (count >= options.min_variant_frequency) allowed.insert(key);
-    }
+  }
+
+  std::unordered_set<std::string> allowed;
+  for (std::size_t i = 0; i < order.size(); ++i) {
+    if (by_rank && i >= options.top_variants) break;
+    if (counts[order[i]] < options.min_variant_frequency) continue;
+    if (by_coverage && covered.find(order[i]) == covered.end()) continue;
+    allowed.insert(order[i]);
   }
 
   EventLog result;

@@ -148,6 +148,24 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("rework_activity"); !value.empty()) {
     params.filter.rework_activity = value;
   }
+  if (const auto value = field("keep_directly_follows"); !value.empty()) {
+    params.filter.keep_directly_follows = parse_activity_pairs(value);
+  }
+  if (const auto value = field("remove_directly_follows"); !value.empty()) {
+    params.filter.remove_directly_follows = parse_activity_pairs(value);
+  }
+  if (const auto value = field("keep_eventually_follows"); !value.empty()) {
+    params.filter.keep_eventually_follows = parse_activity_pairs(value);
+  }
+  if (const auto value = field("remove_eventually_follows"); !value.empty()) {
+    params.filter.remove_eventually_follows = parse_activity_pairs(value);
+  }
+  if (const auto value = field("prefix_activity"); !value.empty()) {
+    params.filter.prefix_activity = value;
+  }
+  if (const auto value = field("suffix_activity"); !value.empty()) {
+    params.filter.suffix_activity = value;
+  }
   if (const auto value = field("rework_min_occurrences"); !value.empty()) {
     params.filter.rework_min_occurrences =
         static_cast<std::uint64_t>(std::atoll(value.c_str()));
@@ -176,6 +194,9 @@ MineParams parse_mine_params(const FieldLookup& field) {
   }
   if (const auto value = field("top_variants"); !value.empty()) {
     params.filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
+  }
+  if (const auto value = field("variant_coverage"); !value.empty()) {
+    params.filter.variant_coverage = std::atof(value.c_str());
   }
   if (const auto value = field("noise_threshold"); !value.empty()) {
     params.inductive.noise_threshold = std::atof(value.c_str());

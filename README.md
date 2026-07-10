@@ -177,10 +177,14 @@ workflows with native performance.
   resource (performer) projection, lifecycle projection, attribute values (drop or keep matching
   events, or whole cases with a match), case-attribute values (keep or drop
   whole cases by their own attributes), rework (keep only cases where an
-  activity repeats), between-extraction (cut each case into the subtraces
-  running from one activity to another — e.g. every loop iteration), trace
-  length, start/end activities, and variant frequency (minimum count or top-N)
-  before discovery.
+  activity repeats), succession (keep or drop cases where one activity is
+  directly — or eventually, anywhere later in the case — followed by another),
+  prefix/suffix cuts (reduce each case to its head up to the first occurrence
+  of an activity, or its tail from it), between-extraction (cut each case into
+  the subtraces running from one activity to another — e.g. every loop
+  iteration), trace length, start/end activities, and variant selection
+  (minimum count, top-N, or the most frequent variants that together cover a
+  share of the cases) before discovery.
 - `minera_server`, a local application server: it serves the frontend and
   mines uploaded CSV event logs with the native core (`POST /api/mine`),
   returning the event log, the directly-follows graph, the process tree, and
@@ -280,9 +284,13 @@ events first; discovery lives in tabs:
   resource to the next).
 
 A **Filter log** bar above the tabs re-mines the original upload focused on the
-most frequent variants (top-N or a minimum frequency), a time window (keeping
+most frequent variants (top-N, a minimum frequency, or a cumulative coverage
+share), a time window (keeping
 the events inside it, or the cases contained in / touching it), rework (only
-cases where a chosen activity repeats), a between cut (each case reduced to its
+cases where a chosen activity repeats), a succession (keeping or dropping the
+cases where one activity is directly — or eventually — followed by another), a
+head or tail cut (each case reduced to everything up to the first occurrence
+of an activity, or from it on), a between cut (each case reduced to its
 stretches from one activity to another), a subset of activities or resources,
 an event attribute's values (dropping the matching events, or whole cases
 with a match), or a case attribute's values (dropping whole cases); every
@@ -327,9 +335,19 @@ out.bpmn` writes a discovered model as BPMN 2.0, with `--bpmn-miner`
 (inductive, alpha, or heuristic) picking which — mirroring `--pnml` /
 `--pnml-miner`.
 
-Other filters include `--min-variant-frequency`, `--keep-activities`,
-`--remove-activities`, `--keep-resources`, `--remove-resources`,
-`--start-activities`, `--end-activities`, `--min-length`, and `--max-length`.
+Other filters include `--min-variant-frequency`, `--variant-coverage` (keep
+the most frequent variants that together cover a share of cases, e.g. `0.8`),
+`--keep-activities`, `--remove-activities`, `--keep-resources`,
+`--remove-resources`, `--start-activities`, `--end-activities`,
+`--min-length`, and `--max-length`.
+Succession filters keep or drop whole cases by an activity pair:
+`--keep-directly-follows "a -> b, c -> d"` keeps only cases where some listed
+activity is directly followed by its partner, `--remove-directly-follows`
+drops them, and the `--keep-eventually-follows` / `--remove-eventually-follows`
+variants let the partner occur anywhere later in the same case.
+`--prefix-activity <a>` reduces each case to its head up to (and including)
+the first `<a>`; `--suffix-activity <a>` keeps the tail from the first `<a>`
+on; cases without the activity are dropped.
 `--attribute-key` filters on a generic event attribute (an extra CSV column or
 non-standard XES key): `--keep-attribute-values` / `--remove-attribute-values`
 constrain its values, the bare key keeps only events carrying the attribute,
