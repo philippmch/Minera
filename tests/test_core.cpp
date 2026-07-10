@@ -13,6 +13,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
@@ -961,6 +962,94 @@ void parse_bpmn_rejects_unsupported_models() {
   }));
   // No process at all.
   assert(throws([] { (void)minera::parse_bpmn("<definitions/>"); }));
+}
+
+void decorate_model_counts_firings_and_waits() {
+  // Three timed cases against the (perfectly fitting) inductive net: the
+  // shared place after "a" collects one wait sample per case — the gap
+  // between "a" and whichever branch follows.
+  minera::EventLog log;
+  const auto add_trace =
+      [&](const char* id,
+          std::vector<std::pair<std::string, std::string>> steps) {
+        minera::Trace trace;
+        trace.case_id = id;
+        for (auto& [activity, timestamp] : steps) {
+          minera::Event event;
+          event.case_id = id;
+          event.activity = activity;
+          event.timestamp = timestamp;
+          trace.events.push_back(std::move(event));
+        }
+        log.traces.push_back(std::move(trace));
+      };
+  add_trace("c1", {{"a", "2024-01-01T10:00:00Z"},
+                   {"b", "2024-01-01T10:01:00Z"}});  // 60 s
+  add_trace("c2", {{"a", "2024-01-02T10:00:00Z"},
+                   {"b", "2024-01-02T10:03:00Z"}});  // 180 s
+  add_trace("c3", {{"a", "2024-01-03T10:00:00Z"},
+                   {"c", "2024-01-03T10:02:00Z"}});  // 120 s
+
+  const auto tree = minera::discover_process_tree(log);
+  const auto net = minera::to_petri_net(tree);
+  const auto decoration = minera::decorate_model(log, net);
+
+  assert(decoration.trace_count == 3);
+  assert(decoration.decorated_traces == 3);
+
+  const auto transition_of = [&](const std::string& name) {
+    for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+      const auto& transition = net.transitions()[t];
+      if (!transition.silent() &&
+          net.activities()[*transition.activity] == name) {
+        return t;
+      }
+    }
+    assert(false);
+    return std::size_t{0};
+  };
+  assert(decoration.transition_counts[transition_of("a")] == 3);
+  assert(decoration.transition_counts[transition_of("b")] == 2);
+  assert(decoration.transition_counts[transition_of("c")] == 1);
+
+  // The place feeding "b" (shared with "c" by the exclusive choice) saw all
+  // three tokens; its waits are the a→next gaps.
+  const auto& b = net.transitions()[transition_of("b")];
+  assert(b.inputs.size() == 1);
+  const auto place = b.inputs.front();
+  assert(decoration.place_counts[place] == 3);
+  const auto& wait = decoration.place_waits[place];
+  assert(wait.count == 3);
+  assert(wait.min == 60.0);
+  assert(wait.median == 120.0);
+  assert(wait.max == 180.0);
+  assert(wait.mean == 120.0);
+
+  // The initial token is stamped with the case's first instant, so the source
+  // place measures no artificial wait.
+  assert(decoration.place_counts[net.source()] == 3);
+  assert(decoration.place_waits[net.source()].max == 0.0);
+}
+
+void decorate_model_skips_deviating_and_untimed_traces() {
+  // The net knows only {a, b}; the {a, x} trace deviates, so it contributes
+  // nothing. Without timestamps the counts still tally but no waits appear.
+  const auto fitting = log_from_variants({{"a", "b"}, {"a", "b"}});
+  const auto tree = minera::discover_process_tree(fitting);
+  const auto net = minera::to_petri_net(tree);
+
+  const auto mixed = log_from_variants({{"a", "b"}, {"a", "x"}});
+  const auto decoration = minera::decorate_model(mixed, net);
+  assert(decoration.trace_count == 2);
+  assert(decoration.decorated_traces == 1);
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    const auto& transition = net.transitions()[t];
+    if (transition.silent()) continue;
+    assert(decoration.transition_counts[t] == 1);  // one clean a, one clean b
+  }
+  for (const auto& wait : decoration.place_waits) {
+    assert(wait.count == 0);  // log_from_variants carries no timestamps
+  }
 }
 
 void xes_export_round_trips_the_log() {
@@ -2974,6 +3063,8 @@ int main() {
   parse_bpmn_keeps_disconnected_tasks();
   parse_bpmn_reads_subprocesses();
   parse_bpmn_rejects_unsupported_models();
+  decorate_model_counts_firings_and_waits();
+  decorate_model_skips_deviating_and_untimed_traces();
   xes_export_round_trips_the_log();
   xes_export_keeps_unparseable_timestamps_verbatim();
   graph_counts_rework_cases();

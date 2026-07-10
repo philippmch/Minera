@@ -11,6 +11,7 @@
 #include "minera/event_log.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
@@ -34,7 +35,9 @@ namespace minera {
 // When `eventually_follows` is non-null the eventually-follows graph is
 // embedded under "eventually_follows", shaped like "edges".
 // When `decisions` is non-null the decision-mining result is embedded under
-// "decisions".
+// "decisions". When both `net` and `petri_decoration` are non-null the net's
+// replay decoration (transition firing counts and place waiting times, indices
+// matching "petri_net") is embedded under "petri_net_decoration".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -47,7 +50,8 @@ void write_analysis_json(std::ostream& out,
                          const ResourceNetwork* resources = nullptr,
                          const std::vector<DurationStats>* variant_durations = nullptr,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
-                         const DecisionMiningResult* decisions = nullptr);
+                         const DecisionMiningResult* decisions = nullptr,
+                         const ModelDecoration* petri_decoration = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -61,7 +65,8 @@ void write_analysis_json(std::ostream& out,
     const ResourceNetwork* resources = nullptr,
     const std::vector<DurationStats>* variant_durations = nullptr,
     const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
-    const DecisionMiningResult* decisions = nullptr);
+    const DecisionMiningResult* decisions = nullptr,
+    const ModelDecoration* petri_decoration = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

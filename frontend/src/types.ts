@@ -59,6 +59,28 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+/** One place's replay decoration: tokens through it, and how long they rest. */
+export interface PetriPlaceDecoration {
+  /** Tokens consumed from this place across the cleanly replaying cases. */
+  count: number;
+  /** Waiting time between a token's production and its consumption. */
+  wait: DurationStats;
+}
+
+/**
+ * Frequency/performance annotations for the Petri net, measured by token
+ * replay of the log's cleanly fitting cases; indices match `petri_net`.
+ */
+export interface PetriDecoration {
+  /** Cases whose replay was clean — the ones the annotations describe. */
+  decorated_traces: number;
+  trace_count: number;
+  /** Firing count per transition, aligned with petri_net.transitions. */
+  transitions: number[];
+  /** Per place id: token count and waiting time. */
+  places: PetriPlaceDecoration[];
+}
+
 export interface HeuristicEdge {
   source: number;
   target: number;
@@ -370,6 +392,11 @@ export interface MineraExport {
   conformance?: ConformanceModels;
   /** Alpha Miner Petri net; absent in exports from older minera versions. */
   petri_net?: PetriNetModel;
+  /**
+   * Replay decoration of `petri_net` (firing counts, place waiting times);
+   * absent in exports from older minera versions.
+   */
+  petri_net_decoration?: PetriDecoration;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */

@@ -26,6 +26,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
@@ -119,10 +120,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net)};
 
-    const std::string body =
-        minera::analysis_json(dataset, log, graph, &tree, &net, &heuristics,
-                              &conformance, &performance, &resources,
-                              &variant_durations, &eventually);
+    // Frequency/performance annotations for the Petri-net model view: one
+    // more token replay, so cheap enough to compute up front like the rest.
+    const auto petri_decoration = minera::decorate_model(log, net);
+
+    const std::string body = minera::analysis_json(
+        dataset, log, graph, &tree, &net, &heuristics, &conformance,
+        &performance, &resources, &variant_durations, &eventually,
+        /*decisions=*/nullptr, &petri_decoration);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

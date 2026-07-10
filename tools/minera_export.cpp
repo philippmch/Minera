@@ -23,6 +23,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/pnml.hpp"
 #include "minera/resource_analysis.hpp"
@@ -468,11 +469,14 @@ int main(int argc, char** argv) {
     const minera::DecisionMiningResult* decisions_ptr =
         decisions ? &*decisions : nullptr;
 
+    // Frequency/performance annotations for the Petri-net model view.
+    const auto petri_decoration = minera::decorate_model(log, net);
+
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
                                   &resources, &variant_durations, &eventually,
-                                  decisions_ptr);
+                                  decisions_ptr, &petri_decoration);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -482,7 +486,7 @@ int main(int argc, char** argv) {
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
                                   &resources, &variant_durations, &eventually,
-                                  decisions_ptr);
+                                  decisions_ptr, &petri_decoration);
     }
 
     // Optionally emit one discovered model as standard PNML.

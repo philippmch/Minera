@@ -471,6 +471,26 @@ void write_duration_stats(std::ostream& out, const DurationStats& stats) {
       << ", \"min\": " << stats.min << ", \"max\": " << stats.max << '}';
 }
 
+// The replay decoration of the embedded Petri net: transition and place
+// indices match the "petri_net" object it sits next to.
+void write_model_decoration(std::ostream& out,
+                            const ModelDecoration& decoration) {
+  out << "{\"decorated_traces\": " << decoration.decorated_traces
+      << ", \"trace_count\": " << decoration.trace_count
+      << ", \"transitions\": [";
+  for (std::size_t i = 0; i < decoration.transition_counts.size(); ++i) {
+    out << decoration.transition_counts[i]
+        << (i + 1 < decoration.transition_counts.size() ? ", " : "");
+  }
+  out << "], \"places\": [";
+  for (std::size_t i = 0; i < decoration.place_counts.size(); ++i) {
+    out << "{\"count\": " << decoration.place_counts[i] << ", \"wait\": ";
+    write_duration_stats(out, decoration.place_waits[i]);
+    out << '}' << (i + 1 < decoration.place_counts.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 void write_performance(std::ostream& out, const PerformanceMetrics& performance) {
   out << "{\"timed_traces\": " << performance.timed_traces
       << ", \"case_duration\": ";
@@ -531,7 +551,8 @@ void write_analysis_json(std::ostream& out,
                          const ResourceNetwork* resources,
                          const std::vector<DurationStats>* variant_durations,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows,
-                         const DecisionMiningResult* decisions) {
+                         const DecisionMiningResult* decisions,
+                         const ModelDecoration* petri_decoration) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -626,6 +647,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"petri_net\": ";
     write_petri_net(out, *net, graph);
   }
+  if (net != nullptr && petri_decoration != nullptr) {
+    out << ",\n  \"petri_net_decoration\": ";
+    write_model_decoration(out, *petri_decoration);
+  }
   if (heuristics != nullptr) {
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
@@ -671,11 +696,12 @@ std::string analysis_json(std::string_view dataset,
                           const ResourceNetwork* resources,
                           const std::vector<DurationStats>* variant_durations,
                           const std::vector<EventuallyFollowsEdge>* eventually_follows,
-                          const DecisionMiningResult* decisions) {
+                          const DecisionMiningResult* decisions,
+                          const ModelDecoration* petri_decoration) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
-                      eventually_follows, decisions);
+                      eventually_follows, decisions, petri_decoration);
   return out.str();
 }
 
