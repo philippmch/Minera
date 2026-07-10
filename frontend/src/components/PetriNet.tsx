@@ -1,6 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type ViewBox } from "../layout";
 import { type PetriLayout } from "../petri-layout";
+import {
+  decorationCoverage,
+  hasTimedDecoration,
+  placeTooltip,
+  placeWaitLabel,
+  transitionCountLabel,
+} from "../petri-decoration";
+import { type PetriDecoration } from "../types";
+
+type NetMode = "plain" | "frequency" | "performance";
 
 interface PetriNetProps {
   layout: PetriLayout;
@@ -8,14 +18,24 @@ interface PetriNetProps {
   title?: string;
   /** Extra controls (e.g. an export button) shown in the panel header. */
   actions?: ReactNode;
+  /** Replay annotations (firing counts, place waits); null on older exports. */
+  decoration?: PetriDecoration | null;
 }
 
 // Renders an Alpha Miner workflow net: places as circles (source and sink
 // marked), transitions as labeled boxes, arcs as arrowed curves. Pan/zoom
-// behaviour mirrors the process-tree view.
-export function PetriNet({ layout, title, actions }: PetriNetProps) {
+// behaviour mirrors the process-tree view. With a replay decoration the view
+// gains the process map's frequency/performance modes: frequency badges each
+// transition with how often it fired, performance labels each place with the
+// mean time tokens rested there.
+export function PetriNet({ layout, title, actions, decoration }: PetriNetProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
+  const [mode, setMode] = useState<NetMode>("plain");
+  const decorated = decoration && decoration.decorated_traces > 0 ? decoration : null;
+  const timed = hasTimedDecoration(decorated);
+  const showCounts = mode === "frequency" && decorated !== null;
+  const showWaits = mode === "performance" && decorated !== null && timed;
 
   useEffect(() => setView(layout.fit), [layout]);
 
@@ -54,6 +74,40 @@ export function PetriNet({ layout, title, actions }: PetriNetProps) {
         <h2>Petri net</h2>
         {title && <span className="panel-meta">{title}</span>}
         <div className="map-controls">
+          {decorated && (
+            <div className="map-mode" role="group" aria-label="Net annotation">
+              <button
+                className={mode === "plain" ? "mode-btn active" : "mode-btn"}
+                onClick={() => setMode("plain")}
+              >
+                Plain
+              </button>
+              <button
+                className={mode === "frequency" ? "mode-btn active" : "mode-btn"}
+                onClick={() => setMode("frequency")}
+              >
+                Frequency
+              </button>
+              {timed && (
+                <button
+                  className={
+                    mode === "performance" ? "mode-btn active" : "mode-btn"
+                  }
+                  onClick={() => setMode("performance")}
+                >
+                  Performance
+                </button>
+              )}
+            </div>
+          )}
+          {decorated && mode !== "plain" && (
+            <span
+              className="map-stat"
+              title="Annotations come from token replay of the cases that fit the model"
+            >
+              {decorationCoverage(decorated)}
+            </span>
+          )}
           <div className="tree-legend">
             <span><i className="petri-legend-place" /> place</span>
             <span><i className="petri-legend-trans" /> activity</span>
@@ -122,31 +176,46 @@ export function PetriNet({ layout, title, actions }: PetriNetProps) {
             ))}
           </g>
           <g>
-            {layout.places.map((place) => (
-              <g className={`petri-place ${place.kind}`} key={`p${place.id}`}>
-                <title>
-                  {place.kind === "source"
-                    ? "Source place (initial marking)"
-                    : place.kind === "sink"
-                      ? "Sink place (final marking)"
-                      : "Place"}
-                </title>
-                <circle
-                  className="petri-place-box"
-                  cx={place.x}
-                  cy={place.y}
-                  r={place.r}
-                />
-                {place.kind === "source" && (
+            {layout.places.map((place) => {
+              const tooltip = decorated ? placeTooltip(decorated, place.id) : null;
+              const waitLabel =
+                showWaits && decorated ? placeWaitLabel(decorated, place.id) : null;
+              return (
+                <g className={`petri-place ${place.kind}`} key={`p${place.id}`}>
+                  <title>
+                    {(place.kind === "source"
+                      ? "Source place (initial marking)"
+                      : place.kind === "sink"
+                        ? "Sink place (final marking)"
+                        : "Place") + (tooltip ? ` — ${tooltip}` : "")}
+                  </title>
                   <circle
-                    className="petri-token"
+                    className="petri-place-box"
                     cx={place.x}
                     cy={place.y}
-                    r={place.r * 0.4}
+                    r={place.r}
                   />
-                )}
-              </g>
-            ))}
+                  {place.kind === "source" && (
+                    <circle
+                      className="petri-token"
+                      cx={place.x}
+                      cy={place.y}
+                      r={place.r * 0.4}
+                    />
+                  )}
+                  {waitLabel && (
+                    <text
+                      className="petri-wait-label"
+                      x={place.x}
+                      y={place.y + place.r + 13}
+                      textAnchor="middle"
+                    >
+                      {waitLabel}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
           </g>
           {layout.unconnectedY !== null && (
             <g className="petri-lane">
@@ -170,14 +239,20 @@ export function PetriNet({ layout, title, actions }: PetriNetProps) {
               const classes = ["petri-trans"];
               if (transition.silent) classes.push("silent");
               if (transition.disconnected) classes.push("disconnected");
+              const count =
+                showCounts && decorated
+                  ? transitionCountLabel(decorated, transition.id)
+                  : null;
+              if (count === "0") classes.push("unfired");
               return (
                 <g className={classes.join(" ")} key={`t${transition.id}`}>
                   <title>
-                    {transition.silent
+                    {(transition.silent
                       ? "Silent step (τ)"
                       : transition.disconnected
                         ? `${transition.label} — not placeable by the Alpha Miner (short loop)`
-                        : transition.label}
+                        : transition.label) +
+                      (count !== null ? ` — fired ${count}×` : "")}
                   </title>
                   <rect
                     className="petri-trans-box"
@@ -196,6 +271,16 @@ export function PetriNet({ layout, title, actions }: PetriNetProps) {
                   >
                     {transition.label}
                   </text>
+                  {count !== null && (
+                    <text
+                      className="petri-count-label"
+                      x={transition.x}
+                      y={transition.y - transition.h / 2 - 6}
+                      textAnchor="middle"
+                    >
+                      {count}
+                    </text>
+                  )}
                 </g>
               );
             })}

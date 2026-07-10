@@ -94,6 +94,15 @@ workflows with native performance.
   shows (precision), and lists the deviating pairs. Token replay and footprints
   are robust on unsound nets; alignments report that they can't be computed when
   a net (e.g. an Alpha net with concurrency) has an unreachable final marking.
+- **Model annotations (frequency & performance)**: token replay of the
+  cleanly fitting cases decorates the discovered model itself — per
+  transition, how often it actually fired (so a path the log never takes is
+  visibly dead), and per place, how long tokens rest there between production
+  and consumption (count, mean, median, min, max) — bringing the process
+  map's frequency/performance perspective onto the model's own structure.
+  Deviating cases are excluded rather than force-replayed, and the annotation
+  says how many cases it describes. Carried in the JSON export as
+  `petri_net_decoration`, aligned index-for-index with the exported net.
 - **Decision mining** (Rozinat & van der Aalst): where a model offers
   alternatives — a place in the workflow net with several outgoing
   transitions — Minera learns *which attribute values steer a case down which
@@ -243,7 +252,11 @@ events first; discovery lives in tabs:
   local edges don't show,
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
-  graph) and explore the resulting model; the Heuristic Miner's dependency and
+  graph) and explore the resulting model; the Petri-net view has a
+  **plain / frequency / performance** toggle that badges each transition with
+  its replay firing count (never-fired paths fade out) and labels each place
+  with the mean time tokens wait in it, with a caption saying how many cases
+  the replay covers; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser,
   **Download … as PNML / as BPMN** buttons export any miner's model for
   ProM/PM4Py or a BPM suite, and **Simulate log (XES)** plays the model out

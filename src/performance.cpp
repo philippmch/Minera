@@ -33,9 +33,11 @@ std::uint64_t edge_key(std::size_t source, std::size_t target) {
          static_cast<std::uint64_t>(target);
 }
 
-// Reduces a list of durations to summary statistics. Sorts a local copy to take
-// the median; an even count averages the two middle values.
-DurationStats summarize(std::vector<double> durations) {
+}  // namespace
+
+// Sorts a local copy to take the median; an even count averages the two middle
+// values.
+DurationStats summarize_durations(std::vector<double> durations) {
   DurationStats stats;
   if (durations.empty()) {
     return stats;
@@ -56,8 +58,6 @@ DurationStats summarize(std::vector<double> durations) {
                      : durations[mid];
   return stats;
 }
-
-}  // namespace
 
 PerformanceMetrics compute_performance_metrics(
     const EventLog& log,
@@ -123,7 +123,7 @@ PerformanceMetrics compute_performance_metrics(
 
   PerformanceMetrics metrics;
   metrics.timed_traces = case_durations.size();
-  metrics.case_duration = summarize(case_durations);
+  metrics.case_duration = summarize_durations(case_durations);
 
   // Case arrival rate: order the cases by start instant and summarize the
   // gaps between consecutive arrivals.
@@ -135,7 +135,7 @@ PerformanceMetrics compute_performance_metrics(
       arrival_gaps.push_back(case_starts[i] - case_starts[i - 1]);
     }
   }
-  metrics.case_arrival = summarize(std::move(arrival_gaps));
+  metrics.case_arrival = summarize_durations(std::move(arrival_gaps));
 
   // Emit edge timings in the graph's edge order so the two line up by index.
   metrics.edges.reserve(graph.edges().size());
@@ -145,7 +145,7 @@ PerformanceMetrics compute_performance_metrics(
     performance.target = edge.target;
     const auto it = edge_durations.find(edge_key(edge.source, edge.target));
     if (it != edge_durations.end()) {
-      performance.stats = summarize(std::move(it->second));
+      performance.stats = summarize_durations(std::move(it->second));
     }
     metrics.edges.push_back(std::move(performance));
   }
@@ -155,7 +155,7 @@ PerformanceMetrics compute_performance_metrics(
   for (auto& [activity, durations] : service_durations) {
     ActivityPerformance performance;
     performance.activity = activity;
-    performance.stats = summarize(std::move(durations));
+    performance.stats = summarize_durations(std::move(durations));
     metrics.activity_service.push_back(std::move(performance));
   }
 
@@ -201,7 +201,7 @@ std::vector<DurationStats> compute_variant_durations(
   result.reserve(graph.variants().size());
   for (const auto& variant : graph.variants()) {
     const auto it = durations_by_variant.find(variant.activities);
-    result.push_back(it != durations_by_variant.end() ? summarize(it->second)
+    result.push_back(it != durations_by_variant.end() ? summarize_durations(it->second)
                                                        : DurationStats{});
   }
   return result;

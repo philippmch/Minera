@@ -58,6 +58,10 @@ struct PerformanceMetrics {
   std::uint64_t timed_traces = 0;  // traces with at least two parseable instants
 };
 
+// Reduces a list of durations (seconds) to summary statistics — the shared
+// aggregation behind every DurationStats in the analysis.
+[[nodiscard]] DurationStats summarize_durations(std::vector<double> durations);
+
 // Measures edge waiting times and case throughput times from event timestamps.
 // Events whose timestamps do not parse are skipped, so a partially-timed or
 // untimed log yields empty stats rather than an error. The `graph` supplies the

@@ -32,6 +32,7 @@ add_library(minera_core
   src/inductive_miner.cpp
   src/json_export.cpp
   src/log_filter.cpp
+  src/model_decoration.cpp
   src/performance.cpp
   src/petri_net.cpp
   src/playout.cpp

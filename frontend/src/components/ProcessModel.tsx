@@ -182,7 +182,12 @@ function ModelResult({
   }
 
   return petriLayout ? (
-    <PetriNet layout={petriLayout} title={groupName} actions={actions} />
+    <PetriNet
+      layout={petriLayout}
+      title={groupName}
+      actions={actions}
+      decoration={data.petri_net_decoration ?? null}
+    />
   ) : (
     <Placeholder>
       No model to display. This export predates {groupName} discovery — re-open

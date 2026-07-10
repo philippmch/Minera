@@ -795,6 +795,24 @@ input[type="range"]::-moz-range-thumb {
 }
 .petri-trans.disconnected .petri-trans-label { fill: var(--ink-70); }
 
+/* Replay annotations: firing-count badges above transitions (frequency mode)
+   and mean-wait labels under places (performance mode). A transition the
+   replay never fired fades, so dead paths stand out at a glance. */
+.petri-count-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--copper-deep);
+}
+.petri-wait-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--copper-deep);
+}
+.petri-trans.unfired .petri-trans-box { opacity: 0.35; }
+.petri-trans.unfired .petri-trans-label { opacity: 0.45; }
+.petri-trans.unfired .petri-count-label { fill: var(--ink-45); }
+
 .petri-lane line {
   stroke: var(--line);
   stroke-width: 1;
