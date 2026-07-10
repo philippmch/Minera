@@ -17,7 +17,7 @@ import { MINER_GROUPS } from "../miners";
 
 type Step = "miner" | "method" | "result";
 
-/** The conformance tab's extra, non-miner model: a user-uploaded PNML net. */
+/** The conformance tab's extra, non-miner model: a user-uploaded PNML or BPMN model. */
 const IMPORTED = "imported";
 
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
@@ -47,7 +47,7 @@ export function Conformance({
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
 
-  // A user-uploaded PNML model, checked server-side against the mined log.
+  // A user-uploaded PNML or BPMN model, checked server-side against the mined log.
   const [imported, setImported] = useState<ImportedModelCheck | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export function Conformance({
   // The backend checks every discovered model both ways, keyed by miner id, so
   // any miner × any method has results — as long as this export carries them.
   // The imported model's results come from the upload (or are embedded when a
-  // CLI export was produced with --check-pnml).
+  // CLI export was produced with --check-pnml / --check-bpmn).
   const models = isImported
     ? imported?.model ?? data.conformance?.[IMPORTED]
     : miner
@@ -158,19 +158,19 @@ export function Conformance({
             {imported || data.conformance?.[IMPORTED] ? (
               <button className="miner-card" onClick={() => chooseMiner(IMPORTED)}>
                 <span className="miner-card-name">Imported model</span>
-                <span className="miner-card-count">PNML</span>
+                <span className="miner-card-count">PNML / BPMN</span>
                 <p className="miner-card-desc">
-                  A workflow net you supplied, checked against this log.
+                  A model you supplied, checked against this log.
                 </p>
                 <span className="miner-card-go">Select →</span>
               </button>
             ) : (
               <label className="miner-card miner-card-upload">
                 <span className="miner-card-name">Your model</span>
-                <span className="miner-card-count">PNML</span>
+                <span className="miner-card-count">PNML / BPMN</span>
                 <p className="miner-card-desc">
-                  Check the log against a workflow net from another tool —
-                  upload a PNML file.
+                  Check the log against a model from another tool — upload a
+                  PNML workflow net or a BPMN 2.0 process.
                 </p>
                 <span className="miner-card-go">
                   {importing ? "Checking…" : "Upload →"}
@@ -180,7 +180,7 @@ export function Conformance({
                 )}
                 <input
                   type="file"
-                  accept=".pnml,.xml"
+                  accept=".pnml,.bpmn,.xml"
                   hidden
                   disabled={importing}
                   onChange={(e) => {

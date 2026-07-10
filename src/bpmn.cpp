@@ -2,9 +2,17 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <fstream>
+#include <iterator>
+#include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
+
+#include "xml_pull_parser.hpp"
 
 namespace minera {
 namespace {
@@ -355,6 +363,409 @@ std::string to_bpmn(const PetriNet& net, std::string_view name) {
   std::ostringstream out;
   write_bpmn(out, net, name);
   return out.str();
+}
+
+namespace {
+
+// What the parse pass collects per flow node before the net is assembled.
+enum class BpmnNodeKind {
+  task,         // any task kind or call activity; silent when unnamed
+  passthrough,  // intermediate events: route the token, consume no event
+  start,
+  end,
+  exclusive,    // exclusive and event-based gateways: one in, one out
+  parallel,     // parallel gateways: all in, all out
+  subprocess,   // an embedded scope with its own start and end events
+};
+
+struct BpmnNode {
+  std::string id;
+  std::string name;
+  BpmnNodeKind kind = BpmnNodeKind::task;
+  std::size_t child_scope = 0;  // scope index, kind == subprocess only
+  std::vector<std::size_t> in_flows;   // indices into the scope's flows
+  std::vector<std::size_t> out_flows;
+};
+
+struct BpmnFlow {
+  std::string source;
+  std::string target;
+};
+
+// One <process> or expanded <subProcess>: sequence flows only ever connect
+// nodes of the same scope.
+struct BpmnScope {
+  std::vector<BpmnNode> nodes;
+  std::vector<BpmnFlow> flows;
+  std::unordered_map<std::string, std::size_t> node_index;
+};
+
+// The element's name with any namespace prefix removed — BPMN files routinely
+// qualify every element (<bpmn:task>, <bpmn2:process>, …).
+std::string_view local_name(std::string_view name) {
+  const auto colon = name.rfind(':');
+  return colon == std::string_view::npos ? name : name.substr(colon + 1);
+}
+
+bool is_task_element(std::string_view name) {
+  return name == "task" || name == "userTask" || name == "serviceTask" ||
+         name == "scriptTask" || name == "manualTask" || name == "sendTask" ||
+         name == "receiveTask" || name == "businessRuleTask" ||
+         name == "callActivity";
+}
+
+// Wires each scope's flows onto its nodes and assembles the workflow net,
+// recursing through subprocess scopes.
+class BpmnNetBuilder {
+ public:
+  explicit BpmnNetBuilder(std::vector<BpmnScope>& scopes) : scopes_(scopes) {}
+
+  PetriNet build(std::size_t root_scope) {
+    const auto source = net_.add_place();
+    const auto sink = net_.add_place();
+    net_.set_source(source);
+    net_.set_sink(sink);
+    convert(scopes_[root_scope], source, sink);
+    net_.set_activities(std::move(activities_));
+    return std::move(net_);
+  }
+
+ private:
+  void convert(BpmnScope& scope, std::size_t entry, std::size_t exit) {
+    resolve_flows(scope);
+
+    bool has_start = false;
+    bool has_end = false;
+    for (const auto& node : scope.nodes) {
+      has_start |= node.kind == BpmnNodeKind::start;
+      has_end |= node.kind == BpmnNodeKind::end;
+    }
+    if (!has_start) {
+      throw std::runtime_error("BPMN process has no start event");
+    }
+    if (!has_end) {
+      throw std::runtime_error("BPMN process has no end event");
+    }
+
+    // Every sequence flow holds at most one token at a time: a place.
+    std::vector<std::size_t> place(scope.flows.size());
+    for (auto& p : place) p = net_.add_place();
+
+    for (const auto& node : scope.nodes) {
+      switch (node.kind) {
+        case BpmnNodeKind::start:
+          // Instantiation: the scope's entry token starts every outgoing
+          // flow at once (several starts are alternative instantiations).
+          if (!node.in_flows.empty()) {
+            throw std::runtime_error("BPMN start event '" + node.id +
+                                     "' has an incoming sequence flow");
+          }
+          silent({entry}, out_places(node, place));
+          break;
+        case BpmnNodeKind::end:
+          // Each token reaching an end event completes independently.
+          if (!node.out_flows.empty()) {
+            throw std::runtime_error("BPMN end event '" + node.id +
+                                     "' has an outgoing sequence flow");
+          }
+          if (node.in_flows.empty()) {
+            throw std::runtime_error("BPMN node '" + node.id +
+                                     "' has no incoming sequence flow");
+          }
+          for (const auto flow : node.in_flows) {
+            silent({place[flow]}, {exit});
+          }
+          break;
+        case BpmnNodeKind::task:
+        case BpmnNodeKind::passthrough: {
+          std::optional<std::size_t> activity;
+          if (node.kind == BpmnNodeKind::task && !node.name.empty()) {
+            activity = activity_id(node.name);
+          }
+          add_activity_node(node, place, activity);
+          break;
+        }
+        case BpmnNodeKind::exclusive: {
+          const auto in = merge_entry(node, place);
+          const auto outs = out_places(node, place);
+          for (const auto out : outs) {
+            silent({in}, {out});
+          }
+          break;
+        }
+        case BpmnNodeKind::parallel: {
+          if (node.in_flows.empty()) {
+            throw std::runtime_error("BPMN node '" + node.id +
+                                     "' has no incoming sequence flow");
+          }
+          std::vector<std::size_t> inputs;
+          inputs.reserve(node.in_flows.size());
+          for (const auto flow : node.in_flows) inputs.push_back(place[flow]);
+          silent(std::move(inputs), out_places(node, place));
+          break;
+        }
+        case BpmnNodeKind::subprocess: {
+          auto& child = scopes_[node.child_scope];
+          if (child.nodes.empty()) {
+            // Collapsed subprocess: an atomic step, like a task.
+            std::optional<std::size_t> activity;
+            if (!node.name.empty()) activity = activity_id(node.name);
+            add_activity_node(node, place, activity);
+            break;
+          }
+          const auto in = merge_entry(node, place);
+          const auto outs = out_places(node, place);
+          std::size_t local_exit;
+          if (outs.size() == 1) {
+            local_exit = outs.front();
+          } else {
+            local_exit = net_.add_place();
+            silent({local_exit}, outs);
+          }
+          convert(child, in, local_exit);
+          break;
+        }
+      }
+    }
+  }
+
+  // Attaches the flows to their endpoint nodes, in document order.
+  static void resolve_flows(BpmnScope& scope) {
+    for (std::size_t f = 0; f < scope.flows.size(); ++f) {
+      const auto& flow = scope.flows[f];
+      const auto source = scope.node_index.find(flow.source);
+      const auto target = scope.node_index.find(flow.target);
+      if (source == scope.node_index.end() ||
+          target == scope.node_index.end()) {
+        throw std::runtime_error("BPMN sequence flow '" + flow.source +
+                                 "' -> '" + flow.target +
+                                 "' references an unknown node");
+      }
+      scope.nodes[source->second].out_flows.push_back(f);
+      scope.nodes[target->second].in_flows.push_back(f);
+    }
+  }
+
+  // A task-like node (task, intermediate event, collapsed subprocess) as one
+  // transition. A node some flow reaches consumes its merged entry and starts
+  // every outgoing flow; a node with no incoming or outgoing flow — the shape
+  // a disconnected activity takes in our own export — gets fresh unconnected
+  // places instead, staying a dead transition the way it was a dead
+  // transition in the net, so conformance keeps reporting it honestly.
+  void add_activity_node(const BpmnNode& node,
+                         const std::vector<std::size_t>& place,
+                         std::optional<std::size_t> activity) {
+    const auto in =
+        node.in_flows.empty() ? net_.add_place() : merge_entry(node, place);
+    auto outs = node.out_flows.empty()
+                    ? std::vector<std::size_t>{net_.add_place()}
+                    : out_places(node, place);
+    net_.add_transition(activity, {in}, std::move(outs));
+  }
+
+  // The single place a node consumes from: its one incoming flow, or — since
+  // several incoming flows fire a non-gateway node once per token, and an
+  // exclusive gateway merges the same way — a hub place fed silently by each.
+  std::size_t merge_entry(const BpmnNode& node,
+                          const std::vector<std::size_t>& place) {
+    if (node.in_flows.empty()) {
+      throw std::runtime_error("BPMN node '" + node.id +
+                               "' has no incoming sequence flow");
+    }
+    if (node.in_flows.size() == 1) return place[node.in_flows.front()];
+    const auto hub = net_.add_place();
+    for (const auto flow : node.in_flows) {
+      silent({place[flow]}, {hub});
+    }
+    return hub;
+  }
+
+  std::vector<std::size_t> out_places(const BpmnNode& node,
+                                      const std::vector<std::size_t>& place) {
+    if (node.out_flows.empty()) {
+      throw std::runtime_error("BPMN node '" + node.id +
+                               "' has no outgoing sequence flow");
+    }
+    std::vector<std::size_t> outs;
+    outs.reserve(node.out_flows.size());
+    for (const auto flow : node.out_flows) outs.push_back(place[flow]);
+    return outs;
+  }
+
+  void silent(std::vector<std::size_t> inputs, std::vector<std::size_t> outputs) {
+    net_.add_transition(std::nullopt, std::move(inputs), std::move(outputs));
+  }
+
+  // Tasks with the same label share one activity, in first-seen order.
+  std::size_t activity_id(const std::string& label) {
+    const auto [it, inserted] = activity_ids_.emplace(label, activities_.size());
+    if (inserted) activities_.push_back(label);
+    return it->second;
+  }
+
+  std::vector<BpmnScope>& scopes_;
+  PetriNet net_;
+  std::vector<std::string> activities_;
+  std::unordered_map<std::string, std::size_t> activity_ids_;
+};
+
+}  // namespace
+
+PetriNet parse_bpmn(std::string_view xml) {
+  detail::XmlPullParser parser(xml);
+
+  std::vector<BpmnScope> scopes;
+  std::vector<std::size_t> processes;    // top-level <process> scopes, in order
+  std::vector<std::size_t> scope_stack;  // open <process>/<subProcess> scopes
+
+  // Skips the rest of an element whose subtree must not be interpreted —
+  // extension elements carry foreign markup whose local names could collide.
+  const auto skip_subtree = [&parser] {
+    std::size_t depth = 1;
+    while (depth > 0) {
+      const auto token = parser.next();
+      if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
+      if (token.kind == detail::XmlPullParser::Kind::StartElement &&
+          !token.self_closing) {
+        ++depth;
+      } else if (token.kind == detail::XmlPullParser::Kind::EndElement) {
+        --depth;
+      }
+    }
+  };
+
+  const auto add_node = [&](BpmnScope& scope, BpmnNodeKind kind,
+                            const detail::XmlPullParser::Token& token,
+                            std::size_t child_scope = 0) {
+    BpmnNode node;
+    node.kind = kind;
+    node.child_scope = child_scope;
+    const auto* id = detail::attribute(token.attributes, "id");
+    if (!id) {
+      throw std::runtime_error("BPMN flow node is missing its id");
+    }
+    node.id = *id;
+    if (const auto* name = detail::attribute(token.attributes, "name")) {
+      node.name = *name;
+    }
+    if (!scope.node_index.emplace(node.id, scope.nodes.size()).second) {
+      throw std::runtime_error("BPMN has a duplicate node id '" + node.id +
+                               "'");
+    }
+    scope.nodes.push_back(std::move(node));
+  };
+
+  while (true) {
+    const auto token = parser.next();
+    if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
+    if (token.kind == detail::XmlPullParser::Kind::CharacterData) continue;
+
+    const auto name = local_name(token.name);
+    if (token.kind == detail::XmlPullParser::Kind::EndElement) {
+      if ((name == "process" || name == "subProcess" ||
+           name == "transaction") &&
+          !scope_stack.empty()) {
+        scope_stack.pop_back();
+      }
+      continue;
+    }
+
+    if (name == "extensionElements") {
+      if (!token.self_closing) skip_subtree();
+      continue;
+    }
+    if (name == "process") {
+      scopes.emplace_back();
+      processes.push_back(scopes.size() - 1);
+      if (!token.self_closing) scope_stack.push_back(scopes.size() - 1);
+      continue;
+    }
+    if (scope_stack.empty()) continue;  // outside any process (diagram, …)
+    auto& scope = scopes[scope_stack.back()];
+
+    if (name == "sequenceFlow") {
+      const auto* source = detail::attribute(token.attributes, "sourceRef");
+      const auto* target = detail::attribute(token.attributes, "targetRef");
+      if (!source || !target) {
+        throw std::runtime_error(
+            "BPMN sequence flow is missing its sourceRef or targetRef");
+      }
+      scope.flows.push_back({*source, *target});
+    } else if (is_task_element(name)) {
+      add_node(scope, BpmnNodeKind::task, token);
+    } else if (name == "startEvent") {
+      add_node(scope, BpmnNodeKind::start, token);
+    } else if (name == "endEvent") {
+      add_node(scope, BpmnNodeKind::end, token);
+    } else if (name == "intermediateThrowEvent" ||
+               name == "intermediateCatchEvent") {
+      add_node(scope, BpmnNodeKind::passthrough, token);
+    } else if (name == "exclusiveGateway" || name == "eventBasedGateway") {
+      add_node(scope, BpmnNodeKind::exclusive, token);
+    } else if (name == "parallelGateway") {
+      add_node(scope, BpmnNodeKind::parallel, token);
+    } else if (name == "subProcess" || name == "transaction") {
+      const auto* triggered =
+          detail::attribute(token.attributes, "triggeredByEvent");
+      if (triggered && *triggered == "true") {
+        throw std::runtime_error(
+            "BPMN event subprocesses are not supported; only regular flow "
+            "can be checked");
+      }
+      scopes.emplace_back();
+      const auto child = scopes.size() - 1;
+      // scopes may have reallocated: re-fetch the enclosing scope.
+      add_node(scopes[scope_stack.back()], BpmnNodeKind::subprocess, token,
+               child);
+      if (!token.self_closing) scope_stack.push_back(child);
+    } else if (name == "inclusiveGateway" || name == "complexGateway") {
+      throw std::runtime_error(
+          "BPMN inclusive and complex gateways are not supported; their "
+          "token semantics do not fit a workflow net");
+    } else if (name == "boundaryEvent") {
+      throw std::runtime_error(
+          "BPMN boundary events are not supported; interrupting semantics "
+          "do not fit a workflow net");
+    } else if (name == "adHocSubProcess") {
+      throw std::runtime_error("BPMN ad-hoc subprocesses are not supported");
+    }
+    // Anything else (lanes, data objects, annotations, …) is ignored.
+  }
+
+  // The first process that actually models flow; pools that only reference
+  // another participant stay empty and are skipped.
+  for (const auto scope : processes) {
+    if (!scopes[scope].nodes.empty()) {
+      return BpmnNetBuilder(scopes).build(scope);
+    }
+  }
+  throw std::runtime_error("BPMN input contains no process (or an empty one)");
+}
+
+PetriNet import_bpmn(const std::filesystem::path& path) {
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    throw std::runtime_error("Unable to open BPMN file: " + path.string());
+  }
+  std::string xml((std::istreambuf_iterator<char>(input)),
+                  std::istreambuf_iterator<char>());
+  if (xml.size() >= 3 && static_cast<unsigned char>(xml[0]) == 0xEF &&
+      static_cast<unsigned char>(xml[1]) == 0xBB &&
+      static_cast<unsigned char>(xml[2]) == 0xBF) {
+    xml.erase(0, 3);
+  }
+  return parse_bpmn(xml);
+}
+
+bool looks_like_bpmn(std::string_view xml) {
+  try {
+    detail::XmlPullParser parser(xml);
+    const auto token = parser.next();
+    return token.kind == detail::XmlPullParser::Kind::StartElement &&
+           local_name(token.name) == "definitions";
+  } catch (const std::exception&) {
+    return false;
+  }
 }
 
 }  // namespace minera

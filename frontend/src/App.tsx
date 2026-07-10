@@ -99,9 +99,9 @@ export default function App() {
     return result;
   }, []);
 
-  // Checks an uploaded PNML model against the mined log. A new upload replaces
-  // the server's cached "imported" net, so its stale alignments and decisions
-  // are dropped.
+  // Checks an uploaded PNML or BPMN model against the mined log. A new upload
+  // replaces the server's cached "imported" net, so its stale alignments and
+  // decisions are dropped.
   const requestModelCheck = useCallback(async (file: File) => {
     const result = await checkModel(file);
     const { imported: _dropped, ...rest } = alignCache.current;

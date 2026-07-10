@@ -261,7 +261,7 @@ export async function decideModel(miner: string): Promise<Decisions> {
   return parsed as Decisions;
 }
 
-/** The backend's answer to checking an uploaded PNML model against the log. */
+/** The backend's answer to checking an uploaded model against the log. */
 export interface ImportedModelCheck {
   /**
    * The activity registry, re-sent because the imported model may name
@@ -272,9 +272,10 @@ export interface ImportedModelCheck {
 }
 
 /**
- * Checks the most recently mined log against a user-supplied PNML workflow
- * net. The server keeps the net under the miner id "imported", so alignments
- * can be requested for it afterwards like for any discovered model.
+ * Checks the most recently mined log against a user-supplied model — a PNML
+ * workflow net or a BPMN 2.0 process, told apart server-side. The server
+ * keeps the net under the miner id "imported", so alignments can be
+ * requested for it afterwards like for any discovered model.
  */
 export async function checkModel(file: File): Promise<ImportedModelCheck> {
   const form = new FormData();
