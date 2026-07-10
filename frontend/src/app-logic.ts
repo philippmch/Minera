@@ -34,6 +34,13 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
   return Boolean(
     filters.topVariants ||
       filters.minVariantFrequency ||
+      filters.variantCoverage ||
+      filters.keepDirectlyFollows?.length ||
+      filters.removeDirectlyFollows?.length ||
+      filters.keepEventuallyFollows?.length ||
+      filters.removeEventuallyFollows?.length ||
+      filters.prefixActivity ||
+      filters.suffixActivity ||
       filters.removeActivities?.length ||
       filters.keepActivities?.length ||
       filters.removeResources?.length ||

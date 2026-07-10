@@ -137,6 +137,21 @@ int usage(const char* program) {
                "  --rework-activity <a>     Keep only traces where <a> repeats\n"
                "  --rework-min <n>          Repetitions that count as rework\n"
                "                            (default: 2)\n"
+               "  --keep-directly-follows <a->b,c->d>\n"
+               "                            Keep only cases where some listed\n"
+               "                            activity is directly followed by\n"
+               "                            its partner\n"
+               "  --remove-directly-follows <a->b,...>  Drop such cases\n"
+               "  --keep-eventually-follows <a->b,...>  Like the directly-\n"
+               "                            follows pair, but the partner may\n"
+               "                            occur anywhere later in the case\n"
+               "  --remove-eventually-follows <a->b,...>  Drop such cases\n"
+               "  --prefix-activity <a>     Keep each case's head up to (and\n"
+               "                            including) the first <a>; cases\n"
+               "                            without <a> are dropped\n"
+               "  --suffix-activity <a>     Keep each case's tail from the\n"
+               "                            first <a> on; cases without <a>\n"
+               "                            are dropped\n"
                "  --between-start <a>       With --between-end: cut each trace\n"
                "  --between-end <b>         into the subtraces running from <a>\n"
                "                            to <b>, endpoints included\n"
@@ -145,7 +160,10 @@ int usage(const char* program) {
                "  --min-length <n>          Drop traces shorter than n events\n"
                "  --max-length <n>          Drop traces longer than n events\n"
                "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
-               "  --top-variants <n>        Keep only the n most frequent variants\n";
+               "  --top-variants <n>        Keep only the n most frequent variants\n"
+               "  --variant-coverage <f>    Keep the most frequent variants\n"
+               "                            that together cover this share of\n"
+               "                            cases, f in (0,1]\n";
   return 2;
 }
 
@@ -167,6 +185,17 @@ int main(int argc, char** argv) {
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
+
+  // Succession pairs are parsed while the try block below is not yet open, so
+  // report a malformed value as a clean usage error rather than a terminate.
+  const auto parse_pairs = [](const char* value) {
+    try {
+      return minera::parse_activity_pairs(value);
+    } catch (const std::exception& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      std::exit(2);
+    }
+  };
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -347,6 +376,30 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       filter.rework_min_occurrences =
           static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--keep-directly-follows") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_directly_follows = parse_pairs(value);
+    } else if (arg == "--remove-directly-follows") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_directly_follows = parse_pairs(value);
+    } else if (arg == "--keep-eventually-follows") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.keep_eventually_follows = parse_pairs(value);
+    } else if (arg == "--remove-eventually-follows") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.remove_eventually_follows = parse_pairs(value);
+    } else if (arg == "--prefix-activity") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.prefix_activity = value;
+    } else if (arg == "--suffix-activity") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.suffix_activity = value;
     } else if (arg == "--between-start") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -380,6 +433,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.top_variants = static_cast<std::size_t>(std::atoll(value));
+    } else if (arg == "--variant-coverage") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.variant_coverage = std::atof(value);
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {

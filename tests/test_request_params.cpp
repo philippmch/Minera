@@ -153,6 +153,11 @@ void parse_mine_params_maps_filters() {
       {"case_attribute_key", "region"},
       {"keep_case_attribute_values", "north, east"},
       {"remove_case_attribute_values", "south"},
+      {"keep_directly_follows", "a -> b, b->c"},
+      {"remove_eventually_follows", "a -> d"},
+      {"prefix_activity", "c"},
+      {"suffix_activity", "a"},
+      {"variant_coverage", "0.8"},
   }));
   assert(params.filter.time_from == "2024-01-01");
   assert(params.filter.time_to == "2024-01-31T23:59:59");
@@ -189,7 +194,28 @@ void parse_mine_params_maps_filters() {
           std::vector<std::string>{"north", "east"}));
   assert((params.filter.remove_case_attribute_values ==
           std::vector<std::string>{"south"}));
+  assert(params.filter.keep_directly_follows.size() == 2);
+  assert(params.filter.keep_directly_follows[0].predecessor == "a");
+  assert(params.filter.keep_directly_follows[0].successor == "b");
+  assert(params.filter.keep_directly_follows[1].predecessor == "b");
+  assert(params.filter.keep_directly_follows[1].successor == "c");
+  assert(params.filter.remove_eventually_follows.size() == 1);
+  assert(params.filter.remove_eventually_follows[0].successor == "d");
+  assert(params.filter.prefix_activity == "c");
+  assert(params.filter.suffix_activity == "a");
+  assert(params.filter.variant_coverage == 0.8);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_a_malformed_succession() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(
+        fields({{"keep_directly_follows", "a, b"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_an_unknown_attribute_mode() {
@@ -237,6 +263,7 @@ int main() {
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_rejects_an_unknown_attribute_mode();
+  parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_ignores_blank_fields();

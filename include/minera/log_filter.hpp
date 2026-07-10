@@ -33,11 +33,28 @@ enum class AttributeFilterMode {
   traces,
 };
 
+// An ordered activity pair for the succession filters: `predecessor` is
+// followed by `successor` — directly (adjacent events) or eventually (later
+// anywhere in the same case), depending on the filter it feeds.
+struct ActivityPair {
+  std::string predecessor;
+  std::string successor;
+};
+
+// Parses a comma-separated list of successions ("a -> b, c -> d") into
+// activity pairs, trimming spaces around each side. An entry without "->" or
+// with an empty side throws std::invalid_argument. The shared syntax for the
+// CLI's succession flags and the server's form fields.
+[[nodiscard]] std::vector<ActivityPair> parse_activity_pairs(
+    std::string_view text);
+
 // Log-preprocessing options. Filters are applied in a fixed order so the result
 // is well defined when several are combined: the case-attribute filter, then
 // time range, then activity / resource / event-attribute projection, then the
-// case-level event-attribute filter, then rework, then between-extraction,
-// then trace length, then endpoints, then variant frequency.
+// case-level event-attribute filter, then rework, then the succession
+// (directly-/eventually-follows) filters, then the prefix/suffix cuts, then
+// between-extraction, then trace length, then endpoints, then the variant
+// filters (frequency, rank, coverage).
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -104,6 +121,25 @@ struct LogFilterOptions {
   std::string rework_activity;
   std::uint64_t rework_min_occurrences = 2;
 
+  // Succession filters, judged on the projected traces. A keep-list keeps
+  // only cases exhibiting at least one listed succession; a remove-list then
+  // drops cases exhibiting any listed one. "Directly" means the successor is
+  // the very next event; "eventually" means it occurs anywhere later in the
+  // same case (so a pair (a, a) matches a case where the activity repeats).
+  // Empty lists mean "no constraint".
+  std::vector<ActivityPair> keep_directly_follows;
+  std::vector<ActivityPair> remove_directly_follows;
+  std::vector<ActivityPair> keep_eventually_follows;
+  std::vector<ActivityPair> remove_eventually_follows;
+
+  // Prefix/suffix cuts: reduce each case to its head up to the first
+  // occurrence of `prefix_activity`, and/or its tail from the first
+  // occurrence of `suffix_activity` — the anchor event included on both
+  // sides. Cases without the anchor are dropped. Both may be set; the prefix
+  // cut applies first, so the suffix anchor is sought inside the kept head.
+  std::string prefix_activity;
+  std::string suffix_activity;
+
   // Between-extraction: cut each trace into the subtraces that run from an
   // occurrence of `between_start` to the next occurrence of `between_end`, both
   // endpoints included. A trace can yield several subtraces (each becomes its
@@ -121,12 +157,16 @@ struct LogFilterOptions {
   std::vector<std::string> start_activities;
   std::vector<std::string> end_activities;
 
-  // Variant-frequency selection. Keep only traces whose variant (its activity
-  // sequence) occurs at least `min_variant_frequency` times, and — when
-  // `top_variants` is non-zero — only the `top_variants` most frequent
-  // variants. Both default to "keep everything".
+  // Variant selection. Keep only traces whose variant (its activity sequence)
+  // occurs at least `min_variant_frequency` times; when `top_variants` is
+  // non-zero, only the `top_variants` most frequent variants; and when
+  // `variant_coverage` is non-zero, the most frequent variants that together
+  // cover at least that share of the surviving cases ((0, 1]; a value outside
+  // that range throws). A variant must satisfy every active constraint. All
+  // default to "keep everything".
   std::uint64_t min_variant_frequency = 0;
   std::size_t top_variants = 0;
+  double variant_coverage = 0.0;
 
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
@@ -138,11 +178,16 @@ struct LogFilterOptions {
            !case_attribute_key.empty() ||
            !keep_case_attribute_values.empty() ||
            !remove_case_attribute_values.empty() ||
-           !rework_activity.empty() || !between_start.empty() ||
-           !between_end.empty() ||
+           !rework_activity.empty() ||
+           !keep_directly_follows.empty() ||
+           !remove_directly_follows.empty() ||
+           !keep_eventually_follows.empty() ||
+           !remove_eventually_follows.empty() ||
+           !prefix_activity.empty() || !suffix_activity.empty() ||
+           !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || min_variant_frequency > 1 ||
-           top_variants != 0;
+           top_variants != 0 || variant_coverage != 0.0;
   }
 };
 

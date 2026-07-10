@@ -1759,6 +1759,112 @@ void filter_keeps_only_the_top_variant() {
           std::vector<std::string>{"a", "b"}));
 }
 
+void filter_keeps_variants_covering_a_share_of_cases() {
+  // Variant counts 5 / 3 / 2 over 10 cases: half the cases are covered by the
+  // top variant alone, 80% needs the second, and full coverage needs all.
+  std::vector<std::vector<std::string>> variants;
+  for (int i = 0; i < 5; ++i) variants.push_back({"a", "b"});
+  for (int i = 0; i < 3; ++i) variants.push_back({"a", "c"});
+  for (int i = 0; i < 2; ++i) variants.push_back({"a", "d"});
+  const auto log = log_from_variants(variants);
+
+  minera::LogFilterOptions options;
+  options.variant_coverage = 0.5;
+  assert(options.any());
+  assert(minera::filter_event_log(log, options).trace_count() == 5);
+
+  options.variant_coverage = 0.8;
+  assert(minera::filter_event_log(log, options).trace_count() == 8);
+
+  options.variant_coverage = 1.0;
+  assert(minera::filter_event_log(log, options).trace_count() == 10);
+
+  // Combined with a rank cap, a variant must satisfy both constraints.
+  options.variant_coverage = 0.8;
+  options.top_variants = 1;
+  assert(minera::filter_event_log(log, options).trace_count() == 5);
+
+  options.top_variants = 0;
+  options.variant_coverage = 1.5;
+  assert(throws([&] { (void)minera::filter_event_log(log, options); }));
+}
+
+void filter_selects_cases_by_succession() {
+  const auto log = log_from_variants(
+      {{"a", "b", "c"}, {"a", "c", "b"}, {"a", "b", "b", "c"}});
+
+  // Directly-follows: "a -> b" holds where b is the very next event.
+  minera::LogFilterOptions keep_df;
+  keep_df.keep_directly_follows = {{"a", "b"}};
+  assert(keep_df.any());
+  assert(minera::filter_event_log(log, keep_df).trace_count() == 2);
+
+  minera::LogFilterOptions remove_df;
+  remove_df.remove_directly_follows = {{"a", "c"}};
+  assert(minera::filter_event_log(log, remove_df).trace_count() == 2);
+
+  // Eventually-follows: "a -> b" also holds in {a, c, b}.
+  minera::LogFilterOptions keep_ef;
+  keep_ef.keep_eventually_follows = {{"a", "b"}};
+  assert(minera::filter_event_log(log, keep_ef).trace_count() == 3);
+
+  // A self-pair needs a second occurrence — an event never follows itself.
+  minera::LogFilterOptions repeat;
+  repeat.keep_eventually_follows = {{"b", "b"}};
+  assert(minera::filter_event_log(log, repeat).trace_count() == 1);
+
+  // Several pairs are alternatives: any listed succession keeps the case.
+  minera::LogFilterOptions either;
+  either.keep_directly_follows = {{"c", "b"}, {"b", "b"}};
+  assert(minera::filter_event_log(log, either).trace_count() == 2);
+}
+
+void filter_cuts_prefixes_and_suffixes() {
+  const auto log = log_from_variants({{"a", "b", "c", "d"}, {"a", "d"}});
+
+  // Prefix: the head up to and including the first anchor; a case without
+  // the anchor is dropped.
+  minera::LogFilterOptions prefix;
+  prefix.prefix_activity = "b";
+  assert(prefix.any());
+  const auto heads = minera::filter_event_log(log, prefix);
+  assert(heads.trace_count() == 1);
+  assert((activity_names(heads.traces.front()) ==
+          std::vector<std::string>{"a", "b"}));
+
+  // Suffix: the tail from the first anchor on.
+  minera::LogFilterOptions suffix;
+  suffix.suffix_activity = "c";
+  const auto tails = minera::filter_event_log(log, suffix);
+  assert(tails.trace_count() == 1);
+  assert((activity_names(tails.traces.front()) ==
+          std::vector<std::string>{"c", "d"}));
+
+  // Both: the prefix cut applies first, the suffix is sought inside it.
+  minera::LogFilterOptions both;
+  both.prefix_activity = "c";
+  both.suffix_activity = "b";
+  const auto middles = minera::filter_event_log(log, both);
+  assert(middles.trace_count() == 1);
+  assert((activity_names(middles.traces.front()) ==
+          std::vector<std::string>{"b", "c"}));
+}
+
+void parse_activity_pairs_reads_the_arrow_syntax() {
+  const auto pairs =
+      minera::parse_activity_pairs(" check ticket ->  decide ,a->b, ");
+  assert(pairs.size() == 2);
+  assert(pairs[0].predecessor == "check ticket");
+  assert(pairs[0].successor == "decide");
+  assert(pairs[1].predecessor == "a");
+  assert(pairs[1].successor == "b");
+  assert(minera::parse_activity_pairs("").empty());
+
+  assert(throws([] { (void)minera::parse_activity_pairs("a, b"); }));
+  assert(throws([] { (void)minera::parse_activity_pairs("a ->"); }));
+  assert(throws([] { (void)minera::parse_activity_pairs("-> b"); }));
+}
+
 void filter_projects_activities() {
   const auto log = log_from_variants({{"a", "b", "c"}});
 
@@ -3101,6 +3207,10 @@ int main() {
   importer_rejects_malformed_rows();
   filter_keeps_frequent_variants();
   filter_keeps_only_the_top_variant();
+  filter_keeps_variants_covering_a_share_of_cases();
+  filter_selects_cases_by_succession();
+  filter_cuts_prefixes_and_suffixes();
+  parse_activity_pairs_reads_the_arrow_syntax();
   filter_projects_activities();
   filter_applies_length_and_endpoint_constraints();
   filter_rework_keeps_cases_with_a_repeated_activity();

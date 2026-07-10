@@ -47,6 +47,19 @@ export function Filters({
   const [reworkMin, setReworkMin] = useState("");
   const [betweenStart, setBetweenStart] = useState("");
   const [betweenEnd, setBetweenEnd] = useState("");
+  const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
+  const [prefixActivity, setPrefixActivity] = useState("");
+  const [suffixActivity, setSuffixActivity] = useState("");
+  // One succession constraint: keep or drop cases where `from` is directly /
+  // eventually followed by `to` (the CLI accepts several pairs; the UI one).
+  const [successionAction, setSuccessionAction] = useState<
+    "off" | "keep" | "remove"
+  >("off");
+  const [successionRelation, setSuccessionRelation] = useState<
+    "directly" | "eventually"
+  >("directly");
+  const [successionFrom, setSuccessionFrom] = useState("");
+  const [successionTo, setSuccessionTo] = useState("");
   // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [removedResources, setRemovedResources] = useState<Set<string>>(
@@ -128,9 +141,30 @@ export function Filters({
       selectedCaseAttribute?.values
         .map((v) => v.value)
         .filter((v) => removedCaseValues.has(v)) ?? [];
+    // The UI takes coverage as a percentage; the backend expects (0, 1].
+    const coveragePercent = toFloat(variantCoverage);
+    const coverage =
+      coveragePercent && coveragePercent > 0 && coveragePercent <= 100
+        ? coveragePercent / 100
+        : undefined;
+    const successionPair =
+      successionAction !== "off" && successionFrom && successionTo
+        ? [`${successionFrom} -> ${successionTo}`]
+        : undefined;
+    const succession = (action: "keep" | "remove", relation: string) =>
+      successionAction === action && successionRelation === relation
+        ? successionPair
+        : undefined;
     onApply({
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
+      variantCoverage: coverage,
+      keepDirectlyFollows: succession("keep", "directly"),
+      removeDirectlyFollows: succession("remove", "directly"),
+      keepEventuallyFollows: succession("keep", "eventually"),
+      removeEventuallyFollows: succession("remove", "eventually"),
+      prefixActivity: prefixActivity || undefined,
+      suffixActivity: suffixActivity || undefined,
       removeActivities: removeList.length > 0 ? removeList : undefined,
       removeResources:
         removeResourceList.length > 0 ? removeResourceList : undefined,
@@ -173,6 +207,13 @@ export function Filters({
     setReworkMin("");
     setBetweenStart("");
     setBetweenEnd("");
+    setVariantCoverage("");
+    setPrefixActivity("");
+    setSuffixActivity("");
+    setSuccessionAction("off");
+    setSuccessionRelation("directly");
+    setSuccessionFrom("");
+    setSuccessionTo("");
     setRemoved(new Set());
     setRemovedResources(new Set());
     setRemovedLifecycles(new Set());
@@ -193,11 +234,15 @@ export function Filters({
   const dirty =
     topVariants !== "" ||
     minFrequency !== "" ||
+    variantCoverage !== "" ||
     timeFrom !== "" ||
     timeTo !== "" ||
     reworkActivity !== "" ||
     betweenStart !== "" ||
     betweenEnd !== "" ||
+    prefixActivity !== "" ||
+    suffixActivity !== "" ||
+    successionAction !== "off" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
     removedLifecycles.size > 0 ||
@@ -245,6 +290,18 @@ export function Filters({
                 placeholder="none"
                 value={minFrequency}
                 onChange={(e) => setMinFrequency(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Variant coverage %</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                placeholder="all"
+                title="Keep the most frequent variants that together cover this share of cases"
+                value={variantCoverage}
+                onChange={(e) => setVariantCoverage(e.target.value)}
               />
             </label>
           </div>
@@ -326,6 +383,98 @@ export function Filters({
                 onChange={(e) => setBetweenEnd(e.target.value)}
               >
                 <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Head: keep up to first</span>
+              <select
+                value={prefixActivity}
+                onChange={(e) => setPrefixActivity(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Tail: keep from first</span>
+              <select
+                value={suffixActivity}
+                onChange={(e) => setSuffixActivity(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Succession</span>
+              <select
+                value={successionAction}
+                onChange={(e) =>
+                  setSuccessionAction(e.target.value as typeof successionAction)
+                }
+              >
+                <option value="off">off</option>
+                <option value="keep">keep cases where</option>
+                <option value="remove">drop cases where</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>activity</span>
+              <select
+                value={successionFrom}
+                disabled={successionAction === "off"}
+                onChange={(e) => setSuccessionFrom(e.target.value)}
+              >
+                <option value="">—</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>is</span>
+              <select
+                value={successionRelation}
+                disabled={successionAction === "off"}
+                onChange={(e) =>
+                  setSuccessionRelation(
+                    e.target.value as typeof successionRelation,
+                  )
+                }
+              >
+                <option value="directly">directly followed by</option>
+                <option value="eventually">eventually followed by</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>activity</span>
+              <select
+                value={successionTo}
+                disabled={successionAction === "off"}
+                onChange={(e) => setSuccessionTo(e.target.value)}
+              >
+                <option value="">—</option>
                 {activities.map((name) => (
                   <option key={name} value={name}>
                     {name}

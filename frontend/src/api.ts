@@ -27,6 +27,9 @@ export type AttributeFilterMode = "events" | "traces";
 export interface FilterOptions {
   topVariants?: number;
   minVariantFrequency?: number;
+  /** Cumulative variant coverage in (0, 1]: keep the most frequent variants
+   * until together they cover this share of cases. */
+  variantCoverage?: number;
   keepActivities?: string[];
   removeActivities?: string[];
   keepResources?: string[];
@@ -40,6 +43,16 @@ export interface FilterOptions {
   /** Keep only cases where this activity occurs at least reworkMin times. */
   reworkActivity?: string;
   reworkMin?: number;
+  /** Succession filters, each entry an "a -> b" pair: keep (or drop) cases
+   * where the first activity is directly / eventually followed by the second. */
+  keepDirectlyFollows?: string[];
+  removeDirectlyFollows?: string[];
+  keepEventuallyFollows?: string[];
+  removeEventuallyFollows?: string[];
+  /** Reduce each case to its head up to the first prefixActivity / its tail
+   * from the first suffixActivity (anchor included); cases without it drop. */
+  prefixActivity?: string;
+  suffixActivity?: string;
   /** Cut each case into the subtraces from betweenStart to betweenEnd. */
   betweenStart?: string;
   betweenEnd?: string;
@@ -98,6 +111,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.topVariants) add("top_variants", String(options.topVariants));
   if (options.minVariantFrequency)
     add("min_variant_frequency", String(options.minVariantFrequency));
+  if (options.variantCoverage)
+    add("variant_coverage", String(options.variantCoverage));
   if (options.keepActivities?.length)
     add("keep_activities", options.keepActivities.join(","));
   if (options.removeActivities?.length)
@@ -119,6 +134,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.reworkMin)
       add("rework_min_occurrences", String(options.reworkMin));
   }
+  if (options.keepDirectlyFollows?.length)
+    add("keep_directly_follows", options.keepDirectlyFollows.join(","));
+  if (options.removeDirectlyFollows?.length)
+    add("remove_directly_follows", options.removeDirectlyFollows.join(","));
+  if (options.keepEventuallyFollows?.length)
+    add("keep_eventually_follows", options.keepEventuallyFollows.join(","));
+  if (options.removeEventuallyFollows?.length)
+    add("remove_eventually_follows", options.removeEventuallyFollows.join(","));
+  if (options.prefixActivity) add("prefix_activity", options.prefixActivity);
+  if (options.suffixActivity) add("suffix_activity", options.suffixActivity);
   if (options.betweenStart && options.betweenEnd) {
     add("between_start", options.betweenStart);
     add("between_end", options.betweenEnd);

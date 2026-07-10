@@ -67,6 +67,13 @@ describe("hasActiveFilters", () => {
       { betweenStart: "a", betweenEnd: "b" },
       { attributeKey: "channel" },
       { caseAttributeKey: "region" },
+      { variantCoverage: 0.8 },
+      { keepDirectlyFollows: ["a -> b"] },
+      { removeDirectlyFollows: ["a -> b"] },
+      { keepEventuallyFollows: ["a -> b"] },
+      { removeEventuallyFollows: ["a -> b"] },
+      { prefixActivity: "a" },
+      { suffixActivity: "b" },
       { removeLifecycles: ["start"] },
       { keepLifecycles: ["complete"] },
     ];
@@ -199,6 +206,24 @@ describe("mineFormEntries", () => {
   it("drops a time mode without bounds and a rework minimum without activity", () => {
     expect(mineFormEntries({ timeMode: "traces_contained" })).toEqual([]);
     expect(mineFormEntries({ reworkMin: 3 })).toEqual([]);
+  });
+
+  it("maps the succession, cut, and coverage filters", () => {
+    const entries = mineFormEntries({
+      variantCoverage: 0.8,
+      keepDirectlyFollows: ["a -> b", "b -> c"],
+      removeEventuallyFollows: ["a -> d"],
+      prefixActivity: "ship",
+      suffixActivity: "approve",
+    });
+    expect(entries).toEqual([
+      ["variant_coverage", "0.8"],
+      ["keep_directly_follows", "a -> b,b -> c"],
+      ["remove_eventually_follows", "a -> d"],
+      ["prefix_activity", "ship"],
+      ["suffix_activity", "approve"],
+    ]);
+    expect(mineFormEntries({ keepEventuallyFollows: [] })).toEqual([]);
   });
 
   it("maps the attribute filter and requires its key", () => {
