@@ -491,6 +491,30 @@ void write_model_decoration(std::ostream& out,
   out << "]}";
 }
 
+// The spectrum: the pattern's activity names, then one row of instants per
+// observation (epoch seconds, one per pattern step, with the case id).
+void write_performance_spectrum(std::ostream& out,
+                                const PerformanceSpectrum& spectrum) {
+  out << "{\"activities\": [";
+  for (std::size_t i = 0; i < spectrum.activities.size(); ++i) {
+    write_json_string(out, spectrum.activities[i]);
+    out << (i + 1 < spectrum.activities.size() ? ", " : "");
+  }
+  out << "], \"observations\": [";
+  for (std::size_t i = 0; i < spectrum.observations.size(); ++i) {
+    const auto& observation = spectrum.observations[i];
+    out << "{\"case_id\": ";
+    write_json_string(out, observation.case_id);
+    out << ", \"instants\": [";
+    for (std::size_t k = 0; k < observation.instants.size(); ++k) {
+      out << observation.instants[k]
+          << (k + 1 < observation.instants.size() ? ", " : "");
+    }
+    out << "]}" << (i + 1 < spectrum.observations.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 void write_performance(std::ostream& out, const PerformanceMetrics& performance) {
   out << "{\"timed_traces\": " << performance.timed_traces
       << ", \"case_duration\": ";
@@ -552,7 +576,8 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<DurationStats>* variant_durations,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows,
                          const DecisionMiningResult* decisions,
-                         const ModelDecoration* petri_decoration) {
+                         const ModelDecoration* petri_decoration,
+                         const PerformanceSpectrum* spectrum) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -681,6 +706,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"decisions\": ";
     write_decisions(out, *decisions);
   }
+  if (spectrum != nullptr) {
+    out << ",\n  \"performance_spectrum\": ";
+    write_performance_spectrum(out, *spectrum);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -697,11 +726,13 @@ std::string analysis_json(std::string_view dataset,
                           const std::vector<DurationStats>* variant_durations,
                           const std::vector<EventuallyFollowsEdge>* eventually_follows,
                           const DecisionMiningResult* decisions,
-                          const ModelDecoration* petri_decoration) {
+                          const ModelDecoration* petri_decoration,
+                          const PerformanceSpectrum* spectrum) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
-                      eventually_follows, decisions, petri_decoration);
+                      eventually_follows, decisions, petri_decoration,
+                      spectrum);
   return out.str();
 }
 

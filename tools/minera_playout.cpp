@@ -23,9 +23,15 @@ int usage(const char* program) {
             << " <model.pnml|model.bpmn|model.ptml> [options]\n"
                "  Simulates the workflow net and writes the traces as XES.\n"
                "  -o <path>          Write XES to <path> instead of stdout\n"
-               "  --traces <n>       Cases to generate (default: 100)\n"
+               "  --traces <n>       Cases to generate (default: 100); with\n"
+               "                     --extensive, the cap on distinct traces\n"
                "  --max-steps <n>    Firing cap per case (default: 1000)\n"
-               "  --seed <n>         RNG seed; same seed, same log (default: 1)\n";
+               "  --seed <n>         RNG seed; same seed, same log (default: 1)\n"
+               "  --extensive        Enumerate every distinct trace the model\n"
+               "                     allows (shortest first) instead of\n"
+               "                     sampling randomly\n"
+               "  --max-length <n>   Extensive: longest visible trace to\n"
+               "                     enumerate (default: 10)\n";
   return 2;
 }
 
@@ -35,6 +41,8 @@ int main(int argc, char** argv) {
   std::filesystem::path input;
   std::filesystem::path output;
   minera::PlayoutOptions options;
+  minera::ExtensivePlayoutOptions extensive_options;
+  bool extensive = false;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -58,6 +66,12 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       options.seed = static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--extensive") {
+      extensive = true;
+    } else if (arg == "--max-length") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      extensive_options.max_length = static_cast<std::size_t>(std::atoll(value));
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {
@@ -66,9 +80,11 @@ int main(int argc, char** argv) {
       return usage(argv[0]);
     }
   }
-  if (input.empty() || options.traces == 0 || options.max_steps == 0) {
+  if (input.empty() || options.traces == 0 || options.max_steps == 0 ||
+      extensive_options.max_length == 0) {
     return usage(argv[0]);
   }
+  extensive_options.max_traces = options.traces;
 
   try {
     const auto net =
@@ -76,7 +92,8 @@ int main(int argc, char** argv) {
         : input.extension() == ".ptml"
             ? minera::to_petri_net(minera::import_ptml(input))
             : minera::import_pnml(input);
-    const auto log = minera::playout(net, options);
+    const auto log = extensive ? minera::extensive_playout(net, extensive_options)
+                               : minera::playout(net, options);
     const auto name = input.stem().string() + " playout";
 
     if (output.empty()) {

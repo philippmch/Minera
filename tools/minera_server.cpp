@@ -408,6 +408,29 @@ void handle_playout(const httplib::Request& request,
     options.traces = static_cast<std::size_t>(requested);
   }
 
+  // mode=extensive enumerates the model's distinct traces (shortest first,
+  // capped by `traces` and `max_length`) instead of sampling randomly.
+  if (request.get_param_value("mode") == "extensive") {
+    minera::ExtensivePlayoutOptions extensive;
+    extensive.max_traces = options.traces;
+    if (request.has_param("max_length")) {
+      const auto requested =
+          std::atoll(request.get_param_value("max_length").c_str());
+      if (requested < 1 || requested > 1000) {
+        response.status = 400;
+        response.set_content(
+            error_json("max_length must be between 1 and 1000"),
+            "application/json");
+        return;
+      }
+      extensive.max_length = static_cast<std::size_t>(requested);
+    }
+    const auto log = minera::extensive_playout(it->second, extensive);
+    response.set_content(minera::to_xes(log, miner + " playout"),
+                         "application/xml");
+    return;
+  }
+
   const auto log = minera::playout(it->second, options);
   response.set_content(minera::to_xes(log, miner + " playout"),
                        "application/xml");
