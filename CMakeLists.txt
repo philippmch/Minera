@@ -34,6 +34,7 @@ add_library(minera_core
   src/log_filter.cpp
   src/model_decoration.cpp
   src/performance.cpp
+  src/performance_spectrum.cpp
   src/petri_net.cpp
   src/playout.cpp
   src/pnml.cpp

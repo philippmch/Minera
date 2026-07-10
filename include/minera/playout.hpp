@@ -35,4 +35,32 @@ struct PlayoutOptions {
 [[nodiscard]] EventLog playout(const PetriNet& net,
                                const PlayoutOptions& options = {});
 
+struct ExtensivePlayoutOptions {
+  // Longest visible trace to enumerate (events per case).
+  std::size_t max_length = 10;
+  // Cap on the distinct traces emitted, so a permissive model cannot explode
+  // the log; the shortest traces win because enumeration is breadth-first.
+  std::size_t max_traces = 1000;
+  // Exploration budget (distinct search states), the guard against nets whose
+  // silent structure can grow the marking without growing the trace.
+  std::size_t max_states = 200000;
+  // Synthetic timestamps, as in PlayoutOptions.
+  double start = 1767225600.0;
+  double case_interval = 60.0;
+  double event_interval = 1.0;
+};
+
+// Enumerates the model's language instead of sampling it: every distinct
+// visible trace of at most `max_length` events that walks the net from the
+// initial to the final marking becomes one case, shortest traces first (the
+// exploration is a breadth-first search over marking × trace states, so two
+// silent routings of the same visible trace collapse into one case). The
+// exhaustive counterpart of `playout` — a fitting log of everything the model
+// allows, for inspecting its language or probing precision. Bounded by
+// `max_traces` and `max_states`, so an infinite language yields its shortest
+// members rather than spinning forever.
+[[nodiscard]] EventLog extensive_playout(
+    const PetriNet& net,
+    const ExtensivePlayoutOptions& options = {});
+
 }  // namespace minera

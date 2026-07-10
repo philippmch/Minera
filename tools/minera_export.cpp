@@ -25,6 +25,7 @@
 #include "minera/log_filter.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
+#include "minera/performance_spectrum.hpp"
 #include "minera/pnml.hpp"
 #include "minera/ptml.hpp"
 #include "minera/resource_analysis.hpp"
@@ -102,6 +103,11 @@ int usage(const char* program) {
                "                            (conformance id: imported)\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
+               "  --spectrum <a,b,c>        Compute the performance spectrum\n"
+               "                            over this activity pattern (2+\n"
+               "                            steps): per occurrence, when each\n"
+               "                            step happened; embedded under\n"
+               "                            \"performance_spectrum\"\n"
                "  --decisions <miner>       Mine the decision points of one\n"
                "                            model (inductive, alpha, or\n"
                "                            heuristic): which attribute values\n"
@@ -188,6 +194,7 @@ int main(int argc, char** argv) {
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
+  std::vector<std::string> spectrum_activities;  // empty = no spectrum
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   minera::InductiveMinerOptions inductive_options;
@@ -271,6 +278,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       decisions_miner = value;
+    } else if (arg == "--spectrum") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      spectrum_activities = split_csv(value);
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -551,11 +562,20 @@ int main(int argc, char** argv) {
     // Frequency/performance annotations for the Petri-net model view.
     const auto petri_decoration = minera::decorate_model(log, net);
 
+    // Optionally compute the performance spectrum over an activity pattern.
+    std::optional<minera::PerformanceSpectrum> spectrum;
+    if (!spectrum_activities.empty()) {
+      spectrum = minera::compute_performance_spectrum(log, spectrum_activities);
+    }
+    const minera::PerformanceSpectrum* spectrum_ptr =
+        spectrum ? &*spectrum : nullptr;
+
     if (output.empty()) {
       minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
                                   &resources, &variant_durations, &eventually,
-                                  decisions_ptr, &petri_decoration);
+                                  decisions_ptr, &petri_decoration,
+                                  spectrum_ptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -565,7 +585,8 @@ int main(int argc, char** argv) {
       minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
                                   &heuristics, &conformance, &performance,
                                   &resources, &variant_durations, &eventually,
-                                  decisions_ptr, &petri_decoration);
+                                  decisions_ptr, &petri_decoration,
+                                  spectrum_ptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

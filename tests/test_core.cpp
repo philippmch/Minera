@@ -15,6 +15,7 @@
 #include "minera/log_filter.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/performance_spectrum.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/ptml.hpp"
@@ -28,8 +29,10 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -126,6 +129,12 @@ minera::EventLog log_from_variants(
     log.traces.push_back(std::move(trace));
   }
   return log;
+}
+
+std::vector<std::string> activity_names(const minera::Trace& trace) {
+  std::vector<std::string> names;
+  for (const auto& event : trace.events) names.push_back(event.activity);
+  return names;
 }
 
 // Renders a process tree to a canonical S-expression: ->(a, b), X(a, b),
@@ -1383,6 +1392,103 @@ void playout_simulates_an_imported_model() {
   }
 }
 
+void extensive_playout_enumerates_the_language() {
+  // sequence(a, xor(b, e-loop), d)-ish model: variants {a b d}, {a e d},
+  // {a e e d}, … — the enumeration must list exactly the distinct traces the
+  // model allows within the length bound, shortest first, each once.
+  const auto log = log_from_variants(
+      {{"a", "b", "d"}, {"a", "e", "d"}, {"a", "e", "e", "d"}});
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+
+  minera::ExtensivePlayoutOptions options;
+  options.max_length = 5;
+  const auto generated = minera::extensive_playout(net, options);
+
+  // Every enumerated trace fits, no two are alike, lengths never decrease.
+  assert(minera::check_conformance(generated, net).fitness == 1.0);
+  std::set<std::vector<std::string>> distinct;
+  std::size_t previous_length = 0;
+  for (const auto& trace : generated.traces) {
+    assert(distinct.insert(activity_names(trace)).second);
+    assert(trace.events.size() >= previous_length);
+    assert(trace.events.size() <= options.max_length);
+    previous_length = trace.events.size();
+  }
+  // The three observed variants are in the language, plus the deeper loop
+  // unrolling {a e e e d} the log never showed.
+  assert(distinct.count({"a", "b", "d"}) == 1);
+  assert(distinct.count({"a", "e", "d"}) == 1);
+  assert(distinct.count({"a", "e", "e", "d"}) == 1);
+  assert(distinct.count({"a", "e", "e", "e", "d"}) == 1);
+
+  // A tighter length bound trims the language accordingly.
+  options.max_length = 3;
+  const auto short_traces = minera::extensive_playout(net, options);
+  for (const auto& trace : short_traces.traces) {
+    assert(trace.events.size() <= 3);
+  }
+  assert(short_traces.trace_count() >= 2);  // {a b d} and {a e d}
+
+  // The trace cap keeps an infinite language finite, shortest members first.
+  options.max_length = 100;
+  options.max_traces = 4;
+  assert(minera::extensive_playout(net, options).trace_count() == 4);
+}
+
+void performance_spectrum_finds_pattern_occurrences() {
+  minera::EventLog log;
+  const auto add_trace =
+      [&](const char* id,
+          std::vector<std::pair<std::string, std::string>> steps) {
+        minera::Trace trace;
+        trace.case_id = id;
+        for (auto& [activity, timestamp] : steps) {
+          minera::Event event;
+          event.case_id = id;
+          event.activity = activity;
+          event.timestamp = timestamp;
+          trace.events.push_back(std::move(event));
+        }
+        log.traces.push_back(std::move(trace));
+      };
+  // c1 runs a→b once, with an unrelated activity in between (ignored by the
+  // projection); c2 runs the pattern backwards (no match); c3 loops, so both
+  // iterations count.
+  add_trace("c1", {{"a", "2024-01-01T10:00:00Z"},
+                   {"x", "2024-01-01T10:02:00Z"},
+                   {"b", "2024-01-01T10:05:00Z"}});
+  add_trace("c2", {{"b", "2024-01-02T10:00:00Z"},
+                   {"a", "2024-01-02T10:05:00Z"}});
+  add_trace("c3", {{"a", "2024-01-03T10:00:00Z"},
+                   {"b", "2024-01-03T10:01:00Z"},
+                   {"a", "2024-01-03T10:02:00Z"},
+                   {"b", "2024-01-03T10:03:00Z"}});
+
+  const auto spectrum =
+      minera::compute_performance_spectrum(log, {"a", "b"});
+  assert((spectrum.activities == std::vector<std::string>{"a", "b"}));
+  // c1 once; c3's projection a b a b has windows [a b], [b a], [a b] — two.
+  assert(spectrum.observations.size() == 3);
+  assert(spectrum.observations[0].case_id == "c1");
+  assert(spectrum.observations[0].instants[1] -
+             spectrum.observations[0].instants[0] ==
+         300.0);
+  assert(spectrum.observations[1].case_id == "c3");
+  assert(spectrum.observations[2].case_id == "c3");
+
+  // A one-step pattern has no flow to show.
+  assert(throws(
+      [&] { (void)minera::compute_performance_spectrum(log, {"a"}); }));
+
+  // The JSON export embeds the spectrum for the frontend/CLI contract.
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto json = minera::analysis_json(
+      "t", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, &spectrum);
+  assert(json.find("\"performance_spectrum\": {") != std::string::npos);
+  assert(json.find("\"instants\": [") != std::string::npos);
+}
+
 void json_export_carries_the_eventually_follows_contract() {
   // The frontend reads "eventually_follows" by name and expects the same
   // {source, target, count} shape as "edges".
@@ -1832,12 +1938,6 @@ void dfg_handles_single_event_traces() {
   assert(graph.edges().empty());  // no directly-follows pair within length-1 traces
   assert(graph.start_activity_count("A") == 2);
   assert(graph.end_activity_count("A") == 2);
-}
-
-std::vector<std::string> activity_names(const minera::Trace& trace) {
-  std::vector<std::string> names;
-  for (const auto& event : trace.events) names.push_back(event.activity);
-  return names;
 }
 
 void filter_keeps_frequent_variants() {
@@ -3292,6 +3392,8 @@ int main() {
   alignment_precision_survives_a_deviating_log();
   playout_generates_perfectly_fitting_logs();
   playout_simulates_an_imported_model();
+  extensive_playout_enumerates_the_language();
+  performance_spectrum_finds_pattern_occurrences();
   json_export_carries_the_eventually_follows_contract();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();

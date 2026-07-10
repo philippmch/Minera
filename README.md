@@ -104,6 +104,15 @@ workflows with native performance.
   Deviating cases are excluded rather than force-replayed, and the annotation
   says how many cases it describes. Carried in the JSON export as
   `petri_net_decoration`, aligned index-for-index with the exported net.
+- **Performance spectrum**: pick two or more activities as a pattern, and
+  every case that performs them as an uninterrupted run (other activities in
+  between are ignored) contributes one observation — the instants at which
+  each step happened. Plotted as lines between the steps' time axes, the
+  observations show how flow times evolve over the log's lifetime, where
+  cases batch up, and which ones overtake others — detail a mean waiting
+  time averages away. CLI `--spectrum "a,b,c"` embeds it in the JSON export;
+  the frontend computes and draws it live on the **Events over Time** tab,
+  with lines graded by flow-time tercile.
 - **Decision mining** (Rozinat & van der Aalst): where a model offers
   alternatives — a place in the workflow net with several outgoing
   transitions — Minera learns *which attribute values steer a case down which
@@ -168,7 +177,12 @@ workflows with native performance.
   generated trace replays with fitness 1.0, which makes the playout a
   self-check for discovery and a test-log generator (`minera_playout
   model.pnml -o log.xes`, `model.bpmn` and `model.ptml` likewise, or the
-  **Simulate log** button on any mined model).
+  **Simulate log** button on any mined model). An **extensive** mode
+  (`--extensive`, with `--max-length`) enumerates every distinct trace the
+  model allows up to a length bound instead of sampling — shortest first,
+  each exactly once — turning the playout into a listing of the model's
+  language, e.g. for eyeballing what a permissive model really admits
+  (also `GET /api/playout?mode=extensive` on the server).
 - **Generic event attributes**: extra CSV columns and non-standard XES event
   attributes (channel, region, amount, …) are imported alongside the
   case/activity/timestamp/resource fields, keep their XES types through an
@@ -253,6 +267,12 @@ events first; discovery lives in tabs:
 - **Event Log** — the imported cases with their event sequences, timestamps,
   and case attributes, filterable by case id, with a **Download log as XES**
   button that exports the log exactly as mined (filters included),
+- **Events over Time** — a dotted chart (one row per case ordered by start
+  instant, one dot per event colored by activity) exposing arrival patterns,
+  batching, and drift at a glance, and the **performance spectrum**: choose
+  a sequence of activities and every uninterrupted run a case makes through
+  them draws one line between the steps' time axes, colored by flow-time
+  tercile — so slow stretches and overtaking stand out,
 - **Directly-Follows Graph** — an interactive process map (pan, zoom, and a
   minimum-frequency path filter) with a **frequency / performance** toggle that
   relabels edges with mean waiting times (and shows median/mean case throughput)

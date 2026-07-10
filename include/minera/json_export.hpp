@@ -13,6 +13,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
+#include "minera/performance_spectrum.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/resource_analysis.hpp"
@@ -37,7 +38,9 @@ namespace minera {
 // When `decisions` is non-null the decision-mining result is embedded under
 // "decisions". When both `net` and `petri_decoration` are non-null the net's
 // replay decoration (transition firing counts and place waiting times, indices
-// matching "petri_net") is embedded under "petri_net_decoration".
+// matching "petri_net") is embedded under "petri_net_decoration". When
+// `spectrum` is non-null the performance spectrum (the pattern and one
+// instants row per observation) is embedded under "performance_spectrum".
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -51,7 +54,8 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<DurationStats>* variant_durations = nullptr,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
                          const DecisionMiningResult* decisions = nullptr,
-                         const ModelDecoration* petri_decoration = nullptr);
+                         const ModelDecoration* petri_decoration = nullptr,
+                         const PerformanceSpectrum* spectrum = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -66,7 +70,8 @@ void write_analysis_json(std::ostream& out,
     const std::vector<DurationStats>* variant_durations = nullptr,
     const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
     const DecisionMiningResult* decisions = nullptr,
-    const ModelDecoration* petri_decoration = nullptr);
+    const ModelDecoration* petri_decoration = nullptr,
+    const PerformanceSpectrum* spectrum = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

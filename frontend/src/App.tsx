@@ -19,6 +19,7 @@ import { Conformance } from "./components/Conformance";
 import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
 import { DottedChartView } from "./components/DottedChart";
+import { PerformanceSpectrumView } from "./components/PerformanceSpectrum";
 import { buildDottedChart } from "./dotted-chart";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
@@ -363,6 +364,7 @@ export default function App() {
       {tab === "dotted" && (
         <main className="layout-log">
           <DottedChartView data={data} />
+          <PerformanceSpectrumView data={data} />
         </main>
       )}
       {tab === "conformance" && (
