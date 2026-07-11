@@ -108,6 +108,10 @@ int usage(const char* program) {
                "                            steps): per occurrence, when each\n"
                "                            step happened; embedded under\n"
                "                            \"performance_spectrum\"\n"
+               "  --no-alignments           Skip the optimal alignments in the\n"
+               "                            export (token replay and footprints\n"
+               "                            stay); alignments dominate runtime\n"
+               "                            on large, badly fitting logs\n"
                "  --decisions <miner>       Mine the decision points of one\n"
                "                            model (inductive, alpha, or\n"
                "                            heuristic): which attribute values\n"
@@ -194,6 +198,7 @@ int main(int argc, char** argv) {
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
+  bool no_alignments = false;
   std::vector<std::string> spectrum_activities;  // empty = no spectrum
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
@@ -278,6 +283,8 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       decisions_miner = value;
+    } else if (arg == "--no-alignments") {
+      no_alignments = true;
     } else if (arg == "--spectrum") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -497,15 +504,26 @@ int main(int argc, char** argv) {
     const auto eventually = minera::discover_eventually_follows(log, graph);
 
     // Check every discovered model both ways, keyed by miner id. The export is
-    // offline, so embed the alignments too (the server defers them instead).
+    // offline, so embed the alignments too (the server defers them instead)
+    // unless --no-alignments opted out: optimal alignments dominate the whole
+    // run on a large log a model fits badly, where every variant needs a deep
+    // search (the marking-equation LP per visited state is the honest price
+    // of optimality).
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
+    if (!no_alignments && log.traces.size() > 1000) {
+      std::cerr << "note: computing optimal alignments for every model; on a "
+                   "large or badly fitting log this can take minutes "
+                   "(--no-alignments skips them)\n";
+    }
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(petri),
           minera::check_conformance(log, petri),
           minera::check_footprints(log, petri),
-          minera::check_alignment(log, petri)};
+          no_alignments ? std::optional<minera::AlignmentResult>{}
+                        : std::optional<minera::AlignmentResult>(
+                              minera::check_alignment(log, petri))};
     };
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
