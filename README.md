@@ -356,6 +356,14 @@ process tree (the three flags share the `imported` id, so pass only one).
 `--pnml` / `--bpmn` model exports; the running server serves the same at
 `GET /api/ptml`.
 
+`--no-alignments` skips embedding the optimal alignments in the export
+(token replay and footprints stay). Worth reaching for on a very large log
+checked against a badly fitting model: optimal alignments need a deep search
+per trace variant there, which can dominate the whole run — the CLI prints a
+note when that risk applies. The frontend's Alignments view then computes
+them on demand against a running server, exactly as it does for server-mined
+logs.
+
 `--decisions <miner>` additionally mines the decision points of one
 discovered model — which attribute values steer a case down which branch —
 and embeds the rules in the export under `decisions`.

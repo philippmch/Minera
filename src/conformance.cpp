@@ -207,23 +207,51 @@ class Replayer {
 
     // General nets: an activity is allowed next if a transition for it is
     // enabled at this marking or at any marking reachable by firing silent
-    // transitions. A single breadth-first silent closure (bounded so a
-    // pathological model cannot loop forever) collects them all at once,
-    // rather than re-walking the same silent space once per activity.
+    // transitions. The exact answer needs a breadth-first silent closure
+    // (bounded so a pathological model cannot loop forever) — but on a net
+    // whose silent structure interleaves several tokens, that closure used to
+    // run to its cap on every distinct marking, which dominated whole
+    // conformance checks. Two sound cuts keep it honest and fast: activities
+    // the relaxed reachability disproves are dropped before the search, and
+    // the search stops the moment every surviving candidate has been found.
     std::unordered_set<std::size_t> acts;
+    const auto reachable = relaxed_silent_places(marking);
+    std::vector<std::size_t> remaining;
+    for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
+      bool possible = false;
+      for (const std::size_t t : transitions_by_activity_[a]) {
+        if (relaxed_enables(reachable, t)) {
+          possible = true;
+          break;
+        }
+      }
+      if (!possible) continue;  // provably not enableable from here
+      if (any_enabled(marking, transitions_by_activity_[a])) {
+        acts.insert(a);
+      } else {
+        remaining.push_back(a);
+      }
+    }
+    if (remaining.empty()) return acts;
+
     const auto collect = [&](const Marking& m) {
-      for (std::size_t a = 0; a < transitions_by_activity_.size(); ++a) {
-        if (acts.count(a)) continue;
-        if (any_enabled(m, transitions_by_activity_[a])) acts.insert(a);
+      for (std::size_t i = 0; i < remaining.size();) {
+        if (any_enabled(m, transitions_by_activity_[remaining[i]])) {
+          acts.insert(remaining[i]);
+          remaining[i] = remaining.back();
+          remaining.pop_back();
+        } else {
+          ++i;
+        }
       }
     };
-    collect(marking);
 
     std::unordered_set<Marking, MarkingHash> seen{marking};
     std::queue<Marking> frontier;
     frontier.push(marking);
     std::size_t expanded = 0;
-    while (!frontier.empty() && expanded++ < kSilentSearchCap) {
+    while (!frontier.empty() && !remaining.empty() &&
+           expanded++ < kSilentSearchCap) {
       const Marking current = std::move(frontier.front());
       frontier.pop();
       for (const std::size_t s : silent_transitions_) {
@@ -233,6 +261,7 @@ class Replayer {
         fire(next, s, scratch);
         if (!seen.insert(next).second) continue;
         collect(next);
+        if (remaining.empty()) break;
         frontier.push(std::move(next));
       }
     }
@@ -350,6 +379,42 @@ class Replayer {
     place_closure_exact_ = true;
   }
 
+  // The places a token could ever occupy from `marking` through silent
+  // firings when token counts are ignored — a cheap over-approximation of the
+  // silent closure. Sound by induction: a real firing needs every input place
+  // tokened, so every place a real silent run can mark lands in the fixpoint.
+  // What the fixpoint rules out is therefore truly unreachable, which lets
+  // the exact (and expensive) searches skip provably hopeless goals.
+  [[nodiscard]] std::vector<char> relaxed_silent_places(
+      const Marking& marking) const {
+    std::vector<char> reachable(marking.size(), 0);
+    for (std::size_t p = 0; p < marking.size(); ++p) {
+      reachable[p] = marking[p] > 0 ? 1 : 0;
+    }
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (const std::size_t s : silent_transitions_) {
+        if (!relaxed_enables(reachable, s)) continue;
+        for (const std::size_t place : net_.transitions()[s].outputs) {
+          if (!reachable[place]) {
+            reachable[place] = 1;
+            changed = true;
+          }
+        }
+      }
+    }
+    return reachable;
+  }
+
+  [[nodiscard]] bool relaxed_enables(const std::vector<char>& reachable,
+                                     std::size_t t) const {
+    for (const std::size_t place : net_.transitions()[t].inputs) {
+      if (!reachable[place]) return false;
+    }
+    return true;
+  }
+
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
     for (const std::size_t place : net_.transitions()[t].inputs) {
       if (marking[place] <= 0) return false;
@@ -446,6 +511,14 @@ class Replayer {
                       Counts& counts,
                       std::vector<std::size_t>* fired = nullptr) const {
     if (any_enabled(marking, targets)) return;
+    // A search that cannot succeed would still run to its cap; the relaxed
+    // fixpoint disproves most of those misses for the price of one pass.
+    const auto reachable = relaxed_silent_places(marking);
+    if (std::none_of(targets.begin(), targets.end(), [&](std::size_t t) {
+          return relaxed_enables(reachable, t);
+        })) {
+      return;  // provably no silent route; the visible firing creates tokens
+    }
     const auto path = silent_path(
         marking, [&](const Marking& m) { return any_enabled(m, targets); });
     if (!path) return;  // no silent route; the visible firing will create tokens
@@ -458,6 +531,7 @@ class Replayer {
                          Counts& counts,
                          std::vector<std::size_t>* fired = nullptr) const {
     if (marking[place] > 0) return;
+    if (!relaxed_silent_places(marking)[place]) return;  // provably unreachable
     const auto path =
         silent_path(marking, [&](const Marking& m) { return m[place] > 0; });
     if (!path) return;
