@@ -17,6 +17,10 @@ interface ProcessModelProps {
   treeLayout: TreeLayout | null;
   /** Layout for the alpha miner's Petri net, if the export carries one. */
   petriLayout: PetriLayout | null;
+  /** Layout for the inductive model's workflow net, if the export carries one. */
+  inductivePetriLayout: PetriLayout | null;
+  /** Layout for the heuristic model's workflow net, if the export carries one. */
+  heuristicPetriLayout: PetriLayout | null;
   /** Whether the backend can export PNML (a log was mined this session). */
   canExportPnml: boolean;
 }
@@ -27,6 +31,8 @@ export function ProcessModel({
   data,
   treeLayout,
   petriLayout,
+  inductivePetriLayout,
+  heuristicPetriLayout,
   canExportPnml,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
@@ -119,12 +125,15 @@ export function ProcessModel({
 
       {step === "result" && group && variant && (
         <ModelResult
+          key={variant.id}
           variant={variant}
           minerId={group.id}
           groupName={group.name}
           data={data}
           treeLayout={treeLayout}
           petriLayout={petriLayout}
+          inductivePetriLayout={inductivePetriLayout}
+          heuristicPetriLayout={heuristicPetriLayout}
           canExportPnml={canExportPnml}
         />
       )}
@@ -139,12 +148,17 @@ interface ModelResultProps {
   data: MineraExport;
   treeLayout: TreeLayout | null;
   petriLayout: PetriLayout | null;
+  inductivePetriLayout: PetriLayout | null;
+  heuristicPetriLayout: PetriLayout | null;
   canExportPnml: boolean;
 }
 
 // Renders the mined model for the chosen variant by its artifact type. A null
 // layout means the export carries no model of that kind (an older export, or a
 // log too small to mine one), so an honest placeholder is shown instead.
+// The tree and dependency-graph artifacts can flip to the model's workflow
+// net — the exact net conformance checks and exports use — where the replay
+// annotations (firing counts, place waits) live.
 function ModelResult({
   variant,
   minerId,
@@ -152,8 +166,12 @@ function ModelResult({
   data,
   treeLayout,
   petriLayout,
+  inductivePetriLayout,
+  heuristicPetriLayout,
   canExportPnml,
 }: ModelResultProps) {
+  const [asNet, setAsNet] = useState(false);
+
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side).
   // The inductive tree additionally exports as PTML, the process-tree format.
@@ -168,9 +186,53 @@ function ModelResult({
     </>
   ) : null;
 
+  // The primary-view ⇄ workflow-net flip, offered when the export carries the
+  // net (older exports lack it and simply show no toggle).
+  const netToggle = (primaryLabel: string, netLayout: PetriLayout | null) =>
+    netLayout ? (
+      <div className="map-mode" role="group" aria-label="Model view">
+        <button
+          className={asNet ? "mode-btn" : "mode-btn active"}
+          onClick={() => setAsNet(false)}
+        >
+          {primaryLabel}
+        </button>
+        <button
+          className={asNet ? "mode-btn active" : "mode-btn"}
+          onClick={() => setAsNet(true)}
+        >
+          Workflow net
+        </button>
+      </div>
+    ) : null;
+
   if (variant.artifact === "process-tree") {
+    if (asNet && inductivePetriLayout) {
+      return (
+        <PetriNet
+          layout={inductivePetriLayout}
+          title={groupName}
+          actions={
+            <>
+              {netToggle("Tree", inductivePetriLayout)}
+              {actions}
+            </>
+          }
+          decoration={data.inductive_petri_net_decoration ?? null}
+        />
+      );
+    }
     return treeLayout ? (
-      <ProcessTree layout={treeLayout} title={groupName} actions={actions} />
+      <ProcessTree
+        layout={treeLayout}
+        title={groupName}
+        actions={
+          <>
+            {netToggle("Tree", inductivePetriLayout)}
+            {actions}
+          </>
+        }
+      />
     ) : (
       <Placeholder>
         No model to display. This export predates model discovery — re-open the
@@ -180,9 +242,35 @@ function ModelResult({
   }
 
   if (variant.artifact === "dependency-graph") {
+    if (asNet && heuristicPetriLayout) {
+      return (
+        <PetriNet
+          layout={heuristicPetriLayout}
+          title={groupName}
+          actions={
+            <>
+              {netToggle("Dependency graph", heuristicPetriLayout)}
+              {actions}
+            </>
+          }
+          decoration={data.heuristic_petri_net_decoration ?? null}
+        />
+      );
+    }
     // The dependency graph is derived from the directly-follows counts, which
     // every analysis carries, so it is always available.
-    return <DependencyGraph data={data} title={groupName} actions={actions} />;
+    return (
+      <DependencyGraph
+        data={data}
+        title={groupName}
+        actions={
+          <>
+            {netToggle("Dependency graph", heuristicPetriLayout)}
+            {actions}
+          </>
+        }
+      />
+    );
   }
 
   return petriLayout ? (

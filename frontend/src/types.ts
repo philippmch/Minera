@@ -397,6 +397,15 @@ export interface MineraExport {
    * absent in exports from older minera versions.
    */
   petri_net_decoration?: PetriDecoration;
+  /**
+   * The Inductive and Heuristic models as workflow nets, each with its own
+   * replay decoration — so any miner's model can be drawn (and annotated) as
+   * a Petri net. Absent in exports from older minera versions.
+   */
+  inductive_petri_net?: PetriNetModel;
+  inductive_petri_net_decoration?: PetriDecoration;
+  heuristic_petri_net?: PetriNetModel;
+  heuristic_petri_net_decoration?: PetriDecoration;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */

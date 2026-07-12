@@ -577,7 +577,11 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows,
                          const DecisionMiningResult* decisions,
                          const ModelDecoration* petri_decoration,
-                         const PerformanceSpectrum* spectrum) {
+                         const PerformanceSpectrum* spectrum,
+                         const PetriNet* inductive_net,
+                         const ModelDecoration* inductive_decoration,
+                         const PetriNet* heuristic_petri,
+                         const ModelDecoration* heuristic_decoration) {
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -676,6 +680,22 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"petri_net_decoration\": ";
     write_model_decoration(out, *petri_decoration);
   }
+  if (inductive_net != nullptr) {
+    out << ",\n  \"inductive_petri_net\": ";
+    write_petri_net(out, *inductive_net, graph);
+    if (inductive_decoration != nullptr) {
+      out << ",\n  \"inductive_petri_net_decoration\": ";
+      write_model_decoration(out, *inductive_decoration);
+    }
+  }
+  if (heuristic_petri != nullptr) {
+    out << ",\n  \"heuristic_petri_net\": ";
+    write_petri_net(out, *heuristic_petri, graph);
+    if (heuristic_decoration != nullptr) {
+      out << ",\n  \"heuristic_petri_net_decoration\": ";
+      write_model_decoration(out, *heuristic_decoration);
+    }
+  }
   if (heuristics != nullptr) {
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
@@ -727,12 +747,17 @@ std::string analysis_json(std::string_view dataset,
                           const std::vector<EventuallyFollowsEdge>* eventually_follows,
                           const DecisionMiningResult* decisions,
                           const ModelDecoration* petri_decoration,
-                          const PerformanceSpectrum* spectrum) {
+                          const PerformanceSpectrum* spectrum,
+                          const PetriNet* inductive_net,
+                          const ModelDecoration* inductive_decoration,
+                          const PetriNet* heuristic_petri,
+                          const ModelDecoration* heuristic_decoration) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
                       eventually_follows, decisions, petri_decoration,
-                      spectrum);
+                      spectrum, inductive_net, inductive_decoration,
+                      heuristic_petri, heuristic_decoration);
   return out.str();
 }
 

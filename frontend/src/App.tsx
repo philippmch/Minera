@@ -239,6 +239,22 @@ export default function App() {
     [data, fontsReady],
   );
 
+  const inductivePetriLayout = useMemo(
+    () =>
+      data && data.inductive_petri_net
+        ? computePetriLayout(data.inductive_petri_net, data)
+        : null,
+    [data, fontsReady],
+  );
+
+  const heuristicPetriLayout = useMemo(
+    () =>
+      data && data.heuristic_petri_net
+        ? computePetriLayout(data.heuristic_petri_net, data)
+        : null,
+    [data, fontsReady],
+  );
+
   // Whether the log has any timestamped events to plot. Built once per load so
   // the Dotted Chart tab only appears when it would have something to show.
   const hasDottedChart = useMemo(
@@ -357,6 +373,8 @@ export default function App() {
             data={data}
             treeLayout={treeLayout}
             petriLayout={petriLayout}
+            inductivePetriLayout={inductivePetriLayout}
+            heuristicPetriLayout={heuristicPetriLayout}
             canExportPnml={source !== null}
           />
         </main>
