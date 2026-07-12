@@ -522,6 +522,25 @@ void json_export_carries_the_petri_net_contract() {
   // The Petri net is omitted when not supplied (older-export compatibility).
   const auto without = minera::analysis_json("test", log, graph);
   assert(without.find("\"petri_net\"") == std::string::npos);
+
+  // The inductive and heuristic models travel as workflow nets too, each with
+  // its replay decoration, so every miner's model can be drawn as a Petri net.
+  const auto tree = minera::discover_process_tree(log);
+  const auto inductive_net = minera::to_petri_net(tree);
+  const auto heuristic_net =
+      minera::to_petri_net(minera::discover_heuristics_net(log));
+  const auto inductive_decoration = minera::decorate_model(log, inductive_net);
+  const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
+  const auto full = minera::analysis_json(
+      "test", log, graph, &tree, &net, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &inductive_net,
+      &inductive_decoration, &heuristic_net, &heuristic_decoration);
+  for (const char* key :
+       {"\"inductive_petri_net\"", "\"inductive_petri_net_decoration\"",
+        "\"heuristic_petri_net\"", "\"heuristic_petri_net_decoration\""}) {
+    assert(full.find(key) != std::string::npos);
+  }
+  assert(without.find("\"inductive_petri_net\"") == std::string::npos);
 }
 
 void conformance_is_perfect_on_the_discovery_log() {

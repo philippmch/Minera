@@ -121,14 +121,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net)};
 
-    // Frequency/performance annotations for the Petri-net model view: one
-    // more token replay, so cheap enough to compute up front like the rest.
+    // Frequency/performance annotations for every miner's Petri-net view:
+    // one more token replay per net, cheap enough to compute up front.
     const auto petri_decoration = minera::decorate_model(log, net);
+    const auto inductive_decoration = minera::decorate_model(log, inductive_net);
+    const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
 
     const std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
-        /*decisions=*/nullptr, &petri_decoration);
+        /*decisions=*/nullptr, &petri_decoration, /*spectrum=*/nullptr,
+        &inductive_net, &inductive_decoration, &heuristic_net,
+        &heuristic_decoration);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

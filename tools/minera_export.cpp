@@ -577,8 +577,12 @@ int main(int argc, char** argv) {
     const minera::DecisionMiningResult* decisions_ptr =
         decisions ? &*decisions : nullptr;
 
-    // Frequency/performance annotations for the Petri-net model view.
+    // Frequency/performance annotations for every miner's Petri-net view —
+    // the inductive net fits by construction, so its overlay always has data
+    // even when the alpha net (the classic view) fits nothing of a real log.
     const auto petri_decoration = minera::decorate_model(log, net);
+    const auto inductive_decoration = minera::decorate_model(log, inductive_net);
+    const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
 
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
@@ -589,22 +593,23 @@ int main(int argc, char** argv) {
         spectrum ? &*spectrum : nullptr;
 
     if (output.empty()) {
-      minera::write_analysis_json(std::cout, dataset, log, graph, &tree, &net,
-                                  &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations, &eventually,
-                                  decisions_ptr, &petri_decoration,
-                                  spectrum_ptr);
+      minera::write_analysis_json(
+          std::cout, dataset, log, graph, &tree, &net, &heuristics,
+          &conformance, &performance, &resources, &variant_durations,
+          &eventually, decisions_ptr, &petri_decoration, spectrum_ptr,
+          &inductive_net, &inductive_decoration, &heuristic_net,
+          &heuristic_decoration);
     } else {
       std::ofstream file(output);
       if (!file) {
         std::cerr << "error: cannot open output file " << output << '\n';
         return 1;
       }
-      minera::write_analysis_json(file, dataset, log, graph, &tree, &net,
-                                  &heuristics, &conformance, &performance,
-                                  &resources, &variant_durations, &eventually,
-                                  decisions_ptr, &petri_decoration,
-                                  spectrum_ptr);
+      minera::write_analysis_json(
+          file, dataset, log, graph, &tree, &net, &heuristics, &conformance,
+          &performance, &resources, &variant_durations, &eventually,
+          decisions_ptr, &petri_decoration, spectrum_ptr, &inductive_net,
+          &inductive_decoration, &heuristic_net, &heuristic_decoration);
     }
 
     // Optionally emit one discovered model as standard PNML.

@@ -102,8 +102,13 @@ workflows with native performance.
   and consumption (count, mean, median, min, max) — bringing the process
   map's frequency/performance perspective onto the model's own structure.
   Deviating cases are excluded rather than force-replayed, and the annotation
-  says how many cases it describes. Carried in the JSON export as
-  `petri_net_decoration`, aligned index-for-index with the exported net.
+  says how many cases it describes. Every miner's model is decorated as its
+  workflow net — the Inductive Miner's net fits its log by construction, so
+  that view always carries full annotations even on noisy real-world logs
+  where the Alpha net fits little. Carried in the JSON export as
+  `petri_net_decoration` (alpha), `inductive_petri_net(_decoration)`, and
+  `heuristic_petri_net(_decoration)`, each aligned index-for-index with its
+  net.
 - **Performance spectrum**: pick two or more activities as a pattern, and
   every case that performs them as an uninterrupted run (other activities in
   between are ignored) contributes one observation — the instants at which
@@ -284,7 +289,9 @@ events first; discovery lives in tabs:
   local edges don't show,
 - **Mine a Process Model** — pick a discovery algorithm (the Inductive Miner's
   process tree, the Alpha Miner's Petri net, or the Heuristic Miner's dependency
-  graph) and explore the resulting model; the Petri-net view has a
+  graph) and explore the resulting model; the tree and dependency-graph
+  views flip to the model's **workflow net** — the exact net conformance
+  checks and exports use — and every Petri-net view has a
   **plain / frequency / performance** toggle that badges each transition with
   its replay firing count (never-fired paths fade out) and labels each place
   with the mean time tokens wait in it, with a caption saying how many cases

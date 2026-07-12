@@ -41,6 +41,12 @@ namespace minera {
 // matching "petri_net") is embedded under "petri_net_decoration". When
 // `spectrum` is non-null the performance spectrum (the pattern and one
 // instants row per observation) is embedded under "performance_spectrum".
+// The inductive and heuristic models' workflow nets travel the same way the
+// alpha net does: when `inductive_net` / `heuristic_petri` are non-null they
+// are embedded under "inductive_petri_net" / "heuristic_petri_net", each with
+// its replay decoration under the matching "..._decoration" key when given —
+// so every miner's model can be drawn (and annotated) as a Petri net, not
+// just exported as one.
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -55,7 +61,11 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
                          const DecisionMiningResult* decisions = nullptr,
                          const ModelDecoration* petri_decoration = nullptr,
-                         const PerformanceSpectrum* spectrum = nullptr);
+                         const PerformanceSpectrum* spectrum = nullptr,
+                         const PetriNet* inductive_net = nullptr,
+                         const ModelDecoration* inductive_decoration = nullptr,
+                         const PetriNet* heuristic_petri = nullptr,
+                         const ModelDecoration* heuristic_decoration = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -71,7 +81,11 @@ void write_analysis_json(std::ostream& out,
     const std::vector<EventuallyFollowsEdge>* eventually_follows = nullptr,
     const DecisionMiningResult* decisions = nullptr,
     const ModelDecoration* petri_decoration = nullptr,
-    const PerformanceSpectrum* spectrum = nullptr);
+    const PerformanceSpectrum* spectrum = nullptr,
+    const PetriNet* inductive_net = nullptr,
+    const ModelDecoration* inductive_decoration = nullptr,
+    const PetriNet* heuristic_petri = nullptr,
+    const ModelDecoration* heuristic_decoration = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same
