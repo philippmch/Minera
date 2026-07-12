@@ -82,8 +82,10 @@ workflows with native performance.
   by mean arc degree), completing the four standard quality dimensions. **Alignment-based conformance** finds, per trace,
   the cheapest sequence of synchronous, log-only, and model-only moves that
   walks the net from start to end (an A\* search over the synchronous product,
-  guided by the marking-equation lower bound so even highly concurrent models
-  stay alignable) — giving exact, optimal diagnostics of *where* and *how* each
+  guided by the marking-equation lower bound — aggregated per remaining
+  activity and cached across trace variants, so states that share a marking
+  and remaining work never pay for a second solve — which keeps even highly
+  concurrent models alignable) — giving exact, optimal diagnostics of *where* and *how* each
   trace deviates, plus cost-based fitness. The moves are also aggregated per
   activity across the whole log — how often each activity aligns
   synchronously, is inserted (in the log with no model step), or is skipped

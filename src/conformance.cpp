@@ -27,6 +27,10 @@ using Marking = std::vector<int>;
 // block-structured nets the inductive miner produces.
 constexpr std::size_t kSilentSearchCap = 4096;
 
+// Cap on the aligner's cross-variant bound cache (entries); past it, solves
+// simply stop being remembered rather than growing memory without limit.
+constexpr std::size_t kAlignerBoundCacheCap = 2'000'000;
+
 // FNV-1a hash of a token vector, used to key every marking-indexed search
 // (token replay's silent routing, the precision pass, and alignment) directly
 // on the marking instead of formatting a string per state — these searches
@@ -998,70 +1002,190 @@ class Aligner {
     State final_key = final_;
     final_key.push_back(static_cast<int>(len));
 
-    // Transitions whose label matches each trace event, for the heuristic's
-    // synchronous-move columns.
+    // Distinct model-known activities of the trace, with their transition
+    // matches. Trace positions carrying the same activity are interchangeable
+    // for the marking-equation relaxation, so the heuristic below groups them
+    // by activity: its rows scale with the alphabet instead of the remaining
+    // trace length, and its value depends only on the marking and the
+    // remaining activity counts — which is what makes it cacheable across
+    // states and across variants.
+    std::vector<std::size_t> slot_activity;  // slot -> activity id
+    std::vector<std::vector<std::size_t>> slot_matches;
+    std::unordered_map<std::size_t, std::size_t> slot_of;
     std::vector<std::vector<std::size_t>> matches(len);
     for (std::size_t d = 0; d < len; ++d) {
       if (!ids[d]) continue;
-      for (std::size_t t = 0; t < tcount; ++t) {
-        const auto& transition = net_.transitions()[t];
-        if (!transition.silent() && *transition.activity == *ids[d]) {
-          matches[d].push_back(t);
+      const auto [it, inserted] = slot_of.try_emplace(*ids[d], slot_activity.size());
+      if (inserted) {
+        slot_activity.push_back(*ids[d]);
+        std::vector<std::size_t> ts;
+        for (std::size_t t = 0; t < tcount; ++t) {
+          const auto& transition = net_.transitions()[t];
+          if (!transition.silent() && *transition.activity == *ids[d]) {
+            ts.push_back(t);
+          }
         }
+        slot_matches.push_back(std::move(ts));
       }
+      matches[d] = slot_matches[it->second];
     }
+    const std::size_t slots = slot_activity.size();
 
-    // Marking-equation heuristic: the remaining alignment cost is bounded from
-    // below by relaxing it to the LP  min c·x  s.t.  N·x = m_final - m  over
-    // continuous move counts x >= 0. Columns are the net's transitions fired
-    // as model moves, plus one log move and the matching synchronous moves per
-    // remaining trace position (each position must advance exactly once) — so
-    // a move out of `state` is column t (model), tcount (log at the current
-    // position), or tcount + 1 + k (sync with matches[pos][k]). Every real
-    // completion is a feasible integer solution, so the LP optimum never
-    // overestimates; costs are integral, so its ceiling is still a lower
-    // bound. Infeasible means the final marking is unreachable from this
-    // state: the branch can be pruned outright.
+    // suffix_counts[d][slot]: occurrences of the slot's activity in the
+    // remaining trace ids[d..len). Canonical slot order (ascending activity
+    // id) keys the cross-variant cache, since slots are discovered in
+    // per-variant order.
+    std::vector<std::vector<std::uint32_t>> suffix_counts(
+        len + 1, std::vector<std::uint32_t>(slots, 0));
+    for (std::size_t d = len; d-- > 0;) {
+      suffix_counts[d] = suffix_counts[d + 1];
+      if (ids[d]) ++suffix_counts[d][slot_of.at(*ids[d])];
+    }
+    std::vector<std::size_t> canonical_slots(slots);
+    for (std::size_t i = 0; i < slots; ++i) canonical_slots[i] = i;
+    std::sort(canonical_slots.begin(), canonical_slots.end(),
+              [&](std::size_t a, std::size_t b) {
+                return slot_activity[a] < slot_activity[b];
+              });
+
+    // Marking-equation heuristic: the remaining alignment cost is bounded
+    // from below by relaxing it to an LP over continuous move counts x >= 0.
+    // Columns are the net's transitions fired as model moves plus, per
+    // remaining activity, one aggregated synchronous column per matching
+    // transition and one slack; the activity's row caps synchronous use at
+    // its remaining count, with the slack standing for the positions aligned
+    // as log moves instead. Every remaining position pays a log move up
+    // front (the `constant` below) and each synchronous unit refunds one, so
+    // the aggregated optimum equals the per-position formulation's — the
+    // positions it merges are interchangeable. Every real completion is a
+    // feasible integer solution, so the LP optimum never overestimates;
+    // costs are integral, so its ceiling is still a lower bound. Infeasible
+    // means the final marking is unreachable from this state: the branch can
+    // be pruned outright.
     struct LpBound {
       std::uint64_t bound = 0;
-      std::vector<double> solution;  // empty when the solve was aborted
+      bool solved = false;  // false: bound only (cache hit or aborted solve)
+      std::vector<double> model_use;  // x_t per transition, when solved
+      std::vector<double> sync_use;   // per matches[pos] entry, when solved
+      double log_slack = 0.0;         // unmet remaining count of ids[pos]
+      bool log_free = false;  // ids[pos] absent from the model: log is exact
     };
     const auto heuristic = [&](const State& state) -> std::optional<LpBound> {
       const std::size_t pos = static_cast<std::size_t>(state.back());
-      const std::size_t rows = pc + (len - pos);
-      std::size_t vars = tcount;
-      for (std::size_t d = pos; d < len; ++d) vars += 1 + matches[d].size();
+      const auto& counts = suffix_counts[pos];
+      const double constant = static_cast<double>(len - pos);
 
-      std::vector<std::vector<double>> a(rows, std::vector<double>(vars, 0.0));
-      std::vector<double> b(rows, 0.0);
-      std::vector<double> c(vars, 0.0);
+      // The bound is a function of (marking, remaining counts) alone, so one
+      // solve serves every state — of any variant — that shares them. Each
+      // value packs into one byte (they are tiny in practice), spilling to an
+      // escaped five-byte form when one ever is not — a prefix code, so the
+      // fixed decode order (pc markings, then activity/count pairs) keeps the
+      // key injective while millions of cached bounds stay affordable.
+      std::string key;
+      key.reserve(pc + slots * 2 + 4);
+      const auto pack = [&key](std::uint32_t value) {
+        if (value < 0xFE) {
+          key += static_cast<char>(value);
+        } else {
+          key += static_cast<char>(0xFF);
+          key += static_cast<char>(value & 0xFF);
+          key += static_cast<char>((value >> 8) & 0xFF);
+          key += static_cast<char>((value >> 16) & 0xFF);
+          key += static_cast<char>((value >> 24) & 0xFF);
+        }
+      };
       for (std::size_t p = 0; p < pc; ++p) {
-        b[p] = static_cast<double>(final_[p]) - static_cast<double>(state[p]);
+        pack(static_cast<std::uint32_t>(state[p]));
       }
-      for (std::size_t t = 0; t < tcount; ++t) {
-        for (const auto& [place, coef] : incidence_[t]) a[place][t] = coef;
-        c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
+      for (const std::size_t slot : canonical_slots) {
+        if (counts[slot] == 0) continue;
+        pack(static_cast<std::uint32_t>(slot_activity[slot]));
+        pack(counts[slot]);
       }
-      std::size_t col = tcount;
-      for (std::size_t d = pos; d < len; ++d) {
-        const std::size_t row = pc + (d - pos);
-        b[row] = 1.0;
-        a[row][col] = 1.0;  // log move: advances the trace, costs one
-        c[col] = 1.0;
-        ++col;
-        for (const std::size_t t : matches[d]) {  // synchronous moves: free
-          for (const auto& [place, coef] : incidence_[t]) a[place][col] = coef;
-          a[row][col] = 1.0;
+      const auto cached = bound_cache_.find(key);
+      LpBound result;
+      if (cached != bound_cache_.end()) {
+        if (!cached->second) return std::nullopt;  // known infeasible
+        result.bound = *cached->second;
+      } else {
+        std::size_t active = 0;
+        std::size_t sync_cols = 0;
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+          if (counts[slot] == 0) continue;
+          ++active;
+          sync_cols += slot_matches[slot].size();
+        }
+        const std::size_t rows = pc + active;
+        const std::size_t vars = tcount + sync_cols + active;
+
+        std::vector<std::vector<double>> a(rows,
+                                           std::vector<double>(vars, 0.0));
+        std::vector<double> b(rows, 0.0);
+        std::vector<double> c(vars, 0.0);
+        for (std::size_t p = 0; p < pc; ++p) {
+          b[p] = static_cast<double>(final_[p]) - static_cast<double>(state[p]);
+        }
+        for (std::size_t t = 0; t < tcount; ++t) {
+          for (const auto& [place, coef] : incidence_[t]) a[place][t] = coef;
+          c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
+        }
+        std::size_t col = tcount;
+        std::size_t row = pc;
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+          if (counts[slot] == 0) continue;
+          b[row] = static_cast<double>(counts[slot]);
+          for (const std::size_t t : slot_matches[slot]) {
+            for (const auto& [place, coef] : incidence_[t]) a[place][col] = coef;
+            a[row][col] = 1.0;
+            c[col] = -1.0;  // each synchronous unit refunds one paid log move
+            ++col;
+          }
+          a[row][col] = 1.0;  // slack: positions left to align as log moves
           ++col;
+          ++row;
+        }
+
+        auto lp = solve_lp(std::move(a), std::move(b), c);
+        if (lp.aborted) return LpBound{};  // no usable bound, nothing dead
+        if (!lp.feasible) {
+          if (bound_cache_.size() < kAlignerBoundCacheCap) {
+            bound_cache_.try_emplace(std::move(key), std::nullopt);
+          }
+          return std::nullopt;
+        }
+        result.bound = static_cast<std::uint64_t>(
+            std::ceil(std::max(lp.objective + constant, 0.0) - 1e-6));
+        if (bound_cache_.size() < kAlignerBoundCacheCap) {
+          bound_cache_.try_emplace(std::move(key), result.bound);
+        }
+
+        // Unpack what the propagation needs for the current position.
+        result.solved = true;
+        result.model_use.assign(lp.solution.begin(),
+                                lp.solution.begin() + tcount);
+        if (pos < len && ids[pos]) {
+          const std::size_t want = slot_of.at(*ids[pos]);
+          std::size_t scan_col = tcount;
+          for (std::size_t slot = 0; slot < slots; ++slot) {
+            if (counts[slot] == 0) continue;
+            if (slot == want) {
+              result.sync_use.assign(
+                  lp.solution.begin() + scan_col,
+                  lp.solution.begin() + scan_col + slot_matches[slot].size());
+              result.log_slack =
+                  lp.solution[scan_col + slot_matches[slot].size()];
+              break;
+            }
+            scan_col += slot_matches[slot].size() + 1;
+          }
         }
       }
-
-      auto lp = solve_lp(std::move(a), std::move(b), c);
-      if (lp.aborted) return LpBound{};  // no usable bound, nothing provably dead
-      if (!lp.feasible) return std::nullopt;
-      return LpBound{static_cast<std::uint64_t>(
-                         std::ceil(std::max(lp.objective, 0.0) - 1e-6)),
-                     std::move(lp.solution)};
+      if (pos < len && !ids[pos]) {
+        // An activity the model lacks can only be a log move; consuming it
+        // drops the constant by exactly one, so that step is always exact.
+        result.log_free = true;
+      }
+      return result;
     };
 
     // A state whose marking equation is infeasible can never reach the goal;
@@ -1171,9 +1295,9 @@ class Aligner {
         // Lazy exactness: states carry inherited bounds until they are
         // actually popped, so the LP runs only for states the search truly
         // visits — and the solution just computed marks the children on its
-        // predicted path exact, sparing them their own solve.
-        const std::vector<double>* solution = nullptr;
-        std::vector<double> solved_solution;
+        // predicted path exact, sparing them their own solve. A bound served
+        // from the cache carries no solution; its children simply inherit.
+        LpBound info;
         if (!entries[node.state].exact) {
           auto solved = heuristic(*by_id[node.state]);
           Entry& entry = entries[node.state];
@@ -1190,8 +1314,7 @@ class Aligner {
               continue;  // wait for its turn under the tightened bound
             }
           }
-          solved_solution = std::move(solved->solution);
-          if (!solved_solution.empty()) solution = &solved_solution;
+          info = std::move(*solved);
         }
 
         entries[node.state].closed = true;
@@ -1202,9 +1325,19 @@ class Aligner {
         const std::uint64_t h_less_one = h > 0 ? h - 1 : 0;
         const State& state = *by_id[node.state];
         const std::size_t pos = static_cast<std::size_t>(state.back());
-        const auto walked = [&](std::size_t var) {
-          return solution != nullptr && (*solution)[var] >= 1.0 - 1e-6;
+        // A move the LP optimum provably takes (the aggregated positions are
+        // interchangeable, so "some remaining position of this activity"
+        // stands for the current one) makes the child's inherited bound its
+        // exact LP value, sparing the child its own solve.
+        const auto walked_model = [&](std::size_t t) {
+          return info.solved && info.model_use[t] >= 1.0 - 1e-6;
         };
+        const auto walked_sync = [&](std::size_t k) {
+          return info.solved && k < info.sync_use.size() &&
+                 info.sync_use[k] >= 1.0 - 1e-6;
+        };
+        const bool walked_log =
+            info.log_free || (info.solved && info.log_slack >= 1.0 - 1e-6);
 
         // Log move: the trace advances while the model stands still.
         if (pos < len) {
@@ -1212,7 +1345,7 @@ class Aligner {
           next.back() = static_cast<int>(pos + 1);
           relax(std::move(next), g + 1, node.state, AlignmentMoveType::kLog,
                 static_cast<std::int32_t>(pos), false, h_less_one,
-                !use_lp || walked(tcount));
+                !use_lp || walked_log);
         }
 
         // Model moves (and the synchronous move when the labels agree).
@@ -1224,7 +1357,7 @@ class Aligner {
           for (const std::size_t place : transition.outputs) ++fired[place];
           if (transition.silent()) {
             relax(std::move(fired), g, node.state, AlignmentMoveType::kModel,
-                  -1, true, h, !use_lp || walked(t));
+                  -1, true, h, !use_lp || walked_model(t));
             continue;
           }
           const auto activity = static_cast<std::int32_t>(*transition.activity);
@@ -1238,14 +1371,14 @@ class Aligner {
             synced.back() = static_cast<int>(pos + 1);
             relax(std::move(fired), g + 1, node.state,
                   AlignmentMoveType::kModel, activity, false, h_less_one,
-                  !use_lp || walked(t));
+                  !use_lp || walked_model(t));
             relax(std::move(synced), g, node.state,
                   AlignmentMoveType::kSynchronous, activity, false, h,
-                  !use_lp || walked(tcount + 1 + k));
+                  !use_lp || walked_sync(k));
           } else {
             relax(std::move(fired), g + 1, node.state,
                   AlignmentMoveType::kModel, activity, false, h_less_one,
-                  !use_lp || walked(t));
+                  !use_lp || walked_model(t));
           }
         }
       }
@@ -1363,6 +1496,14 @@ class Aligner {
   // Per-transition sparse LP column for the marking-equation heuristic:
   // produced minus consumed tokens per place.
   std::vector<std::vector<std::pair<std::size_t, double>>> incidence_;
+  // Exact heuristic bounds keyed by marking + remaining activity counts —
+  // the aggregated LP depends on nothing else, so a bound computed for one
+  // search state serves every state (of any trace variant) that shares them.
+  // nullopt marks a marking-equation-infeasible key: a provable dead end.
+  // Bounded so a pathological log cannot grow it without limit; past the cap
+  // the aligner just solves without remembering.
+  mutable std::unordered_map<std::string, std::optional<std::uint64_t>>
+      bound_cache_;
 };
 
 // Bounds the model-footprint exploration so a highly concurrent net cannot
