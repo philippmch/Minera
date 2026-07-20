@@ -79,6 +79,13 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.correlation.start_timestamp_attribute.empty());
   assert(!params.correlation.exact_time_matching);
   assert(params.correlation.sample_size == 100000);
+  assert(params.spectrum_activities.empty());
+  assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kConnected);
+  assert(params.spectrum.sample_size == 10000);
+  assert(params.spectrum.sort_log);
+  assert(!params.batches);
+  assert(params.batch_options.merge_distance_seconds == 900.0);
+  assert(params.batch_options.min_batch_size == 2);
 }
 
 void parse_mine_params_maps_correlation_options() {
@@ -746,6 +753,105 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
   }
 }
 
+void parse_mine_params_maps_spectrum_and_batch_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"spectrum_activities", " A, B "},
+      {"spectrum_variant", "disconnected"},
+      {"spectrum_sample_size", "17"},
+      {"spectrum_sort_log", "false"},
+      {"batches", "true"},
+      {"batch_merge_distance_seconds", "12.5"},
+      {"batch_min_size", "3"},
+      {"batch_start_timestamp_attribute", "started_at"},
+  }));
+  assert((params.spectrum_activities == std::vector<std::string>{"A", "B"}));
+  assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kDisconnected);
+  assert(params.spectrum.sample_size == 17);
+  assert(!params.spectrum.sort_log);
+  assert(params.batches);
+  assert(params.batch_options.merge_distance_seconds == 12.5);
+  assert(params.batch_options.min_batch_size == 3);
+  assert(params.batch_options.start_timestamp_attribute == "started_at");
+}
+
+void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
+  for (const auto& item : {
+           std::pair{"spectrum_variant", "other"},
+           std::pair{"spectrum_activities", "only_one"},
+           std::pair{"spectrum_sample_size", "0"},
+           std::pair{"spectrum_sort_log", "yes"},
+           std::pair{"batches", "on"},
+           std::pair{"batch_merge_distance_seconds", "nan"},
+           std::pair{"batch_merge_distance_seconds", "-1"},
+           std::pair{"batch_min_size", "1"},
+           std::pair{"batch_min_size", "no"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> empty = {{"spectrum_activities", ""}};
+  const auto lookup = [&empty](std::string_view key) -> std::string {
+    const auto it = empty.find(std::string(key));
+    return it == empty.end() ? std::string{} : it->second;
+  };
+  const auto present = [&empty](std::string_view key) {
+    return empty.contains(std::string(key));
+  };
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_dependent_options_without_opt_in() {
+  bool threw = false;
+  for (const auto& item : {
+           std::pair{"spectrum_variant", "connected"},
+           std::pair{"spectrum_sample_size", "10"},
+           std::pair{"spectrum_sort_log", "true"},
+           std::pair{"batch_merge_distance_seconds", "1"},
+           std::pair{"batch_min_size", "2"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> explicit_empty = {
+      {"batch_start_timestamp_attribute", ""}};
+  const auto lookup = [&explicit_empty](std::string_view key) -> std::string {
+    const auto it = explicit_empty.find(std::string(key));
+    return it == explicit_empty.end() ? std::string{} : it->second;
+  };
+  const auto present = [&explicit_empty](std::string_view key) {
+    return explicit_empty.contains(std::string(key));
+  };
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"batches", "false"}, {"batch_min_size", "2"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -765,6 +871,9 @@ int main() {
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
+  parse_mine_params_maps_spectrum_and_batch_options();
+  parse_mine_params_rejects_invalid_spectrum_and_batch_options();
+  parse_mine_params_rejects_dependent_options_without_opt_in();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

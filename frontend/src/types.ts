@@ -632,6 +632,50 @@ export interface Performance {
   activities?: ActivityPerformance[];
 }
 
+/** Server-computed PM4Py performance spectrum observations. */
+export interface PerformanceSpectrumObservation {
+  case_id: string;
+  activities: string[];
+  instants: number[];
+  /** Start index of this contiguous sub-pattern in the requested pattern. */
+  pattern_offset: number;
+}
+export interface PerformanceSpectrumExport {
+  variant: "connected" | "disconnected";
+  activities: string[];
+  observations: PerformanceSpectrumObservation[];
+}
+
+export type BatchType =
+  | "simultaneous"
+  | "batching_on_start"
+  | "batching_on_end"
+  | "sequential"
+  | "concurrent";
+export interface BatchEvent {
+  start: number;
+  complete: number;
+  case_id: string;
+  trace_index: number;
+  event_index: number;
+}
+export interface BatchInstance {
+  type: BatchType;
+  start: number;
+  complete: number;
+  events: BatchEvent[];
+}
+export interface BatchGroup {
+  activity: number;
+  resource: string;
+  batch_count: number;
+  event_count: number;
+  batches: BatchInstance[];
+}
+export interface BatchDiscoveryExport {
+  groups: BatchGroup[];
+}
+
 export interface ResourceStat {
   name: string;
   event_count: number;
@@ -808,6 +852,10 @@ export interface MineraExport {
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */
   performance?: Performance;
+  /** Optional PM4Py performance spectrum analysis. */
+  performance_spectrum?: PerformanceSpectrumExport;
+  /** Optional PM4Py batch discovery analysis. */
+  batch_discovery?: BatchDiscoveryExport;
   /** Organizational perspective (handover-of-work network); absent in older exports. */
   resources?: ResourceNetwork;
   /**

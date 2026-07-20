@@ -168,6 +168,16 @@ export interface MinerOptions {
   correlationStartTimestampAttribute?: string;
   correlationExactTimeMatching?: boolean;
   correlationSampleSize?: number;
+  /** PM4Py performance spectrum (opt-in when activities are supplied). */
+  spectrumActivities?: string[];
+  spectrumVariant?: "connected" | "disconnected";
+  spectrumSampleSize?: number;
+  spectrumSortLog?: boolean;
+  /** PM4Py batch discovery (opt-in). */
+  batches?: boolean;
+  batchMergeDistanceSeconds?: number;
+  batchMinSize?: number;
+  batchStartTimestampAttribute?: string;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -500,6 +510,27 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     ) {
       add("correlation_sample_size", String(options.correlationSampleSize));
     }
+  }
+
+  // Temporal/behavioural analyses are opt-in. Dependent settings are sent
+  // only while their analysis is active, and defaults stay on the backend.
+  const spectrumActivities = options.spectrumActivities?.map((name) => name.trim()).filter(Boolean);
+  if (spectrumActivities && spectrumActivities.length >= 2) {
+    add("spectrum_activities", spectrumActivities.join(","));
+    if (options.spectrumVariant && options.spectrumVariant !== "connected")
+      add("spectrum_variant", options.spectrumVariant);
+    if (options.spectrumSampleSize !== undefined && Number.isInteger(options.spectrumSampleSize) && options.spectrumSampleSize > 0 && options.spectrumSampleSize !== 10000)
+      add("spectrum_sample_size", String(options.spectrumSampleSize));
+    if (options.spectrumSortLog === false) add("spectrum_sort_log", "false");
+  }
+  if (options.batches) {
+    add("batches", "true");
+    if (options.batchMergeDistanceSeconds !== undefined && Number.isFinite(options.batchMergeDistanceSeconds) && options.batchMergeDistanceSeconds >= 0 && options.batchMergeDistanceSeconds !== 900)
+      add("batch_merge_distance_seconds", String(options.batchMergeDistanceSeconds));
+    if (options.batchMinSize !== undefined && Number.isInteger(options.batchMinSize) && options.batchMinSize >= 2 && options.batchMinSize !== 2)
+      add("batch_min_size", String(options.batchMinSize));
+    if (options.batchStartTimestampAttribute?.trim())
+      add("batch_start_timestamp_attribute", options.batchStartTimestampAttribute.trim());
   }
 
   return entries;

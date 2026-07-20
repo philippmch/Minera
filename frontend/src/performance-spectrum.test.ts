@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSpectrum } from "./performance-spectrum";
+import { buildSpectrum, serverSpectrumToSpectrum } from "./performance-spectrum";
 import { type Trace } from "./types";
 
 const trace = (
@@ -70,5 +70,28 @@ describe("buildSpectrum", () => {
       minTime: 0,
       maxTime: 0,
     });
+  });
+});
+
+describe("serverSpectrumToSpectrum", () => {
+  it("preserves connected observations and labels disconnected partial patterns", () => {
+    const result = serverSpectrumToSpectrum({
+      variant: "disconnected",
+      activities: ["A", "B", "C"],
+      observations: [
+        { case_id: "c1", activities: ["A", "B"], instants: [1000, 2000], pattern_offset: 0 },
+        { case_id: "c2", activities: ["B", "C"], instants: [3000, 5000], pattern_offset: 1 },
+      ],
+    });
+    expect(result.variant).toBe("disconnected");
+    expect(result.lines.map((line) => line.activityNames)).toEqual([["A", "B"], ["B", "C"]]);
+    expect(result.lines.map((line) => line.patternOffset)).toEqual([0, 1]);
+    expect(result.lines[1].duration).toBe(2000000);
+    expect(result.minTime).toBe(1000000);
+    expect(result.maxTime).toBe(5000000);
+  });
+
+  it("drops observations without two finite instants and exposes empty bounds", () => {
+    expect(serverSpectrumToSpectrum({ variant: "connected", activities: ["A", "B"], observations: [{ case_id: "x", activities: ["A"], instants: [NaN], pattern_offset: 0 }] })).toMatchObject({ lines: [], minTime: 0, maxTime: 0 });
   });
 });

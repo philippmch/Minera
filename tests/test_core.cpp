@@ -44,6 +44,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -1957,6 +1958,23 @@ void performance_spectrum_finds_pattern_occurrences() {
       nullptr, nullptr, nullptr, nullptr, &spectrum);
   assert(json.find("\"performance_spectrum\": {") != std::string::npos);
   assert(json.find("\"instants\": [") != std::string::npos);
+
+  minera::PerformanceSpectrumOptions disconnected_options;
+  disconnected_options.variant =
+      minera::PerformanceSpectrumVariant::kDisconnected;
+  const auto disconnected = minera::compute_performance_spectrum(
+      log, {"a", "b"}, disconnected_options);
+  assert(disconnected.variant ==
+         minera::PerformanceSpectrumVariant::kDisconnected);
+  assert(!disconnected.observations.empty());
+  assert(disconnected.observations.front().activities.size() >= 2);
+  const auto disconnected_json = minera::analysis_json(
+      "t", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &disconnected);
+  assert(disconnected_json.find("\"variant\": \"disconnected\"") !=
+         std::string::npos);
+  assert(disconnected_json.find("\"activities\": [\"a\", \"b\"]") !=
+         std::string::npos);
 }
 
 void json_export_carries_the_eventually_follows_contract() {
@@ -2017,6 +2035,183 @@ void conformance_handles_an_empty_log() {
   const auto legacy = minera::check_conformance(empty, tree, backwards);
   assert(legacy.trace_count == 0);
   assert(legacy.fitting_traces == 0);
+}
+
+void temporal_behavioral_json_validates_and_serializes_batches() {
+  minera::EventLog log;
+  for (std::size_t i = 0; i < 10; ++i) {
+    minera::Trace trace;
+    trace.case_id = "c" + std::to_string(i);
+    minera::Event event;
+    event.case_id = trace.case_id;
+    event.activity = "a";
+    event.resource = "r";
+    event.timestamp = std::string("1970-01-01T00:00:") +
+                      (i < 10 ? "0" : "") + std::to_string(i) + "Z";
+    trace.events.push_back(std::move(event));
+    log.traces.push_back(std::move(trace));
+  }
+  // Add a second activity so spectrum activity registration can be checked.
+  minera::Trace extra;
+  extra.case_id = "extra";
+  minera::Event extra_a;
+  extra_a.case_id = "extra";
+  extra_a.activity = "a";
+  extra_a.timestamp = "1970-01-01T00:00:30Z";
+  extra.events.push_back(std::move(extra_a));
+  minera::Event extra_event;
+  extra_event.case_id = "extra";
+  extra_event.activity = "b";
+  extra_event.timestamp = "1970-01-01T00:01:00Z";
+  extra.events.push_back(std::move(extra_event));
+  log.traces.push_back(std::move(extra));
+  const auto graph = minera::discover_directly_follows_graph(log);
+
+  minera::BatchDiscovery discovery;
+  discovery.groups.emplace_back();
+  auto& group = discovery.groups.back();
+  group.activity = "a";
+  group.resource = "r";
+  group.batch_count = 5;
+  group.event_count = 10;
+  for (std::size_t batch_index = 0; batch_index < 5; ++batch_index) {
+    minera::Batch batch;
+    batch.type = static_cast<minera::BatchType>(batch_index);
+    batch.start = static_cast<double>(batch_index * 2);
+    batch.complete = batch.start + 1.5;
+    for (std::size_t member = 0; member < 2; ++member) {
+      const auto event_index = batch_index * 2 + member;
+      double start = batch.start + member * 0.5;
+      double complete = start + 0.5;
+      if (batch_index == 0) {
+        start = batch.start;
+        complete = batch.start + 1.5;
+      } else if (batch_index == 1) {
+        start = batch.start;
+        complete = batch.start + 1.0 + member * 0.25;
+      } else if (batch_index == 2) {
+        start = batch.start + member * 0.25;
+        complete = batch.start + 1.5;
+      } else if (batch_index == 4) {
+        start = batch.start + member * 0.1;
+        complete = batch.start + 1.0 + member * 0.1;
+      }
+      batch.events.push_back({start, complete,
+                              "c" + std::to_string(event_index), event_index,
+                              0});
+    }
+    group.batches.push_back(std::move(batch));
+  }
+  const auto json = minera::analysis_json("t", log, graph, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, &discovery);
+  assert(json.find("\"batch_discovery\": {\"groups\"") != std::string::npos);
+  for (const auto type : {"simultaneous", "batching_on_start",
+                          "batching_on_end", "sequential", "concurrent"}) {
+    assert(json.find(std::string("\"type\": \"") + type + "\"") !=
+           std::string::npos);
+  }
+  assert(json.find("\"batch_count\": 5") != std::string::npos);
+
+  // Validation runs before any bytes are emitted.
+  minera::PerformanceSpectrum malformed_spectrum;
+  malformed_spectrum.activities = {"a", "b"};
+  malformed_spectrum.observations.push_back({"c0", {1.0}, {"a"}});
+  std::ostringstream out;
+  out << "sentinel";
+  bool threw = false;
+  try {
+    minera::write_analysis_json(out, "t", log, graph, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, &malformed_spectrum);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(out.str() == "sentinel");
+
+  auto malformed_batch = discovery;
+  malformed_batch.groups[0].event_count = 9;
+  out.str("");
+  out.clear();
+  out << "sentinel";
+  threw = false;
+  try {
+    minera::write_analysis_json(out, "t", log, graph, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, nullptr, nullptr,
+                                nullptr, nullptr, &malformed_batch);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(out.str() == "sentinel");
+
+  minera::PerformanceSpectrumOptions disconnected_options;
+  disconnected_options.variant =
+      minera::PerformanceSpectrumVariant::kDisconnected;
+  const auto disconnected = minera::compute_performance_spectrum(
+      log, {"a", "b"}, disconnected_options);
+  const auto rejects_before_output = [&](const auto& artifact, bool spectrum_artifact) {
+    out.str("");
+    out.clear();
+    out << "sentinel";
+    bool rejected = false;
+    try {
+      if constexpr (std::is_same_v<std::decay_t<decltype(artifact)>,
+                                   minera::PerformanceSpectrum>) {
+        minera::write_analysis_json(
+            out, "t", log, graph, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            &artifact);
+      } else {
+        minera::write_analysis_json(
+            out, "t", log, graph, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, &artifact);
+      }
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+    assert(out.str() == "sentinel");
+  };
+  auto unknown_variant = disconnected;
+  unknown_variant.variant = static_cast<minera::PerformanceSpectrumVariant>(99);
+  rejects_before_output(unknown_variant, true);
+  auto short_disconnected = disconnected;
+  short_disconnected.observations.front().activities = {"a"};
+  short_disconnected.observations.front().instants = {1.0};
+  rejects_before_output(short_disconnected, true);
+  auto bad_offset = disconnected;
+  bad_offset.observations.front().pattern_offset = 99;
+  rejects_before_output(bad_offset, true);
+
+  auto bad_min = discovery;
+  bad_min.options.min_batch_size = 3;
+  rejects_before_output(bad_min, false);
+  auto bad_type = discovery;
+  bad_type.groups[0].batches[0].type = minera::BatchType::kConcurrent;
+  rejects_before_output(bad_type, false);
+  auto bad_enum = discovery;
+  bad_enum.groups[0].batches[0].type =
+      static_cast<minera::BatchType>(99);
+  rejects_before_output(bad_enum, false);
+  auto bad_tie = discovery;
+  minera::BatchGroup second = bad_tie.groups[0];
+  second.activity = "b";
+  bad_tie.groups.push_back(std::move(second));
+  rejects_before_output(bad_tie, false);
 }
 
 // Counts alignment moves of a given type in a variant.
@@ -4561,6 +4756,7 @@ int main() {
   playout_simulates_an_imported_model();
   extensive_playout_enumerates_the_language();
   performance_spectrum_finds_pattern_occurrences();
+  temporal_behavioral_json_validates_and_serializes_batches();
   json_export_carries_the_eventually_follows_contract();
   json_export_carries_the_conformance_contract();
   conformance_handles_an_empty_log();

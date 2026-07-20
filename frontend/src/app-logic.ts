@@ -57,6 +57,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   const correlationActive = options.correlationVariants?.some((name) =>
     ["classic", "classic_split", "trace_based"].includes(name),
   );
+  const spectrumActive = (options.spectrumActivities ?? []).filter((name) => name.trim()).length >= 2;
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
@@ -108,6 +109,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.footprintsStrict === true ||
       options.footprintsEnableActAlwaysExecuted === false ||
       dfgStatisticalActive || dfgCausalActive || correlationActive
+      || spectrumActive
+      || (options.batches === true)
   );
 }
 

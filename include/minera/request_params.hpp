@@ -18,6 +18,8 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/transition_system.hpp"
+#include "minera/performance_spectrum.hpp"
+#include "minera/batches.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -64,6 +66,11 @@ struct MineParams {
   // historical request behaviour and avoids requiring timestamps by default.
   std::vector<std::string> correlation_variants;
   CorrelationMinerOptions correlation;
+  // Opt-in temporal/behavioral discovery options.
+  std::vector<std::string> spectrum_activities;
+  PerformanceSpectrumOptions spectrum;
+  bool batches = false;
+  BatchDiscoveryOptions batch_options;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.
