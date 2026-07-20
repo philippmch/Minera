@@ -19,6 +19,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
+#include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -172,6 +173,26 @@ minera::DfgVariantsAnalysis analyze_dfg_variants(
       result.causal.push_back(
           {name, minera::discover_dfg_causality(frequency, variant)});
     }
+  }
+  return result;
+}
+
+minera::CorrelationVariant correlation_variant(std::string_view name) {
+  if (name == "classic") return minera::CorrelationVariant::kClassic;
+  if (name == "classic_split") return minera::CorrelationVariant::kClassicSplit;
+  return minera::CorrelationVariant::kTraceBased;
+}
+
+minera::CorrelationVariantsAnalysis analyze_correlation_variants(
+    const minera::EventLog& log, const std::vector<std::string>& variants,
+    const minera::CorrelationMinerOptions& shared_options) {
+  minera::CorrelationVariantsAnalysis result;
+  result.variants.reserve(variants.size());
+  for (const auto& name : variants) {
+    auto options = shared_options;
+    options.variant = correlation_variant(name);
+    result.variants.push_back(
+        {name, minera::discover_correlation_miner(log, options)});
   }
   return result;
 }
@@ -419,6 +440,12 @@ int usage(const char* program) {
                "  --dfg-business-hour-slots <start-end,...> Weekly seconds\n"
                "  --dfg-case-attributes <a,b,...> Attributes for case DFG\n"
                "  --dfg-return-node-attributes Include case attributes on nodes\n"
+               "  --correlation-variants <a,b,...> Correlation miner analyses:\n"
+               "                            classic, classic_split, trace_based\n"
+               "  --correlation-start-timestamp-attribute <name> Correlation start time\n"
+               "  --correlation-exact-time-matching <bool> Exact timestamp matching\n"
+               "                            (true, false, 1, or 0)\n"
+               "  --correlation-sample-size <n> Positive correlation sample size\n"
                "  --decisions <miner>       Mine the decision points of one\n"
                "                            model (inductive, alpha, heuristic,\n"
                "                            or powl): which attribute values\n"
@@ -533,6 +560,8 @@ int main(int argc, char** argv) {
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
   minera::DfgStatisticalOptions dfg_statistics_options;
+  std::vector<std::string> correlation_variants;
+  minera::CorrelationMinerOptions correlation_options;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -552,6 +581,16 @@ int main(int argc, char** argv) {
     if (result.ec != std::errc{} || result.ptr != end)
       throw std::invalid_argument(std::string(option) +
                                   " expects a non-negative integer");
+    return parsed;
+  };
+  const auto parse_positive_size =
+      [](const char* value, std::string_view option) -> std::size_t {
+    std::size_t parsed = 0;
+    const auto end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end || parsed == 0)
+      throw std::invalid_argument(std::string(option) +
+                                  " expects a positive integer");
     return parsed;
   };
   const auto parse_declare_playout_int =
@@ -950,6 +989,42 @@ int main(int argc, char** argv) {
       dfg_statistics_options.case_attributes = std::move(attributes);
     } else if (arg == "--dfg-return-node-attributes") {
       dfg_statistics_options.return_node_attributes = true;
+    } else if (arg == "--correlation-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        correlation_variants = canonical_dfg_variants(
+            value, {"classic", "classic_split", "trace_based"}, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--correlation-start-timestamp-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      correlation_options.start_timestamp_attribute = value;
+    } else if (arg == "--correlation-exact-time-matching") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view boolean = value;
+      if (boolean == "true" || boolean == "1") {
+        correlation_options.exact_time_matching = true;
+      } else if (boolean == "false" || boolean == "0") {
+        correlation_options.exact_time_matching = false;
+      } else {
+        std::cerr << "error: --correlation-exact-time-matching expects true, "
+                     "false, 1, or 0\n";
+        return 2;
+      }
+    } else if (arg == "--correlation-sample-size") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        correlation_options.sample_size = parse_positive_size(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
     } else if (arg == "--spectrum") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -1354,6 +1429,12 @@ int main(int argc, char** argv) {
           analyze_dfg_variants(log, dfg_statistical_variants,
                                dfg_causal_variants, dfg_statistics_options);
     }
+    std::optional<minera::CorrelationVariantsAnalysis>
+        correlation_variants_analysis;
+    if (!correlation_variants.empty()) {
+      correlation_variants_analysis = analyze_correlation_variants(
+          log, correlation_variants, correlation_options);
+    }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(log);
@@ -1496,7 +1577,9 @@ int main(int argc, char** argv) {
           &transition_system, &powl, &powl_net, &powl_decoration,
           &log_skeleton, &log_skeleton_conformance, &declare,
           &declare_conformance, &footprints,
-          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
+          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
+          correlation_variants_analysis ? &*correlation_variants_analysis
+                                        : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1512,7 +1595,9 @@ int main(int argc, char** argv) {
           &powl, &powl_net, &powl_decoration, &log_skeleton,
           &log_skeleton_conformance, &declare, &declare_conformance,
           &footprints,
-          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
+          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
+          correlation_variants_analysis ? &*correlation_variants_analysis
+                                        : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

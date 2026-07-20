@@ -22,6 +22,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
+#include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -223,6 +224,26 @@ minera::DfgVariantsAnalysis analyze_dfg_variants(
   return result;
 }
 
+minera::CorrelationVariant correlation_variant(std::string_view name) {
+  if (name == "classic") return minera::CorrelationVariant::kClassic;
+  if (name == "classic_split") return minera::CorrelationVariant::kClassicSplit;
+  return minera::CorrelationVariant::kTraceBased;
+}
+
+minera::CorrelationVariantsAnalysis analyze_correlation_variants(
+    const minera::EventLog& log, const std::vector<std::string>& variants,
+    const minera::CorrelationMinerOptions& shared_options) {
+  minera::CorrelationVariantsAnalysis result;
+  result.variants.reserve(variants.size());
+  for (const auto& name : variants) {
+    auto options = shared_options;
+    options.variant = correlation_variant(name);
+    result.variants.push_back(
+        {name, minera::discover_correlation_miner(log, options)});
+  }
+  return result;
+}
+
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   try {
     std::string csv;
@@ -265,6 +286,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       dfg_variants_analysis = analyze_dfg_variants(
           log, params.dfg_statistical_variants, params.dfg_causal_variants,
           params.dfg_statistics);
+    }
+    std::optional<minera::CorrelationVariantsAnalysis>
+        correlation_variants_analysis;
+    if (!params.correlation_variants.empty()) {
+      correlation_variants_analysis = analyze_correlation_variants(
+          log, params.correlation_variants, params.correlation);
     }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
@@ -338,7 +365,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         &transition_system, &powl, &powl_net, &powl_decoration,
         &log_skeleton, &log_skeleton_conformance, &declare,
         &declare_conformance, &footprints,
-        dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
+        dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
+        correlation_variants_analysis ? &*correlation_variants_analysis
+                                      : nullptr);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

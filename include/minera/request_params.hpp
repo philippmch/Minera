@@ -7,6 +7,7 @@
 
 #include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
+#include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dfg_variants.hpp"
@@ -59,6 +60,10 @@ struct MineParams {
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
   DfgStatisticalOptions dfg_statistics;
+  // Correlation mining is strictly opt-in; an empty list preserves the
+  // historical request behaviour and avoids requiring timestamps by default.
+  std::vector<std::string> correlation_variants;
+  CorrelationMinerOptions correlation;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.

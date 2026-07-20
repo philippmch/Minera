@@ -24,6 +24,22 @@ std::size_t parse_nonnegative_size(std::string_view value, std::string_view name
   return parsed;
 }
 
+std::size_t parse_positive_size(std::string_view value, std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a positive integer");
+  std::size_t parsed = 0;
+  const auto result = std::from_chars(value.data(), value.data() + value.size(),
+                                      parsed);
+  if (result.ec != std::errc{} || result.ptr != value.data() + value.size() ||
+      parsed == 0) {
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a positive integer, got '" +
+                                std::string(value) + "'");
+  }
+  return parsed;
+}
+
 double parse_finite_double(std::string_view value, std::string_view name) {
   std::string owned(value);
   char* end = nullptr;
@@ -716,6 +732,54 @@ MineParams parse_mine_params(const FieldLookup& field,
       present ? present("dfg_return_node_attributes") : !value.empty()) {
     params.dfg_statistics.return_node_attributes =
         parse_boolean(value, "dfg_return_node_attributes");
+  }
+
+  // Correlation miner variants are deliberately opt-in. Keep a canonical
+  // catalog order and deduplicate aliases/repeated selections so callers can
+  // execute each requested PM4Py variant exactly once.
+  const auto parse_correlation_variants = [&]() {
+    constexpr std::string_view field_name = "correlation_variants";
+    const auto value = field(field_name);
+    const bool supplied = present ? present(field_name) : !value.empty();
+    if (!supplied) return;
+    static const std::vector<std::string> catalog = {
+        "classic", "classic_split", "trace_based"};
+    const auto requested = split_csv(value);
+    if (requested.empty()) {
+      throw std::invalid_argument("correlation_variants: expected a non-empty list");
+    }
+    for (const auto& name : requested) {
+      if (std::find(catalog.begin(), catalog.end(), name) == catalog.end()) {
+        throw std::invalid_argument("correlation_variants: unknown variant '" +
+                                    name + "'");
+      }
+    }
+    params.correlation_variants.clear();
+    for (const auto& name : catalog) {
+      if (std::find(requested.begin(), requested.end(), name) !=
+          requested.end()) {
+        params.correlation_variants.push_back(name);
+      }
+    }
+  };
+  parse_correlation_variants();
+  if (const auto value = field("correlation_start_timestamp_attribute");
+      present ? present("correlation_start_timestamp_attribute")
+              : !value.empty()) {
+    // With FieldPresence an explicit empty value is meaningful: it asks the
+    // miner to use its own fallback attribute rather than the request parser's
+    // default. The legacy lookup overload still treats empty as omitted.
+    params.correlation.start_timestamp_attribute = value;
+  }
+  if (const auto value = field("correlation_exact_time_matching");
+      present ? present("correlation_exact_time_matching") : !value.empty()) {
+    params.correlation.exact_time_matching =
+        parse_boolean(value, "correlation_exact_time_matching");
+  }
+  if (const auto value = field("correlation_sample_size");
+      present ? present("correlation_sample_size") : !value.empty()) {
+    params.correlation.sample_size =
+        parse_positive_size(value, "correlation_sample_size");
   }
 
   return params;

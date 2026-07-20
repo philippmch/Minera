@@ -67,7 +67,7 @@ are reconciled.
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Missing** |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
-| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial** — all DFG statistical aliases and both causal variants are complete, as are eventually-follows and minimum self-distance with witnesses; the three correlation-miner variants remain |
+| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Partial** — temporal profile and connected performance spectrum |
@@ -92,7 +92,7 @@ are reconciled.
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Missing** |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters; LTL/segments/DFG/OCEL gaps |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
-| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal DFG results, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
+| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Missing** |
@@ -211,8 +211,47 @@ Every variant remains individually selectable through the native API, strict
 request fields, CLI, and local server. Deterministic JSON resolves all
 activities against the shared registry and preserves alias names; the frontend
 exposes all settings and renders frequency, triple, performance,
-case-attribute, clean-time, and causal artifacts. Correlation mining is tracked
-separately and remains the outstanding part of the graph/statistical row.
+case-attribute, clean-time, and causal artifacts.
+
+## Correlation-mining parity evidence
+
+Correlation discovery exposes CLASSIC, CLASSIC_SPLIT, and TRACE_BASED as
+independent variants. CLASSIC discards case boundaries, orders interval events
+by start and completion time, computes strict precede/succeed probabilities,
+and supports both the pinned bidirectional greedy duration estimate and exact
+minimum-weight full bipartite matching. The exact matcher has no artificial
+population cap. Equal completion/start boundaries are eligible for exact
+duration matching but remain excluded from the strict precedence probability.
+
+CLASSIC_SPLIT partitions the native flattened input order before sorting each
+chunk. It averages precedence matrices across every chunk, including zero
+entries for absent activity pairs, and takes the elementwise maximum duration.
+TRACE_BASED instead preserves case boundaries, uses only traces containing both
+activities in each probability denominator, and aggregates the two greedy
+matching directions over trace-local samples. The trace variant intentionally
+ignores the exact-matching option, as does the pinned variation.
+
+All variants solve the same balanced activity-occurrence transportation
+problem. Minera uses an integral minimum-cost solver and a deterministic
+lexicographic tie normalization; ties may therefore choose a different but
+equally optimal DFG from an LP backend while preserving every activity's
+incoming and outgoing marginals and the same objective. Frequency edges retain
+their raw correlation duration, including zero-duration forced reverse and
+self edges.
+
+The configurable interval-start attribute, exact-match toggle, and split
+sample size are available through the native API, strict request parser, CLI,
+local server, deterministic JSON, and frontend. Missing or malformed configured
+starts and malformed completion timestamps fail explicitly. The native
+TRACE_BASED path honors a configured start key; this fixes the pinned EventLog
+wrapper's dropped-parameter defect while retaining the intended algorithm.
+Dataframe and Polars paths are adapters to these same semantics.
+
+Focused regressions cover canonical classic/trace/split fixtures, raw split
+chunk order, forced reverse and self edges, one-sided greedy matching, equal
+interval boundaries, exact matching above 25 events, custom interval keys,
+strict timestamp errors, empty and single-activity logs, complete diagnostic
+matrices, deterministic ties, and balanced transportation marginals.
 
 ## Footprints parity evidence
 

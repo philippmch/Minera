@@ -163,6 +163,11 @@ export interface MinerOptions {
   dfgBusinessHourSlots?: string;
   dfgCaseAttributes?: string[];
   dfgReturnNodeAttributes?: boolean;
+  /** Optional PM4Py correlation-mining analyses. */
+  correlationVariants?: string[];
+  correlationStartTimestampAttribute?: string;
+  correlationExactTimeMatching?: boolean;
+  correlationSampleSize?: number;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -467,6 +472,34 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (caseAttributes?.length && !(caseAttributes.length === 1 && caseAttributes[0] === "concept:name"))
       add("dfg_case_attributes", caseAttributes.join(","));
     if (options.dfgReturnNodeAttributes) add("dfg_return_node_attributes", "true");
+  }
+
+  const correlationNames = ["classic", "classic_split", "trace_based"];
+  const selectedCorrelation = options.correlationVariants
+    ? correlationNames.filter((name) =>
+        options.correlationVariants?.includes(name))
+    : [];
+  if (selectedCorrelation.length) {
+    add("correlation_variants", selectedCorrelation.join(","));
+    const startAttribute = options.correlationStartTimestampAttribute?.trim();
+    if (startAttribute) {
+      add("correlation_start_timestamp_attribute", startAttribute);
+    }
+    const exactCapable =
+      selectedCorrelation.includes("classic") ||
+      selectedCorrelation.includes("classic_split");
+    if (exactCapable && options.correlationExactTimeMatching) {
+      add("correlation_exact_time_matching", "true");
+    }
+    if (
+      selectedCorrelation.includes("classic_split") &&
+      options.correlationSampleSize !== undefined &&
+      Number.isInteger(options.correlationSampleSize) &&
+      options.correlationSampleSize > 0 &&
+      options.correlationSampleSize !== 100000
+    ) {
+      add("correlation_sample_size", String(options.correlationSampleSize));
+    }
   }
 
   return entries;

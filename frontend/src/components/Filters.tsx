@@ -196,6 +196,22 @@ export function Filters({
     dfgStatisticalVariants.has("performance_greedy");
   const dfgCaseAttributeOptionsActive =
     dfgStatisticalVariants.has("case_attributes");
+  const correlationNames = [
+    "classic", "classic_split", "trace_based",
+  ] as const;
+  const [correlationVariants, setCorrelationVariants] =
+    useState<Set<string>>(new Set());
+  const [correlationStartTimestampAttribute,
+    setCorrelationStartTimestampAttribute] = useState("");
+  const [correlationExactTimeMatching,
+    setCorrelationExactTimeMatching] = useState(false);
+  const [correlationSampleSize, setCorrelationSampleSize] =
+    useState("100000");
+  const correlationExactOptionsActive =
+    correlationVariants.has("classic") ||
+    correlationVariants.has("classic_split");
+  const correlationSplitOptionsActive =
+    correlationVariants.has("classic_split");
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -469,6 +485,17 @@ export function Filters({
       dfgReturnNodeAttributes:
         dfgCaseAttributeOptionsActive && dfgReturnNodeAttributes
           ? true : undefined,
+      correlationVariants:
+        correlationVariants.size > 0 ? [...correlationVariants] : undefined,
+      correlationStartTimestampAttribute:
+        correlationVariants.size > 0
+          ? correlationStartTimestampAttribute.trim() || undefined
+          : undefined,
+      correlationExactTimeMatching:
+        correlationExactOptionsActive && correlationExactTimeMatching
+          ? true : undefined,
+      correlationSampleSize: correlationSplitOptionsActive
+        ? toInt(correlationSampleSize) : undefined,
     });
   };
 
@@ -542,6 +569,10 @@ export function Filters({
     setDfgBusinessHourSlots("");
     setDfgCaseAttributes("concept:name");
     setDfgReturnNodeAttributes(false);
+    setCorrelationVariants(new Set());
+    setCorrelationStartTimestampAttribute("");
+    setCorrelationExactTimeMatching(false);
+    setCorrelationSampleSize("100000");
     onApply({});
   };
 
@@ -602,7 +633,9 @@ export function Filters({
     footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model");
   const dfgDirty =
     dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0;
-  const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty || declareDirty || footprintsDirty || dfgDirty;
+  const correlationDirty = correlationVariants.size > 0;
+  const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
+    declareDirty || footprintsDirty || dfgDirty || correlationDirty;
 
   return (
     <section className="filters reveal">
@@ -991,6 +1024,48 @@ export function Filters({
                 checked={dfgReturnNodeAttributes}
                 disabled={!dfgCaseAttributeOptionsActive}
                 onChange={(event) => setDfgReturnNodeAttributes(event.target.checked)} /> return node attributes</label>
+            </label>
+          </div>
+
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Correlation mining <small>(optional; select any variants to include)</small>
+            </span>
+            <div className="filter-chips" role="group" aria-label="Correlation-miner variants">
+              {correlationNames.map((name) => {
+                const selected = correlationVariants.has(name);
+                return <button type="button" key={name}
+                  className={selected ? "filter-chip active" : "filter-chip"}
+                  aria-pressed={selected}
+                  onClick={() => toggleDfgVariant(setCorrelationVariants, name)}>
+                  {name.replaceAll("_", " ")}
+                </button>;
+              })}
+            </div>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Correlation start timestamp attribute</span>
+              <input type="text" placeholder="complete timestamp"
+                value={correlationStartTimestampAttribute}
+                disabled={correlationVariants.size === 0}
+                onChange={(event) =>
+                  setCorrelationStartTimestampAttribute(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Split sample size</span>
+              <input type="number" min={1} step={1}
+                value={correlationSampleSize}
+                disabled={!correlationSplitOptionsActive}
+                onChange={(event) => setCorrelationSampleSize(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Correlation flags</span>
+              <label className="checkbox-field"><input type="checkbox"
+                checked={correlationExactTimeMatching}
+                disabled={!correlationExactOptionsActive}
+                onChange={(event) =>
+                  setCorrelationExactTimeMatching(event.target.checked)} /> exact time matching</label>
             </label>
           </div>
 

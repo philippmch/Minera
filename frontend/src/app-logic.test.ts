@@ -158,6 +158,8 @@ describe("hasActiveMinerOptions", () => {
     })).toBe(false);
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: [], dfgCausalVariants: [] })).toBe(false);
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["unknown"], dfgCausalVariants: ["unknown"] })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationVariants: [] })).toBe(false);
+    expect(hasActiveMinerOptions({ correlationVariants: ["unknown"] })).toBe(false);
     expect(hasActiveMinerOptions({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toBe(false);
     expect(hasActiveMinerOptions({ powlVariant: "maximal", powlFilteringType: "decreasing_factor", powlFilteringThreshold: 0, powlOrderFrequencyRatio: 1, powlBruteForceActivityLimit: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ tokenReplayVariant: "forward", tokenReplayStopImmediatelyUnfit: false })).toBe(false);
@@ -223,6 +225,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ footprintsEnableActAlwaysExecuted: false })).toBe(true);
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
     expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
+    expect(hasActiveMinerOptions({ correlationVariants: ["trace_based"] })).toBe(true);
   });
 });
 
@@ -469,6 +472,37 @@ describe("mineFormEntries", () => {
       ["dfg_business_hours", "true"],
       ["dfg_business_hour_slots", "0.5-3600.5"],
     ]);
+  });
+
+  it("maps correlation variants and only their relevant settings", () => {
+    expect(mineFormEntries({
+      correlationVariants: ["trace_based", "bogus", "classic_split", "classic"],
+      correlationStartTimestampAttribute: "started",
+      correlationExactTimeMatching: true,
+      correlationSampleSize: 2,
+    })).toEqual([
+      ["correlation_variants", "classic,classic_split,trace_based"],
+      ["correlation_start_timestamp_attribute", "started"],
+      ["correlation_exact_time_matching", "true"],
+      ["correlation_sample_size", "2"],
+    ]);
+    expect(mineFormEntries({
+      correlationVariants: ["trace_based"],
+      correlationExactTimeMatching: true,
+      correlationSampleSize: 2,
+    })).toEqual([["correlation_variants", "trace_based"]]);
+    expect(mineFormEntries({
+      correlationVariants: ["classic"],
+      correlationSampleSize: 2,
+    })).toEqual([["correlation_variants", "classic"]]);
+    expect(mineFormEntries({
+      correlationVariants: ["classic_split"],
+      correlationSampleSize: 100000,
+    })).toEqual([["correlation_variants", "classic_split"]]);
+    expect(mineFormEntries({
+      correlationVariants: ["unknown"],
+      correlationStartTimestampAttribute: "started",
+    })).toEqual([]);
   });
 
   it("keeps the filter mappings intact", () => {
