@@ -25,7 +25,11 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       (options.alphaVariant && options.alphaVariant !== "plus") ||
       options.dependencyThreshold !== undefined ||
       options.andThreshold !== undefined ||
-      options.minEdgeFrequency !== undefined,
+      options.minEdgeFrequency !== undefined ||
+      (options.transitionView && options.transitionView !== "sequence") ||
+      options.transitionDirection && options.transitionDirection !== "forward" ||
+      options.transitionWindow !== undefined && options.transitionWindow !== 2 ||
+      options.transitionIncludeData === true,
   );
 }
 

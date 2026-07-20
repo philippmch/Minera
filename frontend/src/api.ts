@@ -89,6 +89,11 @@ export interface MinerOptions {
   andThreshold?: number;
   /** Heuristic Miner: direct successions an edge needs (default 1). */
   minEdgeFrequency?: number;
+  /** PM4Py view-based transition-system options. */
+  transitionView?: "sequence" | "set" | "multiset";
+  transitionDirection?: "forward" | "backward";
+  transitionWindow?: number;
+  transitionIncludeData?: boolean;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -186,6 +191,13 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("and_threshold", String(options.andThreshold));
   if (options.minEdgeFrequency !== undefined)
     add("min_edge_frequency", String(options.minEdgeFrequency));
+  if (options.transitionView && options.transitionView !== "sequence")
+    add("transition_view", options.transitionView);
+  if (options.transitionDirection && options.transitionDirection !== "forward")
+    add("transition_direction", options.transitionDirection);
+  if (options.transitionWindow !== undefined && options.transitionWindow !== 2)
+    add("transition_window", String(options.transitionWindow));
+  if (options.transitionIncludeData) add("transition_include_data", "true");
 
   return entries;
 }

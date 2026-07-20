@@ -12,11 +12,14 @@
 #include "minera/eventually_follows.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/model_decoration.hpp"
+#include "minera/minimum_self_distance.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/resource_analysis.hpp"
+#include "minera/temporal_profile.hpp"
+#include "minera/transition_system.hpp"
 
 namespace minera {
 
@@ -47,6 +50,9 @@ namespace minera {
 // its replay decoration under the matching "..._decoration" key when given —
 // so every miner's model can be drawn (and annotated) as a Petri net, not
 // just exported as one.
+// When `temporal_profile` is non-null its entries are embedded under
+// "temporal_profile", with source and target activity ids resolved against
+// the directly-follows graph.
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& event_log,
@@ -65,7 +71,10 @@ void write_analysis_json(std::ostream& out,
                          const PetriNet* inductive_net = nullptr,
                          const ModelDecoration* inductive_decoration = nullptr,
                          const PetriNet* heuristic_petri = nullptr,
-                         const ModelDecoration* heuristic_decoration = nullptr);
+                         const ModelDecoration* heuristic_decoration = nullptr,
+                         const TemporalProfile* temporal_profile = nullptr,
+                         const MinimumSelfDistances* minimum_self_distances = nullptr,
+                         const TransitionSystem* transition_system = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -85,7 +94,10 @@ void write_analysis_json(std::ostream& out,
     const PetriNet* inductive_net = nullptr,
     const ModelDecoration* inductive_decoration = nullptr,
     const PetriNet* heuristic_petri = nullptr,
-    const ModelDecoration* heuristic_decoration = nullptr);
+    const ModelDecoration* heuristic_decoration = nullptr,
+    const TemporalProfile* temporal_profile = nullptr,
+    const MinimumSelfDistances* minimum_self_distances = nullptr,
+    const TransitionSystem* transition_system = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

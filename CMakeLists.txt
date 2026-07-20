@@ -33,15 +33,21 @@ add_library(minera_core
   src/json_export.cpp
   src/log_filter.cpp
   src/model_decoration.cpp
+  src/minimum_self_distance.cpp
   src/performance.cpp
   src/performance_spectrum.cpp
   src/petri_net.cpp
   src/playout.cpp
+  src/powl.cpp
+  src/powl_conversion.cpp
+  src/powl_discovery.cpp
   src/pnml.cpp
   src/ptml.cpp
   src/request_params.cpp
   src/resource_analysis.cpp
   src/timestamp.cpp
+  src/temporal_profile.cpp
+  src/transition_system.cpp
   src/xes_event_log_importer.cpp
   src/xes_export.cpp
 )
@@ -122,4 +128,31 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_request_params_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_request_params_tests COMMAND minera_request_params_tests)
+
+  add_executable(minera_powl_tests
+    tests/test_powl.cpp
+  )
+  target_link_libraries(minera_powl_tests PRIVATE minera::core)
+  target_compile_features(minera_powl_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_powl_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_powl_tests COMMAND minera_powl_tests)
+
+  add_executable(minera_powl_discovery_tests
+    tests/test_powl_discovery.cpp
+  )
+  target_link_libraries(minera_powl_discovery_tests PRIVATE minera::core)
+  target_compile_features(minera_powl_discovery_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_powl_discovery_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_powl_discovery_tests COMMAND minera_powl_discovery_tests)
+
+  add_executable(minera_powl_conversion_tests
+    tests/test_powl_conversion.cpp
+  )
+  target_link_libraries(minera_powl_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_powl_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_powl_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_powl_conversion_tests COMMAND minera_powl_conversion_tests)
 endif()

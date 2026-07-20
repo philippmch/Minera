@@ -251,6 +251,32 @@ void parse_mine_params_ignores_blank_fields() {
   assert(params.filter.min_length == 0);
 }
 
+void parse_mine_params_maps_transition_system_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"transition_view", "multiset"},
+      {"transition_direction", "backward"},
+      {"transition_window", "0"},
+      {"transition_include_data", "1"},
+  }));
+  assert(params.transition_system.view == minera::TransitionView::kMultiset);
+  assert(params.transition_system.direction == minera::TransitionDirection::kBackward);
+  assert(params.transition_system.window == 0);
+  assert(params.transition_system.include_data);
+}
+
+void parse_mine_params_rejects_invalid_transition_fields() {
+  for (const auto& item : {std::pair{"transition_view", "bad"},
+                           std::pair{"transition_direction", "bad"},
+                           std::pair{"transition_window", "-1"},
+                           std::pair{"transition_window", "2x"},
+                           std::pair{"transition_include_data", "yes"}}) {
+    bool threw = false;
+    try { (void)minera::parse_mine_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -267,5 +293,7 @@ int main() {
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_ignores_blank_fields();
+  parse_mine_params_maps_transition_system_options();
+  parse_mine_params_rejects_invalid_transition_fields();
   return 0;
 }

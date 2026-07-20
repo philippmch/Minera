@@ -60,6 +60,15 @@ void timestamp_parses_iso8601_forms() {
   assert(!minera::parse_timestamp(""));
   assert(!minera::parse_timestamp("not-a-date"));
   assert(!minera::parse_timestamp("2020-13-01"));  // month out of range
+  assert(!minera::parse_timestamp("2021-02-29"));  // not a leap year
+  assert(!minera::parse_timestamp("2020-02-30"));
+  assert(!minera::parse_timestamp("2020-04-31"));
+  assert(!minera::parse_timestamp("2020-01-01T24:00:00"));
+  assert(!minera::parse_timestamp("2020-01-01T23:60:00"));
+  assert(!minera::parse_timestamp("2020-01-01T23:59:60"));
+  assert(!minera::parse_timestamp("2020-01-01T12:00:00+14:01"));
+  assert(!minera::parse_timestamp("2020-01-01T12:00:00+15:00"));
+  assert(minera::parse_timestamp("2020-02-29T23:59:59-14:00"));
 }
 
 void importer_orders_events_by_instant_not_string() {

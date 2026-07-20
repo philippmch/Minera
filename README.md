@@ -3,6 +3,11 @@
 Minera is an early C++ process mining core built to explore PM4Py-style
 workflows with native performance.
 
+The compatibility target is pinned to **PM4Py 2.7.22**. The
+[feature/variant parity contract](docs/pm4py-2.7.22-parity.md) separates true
+algorithm semantics from Python dataframe adapters and optional integrations,
+and tracks every family as complete, partial, or missing.
+
 ## Current Core
 
 - CSV event-log import with configurable case, activity, and timestamp columns.
@@ -15,6 +20,7 @@ workflows with native performance.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
+- Minimum self-distance discovery with deterministic witness activities.
 - Eventually-follows graph discovery: for every activity pair, how often one
   is followed by the other — directly or transitively — later in the same
   case, surfacing long-range dependencies the directly-follows edges miss.
@@ -111,6 +117,12 @@ workflows with native performance.
   `petri_net_decoration` (alpha), `inductive_petri_net(_decoration)`, and
   `heuristic_petri_net(_decoration)`, each aligned index-for-index with its
   net.
+- **Transition-system discovery**: reproduce PM4Py's view-based transition
+  system in sequence, set, and multiset variants, with forward/backward
+  windows and optional stable event occurrence references (`--transition-view`,
+  `--transition-direction`, `--transition-window`, `--transition-include-data`).
+  Imported logs are normalized to importer event order; direct `EventLog` API
+  callers retain the order they supply.
 - **Performance spectrum**: pick two or more activities as a pattern, and
   every case that performs them as an uninterrupted run (other activities in
   between are ignored) contributes one observation — the instants at which
@@ -120,6 +132,13 @@ workflows with native performance.
   time averages away. CLI `--spectrum "a,b,c"` embeds it in the JSON export;
   the frontend computes and draws it live on the **Events over Time** tab,
   with lines graded by flow-time tercile.
+- **Temporal-profile discovery and conformance**: every ordered activity pair
+  in a trace contributes its elapsed-time observation, producing count, mean,
+  and sample standard deviation per pair. Conformance flags observations
+  outside a configurable number of standard deviations, supports separate
+  completion/start timestamp attributes, and can measure time through a
+  normalized weekly business-hours calendar (Monday-Friday 07:00-17:00 by
+  default).
 - **Decision mining** (Rozinat & van der Aalst): where a model offers
   alternatives — a place in the workflow net with several outgoing
   transitions — Minera learns *which attribute values steer a case down which

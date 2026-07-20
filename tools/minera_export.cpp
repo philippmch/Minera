@@ -2,6 +2,8 @@
 // plus discovered directly-follows graph) as JSON for the frontend.
 
 #include <algorithm>
+#include <charconv>
+#include <cstring>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
@@ -29,6 +31,9 @@
 #include "minera/pnml.hpp"
 #include "minera/ptml.hpp"
 #include "minera/resource_analysis.hpp"
+#include "minera/temporal_profile.hpp"
+#include "minera/minimum_self_distance.hpp"
+#include "minera/transition_system.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 
@@ -84,6 +89,14 @@ int usage(const char* program) {
                "                            0.65)\n"
                "  --min-edge-frequency <n>  Heuristic Miner: direct successions\n"
                "                            an edge needs (default: 1)\n"
+               "  --transition-view <id>    Transition-system state view:\n"
+               "                            sequence (default), set, or multiset\n"
+               "  --transition-direction <id>  Window direction: forward\n"
+               "                            (default) or backward\n"
+               "  --transition-window <n>   Non-negative state-window size\n"
+               "                            (default: 2; 0 collapses all states)\n"
+               "  --transition-include-data Include stable trace/event occurrence\n"
+               "                            references in the transition system\n"
                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --check-pnml <path>       Also check the log against the\n"
                "                            workflow net in this PNML file\n"
@@ -205,6 +218,7 @@ int main(int argc, char** argv) {
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
+  minera::TransitionSystemOptions transition_options;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -215,6 +229,14 @@ int main(int argc, char** argv) {
       std::cerr << "error: " << error.what() << '\n';
       std::exit(2);
     }
+  };
+  const auto parse_window = [](const char* value) -> std::size_t {
+    std::size_t parsed = 0;
+    const auto end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end)
+      throw std::invalid_argument("--transition-window expects a non-negative integer");
+    return parsed;
   };
 
   for (int i = 1; i < argc; ++i) {
@@ -289,6 +311,23 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       spectrum_activities = split_csv(value);
+    } else if (arg == "--transition-view") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      if (std::string_view(value) == "sequence") transition_options.view = minera::TransitionView::kSequence;
+      else if (std::string_view(value) == "set") transition_options.view = minera::TransitionView::kSet;
+      else if (std::string_view(value) == "multiset") transition_options.view = minera::TransitionView::kMultiset;
+      else { std::cerr << "error: --transition-view expects sequence, set, or multiset\n"; return 2; }
+    } else if (arg == "--transition-direction") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      if (std::string_view(value) == "forward") transition_options.direction = minera::TransitionDirection::kForward;
+      else if (std::string_view(value) == "backward") transition_options.direction = minera::TransitionDirection::kBackward;
+      else { std::cerr << "error: --transition-direction expects forward or backward\n"; return 2; }
+    } else if (arg == "--transition-window") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      try { transition_options.window = parse_window(value); }
+      catch (const std::exception& error) { std::cerr << "error: " << error.what() << "\n"; return 2; }
+    } else if (arg == "--transition-include-data") {
+      transition_options.include_data = true;
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -493,6 +532,11 @@ int main(int argc, char** argv) {
       log = minera::filter_event_log(log, filter);
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    const auto temporal_profile = minera::discover_temporal_profile(log);
+    const auto minimum_self_distances =
+        minera::discover_minimum_self_distances(log);
+    const auto transition_system =
+        minera::discover_transition_system(log, transition_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
     const auto net = minera::discover_petri_net(log, alpha_options);
     const auto heuristics =
@@ -598,7 +642,8 @@ int main(int argc, char** argv) {
           &conformance, &performance, &resources, &variant_durations,
           &eventually, decisions_ptr, &petri_decoration, spectrum_ptr,
           &inductive_net, &inductive_decoration, &heuristic_net,
-          &heuristic_decoration);
+          &heuristic_decoration, &temporal_profile, &minimum_self_distances,
+          &transition_system);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -609,7 +654,8 @@ int main(int argc, char** argv) {
           file, dataset, log, graph, &tree, &net, &heuristics, &conformance,
           &performance, &resources, &variant_durations, &eventually,
           decisions_ptr, &petri_decoration, spectrum_ptr, &inductive_net,
-          &inductive_decoration, &heuristic_net, &heuristic_decoration);
+          &inductive_decoration, &heuristic_net, &heuristic_decoration,
+          &temporal_profile, &minimum_self_distances, &transition_system);
     }
 
     // Optionally emit one discovered model as standard PNML.

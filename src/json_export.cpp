@@ -1,11 +1,15 @@
 #include "minera/json_export.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <map>
 #include <numeric>
 #include <sstream>
+#include <set>
+#include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -561,6 +565,327 @@ void write_resources(std::ostream& out, const ResourceNetwork& resources) {
   out << "]}";
 }
 
+struct ResolvedTemporalProfileEntry {
+  std::size_t source = 0;
+  std::size_t target = 0;
+  std::uint64_t count = 0;
+  double mean_seconds = 0.0;
+  double standard_deviation_seconds = 0.0;
+};
+
+struct ResolvedMinimumSelfDistance {
+  std::size_t activity = 0;
+  std::uint64_t distance = 0;
+  std::vector<std::size_t> witnesses;
+};
+
+std::vector<ResolvedMinimumSelfDistance> resolve_minimum_self_distances(
+    const MinimumSelfDistances& distances, const DirectlyFollowsGraph& graph) {
+  std::vector<ResolvedMinimumSelfDistance> resolved;
+  resolved.reserve(distances.size());
+  std::map<std::size_t, bool> seen_activities;
+  std::string previous_activity;
+  bool first = true;
+  for (const auto& entry : distances) {
+    if (!first && entry.activity <= previous_activity) {
+      throw std::invalid_argument(
+          "minimum self-distance JSON activities must be strictly sorted");
+    }
+    first = false;
+    previous_activity = entry.activity;
+    const auto activity = graph.activity_id(entry.activity);
+    if (!activity) {
+      throw std::invalid_argument(
+          "minimum self-distance activity is not registered in the directly-follows graph: " +
+          entry.activity);
+    }
+    if (!seen_activities.emplace(*activity, true).second) {
+      throw std::invalid_argument(
+          "minimum self-distance JSON contains a duplicate activity");
+    }
+    if (entry.distance == 0 && !entry.witnesses.empty()) {
+      throw std::invalid_argument(
+          "minimum self-distance zero entries must have empty witnesses");
+    }
+    if (entry.distance > 0 && entry.witnesses.empty()) {
+      throw std::invalid_argument(
+          "positive minimum self-distance entries must have witnesses");
+    }
+    std::vector<std::size_t> witnesses;
+    witnesses.reserve(entry.witnesses.size());
+    std::string previous_witness;
+    bool first_witness = true;
+    for (const auto& witness_name : entry.witnesses) {
+      if (!first_witness && witness_name <= previous_witness) {
+        throw std::invalid_argument(
+            "minimum self-distance witnesses must be strictly sorted");
+      }
+      first_witness = false;
+      previous_witness = witness_name;
+      const auto witness = graph.activity_id(witness_name);
+      if (!witness) {
+        throw std::invalid_argument(
+            "minimum self-distance witness is not registered in the directly-follows graph: " +
+            witness_name);
+      }
+      if (*witness == *activity) {
+        throw std::invalid_argument(
+            "minimum self-distance witness cannot equal its activity");
+      }
+      witnesses.push_back(*witness);
+    }
+    resolved.push_back({*activity, entry.distance, std::move(witnesses)});
+  }
+  return resolved;
+}
+
+void write_minimum_self_distances(
+    std::ostream& out,
+    const std::vector<ResolvedMinimumSelfDistance>& distances) {
+  out << '[';
+  for (std::size_t i = 0; i < distances.size(); ++i) {
+    const auto& entry = distances[i];
+    out << "{\"activity\": " << entry.activity
+        << ", \"distance\": " << entry.distance << ", \"witnesses\": [";
+    for (std::size_t j = 0; j < entry.witnesses.size(); ++j) {
+      out << entry.witnesses[j]
+          << (j + 1 < entry.witnesses.size() ? ", " : "");
+    }
+    out << "]}" << (i + 1 < distances.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+std::vector<ResolvedTemporalProfileEntry> resolve_temporal_profile(
+    const TemporalProfile& profile, const DirectlyFollowsGraph& graph) {
+  std::vector<ResolvedTemporalProfileEntry> resolved;
+  resolved.reserve(profile.entries.size());
+  std::map<std::pair<std::size_t, std::size_t>, bool> seen;
+  std::pair<std::string, std::string> previous_names;
+  bool first = true;
+  for (const auto& entry : profile.entries) {
+    const auto names = std::make_pair(entry.source, entry.target);
+    if (!first && names <= previous_names) {
+      throw std::invalid_argument(
+          "temporal profile JSON entries must be strictly sorted by source and target");
+    }
+    first = false;
+    previous_names = names;
+    const auto source = graph.activity_id(entry.source);
+    const auto target = graph.activity_id(entry.target);
+    if (!source || !target) {
+      throw std::invalid_argument(
+          "temporal profile activity is not registered in the directly-follows graph: " +
+          entry.source + " -> " + entry.target);
+    }
+    if (entry.count == 0 || !std::isfinite(entry.mean_seconds) ||
+        entry.mean_seconds < 0.0 ||
+        !std::isfinite(entry.standard_deviation_seconds) ||
+        entry.standard_deviation_seconds < 0.0) {
+      throw std::invalid_argument(
+          "temporal profile JSON requires a positive count and finite, non-negative timing statistics");
+    }
+    if (!seen.emplace(std::make_pair(*source, *target), true).second) {
+      throw std::invalid_argument(
+          "temporal profile JSON contains a duplicate source/target pair");
+    }
+    resolved.push_back({*source, *target, entry.count, entry.mean_seconds,
+                        entry.standard_deviation_seconds});
+  }
+  return resolved;
+}
+
+void write_temporal_profile(
+    std::ostream& out,
+    const std::vector<ResolvedTemporalProfileEntry>& profile) {
+  out << "[";
+  for (std::size_t i = 0; i < profile.size(); ++i) {
+    const auto& entry = profile[i];
+    out << "{\"source\": " << entry.source << ", \"target\": " << entry.target
+        << ", \"count\": " << entry.count
+        << ", \"mean_seconds\": " << entry.mean_seconds
+        << ", \"standard_deviation_seconds\": "
+        << entry.standard_deviation_seconds << '}'
+        << (i + 1 < profile.size() ? ", " : "");
+  }
+  out << "]";
+}
+
+struct ResolvedTransitionSystem {
+  std::vector<std::vector<std::size_t>> payload;
+};
+
+const char* transition_view_name(TransitionView view) {
+  switch (view) {
+    case TransitionView::kSequence: return "sequence";
+    case TransitionView::kSet: return "set";
+    case TransitionView::kMultiset: return "multiset";
+  }
+  throw std::invalid_argument("transition system has an invalid view");
+}
+
+const char* transition_direction_name(TransitionDirection direction) {
+  switch (direction) {
+    case TransitionDirection::kForward: return "forward";
+    case TransitionDirection::kBackward: return "backward";
+  }
+  throw std::invalid_argument("transition system has an invalid direction");
+}
+
+ResolvedTransitionSystem resolve_transition_system(
+    const TransitionSystem& system, const EventLog& log,
+    const DirectlyFollowsGraph& graph) {
+  (void)transition_view_name(system.options().view);
+  (void)transition_direction_name(system.options().direction);
+  ResolvedTransitionSystem resolved;
+  const auto& states = system.states();
+  resolved.payload.reserve(states.size());
+  for (std::size_t i = 0; i < states.size(); ++i) {
+    const auto& state = states[i];
+    if (state.id != i) throw std::invalid_argument("transition system state ids must be contiguous and ordered");
+    std::vector<std::size_t> ids;
+    ids.reserve(state.payload.size());
+    std::string previous;
+    bool first = true;
+    for (const auto& activity : state.payload) {
+      if (!first && (system.options().view == TransitionView::kSet ||
+                     system.options().view == TransitionView::kMultiset) &&
+          activity < previous) {
+        throw std::invalid_argument("transition system set/multiset payloads must be sorted");
+      }
+      if (!first && system.options().view == TransitionView::kSet && activity == previous) {
+        throw std::invalid_argument("transition system set payloads must be unique");
+      }
+      first = false;
+      previous = activity;
+      const auto id = graph.activity_id(activity);
+      if (!id) throw std::invalid_argument("transition system activity is not registered: " + activity);
+      ids.push_back(*id);
+    }
+    resolved.payload.push_back(std::move(ids));
+    const auto validate_occurrence = [&](const TransitionOccurrence& occurrence) {
+      if (occurrence.trace_index >= log.traces.size() ||
+          occurrence.event_index >= log.traces[occurrence.trace_index].events.size()) {
+        throw std::invalid_argument("transition system occurrence is outside the event log");
+      }
+    };
+    const auto validate_occurrences = [&](const std::vector<TransitionOccurrence>& occurrences) {
+      TransitionOccurrence previous{};
+      bool first_occurrence = true;
+      for (const auto& occurrence : occurrences) {
+        validate_occurrence(occurrence);
+        if (!first_occurrence && (occurrence.trace_index < previous.trace_index ||
+                                  (occurrence.trace_index == previous.trace_index &&
+                                   occurrence.event_index <= previous.event_index))) {
+          throw std::invalid_argument("transition system occurrence references must be strictly sorted");
+        }
+        first_occurrence = false;
+        previous = occurrence;
+      }
+    };
+    validate_occurrences(state.incoming_occurrences);
+    validate_occurrences(state.outgoing_occurrences);
+  }
+  std::set<std::tuple<std::size_t, std::size_t, std::string>> seen;
+  std::tuple<std::size_t, std::size_t, std::string> previous_transition;
+  bool first_transition = true;
+  for (const auto& transition : system.transitions()) {
+    if (transition.source >= states.size() || transition.target >= states.size())
+      throw std::invalid_argument("transition system transition references an unknown state");
+    if (transition.count == 0) throw std::invalid_argument("transition system transition counts must be positive");
+    if (!seen.emplace(transition.source, transition.target, transition.label).second)
+      throw std::invalid_argument("transition system contains duplicate transitions");
+    const auto transition_key = std::make_tuple(transition.source, transition.target,
+                                                transition.label);
+    if (!first_transition && transition_key <= previous_transition)
+      throw std::invalid_argument("transition system transitions must be strictly sorted");
+    first_transition = false;
+    previous_transition = transition_key;
+    if (!graph.activity_id(transition.label))
+      throw std::invalid_argument("transition system transition activity is not registered: " + transition.label);
+    TransitionOccurrence previous{};
+    bool first_occurrence = true;
+    for (const auto& occurrence : transition.occurrences) {
+      if (occurrence.trace_index >= log.traces.size() ||
+          occurrence.event_index >= log.traces[occurrence.trace_index].events.size())
+        throw std::invalid_argument("transition system occurrence is outside the event log");
+      if (log.traces[occurrence.trace_index].events[occurrence.event_index].activity != transition.label)
+        throw std::invalid_argument("transition system occurrence activity does not match its transition label");
+      if (!first_occurrence && (occurrence.trace_index < previous.trace_index ||
+                                (occurrence.trace_index == previous.trace_index &&
+                                 occurrence.event_index <= previous.event_index)))
+        throw std::invalid_argument("transition system occurrence references must be strictly sorted");
+      first_occurrence = false;
+      previous = occurrence;
+    }
+    if (system.options().include_data && transition.occurrences.size() != transition.count)
+      throw std::invalid_argument("transition system transition occurrences must match count when include_data is enabled");
+  }
+  return resolved;
+}
+
+void write_transition_occurrences(std::ostream& out,
+                                  const std::vector<TransitionOccurrence>& occurrences) {
+  out << "[";
+  for (std::size_t i = 0; i < occurrences.size(); ++i) {
+    out << "{\"trace_index\": " << occurrences[i].trace_index
+        << ", \"event_index\": " << occurrences[i].event_index << "}"
+        << (i + 1 < occurrences.size() ? ", " : "");
+  }
+  out << "]";
+}
+
+void write_transition_system(std::ostream& out, const TransitionSystem& system,
+                             const ResolvedTransitionSystem& resolved,
+                             const DirectlyFollowsGraph& graph) {
+  const auto& options = system.options();
+  out << "{\"view\": \"" << transition_view_name(options.view)
+      << "\", \"direction\": \"" << transition_direction_name(options.direction)
+      << "\", \"window\": " << options.window
+      << ", \"include_data\": " << (options.include_data ? "true" : "false")
+      << ", \"states\": [";
+  for (std::size_t i = 0; i < system.states().size(); ++i) {
+    const auto& state = system.states()[i];
+    out << "{\"id\": " << state.id << ", \"payload\": ";
+    if (options.view == TransitionView::kMultiset) {
+      out << "[";
+      for (std::size_t j = 0; j < resolved.payload[i].size();) {
+        std::size_t k = j + 1;
+        while (k < resolved.payload[i].size() && resolved.payload[i][k] == resolved.payload[i][j]) ++k;
+        out << "{\"activity\": " << resolved.payload[i][j] << ", \"count\": " << (k - j) << "}"
+            << (k < resolved.payload[i].size() ? ", " : "");
+        j = k;
+      }
+      out << "]";
+    } else {
+      out << "[";
+      for (std::size_t j = 0; j < resolved.payload[i].size(); ++j)
+        out << resolved.payload[i][j] << (j + 1 < resolved.payload[i].size() ? ", " : "");
+      out << "]";
+    }
+    out << ", \"start_count\": " << state.start_count
+        << ", \"end_count\": " << state.end_count;
+    if (options.include_data) {
+      out << ", \"incoming_occurrences\": "; write_transition_occurrences(out, state.incoming_occurrences);
+      out << ", \"outgoing_occurrences\": "; write_transition_occurrences(out, state.outgoing_occurrences);
+    }
+    out << "}" << (i + 1 < system.states().size() ? ", " : "");
+  }
+  out << "], \"transitions\": [";
+  for (std::size_t i = 0; i < system.transitions().size(); ++i) {
+    const auto& transition = system.transitions()[i];
+    out << "{\"source\": " << transition.source << ", \"target\": " << transition.target
+        << ", \"activity\": " << *graph.activity_id(transition.label)
+        << ", \"count\": " << transition.count;
+    if (options.include_data) {
+      out << ", \"occurrences\": ";
+      write_transition_occurrences(out, transition.occurrences);
+    }
+    out << "}" << (i + 1 < system.transitions().size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -581,7 +906,25 @@ void write_analysis_json(std::ostream& out,
                          const PetriNet* inductive_net,
                          const ModelDecoration* inductive_decoration,
                          const PetriNet* heuristic_petri,
-                         const ModelDecoration* heuristic_decoration) {
+                         const ModelDecoration* heuristic_decoration,
+                         const TemporalProfile* temporal_profile,
+                         const MinimumSelfDistances* minimum_self_distances,
+                         const TransitionSystem* transition_system) {
+  // Resolve and validate the optional profile before writing any document
+  // bytes, so a bad manually assembled profile cannot leave partial JSON in
+  // the caller's stream.
+  const auto resolved_temporal_profile =
+      temporal_profile != nullptr
+          ? resolve_temporal_profile(*temporal_profile, graph)
+          : std::vector<ResolvedTemporalProfileEntry>{};
+  const auto resolved_minimum_self_distances =
+      minimum_self_distances != nullptr
+          ? resolve_minimum_self_distances(*minimum_self_distances, graph)
+          : std::vector<ResolvedMinimumSelfDistance>{};
+  const auto resolved_transition_system =
+      transition_system != nullptr
+          ? resolve_transition_system(*transition_system, log, graph)
+          : ResolvedTransitionSystem{};
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -664,6 +1007,19 @@ void write_analysis_json(std::ostream& out,
     out << '}' << (i + 1 < variant_order.size() ? "," : "") << '\n';
   }
   out << "  ]";
+
+  if (temporal_profile != nullptr) {
+    out << ",\n  \"temporal_profile\": ";
+    write_temporal_profile(out, resolved_temporal_profile);
+  }
+  if (minimum_self_distances != nullptr) {
+    out << ",\n  \"minimum_self_distances\": ";
+    write_minimum_self_distances(out, resolved_minimum_self_distances);
+  }
+  if (transition_system != nullptr) {
+    out << ",\n  \"transition_system\": ";
+    write_transition_system(out, *transition_system, resolved_transition_system, graph);
+  }
 
   write_event_attribute_stats(out, log);
   write_case_attribute_stats(out, log);
@@ -751,13 +1107,17 @@ std::string analysis_json(std::string_view dataset,
                           const PetriNet* inductive_net,
                           const ModelDecoration* inductive_decoration,
                           const PetriNet* heuristic_petri,
-                          const ModelDecoration* heuristic_decoration) {
+                          const ModelDecoration* heuristic_decoration,
+                          const TemporalProfile* temporal_profile,
+                          const MinimumSelfDistances* minimum_self_distances,
+                          const TransitionSystem* transition_system) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
                       eventually_follows, decisions, petri_decoration,
                       spectrum, inductive_net, inductive_decoration,
-                      heuristic_petri, heuristic_decoration);
+                      heuristic_petri, heuristic_decoration, temporal_profile,
+                      minimum_self_distances, transition_system);
   return out.str();
 }
 
