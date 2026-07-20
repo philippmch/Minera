@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstring>
 #include <cctype>
 #include <cstdlib>
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,17 +20,24 @@
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/declare.hpp"
+#include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
+#include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_skeleton.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
+#include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/powl_conversion.hpp"
+#include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
@@ -50,17 +59,121 @@ bool ends_with_ci(std::string_view value, std::string_view suffix) {
 // Splits a comma-separated option value into trimmed, non-empty activity names.
 std::vector<std::string> split_csv(std::string_view value) {
   std::vector<std::string> parts;
-  std::string current;
-  for (const char ch : value) {
-    if (ch == ',') {
-      if (!current.empty()) parts.push_back(current);
-      current.clear();
-    } else if (ch != ' ' || !current.empty()) {
-      current.push_back(ch);
+  std::size_t start = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i == value.size() || value[i] == ',') {
+      const auto token = value.substr(start, i - start);
+      const auto first = token.find_first_not_of(" \t\r\n");
+      if (first != std::string_view::npos) {
+        const auto last = token.find_last_not_of(" \t\r\n");
+        parts.emplace_back(token.substr(first, last - first + 1));
+      }
+      start = i + 1;
     }
   }
-  if (!current.empty()) parts.push_back(current);
   return parts;
+}
+
+minera::FootprintsAnalysis analyze_footprints(
+    const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
+    const minera::ProcessTree& tree, const minera::PowlNode& powl,
+    const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
+    const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
+    const minera::FootprintsOptions& options) {
+  minera::FootprintsAnalysis analysis;
+  analysis.model = options.model;
+  analysis.strict = options.strict;
+  std::optional<minera::Footprint> log_footprint;
+  std::optional<std::vector<minera::Footprint>> trace_footprints;
+  std::optional<minera::Footprint> dfg_footprint;
+  std::optional<minera::Footprint> tree_footprint;
+  std::optional<minera::Footprint> powl_footprint;
+  const auto& log_fp = [&]() -> const minera::Footprint& {
+    if (!log_footprint) log_footprint = minera::discover_footprints(log);
+    return *log_footprint;
+  }();
+  const auto traces = [&]() -> const std::vector<minera::Footprint>& {
+    if (!trace_footprints) {
+      trace_footprints = minera::discover_trace_footprints(log);
+    }
+    return *trace_footprints;
+  };
+  const auto dfg_fp = [&]() -> const minera::Footprint& {
+    if (!dfg_footprint) {
+      dfg_footprint = minera::discover_dfg_footprints(graph);
+    }
+    return *dfg_footprint;
+  };
+  const auto tree_fp = [&]() -> const minera::Footprint& {
+    if (!tree_footprint) tree_footprint = minera::discover_footprints(tree);
+    return *tree_footprint;
+  };
+  const auto powl_fp = [&]() -> const minera::Footprint& {
+    if (!powl_footprint) powl_footprint = minera::discover_footprints(powl);
+    return *powl_footprint;
+  };
+
+  if (options.discovery_variants.contains("entire_event_log")) {
+    analysis.entire_event_log = log_fp;
+  }
+  if (options.discovery_variants.contains("trace_by_trace")) {
+    analysis.trace_by_trace = traces();
+  }
+  if (options.discovery_variants.contains("dfg")) analysis.dfg = dfg_fp();
+  if (options.discovery_variants.contains("process_tree")) {
+    analysis.process_tree = tree_fp();
+  }
+  if (options.discovery_variants.contains("powl")) analysis.powl = powl_fp();
+
+  const minera::PetriNet* selected_petri = nullptr;
+  if (options.model == "process_tree" || options.model == "inductive") {
+    selected_petri = &inductive_net;
+  } else if (options.model == "powl") {
+    selected_petri = &powl_net;
+  } else if (options.model == "alpha") {
+    selected_petri = &alpha_net;
+  } else if (options.model == "heuristic") {
+    selected_petri = &heuristic_net;
+  }
+  if (options.model == "process_tree") {
+    analysis.model_footprint = tree_fp();
+  } else if (options.model == "powl") {
+    analysis.model_footprint = powl_fp();
+  } else if (options.model == "dfg") {
+    analysis.model_footprint = dfg_fp();
+  } else {
+    analysis.model_footprint =
+        minera::discover_footprints(*selected_petri);
+  }
+  if (options.discovery_variants.contains("petri_reach_graph")) {
+    if (selected_petri == nullptr) {
+      throw std::invalid_argument(
+          "petri_reach_graph requires a Petri-capable footprints model");
+    }
+    analysis.petri_reach_graph =
+        minera::discover_footprints(*selected_petri);
+  }
+
+  if (options.conformance_variants.contains("log_model")) {
+    analysis.log_model = minera::check_footprints_log_model(
+        log_fp, analysis.model_footprint, {options.strict});
+  }
+  if (options.conformance_variants.contains("log_extensive")) {
+    analysis.log_extensive = minera::check_footprints_log_extensive(
+        log_fp, analysis.model_footprint);
+  }
+  const auto trace_results = minera::check_footprints_trace_extensive(
+      traces(), analysis.model_footprint,
+      {options.enable_act_always_executed});
+  if (options.conformance_variants.contains("trace_extensive")) {
+    analysis.trace_extensive = trace_results;
+  }
+  analysis.precision = minera::fp_precision(log_fp, analysis.model_footprint);
+  const auto fitness =
+      minera::fp_fitness(traces(), analysis.model_footprint, trace_results);
+  analysis.log_fitness = fitness.log_fitness;
+  analysis.perc_fit_traces = fitness.perc_fit_traces;
+  return analysis;
 }
 
 int usage(const char* program) {
@@ -82,13 +195,38 @@ int usage(const char* program) {
                "  --alpha-variant <id>      plus (default: short loops become\n"
                "                            self loops and two-way causality)\n"
                "                            or classic (the textbook Alpha)\n"
+               "  --heuristic-variant <id>  classic (default) or plusplus\n"
+               "                            (interval/eventual-follow semantics)\n"
                "  --dependency-threshold <f>  Heuristic Miner: minimum dependency\n"
-               "                            measure for an edge (default: 0.9)\n"
+               "                            measure (default: 0.5)\n"
                "  --and-threshold <f>       Heuristic Miner: minimum AND measure\n"
                "                            for a parallel split/join (default:\n"
                "                            0.65)\n"
-               "  --min-edge-frequency <n>  Heuristic Miner: direct successions\n"
-               "                            an edge needs (default: 1)\n"
+               "  --min-edge-frequency <n>  Heuristic Miner: minimum path\n"
+               "                            occurrences (default: 1)\n"
+               "  --heuristic-min-activity-count <n>\n"
+               "                            Minimum activity occurrences\n"
+               "                            (default: 1)\n"
+               "  --heuristic-decoration <id> frequency (default) or performance\n"
+               "  --heuristic-performance-aggregation <id>\n"
+               "                            mean (default), median, min, max,\n"
+               "                            stdev, sum, raw_values, or all\n"
+               "  --heuristic-dfg-pre-cleaning-noise-threshold <f>\n"
+               "                            Classic DFG pre-clean noise\n"
+               "                            (default: 0.05)\n"
+               "  --heuristic-loop-length-two-threshold <f>\n"
+               "                            Classic length-two-loop threshold\n"
+               "                            (default: 0.5)\n"
+               "  --heuristic-keep-once-per-case\n"
+               "                            Count each classic DFG path once/case\n"
+               "  --heuristic-most-common-paths <a->b,...>\n"
+               "                            Exempt classic paths from pre-cleaning\n"
+               "  --heuristic-start-timestamp-attribute <name>\n"
+               "                            Miner++ interval-start event attribute\n"
+               "                            (default: start_timestamp)\n"
+               "  --heuristic-lifecycle-instance-attribute <name>\n"
+               "                            Miner++ lifecycle instance attribute\n"
+               "                            (default: concept:instance)\n"
                "  --transition-view <id>    Transition-system state view:\n"
                "                            sequence (default), set, or multiset\n"
                "  --transition-direction <id>  Window direction: forward\n"
@@ -97,18 +235,31 @@ int usage(const char* program) {
                "                            (default: 2; 0 collapses all states)\n"
                "  --transition-include-data Include stable trace/event occurrence\n"
                "                            references in the transition system\n"
+               "  --powl-variant <id>       POWL discovery: tree, brute_force,\n"
+               "                            maximal (default), dynamic_clustering,\n"
+               "                            or dynamic_clustering_plain\n"
+               "  --powl-filtering-type <id> POWL filtering: decreasing_factor\n"
+               "                            (default) or dynamic\n"
+               "  --powl-filtering-threshold <f> POWL filter threshold in [0,1)\n"
+               "                            (default: 0 = disabled)\n"
+               "  --powl-order-frequency-ratio <f> Dynamic-clustering order\n"
+               "                            ratio in (0.5,1] (default: 1)\n"
+               "  --powl-brute-force-activity-limit <n> Maximum local alphabet\n"
+               "                            for brute force (0 = unlimited)\n"
                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --check-pnml <path>       Also check the log against the\n"
                "                            workflow net in this PNML file\n"
                "                            (conformance id: imported)\n"
                "  --pnml-miner <id>         Which model to export as PNML:\n"
-               "                            inductive (default), alpha, or heuristic\n"
+               "                            inductive (default), alpha, heuristic,\n"
+               "                            or powl\n"
                "  --bpmn <path>             Also write a model as BPMN 2.0 to <path>\n"
                "  --check-bpmn <path>       Also check the log against the\n"
                "                            BPMN 2.0 model in this file\n"
                "                            (conformance id: imported)\n"
                "  --bpmn-miner <id>         Which model to export as BPMN:\n"
-               "                            inductive (default), alpha, or heuristic\n"
+               "                            inductive (default), alpha, heuristic,\n"
+               "                            or powl\n"
                "  --ptml <path>             Also write the inductive process\n"
                "                            tree as PTML to <path>\n"
                "  --check-ptml <path>       Also check the log against the\n"
@@ -125,11 +276,45 @@ int usage(const char* program) {
                "                            export (token replay and footprints\n"
                "                            stay); alignments dominate runtime\n"
                "                            on large, badly fitting logs\n"
+               "  --token-replay-variant <id> Token replay: forward (default)\n"
+               "                            or backwards\n"
+               "  --token-replay-stop-immediately-unfit\n"
+               "                            Stop a backwards replay trace at its\n"
+               "                            first event that cannot be enabled\n"
+               "  --log-skeleton-noise-threshold <f> Log-skeleton noise in [0,1]\n"
+               "  --log-skeleton-constraints <a,b,...> Constraint families:\n"
+               "                            equivalence, always_after, always_before,\n"
+               "                            never_together, directly_follows, activ_freq\n"
+               "  --declare-considered-activities <a,b,...> Declare activity filter\n"
+               "                            (omit = infer; empty = use none)\n"
+               "  --declare-allowed-templates <a,b,...> Declare template families\n"
+               "                            (omit = all; empty = use none)\n"
+               "  --declare-min-support-ratio <f> Declare support ratio in [0,1]\n"
+               "  --declare-min-confidence-ratio <f> Declare confidence ratio in [0,1]\n"
+               "  --declare-auto-selection-multiplier <f> Declare auto-selection multiplier in [0,1]\n"
+               "  --footprints-discovery-variants <a,b,...> Footprint discovery:\n"
+               "                            entire_event_log, trace_by_trace, dfg,\n"
+               "                            process_tree, powl, petri_reach_graph\n"
+               "  --footprints-model <id>  process_tree (default), powl,\n"
+               "                            inductive, alpha, heuristic, or dfg\n"
+               "  --footprints-conformance-variants <a,b,...> Footprint checks:\n"
+               "                            log_model, log_extensive, trace_extensive\n"
+               "  --footprints-strict <bool> Strict log-model footprint checking\n"
+               "  --footprints-enable-act-always-executed <bool>\n"
+               "                            Check always-executed trace activities\n"
                "  --decisions <miner>       Mine the decision points of one\n"
-               "                            model (inductive, alpha, or\n"
-               "                            heuristic): which attribute values\n"
+               "                            model (inductive, alpha, heuristic,\n"
+               "                            or powl): which attribute values\n"
                "                            steer a case down which branch;\n"
                "                            embedded under \"decisions\"\n"
+               "  --playout <path>          Simulate a discovered model to XES\n"
+               "  --playout-miner <id>      Model for --playout: inductive\n"
+               "                            (default), alpha, heuristic, powl,\n"
+               "                            or declare\n"
+               "  --declare-playout-traces <n> Declare cases (default: 1000)\n"
+               "  --declare-playout-min-length <n> Minimum events (default: 3)\n"
+               "  --declare-playout-max-length <n> Maximum events (default: 15)\n"
+               "  --declare-playout-seed <u64> Deterministic Declare seed\n"
                "\n  Log filtering (applied before discovery):\n"
                "  --time-from <iso8601>     Keep only behaviour at/after this instant\n"
                "  --time-to <iso8601>       Keep only behaviour at/before this instant\n"
@@ -208,8 +393,10 @@ int main(int argc, char** argv) {
   std::filesystem::path ptml_output;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
+  std::filesystem::path playout_output;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
+  std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   bool no_alignments = false;
   std::vector<std::string> spectrum_activities;  // empty = no spectrum
@@ -218,7 +405,14 @@ int main(int argc, char** argv) {
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
+  minera::PowlDiscoveryOptions powl_options;
   minera::TransitionSystemOptions transition_options;
+  minera::TokenReplayOptions token_replay_options;
+  minera::LogSkeletonOptions log_skeleton_options;
+  minera::DeclareDiscoveryOptions declare_options;
+  minera::DeclarePlayoutOptions declare_playout_options;
+  bool declare_playout_options_used = false;
+  minera::FootprintsOptions footprints_options;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -236,6 +430,32 @@ int main(int argc, char** argv) {
     const auto result = std::from_chars(value, end, parsed);
     if (result.ec != std::errc{} || result.ptr != end)
       throw std::invalid_argument("--transition-window expects a non-negative integer");
+    return parsed;
+  };
+  const auto parse_declare_playout_int =
+      [](const char* value, std::string_view name,
+         bool require_nonnegative) -> int {
+    int parsed = 0;
+    const auto end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end ||
+        (require_nonnegative && parsed < 0)) {
+      throw std::invalid_argument(std::string(name) +
+                                  (require_nonnegative
+                                       ? " expects a non-negative integer"
+                                       : " expects a signed integer"));
+    }
+    return parsed;
+  };
+  const auto parse_declare_playout_seed =
+      [](const char* value) -> std::uint64_t {
+    std::uint64_t parsed = 0;
+    const auto end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end) {
+      throw std::invalid_argument(
+          "--declare-playout-seed expects an unsigned 64-bit integer");
+    }
     return parsed;
   };
 
@@ -293,6 +513,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       xes_output = value;
+    } else if (arg == "--playout") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      playout_output = value;
     } else if (arg == "--pnml-miner") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -301,12 +525,218 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       bpmn_miner = value;
+    } else if (arg == "--playout-miner") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      playout_miner = value;
+    } else if (arg == "--declare-playout-traces" ||
+               arg == "--declare-playout-min-length" ||
+               arg == "--declare-playout-max-length") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const int parsed = parse_declare_playout_int(
+            value, arg, arg == "--declare-playout-traces");
+        if (arg == "--declare-playout-traces") {
+          declare_playout_options.n_traces = parsed;
+        } else if (arg == "--declare-playout-min-length") {
+          declare_playout_options.min_length = parsed;
+        } else {
+          declare_playout_options.max_length = parsed;
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      declare_playout_options_used = true;
+    } else if (arg == "--declare-playout-seed") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        declare_playout_options.seed = parse_declare_playout_seed(value);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      declare_playout_options_used = true;
     } else if (arg == "--decisions") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       decisions_miner = value;
     } else if (arg == "--no-alignments") {
       no_alignments = true;
+    } else if (arg == "--token-replay-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view variant = value;
+      if (variant == "forward")
+        token_replay_options.variant = minera::TokenReplayVariant::kForward;
+      else if (variant == "backwards")
+        token_replay_options.variant = minera::TokenReplayVariant::kBackwards;
+      else {
+        std::cerr << "error: --token-replay-variant expects forward or "
+                     "backwards\n";
+        return 2;
+      }
+    } else if (arg == "--token-replay-stop-immediately-unfit") {
+      token_replay_options.stop_immediately_unfit = true;
+    } else if (arg == "--log-skeleton-noise-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      log_skeleton_options.noise_threshold = std::strtod(value, &end);
+      if (end == value || *end != '\0' ||
+          !std::isfinite(log_skeleton_options.noise_threshold) ||
+          log_skeleton_options.noise_threshold < 0.0 ||
+          log_skeleton_options.noise_threshold > 1.0) {
+        std::cerr << "error: --log-skeleton-noise-threshold expects 0 <= f <= 1\n";
+        return 2;
+      }
+    } else if (arg == "--log-skeleton-constraints") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string raw = value;
+      std::vector<std::string> constraints;
+      std::size_t start = 0;
+      while (start <= raw.size()) {
+        const auto comma = raw.find(',', start);
+        const auto token = raw.substr(start, comma == std::string::npos
+                                               ? std::string::npos
+                                               : comma - start);
+        const auto first = token.find_first_not_of(" \t\r\n");
+        if (first != std::string::npos) {
+          const auto last = token.find_last_not_of(" \t\r\n");
+          constraints.push_back(token.substr(first, last - first + 1));
+        }
+        if (comma == std::string::npos) break;
+        start = comma + 1;
+      }
+      static constexpr std::string_view allowed[] = {
+          "equivalence", "always_after", "always_before", "never_together",
+          "directly_follows", "activ_freq"};
+      for (const auto& constraint : constraints) {
+        if (std::find(std::begin(allowed), std::end(allowed), constraint) ==
+            std::end(allowed)) {
+          std::cerr << "error: --log-skeleton-constraints unknown constraint '"
+                    << constraint << "'\n";
+          return 2;
+        }
+      }
+      std::sort(constraints.begin(), constraints.end());
+      constraints.erase(std::unique(constraints.begin(), constraints.end()),
+                        constraints.end());
+      log_skeleton_options.considered_constraints = std::move(constraints);
+    } else if (arg == "--declare-considered-activities") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      auto activities = split_csv(value);
+      declare_options.considered_activities = std::move(activities);
+    } else if (arg == "--declare-allowed-templates") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      auto templates = split_csv(value);
+      static constexpr std::string_view allowed[] = {
+          minera::kDeclareExistence, minera::kDeclareExactlyOne,
+          minera::kDeclareInit, minera::kDeclareRespondedExistence,
+          minera::kDeclareResponse, minera::kDeclarePrecedence,
+          minera::kDeclareSuccession, minera::kDeclareAltResponse,
+          minera::kDeclareAltPrecedence, minera::kDeclareAltSuccession,
+          minera::kDeclareChainResponse, minera::kDeclareChainPrecedence,
+          minera::kDeclareChainSuccession, minera::kDeclareAbsence,
+          minera::kDeclareCoexistence, minera::kDeclareNonCoexistence,
+          minera::kDeclareNonSuccession, minera::kDeclareNonChainSuccession};
+      for (const auto& name : templates) {
+        if (std::find(std::begin(allowed), std::end(allowed), name) ==
+            std::end(allowed)) {
+          std::cerr << "error: --declare-allowed-templates unknown template '"
+                    << name << "'\n";
+          return 2;
+        }
+      }
+      std::sort(templates.begin(), templates.end());
+      templates.erase(std::unique(templates.begin(), templates.end()),
+                      templates.end());
+      declare_options.allowed_templates = std::move(templates);
+    } else if (arg == "--declare-min-support-ratio" ||
+               arg == "--declare-min-confidence-ratio" ||
+               arg == "--declare-auto-selection-multiplier") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      const double parsed = std::strtod(value, &end);
+      if (end == value || *end != '\0' || !std::isfinite(parsed) ||
+          parsed < 0.0 || parsed > 1.0) {
+        std::cerr << "error: " << arg << " expects a finite value in [0,1]\n";
+        return 2;
+      }
+      if (arg == "--declare-min-support-ratio") {
+        declare_options.min_support_ratio = parsed;
+        declare_options.has_min_support_ratio = true;
+      } else if (arg == "--declare-min-confidence-ratio") {
+        declare_options.min_confidence_ratio = parsed;
+        declare_options.has_min_confidence_ratio = true;
+      } else {
+        declare_options.auto_selection_multiplier = parsed;
+      }
+    } else if (arg == "--footprints-discovery-variants" ||
+               arg == "--footprints-conformance-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto parts = split_csv(value);
+      if (parts.empty()) {
+        std::cerr << "error: " << arg << " expects a non-empty list\n";
+        return 2;
+      }
+      const std::set<std::string> allowed =
+          arg == "--footprints-discovery-variants"
+              ? std::set<std::string>{"entire_event_log", "trace_by_trace",
+                                      "dfg", "process_tree", "powl",
+                                      "petri_reach_graph"}
+              : std::set<std::string>{"log_model", "log_extensive",
+                                      "trace_extensive"};
+      std::set<std::string> parsed;
+      for (const auto& part : parts) {
+        if (!allowed.contains(part)) {
+          std::cerr << "error: " << arg << " unknown variant '" << part
+                    << "'\n";
+          return 2;
+        }
+        parsed.insert(part);
+      }
+      if (arg == "--footprints-discovery-variants") {
+        footprints_options.discovery_variants = std::move(parsed);
+      } else {
+        footprints_options.conformance_variants = std::move(parsed);
+      }
+    } else if (arg == "--footprints-model") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      static const std::set<std::string> allowed = {
+          "process_tree", "powl", "inductive", "alpha", "heuristic", "dfg"};
+      if (!allowed.contains(value)) {
+        std::cerr << "error: --footprints-model unknown model '" << value
+                  << "'\n";
+        return 2;
+      }
+      footprints_options.model = value;
+    } else if (arg == "--footprints-strict" ||
+               arg == "--footprints-enable-act-always-executed") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view boolean = value;
+      bool parsed = false;
+      if (boolean == "true" || boolean == "1") {
+        parsed = true;
+      } else if (boolean != "false" && boolean != "0") {
+        std::cerr << "error: " << arg
+                  << " expects true, false, 1, or 0\n";
+        return 2;
+      }
+      if (arg == "--footprints-strict") {
+        footprints_options.strict = parsed;
+      } else {
+        footprints_options.enable_act_always_executed = parsed;
+      }
     } else if (arg == "--spectrum") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -328,6 +758,77 @@ int main(int argc, char** argv) {
       catch (const std::exception& error) { std::cerr << "error: " << error.what() << "\n"; return 2; }
     } else if (arg == "--transition-include-data") {
       transition_options.include_data = true;
+    } else if (arg == "--powl-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view variant = value;
+      if (variant == "tree")
+        powl_options.variant = minera::PowlDiscoveryVariant::kTree;
+      else if (variant == "brute_force")
+        powl_options.variant = minera::PowlDiscoveryVariant::kBruteForce;
+      else if (variant == "maximal")
+        powl_options.variant = minera::PowlDiscoveryVariant::kMaximal;
+      else if (variant == "dynamic_clustering")
+        powl_options.variant =
+            minera::PowlDiscoveryVariant::kDynamicClustering;
+      else if (variant == "dynamic_clustering_plain")
+        powl_options.variant =
+            minera::PowlDiscoveryVariant::kDynamicClusteringPlain;
+      else {
+        std::cerr << "error: --powl-variant expects tree, brute_force, "
+                     "maximal, dynamic_clustering, or "
+                     "dynamic_clustering_plain\n";
+        return 2;
+      }
+    } else if (arg == "--powl-filtering-type") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view type = value;
+      if (type == "decreasing_factor")
+        powl_options.filtering_type =
+            minera::PowlFilteringType::kDecreasingFactor;
+      else if (type == "dynamic")
+        powl_options.filtering_type = minera::PowlFilteringType::kDynamic;
+      else {
+        std::cerr << "error: --powl-filtering-type expects "
+                     "decreasing_factor or dynamic\n";
+        return 2;
+      }
+    } else if (arg == "--powl-filtering-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      powl_options.filtering_threshold = std::strtod(value, &end);
+      if (end == value || *end != '\0' ||
+          !std::isfinite(powl_options.filtering_threshold) ||
+          powl_options.filtering_threshold < 0.0 ||
+          powl_options.filtering_threshold >= 1.0) {
+        std::cerr << "error: --powl-filtering-threshold expects 0 <= f < 1\n";
+        return 2;
+      }
+    } else if (arg == "--powl-order-frequency-ratio") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      powl_options.order_frequency_ratio = std::strtod(value, &end);
+      if (end == value || *end != '\0' ||
+          !std::isfinite(powl_options.order_frequency_ratio) ||
+          powl_options.order_frequency_ratio <= 0.5 ||
+          powl_options.order_frequency_ratio > 1.0) {
+        std::cerr << "error: --powl-order-frequency-ratio expects "
+                     "0.5 < f <= 1\n";
+        return 2;
+      }
+    } else if (arg == "--powl-brute-force-activity-limit") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        powl_options.brute_force_activity_limit = parse_window(value);
+      } catch (const std::exception&) {
+        std::cerr << "error: --powl-brute-force-activity-limit expects a "
+                     "non-negative integer\n";
+        return 2;
+      }
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -346,6 +847,15 @@ int main(int argc, char** argv) {
       const std::string_view variant = value;
       if (variant != "classic" && variant != "plus") return usage(argv[0]);
       alpha_options.short_loops = variant == "plus";
+    } else if (arg == "--heuristic-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view variant = value;
+      if (variant != "classic" && variant != "plusplus")
+        return usage(argv[0]);
+      heuristic_options.variant =
+          variant == "plusplus" ? minera::HeuristicMinerVariant::kPlusPlus
+                                : minera::HeuristicMinerVariant::kClassic;
     } else if (arg == "--dependency-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -359,6 +869,77 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       heuristic_options.min_frequency =
           static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--heuristic-min-activity-count") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.min_activity_count =
+          static_cast<std::uint64_t>(std::atoll(value));
+    } else if (arg == "--heuristic-decoration") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view decoration = value;
+      if (decoration != "frequency" && decoration != "performance")
+        return usage(argv[0]);
+      heuristic_options.decoration =
+          decoration == "performance"
+              ? minera::HeuristicNetDecoration::kPerformance
+              : minera::HeuristicNetDecoration::kFrequency;
+    } else if (arg == "--heuristic-performance-aggregation") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view aggregation = value;
+      if (aggregation == "mean")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kMean;
+      else if (aggregation == "median")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kMedian;
+      else if (aggregation == "min")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kMinimum;
+      else if (aggregation == "max")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kMaximum;
+      else if (aggregation == "stdev")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kStandardDeviation;
+      else if (aggregation == "sum")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kSum;
+      else if (aggregation == "raw_values")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kRawValues;
+      else if (aggregation == "all")
+        heuristic_options.performance_aggregation =
+            minera::HeuristicPerformanceAggregation::kAll;
+      else
+        return usage(argv[0]);
+    } else if (arg ==
+               "--heuristic-dfg-pre-cleaning-noise-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.dfg_pre_cleaning_noise_threshold = std::atof(value);
+    } else if (arg == "--heuristic-loop-length-two-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      heuristic_options.loop_length_two_threshold = std::atof(value);
+    } else if (arg == "--heuristic-keep-once-per-case") {
+      heuristic_options.keep_once_per_case = true;
+    } else if (arg == "--heuristic-most-common-paths") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      for (const auto& pair : parse_pairs(value)) {
+        heuristic_options.most_common_paths.emplace(pair.predecessor,
+                                                    pair.successor);
+      }
+    } else if (arg == "--heuristic-start-timestamp-attribute") {
+      const auto* value = next();
+      if (!value || value[0] == '\0') return usage(argv[0]);
+      heuristic_options.start_timestamp_attribute = value;
+    } else if (arg == "--heuristic-lifecycle-instance-attribute") {
+      const auto* value = next();
+      if (!value || value[0] == '\0') return usage(argv[0]);
+      heuristic_options.lifecycle_instance_attribute = value;
     } else if (arg == "--delimiter") {
       const auto* value = next();
       if (!value || value[0] == '\0') return usage(argv[0]);
@@ -519,6 +1100,24 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (footprints_options.model == "dfg" &&
+      footprints_options.discovery_variants.contains("petri_reach_graph")) {
+    std::cerr << "error: --footprints-model dfg cannot be combined with "
+                 "petri_reach_graph discovery\n";
+    return 2;
+  }
+  if (declare_playout_options.min_length >
+      declare_playout_options.max_length) {
+    std::cerr << "error: --declare-playout-min-length must not exceed "
+                 "--declare-playout-max-length\n";
+    return 2;
+  }
+  if (declare_playout_options_used && playout_miner != "declare") {
+    std::cerr << "error: --declare-playout-* options require "
+                 "--playout-miner declare\n";
+    return 2;
+  }
+
   if (input.empty()) {
     return usage(argv[0]);
   }
@@ -541,11 +1140,32 @@ int main(int argc, char** argv) {
     const auto net = minera::discover_petri_net(log, alpha_options);
     const auto heuristics =
         minera::discover_heuristics_net(log, heuristic_options);
+    const auto powl = minera::discover_powl(log, powl_options);
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
     const auto eventually = minera::discover_eventually_follows(log, graph);
+    const auto log_skeleton =
+        minera::discover_log_skeleton(log, log_skeleton_options);
+    const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
+        log, log_skeleton, log_skeleton_options);
+    const auto declare = minera::discover_declare(log, declare_options);
+    const auto declare_conformance =
+        minera::check_declare_conformance(log, declare);
+    for (const auto& [family, rules] : declare.rules) {
+      (void)family;
+      for (const auto& rule : rules) {
+        graph.ensure_activity(rule.first);
+        if (rule.binary) graph.ensure_activity(rule.second);
+      }
+    }
+    for (const auto& result : declare_conformance) {
+      for (const auto& deviation : result.deviations) {
+        graph.ensure_activity(deviation.first);
+        if (deviation.binary) graph.ensure_activity(deviation.second);
+      }
+    }
 
     // Check every discovered model both ways, keyed by miner id. The export is
     // offline, so embed the alignments too (the server defers them instead)
@@ -555,6 +1175,10 @@ int main(int argc, char** argv) {
     // of optimality).
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
+    const auto powl_net = minera::to_petri_net(powl);
+    const auto footprints =
+        analyze_footprints(log, graph, tree, powl, inductive_net, net,
+                           heuristic_net, powl_net, footprints_options);
     if (!no_alignments && log.traces.size() > 1000) {
       std::cerr << "note: computing optimal alignments for every model; on a "
                    "large or badly fitting log this can take minutes "
@@ -563,7 +1187,7 @@ int main(int argc, char** argv) {
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(petri),
-          minera::check_conformance(log, petri),
+          minera::check_conformance(log, petri, token_replay_options),
           minera::check_footprints(log, petri),
           no_alignments ? std::optional<minera::AlignmentResult>{}
                         : std::optional<minera::AlignmentResult>(
@@ -571,7 +1195,7 @@ int main(int argc, char** argv) {
     };
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
-        model("heuristic", heuristic_net)};
+        model("heuristic", heuristic_net), model("powl", powl_net)};
 
     // Optionally check the log against a user-supplied model too — a PNML
     // workflow net, a BPMN 2.0 process, or a PTML process tree, all landing
@@ -610,9 +1234,11 @@ int main(int argc, char** argv) {
         selected = &net;
       } else if (decisions_miner == "heuristic") {
         selected = &heuristic_net;
+      } else if (decisions_miner == "powl") {
+        selected = &powl_net;
       } else {
         std::cerr << "error: unknown --decisions miner '" << decisions_miner
-                  << "' (expected inductive, alpha, or heuristic)\n";
+                  << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
       }
       decisions = minera::mine_decisions(log, *selected);
@@ -627,6 +1253,7 @@ int main(int argc, char** argv) {
     const auto petri_decoration = minera::decorate_model(log, net);
     const auto inductive_decoration = minera::decorate_model(log, inductive_net);
     const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
+    const auto powl_decoration = minera::decorate_model(log, powl_net);
 
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
@@ -643,7 +1270,9 @@ int main(int argc, char** argv) {
           &eventually, decisions_ptr, &petri_decoration, spectrum_ptr,
           &inductive_net, &inductive_decoration, &heuristic_net,
           &heuristic_decoration, &temporal_profile, &minimum_self_distances,
-          &transition_system);
+          &transition_system, &powl, &powl_net, &powl_decoration,
+          &log_skeleton, &log_skeleton_conformance, &declare,
+          &declare_conformance, &footprints);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -655,7 +1284,10 @@ int main(int argc, char** argv) {
           &performance, &resources, &variant_durations, &eventually,
           decisions_ptr, &petri_decoration, spectrum_ptr, &inductive_net,
           &inductive_decoration, &heuristic_net, &heuristic_decoration,
-          &temporal_profile, &minimum_self_distances, &transition_system);
+          &temporal_profile, &minimum_self_distances, &transition_system,
+          &powl, &powl_net, &powl_decoration, &log_skeleton,
+          &log_skeleton_conformance, &declare, &declare_conformance,
+          &footprints);
     }
 
     // Optionally emit one discovered model as standard PNML.
@@ -667,9 +1299,11 @@ int main(int argc, char** argv) {
         selected = &net;
       } else if (pnml_miner == "heuristic") {
         selected = &heuristic_net;
+      } else if (pnml_miner == "powl") {
+        selected = &powl_net;
       } else {
         std::cerr << "error: unknown --pnml-miner '" << pnml_miner
-                  << "' (expected inductive, alpha, or heuristic)\n";
+                  << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 1;
       }
       std::ofstream pnml_file(pnml_output);
@@ -697,9 +1331,11 @@ int main(int argc, char** argv) {
         minera::write_bpmn(bpmn_file, net, dataset);
       } else if (bpmn_miner == "heuristic") {
         minera::write_bpmn(bpmn_file, heuristic_net, dataset);
+      } else if (bpmn_miner == "powl") {
+        minera::write_bpmn(bpmn_file, powl_net, dataset);
       } else {
         std::cerr << "error: unknown --bpmn-miner '" << bpmn_miner
-                  << "' (expected inductive, alpha, or heuristic)\n";
+                  << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 1;
       }
     }
@@ -726,6 +1362,36 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_xes(xes_file, log, dataset);
+    }
+
+    if (!playout_output.empty()) {
+      std::optional<minera::EventLog> generated;
+      const minera::PetriNet* selected = nullptr;
+      if (playout_miner == "inductive")
+        selected = &inductive_net;
+      else if (playout_miner == "alpha")
+        selected = &net;
+      else if (playout_miner == "heuristic")
+        selected = &heuristic_net;
+      else if (playout_miner == "powl")
+        selected = &powl_net;
+      else if (playout_miner == "declare")
+        generated =
+            minera::declare_playout(declare, declare_playout_options);
+      else {
+        std::cerr << "error: unknown --playout-miner '" << playout_miner
+                  << "' (expected inductive, alpha, heuristic, powl, or "
+                     "declare)\n";
+        return 1;
+      }
+      if (!generated) generated = minera::playout(*selected);
+      std::ofstream playout_file(playout_output);
+      if (!playout_file) {
+        std::cerr << "error: cannot open playout output file "
+                  << playout_output << '\n';
+        return 1;
+      }
+      minera::write_xes(playout_file, *generated, playout_miner + " playout");
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

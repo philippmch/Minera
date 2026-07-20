@@ -163,7 +163,12 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     return std::find(list.begin(), list.end(), a) != list.end();
   };
 
-  for (std::size_t a = 0; a < n; ++a) {
+  std::vector<std::size_t> active = heuristics.active_activities;
+  if (active.empty()) {
+    active.resize(n);
+    for (std::size_t i = 0; i < n; ++i) active[i] = i;
+  }
+  for (const std::size_t a : active) {
     auto in_alts = alternatives(a, false);
     if (contains(heuristics.start_activities, a)) {
       in_alts.push_back({source});  // starting is one more way to get enabled

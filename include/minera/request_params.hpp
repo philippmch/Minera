@@ -6,10 +6,15 @@
 #include <vector>
 
 #include "minera/alpha_miner.hpp"
+#include "minera/conformance.hpp"
+#include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_skeleton.hpp"
+#include "minera/powl_discovery.hpp"
 #include "minera/transition_system.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
@@ -42,17 +47,30 @@ struct MineParams {
   InductiveMinerOptions inductive;
   AlphaMinerOptions alpha;
   HeuristicMinerOptions heuristic;
+  PowlDiscoveryOptions powl;
   TransitionSystemOptions transition_system;
+  TokenReplayOptions token_replay;
+  LogSkeletonOptions log_skeleton;
+  DeclareDiscoveryOptions declare_options;
+  FootprintsOptions footprints;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
+// Optional companion lookup that distinguishes an omitted field from a
+// present field whose value is empty. This matters for options where an
+// explicit empty list has different semantics from using the default.
+using FieldPresence = std::function<bool(std::string_view)>;
 
-// Builds the discovery options from a mine request's form fields. Absent or
-// empty fields leave each option at its default, so a bare upload mines with the
-// stock settings. A `time_mode` value that is not one of the three known modes
-// throws std::invalid_argument, so the caller can report it instead of silently
-// mining with the wrong filter.
+// Builds the discovery options from a mine request's form fields. The
+// single-callback overload treats absent and empty fields alike, preserving the
+// original defaults. With FieldPresence, explicitly present empty Declare list
+// fields become engaged empty filters, while footprint list fields can reject
+// an explicit empty list; omitted fields retain their defaults. A `time_mode`
+// value that is not one of the three known modes throws std::invalid_argument,
+// so the caller can report it instead of silently mining with the wrong filter.
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field);
+[[nodiscard]] MineParams parse_mine_params(const FieldLookup& field,
+                                           const FieldPresence& present);
 
 }  // namespace minera

@@ -7,6 +7,10 @@ import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml } from "../api";
 import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
+import { PowlModel } from "./PowlModel";
+import { LogSkeletonModel } from "./LogSkeletonModel";
+import { DeclareModel } from "./DeclareModel";
+import { FootprintsModel } from "./FootprintsModel";
 
 type Step = "miner" | "variant" | "result";
 
@@ -21,6 +25,7 @@ interface ProcessModelProps {
   inductivePetriLayout: PetriLayout | null;
   /** Layout for the heuristic model's workflow net, if the export carries one. */
   heuristicPetriLayout: PetriLayout | null;
+  powlPetriLayout: PetriLayout | null;
   /** Whether the backend can export PNML (a log was mined this session). */
   canExportPnml: boolean;
 }
@@ -33,6 +38,7 @@ export function ProcessModel({
   petriLayout,
   inductivePetriLayout,
   heuristicPetriLayout,
+  powlPetriLayout,
   canExportPnml,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
@@ -134,6 +140,7 @@ export function ProcessModel({
           petriLayout={petriLayout}
           inductivePetriLayout={inductivePetriLayout}
           heuristicPetriLayout={heuristicPetriLayout}
+          powlPetriLayout={powlPetriLayout}
           canExportPnml={canExportPnml}
         />
       )}
@@ -150,6 +157,7 @@ interface ModelResultProps {
   petriLayout: PetriLayout | null;
   inductivePetriLayout: PetriLayout | null;
   heuristicPetriLayout: PetriLayout | null;
+  powlPetriLayout: PetriLayout | null;
   canExportPnml: boolean;
 }
 
@@ -168,6 +176,7 @@ function ModelResult({
   petriLayout,
   inductivePetriLayout,
   heuristicPetriLayout,
+  powlPetriLayout,
   canExportPnml,
 }: ModelResultProps) {
   const [asNet, setAsNet] = useState(false);
@@ -270,6 +279,87 @@ function ModelResult({
           </>
         }
       />
+    );
+  }
+
+  if (variant.artifact === "powl") {
+    if (asNet && powlPetriLayout) {
+      return (
+        <PetriNet
+          layout={powlPetriLayout}
+          title={groupName}
+          actions={
+            <>
+              {netToggle("POWL", powlPetriLayout)}
+              {actions}
+            </>
+          }
+          decoration={data.powl_petri_net_decoration ?? null}
+        />
+      );
+    }
+    return data.powl ? (
+      <PowlModel
+        model={data.powl}
+        data={data}
+        title={groupName}
+        actions={
+          <>
+            {netToggle("POWL", powlPetriLayout)}
+            {actions}
+          </>
+        }
+      />
+    ) : (
+      <Placeholder>
+        No POWL model is available in this export — re-open the CSV event log to discover one.
+      </Placeholder>
+    );
+  }
+
+  if (variant.artifact === "log-skeleton") {
+    return data.log_skeleton ? (
+      <LogSkeletonModel
+        model={data.log_skeleton}
+        conformance={data.log_skeleton_conformance}
+        data={data}
+        title={groupName}
+      />
+    ) : (
+      <Placeholder>
+        No log-skeleton model is available in this export — re-open the CSV event
+        log to discover one.
+      </Placeholder>
+    );
+  }
+
+  if (variant.artifact === "declare") {
+    return data.declare ? (
+      <DeclareModel
+        model={data.declare}
+        conformance={data.declare_conformance}
+        data={data}
+        title={groupName}
+        actions={
+          canExportPnml ? (
+            <PlayoutButton minerId="declare" dataset={data.dataset} />
+          ) : null
+        }
+      />
+    ) : (
+      <Placeholder>
+        No Declare model is available in this export — re-open the CSV event log to discover one.
+      </Placeholder>
+    );
+  }
+
+  if (variant.artifact === "footprints") {
+    return data.footprints ? (
+      <FootprintsModel data={data} footprints={data.footprints} title={groupName} />
+    ) : (
+      <Placeholder>
+        No aggregate footprints are available in this export — re-open the CSV event log to discover them.
+      </Placeholder>
     );
   }
 
@@ -415,9 +505,8 @@ function PtmlButton({
   );
 }
 
-// Simulates the shown model into a synthetic 100-case event log (XES). On a
-// sound model every trace replays perfectly, so the download doubles as a
-// self-check and a shareable test log.
+// Simulates the shown model into an XES log using the backend's model-specific
+// defaults. Declare traces are prefix-safe and may retain pending obligations.
 function PlayoutButton({
   minerId,
   dataset,

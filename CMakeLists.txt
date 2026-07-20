@@ -24,14 +24,20 @@ add_library(minera_core
   src/bpmn.cpp
   src/conformance.cpp
   src/csv_event_log_importer.cpp
+  src/declare.cpp
+  src/declare_playout.cpp
+  src/declare_streaming.cpp
   src/decision_mining.cpp
   src/directly_follows_graph.cpp
   src/event_ordering.cpp
   src/eventually_follows.cpp
+  src/footprints.cpp
+  src/footprints_models.cpp
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
   src/json_export.cpp
   src/log_filter.cpp
+  src/log_skeleton.cpp
   src/model_decoration.cpp
   src/minimum_self_distance.cpp
   src/performance.cpp
@@ -155,4 +161,58 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_powl_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_powl_conversion_tests COMMAND minera_powl_conversion_tests)
+
+  add_executable(minera_log_skeleton_tests
+    tests/test_log_skeleton.cpp
+  )
+  target_link_libraries(minera_log_skeleton_tests PRIVATE minera::core)
+  target_compile_features(minera_log_skeleton_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_log_skeleton_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_log_skeleton_tests COMMAND minera_log_skeleton_tests)
+
+  add_executable(minera_footprints_tests
+    tests/test_footprints.cpp
+  )
+  target_link_libraries(minera_footprints_tests PRIVATE minera::core)
+  target_compile_features(minera_footprints_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_footprints_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_footprints_tests COMMAND minera_footprints_tests)
+
+  add_executable(minera_footprints_models_tests
+    tests/test_footprints_models.cpp
+  )
+  target_link_libraries(minera_footprints_models_tests PRIVATE minera::core)
+  target_compile_features(minera_footprints_models_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_footprints_models_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_footprints_models_tests COMMAND minera_footprints_models_tests)
+
+  add_executable(minera_declare_tests
+    tests/test_declare.cpp
+  )
+  target_link_libraries(minera_declare_tests PRIVATE minera::core)
+  target_compile_features(minera_declare_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_declare_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_declare_tests COMMAND minera_declare_tests)
+
+  add_executable(minera_declare_variants_tests
+    tests/test_declare_variants.cpp
+  )
+  target_link_libraries(minera_declare_variants_tests PRIVATE minera::core)
+  target_compile_features(minera_declare_variants_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_declare_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_declare_variants_tests COMMAND minera_declare_variants_tests)
+
+  add_executable(minera_heuristic_variants_tests
+    tests/test_heuristic_variants.cpp
+  )
+  target_link_libraries(minera_heuristic_variants_tests PRIVATE minera::core)
+  target_compile_features(minera_heuristic_variants_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_heuristic_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_heuristic_variants_tests COMMAND minera_heuristic_variants_tests)
 endif()

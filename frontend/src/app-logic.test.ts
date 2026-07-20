@@ -147,21 +147,78 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(false);
+    expect(hasActiveMinerOptions({
+      heuristicVariant: "classic",
+      heuristicDecoration: "frequency",
+      heuristicPerformanceAggregation: "mean",
+      heuristicDfgPreCleaningNoiseThreshold: 0.05,
+      heuristicLoopLengthTwoThreshold: 0.5,
+      heuristicStartTimestampAttribute: "start_timestamp",
+      heuristicLifecycleInstanceAttribute: "concept:instance",
+    })).toBe(false);
     expect(hasActiveMinerOptions({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toBe(false);
+    expect(hasActiveMinerOptions({ powlVariant: "maximal", powlFilteringType: "decreasing_factor", powlFilteringThreshold: 0, powlOrderFrequencyRatio: 1, powlBruteForceActivityLimit: 0 })).toBe(false);
+    expect(hasActiveMinerOptions({ tokenReplayVariant: "forward", tokenReplayStopImmediatelyUnfit: false })).toBe(false);
+    expect(hasActiveMinerOptions({ logSkeletonNoiseThreshold: 0, logSkeletonConstraints: ["equivalence", "always_after", "always_before", "never_together", "directly_follows", "activ_freq"] })).toBe(false);
+    expect(hasActiveMinerOptions({ declareAutoSelectionMultiplier: 0.8 })).toBe(false);
+    expect(hasActiveMinerOptions({
+      footprintsDiscoveryVariants: ["entire_event_log", "dfg", "process_tree", "powl"],
+      footprintsModel: "process_tree",
+      footprintsConformanceVariants: ["log_model"],
+      footprintsEnableActAlwaysExecuted: true,
+    })).toBe(false);
   });
 
   it("is true when any setting deviates", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0.2 })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicVariant: "plusplus" })).toBe(true);
     // Zero is a meaningful heuristic threshold, not "off".
     expect(hasActiveMinerOptions({ dependencyThreshold: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ andThreshold: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ minEdgeFrequency: 3 })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicMinActivityCount: 3 })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicDecoration: "performance" })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicPerformanceAggregation: "all",
+    })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicDfgPreCleaningNoiseThreshold: 0,
+    })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicLoopLengthTwoThreshold: 0.75,
+    })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicKeepOncePerCase: true })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicMostCommonPaths: "A -> B",
+    })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicStartTimestampAttribute: "started_at",
+    })).toBe(true);
+    expect(hasActiveMinerOptions({
+      heuristicLifecycleInstanceAttribute: "instance",
+    })).toBe(true);
     expect(hasActiveMinerOptions({ transitionView: "set" })).toBe(true);
     expect(hasActiveMinerOptions({ transitionDirection: "backward" })).toBe(true);
     expect(hasActiveMinerOptions({ transitionWindow: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ transitionIncludeData: true })).toBe(true);
+    expect(hasActiveMinerOptions({ powlVariant: "tree" })).toBe(true);
+    expect(hasActiveMinerOptions({ powlFilteringType: "dynamic" })).toBe(true);
+    expect(hasActiveMinerOptions({ powlFilteringThreshold: 0.2 })).toBe(true);
+    expect(hasActiveMinerOptions({ powlOrderFrequencyRatio: 0.8 })).toBe(true);
+    expect(hasActiveMinerOptions({ powlBruteForceActivityLimit: 3 })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayVariant: "backwards" })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayStopImmediatelyUnfit: true })).toBe(true);
+    expect(hasActiveMinerOptions({ logSkeletonNoiseThreshold: 0.2 })).toBe(true);
+    expect(hasActiveMinerOptions({ logSkeletonConstraints: ["equivalence"] })).toBe(true);
+    expect(hasActiveMinerOptions({ declareConsideredActivities: ["A"] })).toBe(true);
+    expect(hasActiveMinerOptions({ declareAllowedTemplates: ["response"] })).toBe(true);
+    expect(hasActiveMinerOptions({ declareMinSupportRatio: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsDiscoveryVariants: ["dfg"] })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsConformanceVariants: ["trace_extensive"] })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsStrict: true })).toBe(true);
+    expect(hasActiveMinerOptions({ footprintsEnableActAlwaysExecuted: false })).toBe(true);
   });
 });
 
@@ -175,17 +232,37 @@ describe("mineFormEntries", () => {
       noiseThreshold: 0.2,
       inductiveVariant: "dfg",
       alphaVariant: "classic",
+      heuristicVariant: "plusplus",
       dependencyThreshold: 0.75,
       andThreshold: 0,
       minEdgeFrequency: 2,
+      heuristicMinActivityCount: 3,
+      heuristicDecoration: "performance",
+      heuristicPerformanceAggregation: "all",
+      heuristicDfgPreCleaningNoiseThreshold: 0.1,
+      heuristicLoopLengthTwoThreshold: 0.6,
+      heuristicKeepOncePerCase: true,
+      heuristicMostCommonPaths: "A -> B, C -> D",
+      heuristicStartTimestampAttribute: "started_at",
+      heuristicLifecycleInstanceAttribute: "instance",
     });
     expect(entries).toEqual([
       ["noise_threshold", "0.2"],
       ["inductive_variant", "dfg"],
       ["alpha_variant", "classic"],
+      ["heuristic_variant", "plusplus"],
       ["dependency_threshold", "0.75"],
       ["and_threshold", "0"],
       ["min_edge_frequency", "2"],
+      ["heuristic_min_activity_count", "3"],
+      ["heuristic_decoration", "performance"],
+      ["heuristic_performance_aggregation", "all"],
+      ["heuristic_dfg_pre_cleaning_noise_threshold", "0.1"],
+      ["heuristic_loop_length_two_threshold", "0.6"],
+      ["heuristic_keep_once_per_case", "true"],
+      ["heuristic_most_common_paths", "A -> B, C -> D"],
+      ["heuristic_start_timestamp_attribute", "started_at"],
+      ["heuristic_lifecycle_instance_attribute", "instance"],
     ]);
   });
 
@@ -202,6 +279,123 @@ describe("mineFormEntries", () => {
       ["transition_include_data", "true"],
     ]);
     expect(mineFormEntries({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toEqual([]);
+  });
+
+  it("maps non-default POWL settings and preserves meaningful zero values", () => {
+    expect(mineFormEntries({
+      powlVariant: "dynamic_clustering_plain",
+      powlFilteringType: "dynamic",
+      powlFilteringThreshold: 0.2,
+      powlOrderFrequencyRatio: 0.8,
+      powlBruteForceActivityLimit: 4,
+    })).toEqual([
+      ["powl_variant", "dynamic_clustering_plain"],
+      ["powl_filtering_type", "dynamic"],
+      ["powl_filtering_threshold", "0.2"],
+      ["powl_order_frequency_ratio", "0.8"],
+      ["powl_brute_force_activity_limit", "4"],
+    ]);
+    expect(mineFormEntries({
+      powlVariant: "maximal",
+      powlFilteringType: "decreasing_factor",
+      powlFilteringThreshold: 0,
+      powlOrderFrequencyRatio: 1,
+      powlBruteForceActivityLimit: 0,
+    })).toEqual([]);
+  });
+
+  it("maps non-default token-replay settings", () => {
+    expect(mineFormEntries({
+      tokenReplayVariant: "backwards",
+      tokenReplayStopImmediatelyUnfit: true,
+    })).toEqual([
+      ["token_replay_variant", "backwards"],
+      ["token_replay_stop_immediately_unfit", "true"],
+    ]);
+    expect(mineFormEntries({
+      tokenReplayVariant: "forward",
+      tokenReplayStopImmediatelyUnfit: false,
+    })).toEqual([]);
+  });
+
+  it("maps non-default log-skeleton settings and leaves defaults implicit", () => {
+    expect(mineFormEntries({
+      logSkeletonNoiseThreshold: 0.25,
+      logSkeletonConstraints: ["equivalence", "activ_freq"],
+    })).toEqual([
+      ["log_skeleton_noise_threshold", "0.25"],
+      ["log_skeleton_constraints", "equivalence,activ_freq"],
+    ]);
+    expect(mineFormEntries({
+      logSkeletonNoiseThreshold: 0,
+      logSkeletonConstraints: ["equivalence", "always_after", "always_before", "never_together", "directly_follows", "activ_freq"],
+    })).toEqual([]);
+    // Empty or unknown-only selections cannot accidentally override defaults.
+    expect(mineFormEntries({ logSkeletonConstraints: [] })).toEqual([]);
+    expect(mineFormEntries({ logSkeletonNoiseThreshold: 1 })).toEqual([
+      ["log_skeleton_noise_threshold", "1"],
+    ]);
+    expect(mineFormEntries({ logSkeletonNoiseThreshold: -0.1 })).toEqual([]);
+    expect(mineFormEntries({ logSkeletonNoiseThreshold: 1.1 })).toEqual([]);
+  });
+
+  it("maps Declare settings in deterministic order and guards ratios/templates", () => {
+    expect(mineFormEntries({
+      declareConsideredActivities: ["B", "A"],
+      declareAllowedTemplates: ["response", "existence", "not-a-template"],
+      declareMinSupportRatio: 0.2,
+      declareMinConfidenceRatio: 0.7,
+      declareAutoSelectionMultiplier: 0.6,
+    })).toEqual([
+      ["declare_considered_activities", "B,A"],
+      ["declare_allowed_templates", "response,existence"],
+      ["declare_min_support_ratio", "0.2"],
+      ["declare_min_confidence_ratio", "0.7"],
+    ]);
+    expect(mineFormEntries({
+      declareAllowedTemplates: ["unknown"],
+      declareMinSupportRatio: -0.1,
+      declareMinConfidenceRatio: 1.1,
+      declareAutoSelectionMultiplier: Number.NaN,
+    })).toEqual([]);
+    expect(mineFormEntries({ declareAutoSelectionMultiplier: 0.8 })).toEqual([]);
+    expect(mineFormEntries({
+      declareMinSupportRatio: 0.2,
+      declareAutoSelectionMultiplier: 0.6,
+    })).toEqual([["declare_min_support_ratio", "0.2"]]);
+    expect(mineFormEntries({
+      declareMinConfidenceRatio: 0.7,
+      declareAutoSelectionMultiplier: 0.6,
+    })).toEqual([["declare_min_confidence_ratio", "0.7"]]);
+  });
+
+  it("maps aggregate footprints variants in canonical order and omits defaults", () => {
+    expect(mineFormEntries({
+      footprintsDiscoveryVariants: ["powl", "trace_by_trace", "bogus"],
+      footprintsModel: "dfg",
+      footprintsConformanceVariants: ["trace_extensive", "log_model", "unknown"],
+      footprintsStrict: true,
+      footprintsEnableActAlwaysExecuted: false,
+    })).toEqual([
+      ["footprints_discovery_variants", "trace_by_trace,powl"],
+      ["footprints_model", "dfg"],
+      ["footprints_conformance_variants", "log_model,trace_extensive"],
+      ["footprints_strict", "true"],
+      ["footprints_enable_act_always_executed", "false"],
+    ]);
+    expect(mineFormEntries({
+      footprintsDiscoveryVariants: ["entire_event_log", "dfg", "process_tree", "powl"],
+      footprintsModel: "process_tree",
+      footprintsConformanceVariants: ["log_model"],
+      footprintsEnableActAlwaysExecuted: true,
+    })).toEqual([]);
+    expect(mineFormEntries({
+      footprintsDiscoveryVariants: ["petri_reach_graph", "dfg"],
+      footprintsModel: "dfg",
+    })).toEqual([
+      ["footprints_discovery_variants", "dfg"],
+      ["footprints_model", "dfg"],
+    ]);
   });
 
   it("keeps the filter mappings intact", () => {

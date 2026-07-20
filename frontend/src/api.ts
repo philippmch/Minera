@@ -1,6 +1,10 @@
 import {
   type ActivityStat,
   type Alignments,
+  DECLARE_TEMPLATES,
+  FOOTPRINTS_CONFORMANCE_VARIANTS,
+  FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
+  FOOTPRINTS_DISCOVERY_VARIANTS,
   type Decisions,
   type MineraExport,
   type ModelConformance,
@@ -83,17 +87,70 @@ export interface MinerOptions {
   inductiveVariant?: "log" | "dfg";
   /** "plus" (default) handles short loops; "classic" is the textbook Alpha. */
   alphaVariant?: "plus" | "classic";
-  /** Heuristic Miner: minimum dependency measure for an edge (default 0.9). */
+  /** Heuristic Miner algorithm variant (classic by default). */
+  heuristicVariant?: "classic" | "plusplus";
+  /** Heuristic Miner: minimum dependency measure for an edge. */
   dependencyThreshold?: number;
   /** Heuristic Miner: minimum AND measure for a parallel split (default 0.65). */
   andThreshold?: number;
   /** Heuristic Miner: direct successions an edge needs (default 1). */
   minEdgeFrequency?: number;
+  /** Heuristics Miner++: minimum retained activity occurrences (default 1). */
+  heuristicMinActivityCount?: number;
+  /** Heuristics-net edge decoration (frequency by default). */
+  heuristicDecoration?: "frequency" | "performance";
+  /** Performance edge aggregation (mean by default). */
+  heuristicPerformanceAggregation?:
+    | "mean"
+    | "median"
+    | "min"
+    | "max"
+    | "stdev"
+    | "sum"
+    | "raw_values"
+    | "all";
+  /** Classic DFG pre-cleaning noise threshold (default 0.05). */
+  heuristicDfgPreCleaningNoiseThreshold?: number;
+  /** Classic two-step-loop threshold (default 0.5). */
+  heuristicLoopLengthTwoThreshold?: number;
+  /** Deduplicate each classic DFG relation within a case. */
+  heuristicKeepOncePerCase?: boolean;
+  /** Comma-separated classic path exemptions in `A -> B` syntax. */
+  heuristicMostCommonPaths?: string;
+  /** Miner++ generic event attribute holding interval start timestamps. */
+  heuristicStartTimestampAttribute?: string;
+  /** Miner++ generic event attribute distinguishing lifecycle instances. */
+  heuristicLifecycleInstanceAttribute?: string;
   /** PM4Py view-based transition-system options. */
   transitionView?: "sequence" | "set" | "multiset";
   transitionDirection?: "forward" | "backward";
   transitionWindow?: number;
   transitionIncludeData?: boolean;
+  /** POWL discovery algorithm variant (maximal is the default). */
+  powlVariant?: "tree" | "brute_force" | "maximal" | "dynamic_clustering" | "dynamic_clustering_plain";
+  powlFilteringType?: "decreasing_factor" | "dynamic";
+  powlFilteringThreshold?: number;
+  powlOrderFrequencyRatio?: number;
+  powlBruteForceActivityLimit?: number;
+  /** PM4Py-compatible token-replay variation used for model conformance. */
+  tokenReplayVariant?: "forward" | "backwards";
+  tokenReplayStopImmediatelyUnfit?: boolean;
+  /** Classic log-skeleton noise threshold (default 0). */
+  logSkeletonNoiseThreshold?: number;
+  /** Selected log-skeleton constraint families; all six is the default. */
+  logSkeletonConstraints?: string[];
+  /** Classic Declare discovery controls. */
+  declareConsideredActivities?: string[];
+  declareAllowedTemplates?: string[];
+  declareMinSupportRatio?: number;
+  declareMinConfidenceRatio?: number;
+  declareAutoSelectionMultiplier?: number;
+  /** Aggregate PM4Py footprints discovery/conformance settings. */
+  footprintsDiscoveryVariants?: string[];
+  footprintsModel?: "process_tree" | "powl" | "inductive" | "alpha" | "heuristic" | "dfg";
+  footprintsConformanceVariants?: string[];
+  footprintsStrict?: boolean;
+  footprintsEnableActAlwaysExecuted?: boolean;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -185,12 +242,62 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("noise_threshold", String(options.noiseThreshold));
   if (options.inductiveVariant) add("inductive_variant", options.inductiveVariant);
   if (options.alphaVariant) add("alpha_variant", options.alphaVariant);
+  if (options.heuristicVariant && options.heuristicVariant !== "classic")
+    add("heuristic_variant", options.heuristicVariant);
   if (options.dependencyThreshold !== undefined)
     add("dependency_threshold", String(options.dependencyThreshold));
   if (options.andThreshold !== undefined)
     add("and_threshold", String(options.andThreshold));
   if (options.minEdgeFrequency !== undefined)
     add("min_edge_frequency", String(options.minEdgeFrequency));
+  if (options.heuristicMinActivityCount !== undefined)
+    add("heuristic_min_activity_count", String(options.heuristicMinActivityCount));
+  if (options.heuristicDecoration && options.heuristicDecoration !== "frequency")
+    add("heuristic_decoration", options.heuristicDecoration);
+  if (
+    options.heuristicPerformanceAggregation &&
+    options.heuristicPerformanceAggregation !== "mean"
+  )
+    add(
+      "heuristic_performance_aggregation",
+      options.heuristicPerformanceAggregation,
+    );
+  if (
+    options.heuristicDfgPreCleaningNoiseThreshold !== undefined &&
+    options.heuristicDfgPreCleaningNoiseThreshold !== 0.05
+  )
+    add(
+      "heuristic_dfg_pre_cleaning_noise_threshold",
+      String(options.heuristicDfgPreCleaningNoiseThreshold),
+    );
+  if (
+    options.heuristicLoopLengthTwoThreshold !== undefined &&
+    options.heuristicLoopLengthTwoThreshold !== 0.5
+  )
+    add(
+      "heuristic_loop_length_two_threshold",
+      String(options.heuristicLoopLengthTwoThreshold),
+    );
+  if (options.heuristicKeepOncePerCase)
+    add("heuristic_keep_once_per_case", "true");
+  if (options.heuristicMostCommonPaths?.trim())
+    add("heuristic_most_common_paths", options.heuristicMostCommonPaths.trim());
+  if (
+    options.heuristicStartTimestampAttribute &&
+    options.heuristicStartTimestampAttribute !== "start_timestamp"
+  )
+    add(
+      "heuristic_start_timestamp_attribute",
+      options.heuristicStartTimestampAttribute,
+    );
+  if (
+    options.heuristicLifecycleInstanceAttribute &&
+    options.heuristicLifecycleInstanceAttribute !== "concept:instance"
+  )
+    add(
+      "heuristic_lifecycle_instance_attribute",
+      options.heuristicLifecycleInstanceAttribute,
+    );
   if (options.transitionView && options.transitionView !== "sequence")
     add("transition_view", options.transitionView);
   if (options.transitionDirection && options.transitionDirection !== "forward")
@@ -198,6 +305,99 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.transitionWindow !== undefined && options.transitionWindow !== 2)
     add("transition_window", String(options.transitionWindow));
   if (options.transitionIncludeData) add("transition_include_data", "true");
+  if (options.powlVariant && options.powlVariant !== "maximal")
+    add("powl_variant", options.powlVariant);
+  if (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor")
+    add("powl_filtering_type", options.powlFilteringType);
+  if (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold >= 0 && options.powlFilteringThreshold < 1 && options.powlFilteringThreshold !== 0)
+    add("powl_filtering_threshold", String(options.powlFilteringThreshold));
+  if (options.powlOrderFrequencyRatio !== undefined && options.powlOrderFrequencyRatio > 0.5 && options.powlOrderFrequencyRatio <= 1 && options.powlOrderFrequencyRatio !== 1)
+    add("powl_order_frequency_ratio", String(options.powlOrderFrequencyRatio));
+  if (options.powlBruteForceActivityLimit !== undefined && Number.isInteger(options.powlBruteForceActivityLimit) && options.powlBruteForceActivityLimit >= 0 && options.powlBruteForceActivityLimit !== 0)
+    add("powl_brute_force_activity_limit", String(options.powlBruteForceActivityLimit));
+  if (options.tokenReplayVariant && options.tokenReplayVariant !== "forward")
+    add("token_replay_variant", options.tokenReplayVariant);
+  if (options.tokenReplayStopImmediatelyUnfit)
+    add("token_replay_stop_immediately_unfit", "true");
+  if (
+    options.logSkeletonNoiseThreshold !== undefined &&
+    Number.isFinite(options.logSkeletonNoiseThreshold) &&
+    options.logSkeletonNoiseThreshold >= 0 &&
+    options.logSkeletonNoiseThreshold <= 1 &&
+    options.logSkeletonNoiseThreshold !== 0
+  ) {
+    add("log_skeleton_noise_threshold", String(options.logSkeletonNoiseThreshold));
+  }
+  const allLogSkeletonConstraints = [
+    "equivalence",
+    "always_after",
+    "always_before",
+    "never_together",
+    "directly_follows",
+    "activ_freq",
+  ];
+  const selectedLogSkeletonConstraints = options.logSkeletonConstraints?.filter(
+    (name) => allLogSkeletonConstraints.includes(name),
+  );
+  if (
+    selectedLogSkeletonConstraints &&
+    selectedLogSkeletonConstraints.length > 0 &&
+    (selectedLogSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
+      allLogSkeletonConstraints.some((name) => !selectedLogSkeletonConstraints.includes(name)))
+  ) {
+    add("log_skeleton_constraints", selectedLogSkeletonConstraints.join(","));
+  }
+
+  const selectedDeclareTemplates = options.declareAllowedTemplates?.filter(
+    (name) => (DECLARE_TEMPLATES as readonly string[]).includes(name),
+  );
+  if (options.declareConsideredActivities?.length)
+    add("declare_considered_activities", options.declareConsideredActivities.join(","));
+  if (
+    selectedDeclareTemplates && selectedDeclareTemplates.length > 0 &&
+    (selectedDeclareTemplates.length !== DECLARE_TEMPLATES.length ||
+      DECLARE_TEMPLATES.some((name) => !selectedDeclareTemplates.includes(name)))
+  ) add("declare_allowed_templates", selectedDeclareTemplates.join(","));
+  const declareRatio = (value: number | undefined) =>
+    value !== undefined && Number.isFinite(value) && value >= 0 && value <= 1
+      ? String(value)
+      : undefined;
+  const support = declareRatio(options.declareMinSupportRatio);
+  const confidence = declareRatio(options.declareMinConfidenceRatio);
+  const multiplier = declareRatio(options.declareAutoSelectionMultiplier);
+  if (support !== undefined) add("declare_min_support_ratio", support);
+  if (confidence !== undefined) add("declare_min_confidence_ratio", confidence);
+  if (
+    multiplier !== undefined && Number(multiplier) !== 0.8 &&
+    options.declareMinSupportRatio === undefined &&
+    options.declareMinConfidenceRatio === undefined
+  )
+    add("declare_auto_selection_multiplier", multiplier);
+
+  const selectedFootprintsDiscovery = options.footprintsDiscoveryVariants
+    ? FOOTPRINTS_DISCOVERY_VARIANTS.filter(
+        (name) =>
+          options.footprintsDiscoveryVariants?.includes(name) &&
+          !(options.footprintsModel === "dfg" && name === "petri_reach_graph"),
+      )
+    : undefined;
+  if (
+    selectedFootprintsDiscovery && selectedFootprintsDiscovery.length > 0 &&
+    (selectedFootprintsDiscovery.length !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
+      FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !selectedFootprintsDiscovery.includes(name)))
+  ) add("footprints_discovery_variants", selectedFootprintsDiscovery.join(","));
+  if (options.footprintsModel && options.footprintsModel !== "process_tree")
+    add("footprints_model", options.footprintsModel);
+  const selectedFootprintsConformance = options.footprintsConformanceVariants
+    ? FOOTPRINTS_CONFORMANCE_VARIANTS.filter((name) => options.footprintsConformanceVariants?.includes(name))
+    : undefined;
+  if (
+    selectedFootprintsConformance && selectedFootprintsConformance.length > 0 &&
+    (selectedFootprintsConformance.length !== 1 || selectedFootprintsConformance[0] !== "log_model")
+  ) add("footprints_conformance_variants", selectedFootprintsConformance.join(","));
+  if (options.footprintsStrict) add("footprints_strict", "true");
+  if (options.footprintsEnableActAlwaysExecuted === false)
+    add("footprints_enable_act_always_executed", "false");
 
   return entries;
 }
@@ -416,10 +616,11 @@ export async function fetchXes(): Promise<string> {
 }
 
 /**
- * Simulates one miner's model into a synthetic event log (100 cases), served
- * as standard XES. On a sound model every generated trace replays perfectly,
- * so the playout doubles as a self-check and a shareable test log. Like the
- * other model endpoints this only works for a log mined this session.
+ * Simulates one miner's model into a synthetic event log served as standard
+ * XES. The backend defaults to 100 traces for Petri models and 1,000 for
+ * Declare. Declare classic playout is prefix-safe, so a generated trace may
+ * end with pending obligations rather than being a complete fitting execution.
+ * Like the other model endpoints this only works for a log mined this session.
  */
 export async function fetchPlayout(miner: string): Promise<string> {
   let response: Response;

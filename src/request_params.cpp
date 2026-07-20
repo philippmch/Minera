@@ -1,11 +1,14 @@
 #include "minera/request_params.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <charconv>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -19,6 +22,28 @@ std::size_t parse_nonnegative_size(std::string_view value, std::string_view name
   if (result.ec != std::errc{} || result.ptr != value.data() + value.size())
     throw std::invalid_argument(std::string(name) + ": expected a non-negative integer, got '" + std::string(value) + "'");
   return parsed;
+}
+
+double parse_finite_double(std::string_view value, std::string_view name) {
+  std::string owned(value);
+  char* end = nullptr;
+  errno = 0;
+  const double parsed = std::strtod(owned.c_str(), &end);
+  if (end != owned.c_str() + owned.size() || errno == ERANGE ||
+      !std::isfinite(parsed)) {
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a finite number, got '" +
+                                owned + "'");
+  }
+  return parsed;
+}
+
+bool parse_boolean(std::string_view value, std::string_view name) {
+  if (value == "true" || value == "1") return true;
+  if (value == "false" || value == "0") return false;
+  throw std::invalid_argument(std::string(name) +
+                              ": expected true, false, 1, or 0, got '" +
+                              std::string(value) + "'");
 }
 }
 
@@ -76,6 +101,11 @@ std::string error_json(std::string_view message) {
 }
 
 MineParams parse_mine_params(const FieldLookup& field) {
+  return parse_mine_params(field, FieldPresence{});
+}
+
+MineParams parse_mine_params(const FieldLookup& field,
+                             const FieldPresence& present) {
   MineParams params;
 
   if (const auto value = field("case_column"); !value.empty()) {
@@ -229,15 +259,155 @@ MineParams parse_mine_params(const FieldLookup& field) {
     }
     params.alpha.short_loops = value == "plus";
   }
+  if (const auto value = field("heuristic_variant"); !value.empty()) {
+    if (value == "classic")
+      params.heuristic.variant = HeuristicMinerVariant::kClassic;
+    else if (value == "plusplus")
+      params.heuristic.variant = HeuristicMinerVariant::kPlusPlus;
+    else
+      throw std::invalid_argument(
+          "heuristic_variant: expected classic or plusplus, got '" + value +
+          "'");
+  }
   if (const auto value = field("dependency_threshold"); !value.empty()) {
-    params.heuristic.dependency_threshold = std::atof(value.c_str());
+    params.heuristic.dependency_threshold =
+        parse_finite_double(value, "dependency_threshold");
   }
   if (const auto value = field("and_threshold"); !value.empty()) {
-    params.heuristic.and_threshold = std::atof(value.c_str());
+    params.heuristic.and_threshold =
+        parse_finite_double(value, "and_threshold");
   }
   if (const auto value = field("min_edge_frequency"); !value.empty()) {
     params.heuristic.min_frequency =
-        static_cast<std::uint64_t>(std::atoll(value.c_str()));
+        parse_nonnegative_size(value, "min_edge_frequency");
+  }
+  if (const auto value = field("heuristic_min_activity_count"); !value.empty()) {
+    params.heuristic.min_activity_count =
+        parse_nonnegative_size(value, "heuristic_min_activity_count");
+  }
+  if (const auto value = field("heuristic_decoration"); !value.empty()) {
+    if (value == "frequency")
+      params.heuristic.decoration = HeuristicNetDecoration::kFrequency;
+    else if (value == "performance")
+      params.heuristic.decoration = HeuristicNetDecoration::kPerformance;
+    else
+      throw std::invalid_argument(
+          "heuristic_decoration: expected frequency or performance, got '" +
+          value + "'");
+  }
+  if (const auto value = field("heuristic_start_timestamp_attribute");
+      !value.empty()) {
+    params.heuristic.start_timestamp_attribute = value;
+  }
+  if (const auto value = field("heuristic_lifecycle_instance_attribute");
+      !value.empty()) {
+    params.heuristic.lifecycle_instance_attribute = value;
+  }
+  if (const auto value =
+          field("heuristic_dfg_pre_cleaning_noise_threshold");
+      !value.empty()) {
+    params.heuristic.dfg_pre_cleaning_noise_threshold = parse_finite_double(
+        value, "heuristic_dfg_pre_cleaning_noise_threshold");
+  }
+  if (const auto value = field("heuristic_loop_length_two_threshold");
+      !value.empty()) {
+    params.heuristic.loop_length_two_threshold =
+        parse_finite_double(value, "heuristic_loop_length_two_threshold");
+  }
+  if (const auto value = field("heuristic_keep_once_per_case");
+      !value.empty()) {
+    params.heuristic.keep_once_per_case =
+        parse_boolean(value, "heuristic_keep_once_per_case");
+  }
+  if (const auto value = field("heuristic_most_common_paths");
+      !value.empty()) {
+    for (const auto& pair : parse_activity_pairs(value)) {
+      params.heuristic.most_common_paths.emplace(pair.predecessor,
+                                                 pair.successor);
+    }
+  }
+  if (const auto value = field("heuristic_performance_aggregation");
+      !value.empty()) {
+    if (value == "mean")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kMean;
+    else if (value == "median")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kMedian;
+    else if (value == "min")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kMinimum;
+    else if (value == "max")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kMaximum;
+    else if (value == "stdev")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kStandardDeviation;
+    else if (value == "sum")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kSum;
+    else if (value == "raw_values")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kRawValues;
+    else if (value == "all")
+      params.heuristic.performance_aggregation =
+          HeuristicPerformanceAggregation::kAll;
+    else
+      throw std::invalid_argument(
+          "heuristic_performance_aggregation: expected mean, median, min, "
+          "max, stdev, sum, raw_values, or all, got '" +
+          value + "'");
+  }
+
+  if (const auto value = field("powl_variant"); !value.empty()) {
+    if (value == "tree")
+      params.powl.variant = PowlDiscoveryVariant::kTree;
+    else if (value == "brute_force")
+      params.powl.variant = PowlDiscoveryVariant::kBruteForce;
+    else if (value == "maximal")
+      params.powl.variant = PowlDiscoveryVariant::kMaximal;
+    else if (value == "dynamic_clustering")
+      params.powl.variant = PowlDiscoveryVariant::kDynamicClustering;
+    else if (value == "dynamic_clustering_plain")
+      params.powl.variant = PowlDiscoveryVariant::kDynamicClusteringPlain;
+    else
+      throw std::invalid_argument(
+          "powl_variant: expected tree, brute_force, maximal, "
+          "dynamic_clustering, or dynamic_clustering_plain, got '" +
+          value + "'");
+  }
+  if (const auto value = field("powl_filtering_type"); !value.empty()) {
+    if (value == "decreasing_factor")
+      params.powl.filtering_type = PowlFilteringType::kDecreasingFactor;
+    else if (value == "dynamic")
+      params.powl.filtering_type = PowlFilteringType::kDynamic;
+    else
+      throw std::invalid_argument(
+          "powl_filtering_type: expected decreasing_factor or dynamic, got '" +
+          value + "'");
+  }
+  if (const auto value = field("powl_filtering_threshold"); !value.empty()) {
+    params.powl.filtering_threshold =
+        parse_finite_double(value, "powl_filtering_threshold");
+    if (params.powl.filtering_threshold < 0.0 ||
+        params.powl.filtering_threshold >= 1.0) {
+      throw std::invalid_argument(
+          "powl_filtering_threshold: expected 0 <= value < 1");
+    }
+  }
+  if (const auto value = field("powl_order_frequency_ratio"); !value.empty()) {
+    params.powl.order_frequency_ratio =
+        parse_finite_double(value, "powl_order_frequency_ratio");
+    if (params.powl.order_frequency_ratio <= 0.5 ||
+        params.powl.order_frequency_ratio > 1.0) {
+      throw std::invalid_argument(
+          "powl_order_frequency_ratio: expected 0.5 < value <= 1");
+    }
+  }
+  if (const auto value = field("powl_brute_force_activity_limit");
+      !value.empty()) {
+    params.powl.brute_force_activity_limit =
+        parse_nonnegative_size(value, "powl_brute_force_activity_limit");
   }
 
   if (const auto value = field("transition_view"); !value.empty()) {
@@ -255,9 +425,168 @@ MineParams parse_mine_params(const FieldLookup& field) {
     params.transition_system.window = parse_nonnegative_size(value, "transition_window");
   }
   if (const auto value = field("transition_include_data"); !value.empty()) {
-    if (value == "true" || value == "1") params.transition_system.include_data = true;
-    else if (value == "false" || value == "0") params.transition_system.include_data = false;
-    else throw std::invalid_argument("transition_include_data: expected true, false, 1, or 0, got '" + value + "'");
+    params.transition_system.include_data =
+        parse_boolean(value, "transition_include_data");
+  }
+
+  if (const auto value = field("token_replay_variant"); !value.empty()) {
+    if (value == "forward")
+      params.token_replay.variant = TokenReplayVariant::kForward;
+    else if (value == "backwards")
+      params.token_replay.variant = TokenReplayVariant::kBackwards;
+    else
+      throw std::invalid_argument(
+          "token_replay_variant: expected forward or backwards, got '" +
+          value + "'");
+  }
+  if (const auto value = field("token_replay_stop_immediately_unfit");
+      !value.empty()) {
+    params.token_replay.stop_immediately_unfit =
+        parse_boolean(value, "token_replay_stop_immediately_unfit");
+  }
+
+  if (const auto value = field("log_skeleton_noise_threshold");
+      !value.empty()) {
+    params.log_skeleton.noise_threshold =
+        parse_finite_double(value, "log_skeleton_noise_threshold");
+    if (params.log_skeleton.noise_threshold < 0.0 ||
+        params.log_skeleton.noise_threshold > 1.0) {
+      throw std::invalid_argument(
+          "log_skeleton_noise_threshold: expected 0 <= value <= 1");
+    }
+  }
+  if (const auto value = field("log_skeleton_constraints"); !value.empty()) {
+    const auto parts = split_csv(value);
+    static constexpr std::string_view allowed[] = {
+        "equivalence", "always_after", "always_before", "never_together",
+        "directly_follows", "activ_freq"};
+    std::vector<std::string> constraints;
+    for (const auto& part : parts) {
+      if (std::find(std::begin(allowed), std::end(allowed), part) ==
+          std::end(allowed)) {
+        throw std::invalid_argument(
+            "log_skeleton_constraints: unknown constraint '" + part + "'");
+      }
+      constraints.push_back(part);
+    }
+    std::sort(constraints.begin(), constraints.end());
+    constraints.erase(std::unique(constraints.begin(), constraints.end()),
+                      constraints.end());
+    params.log_skeleton.considered_constraints = std::move(constraints);
+  }
+
+  if (const auto value = field("declare_considered_activities");
+      present ? present("declare_considered_activities") : !value.empty()) {
+    auto activities = split_csv(value);
+    params.declare_options.considered_activities = std::move(activities);
+  }
+  if (const auto value = field("declare_allowed_templates");
+      present ? present("declare_allowed_templates") : !value.empty()) {
+    static constexpr std::string_view allowed[] = {
+        kDeclareExistence, kDeclareExactlyOne, kDeclareInit,
+        kDeclareRespondedExistence, kDeclareResponse, kDeclarePrecedence,
+        kDeclareSuccession, kDeclareAltResponse, kDeclareAltPrecedence,
+        kDeclareAltSuccession, kDeclareChainResponse, kDeclareChainPrecedence,
+        kDeclareChainSuccession, kDeclareAbsence, kDeclareCoexistence,
+        kDeclareNonCoexistence, kDeclareNonSuccession,
+        kDeclareNonChainSuccession};
+    auto templates = split_csv(value);
+    for (const auto& name : templates) {
+      if (std::find(std::begin(allowed), std::end(allowed), name) ==
+          std::end(allowed)) {
+        throw std::invalid_argument(
+            "declare_allowed_templates: unknown template '" + name + "'");
+      }
+    }
+    std::sort(templates.begin(), templates.end());
+    templates.erase(std::unique(templates.begin(), templates.end()),
+                    templates.end());
+    params.declare_options.allowed_templates = std::move(templates);
+  }
+  const auto parse_declare_ratio = [&](std::string_view field_name,
+                                       double& destination,
+                                       bool& has_value) {
+    const auto value = field(field_name);
+    if (value.empty()) return;
+    destination = parse_finite_double(value, field_name);
+    if (destination < 0.0 || destination > 1.0) {
+      throw std::invalid_argument(std::string(field_name) +
+                                  ": expected 0 <= value <= 1");
+    }
+    has_value = true;
+  };
+  parse_declare_ratio("declare_min_support_ratio",
+                      params.declare_options.min_support_ratio,
+                      params.declare_options.has_min_support_ratio);
+  parse_declare_ratio("declare_min_confidence_ratio",
+                      params.declare_options.min_confidence_ratio,
+                      params.declare_options.has_min_confidence_ratio);
+  if (const auto value = field("declare_auto_selection_multiplier");
+      !value.empty()) {
+    params.declare_options.auto_selection_multiplier =
+        parse_finite_double(value, "declare_auto_selection_multiplier");
+    if (params.declare_options.auto_selection_multiplier < 0.0 ||
+        params.declare_options.auto_selection_multiplier > 1.0) {
+      throw std::invalid_argument(
+          "declare_auto_selection_multiplier: expected 0 <= value <= 1");
+    }
+  }
+
+  const auto parse_footprints_set =
+      [&](std::string_view field_name,
+          const std::set<std::string>& allowed,
+          std::set<std::string>& destination) {
+        const auto value = field(field_name);
+        const bool supplied = present ? present(field_name) : !value.empty();
+        if (!supplied) return;
+        const auto parts = split_csv(value);
+        if (parts.empty()) {
+          throw std::invalid_argument(std::string(field_name) +
+                                      ": expected a non-empty list");
+        }
+        std::set<std::string> parsed;
+        for (const auto& part : parts) {
+          if (!allowed.contains(part)) {
+            throw std::invalid_argument(std::string(field_name) +
+                                        ": unknown variant '" + part + "'");
+          }
+          parsed.insert(part);
+        }
+        destination = std::move(parsed);
+      };
+  parse_footprints_set(
+      "footprints_discovery_variants",
+      {"entire_event_log", "trace_by_trace", "dfg", "process_tree", "powl",
+       "petri_reach_graph"},
+      params.footprints.discovery_variants);
+  if (const auto value = field("footprints_model");
+      present ? present("footprints_model") : !value.empty()) {
+    static const std::set<std::string> allowed = {
+        "process_tree", "powl", "inductive", "alpha", "heuristic", "dfg"};
+    if (!allowed.contains(value)) {
+      throw std::invalid_argument("footprints_model: unknown model '" + value +
+                                  "'");
+    }
+    params.footprints.model = value;
+  }
+  parse_footprints_set("footprints_conformance_variants",
+                       {"log_model", "log_extensive", "trace_extensive"},
+                       params.footprints.conformance_variants);
+  if (const auto value = field("footprints_strict");
+      present ? present("footprints_strict") : !value.empty()) {
+    params.footprints.strict = parse_boolean(value, "footprints_strict");
+  }
+  if (const auto value = field("footprints_enable_act_always_executed");
+      present ? present("footprints_enable_act_always_executed")
+              : !value.empty()) {
+    params.footprints.enable_act_always_executed = parse_boolean(
+        value, "footprints_enable_act_always_executed");
+  }
+  if (params.footprints.model == "dfg" &&
+      params.footprints.discovery_variants.contains("petri_reach_graph")) {
+    throw std::invalid_argument(
+        "footprints_model=dfg cannot be combined with "
+        "petri_reach_graph discovery");
   }
 
   return params;

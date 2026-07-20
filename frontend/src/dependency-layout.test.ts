@@ -48,4 +48,22 @@ describe("computeDependencyLayout", () => {
     expect(graph.nodes).toHaveLength(1);
     expect(Number.isFinite(graph.fit.w)).toBe(true);
   });
+
+  it("omits classic activities that were not materialized as heuristic nodes", () => {
+    const net: HeuristicsNet = {
+      variant: "classic",
+      edges: [{ source: 0, target: 2, dependency: 0.75, frequency: 3 }],
+      start_activities: [0, 1],
+      end_activities: [1, 2],
+      active_activities: [0, 2],
+    };
+    const { graph, dependency } = computeDependencyLayout(
+      net,
+      data([act("a"), act("filtered"), act("c")]),
+    );
+    expect(graph.nodes.map((node) => node.name)).toEqual(["a", "c"]);
+    expect(dependency.get(edgeKey(0, 1))).toBe(0.75);
+    expect(graph.edges.some((edge) => edge.key === edgeKey(-1, 0))).toBe(true);
+    expect(graph.edges.some((edge) => edge.key === edgeKey(1, -2))).toBe(true);
+  });
 });

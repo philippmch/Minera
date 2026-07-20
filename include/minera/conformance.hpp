@@ -42,6 +42,20 @@ struct ConformanceResult {
   std::vector<VariantConformance> variants;  // worst-fitting first
 };
 
+// Token-replay implementation variation. FORWARD is the modern replay used
+// by default; BACKWARDS retains PM4Py's deprecated reverse-routing behaviour.
+enum class TokenReplayVariant {
+  kForward,
+  kBackwards,
+  FORWARD = kForward,
+  BACKWARDS = kBackwards,
+};
+
+struct TokenReplayOptions {
+  TokenReplayVariant variant = TokenReplayVariant::kForward;
+  bool stop_immediately_unfit = false;
+};
+
 // Replays `event_log` against `tree` and reports all four quality dimensions.
 // The process tree is translated to a workflow net; fitness comes from
 // token-based replay (Rozinat & van der Aalst), precision from escaping edges
@@ -49,13 +63,15 @@ struct ConformanceResult {
 // execution counts (Buijs, van Dongen & van der Aalst), and simplicity from
 // the net's mean arc degree.
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
-                                                  const ProcessTree& tree);
+                                                  const ProcessTree& tree,
+                                                  TokenReplayOptions options = {});
 
 // Token replay against any workflow net (the Alpha Miner produces one directly;
 // a process tree or heuristics net is translated with to_petri_net). Replay is
 // robust on unsound nets, so unlike alignments it always yields a result.
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
-                                                  const PetriNet& net);
+                                                  const PetriNet& net,
+                                                  TokenReplayOptions options = {});
 
 // Footprint (directly-follows relation) conformance between a log and a model.
 // The footprint of each is the set of ordered activity pairs (a, b) where b can

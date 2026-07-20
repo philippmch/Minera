@@ -6,18 +6,24 @@
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/declare.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
+#include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_skeleton.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/powl_conversion.hpp"
+#include "minera/powl.hpp"
+#include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/timestamp.hpp"
@@ -924,6 +930,132 @@ void conformance_penalizes_a_deviating_trace() {
   // The worst-fitting variant is surfaced first.
   assert(!conformance.variants.empty());
   assert(conformance.variants.front().fitness < 1.0);
+}
+
+void backwards_replay_supports_legacy_variation() {
+  const auto log = log_from_variants({{"a", "b"}, {"a", "b"}});
+  const auto tree = minera::discover_process_tree(log);
+  minera::TokenReplayOptions options;
+  options.variant = minera::TokenReplayVariant::BACKWARDS;
+  const auto result = minera::check_conformance(log, tree, options);
+  assert(result.trace_count == 2);
+  assert(result.fitting_traces == 2);
+  assert(result.missing == 0 && result.remaining == 0);
+
+  // A visible transition blocked behind two silent steps is found by the
+  // backwards requirement search and replayed without creating a token.
+  minera::PetriNet routed;
+  const auto source = routed.add_place();
+  const auto middle = routed.add_place();
+  const auto gate = routed.add_place();
+  const auto sink = routed.add_place();
+  routed.set_source(source);
+  routed.set_sink(sink);
+  routed.set_activities({"a"});
+  routed.add_transition(std::nullopt, {source}, {middle});
+  routed.add_transition(std::nullopt, {middle}, {gate});
+  routed.add_transition(0, {gate}, {sink});
+  const auto routed_result = minera::check_conformance(
+      log_from_variants({{"a"}}), routed, options);
+  assert(routed_result.fitting_traces == 1);
+  assert(routed_result.missing == 0 && routed_result.remaining == 0);
+
+  // Repeated output arcs model a weighted silent transition. Reverse diffing
+  // removes each arc independently, while the extra produced token remains.
+  minera::PetriNet weighted;
+  const auto ws = weighted.add_place();
+  const auto wg = weighted.add_place();
+  const auto we = weighted.add_place();
+  weighted.set_source(ws);
+  weighted.set_sink(we);
+  weighted.set_activities({"a"});
+  weighted.add_transition(std::nullopt, {ws}, {wg, wg});
+  weighted.add_transition(0, {wg}, {we});
+  const auto weighted_result = minera::check_conformance(
+      log_from_variants({{"a"}}), weighted, options);
+  assert(weighted_result.fitting_traces == 0);
+  assert(weighted_result.missing == 1);
+  assert(weighted_result.remaining == 1);
+}
+
+void backwards_replay_marks_unroutable_and_stops_when_requested() {
+  minera::TokenReplayOptions options;
+  options.variant = minera::TokenReplayVariant::BACKWARDS;
+
+  // No silent route to the input place: the unique visible transition is
+  // weak-fired and its missing input is counted.
+  minera::PetriNet blocked;
+  const auto source = blocked.add_place();
+  const auto required = blocked.add_place();
+  const auto sink = blocked.add_place();
+  blocked.set_source(source);
+  blocked.set_sink(sink);
+  blocked.set_activities({"a"});
+  blocked.add_transition(0, {required}, {sink});
+  const auto blocked_result = minera::check_conformance(
+      log_from_variants({{"a"}}), blocked, options);
+  assert(blocked_result.fitting_traces == 0);
+  assert(blocked_result.missing > 0);
+
+  // Stopping immediately prevents later events from executing/accounting.
+  minera::PetriNet stop_net;
+  const auto s = stop_net.add_place();
+  const auto need = stop_net.add_place();
+  const auto end = stop_net.add_place();
+  stop_net.set_source(s);
+  stop_net.set_sink(end);
+  stop_net.set_activities({"a", "b"});
+  stop_net.add_transition(0, {need}, {need});  // unreachable a
+  stop_net.add_transition(1, {s}, {end});      // b is initially enabled
+  const auto continued = minera::check_conformance(
+      log_from_variants({{"a", "b"}}), stop_net, options);
+  options.stop_immediately_unfit = true;
+  const auto stopped = minera::check_conformance(
+      log_from_variants({{"a", "b"}}), stop_net, options);
+  assert(continued.consumed > stopped.consumed);
+  assert(continued.produced > stopped.produced);
+}
+
+void backwards_replay_ignores_unknown_and_interrupts_duplicate_labels() {
+  minera::TokenReplayOptions options;
+  options.variant = minera::TokenReplayVariant::BACKWARDS;
+
+  const auto model = log_from_variants({{"a"}});
+  const auto tree = minera::discover_process_tree(model);
+  const auto unknown = log_from_variants({{"a", "unknown"}});
+  const auto backwards = minera::check_conformance(unknown, tree, options);
+  const auto forward = minera::check_conformance(unknown, tree);
+  assert(backwards.fitting_traces == 1 && backwards.missing == 0);
+  assert(forward.fitting_traces == 0 && forward.missing > 0);
+
+  minera::PetriNet duplicate;
+  const auto source = duplicate.add_place();
+  const auto gate = duplicate.add_place();
+  const auto sink = duplicate.add_place();
+  duplicate.set_source(source);
+  duplicate.set_sink(sink);
+  duplicate.set_activities({"a"});
+  duplicate.add_transition(std::nullopt, {source}, {gate});
+  duplicate.add_transition(0, {gate}, {sink});
+  duplicate.add_transition(0, {gate}, {sink});
+  const auto interrupted = minera::check_conformance(
+      log_from_variants({{"a"}}), duplicate, options);
+  assert(interrupted.fitting_traces == 0);
+
+  // Duplicate labels are visited in transition order against the evolving
+  // marking, so a first firing may enable the next same-label transition.
+  minera::PetriNet evolving;
+  const auto start = evolving.add_place();
+  const auto middle = evolving.add_place();
+  const auto finish = evolving.add_place();
+  evolving.set_source(start);
+  evolving.set_sink(finish);
+  evolving.set_activities({"a"});
+  evolving.add_transition(0, {start}, {middle});
+  evolving.add_transition(0, {middle}, {finish});
+  const auto evolved = minera::check_conformance(
+      log_from_variants({{"a"}}), evolving, options);
+  assert(evolved.fitting_traces == 1);
 }
 
 void precision_is_high_for_a_tight_model_and_low_for_a_flower() {
@@ -1880,6 +2012,11 @@ void conformance_handles_an_empty_log() {
   const auto conformance = minera::check_conformance(empty, tree);
   assert(conformance.trace_count == 0);
   assert(conformance.fitting_traces == 0);
+  minera::TokenReplayOptions backwards;
+  backwards.variant = minera::TokenReplayVariant::BACKWARDS;
+  const auto legacy = minera::check_conformance(empty, tree, backwards);
+  assert(legacy.trace_count == 0);
+  assert(legacy.fitting_traces == 0);
 }
 
 // Counts alignment moves of a given type in a variant.
@@ -3614,8 +3751,6 @@ void heuristic_miner_min_frequency_drops_rare_edges() {
   // A has one dominant successor B (10 traces) and one rare successor C (1
   // trace). Both have a positive dependency measure, but with min_frequency=2
   // the single A->C occurrence falls below the cutoff and is dropped.
-  // connect_all still gives every activity its strongest edge, so C is
-  // re-attached via a forced A->C (its only option), while B stays accepted.
   std::vector<std::vector<std::string>> traces(10, {"A", "B"});
   traces.push_back({"A", "C"});
   const auto log = log_of(traces);
@@ -3629,12 +3764,12 @@ void heuristic_miner_min_frequency_drops_rare_edges() {
   assert(net_edge(net, "A", "B") != nullptr);
   assert(net_edge(net, "A", "B")->frequency == 10);
 
-  // A->C was below min_frequency; connect_all forced it back for C's
-  // connectivity. Either way C must have exactly one incoming edge.
-  std::size_t c_in = 0;
+  // PM creates nodes from accepted endpoints only when at least one edge
+  // survives, so the isolated C remains in activities but is not active.
+  assert(net_edge(net, "A", "C") == nullptr);
   const auto c = net_activity(net, "C");
-  for (const auto& e : net.edges) { if (e.target == c) ++c_in; }
-  assert(c_in == 1);
+  assert(std::find(net.active_activities.begin(), net.active_activities.end(),
+                   c) == net.active_activities.end());
 }
 
 void heuristic_miner_connect_all_false_may_leave_gaps() {
@@ -3646,6 +3781,7 @@ void heuristic_miner_connect_all_false_may_leave_gaps() {
       5, {"A", "B", "C"}));
 
   minera::HeuristicMinerOptions opts;
+  opts.dependency_threshold = 0.9;
   opts.connect_all = false;  // nothing forced
   const auto net = minera::discover_heuristics_net(log, opts);
 
@@ -3679,6 +3815,347 @@ minera::EventLog transition_test_log(
     ++trace_index;
   }
   return log;
+}
+
+void json_export_carries_recursive_powl_contract() {
+  const auto log = log_from_variants({{"a", "b"}, {"a", "c"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto powl = minera::PowlNode::loop(
+      minera::PowlNode::strict_partial_order(
+          {minera::PowlNode::transition("a"),
+           minera::PowlNode::transition(
+               "b", minera::PowlFrequency{0, std::nullopt})},
+          {{0, 1}}),
+      minera::PowlNode::xor_node(
+          {minera::PowlNode::transition("c"), minera::PowlNode::silent()}));
+  const auto powl_net = minera::to_petri_net(powl);
+  const auto decoration = minera::decorate_model(log, powl_net);
+  const auto json = minera::analysis_json(
+      "test", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &powl, &powl_net,
+      &decoration);
+  for (const char* fragment :
+       {"\"powl\"", "\"kind\": \"loop\"",
+        "\"kind\": \"strict_partial_order\"", "\"kind\": \"xor\"",
+        "\"kind\": \"silent\"", "\"frequency\"",
+        "\"minimum\": 0", "\"maximum\": null",
+        "\"order\": [{\"source\": 0, \"target\": 1}]",
+        "\"powl_petri_net\"", "\"powl_petri_net_decoration\""}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  const auto without = minera::analysis_json("test", log, graph);
+  assert(without.find("\"powl\"") == std::string::npos);
+  assert(without.find("\"powl_petri_net\"") == std::string::npos);
+}
+
+void json_export_carries_log_skeleton_contract() {
+  const auto log = transition_test_log({{"a", "b"}, {"a"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  minera::LogSkeletonOptions options;
+  options.considered_constraints = {"equivalence", "activ_freq"};
+  const auto model = minera::discover_log_skeleton(log, options);
+  auto constrained_model = model;
+  constrained_model.activ_freq["a"] = {2};
+  const auto conformance =
+      minera::check_log_skeleton_conformance(log, constrained_model, options);
+  const auto json = minera::analysis_json(
+      "test", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      &constrained_model, &conformance);
+  for (const char* fragment :
+       {"\"log_skeleton\"", "\"equivalence\"", "\"activ_freq\"",
+        "\"log_skeleton_conformance\"", "\"case_id\": \"0\"",
+        "\"constraint\": \"activ_freq\"", "\"observed_frequency\"",
+        "\"allowed_frequencies\""}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  const auto without = minera::analysis_json("test", log, graph);
+  assert(without.find("\"log_skeleton\"") == std::string::npos);
+  assert(without.find("\"log_skeleton_conformance\"") ==
+         std::string::npos);
+
+  const auto expect_rejected = [&](const minera::LogSkeletonModel& invalid_model,
+                                   const std::vector<minera::LogSkeletonConformance>& invalid_conformance) {
+    std::ostringstream stream;
+    bool threw = false;
+    try {
+      minera::write_analysis_json(
+          stream, "test", log, graph,
+          /*tree=*/nullptr, /*net=*/nullptr, /*heuristics=*/nullptr,
+          /*conformance=*/nullptr, /*performance=*/nullptr,
+          /*resources=*/nullptr, /*variant_durations=*/nullptr,
+          /*eventually_follows=*/nullptr, /*decisions=*/nullptr,
+          /*petri_decoration=*/nullptr, /*spectrum=*/nullptr,
+          /*inductive_net=*/nullptr, /*inductive_decoration=*/nullptr,
+          /*heuristic_petri=*/nullptr, /*heuristic_decoration=*/nullptr,
+          /*temporal_profile=*/nullptr, /*minimum_self_distances=*/nullptr,
+          /*transition_system=*/nullptr, /*powl=*/nullptr,
+          /*powl_petri=*/nullptr, /*powl_decoration=*/nullptr,
+          &invalid_model, &invalid_conformance);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+    assert(stream.str().empty());
+  };
+  auto unknown_activity_model = model;
+  unknown_activity_model.activ_freq["missing"] = {1};
+  expect_rejected(unknown_activity_model, conformance);
+  expect_rejected(model, {});  // shorter than the two-trace event log
+  auto too_many = conformance;
+  too_many.push_back(conformance.front());
+  expect_rejected(model, too_many);
+
+  auto unknown_constraint = conformance;
+  unknown_constraint[0].deviations.push_back(
+      {"not_a_constraint", {}, {}, 0, {}});
+  expect_rejected(model, unknown_constraint);
+}
+
+void json_export_carries_declare_contract() {
+  auto log = transition_test_log({{"a", "b"}, {"b"}});
+  log.traces[0].case_id = "duplicate";
+  log.traces[1].case_id = "duplicate";
+  auto graph = minera::discover_directly_follows_graph(log);
+  graph.ensure_activity("missing");  // considered-activity style registry entry
+  const auto empty_activity = graph.ensure_activity("");
+  minera::DeclareModel model;
+  model.add(minera::kDeclareExistence, {"missing", {}, false, 2, 2});
+  model.add(minera::kDeclareExistence, {"", {}, false, 2, 0});
+  model.add(minera::kDeclareResponse, {"a", "b", true, 2, 1});
+  model.add(minera::kDeclareResponse, {"a", "", true, 1, 0});
+  auto conformance = minera::check_declare_conformance(log, model);
+  const auto json = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, &model, &conformance);
+  for (const char* fragment :
+       {"\"declare\"", "\"existence\"", "\"response\"",
+        "\"activity\": 2", "\"source\": 0", "\"target\": 1",
+        "\"declare_conformance\"", "\"trace_index\": 0",
+        "\"trace_index\": 1", "\"case_id\": \"duplicate\""}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  const auto empty_id = std::to_string(empty_activity);
+  assert(json.find("\"activity\": " + empty_id) != std::string::npos);
+  assert(json.find("\"target\": " + empty_id) != std::string::npos);
+  assert(json.find("\"template\": \"existence\", \"activity\": " +
+                   empty_id) != std::string::npos);
+  assert(json.find("\"template\": \"response\", \"source\": 0, \"target\": " +
+                   empty_id) != std::string::npos);
+  assert(json.find("\"declare\": {\"existence\"") != std::string::npos);
+  assert(minera::analysis_json("test", log, graph).find("\"declare\"") ==
+         std::string::npos);
+
+  const auto expect_rejected = [&](const minera::DeclareModel* invalid_model,
+                                   const std::vector<minera::DeclareConformance>* invalid_conf) {
+    std::ostringstream stream;
+    bool threw = false;
+    try {
+      minera::write_analysis_json(
+          stream, "test", log, graph,
+          nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, invalid_model, invalid_conf);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+    assert(stream.str().empty());
+  };
+  auto unknown = model;
+  unknown.rules[minera::kDeclareExistence].front().first = "not_registered";
+  expect_rejected(&unknown, &conformance);
+  auto too_short = conformance;
+  too_short.pop_back();
+  expect_rejected(&model, &too_short);
+  auto bad_fitness = conformance;
+  bad_fitness.front().dev_fitness = std::numeric_limits<double>::quiet_NaN();
+  expect_rejected(&model, &bad_fitness);
+  auto bad_shape = model;
+  bad_shape.rules[minera::kDeclareExistence].front().binary = true;
+  expect_rejected(&bad_shape, &conformance);
+  auto bad_binary_activity = model;
+  bad_binary_activity.rules[minera::kDeclareResponse].front().second =
+      "not_registered";
+  expect_rejected(&bad_binary_activity, &conformance);
+  auto bad_deviation_activity = conformance;
+  bool changed_binary = false;
+  for (auto& result : bad_deviation_activity) {
+    for (auto& deviation : result.deviations) {
+      if (deviation.binary) {
+        deviation.second = "not_registered";
+        changed_binary = true;
+        break;
+      }
+    }
+    if (changed_binary) break;
+  }
+  assert(changed_binary);
+  expect_rejected(&model, &bad_deviation_activity);
+}
+
+void json_export_carries_footprints_contract() {
+  auto log = transition_test_log({{"a", "b"}, {"b", "a"}});
+  log.traces[0].case_id = "duplicate";
+  log.traces[1].case_id = "duplicate";
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto tree = minera::discover_process_tree(log);
+  const auto powl = minera::discover_powl(log);
+  const auto net = minera::to_petri_net(tree);
+
+  minera::FootprintsAnalysis analysis;
+  analysis.entire_event_log = minera::discover_footprints(log);
+  analysis.trace_by_trace = minera::discover_trace_footprints(log);
+  analysis.dfg = minera::discover_dfg_footprints(graph);
+  analysis.process_tree = minera::discover_footprints(tree);
+  analysis.powl = minera::discover_footprints(powl);
+  analysis.petri_reach_graph = minera::discover_footprints(net);
+  analysis.petri_reach_graph->start_activities_present = false;
+  analysis.petri_reach_graph->end_activities_present = false;
+  analysis.petri_reach_graph->skippable = false;
+  analysis.petri_reach_graph->activities_always_happening =
+      std::set<std::string>{"a"};
+  analysis.petri_reach_graph->max_trace_length_without_loops = 2;
+  analysis.petri_reach_graph->trace = std::vector<std::string>{"a", "b"};
+  analysis.model = "process_tree";
+  analysis.strict = true;
+  analysis.model_footprint = *analysis.process_tree;
+  analysis.log_model = minera::check_footprints_log_model(
+      *analysis.entire_event_log, analysis.model_footprint);
+  analysis.log_extensive = minera::check_footprints_log_extensive(
+      *analysis.entire_event_log, analysis.model_footprint);
+  analysis.trace_extensive = minera::check_footprints_trace_extensive(
+      *analysis.trace_by_trace, analysis.model_footprint);
+  analysis.precision =
+      minera::fp_precision(*analysis.entire_event_log,
+                           analysis.model_footprint);
+  const auto fitness = minera::fp_fitness(
+      *analysis.trace_by_trace, analysis.model_footprint,
+      *analysis.trace_extensive);
+  analysis.log_fitness = fitness.log_fitness;
+  analysis.perc_fit_traces = 50.0;
+
+  const auto json = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      &analysis);
+  for (const char* fragment :
+       {"\"footprints\"", "\"discovery\"",
+        "\"entire_event_log\"", "\"trace_by_trace\"", "\"dfg\"",
+        "\"process_tree\"", "\"powl\"", "\"petri_reach_graph\"",
+        "\"sequence\":", "\"parallel\":", "\"source\": 0",
+        "\"target\": 1", "\"conformance\": {\"model\": \"process_tree\"",
+        "\"log_model\": {\"strict\": true, \"violations\": [], "
+        "\"is_fit\": true}",
+        "\"log_extensive\"",
+        "\"trace_extensive\": [{\"trace_index\": 0, \"case_id\": "
+        "\"duplicate\", \"footprints\":",
+        "\"metrics\"", "\"precision\"", "\"log_fitness\"",
+        "\"perc_fit_traces\": 50", "\"trace_index\": 0",
+        "\"trace_index\": 1", "\"case_id\": \"duplicate\""}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  assert(json.find("\"result\":") == std::string::npos);
+  // The DFG discovery variant intentionally omits its inner DFG and minimum
+  // length fields while retaining the presence-defined boundary fields.
+  const auto dfg_pos = json.find("\"dfg\": {");
+  const auto process_tree_pos = json.find("\"process_tree\":", dfg_pos);
+  assert(dfg_pos != std::string::npos);
+  assert(process_tree_pos != std::string::npos);
+  const auto dfg_json = json.substr(dfg_pos, process_tree_pos - dfg_pos);
+  assert(dfg_json.find("\"dfg\": [") == std::string::npos);
+  assert(dfg_json.find("\"min_trace_length\"") == std::string::npos);
+  assert(dfg_json.find("\"start_activities\"") != std::string::npos);
+  const auto petri_pos = json.find("\"petri_reach_graph\":");
+  const auto conformance_pos = json.find("\"conformance\":", petri_pos);
+  assert(petri_pos != std::string::npos);
+  assert(conformance_pos != std::string::npos);
+  const auto petri_json =
+      json.substr(petri_pos, conformance_pos - petri_pos);
+  assert(petri_json.find("\"start_activities\"") == std::string::npos);
+  assert(petri_json.find("\"end_activities\"") == std::string::npos);
+  assert(petri_json.find("\"skippable\": false") != std::string::npos);
+  assert(petri_json.find("\"activities_always_happening\": [0]") !=
+         std::string::npos);
+  assert(petri_json.find("\"max_trace_length_without_loops\": 2") !=
+         std::string::npos);
+  assert(petri_json.find("\"trace\": [0, 1]") != std::string::npos);
+
+  minera::FootprintsAnalysis only_log;
+  only_log.entire_event_log = *analysis.entire_event_log;
+  only_log.model_footprint = analysis.model_footprint;
+  const auto selective = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      &only_log);
+  assert(selective.find("\"entire_event_log\"") != std::string::npos);
+  assert(selective.find("\"trace_by_trace\"") == std::string::npos);
+  assert(selective.find("\"petri_reach_graph\"") == std::string::npos);
+  assert(minera::analysis_json("test", log, graph).find("\"footprints\"") ==
+         std::string::npos);
+
+  auto non_strict = analysis;
+  non_strict.strict = false;
+  const auto non_strict_json = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      &non_strict);
+  assert(non_strict_json.find(
+             "\"log_model\": {\"strict\": false, \"violations\": [], "
+             "\"is_fit\": true}") !=
+         std::string::npos);
+
+  const auto expect_rejected =
+      [&](const minera::FootprintsAnalysis& invalid) {
+        std::ostringstream stream;
+        bool threw = false;
+        try {
+          minera::write_analysis_json(
+              stream, "test", log, graph,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              &invalid);
+        } catch (const std::invalid_argument&) {
+          threw = true;
+        }
+        assert(threw);
+        assert(stream.str().empty());
+      };
+  auto unknown_activity = analysis;
+  unknown_activity.entire_event_log->activities.insert("not_registered");
+  expect_rejected(unknown_activity);
+  auto short_traces = analysis;
+  short_traces.trace_by_trace->pop_back();
+  expect_rejected(short_traces);
+  auto short_conformance = analysis;
+  short_conformance.trace_extensive->pop_back();
+  expect_rejected(short_conformance);
+  auto bad_metric = analysis;
+  bad_metric.log_fitness = std::numeric_limits<double>::quiet_NaN();
+  expect_rejected(bad_metric);
 }
 
 void transition_system_forward_backward_views() {
@@ -3856,10 +4333,15 @@ int main() {
   alpha_plus_matches_classic_without_short_loops();
   alpha_miner_handles_an_empty_log();
   json_export_carries_the_petri_net_contract();
+  json_export_carries_recursive_powl_contract();
+  json_export_carries_log_skeleton_contract();
   conformance_is_perfect_on_the_discovery_log();
   conformance_is_perfect_for_every_operator();
   conformance_counts_unmodeled_activities();
   conformance_penalizes_a_deviating_trace();
+  backwards_replay_supports_legacy_variation();
+  backwards_replay_marks_unroutable_and_stops_when_requested();
+  backwards_replay_ignores_unknown_and_interrupts_duplicate_labels();
   precision_is_high_for_a_tight_model_and_low_for_a_flower();
   generalization_rewards_a_well_exercised_model();
   simplicity_reflects_routing_density();
@@ -3970,5 +4452,7 @@ int main() {
   transition_system_views_counts_and_data();
   transition_system_empty_and_deterministic();
   transition_system_positional_options_and_invalid_enums();
+  json_export_carries_declare_contract();
+  json_export_carries_footprints_contract();
   return 0;
 }

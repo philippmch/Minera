@@ -446,6 +446,32 @@ body {
 }
 
 .panel { padding: 20px 0 28px; }
+.filters-field-wide { min-width: min(100%, 520px); }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.filter-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 5px 9px;
+}
+.filter-chip.active { border-color: var(--copper); color: var(--copper-deep); background: var(--copper-soft); }
+.log-skeleton-panel { overflow: hidden; }
+.log-skeleton-families { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+.log-skeleton-family { border: 1px solid var(--line-soft); padding: 11px 13px; background: var(--paper-raised); }
+.log-skeleton-family h3, .log-skeleton-conformance h3 { margin: 0; font-size: 0.84rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.log-skeleton-family ul, .log-skeleton-trace ul { margin: 9px 0 0; padding-left: 18px; }
+.log-skeleton-family li, .log-skeleton-trace li { margin: 3px 0; font-size: 0.88rem; }
+.model-empty-inline { color: var(--ink-45); margin: 9px 0 0; font-size: 0.88rem; }
+.log-skeleton-conformance { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
+.log-skeleton-conformance .panel-head.compact { padding-bottom: 2px; }
+.log-skeleton-deviations { display: grid; gap: 9px; margin-top: 11px; }
+.log-skeleton-trace { border-left: 3px solid var(--copper); padding: 7px 11px; background: var(--copper-soft); }
+.log-skeleton-trace-head { display: flex; justify-content: space-between; gap: 10px; font-size: 0.87rem; }
+.log-skeleton-trace-head span { color: var(--ink-70); }
 .variants-panel { padding-left: 24px; }
 
 .panel-head {
@@ -933,6 +959,24 @@ input[type="range"]::-moz-range-thumb {
 .miner-card-upload {
   border-style: dashed;
 }
+
+/* POWL's recursive structure is intentionally rendered as nested cards: this
+   keeps XOR/loop/partial-order boundaries visible even on small screens. */
+.powl-model { padding: 22px; overflow: auto; }
+.powl-node { border: 1px solid var(--line, #d7d5ce); border-radius: 10px; padding: 10px 12px; background: var(--paper, #fff); min-width: 120px; }
+.powl-transition { display: inline-flex; flex-direction: column; gap: 4px; background: #f2f5ff; border-color: #9aaee8; }
+.powl-transition small, .powl-silent small { color: #667085; font-size: .72rem; }
+.powl-silent { display: inline-flex; gap: 8px; align-items: baseline; background: #f7f7f7; }
+.powl-composite { display: flex; flex-direction: column; gap: 10px; background: #fcfbf6; }
+.powl-composite-title { font-size: .72rem; letter-spacing: .08em; font-weight: 700; color: #59636e; }
+.powl-children { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.powl-child { display: flex; gap: 5px; align-items: flex-start; }
+.powl-child-index { color: #89919a; font-size: .7rem; padding-top: 8px; }
+.powl-xor .powl-children { border-left: 3px solid #d6a85f; padding-left: 10px; }
+.powl-loop .powl-children { border-left: 3px dashed #7c9d83; padding-left: 10px; }
+.powl-strict_partial_order .powl-children { border-left: 3px solid #809ac1; padding-left: 10px; }
+.powl-order { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .75rem; color: #586574; }
+.powl-order-edge { border-radius: 999px; background: #e8edf7; padding: 2px 7px; }
 .miner-card-error {
   margin: 0;
   font-size: 12px;
@@ -1888,3 +1932,34 @@ input[type="range"]::-moz-range-thumb {
 .spectrum-legend i.speed-0 { background: #2f7d5c; }
 .spectrum-legend i.speed-1 { background: #b38624; }
 .spectrum-legend i.speed-2 { background: #a03123; }
+/* Declare's grouped constraint view stays compact while keeping each rule and
+   trace diagnostic readable on narrow screens. */
+.declare-model { display: grid; gap: 1rem; }
+.declare-families { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .75rem; }
+.declare-family, .declare-trace { border: 1px solid var(--line, #d9d9d9); border-radius: .6rem; padding: .7rem; }
+.declare-family h3, .declare-conformance h3 { margin: 0 0 .45rem; font-size: .9rem; }
+.declare-count { float: right; opacity: .65; font-weight: 500; }
+.declare-rules, .declare-trace ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .3rem; }
+.declare-rules li { display: flex; justify-content: space-between; gap: .5rem; font-size: .82rem; }
+.declare-rule-activities { font-weight: 600; overflow-wrap: anywhere; }
+.declare-rule-stats { opacity: .7; white-space: nowrap; }
+.declare-conformance { display: grid; gap: .55rem; }
+.declare-diagnostics { display: grid; gap: .55rem; }
+.declare-trace header { display: flex; justify-content: space-between; gap: .5rem; font-size: .82rem; }
+.declare-trace.unfit { border-color: #d98b8b; }
+.declare-trace ul { margin: .45rem 0; font-size: .8rem; }
+
+.footprints-model { display: grid; gap: 1rem; }
+.footprints-card, .footprints-conformance { display: grid; gap: .7rem; }
+.footprints-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .7rem; }
+.footprints-table { border: 1px solid var(--line); border-radius: .6rem; padding: .7rem; }
+.footprints-table h4, .footprints-traces h4 { margin: 0 0 .45rem; font-size: .9rem; }
+.footprints-table ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; font-size: .8rem; }
+.footprints-summary, .footprints-metrics { display: flex; flex-wrap: wrap; gap: .45rem .9rem; font-size: .82rem; }
+.footprints-metrics { border-top: 1px solid var(--line); padding-top: .7rem; }
+.footprints-traces { display: grid; gap: .35rem; }
+.footprints-trace { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line-soft); padding: .3rem 0; font-size: .8rem; }
+.footprints-trace-discovery { display: grid; gap: .65rem; }
+.footprints-trace-discovery > h3 { margin: 0; font-size: .95rem; }
+.footprints-trace-card { border: 1px solid var(--line); border-radius: .6rem; padding: .7rem; display: grid; gap: .6rem; }
+.footprints-trace-card > header { display: flex; justify-content: space-between; gap: .5rem; font-size: .82rem; }

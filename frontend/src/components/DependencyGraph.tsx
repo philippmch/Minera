@@ -14,12 +14,14 @@ interface DependencyGraphProps {
 
 // Renders a heuristics net: the dependency graph the Heuristic Miner keeps after
 // thresholding. Boxes are activities, edges are accepted dependencies labelled
-// with their dependency measure. The dependency and frequency thresholds are
-// live sliders that re-mine the net in the browser. Pan/zoom mirrors the other
-// model views.
+// with their dependency measure. New exports render the exact server-mined net;
+// old exports that predate the variant-tagged artifact retain the browser-side
+// classic threshold fallback. Pan/zoom mirrors the other model views.
 export function DependencyGraph({ data, title, actions }: DependencyGraphProps) {
   const [dependencyThreshold, setDependencyThreshold] = useState(0.9);
   const [minFrequency, setMinFrequency] = useState(1);
+  const plusPlus = data.heuristics_net?.variant === "plusplus";
+  const fixedNet = data.heuristics_net?.variant !== undefined;
 
   const maxFrequency = useMemo(
     () => Math.max(1, ...data.edges.map((edge) => edge.count)),
@@ -27,9 +29,12 @@ export function DependencyGraph({ data, title, actions }: DependencyGraphProps) 
   );
 
   const { graph, dependency } = useMemo(() => {
-    const net = discoverHeuristicsNet(data, { dependencyThreshold, minFrequency });
+    const net =
+      fixedNet && data.heuristics_net
+        ? data.heuristics_net
+        : discoverHeuristicsNet(data, { dependencyThreshold, minFrequency });
     return computeDependencyLayout(net, data);
-  }, [data, dependencyThreshold, minFrequency]);
+  }, [data, dependencyThreshold, minFrequency, fixedNet]);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(graph.fit);
@@ -93,7 +98,10 @@ export function DependencyGraph({ data, title, actions }: DependencyGraphProps) 
         <span className="panel-meta">
           {dependency.size} {dependency.size === 1 ? "dependency" : "dependencies"}
         </span>
+        {plusPlus && <span className="panel-meta">Miner++ interval model</span>}
         <div className="map-controls">
+          {!fixedNet && (
+            <>
           <label className="threshold">
             <span className="threshold-label">dependency ≥</span>
             <input
@@ -119,6 +127,8 @@ export function DependencyGraph({ data, title, actions }: DependencyGraphProps) 
             />
             <span className="threshold-value">{minFrequency}</span>
           </label>
+            </>
+          )}
           {actions}
           <button className="btn-ghost" onClick={() => setView(graph.fit)}>
             Fit

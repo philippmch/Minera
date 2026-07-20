@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -87,9 +88,19 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
+      {"heuristic_variant", "plusplus"},
       {"dependency_threshold", "0.75"},
       {"and_threshold", "0.5"},
       {"min_edge_frequency", "3"},
+      {"heuristic_min_activity_count", "4"},
+      {"heuristic_decoration", "performance"},
+      {"heuristic_start_timestamp_attribute", "started_at"},
+      {"heuristic_lifecycle_instance_attribute", "instance_id"},
+      {"heuristic_dfg_pre_cleaning_noise_threshold", "0.1"},
+      {"heuristic_loop_length_two_threshold", "0.6"},
+      {"heuristic_keep_once_per_case", "true"},
+      {"heuristic_most_common_paths", "A -> B, C -> D"},
+      {"heuristic_performance_aggregation", "all"},
   }));
   assert(params.csv.case_id_column == "Case");
   assert(params.csv.activity_column == "Act");
@@ -100,9 +111,23 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
   assert(!params.alpha.short_loops);
+  assert(params.heuristic.variant ==
+         minera::HeuristicMinerVariant::kPlusPlus);
   assert(params.heuristic.dependency_threshold == 0.75);
   assert(params.heuristic.and_threshold == 0.5);
   assert(params.heuristic.min_frequency == 3);
+  assert(params.heuristic.min_activity_count == 4);
+  assert(params.heuristic.decoration ==
+         minera::HeuristicNetDecoration::kPerformance);
+  assert(params.heuristic.start_timestamp_attribute == "started_at");
+  assert(params.heuristic.lifecycle_instance_attribute == "instance_id");
+  assert(params.heuristic.dfg_pre_cleaning_noise_threshold == 0.1);
+  assert(params.heuristic.loop_length_two_threshold == 0.6);
+  assert(params.heuristic.keep_once_per_case);
+  assert(params.heuristic.most_common_paths.contains({"A", "B"}));
+  assert(params.heuristic.most_common_paths.contains({"C", "D"}));
+  assert(params.heuristic.performance_aggregation ==
+         minera::HeuristicPerformanceAggregation::kAll);
 }
 
 void parse_mine_params_rejects_an_unknown_inductive_variant() {
@@ -264,6 +289,44 @@ void parse_mine_params_maps_transition_system_options() {
   assert(params.transition_system.include_data);
 }
 
+void parse_mine_params_maps_powl_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"powl_variant", "dynamic_clustering_plain"},
+      {"powl_filtering_type", "dynamic"},
+      {"powl_filtering_threshold", "0.25"},
+      {"powl_order_frequency_ratio", "0.8"},
+      {"powl_brute_force_activity_limit", "12"},
+  }));
+  assert(params.powl.variant ==
+         minera::PowlDiscoveryVariant::kDynamicClusteringPlain);
+  assert(params.powl.filtering_type == minera::PowlFilteringType::kDynamic);
+  assert(params.powl.filtering_threshold == 0.25);
+  assert(params.powl.order_frequency_ratio == 0.8);
+  assert(params.powl.brute_force_activity_limit == 12);
+}
+
+void parse_mine_params_rejects_invalid_powl_fields() {
+  for (const auto& item : {
+           std::pair{"powl_variant", "bad"},
+           std::pair{"powl_filtering_type", "bad"},
+           std::pair{"powl_filtering_threshold", "-0.1"},
+           std::pair{"powl_filtering_threshold", "1"},
+           std::pair{"powl_filtering_threshold", "nan"},
+           std::pair{"powl_order_frequency_ratio", "0.5"},
+           std::pair{"powl_order_frequency_ratio", "1.1"},
+           std::pair{"powl_order_frequency_ratio", "0.9x"},
+           std::pair{"powl_brute_force_activity_limit", "-1"},
+           std::pair{"powl_brute_force_activity_limit", "2x"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 void parse_mine_params_rejects_invalid_transition_fields() {
   for (const auto& item : {std::pair{"transition_view", "bad"},
                            std::pair{"transition_direction", "bad"},
@@ -273,6 +336,231 @@ void parse_mine_params_rejects_invalid_transition_fields() {
     bool threw = false;
     try { (void)minera::parse_mine_params(fields({item})); }
     catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
+void parse_mine_params_maps_token_replay_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"token_replay_variant", "backwards"},
+      {"token_replay_stop_immediately_unfit", "1"},
+  }));
+  assert(params.token_replay.variant ==
+         minera::TokenReplayVariant::kBackwards);
+  assert(params.token_replay.stop_immediately_unfit);
+}
+
+void parse_mine_params_rejects_invalid_token_replay_fields() {
+  for (const auto& item : {
+           std::pair{"token_replay_variant", "backward"},
+           std::pair{"token_replay_variant", "bad"},
+           std::pair{"token_replay_stop_immediately_unfit", "yes"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
+void parse_mine_params_maps_log_skeleton_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"log_skeleton_noise_threshold", "0.25"},
+      {"log_skeleton_constraints",
+       " always_after, equivalence, always_after,, activ_freq "},
+  }));
+  assert(params.log_skeleton.noise_threshold == 0.25);
+  assert((params.log_skeleton.considered_constraints ==
+          std::vector<std::string>{"activ_freq", "always_after",
+                                   "equivalence"}));
+}
+
+void parse_mine_params_rejects_invalid_log_skeleton_fields() {
+  for (const auto& item : {
+           std::pair{"log_skeleton_noise_threshold", "-0.1"},
+           std::pair{"log_skeleton_noise_threshold", "1.1"},
+           std::pair{"log_skeleton_noise_threshold", "nan"},
+           std::pair{"log_skeleton_constraints", "equivalence,unknown"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
+void parse_mine_params_maps_declare_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"declare_considered_activities", " B, A, B "},
+      {"declare_allowed_templates", "response, existence,response"},
+      {"declare_min_support_ratio", "0.25"},
+      {"declare_min_confidence_ratio", "1"},
+      {"declare_auto_selection_multiplier", "0.75"},
+  }));
+  assert(params.declare_options.considered_activities.has_value());
+  assert((params.declare_options.considered_activities.value() ==
+          std::vector<std::string>{"B", "A", "B"}));
+  assert((params.declare_options.allowed_templates.value() ==
+          std::vector<std::string>{"existence", "response"}));
+  assert(params.declare_options.has_min_support_ratio);
+  assert(params.declare_options.min_support_ratio == 0.25);
+  assert(params.declare_options.has_min_confidence_ratio);
+  assert(params.declare_options.min_confidence_ratio == 1.0);
+  assert(params.declare_options.auto_selection_multiplier == 0.75);
+  const auto defaults = minera::parse_mine_params(fields({
+      {"declare_considered_activities", ""},
+      {"declare_allowed_templates", ""},
+  }));
+  assert(!defaults.declare_options.considered_activities.has_value());
+  assert(!defaults.declare_options.allowed_templates.has_value());
+  assert(!defaults.declare_options.has_min_support_ratio);
+  assert(!defaults.declare_options.has_min_confidence_ratio);
+}
+
+void parse_mine_params_preserves_explicit_empty_declare_filters() {
+  const std::map<std::string, std::string> values = {
+      {"declare_considered_activities", ""},
+      {"declare_allowed_templates", ""},
+  };
+  const auto lookup = [&values](std::string_view name) -> std::string {
+    const auto it = values.find(std::string(name));
+    return it == values.end() ? std::string{} : it->second;
+  };
+  const auto present = [&values](std::string_view name) {
+    return values.contains(std::string(name));
+  };
+  const auto explicit_empty = minera::parse_mine_params(lookup, present);
+  assert(explicit_empty.declare_options.considered_activities.has_value());
+  assert(explicit_empty.declare_options.considered_activities->empty());
+  assert(explicit_empty.declare_options.allowed_templates.has_value());
+  assert(explicit_empty.declare_options.allowed_templates->empty());
+
+  // The compatibility overload keeps the historical absent-or-empty behavior.
+  const auto legacy = minera::parse_mine_params(lookup);
+  assert(!legacy.declare_options.considered_activities.has_value());
+  assert(!legacy.declare_options.allowed_templates.has_value());
+
+  const auto absent = minera::parse_mine_params(
+      fields({}), [](std::string_view) { return false; });
+  assert(!absent.declare_options.considered_activities.has_value());
+  assert(!absent.declare_options.allowed_templates.has_value());
+}
+
+void parse_mine_params_rejects_invalid_declare_fields() {
+  for (const auto& item : {
+           std::pair{"declare_allowed_templates", "response,unknown"},
+           std::pair{"declare_min_support_ratio", "-0.1"},
+           std::pair{"declare_min_support_ratio", "1.1"},
+           std::pair{"declare_min_support_ratio", "nan"},
+           std::pair{"declare_min_confidence_ratio", "inf"},
+           std::pair{"declare_auto_selection_multiplier", "2"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
+void parse_mine_params_maps_footprints_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"footprints_discovery_variants",
+       "trace_by_trace, dfg,trace_by_trace,petri_reach_graph"},
+      {"footprints_model", "alpha"},
+      {"footprints_conformance_variants",
+       "trace_extensive,log_model,trace_extensive"},
+      {"footprints_strict", "1"},
+      {"footprints_enable_act_always_executed", "false"},
+  }));
+  assert((params.footprints.discovery_variants ==
+          std::set<std::string>{"dfg", "petri_reach_graph",
+                                "trace_by_trace"}));
+  assert(params.footprints.model == "alpha");
+  assert((params.footprints.conformance_variants ==
+          std::set<std::string>{"log_model", "trace_extensive"}));
+  assert(params.footprints.strict);
+  assert(!params.footprints.enable_act_always_executed);
+
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert((defaults.footprints.discovery_variants ==
+          std::set<std::string>{"dfg", "entire_event_log", "powl",
+                                "process_tree"}));
+  assert(defaults.footprints.model == "process_tree");
+  assert((defaults.footprints.conformance_variants ==
+          std::set<std::string>{"log_model"}));
+  assert(!defaults.footprints.strict);
+  assert(defaults.footprints.enable_act_always_executed);
+}
+
+void parse_mine_params_rejects_invalid_footprints_options() {
+  for (const auto& item : {
+           std::pair{"footprints_discovery_variants", "dfg,unknown"},
+           std::pair{"footprints_model", "unknown"},
+           std::pair{"footprints_conformance_variants", "future"},
+           std::pair{"footprints_strict", "yes"},
+           std::pair{"footprints_enable_act_always_executed", "enabled"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  const std::map<std::string, std::string> empty_lists = {
+      {"footprints_discovery_variants", ""},
+      {"footprints_conformance_variants", ""},
+  };
+  const auto lookup = [&empty_lists](std::string_view name) -> std::string {
+    const auto it = empty_lists.find(std::string(name));
+    return it == empty_lists.end() ? std::string{} : it->second;
+  };
+  const auto present = [&empty_lists](std::string_view name) {
+    return empty_lists.contains(std::string(name));
+  };
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"footprints_model", "dfg"},
+        {"footprints_discovery_variants", "dfg,petri_reach_graph"},
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_unknown_heuristic_settings() {
+  for (const auto& [name, value] :
+       std::vector<std::pair<std::string, std::string>>{
+           {"heuristic_variant", "bogus"},
+           {"heuristic_decoration", "bogus"},
+           {"heuristic_performance_aggregation", "bogus"},
+           {"heuristic_keep_once_per_case", "maybe"},
+           {"heuristic_most_common_paths", "A-B"},
+           {"dependency_threshold", "not-a-number"},
+           {"min_edge_frequency", "-1"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({{name, value}}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
     assert(threw);
   }
 }
@@ -292,8 +580,20 @@ int main() {
   parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
+  parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();
+  parse_mine_params_maps_powl_options();
+  parse_mine_params_rejects_invalid_powl_fields();
+  parse_mine_params_maps_token_replay_options();
+  parse_mine_params_rejects_invalid_token_replay_fields();
+  parse_mine_params_maps_log_skeleton_options();
+  parse_mine_params_rejects_invalid_log_skeleton_fields();
+  parse_mine_params_maps_declare_options();
+  parse_mine_params_preserves_explicit_empty_declare_filters();
+  parse_mine_params_rejects_invalid_declare_fields();
+  parse_mine_params_maps_footprints_options();
+  parse_mine_params_rejects_invalid_footprints_options();
   return 0;
 }

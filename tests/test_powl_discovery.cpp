@@ -64,12 +64,9 @@ int main() {
 
   const auto once_inside_repeat =
       discover_powl(log({{"A", "B", "A"}}), tree);
-  assert(once_inside_repeat.kind() ==
-         PowlNodeKind::kStrictPartialOrder);
-  assert(once_inside_repeat.order().empty());
-  assert(once_inside_repeat.children()[0].label() == "B");
-  assert(once_inside_repeat.children()[1].kind() ==
-         PowlNodeKind::kLoop);
+  assert(once_inside_repeat.kind() == PowlNodeKind::kLoop);
+  assert(once_inside_repeat.children()[0].label() == "A");
+  assert(once_inside_repeat.children()[1].label() == "B");
 
   const auto strict_tau =
       discover_powl(log({{"A", "B", "A", "B"}}), tree);
@@ -80,6 +77,52 @@ int main() {
   assert(strict_tau.children()[0].children().size() == 2);
   assert(strict_tau.children()[0].children()[0].label() == "A");
   assert(strict_tau.children()[0].children()[1].label() == "B");
+
+  // The exact common-loop cut keeps ordered behavior inside the redo log
+  // instead of flattening every middle activity into one XOR.
+  const auto ordered_redo =
+      discover_powl(log({{"A", "B", "C", "A"}, {"A", "D", "A"}}),
+                    tree);
+  assert(ordered_redo.kind() == PowlNodeKind::kLoop);
+  assert(ordered_redo.children()[0].label() == "A");
+  assert(ordered_redo.children()[1].kind() == PowlNodeKind::kXor);
+  assert(ordered_redo.children()[1].children().size() == 2);
+  assert(ordered_redo.children()[1].children()[0].kind() ==
+         PowlNodeKind::kStrictPartialOrder);
+  assert(ordered_redo.children()[1].children()[0].has_edge(0, 1));
+  assert(ordered_redo.children()[1].children()[0].children()[0].label() ==
+         "B");
+  assert(ordered_redo.children()[1].children()[0].children()[1].label() ==
+         "C");
+  assert(ordered_redo.children()[1].children()[1].label() == "D");
+
+  // Different start/end boundary activities still form one do group.
+  const auto boundary_union =
+      discover_powl(log({{"A", "B", "A"}, {"Z", "B", "Z"}}), tree);
+  assert(boundary_union.kind() == PowlNodeKind::kLoop);
+  assert(boundary_union.children()[0].kind() == PowlNodeKind::kXor);
+  assert(boundary_union.children()[0].children()[0].label() == "A");
+  assert(boundary_union.children()[0].children()[1].label() == "Z");
+  assert(boundary_union.children()[1].label() == "B");
+
+  // Boundary reachability repair absorbs ordinary prefix/suffix components;
+  // this log has no loop cut despite sharing its outer activities.
+  const auto repaired_boundaries =
+      discover_powl(log({{"A", "B", "C"}, {"A", "D", "C"}}), tree);
+  assert(repaired_boundaries.kind() != PowlNodeKind::kLoop);
+
+  // Partial return-to-start evidence is not a complete redo component.
+  const auto incomplete_start =
+      discover_powl(log({{"A", "X", "B", "A"}, {"B", "A", "C"}}),
+                    tree);
+  assert(incomplete_start.kind() != PowlNodeKind::kLoop);
+
+  // A single closed variant is a normal LOOP(do, redo), not a tau-loop
+  // fall-through with a different language.
+  const auto single_closed = discover_powl(log({{"A", "B", "A"}}), tree);
+  assert(single_closed.kind() == PowlNodeKind::kLoop);
+  assert(single_closed.children()[0].label() == "A");
+  assert(single_closed.children()[1].label() == "B");
 
   // ActivityOncePerTrace is reached when a once-only activity moves around a
   // structured remainder, preventing a normal top-level cut.

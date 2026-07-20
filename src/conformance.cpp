@@ -138,6 +138,82 @@ class Replayer {
     return counts;
   }
 
+  struct BackwardsOutcome {
+    Counts counts;
+    bool fitting = true;
+  };
+
+  // Legacy PM4Py backwards token replay. Unlike forward replay, unknown
+  // labels are ignored and silent routing is discovered by walking required
+  // input markings backwards from a visible transition.
+  [[nodiscard]] BackwardsOutcome replay_backwards(
+      const std::vector<std::optional<std::size_t>>& trace,
+      std::vector<std::uint64_t>* executions = nullptr,
+      bool stop_immediately_unfit = false) const {
+    Marking marking = initial_marking();
+    BackwardsOutcome outcome;
+    auto& counts = outcome.counts;
+    counts.produced = 1;  // initial source token
+
+    for (const auto& step : trace) {
+      // The deprecated variation silently discards labels absent from the net.
+      if (!step || transitions_by_activity_[*step].empty()) continue;
+      const auto& targets = transitions_by_activity_[*step];
+      bool fired_any = false;
+      for (const std::size_t t : targets) {
+        // Check each duplicate-label transition against the evolving marking;
+        // an earlier firing may enable a later transition.
+        if (enabled(marking, t)) {
+          fire(marking, t, counts);
+          if (executions) ++(*executions)[t];
+          fired_any = true;
+        }
+      }
+      if (fired_any) {
+        continue;
+      }
+
+      if (targets.size() != 1) {
+        outcome.fitting = false;  // ambiguous duplicate label: interrupt trace
+        break;
+      }
+
+      const std::size_t visible = targets.front();
+      const auto path = reverse_silent_path(marking, visible);
+      if (path) {
+        for (const std::size_t s : *path) {
+          fire(marking, s, counts);
+          if (executions) ++(*executions)[s];
+        }
+        fire(marking, visible, counts);
+        if (executions) ++(*executions)[visible];
+      } else {
+        // No route: weak-fire the unique visible transition, creating any
+        // missing inputs and retaining the deviation for fitness.
+        fire(marking, visible, counts);
+        if (executions) ++(*executions)[visible];
+        outcome.fitting = false;
+        if (stop_immediately_unfit) break;
+      }
+    }
+
+    // Compare the exact final marking (one token on sink), with no routing.
+    // Tokens present at final-marked places are consumed as part of the legacy
+    // accounting before surplus/deficit are measured.
+    counts.consumed += static_cast<std::uint64_t>(
+        std::max(0, marking[net_.sink()]));
+    for (std::size_t p = 0; p < marking.size(); ++p) {
+      const int target = p == net_.sink() ? 1 : 0;
+      if (marking[p] > target) {
+        counts.remaining += static_cast<std::uint64_t>(marking[p] - target);
+      } else if (marking[p] < target) {
+        counts.missing += static_cast<std::uint64_t>(target - marking[p]);
+      }
+    }
+    if (counts.missing != 0 || counts.remaining != 0) outcome.fitting = false;
+    return outcome;
+  }
+
   // Like replay(), but only for traces that replay cleanly, and returning what
   // fired instead of token counts: one entry per consumed event holding the
   // transitions fired for it — silent routing first, the event's visible
@@ -502,6 +578,91 @@ class Replayer {
         arena.push_back(Visited{std::move(next), s, index});
         if (done) return reconstruct(arena.size() - 1);
         frontier.push(arena.size() - 1);
+      }
+    }
+    return std::nullopt;
+  }
+
+  // Reverse silent routing used by the deprecated backwards variation. The
+  // search state is the marking required immediately before the visible
+  // transition. A silent transition can precede it when its output multiset
+  // covers that requirement; inverse application removes available output
+  // tokens and adds the transition's inputs. A global visited-transition set,
+  // marking deduplication, and the expansion cap keep this bounded/deterministic.
+  [[nodiscard]] std::optional<std::vector<std::size_t>> reverse_silent_path(
+      const Marking& marking, std::size_t visible) const {
+    const auto& target = net_.transitions()[visible];
+    Marking required(marking.size(), 0);
+    for (const std::size_t p : target.inputs) ++required[p];
+    const auto covers = [](const Marking& have, const Marking& need) {
+      for (std::size_t p = 0; p < have.size(); ++p) {
+        if (have[p] < need[p]) return false;
+      }
+      return true;
+    };
+    if (covers(marking, required)) return std::vector<std::size_t>{};
+
+    constexpr std::size_t kStart = std::numeric_limits<std::size_t>::max();
+    struct Visited {
+      Marking required;
+      std::size_t transition;
+      std::size_t parent;
+    };
+    std::vector<Visited> arena;
+    std::unordered_set<Marking, MarkingHash> seen{required};
+    std::queue<std::size_t> frontier;
+    frontier.push(kStart);
+    std::vector<char> expanded(net_.transitions().size(), 0);
+    const auto reconstruct = [&](std::size_t index) {
+      std::vector<std::size_t> path;
+      for (std::size_t i = index; i != kStart; i = arena[i].parent) {
+        path.push_back(arena[i].transition);
+      }
+      // Parent links lead from the discovered predecessor toward the visible
+      // requirement, which is already forward firing order here.
+      return path;
+    };
+
+    // The global transition-visit rule bounds the search by the number of
+    // silent transitions, so the legacy variation needs no heuristic cap.
+    while (!frontier.empty()) {
+      const std::size_t index = frontier.front();
+      frontier.pop();
+      const Marking current = index == kStart ? required : arena[index].required;
+      for (const std::size_t s : silent_transitions_) {
+        if (expanded[s]) continue;
+        const auto& transition = net_.transitions()[s];
+        bool output_covers = true;
+        Marking output_count(marking.size(), 0);
+        for (const std::size_t p : transition.outputs) ++output_count[p];
+        for (std::size_t p = 0; p < current.size(); ++p) {
+          if (output_count[p] < current[p]) {
+            output_covers = false;
+            break;
+          }
+        }
+        if (!output_covers) continue;
+        expanded[s] = 1;
+
+        Marking predecessor = current;
+        // Subtract an output bundle only when the requirement carries its full
+        // arc weight. Repeated place ids are Minera's representation of a
+        // weighted arc and therefore must be handled as one bundle.
+        for (std::size_t p = 0; p < predecessor.size(); ++p) {
+          if (output_count[p] != 0 &&
+              predecessor[p] >= output_count[p]) {
+            predecessor[p] -= output_count[p];
+          }
+        }
+        for (const std::size_t p : transition.inputs) ++predecessor[p];
+        if (!seen.insert(predecessor).second) continue;
+        arena.push_back(Visited{predecessor, s, index});
+        const std::size_t found = arena.size() - 1;
+        if (covers(marking, arena[found].required)) {
+          auto path = reconstruct(found);
+          return path;
+        }
+        frontier.push(found);
       }
     }
     return std::nullopt;
@@ -1695,7 +1856,8 @@ FootprintResult check_footprints(const EventLog& event_log,
 }
 
 ConformanceResult check_conformance(const EventLog& event_log,
-                                    const PetriNet& net) {
+                                    const PetriNet& net,
+                                    TokenReplayOptions options) {
   const Replayer replayer(net);
   const auto variants = collect_variants(event_log, replayer);
 
@@ -1708,7 +1870,14 @@ ConformanceResult check_conformance(const EventLog& event_log,
   std::vector<std::uint64_t> variant_executions;
   for (const auto& variant : variants) {
     variant_executions.assign(net.transitions().size(), 0);
-    const auto counts = replayer.replay(variant.ids, &variant_executions);
+    const bool backwards = options.variant == TokenReplayVariant::kBackwards;
+    const auto backwards_outcome =
+        backwards ? std::optional<Replayer::BackwardsOutcome>(
+                        replayer.replay_backwards(variant.ids, &variant_executions,
+                                                  options.stop_immediately_unfit))
+                  : std::nullopt;
+    const auto counts = backwards ? backwards_outcome->counts
+                                  : replayer.replay(variant.ids, &variant_executions);
     for (std::size_t t = 0; t < executions.size(); ++t) {
       executions[t] += variant_executions[t] * variant.count;
     }
@@ -1716,7 +1885,9 @@ ConformanceResult check_conformance(const EventLog& event_log,
     result.consumed += counts.consumed * variant.count;
     result.missing += counts.missing * variant.count;
     result.remaining += counts.remaining * variant.count;
-    if (counts.missing == 0 && counts.remaining == 0) {
+    const bool fitting = backwards ? backwards_outcome->fitting
+                                   : (counts.missing == 0 && counts.remaining == 0);
+    if (fitting) {
       result.fitting_traces += variant.count;
     }
     result.variants.push_back(
@@ -1746,8 +1917,9 @@ ConformanceResult check_conformance(const EventLog& event_log,
 }
 
 ConformanceResult check_conformance(const EventLog& event_log,
-                                    const ProcessTree& tree) {
-  return check_conformance(event_log, to_petri_net(tree));
+                                    const ProcessTree& tree,
+                                    TokenReplayOptions options) {
+  return check_conformance(event_log, to_petri_net(tree), options);
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,

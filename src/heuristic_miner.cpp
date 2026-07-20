@@ -1,7 +1,18 @@
 #include "minera/heuristic_miner.hpp"
 
+#include "minera/timestamp.hpp"
+
 #include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <deque>
+#include <functional>
+#include <map>
+#include <numeric>
+#include <optional>
 #include <set>
+#include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -99,123 +110,957 @@ std::vector<HeuristicBundle> to_bundles(const Counts& counts,
   return bundles;
 }
 
+double effective_dependency_threshold(const HeuristicMinerOptions& options) {
+  return options.dependency_threshold.value_or(0.5);
+}
+
+struct Interval {
+  std::string activity;
+  double start = 0.0;
+  double complete = 0.0;
+};
+
+using NamePair = std::pair<std::string, std::string>;
+
+struct PlusAbstraction {
+  std::vector<std::string> activity_order;
+  std::map<std::string, std::uint64_t> occurrences;
+  std::map<std::string, std::uint64_t> starts;
+  std::map<std::string, std::uint64_t> ends;
+  std::map<NamePair, std::uint64_t> eventually_follows;
+  std::map<NamePair, std::uint64_t> direct_adjacency;
+  std::map<NamePair, double> wait_sums;
+  std::map<NamePair, std::vector<double>> wait_samples;
+  std::map<std::string, double> sojourn_sums;
+  std::map<NamePair, std::uint64_t> concurrency;
+};
+
+std::string ascii_lower(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+  return value;
+}
+
+double required_timestamp(const std::string& value,
+                          const std::string& description) {
+  const auto parsed = parse_timestamp(value);
+  if (!parsed)
+    throw std::invalid_argument("Heuristics Miner PLUSPLUS requires a valid " +
+                                description + " timestamp");
+  return *parsed;
+}
+
+struct IntervalTrace {
+  std::vector<Interval> sorted;
+  std::vector<Interval> performance_order;
+};
+
+IntervalTrace to_intervals(const Trace& trace,
+                           const HeuristicMinerOptions& options,
+                           bool pre_interval_mode) {
+  using LifecycleKey = std::pair<std::string, std::string>;
+  std::map<LifecycleKey, std::deque<double>> pending_starts;
+  std::vector<Interval> intervals;
+  for (const auto& event : trace.events) {
+    const double timestamp =
+        required_timestamp(event.timestamp, "event");
+    if (pre_interval_mode) {
+      const auto* value = event.attribute(options.start_timestamp_attribute);
+      if (value == nullptr)
+        throw std::invalid_argument(
+            "Heuristics Miner PLUSPLUS interval input is missing the "
+            "configured start timestamp");
+      intervals.push_back(
+          {event.activity, required_timestamp(*value, "start"), timestamp});
+      continue;
+    }
+    std::string instance;
+    if (const auto* value = event.attribute(
+            options.lifecycle_instance_attribute))
+      instance = *value;
+    const LifecycleKey key{event.activity, instance};
+    const std::string lifecycle = ascii_lower(event.lifecycle);
+    if (lifecycle == "start") {
+      pending_starts[key].push_back(timestamp);
+      continue;
+    }
+    if (!lifecycle.empty() && lifecycle != "complete") continue;
+
+    double start = timestamp;
+    auto pending = pending_starts.find(key);
+    if (pending != pending_starts.end() && !pending->second.empty()) {
+      start = pending->second.front();
+      pending->second.pop_front();
+    }
+    intervals.push_back({event.activity, start, timestamp});
+  }
+  IntervalTrace result;
+  result.sorted = intervals;
+  std::stable_sort(result.sorted.begin(), result.sorted.end(),
+                   [](const Interval& lhs, const Interval& rhs) {
+                     return lhs.start < rhs.start;
+                   });
+  result.performance_order =
+      pre_interval_mode ? std::move(intervals) : result.sorted;
+  return result;
+}
+
+PlusAbstraction build_plus_abstraction(
+    const EventLog& log, const HeuristicMinerOptions& options) {
+  PlusAbstraction out;
+  std::set<std::string> known;
+  const bool pre_interval_mode =
+      !log.traces.empty() && !log.traces.front().events.empty() &&
+      log.traces.front().events.front().attribute(
+          options.start_timestamp_attribute) != nullptr;
+  for (const auto& trace : log.traces) {
+    const auto converted =
+        to_intervals(trace, options, pre_interval_mode);
+    const auto& intervals = converted.sorted;
+    if (intervals.empty()) continue;
+    // In pre-interval mode PM preserves trace order for start/end/attribute
+    // statistics; lifecycle conversion has already produced start-sorted
+    // traces, represented here by performance_order as well.
+    const auto& converted_order = converted.performance_order;
+    ++out.starts[converted_order.front().activity];
+    ++out.ends[converted_order.back().activity];
+    for (const auto& interval : converted_order) {
+      if (known.insert(interval.activity).second)
+        out.activity_order.push_back(interval.activity);
+      ++out.occurrences[interval.activity];
+      out.sojourn_sums[interval.activity] +=
+          interval.complete - interval.start;
+    }
+
+    // PM4Py's PLUSPLUS abstraction keeps only the first activity that starts
+    // after each interval has completed.
+    for (std::size_t i = 0; i < intervals.size(); ++i) {
+      for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+        if (intervals[i].complete <= intervals[j].start) {
+          ++out.eventually_follows[
+              {intervals[i].activity, intervals[j].activity}];
+          break;
+        }
+      }
+    }
+
+    // Inclusive overlap: intervals touching at one endpoint are concurrent.
+    for (std::size_t i = 0; i < intervals.size(); ++i) {
+      for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+        if (std::max(intervals[i].start, intervals[j].start) <=
+            std::min(intervals[i].complete, intervals[j].complete)) {
+          ++out.concurrency[std::minmax(intervals[i].activity,
+                                        intervals[j].activity)];
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Performance DFG uses the converted trace order: lifecycle conversion
+    // sorts it by start time, while pre-interval input is preserved verbatim.
+    const auto& performance = converted.performance_order;
+    for (std::size_t i = 1; i < performance.size(); ++i) {
+      const NamePair pair{performance[i - 1].activity,
+                          performance[i].activity};
+      ++out.direct_adjacency[pair];
+      const double wait =
+          std::max(0.0,
+                   performance[i].start - performance[i - 1].complete);
+      out.wait_sums[pair] += wait;
+      out.wait_samples[pair].push_back(wait);
+    }
+  }
+  return out;
+}
+
+std::uint64_t get_count(const std::map<NamePair, std::uint64_t>& counts,
+                        const std::string& first,
+                        const std::string& second) {
+  const auto it = counts.find({first, second});
+  return it == counts.end() ? 0 : it->second;
+}
+
+std::uint64_t get_concurrency(const PlusAbstraction& abstraction,
+                              const std::string& first,
+                              const std::string& second) {
+  const auto it = abstraction.concurrency.find(std::minmax(first, second));
+  return it == abstraction.concurrency.end() ? 0 : it->second;
+}
+
+double plus_dependency(const PlusAbstraction& abstraction,
+                       const std::string& first,
+                       const std::string& second,
+                       std::uint64_t min_frequency) {
+  const double forward = static_cast<double>(
+      get_count(abstraction.eventually_follows, first, second));
+  const auto raw_backward =
+      get_count(abstraction.eventually_follows, second, first);
+  const double backward = static_cast<double>(
+      raw_backward >= min_frequency ? raw_backward : 0);
+  const double concurrent =
+      static_cast<double>(get_concurrency(abstraction, first, second));
+  return (forward - backward) / (forward + backward + concurrent);
+}
+
+std::vector<HeuristicBundle> maximal_cliques(
+    const std::vector<std::size_t>& neighbours,
+    const std::vector<std::vector<bool>>& adjacent) {
+  const std::size_t k = neighbours.size();
+  if (k == 0) return {};
+  std::vector<HeuristicBundle> bundles;
+  const auto intersect_neighbours =
+      [&](const std::vector<std::size_t>& values, std::size_t vertex) {
+        std::vector<std::size_t> result;
+        for (const auto value : values)
+          if (adjacent[vertex][value]) result.push_back(value);
+        return result;
+      };
+  std::function<void(std::vector<std::size_t>, std::vector<std::size_t>,
+                     std::vector<std::size_t>)>
+      bron_kerbosch;
+  bron_kerbosch = [&](std::vector<std::size_t> clique,
+                      std::vector<std::size_t> candidates,
+                      std::vector<std::size_t> excluded) {
+    if (candidates.empty() && excluded.empty()) {
+      HeuristicBundle bundle;
+      for (const auto index : clique) bundle.push_back(neighbours[index]);
+      bundles.push_back(std::move(bundle));
+      return;
+    }
+    const auto iteration = candidates;
+    for (const auto vertex : iteration) {
+      clique.push_back(vertex);
+      bron_kerbosch(clique, intersect_neighbours(candidates, vertex),
+                    intersect_neighbours(excluded, vertex));
+      clique.pop_back();
+      candidates.erase(
+          std::find(candidates.begin(), candidates.end(), vertex));
+      excluded.push_back(vertex);
+    }
+  };
+  std::vector<std::size_t> candidates(k);
+  for (std::size_t i = 0; i < k; ++i) candidates[i] = i;
+  bron_kerbosch({}, std::move(candidates), {});
+  std::sort(bundles.begin(), bundles.end());
+  return bundles;
+}
+
+void sort_bundles_by_activity_name(
+    std::vector<HeuristicBundle>& bundles,
+    const std::vector<std::string>& activities) {
+  const auto by_name = [&](std::size_t lhs, std::size_t rhs) {
+    return activities[lhs] < activities[rhs];
+  };
+  for (auto& bundle : bundles)
+    std::sort(bundle.begin(), bundle.end(), by_name);
+  std::sort(bundles.begin(), bundles.end(), [&](const auto& lhs,
+                                                const auto& rhs) {
+    return std::lexicographical_compare(
+        lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
+        [&](std::size_t left, std::size_t right) {
+          return activities[left] < activities[right];
+        });
+  });
+}
+
+std::vector<HeuristicBundle> plus_bundles(
+    const PlusAbstraction& abstraction, const HeuristicsNet& net,
+    std::size_t center, const std::vector<std::size_t>& neighbours,
+    bool outgoing, double threshold, std::uint64_t min_frequency) {
+  const std::size_t k = neighbours.size();
+  std::vector<std::vector<bool>> adjacent(k, std::vector<bool>(k, false));
+  for (std::size_t i = 0; i < k; ++i) {
+    for (std::size_t j = i + 1; j < k; ++j) {
+      const auto& n1 = net.activities[neighbours[i]];
+      const auto& n2 = net.activities[neighbours[j]];
+      const auto& middle = net.activities[center];
+      const double numerator = static_cast<double>(
+          (get_count(abstraction.eventually_follows, n1, n2) >=
+                   min_frequency
+               ? get_count(abstraction.eventually_follows, n1, n2)
+               : 0) +
+          (get_count(abstraction.eventually_follows, n2, n1) >=
+                   min_frequency
+               ? get_count(abstraction.eventually_follows, n2, n1)
+               : 0) +
+          get_concurrency(abstraction, n1, n2));
+      const double denominator = static_cast<double>(
+          outgoing
+              ? get_count(abstraction.eventually_follows, middle, n1) +
+                    get_count(abstraction.eventually_follows, middle, n2)
+              : get_count(abstraction.eventually_follows, n1, middle) +
+                    get_count(abstraction.eventually_follows, n2, middle));
+      if (numerator / denominator > threshold)
+        adjacent[i][j] = adjacent[j][i] = true;
+    }
+  }
+
+  // PM4Py converts the AND-pair graph through maximal cliques. Cliques may
+  // overlap (unlike classic's transitive partitioning), which is significant
+  // for shapes such as b--c--d where {b,c} and {c,d} are distinct bundles.
+  return maximal_cliques(neighbours, adjacent);
+}
+
+HeuristicClassicDfgInput build_classic_input(
+    const EventLog& log, const HeuristicMinerOptions& options) {
+  HeuristicClassicDfgInput input;
+  std::vector<std::string> activities;
+  std::set<std::string> known;
+  std::map<std::string, std::uint64_t> occurrences;
+  std::map<std::string, std::uint64_t> starts;
+  std::map<std::string, std::uint64_t> ends;
+  if (options.decoration == HeuristicNetDecoration::kPerformance)
+    input.performance_dfg.emplace();
+  for (const auto& trace : log.traces) {
+    if (!trace.events.empty()) {
+      ++starts[trace.events.front().activity];
+      ++ends[trace.events.back().activity];
+    }
+    std::set<NamePair> seen_direct;
+    std::set<NamePair> seen_window_two;
+    for (const auto& event : trace.events) {
+      if (known.insert(event.activity).second)
+        activities.push_back(event.activity);
+      ++occurrences[event.activity];
+    }
+    for (std::size_t i = 1; i < trace.events.size(); ++i) {
+      const NamePair pair{trace.events[i - 1].activity,
+                          trace.events[i].activity};
+      if (!options.keep_once_per_case || seen_direct.insert(pair).second)
+        ++input.dfg[pair];
+      if (options.decoration == HeuristicNetDecoration::kPerformance) {
+        const double complete = required_timestamp(
+            trace.events[i - 1].timestamp, "event");
+        const auto* start_value =
+            trace.events[i].attribute(options.start_timestamp_attribute);
+        const double start = required_timestamp(
+            start_value == nullptr ? trace.events[i].timestamp : *start_value,
+            "start");
+        (*input.performance_dfg)[pair].push_back(
+            std::max(0.0, start - complete));
+      }
+    }
+    for (std::size_t i = 2; i < trace.events.size(); ++i) {
+      const NamePair pair{trace.events[i - 2].activity,
+                          trace.events[i].activity};
+      if (!options.keep_once_per_case || seen_window_two.insert(pair).second)
+        ++input.window_two_dfg[pair];
+      ++input.frequency_triples[{trace.events[i - 2].activity,
+                                 trace.events[i - 1].activity,
+                                 trace.events[i].activity}];
+    }
+  }
+  input.activities = std::move(activities);
+  input.activity_counts = std::move(occurrences);
+  input.start_counts = std::move(starts);
+  input.end_counts = std::move(ends);
+  return input;
+}
+
+HeuristicFrequencyDfg clean_classic_dfg(
+    const HeuristicClassicDfgInput& input,
+    const HeuristicMinerOptions& options,
+    const std::vector<std::string>& activities) {
+  if (options.dfg_pre_cleaning_noise_threshold <= 0.0) return input.dfg;
+  std::map<std::string, std::uint64_t> maximum;
+  for (const auto& activity : activities) maximum[activity] = 0;
+  for (const auto& [pair, count] : input.dfg) {
+    maximum[pair.first] = std::max(maximum[pair.first], count);
+    maximum[pair.second] = std::max(maximum[pair.second], count);
+  }
+  HeuristicFrequencyDfg cleaned;
+  for (const auto& [pair, count] : input.dfg) {
+    const double boundary =
+        std::min(maximum[pair.first] *
+                     options.dfg_pre_cleaning_noise_threshold,
+                 maximum[pair.second] *
+                     options.dfg_pre_cleaning_noise_threshold);
+    if (options.most_common_paths.contains(pair) || !(count < boundary))
+      cleaned.emplace(pair, count);
+  }
+  return cleaned;
+}
+
+struct WaitSummary {
+  std::vector<double> samples;
+  double mean = 0.0;
+  double median = 0.0;
+  double minimum = 0.0;
+  double maximum = 0.0;
+  double stdev = 0.0;
+  double sum = 0.0;
+};
+
+WaitSummary summarize_waits(const std::vector<double>& values) {
+  WaitSummary result;
+  result.samples = values;
+  if (values.empty()) return result;
+  result.sum = std::accumulate(values.begin(), values.end(), 0.0);
+  result.mean = result.sum / static_cast<double>(values.size());
+  result.minimum = *std::min_element(values.begin(), values.end());
+  result.maximum = *std::max_element(values.begin(), values.end());
+  auto sorted = values;
+  std::sort(sorted.begin(), sorted.end());
+  const std::size_t middle = sorted.size() / 2;
+  result.median =
+      sorted.size() % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2.0
+                             : sorted[middle];
+  if (values.size() > 1) {
+    double squared = 0.0;
+    for (const auto value : values)
+      squared += (value - result.mean) * (value - result.mean);
+    result.stdev =
+        std::sqrt(squared / static_cast<double>(values.size() - 1));
+  }
+  return result;
+}
+
+double performance_representation(
+    const WaitSummary& summary, HeuristicPerformanceAggregation aggregation) {
+  switch (aggregation) {
+    case HeuristicPerformanceAggregation::kMedian:
+      return summary.median;
+    case HeuristicPerformanceAggregation::kMinimum:
+      return summary.minimum;
+    case HeuristicPerformanceAggregation::kMaximum:
+      return summary.maximum;
+    case HeuristicPerformanceAggregation::kStandardDeviation:
+      return summary.stdev;
+    case HeuristicPerformanceAggregation::kSum:
+      return summary.sum;
+    case HeuristicPerformanceAggregation::kMean:
+    case HeuristicPerformanceAggregation::kRawValues:
+    case HeuristicPerformanceAggregation::kAll:
+      // Raw/all remain lossless in relation statistics. A scalar mean keeps
+      // existing consumers source-compatible.
+      return summary.mean;
+  }
+  return summary.mean;
+}
+
+std::uint64_t pair_count(const HeuristicFrequencyDfg& dfg,
+                         const std::string& source,
+                         const std::string& target) {
+  const auto it = dfg.find({source, target});
+  return it == dfg.end() ? 0 : it->second;
+}
+
+double classic_dependency(const HeuristicFrequencyDfg& dfg,
+                          const std::string& source,
+                          const std::string& target) {
+  const double forward = static_cast<double>(pair_count(dfg, source, target));
+  if (source == target) return forward / (forward + 1.0);
+  const double reverse = static_cast<double>(pair_count(dfg, target, source));
+  return (forward - reverse) / (forward + reverse + 1.0);
+}
+
+std::map<std::string, std::uint64_t> infer_activity_counts(
+    const HeuristicFrequencyDfg& dfg,
+    const std::vector<std::string>& activities) {
+  std::map<std::string, std::uint64_t> result;
+  for (const auto& activity : activities) {
+    std::uint64_t incoming = 0;
+    std::uint64_t outgoing = 0;
+    bool has_incoming = false;
+    bool has_outgoing = false;
+    for (const auto& [pair, count] : dfg) {
+      if (pair.first == activity) {
+        outgoing += count;
+        has_outgoing = true;
+      }
+      if (pair.second == activity) {
+        incoming += count;
+        has_incoming = true;
+      }
+    }
+    std::uint64_t total = incoming + outgoing;
+    if (has_incoming && has_outgoing) total /= 2;
+    result[activity] = total;
+  }
+  return result;
+}
+
+HeuristicsNet discover_classic_dfg(
+    const HeuristicClassicDfgInput& input,
+    const HeuristicMinerOptions& options) {
+  if (options.variant == HeuristicMinerVariant::kPlusPlus)
+    throw std::invalid_argument(
+        "Heuristics Miner PLUSPLUS does not support DFG input");
+  HeuristicsNet net;
+  net.variant = HeuristicMinerVariant::kClassic;
+  net.decoration = options.decoration;
+  net.performance_aggregation = options.performance_aggregation;
+  net.raw_dfg = input.dfg;
+  net.window_two_dfg = input.window_two_dfg;
+  net.frequency_triples = input.frequency_triples;
+
+  if (input.activities) {
+    net.activities = *input.activities;
+  } else {
+    std::set<std::string> inferred;
+    for (const auto& [pair, _] : input.dfg) {
+      inferred.insert(pair.first);
+      inferred.insert(pair.second);
+    }
+    net.activities.assign(inferred.begin(), inferred.end());
+  }
+  std::unordered_map<std::string, std::size_t> ids;
+  for (std::size_t i = 0; i < net.activities.size(); ++i)
+    ids[net.activities[i]] = i;
+
+  const auto occurrences =
+      input.activity_counts.value_or(
+          infer_activity_counts(input.dfg, net.activities));
+  std::map<std::string, std::uint64_t> starts;
+  std::map<std::string, std::uint64_t> ends;
+  if (input.start_counts) {
+    starts = *input.start_counts;
+  } else {
+    std::set<std::string> incoming;
+    std::set<std::string> outgoing;
+    for (const auto& [pair, _] : input.dfg) {
+      outgoing.insert(pair.first);
+      incoming.insert(pair.second);
+    }
+    for (const auto& activity : net.activities)
+      if (outgoing.contains(activity) && !incoming.contains(activity))
+        starts[activity] = 1;
+  }
+  if (input.end_counts) {
+    ends = *input.end_counts;
+  } else {
+    std::set<std::string> incoming;
+    std::set<std::string> outgoing;
+    for (const auto& [pair, _] : input.dfg) {
+      outgoing.insert(pair.first);
+      incoming.insert(pair.second);
+    }
+    for (const auto& activity : net.activities)
+      if (incoming.contains(activity) && !outgoing.contains(activity))
+        ends[activity] = 1;
+  }
+
+  net.cleaned_dfg = clean_classic_dfg(input, options, net.activities);
+  if (input.performance_dfg) {
+    for (const auto& [pair, _] : net.cleaned_dfg)
+      if (!input.performance_dfg->contains(pair))
+        throw std::invalid_argument(
+            "Classic heuristic performance DFG is missing a cleaned path");
+  }
+  const double dependency_threshold = effective_dependency_threshold(options);
+  std::vector<bool> active(net.activities.size(), false);
+  std::set<NamePair> initially_accepted;
+  std::map<NamePair, double> dependencies;
+  for (const auto& [pair, count] : net.cleaned_dfg)
+    dependencies[pair] =
+        classic_dependency(net.cleaned_dfg, pair.first, pair.second);
+
+  const auto activity_count = [&](const std::string& name) {
+    const auto it = occurrences.find(name);
+    return it == occurrences.end() ? std::uint64_t{0} : it->second;
+  };
+  const auto accepted_by_threshold = [&](const NamePair& pair) {
+    const auto count = pair_count(net.cleaned_dfg, pair.first, pair.second);
+    const auto dep = dependencies.find(pair);
+    return activity_count(pair.first) >= options.min_activity_count &&
+           activity_count(pair.second) >= options.min_activity_count &&
+           count >= options.min_frequency && dep != dependencies.end() &&
+           dep->second >= dependency_threshold;
+  };
+  for (const auto& [pair, count] : net.cleaned_dfg) {
+    if (!accepted_by_threshold(pair)) continue;
+    initially_accepted.insert(pair);
+    active[ids.at(pair.first)] = active[ids.at(pair.second)] = true;
+    const auto waits = input.performance_dfg
+                           ? input.performance_dfg->find(pair)
+                           : HeuristicPerformanceDfg::const_iterator{};
+    const WaitSummary summary =
+        summarize_waits(!input.performance_dfg ||
+                                waits == input.performance_dfg->end()
+                            ? std::vector<double>{}
+                            : waits->second);
+    const double representation =
+        options.decoration == HeuristicNetDecoration::kFrequency
+            ? static_cast<double>(count)
+            : performance_representation(summary,
+                                         options.performance_aggregation);
+    net.edges.push_back({ids.at(pair.first), ids.at(pair.second),
+                         dependencies.at(pair), count, representation, false});
+  }
+
+  // Non-PM compatibility extension, disabled by default.
+  if (options.connect_all) {
+    for (std::size_t source = 0; source < net.activities.size(); ++source) {
+      bool has_out = false;
+      for (const auto& edge : net.edges) has_out |= edge.source == source;
+      if (has_out || ends.contains(net.activities[source])) continue;
+      std::optional<NamePair> best;
+      double best_dep = 0.0;
+      for (const auto& [pair, dep] : dependencies) {
+        if (pair.first != net.activities[source] || dep <= 0.0 ||
+            pair_count(net.cleaned_dfg, pair.first, pair.second) <
+                options.min_frequency ||
+            activity_count(pair.first) < options.min_activity_count ||
+            activity_count(pair.second) < options.min_activity_count)
+          continue;
+        if (!best || dep > best_dep) {
+          best = pair;
+          best_dep = dep;
+        }
+      }
+      if (best && !initially_accepted.contains(*best)) {
+        const auto count =
+            pair_count(net.cleaned_dfg, best->first, best->second);
+        net.edges.push_back({ids.at(best->first), ids.at(best->second),
+                             best_dep, count,
+                             static_cast<double>(count), false});
+        initially_accepted.insert(*best);
+        active[ids.at(best->first)] = active[ids.at(best->second)] = true;
+      }
+    }
+  }
+
+  // Record AND pairs now; PM does not recompute them after loop-two rescue.
+  using AndKey = std::tuple<std::size_t, std::size_t, std::size_t>;
+  std::set<AndKey> and_out;
+  std::set<AndKey> and_in;
+  for (std::size_t center = 0; center < net.activities.size(); ++center) {
+    if (!active[center]) continue;
+    std::vector<std::size_t> successors;
+    std::vector<std::size_t> predecessors;
+    for (const auto& edge : net.edges) {
+      if (edge.source == center) successors.push_back(edge.target);
+      if (edge.target == center) predecessors.push_back(edge.source);
+    }
+    const auto by_name = [&](std::size_t lhs, std::size_t rhs) {
+      return net.activities[lhs] < net.activities[rhs];
+    };
+    std::sort(successors.begin(), successors.end(), by_name);
+    std::sort(predecessors.begin(), predecessors.end(), by_name);
+    const auto calculate = [&](const std::vector<std::size_t>& neighbours,
+                               bool outgoing, std::set<AndKey>& destination) {
+      for (std::size_t i = 0; i < neighbours.size(); ++i) {
+        for (std::size_t j = i + 1; j < neighbours.size(); ++j) {
+          const auto& first = net.activities[neighbours[i]];
+          const auto& second = net.activities[neighbours[j]];
+          const auto& middle = net.activities[center];
+          const double numerator = static_cast<double>(
+              pair_count(net.cleaned_dfg, first, second) +
+              pair_count(net.cleaned_dfg, second, first));
+          const double denominator = static_cast<double>(
+              (outgoing
+                   ? pair_count(net.cleaned_dfg, middle, first) +
+                         pair_count(net.cleaned_dfg, middle, second)
+                   : pair_count(net.cleaned_dfg, first, middle) +
+                         pair_count(net.cleaned_dfg, second, middle)) +
+              1);
+          if (numerator / denominator >= options.and_threshold)
+            destination.insert({center, neighbours[i], neighbours[j]});
+        }
+      }
+    };
+    calculate(successors, true, and_out);
+    calculate(predecessors, false, and_in);
+  }
+
+  // Frequency triples are deliberately not deduplicated by keep-once.
+  std::map<NamePair, std::uint64_t> loop_triples;
+  for (const auto& [triple, count] : input.frequency_triples) {
+    const auto& [first, middle, last] = triple;
+    if (first == last && first != middle)
+      loop_triples[{first, middle}] += count;
+  }
+  const auto nodes_before_loop = active;
+  std::set<NamePair> added_loop_edges;
+  for (std::size_t first_id = 0; first_id < net.activities.size();
+       ++first_id) {
+    if (!nodes_before_loop[first_id]) continue;
+    const auto& first = net.activities[first_id];
+    for (const auto& [pair, v1] : loop_triples) {
+      if (pair.first != first) continue;
+      const auto& second = pair.second;
+      if (!ids.contains(second)) continue;
+      const auto reverse = loop_triples.find({second, first});
+      const std::uint64_t v2 =
+          reverse == loop_triples.end() ? 0 : reverse->second;
+      const double l2 = static_cast<double>(v1 + v2) /
+                        static_cast<double>(v1 + v2 + 1);
+      if (l2 < options.loop_length_two_threshold) continue;
+      const NamePair forward{first, second};
+      const NamePair backward{second, first};
+      if (pair_count(net.cleaned_dfg, first, second) <
+              options.min_frequency ||
+          activity_count(first) < options.min_activity_count ||
+          activity_count(second) < options.min_activity_count)
+        continue;
+      const bool forward_dep =
+          dependencies.contains(forward) &&
+          dependencies.at(forward) >= dependency_threshold;
+      const bool backward_dep =
+          dependencies.contains(backward) &&
+          dependencies.at(backward) >= dependency_threshold;
+      if (forward_dep || backward_dep) continue;
+      active[ids.at(second)] = true;
+      for (const auto& direction : {forward, backward}) {
+        if (!added_loop_edges.insert(direction).second) continue;
+        const auto frequency =
+            pair_count(net.cleaned_dfg, direction.first, direction.second);
+        const auto waits =
+            input.performance_dfg
+                ? input.performance_dfg->find(direction)
+                : HeuristicPerformanceDfg::const_iterator{};
+        const WaitSummary summary =
+            summarize_waits(!input.performance_dfg ||
+                                    waits == input.performance_dfg->end()
+                                ? std::vector<double>{}
+                                : waits->second);
+        const double representation =
+            options.decoration == HeuristicNetDecoration::kFrequency
+                ? static_cast<double>(frequency)
+                : performance_representation(
+                      summary, options.performance_aggregation);
+        net.edges.push_back(
+            {ids.at(direction.first), ids.at(direction.second), 0.0,
+             frequency, representation, true});
+      }
+    }
+  }
+
+  if (std::none_of(active.begin(), active.end(), [](bool value) {
+        return value;
+      }))
+    std::fill(active.begin(), active.end(), true);
+  for (std::size_t id = 0; id < active.size(); ++id)
+    if (active[id]) net.active_activities.push_back(id);
+  for (const auto id : net.active_activities) {
+    if (starts.contains(net.activities[id])) net.start_activities.push_back(id);
+    if (ends.contains(net.activities[id])) net.end_activities.push_back(id);
+  }
+
+  net.output_bundles.assign(net.activities.size(), {});
+  net.input_bundles.assign(net.activities.size(), {});
+  for (const auto center : net.active_activities) {
+    std::vector<std::size_t> successors;
+    std::vector<std::size_t> predecessors;
+    for (const auto& edge : net.edges) {
+      if (edge.source == center) successors.push_back(edge.target);
+      if (edge.target == center) predecessors.push_back(edge.source);
+    }
+    const auto by_name = [&](std::size_t lhs, std::size_t rhs) {
+      return net.activities[lhs] < net.activities[rhs];
+    };
+    std::sort(successors.begin(), successors.end(), by_name);
+    successors.erase(std::unique(successors.begin(), successors.end()),
+                     successors.end());
+    std::sort(predecessors.begin(), predecessors.end(), by_name);
+    predecessors.erase(std::unique(predecessors.begin(), predecessors.end()),
+                       predecessors.end());
+    const auto bundle = [&](const std::vector<std::size_t>& neighbours,
+                            const std::set<AndKey>& relations) {
+      std::vector<std::vector<bool>> adjacent(
+          neighbours.size(), std::vector<bool>(neighbours.size(), false));
+      for (std::size_t i = 0; i < neighbours.size(); ++i)
+        for (std::size_t j = i + 1; j < neighbours.size(); ++j)
+          adjacent[i][j] = adjacent[j][i] =
+              relations.contains({center, neighbours[i], neighbours[j]});
+      return maximal_cliques(neighbours, adjacent);
+    };
+    net.output_bundles[center] = bundle(successors, and_out);
+    net.input_bundles[center] = bundle(predecessors, and_in);
+    sort_bundles_by_activity_name(net.output_bundles[center],
+                                  net.activities);
+    sort_bundles_by_activity_name(net.input_bundles[center],
+                                  net.activities);
+  }
+
+  for (std::size_t id = 0; id < net.activities.size(); ++id) {
+    const auto& name = net.activities[id];
+    net.activity_statistics.push_back(
+        {id, activity_count(name),
+         starts.contains(name) ? starts.at(name) : 0,
+         ends.contains(name) ? ends.at(name) : 0, 0.0});
+  }
+  std::set<NamePair> statistic_pairs;
+  for (const auto& [pair, _] : input.dfg) statistic_pairs.insert(pair);
+  for (const auto& edge : net.edges)
+    statistic_pairs.insert(
+        {net.activities[edge.source], net.activities[edge.target]});
+  for (const auto& pair : statistic_pairs) {
+    if (!ids.contains(pair.first) || !ids.contains(pair.second)) continue;
+    const auto raw_count = pair_count(input.dfg, pair.first, pair.second);
+    const auto cleaned = pair_count(net.cleaned_dfg, pair.first, pair.second);
+    const auto waits = input.performance_dfg
+                           ? input.performance_dfg->find(pair)
+                           : HeuristicPerformanceDfg::const_iterator{};
+    const WaitSummary summary =
+        summarize_waits(!input.performance_dfg ||
+                                waits == input.performance_dfg->end()
+                            ? std::vector<double>{}
+                            : waits->second);
+    const auto edge_it = std::find_if(
+        net.edges.begin(), net.edges.end(), [&](const auto& edge) {
+          return edge.source == ids.at(pair.first) &&
+                 edge.target == ids.at(pair.second);
+        });
+    const double representation =
+        options.decoration == HeuristicNetDecoration::kFrequency
+            ? static_cast<double>(cleaned)
+            : performance_representation(summary,
+                                         options.performance_aggregation);
+    net.relation_statistics.push_back(
+        {ids.at(pair.first), ids.at(pair.second), cleaned,
+         static_cast<std::uint64_t>(summary.samples.size()), summary.mean,
+         raw_count, cleaned, representation,
+         edge_it != net.edges.end() && edge_it->length_two_loop,
+         summary.samples, summary.median, summary.minimum, summary.maximum,
+         summary.stdev, summary.sum});
+  }
+  std::sort(net.edges.begin(), net.edges.end(),
+            [](const auto& lhs, const auto& rhs) {
+              return std::tie(lhs.source, lhs.target) <
+                     std::tie(rhs.source, rhs.target);
+            });
+  return net;
+}
+
+HeuristicsNet discover_plus_plus(const EventLog& log,
+                                 const HeuristicMinerOptions& options) {
+  const PlusAbstraction abstraction = build_plus_abstraction(log, options);
+  HeuristicsNet net;
+  net.variant = HeuristicMinerVariant::kPlusPlus;
+  net.decoration = options.decoration;
+  net.performance_aggregation = options.performance_aggregation;
+
+  std::unordered_map<std::string, std::size_t> ids;
+  for (const auto& activity : abstraction.activity_order) {
+    if (abstraction.occurrences.at(activity) < options.min_activity_count)
+      continue;
+    ids.emplace(activity, net.activities.size());
+    net.activities.push_back(activity);
+  }
+  const std::size_t n = net.activities.size();
+  net.active_activities.resize(n);
+  std::iota(net.active_activities.begin(), net.active_activities.end(), 0);
+  net.output_bundles.assign(n, {});
+  net.input_bundles.assign(n, {});
+  for (std::size_t id = 0; id < n; ++id) {
+    const auto& activity = net.activities[id];
+    const auto start = abstraction.starts.find(activity);
+    const auto end = abstraction.ends.find(activity);
+    if (start != abstraction.starts.end()) net.start_activities.push_back(id);
+    if (end != abstraction.ends.end()) net.end_activities.push_back(id);
+    net.activity_statistics.push_back(
+        {id, abstraction.occurrences.at(activity),
+         start == abstraction.starts.end() ? 0 : start->second,
+         end == abstraction.ends.end() ? 0 : end->second,
+         abstraction.sojourn_sums.at(activity) /
+             static_cast<double>(abstraction.occurrences.at(activity))});
+  }
+  // PM keeps sojourn data before activity filtering. Preserve every activity
+  // and attach an id only when it survived the node filter.
+  for (const auto& activity : abstraction.activity_order) {
+    net.raw_activity_statistics.push_back(
+        {activity,
+         abstraction.occurrences.at(activity),
+         abstraction.sojourn_sums.at(activity) /
+             static_cast<double>(abstraction.occurrences.at(activity))});
+  }
+
+  for (const auto& [pair, frequency] : abstraction.eventually_follows) {
+    const auto source = ids.find(pair.first);
+    const auto target = ids.find(pair.second);
+    if (source == ids.end() || target == ids.end() ||
+        frequency < options.min_frequency)
+      continue;
+    const auto direct = abstraction.direct_adjacency.find(pair);
+    const std::uint64_t direct_frequency =
+        direct == abstraction.direct_adjacency.end() ? 0 : direct->second;
+    const double mean_wait =
+        direct_frequency == 0
+            ? 0.0
+            : abstraction.wait_sums.at(pair) /
+                  static_cast<double>(direct_frequency);
+    const auto samples = abstraction.wait_samples.find(pair);
+    const WaitSummary summary =
+        summarize_waits(samples == abstraction.wait_samples.end()
+                            ? std::vector<double>{}
+                            : samples->second);
+    const double representation =
+        options.decoration == HeuristicNetDecoration::kFrequency
+            ? static_cast<double>(frequency)
+            : performance_representation(summary,
+                                         options.performance_aggregation);
+    net.relation_statistics.push_back(
+        {source->second, target->second, frequency, direct_frequency,
+         mean_wait, frequency, frequency, representation, false,
+         summary.samples, summary.median, summary.minimum, summary.maximum,
+         summary.stdev, summary.sum});
+    const double dependency =
+        plus_dependency(abstraction, pair.first, pair.second,
+                        options.min_frequency);
+    if (dependency > effective_dependency_threshold(options))
+      net.edges.push_back({source->second, target->second, dependency,
+                           frequency, representation, false});
+  }
+  for (const auto& [pair, frequency] : abstraction.concurrency) {
+    const auto first = ids.find(pair.first);
+    const auto second = ids.find(pair.second);
+    net.raw_concurrency_statistics.push_back(
+        {pair.first, pair.second, frequency});
+    if (first != ids.end() && second != ids.end())
+      net.concurrency_statistics.push_back(
+          {first->second, second->second, frequency});
+  }
+  std::sort(net.edges.begin(), net.edges.end(),
+            [](const auto& lhs, const auto& rhs) {
+              return std::tie(lhs.source, lhs.target) <
+                     std::tie(rhs.source, rhs.target);
+            });
+
+  std::vector<std::vector<std::size_t>> successors(n);
+  std::vector<std::vector<std::size_t>> predecessors(n);
+  for (const auto& edge : net.edges) {
+    successors[edge.source].push_back(edge.target);
+    predecessors[edge.target].push_back(edge.source);
+  }
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    const auto by_name = [&](std::size_t lhs, std::size_t rhs) {
+      return net.activities[lhs] < net.activities[rhs];
+    };
+    std::sort(successors[activity].begin(), successors[activity].end(),
+              by_name);
+    std::sort(predecessors[activity].begin(), predecessors[activity].end(),
+              by_name);
+    net.output_bundles[activity] =
+        plus_bundles(abstraction, net, activity, successors[activity], true,
+                     options.and_threshold, options.min_frequency);
+    net.input_bundles[activity] =
+        plus_bundles(abstraction, net, activity, predecessors[activity], false,
+                     options.and_threshold, options.min_frequency);
+    sort_bundles_by_activity_name(net.output_bundles[activity],
+                                  net.activities);
+    sort_bundles_by_activity_name(net.input_bundles[activity],
+                                  net.activities);
+  }
+  return net;
+}
+
 }  // namespace
 
 HeuristicsNet discover_heuristics_net(
     const EventLog& log,
     const HeuristicMinerOptions& options) {
-  const Counts counts = build_counts(log);
-  const std::size_t n = counts.size();
+  if (options.variant == HeuristicMinerVariant::kPlusPlus)
+    return discover_plus_plus(log, options);
+  return discover_classic_dfg(build_classic_input(log, options), options);
+}
 
-  HeuristicsNet net;
-  net.activities = counts.names;
-  net.start_activities.assign(counts.starts.begin(), counts.starts.end());
-  net.end_activities.assign(counts.ends.begin(), counts.ends.end());
-
-  // Accept an edge once, keyed by (source, target) so the threshold pass and
-  // the connectivity pass never emit a duplicate.
-  std::set<std::pair<std::size_t, std::size_t>> accepted;
-  const auto accept = [&](std::size_t a, std::size_t b) {
-    if (!accepted.emplace(a, b).second) return;
-    net.edges.push_back(HeuristicDependency{a, b, dependency(counts, a, b),
-                                            counts.follows[a][b]});
-  };
-
-  // Every relation that clears both thresholds.
-  for (std::size_t a = 0; a < n; ++a) {
-    for (std::size_t b = 0; b < n; ++b) {
-      if (counts.follows[a][b] >= options.min_frequency &&
-          dependency(counts, a, b) >= options.dependency_threshold) {
-        accept(a, b);
-      }
-    }
-  }
-
-  // Connectivity heuristic: give every non-end activity its strongest outgoing
-  // dependency and every non-start activity its strongest incoming one, so the
-  // graph stays connected even where the threshold would prune the last edge.
-  if (options.connect_all) {
-    const auto best_target = [&](std::size_t a) {
-      bool found = false;
-      std::size_t best = 0;
-      double best_dep = 0.0;
-      for (std::size_t b = 0; b < n; ++b) {
-        if (b == a || counts.follows[a][b] == 0) continue;
-        const double dep = dependency(counts, a, b);
-        if (!found || dep > best_dep) {
-          found = true;
-          best = b;
-          best_dep = dep;
-        }
-      }
-      return std::pair<bool, std::size_t>{found && best_dep > 0.0, best};
-    };
-    const auto best_source = [&](std::size_t b) {
-      bool found = false;
-      std::size_t best = 0;
-      double best_dep = 0.0;
-      for (std::size_t a = 0; a < n; ++a) {
-        if (a == b || counts.follows[a][b] == 0) continue;
-        const double dep = dependency(counts, a, b);
-        if (!found || dep > best_dep) {
-          found = true;
-          best = a;
-          best_dep = dep;
-        }
-      }
-      return std::pair<bool, std::size_t>{found && best_dep > 0.0, best};
-    };
-
-    std::vector<bool> has_out(n, false);
-    std::vector<bool> has_in(n, false);
-    for (const auto& [a, b] : accepted) {
-      has_out[a] = true;
-      has_in[b] = true;
-    }
-    for (std::size_t a = 0; a < n; ++a) {
-      if (!has_out[a] && counts.ends.find(a) == counts.ends.end()) {
-        if (const auto [ok, b] = best_target(a); ok) accept(a, b);
-      }
-      if (!has_in[a] && counts.starts.find(a) == counts.starts.end()) {
-        if (const auto [ok, b] = best_source(a); ok) accept(b, a);
-      }
-    }
-  }
-
-  std::sort(net.edges.begin(), net.edges.end(),
-            [](const HeuristicDependency& lhs, const HeuristicDependency& rhs) {
-              if (lhs.source != rhs.source) return lhs.source < rhs.source;
-              return lhs.target < rhs.target;
-            });
-
-  // Derive the split/join semantics: partition each activity's successors and
-  // predecessors into AND bundles. A self-loop is kept out of the clustering
-  // and appended as its own bundle — repeating is always an alternative to
-  // moving on, never concurrent with it.
-  net.output_bundles.assign(n, {});
-  net.input_bundles.assign(n, {});
-  std::vector<std::vector<std::size_t>> successors(n);
-  std::vector<std::vector<std::size_t>> predecessors(n);
-  std::vector<bool> self_loop(n, false);
-  for (const auto& edge : net.edges) {
-    if (edge.source == edge.target) {
-      self_loop[edge.source] = true;
-    } else {
-      successors[edge.source].push_back(edge.target);
-      predecessors[edge.target].push_back(edge.source);
-    }
-  }
-  for (std::size_t a = 0; a < n; ++a) {
-    net.output_bundles[a] =
-        to_bundles(counts, a, successors[a], true, options.and_threshold);
-    net.input_bundles[a] =
-        to_bundles(counts, a, predecessors[a], false, options.and_threshold);
-    if (self_loop[a]) {
-      net.output_bundles[a].push_back({a});
-      net.input_bundles[a].push_back({a});
-    }
-  }
-  return net;
+HeuristicsNet discover_heuristics_net(
+    const HeuristicClassicDfgInput& input,
+    const HeuristicMinerOptions& options) {
+  return discover_classic_dfg(input, options);
 }
 
 }  // namespace minera
