@@ -47,6 +47,13 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
     options.footprintsConformanceVariants !== undefined &&
     (options.footprintsConformanceVariants.length !== 1 ||
       !options.footprintsConformanceVariants.includes("log_model"));
+  const dfgStatisticalActive = options.dfgStatisticalVariants?.some((name) =>
+    ["native", "frequency", "frequency_greedy", "frequency_triples", "performance",
+      "performance_greedy", "case_attributes", "clean", "clean_polars", "clean_time"].includes(name),
+  );
+  const dfgCausalActive = options.dfgCausalVariants?.some((name) =>
+    ["alpha", "heuristic"].includes(name),
+  );
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
@@ -96,7 +103,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.footprintsModel && options.footprintsModel !== "process_tree" ||
       footprintsConformanceActive ||
       options.footprintsStrict === true ||
-      options.footprintsEnableActAlwaysExecuted === false
+      options.footprintsEnableActAlwaysExecuted === false ||
+      dfgStatisticalActive || dfgCausalActive
   );
 }
 

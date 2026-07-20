@@ -151,6 +151,18 @@ export interface MinerOptions {
   footprintsConformanceVariants?: string[];
   footprintsStrict?: boolean;
   footprintsEnableActAlwaysExecuted?: boolean;
+  /** Optional PM4Py statistical and causal DFG analyses. */
+  dfgStatisticalVariants?: string[];
+  dfgCausalVariants?: string[];
+  dfgWindow?: number;
+  dfgKeepOncePerCase?: boolean;
+  dfgPerformanceAggregation?:
+    | "mean" | "median" | "min" | "max" | "stdev" | "sum" | "raw_values" | "all";
+  dfgStartTimestampAttribute?: string;
+  dfgBusinessHours?: boolean;
+  dfgBusinessHourSlots?: string;
+  dfgCaseAttributes?: string[];
+  dfgReturnNodeAttributes?: boolean;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -398,6 +410,64 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.footprintsStrict) add("footprints_strict", "true");
   if (options.footprintsEnableActAlwaysExecuted === false)
     add("footprints_enable_act_always_executed", "false");
+
+  const dfgStatisticalNames = [
+    "native", "frequency", "frequency_greedy", "frequency_triples",
+    "performance", "performance_greedy", "case_attributes", "clean",
+    "clean_polars", "clean_time",
+  ];
+  const dfgCausalNames = ["alpha", "heuristic"];
+  const selectedDfgStatistical = options.dfgStatisticalVariants
+    ? dfgStatisticalNames.filter((name) => options.dfgStatisticalVariants?.includes(name))
+    : [];
+  const selectedDfgCausal = options.dfgCausalVariants
+    ? dfgCausalNames.filter((name) => options.dfgCausalVariants?.includes(name))
+    : [];
+  const hasDfgFrequency =
+    selectedDfgCausal.length > 0 ||
+    selectedDfgStatistical.some((name) =>
+      ["native", "frequency", "frequency_greedy"].includes(name));
+  const hasDfgPerformance = selectedDfgStatistical.some((name) =>
+    ["performance", "performance_greedy"].includes(name));
+  const hasDfgCaseAttributes =
+    selectedDfgStatistical.includes("case_attributes");
+  if (selectedDfgStatistical.length)
+    add("dfg_statistical_variants", selectedDfgStatistical.join(","));
+  if (selectedDfgCausal.length)
+    add("dfg_causal_variants", selectedDfgCausal.join(","));
+  if (hasDfgFrequency) {
+    if (options.dfgWindow !== undefined && Number.isInteger(options.dfgWindow) && options.dfgWindow >= 0 && options.dfgWindow !== 1)
+      add("dfg_window", String(options.dfgWindow));
+    if (options.dfgKeepOncePerCase) add("dfg_keep_once_per_case", "true");
+  }
+  if (hasDfgPerformance) {
+    const aggregations = ["mean", "median", "min", "max", "stdev", "sum", "raw_values", "all"];
+    if (options.dfgPerformanceAggregation && aggregations.includes(options.dfgPerformanceAggregation) && options.dfgPerformanceAggregation !== "mean")
+      add("dfg_performance_aggregation", options.dfgPerformanceAggregation);
+    if (options.dfgStartTimestampAttribute?.trim() && options.dfgStartTimestampAttribute.trim() !== "start_timestamp")
+      add("dfg_start_timestamp_attribute", options.dfgStartTimestampAttribute.trim());
+    if (options.dfgBusinessHours) add("dfg_business_hours", "true");
+    const businessHourSlots = options.dfgBusinessHourSlots?.trim();
+    if (options.dfgBusinessHours && businessHourSlots) {
+      const validSlots = businessHourSlots.split(",").every((slot) => {
+        const match = slot.trim().match(
+          /^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/,
+        );
+        if (!match) return false;
+        const start = Number(match[1]);
+        const end = Number(match[2]);
+        return Number.isFinite(start) && Number.isFinite(end) &&
+          start >= 0 && start < end && end <= 604800;
+      });
+      if (validSlots) add("dfg_business_hour_slots", businessHourSlots);
+    }
+  }
+  if (hasDfgCaseAttributes) {
+    const caseAttributes = options.dfgCaseAttributes?.map((name) => name.trim()).filter(Boolean);
+    if (caseAttributes?.length && !(caseAttributes.length === 1 && caseAttributes[0] === "concept:name"))
+      add("dfg_case_attributes", caseAttributes.join(","));
+    if (options.dfgReturnNodeAttributes) add("dfg_return_node_attributes", "true");
+  }
 
   return entries;
 }

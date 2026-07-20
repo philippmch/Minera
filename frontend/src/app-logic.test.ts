@@ -156,6 +156,8 @@ describe("hasActiveMinerOptions", () => {
       heuristicStartTimestampAttribute: "start_timestamp",
       heuristicLifecycleInstanceAttribute: "concept:instance",
     })).toBe(false);
+    expect(hasActiveMinerOptions({ dfgStatisticalVariants: [], dfgCausalVariants: [] })).toBe(false);
+    expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["unknown"], dfgCausalVariants: ["unknown"] })).toBe(false);
     expect(hasActiveMinerOptions({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toBe(false);
     expect(hasActiveMinerOptions({ powlVariant: "maximal", powlFilteringType: "decreasing_factor", powlFilteringThreshold: 0, powlOrderFrequencyRatio: 1, powlBruteForceActivityLimit: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ tokenReplayVariant: "forward", tokenReplayStopImmediatelyUnfit: false })).toBe(false);
@@ -219,6 +221,8 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ footprintsConformanceVariants: ["trace_extensive"] })).toBe(true);
     expect(hasActiveMinerOptions({ footprintsStrict: true })).toBe(true);
     expect(hasActiveMinerOptions({ footprintsEnableActAlwaysExecuted: false })).toBe(true);
+    expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
+    expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
   });
 });
 
@@ -395,6 +399,75 @@ describe("mineFormEntries", () => {
     })).toEqual([
       ["footprints_discovery_variants", "dfg"],
       ["footprints_model", "dfg"],
+    ]);
+  });
+
+  it("maps optional statistical and causal DFG analyses in canonical order", () => {
+    expect(mineFormEntries({
+      dfgStatisticalVariants: [
+        "clean_time", "frequency", "unknown", "performance", "case_attributes",
+      ],
+      dfgCausalVariants: ["heuristic", "bogus", "alpha"],
+      dfgWindow: 0,
+      dfgKeepOncePerCase: true,
+      dfgPerformanceAggregation: "all",
+      dfgStartTimestampAttribute: "time:start",
+      dfgBusinessHours: true,
+      dfgBusinessHourSlots: "25200-61200,111600-147600",
+      dfgCaseAttributes: ["concept:name", "region"],
+      dfgReturnNodeAttributes: true,
+    })).toEqual([
+      ["dfg_statistical_variants", "frequency,performance,case_attributes,clean_time"],
+      ["dfg_causal_variants", "alpha,heuristic"],
+      ["dfg_window", "0"],
+      ["dfg_keep_once_per_case", "true"],
+      ["dfg_performance_aggregation", "all"],
+      ["dfg_start_timestamp_attribute", "time:start"],
+      ["dfg_business_hours", "true"],
+      ["dfg_business_hour_slots", "25200-61200,111600-147600"],
+      ["dfg_case_attributes", "concept:name,region"],
+      ["dfg_return_node_attributes", "true"],
+    ]);
+    expect(mineFormEntries({
+      dfgStatisticalVariants: ["unknown"], dfgCausalVariants: ["unknown"],
+      dfgWindow: 0, dfgBusinessHours: true,
+    })).toEqual([]);
+    expect(mineFormEntries({
+      dfgCausalVariants: ["alpha"], dfgWindow: 0,
+      dfgKeepOncePerCase: true, dfgPerformanceAggregation: "all",
+    })).toEqual([
+      ["dfg_causal_variants", "alpha"],
+      ["dfg_window", "0"],
+      ["dfg_keep_once_per_case", "true"],
+    ]);
+    expect(mineFormEntries({
+      dfgStatisticalVariants: ["native"], dfgWindow: 1,
+      dfgPerformanceAggregation: "mean", dfgStartTimestampAttribute: "start_timestamp",
+      dfgCaseAttributes: ["concept:name"], dfgBusinessHourSlots: "0-604801",
+    })).toEqual([["dfg_statistical_variants", "native"]]);
+    expect(mineFormEntries({
+      dfgStatisticalVariants: ["clean_time"], dfgWindow: 0,
+      dfgKeepOncePerCase: true, dfgPerformanceAggregation: "all",
+      dfgStartTimestampAttribute: "started", dfgBusinessHours: true,
+      dfgBusinessHourSlots: "0-3600", dfgCaseAttributes: ["region"],
+      dfgReturnNodeAttributes: true,
+    })).toEqual([["dfg_statistical_variants", "clean_time"]]);
+    expect(mineFormEntries({
+      dfgStatisticalVariants: ["case_attributes"],
+      dfgCaseAttributes: ["region"], dfgReturnNodeAttributes: true,
+      dfgWindow: 0, dfgPerformanceAggregation: "all",
+    })).toEqual([
+      ["dfg_statistical_variants", "case_attributes"],
+      ["dfg_case_attributes", "region"],
+      ["dfg_return_node_attributes", "true"],
+    ]);
+    expect(mineFormEntries({
+      dfgStatisticalVariants: ["performance"],
+      dfgBusinessHours: true, dfgBusinessHourSlots: "0.5-3600.5",
+    })).toEqual([
+      ["dfg_statistical_variants", "performance"],
+      ["dfg_business_hours", "true"],
+      ["dfg_business_hour_slots", "0.5-3600.5"],
     ]);
   });
 

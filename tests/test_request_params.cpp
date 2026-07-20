@@ -545,6 +545,119 @@ void parse_mine_params_rejects_invalid_footprints_options() {
   assert(threw);
 }
 
+void parse_mine_params_maps_dfg_variant_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"dfg_statistical_variants",
+       "clean_time,frequency_greedy,native,frequency,clean_time,performance"},
+      {"dfg_causal_variants", "heuristic,alpha,heuristic"},
+      {"dfg_window", "0"},
+      {"dfg_keep_once_per_case", "true"},
+      {"dfg_performance_aggregation", "all"},
+      {"dfg_start_timestamp_attribute", "start:timestamp"},
+      {"dfg_business_hours", "1"},
+      {"dfg_business_hour_slots", "0-3600,7200:10800"},
+      {"dfg_case_attributes", "region,concept:name,region"},
+      {"dfg_return_node_attributes", "true"},
+  }));
+  assert((params.dfg_statistical_variants ==
+          std::vector<std::string>{"native", "frequency",
+                                   "frequency_greedy", "performance",
+                                   "clean_time"}));
+  assert((params.dfg_causal_variants ==
+          std::vector<std::string>{"alpha", "heuristic"}));
+  assert(params.dfg_statistics.window == 0);
+  assert(params.dfg_statistics.keep_once_per_case);
+  assert(params.dfg_statistics.performance_aggregation ==
+         minera::DfgPerformanceAggregation::kAll);
+  assert(params.dfg_statistics.start_timestamp_attribute ==
+         "start:timestamp");
+  assert(params.dfg_statistics.use_business_hours);
+  assert(params.dfg_statistics.business_hour_slots.size() == 2);
+  assert(params.dfg_statistics.business_hour_slots[0].start_seconds == 0.0);
+  assert(params.dfg_statistics.business_hour_slots[0].end_seconds == 3600.0);
+  assert(params.dfg_statistics.business_hour_slots[1].start_seconds == 7200.0);
+  assert(params.dfg_statistics.business_hour_slots[1].end_seconds == 10800.0);
+  assert((params.dfg_statistics.case_attributes ==
+          std::vector<std::string>{"concept:name", "region"}));
+  assert(params.dfg_statistics.return_node_attributes);
+
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert(defaults.dfg_statistical_variants.empty());
+  assert(defaults.dfg_causal_variants.empty());
+  assert(defaults.dfg_statistics.window == 1);
+  assert(!defaults.dfg_statistics.keep_once_per_case);
+  assert(defaults.dfg_statistics.performance_aggregation ==
+         minera::DfgPerformanceAggregation::kMean);
+  assert(defaults.dfg_statistics.start_timestamp_attribute ==
+         "start_timestamp");
+  assert(!defaults.dfg_statistics.use_business_hours);
+  assert(defaults.dfg_statistics.business_hour_slots.empty());
+  assert((defaults.dfg_statistics.case_attributes ==
+          std::vector<std::string>{"concept:name"}));
+  assert(!defaults.dfg_statistics.return_node_attributes);
+}
+
+void parse_mine_params_preserves_explicit_empty_dfg_attributes() {
+  const std::map<std::string, std::string> values = {
+      {"dfg_start_timestamp_attribute", ""},
+      {"dfg_business_hour_slots", ""},
+      {"dfg_case_attributes", ""},
+  };
+  const auto lookup = [&values](std::string_view name) -> std::string {
+    const auto it = values.find(std::string(name));
+    return it == values.end() ? std::string{} : it->second;
+  };
+  const auto present = [&values](std::string_view name) {
+    return values.contains(std::string(name));
+  };
+  const auto params = minera::parse_mine_params(lookup, present);
+  assert(params.dfg_statistics.start_timestamp_attribute.empty());
+  assert(params.dfg_statistics.business_hour_slots.empty());
+  assert(params.dfg_statistics.case_attributes.empty());
+}
+
+void parse_mine_params_rejects_invalid_dfg_variant_options() {
+  for (const auto& item : {
+           std::pair{"dfg_statistical_variants", "native,unknown"},
+           std::pair{"dfg_causal_variants", "alpha,future"},
+           std::pair{"dfg_window", "-1"},
+           std::pair{"dfg_window", "2x"},
+           std::pair{"dfg_keep_once_per_case", "yes"},
+           std::pair{"dfg_performance_aggregation", "average"},
+           std::pair{"dfg_business_hours", "on"},
+           std::pair{"dfg_business_hour_slots", "0-0"},
+           std::pair{"dfg_business_hour_slots", "0-604801"},
+           std::pair{"dfg_business_hour_slots", "nan-10"},
+           std::pair{"dfg_return_node_attributes", "yes"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  for (const std::string name : {"dfg_statistical_variants",
+                                 "dfg_causal_variants"}) {
+    const std::map<std::string, std::string> values = {{name, ""}};
+    const auto lookup = [&values](std::string_view key) -> std::string {
+      const auto it = values.find(std::string(key));
+      return it == values.end() ? std::string{} : it->second;
+    };
+    const auto present = [&values](std::string_view key) {
+      return values.contains(std::string(key));
+    };
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(lookup, present);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
@@ -595,5 +708,8 @@ int main() {
   parse_mine_params_rejects_invalid_declare_fields();
   parse_mine_params_maps_footprints_options();
   parse_mine_params_rejects_invalid_footprints_options();
+  parse_mine_params_maps_dfg_variant_options();
+  parse_mine_params_preserves_explicit_empty_dfg_attributes();
+  parse_mine_params_rejects_invalid_dfg_variant_options();
   return 0;
 }
