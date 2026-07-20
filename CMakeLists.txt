@@ -23,6 +23,7 @@ add_library(minera_core
   src/alpha_miner.cpp
   src/bpmn.cpp
   src/conformance.cpp
+  src/correlation_miner.cpp
   src/csv_event_log_importer.cpp
   src/declare.cpp
   src/declare_playout.cpp
@@ -117,6 +118,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_correlation_miner_tests
+    tests/test_correlation_miner.cpp
+  )
+  target_link_libraries(minera_correlation_miner_tests PRIVATE minera::core)
+  target_compile_features(minera_correlation_miner_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_correlation_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_correlation_miner_tests COMMAND minera_correlation_miner_tests)
 
   add_executable(minera_perspective_tests
     tests/test_perspectives.cpp

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/dfg_variants.hpp"
@@ -95,7 +96,9 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<DeclareConformance>*
                              declare_conformance = nullptr,
                          const FootprintsAnalysis* footprints = nullptr,
-                         const DfgVariantsAnalysis* dfg_variants = nullptr);
+                         const DfgVariantsAnalysis* dfg_variants = nullptr,
+                         const CorrelationVariantsAnalysis*
+                             correlation_mining = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -128,7 +131,8 @@ void write_analysis_json(std::ostream& out,
     const DeclareModel* declare = nullptr,
     const std::vector<DeclareConformance>* declare_conformance = nullptr,
     const FootprintsAnalysis* footprints = nullptr,
-    const DfgVariantsAnalysis* dfg_variants = nullptr);
+    const DfgVariantsAnalysis* dfg_variants = nullptr,
+    const CorrelationVariantsAnalysis* correlation_mining = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

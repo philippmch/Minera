@@ -75,6 +75,74 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.filter.any());
   assert(params.inductive.noise_threshold == 0.0);
   assert(params.alpha.short_loops);  // Alpha+ is the default variant
+  assert(params.correlation_variants.empty());
+  assert(params.correlation.start_timestamp_attribute.empty());
+  assert(!params.correlation.exact_time_matching);
+  assert(params.correlation.sample_size == 100000);
+}
+
+void parse_mine_params_maps_correlation_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"correlation_variants", "trace_based, classic, classic,classic_split"},
+      {"correlation_start_timestamp_attribute", "started_at"},
+      {"correlation_exact_time_matching", "1"},
+      {"correlation_sample_size", "42"},
+  }));
+  assert((params.correlation_variants ==
+          std::vector<std::string>{"classic", "classic_split", "trace_based"}));
+  assert(params.correlation.start_timestamp_attribute == "started_at");
+  assert(params.correlation.exact_time_matching);
+  assert(params.correlation.sample_size == 42);
+}
+
+void parse_mine_params_preserves_explicit_empty_correlation_timestamp() {
+  const std::map<std::string, std::string> values = {
+      {"correlation_start_timestamp_attribute", ""}};
+  const auto lookup = [&values](std::string_view name) -> std::string {
+    const auto it = values.find(std::string(name));
+    return it == values.end() ? std::string{} : it->second;
+  };
+  const auto present = [&values](std::string_view name) {
+    return values.contains(std::string(name));
+  };
+  const auto explicit_empty = minera::parse_mine_params(lookup, present);
+  assert(explicit_empty.correlation.start_timestamp_attribute.empty());
+  // Compatibility overload treats an empty value as omitted too.
+  const auto legacy = minera::parse_mine_params(lookup);
+  assert(legacy.correlation.start_timestamp_attribute.empty());
+}
+
+void parse_mine_params_rejects_invalid_correlation_options() {
+  for (const auto& item : {
+           std::pair{"correlation_variants", "classic,bogus"},
+           std::pair{"correlation_exact_time_matching", "yes"},
+           std::pair{"correlation_sample_size", "0"},
+           std::pair{"correlation_sample_size", "-1"},
+           std::pair{"correlation_sample_size", "12x"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> empty = {
+      {"correlation_variants", ""}};
+  const auto lookup = [&empty](std::string_view name) -> std::string {
+    const auto it = empty.find(std::string(name));
+    return it == empty.end() ? std::string{} : it->second;
+  };
+  const auto present = [&empty](std::string_view name) {
+    return empty.contains(std::string(name));
+  };
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_maps_csv_and_inductive_options() {
@@ -686,6 +754,9 @@ int main() {
   split_csv_trims_and_drops_empty_parts();
   error_json_escapes_quotes_and_backslashes();
   parse_mine_params_defaults_when_empty();
+  parse_mine_params_maps_correlation_options();
+  parse_mine_params_preserves_explicit_empty_correlation_timestamp();
+  parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_an_unknown_time_mode();

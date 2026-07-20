@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <sstream>
 #include <set>
 #include <stdexcept>
@@ -2035,6 +2036,135 @@ void write_dfg_variants(std::ostream& out,
   out << "]}";
 }
 
+void validate_correlation_mining(
+    const CorrelationVariantsAnalysis& variants,
+    const DirectlyFollowsGraph& graph) {
+  const auto validate_pair = [&](const DfgActivityPair& pair) {
+    (void)dfg_variant_activity_id(graph, pair.first);
+    (void)dfg_variant_activity_id(graph, pair.second);
+  };
+  std::set<DfgActivityPair> expected_matrix_pairs;
+  for (const auto& source : graph.activities()) {
+    if (graph.activity_count(source) == 0) continue;
+    for (const auto& target : graph.activities()) {
+      if (graph.activity_count(target) != 0) {
+        expected_matrix_pairs.emplace(source, target);
+      }
+    }
+  }
+  for (const auto& named : variants.variants) {
+    std::optional<CorrelationVariant> named_variant;
+    if (named.name == "classic") {
+      named_variant = CorrelationVariant::kClassic;
+    } else if (named.name == "classic_split") {
+      named_variant = CorrelationVariant::kClassicSplit;
+    } else if (named.name == "trace_based") {
+      named_variant = CorrelationVariant::kTraceBased;
+    }
+    if (!named_variant || *named_variant != named.analysis.variant) {
+      throw std::invalid_argument(
+          "correlation-miner variant name and result do not agree");
+    }
+    const auto& analysis = named.analysis;
+    if (analysis.frequency_dfg.size() != analysis.performance_dfg.size()) {
+      throw std::invalid_argument(
+          "correlation frequency/performance DFGs must have the same edges");
+    }
+    for (const auto& [pair, count] : analysis.frequency_dfg) {
+      (void)count;
+      validate_pair(pair);
+      if (!analysis.performance_dfg.contains(pair)) {
+        throw std::invalid_argument(
+            "correlation frequency edge has no performance value");
+      }
+    }
+    for (const auto& [pair, value] : analysis.performance_dfg) {
+      validate_pair(pair);
+      if (!analysis.frequency_dfg.contains(pair) || !std::isfinite(value) ||
+          value < 0.0) {
+        throw std::invalid_argument(
+            "correlation performance edge is invalid");
+      }
+    }
+    for (const auto& [pair, value] :
+         analysis.precede_succeed_probability) {
+      validate_pair(pair);
+      if (!std::isfinite(value) || value < 0.0 || value > 1.0) {
+        throw std::invalid_argument(
+            "correlation precede/succeed probability must be finite");
+      }
+    }
+    for (const auto& [pair, value] : analysis.duration_matrix) {
+      validate_pair(pair);
+      if (!std::isfinite(value) || value < 0.0) {
+        throw std::invalid_argument(
+            "correlation duration value must be finite");
+      }
+    }
+    const auto matrix_keys =
+        [](const std::map<DfgActivityPair, double>& matrix) {
+          std::set<DfgActivityPair> keys;
+          for (const auto& [pair, value] : matrix) {
+            (void)value;
+            keys.insert(pair);
+          }
+          return keys;
+        };
+    if (matrix_keys(analysis.precede_succeed_probability) !=
+            expected_matrix_pairs ||
+        matrix_keys(analysis.duration_matrix) != expected_matrix_pairs) {
+      throw std::invalid_argument(
+          "correlation diagnostic matrices must contain every activity pair");
+    }
+  }
+}
+
+void write_correlation_matrix(
+    std::ostream& out, const std::map<DfgActivityPair, double>& matrix,
+    const DirectlyFollowsGraph& graph, std::string_view value_key) {
+  out << '[';
+  std::size_t emitted = 0;
+  for (const auto& [pair, value] : matrix) {
+    if (emitted++ != 0) out << ", ";
+    out << "{\"source\": " << dfg_variant_activity_id(graph, pair.first)
+        << ", \"target\": " << dfg_variant_activity_id(graph, pair.second)
+        << ", ";
+    write_json_string(out, value_key);
+    out << ": " << value << '}';
+  }
+  out << ']';
+}
+
+void write_correlation_mining(
+    std::ostream& out, const CorrelationVariantsAnalysis& variants,
+    const DirectlyFollowsGraph& graph) {
+  out << "{\"variants\": [";
+  for (std::size_t i = 0; i < variants.variants.size(); ++i) {
+    const auto& named = variants.variants[i];
+    out << "{\"variant\": ";
+    write_json_string(out, named.name);
+    out << ", \"frequency_dfg\": ";
+    write_dfg_frequency(out, named.analysis.frequency_dfg, graph);
+    out << ", \"performance_dfg\": [";
+    std::size_t emitted = 0;
+    for (const auto& [pair, value] : named.analysis.performance_dfg) {
+      if (emitted++ != 0) out << ", ";
+      out << "{\"source\": " << dfg_variant_activity_id(graph, pair.first)
+          << ", \"target\": " << dfg_variant_activity_id(graph, pair.second)
+          << ", \"seconds\": " << value << '}';
+    }
+    out << "], \"precede_succeed_probability\": ";
+    write_correlation_matrix(
+        out, named.analysis.precede_succeed_probability, graph, "value");
+    out << ", \"duration_matrix\": ";
+    write_correlation_matrix(
+        out, named.analysis.duration_matrix, graph, "value");
+    out << '}';
+    out << (i + 1 < variants.variants.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -2069,7 +2199,9 @@ void write_analysis_json(std::ostream& out,
                          const std::vector<DeclareConformance>*
                              declare_conformance,
                          const FootprintsAnalysis* footprints,
-                         const DfgVariantsAnalysis* dfg_variants) {
+                         const DfgVariantsAnalysis* dfg_variants,
+                         const CorrelationVariantsAnalysis*
+                             correlation_mining) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2100,6 +2232,9 @@ void write_analysis_json(std::ostream& out,
   }
   if (dfg_variants != nullptr) {
     validate_dfg_variants(*dfg_variants, graph);
+  }
+  if (correlation_mining != nullptr) {
+    validate_correlation_mining(*correlation_mining, graph);
   }
   out << "{\n";
   out << "  \"dataset\": ";
@@ -2264,6 +2399,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"dfg_variants\": ";
     write_dfg_variants(out, *dfg_variants, graph);
   }
+  if (correlation_mining != nullptr) {
+    out << ",\n  \"correlation_mining\": ";
+    write_correlation_mining(out, *correlation_mining, graph);
+  }
   if (heuristics != nullptr) {
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
@@ -2333,7 +2472,9 @@ std::string analysis_json(std::string_view dataset,
                           const std::vector<DeclareConformance>*
                               declare_conformance,
                           const FootprintsAnalysis* footprints,
-                          const DfgVariantsAnalysis* dfg_variants) {
+                          const DfgVariantsAnalysis* dfg_variants,
+                          const CorrelationVariantsAnalysis*
+                              correlation_mining) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2343,7 +2484,7 @@ std::string analysis_json(std::string_view dataset,
                       minimum_self_distances, transition_system, powl,
                       powl_petri, powl_decoration, log_skeleton,
                       log_skeleton_conformance, declare, declare_conformance,
-                      footprints, dfg_variants);
+                      footprints, dfg_variants, correlation_mining);
   return out.str();
 }
 

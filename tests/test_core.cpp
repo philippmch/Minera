@@ -4255,6 +4255,96 @@ void json_export_carries_dfg_variants_contract() {
   assert(stream.str().empty());
 }
 
+void json_export_carries_correlation_mining_contract() {
+  const auto log = transition_test_log({{"a", "b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  minera::CorrelationMinerResult result;
+  result.variant = minera::CorrelationVariant::kClassicSplit;
+  result.frequency_dfg[{"a", "b"}] = 1;
+  result.frequency_dfg[{"b", "a"}] = 1;
+  result.performance_dfg[{"a", "b"}] = 4.5;
+  result.performance_dfg[{"b", "a"}] = 0.0;
+  for (const auto& source : {"a", "b"}) {
+    for (const auto& target : {"a", "b"}) {
+      result.precede_succeed_probability[{source, target}] =
+          source == target ? 0.0 : 0.75;
+      result.duration_matrix[{source, target}] =
+          source == target ? 0.0 : 4.5;
+    }
+  }
+  minera::CorrelationVariantsAnalysis analyses;
+  analyses.variants.push_back({"classic_split", result});
+
+  const auto json = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, &analyses);
+  for (const char* fragment :
+       {"\"correlation_mining\"", "\"variants\"",
+        "\"variant\": \"classic_split\"",
+        "\"frequency_dfg\": [{\"source\": 0, \"target\": 1, "
+        "\"count\": 1}",
+        "\"performance_dfg\": [{\"source\": 0, \"target\": 1, "
+        "\"seconds\": 4.5}",
+        "\"precede_succeed_probability\"",
+        "\"duration_matrix\"", "\"value\": 0.75"}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  assert(minera::analysis_json("test", log, graph).find(
+             "\"correlation_mining\"") == std::string::npos);
+
+  const auto rejects =
+      [&](const minera::CorrelationVariantsAnalysis& invalid) {
+        std::ostringstream stream;
+        bool threw = false;
+        try {
+          minera::write_analysis_json(
+              stream, "test", log, graph,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, &invalid);
+        } catch (const std::invalid_argument&) {
+          threw = true;
+        }
+        assert(threw);
+        assert(stream.str().empty());
+      };
+
+  auto invalid_activity = analyses;
+  invalid_activity.variants.front().analysis.frequency_dfg.clear();
+  invalid_activity.variants.front().analysis.performance_dfg.clear();
+  invalid_activity.variants.front().analysis.frequency_dfg[
+      {"a", "missing"}] = 1;
+  invalid_activity.variants.front().analysis.performance_dfg[
+      {"a", "missing"}] = 2.0;
+  rejects(invalid_activity);
+
+  auto unknown_name = analyses;
+  unknown_name.variants.front().name = "classic_fast";
+  rejects(unknown_name);
+
+  auto mismatched_name = analyses;
+  mismatched_name.variants.front().name = "classic";
+  rejects(mismatched_name);
+
+  auto missing_probability = analyses;
+  missing_probability.variants.front()
+      .analysis.precede_succeed_probability.erase({"a", "b"});
+  rejects(missing_probability);
+
+  auto missing_duration = analyses;
+  missing_duration.variants.front().analysis.duration_matrix.erase(
+      {"b", "a"});
+  rejects(missing_duration);
+}
+
 void transition_system_forward_backward_views() {
   const auto log = transition_test_log({{"a", "b", "a"}});
   const auto forward = minera::discover_transition_system(log);
@@ -4552,5 +4642,6 @@ int main() {
   json_export_carries_declare_contract();
   json_export_carries_footprints_contract();
   json_export_carries_dfg_variants_contract();
+  json_export_carries_correlation_mining_contract();
   return 0;
 }

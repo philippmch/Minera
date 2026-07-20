@@ -54,6 +54,9 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   const dfgCausalActive = options.dfgCausalVariants?.some((name) =>
     ["alpha", "heuristic"].includes(name),
   );
+  const correlationActive = options.correlationVariants?.some((name) =>
+    ["classic", "classic_split", "trace_based"].includes(name),
+  );
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
@@ -104,7 +107,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       footprintsConformanceActive ||
       options.footprintsStrict === true ||
       options.footprintsEnableActAlwaysExecuted === false ||
-      dfgStatisticalActive || dfgCausalActive
+      dfgStatisticalActive || dfgCausalActive || correlationActive
   );
 }
 

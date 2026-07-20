@@ -550,6 +550,30 @@ export interface DfgVariantsAnalysis {
   causal: DfgCausalAnalysis[];
 }
 
+export type CorrelationMinerVariant =
+  | "classic"
+  | "classic_split"
+  | "trace_based";
+export interface CorrelationMatrixEntry {
+  source: number;
+  target: number;
+  value: number;
+}
+export interface CorrelationMinerAnalysis {
+  variant: CorrelationMinerVariant;
+  frequency_dfg: EdgeStat[];
+  performance_dfg: Array<{
+    source: number;
+    target: number;
+    seconds: number;
+  }>;
+  precede_succeed_probability: CorrelationMatrixEntry[];
+  duration_matrix: CorrelationMatrixEntry[];
+}
+export interface CorrelationVariantsAnalysis {
+  variants: CorrelationMinerAnalysis[];
+}
+
 /** Conformance results for one discovered model. */
 export interface ModelConformance {
   /** Whether the model's final marking is reachable — the bar for alignment. */
@@ -778,6 +802,8 @@ export interface MineraExport {
   footprints?: AggregateFootprints;
   /** Opt-in PM4Py statistical DFG and causal-discovery variants. */
   dfg_variants?: DfgVariantsAnalysis;
+  /** Opt-in classic/split/trace-based correlation-miner variants. */
+  correlation_mining?: CorrelationVariantsAnalysis;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */
