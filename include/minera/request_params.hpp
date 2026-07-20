@@ -10,6 +10,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/transition_system.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -41,6 +42,7 @@ struct MineParams {
   InductiveMinerOptions inductive;
   AlphaMinerOptions alpha;
   HeuristicMinerOptions heuristic;
+  TransitionSystemOptions transition_system;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.

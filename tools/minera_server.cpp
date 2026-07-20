@@ -35,6 +35,9 @@
 #include "minera/process_tree.hpp"
 #include "minera/request_params.hpp"
 #include "minera/resource_analysis.hpp"
+#include "minera/temporal_profile.hpp"
+#include "minera/minimum_self_distance.hpp"
+#include "minera/transition_system.hpp"
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
@@ -97,6 +100,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       log = minera::filter_event_log(log, params.filter);
     }
     const auto graph = minera::discover_directly_follows_graph(log);
+    const auto temporal_profile = minera::discover_temporal_profile(log);
+    const auto minimum_self_distances =
+        minera::discover_minimum_self_distances(log);
+    const auto transition_system =
+        minera::discover_transition_system(log, params.transition_system);
     const auto tree = minera::discover_process_tree(log, params.inductive);
     const auto net = minera::discover_petri_net(log, params.alpha);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
@@ -132,7 +140,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         &performance, &resources, &variant_durations, &eventually,
         /*decisions=*/nullptr, &petri_decoration, /*spectrum=*/nullptr,
         &inductive_net, &inductive_decoration, &heuristic_net,
-        &heuristic_decoration);
+        &heuristic_decoration, &temporal_profile, &minimum_self_distances,
+        &transition_system);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

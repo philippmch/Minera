@@ -4,10 +4,23 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <charconv>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
 namespace minera {
+
+namespace {
+std::size_t parse_nonnegative_size(std::string_view value, std::string_view name) {
+  if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  std::size_t parsed = 0;
+  const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (result.ec != std::errc{} || result.ptr != value.data() + value.size())
+    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer, got '" + std::string(value) + "'");
+  return parsed;
+}
+}
 
 bool ends_with_ci(std::string_view value, std::string_view suffix) {
   if (value.size() < suffix.size()) return false;
@@ -225,6 +238,26 @@ MineParams parse_mine_params(const FieldLookup& field) {
   if (const auto value = field("min_edge_frequency"); !value.empty()) {
     params.heuristic.min_frequency =
         static_cast<std::uint64_t>(std::atoll(value.c_str()));
+  }
+
+  if (const auto value = field("transition_view"); !value.empty()) {
+    if (value == "sequence") params.transition_system.view = TransitionView::kSequence;
+    else if (value == "set") params.transition_system.view = TransitionView::kSet;
+    else if (value == "multiset") params.transition_system.view = TransitionView::kMultiset;
+    else throw std::invalid_argument("transition_view: expected sequence, set, or multiset, got '" + value + "'");
+  }
+  if (const auto value = field("transition_direction"); !value.empty()) {
+    if (value == "forward") params.transition_system.direction = TransitionDirection::kForward;
+    else if (value == "backward") params.transition_system.direction = TransitionDirection::kBackward;
+    else throw std::invalid_argument("transition_direction: expected forward or backward, got '" + value + "'");
+  }
+  if (const auto value = field("transition_window"); !value.empty()) {
+    params.transition_system.window = parse_nonnegative_size(value, "transition_window");
+  }
+  if (const auto value = field("transition_include_data"); !value.empty()) {
+    if (value == "true" || value == "1") params.transition_system.include_data = true;
+    else if (value == "false" || value == "0") params.transition_system.include_data = false;
+    else throw std::invalid_argument("transition_include_data: expected true, false, 1, or 0, got '" + value + "'");
   }
 
   return params;

@@ -42,6 +42,17 @@ bool read_uint(std::string_view text, std::size_t& pos, std::size_t count,
   return true;
 }
 
+bool is_leap_year(unsigned year) {
+  return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
+unsigned days_in_month(unsigned year, unsigned month) {
+  constexpr unsigned days[] = {31, 28, 31, 30, 31, 30,
+                               31, 31, 30, 31, 30, 31};
+  if (month == 2 && is_leap_year(year)) return 29;
+  return days[month - 1];
+}
+
 }  // namespace
 
 std::optional<double> parse_timestamp(std::string_view text) {
@@ -62,7 +73,8 @@ std::optional<double> parse_timestamp(std::string_view text) {
   if (!read_uint(text, pos, 2, day)) {
     return std::nullopt;
   }
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
+  if (month < 1 || month > 12 || day < 1 ||
+      day > days_in_month(year, month)) {
     return std::nullopt;
   }
 
@@ -83,6 +95,9 @@ std::optional<double> parse_timestamp(std::string_view text) {
     if (!read_uint(text, pos, 2, minute)) {
       return std::nullopt;
     }
+    if (hour > 23 || minute > 59) {
+      return std::nullopt;
+    }
     seconds += hour * 3600.0 + minute * 60.0;
 
     // Optional :SS and fractional seconds.
@@ -90,6 +105,9 @@ std::optional<double> parse_timestamp(std::string_view text) {
       ++pos;
       unsigned second = 0;
       if (!read_uint(text, pos, 2, second)) {
+        return std::nullopt;
+      }
+      if (second > 59) {
         return std::nullopt;
       }
       seconds += second;
@@ -127,6 +145,10 @@ std::optional<double> parse_timestamp(std::string_view text) {
       }
       // Minutes are optional in the basic ±HH form.
       read_uint(text, pos, 2, off_minute);
+      if (off_hour > 14 || off_minute > 59 ||
+          (off_hour == 14 && off_minute != 0)) {
+        return std::nullopt;
+      }
       seconds -= sign * (off_hour * 3600.0 + off_minute * 60.0);
     }
   }

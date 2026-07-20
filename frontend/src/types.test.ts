@@ -40,6 +40,48 @@ describe("isMineraExport", () => {
     expect(isMineraExport(valid)).toBe(true);
   });
 
+  it("accepts an export with a temporal profile", () => {
+    expect(
+      isMineraExport({
+        ...valid,
+        temporal_profile: [
+          {
+            source: 0,
+            target: 1,
+            count: 2,
+            mean_seconds: 30,
+            standard_deviation_seconds: 5,
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts an export with minimum self-distances", () => {
+    expect(
+      isMineraExport({
+        ...valid,
+        minimum_self_distances: [
+          { activity: 0, distance: 1, witnesses: [1, 2] },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts a transition-system export with multiset payloads", () => {
+    expect(isMineraExport({
+      ...valid,
+      transition_system: {
+        view: "multiset", direction: "forward", window: 2,
+        include_data: true,
+        states: [{ id: 0, payload: [{ activity: 0, count: 2 }], start_count: 1, end_count: 0,
+          incoming_occurrences: [], outgoing_occurrences: [{ trace_index: 0, event_index: 0 }] }],
+        transitions: [{ source: 0, target: 0, activity: 0, count: 1,
+          occurrences: [{ trace_index: 0, event_index: 0 }] }],
+      },
+    })).toBe(true);
+  });
+
   it("rejects non-objects", () => {
     expect(isMineraExport(null)).toBe(false);
     expect(isMineraExport(42)).toBe(false);

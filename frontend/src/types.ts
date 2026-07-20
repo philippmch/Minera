@@ -16,6 +16,54 @@ export interface EdgeStat {
   count: number;
 }
 
+export type TransitionSystemView = "sequence" | "set" | "multiset";
+export type TransitionSystemDirection = "forward" | "backward";
+export interface TransitionOccurrence {
+  trace_index: number;
+  event_index: number;
+}
+export interface TransitionSystemState {
+  id: number;
+  /** Sequence/set payloads are activity ids; multiset uses activity/count pairs. */
+  payload: number[] | Array<{ activity: number; count: number }>;
+  start_count: number;
+  end_count: number;
+  incoming_occurrences?: TransitionOccurrence[];
+  outgoing_occurrences?: TransitionOccurrence[];
+}
+export interface TransitionSystemTransition {
+  source: number;
+  target: number;
+  activity: number;
+  count: number;
+  occurrences?: TransitionOccurrence[];
+}
+export interface TransitionSystemExport {
+  view: TransitionSystemView;
+  direction: TransitionSystemDirection;
+  window: number;
+  include_data: boolean;
+  states: TransitionSystemState[];
+  transitions: TransitionSystemTransition[];
+}
+
+/** Timing statistics for an ordered activity pair in the temporal profile. */
+export interface TemporalProfileEntry {
+  /** Source activity id; indexes into MineraExport.activities. */
+  source: number;
+  /** Target activity id; indexes into MineraExport.activities. */
+  target: number;
+  count: number;
+  mean_seconds: number;
+  standard_deviation_seconds: number;
+}
+
+export interface MinimumSelfDistanceEntry {
+  activity: number;
+  distance: number;
+  witnesses: number[];
+}
+
 export interface VariantStat {
   activities: number[];
   count: number;
@@ -418,6 +466,12 @@ export interface MineraExport {
    * shape as `edges`. Absent in exports from older minera versions.
    */
   eventually_follows?: EdgeStat[];
+  /** Temporal-profile timing statistics; absent in exports from older versions. */
+  temporal_profile?: TemporalProfileEntry[];
+  /** Minimum self-distance and witness activities; absent in older exports. */
+  minimum_self_distances?: MinimumSelfDistanceEntry[];
+  /** PM4Py view-based transition system; absent in older exports. */
+  transition_system?: TransitionSystemExport;
   /**
    * Generic event attributes by key, with each key's most frequent values.
    * Absent when the log has none and in exports from older minera versions.

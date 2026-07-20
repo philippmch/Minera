@@ -21,14 +21,20 @@
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/timestamp.hpp"
+#include "minera/temporal_profile.hpp"
+#include "minera/transition_system.hpp"
+#include "minera/minimum_self_distance.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <string>
@@ -36,6 +42,319 @@
 #include <vector>
 
 namespace {
+
+minera::EventLog temporal_log(std::initializer_list<std::vector<std::string>> rows) {
+  minera::EventLog log;
+  std::size_t case_no = 0;
+  for (const auto& row : rows) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(case_no++);
+    for (std::size_t i = 0; i < row.size(); ++i) {
+      minera::Event event;
+      event.case_id = trace.case_id;
+      event.activity = i == 0 ? "A" : (i == 1 ? "B" : "C");
+      event.timestamp = row[i];
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+void temporal_profile_discovers_all_pairs_and_stats() {
+  const auto log = temporal_log({{"2026-01-01T00:00:00", "2026-01-01T00:00:10",
+                                  "2026-01-01T00:00:30"},
+                                 {"2026-01-01T00:00:00", "2026-01-01T00:00:20",
+                                  "2026-01-01T00:00:40"}});
+  const auto profile = minera::discover_temporal_profile(log);
+  const auto* ac = profile.find("A", "C");
+  assert(ac != nullptr && ac->count == 2 && ac->mean_seconds == 35.0);
+  assert(std::abs(ac->standard_deviation_seconds -
+                  std::sqrt(50.0)) < 1e-9);
+  assert(profile.find("A", "B") != nullptr);
+  assert(profile.find("B", "C") != nullptr);
+
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto without_profile = minera::analysis_json("temporal", log, graph);
+  assert(without_profile.find("\"temporal_profile\"") == std::string::npos);
+  const auto json = minera::analysis_json("temporal", log, graph, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, &profile);
+  assert(json.find("\"temporal_profile\": [") != std::string::npos);
+  assert(json.find(
+             "{\"source\": 0, \"target\": 2, \"count\": 2, \"mean_seconds\": 35") !=
+         std::string::npos);
+  assert(json.find("\"standard_deviation_seconds\": 7.07107") !=
+         std::string::npos);
+  const auto ab_position = json.find("{\"source\": 0, \"target\": 1,");
+  const auto ac_position = json.find("{\"source\": 0, \"target\": 2,");
+  assert(ab_position < ac_position);
+
+  const auto expect_profile_rejected =
+      [&](const minera::TemporalProfile& invalid) {
+        std::ostringstream partial;
+        bool threw = false;
+        try {
+          minera::write_analysis_json(
+              partial, "temporal", log, graph,
+              /*tree=*/nullptr, /*net=*/nullptr, /*heuristics=*/nullptr,
+              /*conformance=*/nullptr, /*performance=*/nullptr,
+              /*resources=*/nullptr, /*variant_durations=*/nullptr,
+              /*eventually_follows=*/nullptr, /*decisions=*/nullptr,
+              /*petri_decoration=*/nullptr, /*spectrum=*/nullptr,
+              /*inductive_net=*/nullptr, /*inductive_decoration=*/nullptr,
+              /*heuristic_petri=*/nullptr, /*heuristic_decoration=*/nullptr,
+              &invalid);
+        } catch (const std::invalid_argument&) {
+          threw = true;
+        }
+        assert(threw);
+        assert(partial.str().empty());
+      };
+
+  minera::TemporalProfile unresolved;
+  unresolved.entries = {{"A", "B", 1, 1.0, 0.0},
+                        {"missing", "A", 1, 1.0, 0.0}};
+  expect_profile_rejected(unresolved);
+
+  const std::vector<minera::TemporalProfileEntry> invalid_entries = {
+      {"A", "B", 0, 1.0, 0.0},
+      {"A", "B", 1, -1.0, 0.0},
+      {"A", "B", 1, std::numeric_limits<double>::quiet_NaN(), 0.0},
+      {"A", "B", 1, std::numeric_limits<double>::infinity(), 0.0},
+      {"A", "B", 1, 1.0, -1.0},
+      {"A", "B", 1, 1.0, std::numeric_limits<double>::infinity()}};
+  for (const auto& invalid_entry : invalid_entries) {
+    minera::TemporalProfile invalid;
+    invalid.entries.push_back(invalid_entry);
+    expect_profile_rejected(invalid);
+  }
+  minera::TemporalProfile duplicate;
+  duplicate.entries = {{"A", "B", 1, 1.0, 0.0},
+                       {"A", "B", 1, 2.0, 0.0}};
+  expect_profile_rejected(duplicate);
+  minera::TemporalProfile reversed;
+  reversed.entries = {{"B", "C", 1, 1.0, 0.0},
+                      {"A", "B", 1, 1.0, 0.0}};
+  expect_profile_rejected(reversed);
+}
+
+void minimum_self_distance_discovers_distances_and_witnesses() {
+  minera::EventLog log;
+  log.traces = {
+      {"t1", {{"", "A", "", "", 0}, {"", "B", "", "", 1},
+               {"", "A", "", "", 2}, {"", "C", "", "", 3},
+               {"", "A", "", "", 4}}},
+      {"t2", {{"", "A", "", "", 0}, {"", "A", "", "", 1}}},
+      {"t3", {{"", "X", "", "", 0}, {"", "Y", "", "", 1},
+               {"", "X", "", "", 2}, {"", "Z", "", "", 3},
+               {"", "X", "", "", 4}}},
+      {"t4", {{"", "", "", "", 0}, {"", "ü", "", "", 1},
+               {"", "", "", "", 2}, {"", "ü", "", "", 3}}},
+      {"t5", {{"", "Q", "", "", 0}, {"", "R", "", "", 1},
+               {"", "R", "", "", 2}, {"", "Q", "", "", 3}}},
+  };
+  const auto result = minera::discover_minimum_self_distances(log);
+  assert(result.size() == 6);
+  assert(result[0].activity.empty() && result[0].distance == 1);
+  assert((result[0].witnesses == std::vector<std::string>{"ü"}));
+  assert(result[1].activity == "A" && result[1].distance == 0);
+  assert(result[1].witnesses.empty());
+  assert(result[2].activity == "Q" && result[2].distance == 2);
+  assert((result[2].witnesses == std::vector<std::string>{"R"}));
+  assert(result[3].activity == "R" && result[3].distance == 0);
+  assert(result[3].witnesses.empty());
+  assert(result[4].activity == "X" && result[4].distance == 1);
+  assert((result[4].witnesses == std::vector<std::string>{"Y", "Z"}));
+  assert(result[5].activity == "ü" && result[5].distance == 1);
+  assert(result[5].witnesses.size() == 1 && result[5].witnesses[0].empty());
+  assert(minera::discover_minimum_self_distances({}).empty());
+}
+
+void minimum_self_distance_json_resolves_ids_and_validates_before_writing() {
+  minera::EventLog log;
+  log.traces = {{"t", {{"", "A", "", "", 0}, {"", "B", "", "", 1},
+                         {"", "A", "", "", 2}}}};
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto distances = minera::discover_minimum_self_distances(log);
+  const auto json = minera::analysis_json("test", log, graph, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, nullptr, nullptr,
+                                          nullptr, nullptr, &distances);
+  assert(json.find("\"minimum_self_distances\": [{\"activity\": 0, \"distance\": 1, \"witnesses\": [1]}]") !=
+         std::string::npos);
+  assert(minera::analysis_json("test", log, graph).find(
+             "minimum_self_distances") == std::string::npos);
+  const auto expect_rejected =
+      [&](const minera::MinimumSelfDistances& invalid) {
+        std::ostringstream stream;
+        bool threw = false;
+        try {
+          minera::write_analysis_json(
+              stream, "test", log, graph,
+              /*tree=*/nullptr, /*net=*/nullptr, /*heuristics=*/nullptr,
+              /*conformance=*/nullptr, /*performance=*/nullptr,
+              /*resources=*/nullptr, /*variant_durations=*/nullptr,
+              /*eventually_follows=*/nullptr, /*decisions=*/nullptr,
+              /*petri_decoration=*/nullptr, /*spectrum=*/nullptr,
+              /*inductive_net=*/nullptr, /*inductive_decoration=*/nullptr,
+              /*heuristic_petri=*/nullptr, /*heuristic_decoration=*/nullptr,
+              /*temporal_profile=*/nullptr, &invalid);
+        } catch (const std::invalid_argument&) {
+          threw = true;
+        }
+        assert(threw);
+        assert(stream.str().empty());
+      };
+  expect_rejected({{"missing", 1, {"B"}}});
+  expect_rejected({{"B", 1, {"A"}}, {"A", 1, {"B"}}});
+  expect_rejected({{"A", 1, {"B"}}, {"A", 1, {"B"}}});
+  expect_rejected({{"A", 0, {"B"}}});
+  expect_rejected({{"A", 1, {}}});
+  expect_rejected({{"A", 1, {"A"}}});
+  expect_rejected({{"A", 1, {"missing"}}});
+}
+
+void temporal_profile_scales_to_many_activities() {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "many";
+  constexpr std::size_t activity_count = 130;
+  trace.events.reserve(activity_count);
+  for (std::size_t i = 0; i < activity_count; ++i) {
+    minera::Event event;
+    event.case_id = trace.case_id;
+    event.activity = "activity_" + std::to_string(i);
+    event.timestamp = minera::format_timestamp(static_cast<double>(i) * 60.0);
+    trace.events.push_back(std::move(event));
+  }
+  log.traces.push_back(std::move(trace));
+
+  const auto profile = minera::discover_temporal_profile(log);
+  assert(profile.entries.size() == activity_count * (activity_count - 1) / 2);
+  const auto deviations =
+      minera::check_temporal_profile_conformance(log, profile);
+  assert(deviations.empty());
+}
+
+void temporal_profile_skips_bad_timestamps_and_checks_deviations() {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "case";
+  trace.events = {{"case", "A", "2026-01-01T00:00:00"},
+                  {"case", "B", "2026-01-01T00:00:10"},
+                  {"case", "C", "not-a-time"},
+                  {"case", "D", "2025-12-31T23:00:00"}};
+  log.traces.push_back(trace);
+  const auto profile = minera::discover_temporal_profile(log);
+  assert(profile.find("A", "B") != nullptr);
+  assert(profile.find("A", "D") == nullptr);
+  minera::TemporalProfile fixed;
+  fixed.entries.push_back({"A", "B", 1, 10.0, 0.0});
+  auto deviations = minera::check_temporal_profile_conformance(log, fixed);
+  assert(deviations.empty());
+  trace.events[1].timestamp = "2026-01-01T00:00:11";
+  log.traces[0] = trace;
+  deviations = minera::check_temporal_profile_conformance(log, fixed);
+  assert(deviations.size() == 1 && std::isinf(deviations[0].distance()));
+}
+
+void temporal_profile_supports_attributes_business_hours_and_validation() {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "attrs";
+  minera::Event a{"attrs", "A", "bad"};
+  a.attributes.push_back({"done", "2026-01-05T07:00:00+02:00", minera::AttributeKind::kDate});
+  a.attributes.push_back({"canonical", "2026-01-05T09:00:00+02:00", minera::AttributeKind::kDate});
+  minera::Event b{"attrs", "B", "bad"};
+  b.attributes.push_back({"started", "2026-01-05T08:00:00+02:00", minera::AttributeKind::kDate});
+  b.attributes.push_back({"canonical_target", "2026-01-05T17:00:00+02:00", minera::AttributeKind::kDate});
+  trace.events = {a, b};
+  log.traces.push_back(trace);
+  minera::TemporalProfileOptions options;
+  options.source_completion_timestamp_attribute = "done";
+  options.target_start_timestamp_attribute = "started";
+  options.use_business_hours = true;
+  const auto profile = minera::discover_temporal_profile(log, options);
+  assert(profile.find("A", "B")->mean_seconds == 3600.0);
+  options.source_timestamp_attribute = "canonical";
+  options.target_timestamp_attribute = "canonical_target";
+  const auto canonical = minera::discover_temporal_profile(log, options);
+  assert(canonical.find("A", "B")->mean_seconds == 28800.0);
+  options.business_hour_slots = {{0.0, 1800.0}, {1800.0, 3600.0}};
+  const auto custom = minera::discover_temporal_profile(log, options);
+  assert(custom.find("A", "B")->mean_seconds == 0.0);
+  options.zeta = 0.0;
+  bool threw = false;
+  try { (void)minera::check_temporal_profile_conformance(log, profile, options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  options.zeta = 6.0;
+  options.business_hour_slots = {{-1.0, 1.0}};
+  threw = false;
+  try { (void)minera::discover_temporal_profile(log, options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
+void temporal_profile_business_hours_handle_multiweek_and_before_epoch() {
+  minera::TemporalProfileOptions options;
+  options.use_business_hours = true;
+  const auto monday_span = temporal_log(
+      {{"2026-01-05T07:00:00", "2026-01-19T08:00:00"}});
+  const auto before_epoch = temporal_log(
+      {{"1969-12-22T07:00:00", "1970-01-05T08:00:00"}});
+  const auto first = minera::discover_temporal_profile(monday_span, options);
+  const auto second = minera::discover_temporal_profile(before_epoch, options);
+  assert(first.find("A", "B")->mean_seconds == 363600.0);
+  assert(second.find("A", "B")->mean_seconds == 363600.0);
+
+  const auto minute_only =
+      temporal_log({{"2026-01-05T16:00", "2026-01-05T17:00"}});
+  const auto at_close =
+      temporal_log({{"2026-01-05T17:00:00", "2026-01-05T18:00:00"}});
+  const auto weekend =
+      temporal_log({{"2026-01-10T08:00:00", "2026-01-10T09:00:00"}});
+  assert(minera::discover_temporal_profile(minute_only, options)
+             .find("A", "B")
+             ->mean_seconds == 3600.0);
+  assert(minera::discover_temporal_profile(at_close, options)
+             .find("A", "B")
+             ->mean_seconds == 0.0);
+  assert(minera::discover_temporal_profile(weekend, options)
+             .find("A", "B")
+             ->mean_seconds == 0.0);
+}
+
+void temporal_profile_validates_profiles_and_zeta_boundary() {
+  const auto log = temporal_log({{"2026-01-01T00:00:00", "2026-01-01T00:00:16"},
+                                 {"2026-01-01T00:00:00", "2026-01-01T00:00:16.1"}});
+  minera::TemporalProfile profile;
+  profile.entries.push_back({"A", "B", 2, 10.0, 1.0});
+  minera::TemporalProfileOptions options;
+  options.zeta = 6.0;
+  auto deviations = minera::check_temporal_profile_conformance(log, profile, options);
+  assert(deviations.size() == 1);
+  profile.entries.push_back({"A", "B", 1, 10.0, 1.0});
+  bool threw = false;
+  try { (void)minera::check_temporal_profile_conformance(log, profile); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  profile.entries.pop_back();
+  profile.entries[0].standard_deviation_seconds = -1.0;
+  threw = false;
+  try { (void)minera::check_temporal_profile_conformance(log, profile); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  profile.entries[0].standard_deviation_seconds = std::numeric_limits<double>::quiet_NaN();
+  threw = false;
+  try { (void)minera::check_temporal_profile_conformance(log, profile); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
 
 std::filesystem::path write_temp_log(const std::string& content) {
   auto path = std::filesystem::temp_directory_path() / "minera_core_test.csv";
@@ -3344,9 +3663,169 @@ void heuristic_miner_connect_all_false_may_leave_gaps() {
   assert(a2_out == 1);
 }
 
+// Transition-system discovery: PM4Py-compatible views plus Minera occurrence
+// data. Kept as one isolated section so its contract is easy to audit.
+minera::EventLog transition_test_log(
+    std::initializer_list<std::vector<std::string>> traces) {
+  minera::EventLog log;
+  std::size_t trace_index = 0;
+  for (const auto& activities : traces) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(trace_index);
+    for (std::size_t i = 0; i < activities.size(); ++i) {
+      trace.events.push_back({trace.case_id, activities[i], "", "", i});
+    }
+    log.traces.push_back(std::move(trace));
+    ++trace_index;
+  }
+  return log;
+}
+
+void transition_system_forward_backward_views() {
+  const auto log = transition_test_log({{"a", "b", "a"}});
+  const auto forward = minera::discover_transition_system(log);
+  assert(forward.states().size() == 4);
+  // States are sorted by canonical payload, not by first occurrence.
+  assert((forward.states()[0].payload == std::vector<std::string>{}));
+  assert((forward.states()[1].payload == std::vector<std::string>{"a"}));
+  assert((forward.states()[2].payload == std::vector<std::string>{"a", "b"}));
+  assert((forward.states()[3].payload == std::vector<std::string>{"b", "a"}));
+  assert(forward.transitions().size() == 3);
+
+  minera::TransitionSystemOptions options;
+  options.direction = minera::Direction::kBackward;
+  const auto backward = minera::discover_transition_system(log, options);
+  assert((backward.states()[0].payload == std::vector<std::string>{}));
+  assert((backward.states()[1].payload == std::vector<std::string>{"a"}));
+  assert((backward.states()[2].payload == std::vector<std::string>{"a", "b"}));
+  assert((backward.states()[3].payload == std::vector<std::string>{"b", "a"}));
+  assert(backward.transitions().size() == 3);
+  assert(backward.transitions()[0].source == 0);
+  assert(backward.transitions()[0].target == 1);
+  assert(backward.transitions()[0].label == "a");
+  assert(backward.transitions()[1].source == 1);
+  assert(backward.transitions()[1].target == 2);
+  assert(backward.transitions()[1].label == "b");
+  assert(backward.transitions()[2].source == 2);
+  assert(backward.transitions()[2].target == 3);
+  assert(backward.transitions()[2].label == "a");
+}
+
+void transition_system_views_counts_and_data() {
+  const auto log = transition_test_log({{"a", "a", "b"}, {"a", "a", "b"}});
+  minera::TransitionSystemOptions set_options;
+  set_options.view = minera::View::kSet;
+  const auto set = minera::discover_transition_system(log, set_options);
+  minera::TransitionSystemOptions multiset_options;
+  multiset_options.view = minera::View::kMultiset;
+  const auto multiset = minera::discover_transition_system(log, multiset_options);
+  assert(set.states().size() == multiset.states().size());
+  const auto has_payload = [](const minera::TransitionSystem& system,
+                              const std::vector<std::string>& payload) {
+    return std::any_of(
+        system.states().begin(), system.states().end(),
+        [&](const auto& state) { return state.payload == payload; });
+  };
+  assert(has_payload(set, {"a"}));
+  assert(!has_payload(set, {"a", "a"}));
+  assert(!has_payload(multiset, {"a"}));
+  assert(has_payload(multiset, {"a", "a"}));
+
+  minera::TransitionSystemOptions data_options;
+  data_options.window = 0;
+  data_options.include_data = true;
+  const auto data = minera::discover_transition_system(
+      transition_test_log({{"a", "a"}}), data_options);
+  assert(data.states().size() == 1 && data.transitions().size() == 1);
+  assert(data.transitions()[0].count == 2);
+  assert(data.transitions()[0].occurrences.size() == 2);
+  assert(data.states()[0].incoming_occurrences.size() == 2);
+  assert(data.states()[0].outgoing_occurrences.size() == 2);
+  assert(data.states()[0].start_count == 1 && data.states()[0].end_count == 1);
+}
+
+void transition_system_empty_and_deterministic() {
+  minera::EventLog empty;
+  empty.traces.push_back({"empty", {}});
+  const auto no_states = minera::discover_transition_system(empty);
+  assert(no_states.states().empty() && no_states.transitions().empty());
+  const auto empty_graph = minera::discover_directly_follows_graph(empty);
+  const auto empty_json = minera::analysis_json(
+      "empty", empty, empty_graph,
+      /*tree=*/nullptr, /*net=*/nullptr, /*heuristics=*/nullptr,
+      /*conformance=*/nullptr, /*performance=*/nullptr,
+      /*resources=*/nullptr, /*variant_durations=*/nullptr,
+      /*eventually_follows=*/nullptr, /*decisions=*/nullptr,
+      /*petri_decoration=*/nullptr, /*spectrum=*/nullptr,
+      /*inductive_net=*/nullptr, /*inductive_decoration=*/nullptr,
+      /*heuristic_petri=*/nullptr, /*heuristic_decoration=*/nullptr,
+      /*temporal_profile=*/nullptr, /*minimum_self_distances=*/nullptr,
+      &no_states);
+  assert(empty_json.find("\"states\": []") != std::string::npos);
+  assert(empty_json.find("\"transitions\": []") != std::string::npos);
+  const auto first = minera::discover_transition_system(
+      transition_test_log({{"b", "a"}, {"a", "b"}}));
+  const auto second = minera::discover_transition_system(
+      transition_test_log({{"a", "b"}, {"b", "a"}}));
+  assert(first.states().size() == second.states().size());
+  for (std::size_t i = 0; i < first.states().size(); ++i) {
+    assert(first.states()[i].payload == second.states()[i].payload);
+  }
+  assert(first.transitions().size() == second.transitions().size());
+}
+
+void transition_system_positional_options_and_invalid_enums() {
+  const auto log = transition_test_log({{"a", "b", "a"}});
+  const auto positional = minera::discover_transition_system(
+      log, minera::TransitionDirection::kBackward, 1,
+      minera::TransitionView::kSet, true);
+  assert(positional.options().direction ==
+         minera::TransitionDirection::kBackward);
+  assert(positional.options().window == 1);
+  assert(positional.options().view == minera::TransitionView::kSet);
+  assert(positional.options().include_data);
+  assert(!positional.transitions().empty());
+  assert(!positional.transitions()[0].occurrences.empty());
+
+  for (const auto invalid_direction :
+       {static_cast<minera::TransitionDirection>(-1),
+        static_cast<minera::TransitionDirection>(42)}) {
+    minera::TransitionSystemOptions options;
+    options.direction = invalid_direction;
+    bool threw = false;
+    try {
+      (void)minera::discover_transition_system(log, options);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  for (const auto invalid_view : {static_cast<minera::TransitionView>(-1),
+                                  static_cast<minera::TransitionView>(42)}) {
+    minera::TransitionSystemOptions options;
+    options.view = invalid_view;
+    bool threw = false;
+    try {
+      (void)minera::discover_transition_system(log, options);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
+  temporal_profile_discovers_all_pairs_and_stats();
+  minimum_self_distance_discovers_distances_and_witnesses();
+  minimum_self_distance_json_resolves_ids_and_validates_before_writing();
+  temporal_profile_scales_to_many_activities();
+  temporal_profile_skips_bad_timestamps_and_checks_deviations();
+  temporal_profile_supports_attributes_business_hours_and_validation();
+  temporal_profile_business_hours_handle_multiweek_and_before_epoch();
+  temporal_profile_validates_profiles_and_zeta_boundary();
   imports_csv_and_discovers_directly_follows_graph();
   handles_quoted_csv_fields_and_timestamp_sorting();
   aggregates_repeated_trace_variants();
@@ -3487,5 +3966,9 @@ int main() {
   heuristic_miner_and_threshold_controls_split_semantics();
   heuristic_miner_min_frequency_drops_rare_edges();
   heuristic_miner_connect_all_false_may_leave_gaps();
+  transition_system_forward_backward_views();
+  transition_system_views_counts_and_data();
+  transition_system_empty_and_deterministic();
+  transition_system_positional_options_and_invalid_enums();
   return 0;
 }

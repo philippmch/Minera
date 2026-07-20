@@ -147,6 +147,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(false);
+    expect(hasActiveMinerOptions({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toBe(false);
   });
 
   it("is true when any setting deviates", () => {
@@ -157,6 +158,10 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ dependencyThreshold: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ andThreshold: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ minEdgeFrequency: 3 })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionView: "set" })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionDirection: "backward" })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionWindow: 0 })).toBe(true);
+    expect(hasActiveMinerOptions({ transitionIncludeData: true })).toBe(true);
   });
 });
 
@@ -182,6 +187,21 @@ describe("mineFormEntries", () => {
       ["and_threshold", "0"],
       ["min_edge_frequency", "2"],
     ]);
+  });
+
+  it("maps non-default transition-system settings", () => {
+    expect(mineFormEntries({
+      transitionView: "multiset",
+      transitionDirection: "backward",
+      transitionWindow: 0,
+      transitionIncludeData: true,
+    })).toEqual([
+      ["transition_view", "multiset"],
+      ["transition_direction", "backward"],
+      ["transition_window", "0"],
+      ["transition_include_data", "true"],
+    ]);
+    expect(mineFormEntries({ transitionView: "sequence", transitionDirection: "forward", transitionWindow: 2 })).toEqual([]);
   });
 
   it("keeps the filter mappings intact", () => {
