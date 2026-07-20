@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, formatDuration, numberFormat } from "../types";
-import { buildSpectrum } from "../performance-spectrum";
+import { buildSpectrum, serverSpectrumToSpectrum } from "../performance-spectrum";
 
 const WIDTH = 880;
 const BAND_H = 96; // vertical distance between two pattern steps
@@ -25,9 +25,18 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
   const [pattern, setPattern] = useState<number[]>([]);
 
   const spectrum = useMemo(
-    () => buildSpectrum(data.traces ?? [], pattern),
+    () => pattern.length > 0
+      ? buildSpectrum(data.traces ?? [], pattern)
+      : data.performance_spectrum
+        ? serverSpectrumToSpectrum(data.performance_spectrum)
+        : buildSpectrum(data.traces ?? [], pattern),
     [data, pattern],
   );
+  const serverMode = pattern.length === 0 && Boolean(data.performance_spectrum);
+  const serverActivities = spectrum.activities ?? [];
+  const axisNames = serverMode
+    ? serverActivities
+    : pattern.map((activityId) => activities[activityId]?.name ?? "?");
 
   const setStep = (index: number, value: string) => {
     setPattern((previous) => {
@@ -43,7 +52,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
 
   const span = Math.max(1, spectrum.maxTime - spectrum.minTime);
   const plotW = WIDTH - 2 * PAD_X;
-  const height = 2 * PAD_Y + BAND_H * Math.max(1, pattern.length - 1);
+  const height = 2 * PAD_Y + BAND_H * Math.max(1, axisNames.length - 1);
   const x = (time: number) =>
     PAD_X + ((time - spectrum.minTime) / span) * plotW;
   const y = (step: number) => PAD_Y + step * BAND_H;
@@ -64,6 +73,12 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
         )}
       </div>
 
+      {serverMode && spectrum.variant && (
+        <p className="panel-meta spectrum-server-note">
+          Server spectrum ({spectrum.variant}); choose activities below for an interactive client-side spectrum.
+          {spectrum.variant === "disconnected" && " Partial lines are labeled by their contiguous subpattern."}
+        </p>
+      )}
       <div className="spectrum-pattern">
         <span className="spectrum-pattern-label">Steps</span>
         {[...pattern, -1].map((selected, index) => (
@@ -89,7 +104,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
         )}
       </div>
 
-      {pattern.length < 2 ? (
+      {!serverMode && pattern.length < 2 ? (
         <p className="empty-note">
           Pick two or more activities: each case that performs them in a row
           draws one line from step to step at the instants they happened.
@@ -106,7 +121,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
             role="img"
             aria-label="Performance spectrum"
           >
-            {pattern.map((activityId, step) => (
+            {axisNames.map((name, step) => (
               <g key={step}>
                 <line
                   className="spectrum-axis"
@@ -116,7 +131,7 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
                   y2={y(step)}
                 />
                 <text className="spectrum-axis-label" x={PAD_X} y={y(step) - 6}>
-                  {activities[activityId]?.name ?? "?"}
+                  {name}
                 </text>
               </g>
             ))}
@@ -125,10 +140,16 @@ export function PerformanceSpectrumView({ data }: PerformanceSpectrumViewProps) 
                 key={index}
                 className={`spectrum-line speed-${line.speed}`}
                 points={line.times
-                  .map((time, step) => `${x(time)},${y(step)}`)
+                  .map((time, step) => {
+                    // Server disconnected observations carry an explicit
+                    // offset; repeated activity labels must not be resolved
+                    // by searching the axis names.
+                    const axisStep = (line.patternOffset ?? 0) + step;
+                    return `${x(time)},${y(axisStep)}`;
+                  })
                   .join(" ")}
               >
-                <title>{`flow time ${formatDuration(line.duration / 1000)}`}</title>
+                <title>{`${line.activityNames?.length ? `${line.activityNames.join(" → ")} · ` : ""}flow time ${formatDuration(line.duration / 1000)}`}</title>
               </polyline>
             ))}
           </svg>

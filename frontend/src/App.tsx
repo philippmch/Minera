@@ -20,6 +20,7 @@ import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
 import { DottedChartView } from "./components/DottedChart";
 import { PerformanceSpectrumView } from "./components/PerformanceSpectrum";
+import { Batches } from "./components/Batches";
 import { buildDottedChart } from "./dotted-chart";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
@@ -268,7 +269,12 @@ export default function App() {
   // Whether the log has any timestamped events to plot. Built once per load so
   // the Dotted Chart tab only appears when it would have something to show.
   const hasDottedChart = useMemo(
-    () => (data?.traces ? buildDottedChart(data.traces).rowCount > 0 : false),
+    () => Boolean(
+      data && (
+        (data.traces ? buildDottedChart(data.traces).rowCount > 0 : false) ||
+        data.performance_spectrum || data.batch_discovery
+      ),
+    ),
     [data],
   );
 
@@ -394,6 +400,7 @@ export default function App() {
         <main className="layout-log">
           <DottedChartView data={data} />
           <PerformanceSpectrumView data={data} />
+          <Batches data={data} />
         </main>
       )}
       {tab === "conformance" && (

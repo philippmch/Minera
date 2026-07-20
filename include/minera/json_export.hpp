@@ -20,6 +20,7 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
+#include "minera/batches.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/powl.hpp"
 #include "minera/process_tree.hpp"
@@ -98,7 +99,8 @@ void write_analysis_json(std::ostream& out,
                          const FootprintsAnalysis* footprints = nullptr,
                          const DfgVariantsAnalysis* dfg_variants = nullptr,
                          const CorrelationVariantsAnalysis*
-                             correlation_mining = nullptr);
+                             correlation_mining = nullptr,
+                         const BatchDiscovery* batch_discovery = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -132,7 +134,8 @@ void write_analysis_json(std::ostream& out,
     const std::vector<DeclareConformance>* declare_conformance = nullptr,
     const FootprintsAnalysis* footprints = nullptr,
     const DfgVariantsAnalysis* dfg_variants = nullptr,
-    const CorrelationVariantsAnalysis* correlation_mining = nullptr);
+    const CorrelationVariantsAnalysis* correlation_mining = nullptr,
+    const BatchDiscovery* batch_discovery = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

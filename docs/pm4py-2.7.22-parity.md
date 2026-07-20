@@ -70,7 +70,7 @@ are reconciled.
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
-| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Partial** — temporal profile and connected performance spectrum |
+| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Missing** |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Partial** — token/alignment fitness, escaping-edge precision, token generalization, arc-degree simplicity |
 | Label splitting | contextual | **Missing** |
@@ -92,7 +92,7 @@ are reconciled.
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Missing** |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters; LTL/segments/DFG/OCEL gaps |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
-| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
+| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Missing** |
@@ -252,6 +252,53 @@ chunk order, forced reverse and self edges, one-sided greedy matching, equal
 interval boundaries, exact matching above 25 events, custom interval keys,
 strict timestamp errors, empty and single-activity logs, complete diagnostic
 matrices, deterministic ties, and balanced transportation marginals.
+
+## Performance-spectrum and batch parity evidence
+
+Performance spectra expose CONNECTED and DISCONNECTED as distinct native
+variants. Both require at least two requested activities, strictly validate
+selected timestamps, optionally preserve input order, and otherwise use stable
+timestamp ordering. Connected discovery projects each case onto the requested
+activities and emits every overlapping full-pattern window. Disconnected
+discovery emits labeled contiguous subpatterns longest-first, removing matched
+events except the endpoint before considering shorter subpatterns so a full
+match is not rediscovered as all of its subsets.
+
+Observations are globally stable-sorted by their first instant. The default
+sample size is 10,000 and uses the pinned deterministic midpoint selector,
+including forced first and last observations; the result can therefore contain
+one or two more observations than the requested sample size. The pinned
+EventLog disconnected adapter has a generator-versus-tuple membership defect
+that limits it to pairs. Minera implements the intended dataframe/lazyframe
+longest-subpattern semantics and documents that repair rather than reproducing
+the wrapper defect. Columnar and lazyframe implementations otherwise remain
+input adapters to the native behavior.
+
+Batch discovery groups events by activity and resource, using completion time
+as the default start or a configured interval-start attribute. It first merges
+strictly overlapping intervals transitively, then merges non-overlapping
+intervals whose gap is at most the configured distance. Groups smaller than
+the minimum batch size are removed. Classification priority is simultaneous,
+batching on start, batching on end, sequential, then concurrent. The reference
+group count is the number of detected batches; Minera additionally reports the
+number of member events and retains trace/event identities so duplicate
+timestamp/case tuples are not collapsed.
+
+Spectrum variant, sampling, sorting, batch enablement, merge distance, minimum
+size, and start attribute are available through strict request parsing, CLI,
+local server, deterministic prevalidated JSON, and frontend controls.
+Disconnected observations retain their per-point labels and explicit requested
+pattern offset in the JSON/UI, including when activity labels repeat. Batch
+JSON/UI exposes all five categories, group batch/event counts, resources,
+ranges, and case evidence.
+
+Focused regressions cover stable sorting and its disable switch, overlapping
+connected windows, full and partial disconnected matches, loops, non-adjacent
+rejection, longest-first suppression, exact midpoint/extreme sampling, all five
+batch types, strict-overlap/touching/gap/transitive merging, custom starts,
+minimum size, empty resources, duplicate event identities, malformed
+timestamps/options, JSON rejection before output, request boundaries, and
+frontend rendering.
 
 ## Footprints parity evidence
 

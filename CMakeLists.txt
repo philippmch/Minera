@@ -22,6 +22,7 @@ endif()
 add_library(minera_core
   src/alpha_miner.cpp
   src/bpmn.cpp
+  src/batches.cpp
   src/conformance.cpp
   src/correlation_miner.cpp
   src/csv_event_log_importer.cpp
@@ -234,4 +235,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dfg_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_dfg_variants_tests COMMAND minera_dfg_variants_tests)
+
+  add_executable(minera_temporal_behavioral_tests
+    tests/test_temporal_behavioral.cpp
+  )
+  target_link_libraries(minera_temporal_behavioral_tests PRIVATE minera::core)
+  target_compile_features(minera_temporal_behavioral_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_temporal_behavioral_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_temporal_behavioral_tests COMMAND minera_temporal_behavioral_tests)
 endif()

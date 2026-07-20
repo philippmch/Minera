@@ -782,6 +782,93 @@ MineParams parse_mine_params(const FieldLookup& field,
         parse_positive_size(value, "correlation_sample_size");
   }
 
+  // Performance spectrum and batch discovery are opt-in.  Unlike the legacy
+  // list fields, an explicitly supplied empty spectrum pattern is invalid so
+  // clients cannot accidentally request an unusable analysis.
+  {
+    const auto value = field("spectrum_activities");
+    const bool supplied = present ? present("spectrum_activities") : !value.empty();
+    if (supplied) {
+      params.spectrum_activities = split_csv(value);
+      if (params.spectrum_activities.size() < 2) {
+        throw std::invalid_argument(
+            "spectrum_activities: expected at least two activities");
+      }
+    }
+  }
+  const auto spectrum_supplied = [&]() {
+    return present ? present("spectrum_activities")
+                   : !field("spectrum_activities").empty();
+  };
+  const auto spectrum_option_supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  for (const auto name : {std::string_view{"spectrum_variant"},
+                          std::string_view{"spectrum_sample_size"},
+                          std::string_view{"spectrum_sort_log"}}) {
+    if (spectrum_option_supplied(name) && !spectrum_supplied()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": requires spectrum_activities");
+    }
+  }
+  if (const auto value = field("spectrum_variant");
+      present ? present("spectrum_variant") : !value.empty()) {
+    if (value == "connected") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kConnected;
+    } else if (value == "disconnected") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kDisconnected;
+    } else {
+      throw std::invalid_argument(
+          "spectrum_variant: expected connected or disconnected, got '" +
+          value + "'");
+    }
+  }
+  if (const auto value = field("spectrum_sample_size");
+      present ? present("spectrum_sample_size") : !value.empty()) {
+    params.spectrum.sample_size =
+        parse_positive_size(value, "spectrum_sample_size");
+  }
+  if (const auto value = field("spectrum_sort_log");
+      present ? present("spectrum_sort_log") : !value.empty()) {
+    params.spectrum.sort_log = parse_boolean(value, "spectrum_sort_log");
+  }
+  if (const auto value = field("batches");
+      present ? present("batches") : !value.empty()) {
+    params.batches = parse_boolean(value, "batches");
+  }
+  if (const auto value = field("batch_merge_distance_seconds");
+      present ? present("batch_merge_distance_seconds") : !value.empty()) {
+    params.batch_options.merge_distance_seconds =
+        parse_finite_double(value, "batch_merge_distance_seconds");
+    if (params.batch_options.merge_distance_seconds < 0.0) {
+      throw std::invalid_argument(
+          "batch_merge_distance_seconds: expected a non-negative number");
+    }
+  }
+  if (const auto value = field("batch_min_size");
+      present ? present("batch_min_size") : !value.empty()) {
+    params.batch_options.min_batch_size =
+        parse_nonnegative_size(value, "batch_min_size");
+    if (params.batch_options.min_batch_size < 2) {
+      throw std::invalid_argument("batch_min_size: expected an integer >= 2");
+    }
+  }
+  if (const auto value = field("batch_start_timestamp_attribute");
+      present ? present("batch_start_timestamp_attribute") : !value.empty()) {
+    // An explicit empty value intentionally selects the completion-time
+    // fallback in the batch miner.
+    params.batch_options.start_timestamp_attribute = value;
+  }
+  const auto batches_supplied = present ? present("batches") : !field("batches").empty();
+  for (const auto name : {std::string_view{"batch_merge_distance_seconds"},
+                          std::string_view{"batch_min_size"},
+                          std::string_view{"batch_start_timestamp_attribute"}}) {
+    const bool supplied = present ? present(name) : !field(name).empty();
+    if (supplied && (!batches_supplied || !params.batches)) {
+      throw std::invalid_argument(std::string(name) + ": requires batches=true");
+    }
+  }
+
   return params;
 }
 

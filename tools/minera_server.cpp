@@ -37,6 +37,8 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
+#include "minera/performance_spectrum.hpp"
+#include "minera/batches.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
@@ -313,6 +315,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
     const auto eventually = minera::discover_eventually_follows(log, graph);
+    std::optional<minera::PerformanceSpectrum> spectrum;
+    if (!params.spectrum_activities.empty()) {
+      spectrum = minera::compute_performance_spectrum(
+          log, params.spectrum_activities, params.spectrum);
+    }
+    std::optional<minera::BatchDiscovery> batch_discovery;
+    if (params.batches) {
+      batch_discovery = minera::discover_batches(log, params.batch_options);
+    }
     const auto log_skeleton =
         minera::discover_log_skeleton(log, params.log_skeleton);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
@@ -359,7 +370,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
-        /*decisions=*/nullptr, &petri_decoration, /*spectrum=*/nullptr,
+        /*decisions=*/nullptr, &petri_decoration,
+        spectrum ? &*spectrum : nullptr,
         &inductive_net, &inductive_decoration, &heuristic_net,
         &heuristic_decoration, &temporal_profile, &minimum_self_distances,
         &transition_system, &powl, &powl_net, &powl_decoration,
@@ -367,7 +379,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         &declare_conformance, &footprints,
         dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
         correlation_variants_analysis ? &*correlation_variants_analysis
-                                      : nullptr);
+                                      : nullptr,
+        batch_discovery ? &*batch_discovery : nullptr);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

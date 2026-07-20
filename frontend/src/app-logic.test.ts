@@ -226,6 +226,10 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ dfgStatisticalVariants: ["frequency_triples"] })).toBe(true);
     expect(hasActiveMinerOptions({ dfgCausalVariants: ["heuristic"] })).toBe(true);
     expect(hasActiveMinerOptions({ correlationVariants: ["trace_based"] })).toBe(true);
+    expect(hasActiveMinerOptions({ spectrumActivities: ["A", "B"] })).toBe(true);
+    expect(hasActiveMinerOptions({ spectrumActivities: ["A"] })).toBe(false);
+    expect(hasActiveMinerOptions({ spectrumVariant: "disconnected" })).toBe(false);
+    expect(hasActiveMinerOptions({ batches: true })).toBe(true);
   });
 });
 
@@ -271,6 +275,22 @@ describe("mineFormEntries", () => {
       ["heuristic_start_timestamp_attribute", "started_at"],
       ["heuristic_lifecycle_instance_attribute", "instance"],
     ]);
+  });
+
+  it("maps temporal analyses and gates dependent defaults", () => {
+    expect(mineFormEntries({ spectrumVariant: "disconnected", spectrumSampleSize: 3 })).toEqual([]);
+    expect(mineFormEntries({
+      spectrumActivities: [" A ", "B"], spectrumVariant: "disconnected",
+      spectrumSampleSize: 3, spectrumSortLog: false,
+      batches: true, batchMergeDistanceSeconds: 12, batchMinSize: 4,
+      batchStartTimestampAttribute: "started_at",
+    })).toEqual([
+      ["spectrum_activities", "A,B"], ["spectrum_variant", "disconnected"],
+      ["spectrum_sample_size", "3"], ["spectrum_sort_log", "false"],
+      ["batches", "true"], ["batch_merge_distance_seconds", "12"],
+      ["batch_min_size", "4"], ["batch_start_timestamp_attribute", "started_at"],
+    ]);
+    expect(mineFormEntries({ spectrumActivities: ["A"], spectrumSampleSize: 10000, spectrumSortLog: true, batches: true, batchMergeDistanceSeconds: 900, batchMinSize: 2 })).toEqual([["batches", "true"]]);
   });
 
   it("maps non-default transition-system settings", () => {

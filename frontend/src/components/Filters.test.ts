@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import { temporalValidationMessage } from "./Filters";
+
+const valid = {
+  spectrumConfigured: true,
+  spectrumActivityCount: 2,
+  spectrumSampleSize: "10000",
+  batches: true,
+  batchMergeDistanceSeconds: "900",
+  batchMinSize: "2",
+};
+
+describe("temporal filter validation", () => {
+  it("accepts active defaults and ignores dependent values when inactive", () => {
+    expect(temporalValidationMessage(valid)).toBeNull();
+    expect(temporalValidationMessage({ ...valid, spectrumConfigured: false, spectrumActivityCount: 0, batches: false, spectrumSampleSize: "0", batchMergeDistanceSeconds: "-1", batchMinSize: "1" })).toBeNull();
+  });
+
+  it("rejects exactly one nonblank spectrum activity", () => {
+    expect(temporalValidationMessage({ ...valid, spectrumConfigured: false, spectrumActivityCount: 1 })).toContain("at least two activities");
+  });
+
+  it("rejects invalid active spectrum and batch numbers", () => {
+    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "0" })).toContain("Spectrum sample size");
+    expect(temporalValidationMessage({ ...valid, spectrumSampleSize: "2.5" })).toContain("Spectrum sample size");
+    expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "-1" })).toContain("merge distance");
+    expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "Infinity" })).toContain("merge distance");
+    expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toContain("minimum size");
+    expect(temporalValidationMessage({ ...valid, batchMinSize: "2.1" })).toContain("minimum size");
+  });
+});

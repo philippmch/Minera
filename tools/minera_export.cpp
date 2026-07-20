@@ -36,6 +36,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
+#include "minera/batches.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/powl_conversion.hpp"
@@ -395,6 +396,13 @@ int usage(const char* program) {
                "                            steps): per occurrence, when each\n"
                "                            step happened; embedded under\n"
                "                            \"performance_spectrum\"\n"
+               "  --spectrum-variant <id>  connected (default) or disconnected\n"
+               "  --spectrum-sample-size <n> Positive spectrum sample size\n"
+               "  --spectrum-sort-log <bool> Sort log before spectrum mining\n"
+               "  --batches                 Discover temporal event batches\n"
+               "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
+               "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
+               "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
                "  --no-alignments           Skip the optimal alignments in the\n"
                "                            export (token replay and footprints\n"
                "                            stay); alignments dominate runtime\n"
@@ -544,6 +552,12 @@ int main(int argc, char** argv) {
   std::string decisions_miner;  // empty = no decision mining
   bool no_alignments = false;
   std::vector<std::string> spectrum_activities;  // empty = no spectrum
+  bool spectrum_requested = false;
+  bool spectrum_option_used = false;
+  minera::PerformanceSpectrumOptions spectrum_options;
+  bool batches = false;
+  bool batch_option_used = false;
+  minera::BatchDiscoveryOptions batch_options;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   minera::InductiveMinerOptions inductive_options;
@@ -591,7 +605,14 @@ int main(int argc, char** argv) {
     if (result.ec != std::errc{} || result.ptr != end || parsed == 0)
       throw std::invalid_argument(std::string(option) +
                                   " expects a positive integer");
-    return parsed;
+      return parsed;
+  };
+  const auto parse_boolean = [](const char* value, std::string_view option) {
+    const std::string_view text = value;
+    if (text == "true" || text == "1") return true;
+    if (text == "false" || text == "0") return false;
+    throw std::invalid_argument(std::string(option) +
+                                " expects true, false, 1, or 0");
   };
   const auto parse_declare_playout_int =
       [](const char* value, std::string_view name,
@@ -1029,6 +1050,72 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       spectrum_activities = split_csv(value);
+      spectrum_requested = true;
+      if (spectrum_activities.size() < 2) {
+        std::cerr << "error: --spectrum expects at least two activities\n";
+        return 2;
+      }
+    } else if (arg == "--spectrum-variant") {
+      spectrum_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (std::string_view(value) == "connected")
+        spectrum_options.variant = minera::PerformanceSpectrumVariant::kConnected;
+      else if (std::string_view(value) == "disconnected")
+        spectrum_options.variant = minera::PerformanceSpectrumVariant::kDisconnected;
+      else {
+        std::cerr << "error: --spectrum-variant expects connected or disconnected\n";
+        return 2;
+      }
+    } else if (arg == "--spectrum-sample-size") {
+      spectrum_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        spectrum_options.sample_size = parse_positive_size(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--spectrum-sort-log") {
+      spectrum_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        spectrum_options.sort_log = parse_boolean(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--batches") {
+      batches = true;
+    } else if (arg == "--batch-merge-distance-seconds") {
+      batch_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      const double parsed = std::strtod(value, &end);
+      if (end != value + std::strlen(value) || !std::isfinite(parsed) || parsed < 0.0) {
+        std::cerr << "error: --batch-merge-distance-seconds expects a finite non-negative number\n";
+        return 2;
+      }
+      batch_options.merge_distance_seconds = parsed;
+    } else if (arg == "--batch-min-size") {
+      batch_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        batch_options.min_batch_size = parse_positive_size(value, arg);
+        if (batch_options.min_batch_size < 2) throw std::invalid_argument("--batch-min-size expects an integer >= 2");
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--batch-start-timestamp-attribute") {
+      batch_option_used = true;
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      batch_options.start_timestamp_attribute = value;
     } else if (arg == "--transition-view") {
       const auto* value = next(); if (!value) return usage(argv[0]);
       if (std::string_view(value) == "sequence") transition_options.view = minera::TransitionView::kSequence;
@@ -1392,6 +1479,16 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (spectrum_option_used && !spectrum_requested) {
+    std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
+                 "--spectrum-sort-log require --spectrum\n";
+    return 2;
+  }
+  if (batch_option_used && !batches) {
+    std::cerr << "error: --batch-* options require --batches\n";
+    return 2;
+  }
+
   if (footprints_options.model == "dfg" &&
       footprints_options.discovery_variants.contains("petri_reach_graph")) {
     std::cerr << "error: --footprints-model dfg cannot be combined with "
@@ -1562,10 +1659,17 @@ int main(int argc, char** argv) {
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
     if (!spectrum_activities.empty()) {
-      spectrum = minera::compute_performance_spectrum(log, spectrum_activities);
+      spectrum = minera::compute_performance_spectrum(log, spectrum_activities,
+                                                      spectrum_options);
     }
     const minera::PerformanceSpectrum* spectrum_ptr =
         spectrum ? &*spectrum : nullptr;
+    std::optional<minera::BatchDiscovery> batch_discovery;
+    if (batches) {
+      batch_discovery = minera::discover_batches(log, batch_options);
+    }
+    const minera::BatchDiscovery* batch_ptr =
+        batch_discovery ? &*batch_discovery : nullptr;
 
     if (output.empty()) {
       minera::write_analysis_json(
@@ -1579,7 +1683,8 @@ int main(int argc, char** argv) {
           &declare_conformance, &footprints,
           dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
           correlation_variants_analysis ? &*correlation_variants_analysis
-                                        : nullptr);
+                                        : nullptr,
+          batch_ptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1597,7 +1702,8 @@ int main(int argc, char** argv) {
           &footprints,
           dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
           correlation_variants_analysis ? &*correlation_variants_analysis
-                                        : nullptr);
+                                        : nullptr,
+          batch_ptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

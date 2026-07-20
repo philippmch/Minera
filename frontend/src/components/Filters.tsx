@@ -30,6 +30,36 @@ interface FiltersProps {
   onApply: (options: FilterOptions & MinerOptions) => void;
 }
 
+/** Validation for temporal controls that are only relevant once enabled. */
+export function temporalValidationMessage(input: {
+  spectrumConfigured: boolean;
+  spectrumActivityCount: number;
+  spectrumSampleSize: string;
+  batches: boolean;
+  batchMergeDistanceSeconds: string;
+  batchMinSize: string;
+}): string | null {
+  if (input.spectrumActivityCount === 1)
+    return "Spectrum needs at least two activities.";
+  if (input.spectrumConfigured) {
+    const raw = input.spectrumSampleSize.trim();
+    const value = Number(raw);
+    if (!raw || !Number.isFinite(value) || !Number.isInteger(value) || value <= 0)
+      return "Spectrum sample size must be a positive integer.";
+  }
+  if (input.batches) {
+    const mergeRaw = input.batchMergeDistanceSeconds.trim();
+    const merge = Number(mergeRaw);
+    if (!mergeRaw || !Number.isFinite(merge) || merge < 0)
+      return "Batch merge distance must be a finite, non-negative number.";
+    const minRaw = input.batchMinSize.trim();
+    const min = Number(minRaw);
+    if (!minRaw || !Number.isFinite(min) || !Number.isInteger(min) || min < 2)
+      return "Batch minimum size must be an integer of at least 2.";
+  }
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -212,6 +242,14 @@ export function Filters({
     correlationVariants.has("classic_split");
   const correlationSplitOptionsActive =
     correlationVariants.has("classic_split");
+  const [spectrumActivities, setSpectrumActivities] = useState("");
+  const [spectrumVariant, setSpectrumVariant] = useState<"connected" | "disconnected">("connected");
+  const [spectrumSampleSize, setSpectrumSampleSize] = useState("10000");
+  const [spectrumSortLog, setSpectrumSortLog] = useState(true);
+  const [batches, setBatches] = useState(false);
+  const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
+  const [batchMinSize, setBatchMinSize] = useState("2");
+  const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -332,7 +370,19 @@ export function Filters({
     return names.length ? [...new Set(names)] : undefined;
   };
 
+  const spectrumNames = spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean);
+  const spectrumConfigured = spectrumNames.length >= 2;
+  const temporalValidationError = temporalValidationMessage({
+    spectrumConfigured,
+    spectrumActivityCount: spectrumNames.length,
+    spectrumSampleSize,
+    batches,
+    batchMergeDistanceSeconds,
+    batchMinSize,
+  });
+
   const apply = () => {
+    if (temporalValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -496,6 +546,22 @@ export function Filters({
           ? true : undefined,
       correlationSampleSize: correlationSplitOptionsActive
         ? toInt(correlationSampleSize) : undefined,
+      spectrumActivities: spectrumConfigured ? spectrumNames : undefined,
+      spectrumVariant: spectrumConfigured && spectrumVariant !== "connected"
+        ? spectrumVariant : undefined,
+      spectrumSampleSize: spectrumConfigured
+        ? (() => { const n = Number(spectrumSampleSize); return Number.isInteger(n) && n > 0 ? n : undefined; })()
+        : undefined,
+      spectrumSortLog: spectrumConfigured && !spectrumSortLog
+        ? false : undefined,
+      batches: batches || undefined,
+      batchMergeDistanceSeconds: batches
+        ? (() => { const n = Number(batchMergeDistanceSeconds); return Number.isFinite(n) && n >= 0 ? n : undefined; })()
+        : undefined,
+      batchMinSize: batches
+        ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 2 ? n : undefined; })()
+        : undefined,
+      batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
     });
   };
 
@@ -573,6 +639,14 @@ export function Filters({
     setCorrelationStartTimestampAttribute("");
     setCorrelationExactTimeMatching(false);
     setCorrelationSampleSize("100000");
+    setSpectrumActivities("");
+    setSpectrumVariant("connected");
+    setSpectrumSampleSize("10000");
+    setSpectrumSortLog(true);
+    setBatches(false);
+    setBatchMergeDistanceSeconds("900");
+    setBatchMinSize("2");
+    setBatchStartTimestampAttribute("");
     onApply({});
   };
 
@@ -634,8 +708,11 @@ export function Filters({
   const dfgDirty =
     dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0;
   const correlationDirty = correlationVariants.size > 0;
+  const spectrumActive = spectrumActivities.trim() !== "";
+  const temporalDirty =
+    spectrumActive || batches;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
-    declareDirty || footprintsDirty || dfgDirty || correlationDirty;
+    declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty;
 
   return (
     <section className="filters reveal">
@@ -1632,8 +1709,93 @@ export function Filters({
             </label>
           </div>
 
+          <div className="filters-subhead">Temporal &amp; behavioral discovery</div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Performance spectrum activities</span>
+              <input
+                type="text"
+                placeholder="A, B, C (optional)"
+                value={spectrumActivities}
+                onChange={(e) => setSpectrumActivities(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Spectrum variant</span>
+              <select
+                value={spectrumVariant}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumVariant(e.target.value as "connected" | "disconnected")}
+              >
+                <option value="connected">connected (default)</option>
+                <option value="disconnected">disconnected</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Spectrum sample size</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={spectrumSampleSize}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumSampleSize(e.target.value)}
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={spectrumSortLog}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumSortLog(e.target.checked)}
+              />
+              <span>Sort spectrum log (default)</span>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={batches} onChange={(e) => setBatches(e.target.checked)} />
+              <span>Discover batches</span>
+            </label>
+            <label className="filters-field">
+              <span>Batch merge distance (seconds)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={batchMergeDistanceSeconds}
+                disabled={!batches}
+                onChange={(e) => setBatchMergeDistanceSeconds(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch minimum size</span>
+              <input
+                type="number"
+                min={2}
+                step={1}
+                value={batchMinSize}
+                disabled={!batches}
+                onChange={(e) => setBatchMinSize(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch start timestamp attribute</span>
+              <input
+                type="text"
+                placeholder="start_timestamp"
+                value={batchStartTimestampAttribute}
+                disabled={!batches}
+                onChange={(e) => setBatchStartTimestampAttribute(e.target.value)}
+              />
+            </label>
+          </div>
+
+          {temporalValidationError && (
+            <p className="filters-validation" role="alert">{temporalValidationError}</p>
+          )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError)}>
               Apply
             </button>
             <button

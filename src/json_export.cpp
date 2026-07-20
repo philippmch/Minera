@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -1320,7 +1321,16 @@ void write_model_decoration(std::ostream& out,
 // observation (epoch seconds, one per pattern step, with the case id).
 void write_performance_spectrum(std::ostream& out,
                                 const PerformanceSpectrum& spectrum) {
-  out << "{\"activities\": [";
+  const auto variant_name = [&]() -> std::string_view {
+    switch (spectrum.variant) {
+      case PerformanceSpectrumVariant::kConnected: return "connected";
+      case PerformanceSpectrumVariant::kDisconnected: return "disconnected";
+    }
+    throw std::invalid_argument("performance spectrum has unknown variant");
+  }();
+  out << "{\"variant\": ";
+  write_json_string(out, variant_name);
+  out << ", \"activities\": [";
   for (std::size_t i = 0; i < spectrum.activities.size(); ++i) {
     write_json_string(out, spectrum.activities[i]);
     out << (i + 1 < spectrum.activities.size() ? ", " : "");
@@ -1330,12 +1340,236 @@ void write_performance_spectrum(std::ostream& out,
     const auto& observation = spectrum.observations[i];
     out << "{\"case_id\": ";
     write_json_string(out, observation.case_id);
-    out << ", \"instants\": [";
+    out << ", \"pattern_offset\": " << observation.pattern_offset
+        << ", \"instants\": [";
     for (std::size_t k = 0; k < observation.instants.size(); ++k) {
       out << observation.instants[k]
           << (k + 1 < observation.instants.size() ? ", " : "");
     }
+    out << "], \"activities\": [";
+    for (std::size_t k = 0; k < observation.activities.size(); ++k) {
+      write_json_string(out, observation.activities[k]);
+      out << (k + 1 < observation.activities.size() ? ", " : "");
+    }
     out << "]}" << (i + 1 < spectrum.observations.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
+void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
+                                   const DirectlyFollowsGraph& graph) {
+  if (spectrum.activities.size() < 2) {
+    throw std::invalid_argument("performance spectrum pattern must have at least two activities");
+  }
+  for (const auto& activity : spectrum.activities) {
+    if (!graph.activity_id(activity)) {
+      throw std::invalid_argument("performance spectrum activity is not registered: " + activity);
+    }
+  }
+  if (spectrum.variant != PerformanceSpectrumVariant::kConnected &&
+      spectrum.variant != PerformanceSpectrumVariant::kDisconnected) {
+    throw std::invalid_argument("performance spectrum has unknown variant");
+  }
+  for (const auto& observation : spectrum.observations) {
+    if (observation.instants.size() != observation.activities.size()) {
+      throw std::invalid_argument("performance spectrum observation vectors have different lengths");
+    }
+    if (observation.instants.empty()) {
+      throw std::invalid_argument("performance spectrum observation cannot be empty");
+    }
+    if (observation.pattern_offset > spectrum.activities.size() ||
+        observation.activities.size() >
+            spectrum.activities.size() - observation.pattern_offset) {
+      throw std::invalid_argument("performance spectrum observation exceeds pattern bounds");
+    }
+    if (spectrum.variant == PerformanceSpectrumVariant::kConnected &&
+        observation.pattern_offset != 0) {
+      throw std::invalid_argument("connected performance spectrum observation must have offset zero");
+    }
+    if (spectrum.variant == PerformanceSpectrumVariant::kDisconnected &&
+        observation.activities.size() < 2) {
+      throw std::invalid_argument("disconnected performance spectrum observation must have at least two activities");
+    }
+    const auto pattern_begin = spectrum.activities.begin() +
+                               static_cast<std::ptrdiff_t>(observation.pattern_offset);
+    if (!std::equal(observation.activities.begin(), observation.activities.end(),
+                    pattern_begin)) {
+      throw std::invalid_argument("performance spectrum observation labels do not match pattern offset");
+    }
+    for (const double instant : observation.instants) {
+      if (!std::isfinite(instant)) {
+        throw std::invalid_argument("performance spectrum contains a non-finite instant");
+      }
+    }
+    if (spectrum.variant == PerformanceSpectrumVariant::kConnected) {
+      if (observation.activities != spectrum.activities) {
+        throw std::invalid_argument("connected performance spectrum observation does not match pattern");
+      }
+    } else if (observation.activities.size() < 2 ||
+               observation.activities.size() > spectrum.activities.size()) {
+      throw std::invalid_argument("disconnected performance spectrum observation is longer than pattern");
+    } else {
+      bool contiguous = false;
+      for (std::size_t start = 0; start + observation.activities.size() <= spectrum.activities.size(); ++start) {
+        if (start != observation.pattern_offset) continue;
+        if (std::equal(observation.activities.begin(), observation.activities.end(),
+                       spectrum.activities.begin() + static_cast<std::ptrdiff_t>(start))) {
+          contiguous = true;
+          break;
+        }
+      }
+      if (!contiguous) {
+        throw std::invalid_argument("disconnected performance spectrum observation is not a contiguous sub-pattern");
+      }
+    }
+  }
+}
+
+std::string_view batch_type_name(BatchType type) {
+  switch (type) {
+    case BatchType::kSimultaneous: return "simultaneous";
+    case BatchType::kBatchingOnStart: return "batching_on_start";
+    case BatchType::kBatchingOnEnd: return "batching_on_end";
+    case BatchType::kSequential: return "sequential";
+    case BatchType::kConcurrent: return "concurrent";
+  }
+  throw std::invalid_argument("batch discovery contains an unknown batch type");
+}
+
+BatchType classify_batch_events(const std::vector<BatchEvent>& events) {
+  const double first_start = events.front().start;
+  const double first_complete = events.front().complete;
+  bool equal_starts = true, equal_ends = true, simultaneous = true;
+  for (const auto& event : events) {
+    equal_starts = equal_starts && event.start == first_start;
+    equal_ends = equal_ends && event.complete == first_complete;
+    simultaneous = simultaneous && event.start == first_start &&
+                   event.complete == first_complete;
+  }
+  if (simultaneous) return BatchType::kSimultaneous;
+  if (equal_starts) return BatchType::kBatchingOnStart;
+  if (equal_ends) return BatchType::kBatchingOnEnd;
+  bool sequential = true;
+  for (std::size_t i = 1; i < events.size(); ++i) {
+    if (events[i - 1].complete != events[i].start) {
+      sequential = false;
+      break;
+    }
+  }
+  return sequential ? BatchType::kSequential : BatchType::kConcurrent;
+}
+
+void validate_batch_discovery(const BatchDiscovery& discovery,
+                              const EventLog& log,
+                              const DirectlyFollowsGraph& graph) {
+  if (!std::isfinite(discovery.options.merge_distance_seconds) ||
+      discovery.options.merge_distance_seconds < 0.0 ||
+      discovery.options.min_batch_size < 2) {
+    throw std::invalid_argument("batch discovery options are invalid");
+  }
+  std::set<std::pair<std::size_t, std::size_t>> identities;
+  std::size_t previous_group_batch_count = std::numeric_limits<std::size_t>::max();
+  std::string previous_group_activity;
+  std::string previous_group_resource;
+  bool first_group = true;
+  for (const auto& group : discovery.groups) {
+    if (!graph.activity_id(group.activity)) {
+      throw std::invalid_argument("batch discovery activity is not registered: " + group.activity);
+    }
+    std::size_t total = 0;
+    if (group.batch_count != group.batches.size()) {
+      throw std::invalid_argument("batch discovery group batch_count does not match batches");
+    }
+    if (!first_group &&
+        (group.batch_count > previous_group_batch_count ||
+         (group.batch_count == previous_group_batch_count &&
+          std::tie(group.activity, group.resource) >=
+              std::tie(previous_group_activity, previous_group_resource)))) {
+      throw std::invalid_argument("batch discovery groups are not ordered");
+    }
+    first_group = false;
+    previous_group_batch_count = group.batch_count;
+    previous_group_activity = group.activity;
+    previous_group_resource = group.resource;
+    double previous_start = -std::numeric_limits<double>::infinity();
+    for (const auto& batch : group.batches) {
+      (void)batch_type_name(batch.type);
+      if (!std::isfinite(batch.start) || !std::isfinite(batch.complete) ||
+          batch.start > batch.complete) {
+        throw std::invalid_argument("batch discovery has invalid batch range");
+      }
+      if (batch.events.size() < discovery.options.min_batch_size) {
+        throw std::invalid_argument("batch discovery batch must contain at least two events");
+      }
+      if (batch.type != classify_batch_events(batch.events)) {
+        throw std::invalid_argument("batch discovery type does not match event intervals");
+      }
+      if (batch.start < previous_start) {
+        throw std::invalid_argument("batch discovery batches are not ordered");
+      }
+      previous_start = batch.start;
+      double previous_event_start = -std::numeric_limits<double>::infinity();
+      for (const auto& event : batch.events) {
+        if (!std::isfinite(event.start) || !std::isfinite(event.complete) ||
+            event.start > event.complete || event.start < batch.start ||
+            event.complete > batch.complete) {
+          throw std::invalid_argument("batch discovery has invalid event range");
+        }
+        if (event.trace_index >= log.traces.size() ||
+            event.event_index >= log.traces[event.trace_index].events.size()) {
+          throw std::invalid_argument("batch discovery event index is out of range");
+        }
+        const auto& source = log.traces[event.trace_index].events[event.event_index];
+        if (source.activity != group.activity || source.resource != group.resource) {
+          throw std::invalid_argument("batch discovery event does not match its group");
+        }
+        if (event.case_id != log.traces[event.trace_index].case_id) {
+          throw std::invalid_argument("batch discovery event case_id does not match trace");
+        }
+        if (event.start < previous_event_start) {
+          throw std::invalid_argument("batch discovery events are not ordered");
+        }
+        previous_event_start = event.start;
+        if (!identities.emplace(event.trace_index, event.event_index).second) {
+          throw std::invalid_argument("batch discovery contains a duplicate event identity");
+        }
+        ++total;
+      }
+    }
+    if (group.event_count != total) {
+      throw std::invalid_argument("batch discovery group event_count does not match batches");
+    }
+  }
+}
+
+void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
+                           const DirectlyFollowsGraph& graph) {
+  out << "{\"groups\": [";
+  for (std::size_t i = 0; i < discovery.groups.size(); ++i) {
+    const auto& group = discovery.groups[i];
+    const auto activity = graph.activity_id(group.activity);
+    out << "{\"activity\": " << *activity << ", \"resource\": ";
+    write_json_string(out, group.resource);
+    out << ", \"event_count\": " << group.event_count
+        << ", \"batch_count\": " << group.batch_count << ", \"batches\": [";
+    for (std::size_t j = 0; j < group.batches.size(); ++j) {
+      const auto& batch = group.batches[j];
+      out << "{\"type\": ";
+      write_json_string(out, batch_type_name(batch.type));
+      out << ", \"start\": " << batch.start << ", \"complete\": "
+          << batch.complete << ", \"events\": [";
+      for (std::size_t k = 0; k < batch.events.size(); ++k) {
+        const auto& event = batch.events[k];
+        out << "{\"start\": " << event.start << ", \"complete\": "
+            << event.complete << ", \"case_id\": ";
+        write_json_string(out, event.case_id);
+        out << ", \"trace_index\": " << event.trace_index
+            << ", \"event_index\": " << event.event_index << "}"
+            << (k + 1 < batch.events.size() ? ", " : "");
+      }
+      out << "]}" << (j + 1 < group.batches.size() ? ", " : "");
+    }
+    out << "]}" << (i + 1 < discovery.groups.size() ? ", " : "");
   }
   out << "]}";
 }
@@ -2201,7 +2435,8 @@ void write_analysis_json(std::ostream& out,
                          const FootprintsAnalysis* footprints,
                          const DfgVariantsAnalysis* dfg_variants,
                          const CorrelationVariantsAnalysis*
-                             correlation_mining) {
+                             correlation_mining,
+                         const BatchDiscovery* batch_discovery) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2235,6 +2470,10 @@ void write_analysis_json(std::ostream& out,
   }
   if (correlation_mining != nullptr) {
     validate_correlation_mining(*correlation_mining, graph);
+  }
+  if (spectrum != nullptr) validate_performance_spectrum(*spectrum, graph);
+  if (batch_discovery != nullptr) {
+    validate_batch_discovery(*batch_discovery, log, graph);
   }
   out << "{\n";
   out << "  \"dataset\": ";
@@ -2437,6 +2676,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"performance_spectrum\": ";
     write_performance_spectrum(out, *spectrum);
   }
+  if (batch_discovery != nullptr) {
+    out << ",\n  \"batch_discovery\": ";
+    write_batch_discovery(out, *batch_discovery, graph);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -2474,7 +2717,8 @@ std::string analysis_json(std::string_view dataset,
                           const FootprintsAnalysis* footprints,
                           const DfgVariantsAnalysis* dfg_variants,
                           const CorrelationVariantsAnalysis*
-                              correlation_mining) {
+                              correlation_mining,
+                          const BatchDiscovery* batch_discovery) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2484,7 +2728,8 @@ std::string analysis_json(std::string_view dataset,
                       minimum_self_distances, transition_system, powl,
                       powl_petri, powl_decoration, log_skeleton,
                       log_skeleton_conformance, declare, declare_conformance,
-                      footprints, dfg_variants, correlation_mining);
+                      footprints, dfg_variants, correlation_mining,
+                      batch_discovery);
   return out.str();
 }
 
