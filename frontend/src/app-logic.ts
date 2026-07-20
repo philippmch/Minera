@@ -1,5 +1,8 @@
 import { type FilterOptions, type MinerOptions } from "./api";
 import { type MineraExport } from "./types";
+import {
+  FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
+} from "./types";
 
 export type Tab = "log" | "dotted" | "dfg" | "model" | "conformance" | "resources";
 
@@ -19,17 +22,81 @@ export function initialTab(data: MineraExport): Tab {
  * heuristic settings, so for those only absence means default.
  */
 export function hasActiveMinerOptions(options: MinerOptions): boolean {
+  const allLogSkeletonConstraints = [
+    "equivalence",
+    "always_after",
+    "always_before",
+    "never_together",
+    "directly_follows",
+    "activ_freq",
+  ];
+  const logSkeletonConstraintsActive =
+    options.logSkeletonConstraints !== undefined &&
+    options.logSkeletonConstraints.length > 0 &&
+    (options.logSkeletonConstraints.length !== allLogSkeletonConstraints.length ||
+      allLogSkeletonConstraints.some(
+        (name) => !options.logSkeletonConstraints?.includes(name),
+      ));
+  const footprintsDiscoveryActive =
+    options.footprintsDiscoveryVariants !== undefined &&
+    (options.footprintsDiscoveryVariants.length !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
+      FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some(
+        (name) => !options.footprintsDiscoveryVariants?.includes(name),
+      ));
+  const footprintsConformanceActive =
+    options.footprintsConformanceVariants !== undefined &&
+    (options.footprintsConformanceVariants.length !== 1 ||
+      !options.footprintsConformanceVariants.includes("log_model"));
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
       (options.alphaVariant && options.alphaVariant !== "plus") ||
+      (options.heuristicVariant && options.heuristicVariant !== "classic") ||
       options.dependencyThreshold !== undefined ||
       options.andThreshold !== undefined ||
       options.minEdgeFrequency !== undefined ||
+      options.heuristicMinActivityCount !== undefined ||
+      (options.heuristicDecoration &&
+        options.heuristicDecoration !== "frequency") ||
+      (options.heuristicPerformanceAggregation &&
+        options.heuristicPerformanceAggregation !== "mean") ||
+      (options.heuristicDfgPreCleaningNoiseThreshold !== undefined &&
+        options.heuristicDfgPreCleaningNoiseThreshold !== 0.05) ||
+      (options.heuristicLoopLengthTwoThreshold !== undefined &&
+        options.heuristicLoopLengthTwoThreshold !== 0.5) ||
+      options.heuristicKeepOncePerCase === true ||
+      Boolean(options.heuristicMostCommonPaths?.trim()) ||
+      (options.heuristicStartTimestampAttribute &&
+        options.heuristicStartTimestampAttribute !== "start_timestamp") ||
+      (options.heuristicLifecycleInstanceAttribute &&
+        options.heuristicLifecycleInstanceAttribute !== "concept:instance") ||
       (options.transitionView && options.transitionView !== "sequence") ||
       options.transitionDirection && options.transitionDirection !== "forward" ||
       options.transitionWindow !== undefined && options.transitionWindow !== 2 ||
-      options.transitionIncludeData === true,
+      options.transitionIncludeData === true ||
+      (options.powlVariant && options.powlVariant !== "maximal") ||
+        (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor") ||
+        (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold !== 0) ||
+        (options.powlOrderFrequencyRatio !== undefined && options.powlOrderFrequencyRatio !== 1) ||
+        (options.powlBruteForceActivityLimit !== undefined && options.powlBruteForceActivityLimit !== 0) ||
+        (options.tokenReplayVariant && options.tokenReplayVariant !== "forward") ||
+      options.tokenReplayStopImmediatelyUnfit === true ||
+      options.logSkeletonNoiseThreshold !== undefined &&
+        options.logSkeletonNoiseThreshold !== 0 ||
+      logSkeletonConstraintsActive ||
+      options.declareConsideredActivities?.length ||
+        (options.declareAllowedTemplates !== undefined &&
+          options.declareAllowedTemplates.length > 0 &&
+          options.declareAllowedTemplates.length < 18) ||
+        options.declareMinSupportRatio !== undefined ||
+      options.declareMinConfidenceRatio !== undefined ||
+        (options.declareAutoSelectionMultiplier !== undefined &&
+          options.declareAutoSelectionMultiplier !== 0.8) ||
+      footprintsDiscoveryActive ||
+      options.footprintsModel && options.footprintsModel !== "process_tree" ||
+      footprintsConformanceActive ||
+      options.footprintsStrict === true ||
+      options.footprintsEnableActAlwaysExecuted === false
   );
 }
 

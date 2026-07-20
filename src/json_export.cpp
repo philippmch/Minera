@@ -77,6 +77,688 @@ void write_process_tree_node(std::ostream& out,
   out << '}';
 }
 
+void write_powl_node(std::ostream& out, const PowlNode& node,
+                     const DirectlyFollowsGraph& graph) {
+  switch (node.kind()) {
+    case PowlNodeKind::kTransition: {
+      const auto activity = graph.activity_id(node.label());
+      if (!activity) {
+        throw std::invalid_argument(
+            "POWL transition activity is not registered: " + node.label());
+      }
+      out << "{\"kind\": \"transition\", \"activity\": " << *activity
+          << ", \"frequency\": {\"minimum\": " << node.frequency().minimum
+          << ", \"maximum\": ";
+      if (node.frequency().maximum) out << *node.frequency().maximum;
+      else out << "null";
+      out << "}}";
+      return;
+    }
+    case PowlNodeKind::kSilent:
+      out << "{\"kind\": \"silent\"}";
+      return;
+    case PowlNodeKind::kXor:
+      out << "{\"kind\": \"xor\"";
+      break;
+    case PowlNodeKind::kLoop:
+      out << "{\"kind\": \"loop\"";
+      break;
+    case PowlNodeKind::kStrictPartialOrder:
+      out << "{\"kind\": \"strict_partial_order\"";
+      break;
+  }
+  out << ", \"children\": [";
+  for (std::size_t i = 0; i < node.children().size(); ++i) {
+    write_powl_node(out, node.children()[i], graph);
+    out << (i + 1 < node.children().size() ? ", " : "");
+  }
+  out << ']';
+  if (node.kind() == PowlNodeKind::kStrictPartialOrder) {
+    out << ", \"order\": [";
+    for (std::size_t i = 0; i < node.order().size(); ++i) {
+      out << "{\"source\": " << node.order()[i].first
+          << ", \"target\": " << node.order()[i].second << '}'
+          << (i + 1 < node.order().size() ? ", " : "");
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
+void write_log_skeleton_pairs(std::ostream& out,
+                              const std::vector<LogSkeletonPair>& pairs,
+                              const DirectlyFollowsGraph& graph) {
+  out << '[';
+  for (std::size_t i = 0; i < pairs.size(); ++i) {
+    const auto source = graph.activity_id(pairs[i].source);
+    const auto target = graph.activity_id(pairs[i].target);
+    if (!source || !target) {
+      throw std::invalid_argument("log skeleton activity is not registered");
+    }
+    out << "{\"source\": " << *source << ", \"target\": " << *target
+        << '}' << (i + 1 < pairs.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+void write_log_skeleton_model(std::ostream& out,
+                              const LogSkeletonModel& model,
+                              const DirectlyFollowsGraph& graph) {
+  out << "{\"equivalence\": ";
+  write_log_skeleton_pairs(out, model.equivalence, graph);
+  out << ", \"always_after\": ";
+  write_log_skeleton_pairs(out, model.always_after, graph);
+  out << ", \"always_before\": ";
+  write_log_skeleton_pairs(out, model.always_before, graph);
+  out << ", \"never_together\": ";
+  write_log_skeleton_pairs(out, model.never_together, graph);
+  out << ", \"directly_follows\": ";
+  write_log_skeleton_pairs(out, model.directly_follows, graph);
+  out << ", \"activ_freq\": {";
+  std::size_t emitted = 0;
+  for (const auto& [activity, frequencies] : model.activ_freq) {
+    const auto id = graph.activity_id(activity);
+    if (!id) {
+      throw std::invalid_argument("log skeleton activity is not registered: " +
+                                  activity);
+    }
+    if (emitted++ != 0) out << ", ";
+    write_json_string(out, std::to_string(*id));
+    out << ": [";
+    for (std::size_t i = 0; i < frequencies.size(); ++i) {
+      out << frequencies[i] << (i + 1 < frequencies.size() ? ", " : "");
+    }
+    out << ']';
+  }
+  out << "}}";
+}
+
+void write_log_skeleton_conformance(
+    std::ostream& out, const EventLog& log,
+    const std::vector<LogSkeletonConformance>& conformance,
+    const DirectlyFollowsGraph& graph) {
+  out << '[';
+  for (std::size_t i = 0; i < conformance.size(); ++i) {
+    const auto& result = conformance[i];
+    out << "{\"case_id\": ";
+    write_json_string(out, log.traces[i].case_id);
+    out << ", \"deviations\": [";
+    for (std::size_t j = 0; j < result.deviations.size(); ++j) {
+      const auto& deviation = result.deviations[j];
+      out << "{\"constraint\": ";
+      write_json_string(out, deviation.constraint);
+      if (deviation.constraint == "activ_freq") {
+        const auto id = graph.activity_id(deviation.activity);
+        if (!id) {
+          throw std::invalid_argument(
+              "log skeleton activity is not registered: " +
+              deviation.activity);
+        }
+        out << ", \"activity\": " << *id
+            << ", \"observed_frequency\": "
+            << deviation.observed_frequency << ", \"allowed_frequencies\": [";
+        for (std::size_t k = 0; k < deviation.allowed_frequencies.size(); ++k) {
+          out << deviation.allowed_frequencies[k]
+              << (k + 1 < deviation.allowed_frequencies.size() ? ", " : "");
+        }
+        out << ']';
+      } else {
+        const auto source = graph.activity_id(deviation.relation.source);
+        const auto target = graph.activity_id(deviation.relation.target);
+        if (!source || !target) {
+          throw std::invalid_argument("log skeleton activity is not registered");
+        }
+        out << ", \"source\": " << *source << ", \"target\": "
+            << *target;
+      }
+      out << '}' << (j + 1 < result.deviations.size() ? ", " : "");
+    }
+    out << "], \"no_dev_total\": " << result.no_dev_total
+        << ", \"no_constr_total\": " << result.no_constr_total
+        << ", \"dev_fitness\": " << result.dev_fitness
+        << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}'
+        << (i + 1 < conformance.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+bool is_log_skeleton_pair_constraint(std::string_view constraint) {
+  return constraint == "equivalence" || constraint == "always_after" ||
+         constraint == "always_before" || constraint == "never_together" ||
+         constraint == "directly_follows";
+}
+
+void validate_log_skeleton_pair(const LogSkeletonPair& pair,
+                                const DirectlyFollowsGraph& graph) {
+  if (pair.source.empty() || pair.target.empty() ||
+      !graph.activity_id(pair.source) || !graph.activity_id(pair.target)) {
+    throw std::invalid_argument("log skeleton pair activity is not registered");
+  }
+}
+
+void validate_log_skeleton_model(const LogSkeletonModel& model,
+                                 const DirectlyFollowsGraph& graph) {
+  const auto validate_pairs = [&](const std::vector<LogSkeletonPair>& pairs) {
+    for (const auto& pair : pairs) validate_log_skeleton_pair(pair, graph);
+  };
+  validate_pairs(model.equivalence);
+  validate_pairs(model.always_after);
+  validate_pairs(model.always_before);
+  validate_pairs(model.never_together);
+  validate_pairs(model.directly_follows);
+  for (const auto& [activity, frequencies] : model.activ_freq) {
+    if (activity.empty() || !graph.activity_id(activity)) {
+      throw std::invalid_argument(
+          "log skeleton activity is not registered: " + activity);
+    }
+    (void)frequencies;
+  }
+}
+
+void validate_log_skeleton_conformance(
+    const EventLog& log, const std::vector<LogSkeletonConformance>& conformance,
+    const DirectlyFollowsGraph& graph) {
+  if (conformance.size() != log.traces.size()) {
+    throw std::invalid_argument(
+        "log skeleton conformance must contain one result per trace");
+  }
+  for (const auto& result : conformance) {
+    for (const auto& deviation : result.deviations) {
+      if (deviation.constraint == "activ_freq") {
+        if (deviation.activity.empty() ||
+            !graph.activity_id(deviation.activity)) {
+          throw std::invalid_argument(
+              "log skeleton activity is not registered: " +
+              deviation.activity);
+        }
+      } else if (is_log_skeleton_pair_constraint(deviation.constraint)) {
+        validate_log_skeleton_pair(deviation.relation, graph);
+      } else {
+        throw std::invalid_argument(
+            "unknown log skeleton deviation constraint: " +
+            deviation.constraint);
+      }
+    }
+  }
+}
+
+constexpr std::string_view kDeclareFamilies[] = {
+    kDeclareExistence, kDeclareExactlyOne, kDeclareInit,
+    kDeclareRespondedExistence, kDeclareResponse, kDeclarePrecedence,
+    kDeclareSuccession, kDeclareAltResponse, kDeclareAltPrecedence,
+    kDeclareAltSuccession, kDeclareChainResponse, kDeclareChainPrecedence,
+    kDeclareChainSuccession, kDeclareAbsence, kDeclareCoexistence,
+    kDeclareNonCoexistence, kDeclareNonSuccession,
+    kDeclareNonChainSuccession};
+
+bool declare_family_is_unary(std::string_view family) {
+  return family == kDeclareExistence || family == kDeclareExactlyOne ||
+         family == kDeclareInit || family == kDeclareAbsence;
+}
+
+bool declare_family_known(std::string_view family) {
+  return std::find(std::begin(kDeclareFamilies), std::end(kDeclareFamilies),
+                   family) != std::end(kDeclareFamilies);
+}
+
+void validate_declare_model(const DeclareModel& model,
+                            const DirectlyFollowsGraph& graph) {
+  for (const auto& [family, rules] : model.rules) {
+    if (!declare_family_known(family)) {
+      throw std::invalid_argument("unknown Declare template family: " + family);
+    }
+    const bool unary = declare_family_is_unary(family);
+    for (const auto& rule : rules) {
+      if (!graph.activity_id(rule.first)) {
+        throw std::invalid_argument("Declare rule activity is not registered");
+      }
+      if (unary) {
+        if (rule.binary) {
+          throw std::invalid_argument("Declare unary rule has binary fields");
+        }
+      } else {
+        if (!rule.binary || !graph.activity_id(rule.second)) {
+          throw std::invalid_argument(
+              "Declare binary rule has invalid activity fields");
+        }
+      }
+    }
+  }
+}
+
+void validate_declare_conformance(
+    const EventLog& log, const std::vector<DeclareConformance>& conformance,
+    const DirectlyFollowsGraph& graph) {
+  if (conformance.size() != log.traces.size()) {
+    throw std::invalid_argument(
+        "Declare conformance must contain one result per trace");
+  }
+  for (const auto& result : conformance) {
+    if (!std::isfinite(result.dev_fitness)) {
+      throw std::invalid_argument("Declare conformance fitness must be finite");
+    }
+    for (const auto& deviation : result.deviations) {
+      if (!declare_family_known(deviation.template_name)) {
+        throw std::invalid_argument("unknown Declare deviation template: " +
+                                    deviation.template_name);
+      }
+      const bool unary = declare_family_is_unary(deviation.template_name);
+      if (!graph.activity_id(deviation.first)) {
+        throw std::invalid_argument(
+            "Declare deviation activity is not registered");
+      }
+      if (unary) {
+        if (deviation.binary) {
+          throw std::invalid_argument(
+              "Declare unary deviation has binary fields");
+        }
+      } else if (!deviation.binary || !graph.activity_id(deviation.second)) {
+        throw std::invalid_argument(
+            "Declare binary deviation has invalid activity fields");
+      }
+    }
+  }
+}
+
+void write_declare_model(std::ostream& out, const DeclareModel& model,
+                         const DirectlyFollowsGraph& graph) {
+  out << '{';
+  for (std::size_t i = 0; i < std::size(kDeclareFamilies); ++i) {
+    if (i != 0) out << ", ";
+    const auto family = kDeclareFamilies[i];
+    write_json_string(out, family);
+    out << ": [";
+    const auto found = model.rules.find(std::string(family));
+    if (found != model.rules.end()) {
+      std::vector<const DeclareConstraint*> ordered;
+      ordered.reserve(found->second.size());
+      for (const auto& rule : found->second) ordered.push_back(&rule);
+      std::stable_sort(ordered.begin(), ordered.end(),
+                       [](const auto* lhs, const auto* rhs) {
+                         return std::tie(lhs->first, lhs->second, lhs->binary,
+                                         lhs->support, lhs->confidence) <
+                                std::tie(rhs->first, rhs->second, rhs->binary,
+                                         rhs->support, rhs->confidence);
+                       });
+      for (std::size_t j = 0; j < ordered.size(); ++j) {
+        const auto& rule = *ordered[j];
+        if (j != 0) out << ", ";
+        out << '{';
+        if (rule.binary) {
+          out << "\"source\": " << *graph.activity_id(rule.first)
+              << ", \"target\": " << *graph.activity_id(rule.second);
+        } else {
+          out << "\"activity\": " << *graph.activity_id(rule.first);
+        }
+        out << ", \"support\": " << rule.support
+            << ", \"confidence\": " << rule.confidence << '}';
+      }
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
+void write_declare_conformance(
+    std::ostream& out, const EventLog& log,
+    const std::vector<DeclareConformance>& conformance,
+    const DirectlyFollowsGraph& graph) {
+  out << '[';
+  for (std::size_t i = 0; i < conformance.size(); ++i) {
+    const auto& result = conformance[i];
+    if (i != 0) out << ", ";
+    out << "{\"trace_index\": " << i << ", \"case_id\": ";
+    write_json_string(out, log.traces[i].case_id);
+    out << ", \"deviations\": [";
+    for (std::size_t j = 0; j < result.deviations.size(); ++j) {
+      const auto& deviation = result.deviations[j];
+      if (j != 0) out << ", ";
+      out << "{\"template\": ";
+      write_json_string(out, deviation.template_name);
+      if (deviation.binary) {
+        out << ", \"source\": " << *graph.activity_id(deviation.first)
+            << ", \"target\": " << *graph.activity_id(deviation.second);
+      } else {
+        out << ", \"activity\": " << *graph.activity_id(deviation.first);
+      }
+      out << '}';
+    }
+    out << "], \"no_constr_total\": " << result.no_constr_total
+        << ", \"no_dev_total\": " << result.no_dev_total
+        << ", \"dev_fitness\": " << result.dev_fitness
+        << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}';
+  }
+  out << ']';
+}
+
+std::size_t footprint_activity_id(const DirectlyFollowsGraph& graph,
+                                  const std::string& activity) {
+  const auto id = graph.activity_id(activity);
+  if (!id) {
+    throw std::invalid_argument("footprint activity is not registered: " +
+                                activity);
+  }
+  return *id;
+}
+
+void validate_footprint_pair(const FootprintPair& pair,
+                             const DirectlyFollowsGraph& graph) {
+  (void)footprint_activity_id(graph, pair.first);
+  (void)footprint_activity_id(graph, pair.second);
+}
+
+void validate_footprint(const Footprint& footprint,
+                        const DirectlyFollowsGraph& graph) {
+  for (const auto& [pair, count] : footprint.dfg) {
+    validate_footprint_pair(pair, graph);
+    (void)count;
+  }
+  for (const auto& pair : footprint.sequence) {
+    validate_footprint_pair(pair, graph);
+  }
+  for (const auto& pair : footprint.parallel) {
+    validate_footprint_pair(pair, graph);
+  }
+  const auto validate_activities = [&](const auto& activities) {
+    for (const auto& activity : activities) {
+      (void)footprint_activity_id(graph, activity);
+    }
+  };
+  validate_activities(footprint.start_activities);
+  validate_activities(footprint.end_activities);
+  validate_activities(footprint.activities);
+  if (footprint.activities_always_happening) {
+    validate_activities(*footprint.activities_always_happening);
+  }
+  if (footprint.trace) validate_activities(*footprint.trace);
+}
+
+void validate_footprints_extensive(
+    const FootprintsExtensiveResult& result,
+    const DirectlyFollowsGraph& graph) {
+  for (const auto& pair : result.footprints) {
+    validate_footprint_pair(pair, graph);
+  }
+  for (const auto& activity : result.start_activities) {
+    (void)footprint_activity_id(graph, activity);
+  }
+  for (const auto& activity : result.end_activities) {
+    (void)footprint_activity_id(graph, activity);
+  }
+  for (const auto& activity : result.activities_always_happening) {
+    (void)footprint_activity_id(graph, activity);
+  }
+}
+
+void validate_footprints_analysis(const FootprintsAnalysis& analysis,
+                                  const EventLog& log,
+                                  const DirectlyFollowsGraph& graph) {
+  if (analysis.entire_event_log) {
+    validate_footprint(*analysis.entire_event_log, graph);
+  }
+  if (analysis.trace_by_trace) {
+    if (analysis.trace_by_trace->size() != log.traces.size()) {
+      throw std::invalid_argument(
+          "trace-by-trace footprints must contain one result per trace");
+    }
+    for (const auto& footprint : *analysis.trace_by_trace) {
+      validate_footprint(footprint, graph);
+    }
+  }
+  if (analysis.dfg) validate_footprint(*analysis.dfg, graph);
+  if (analysis.process_tree) validate_footprint(*analysis.process_tree, graph);
+  if (analysis.powl) validate_footprint(*analysis.powl, graph);
+  if (analysis.petri_reach_graph) {
+    validate_footprint(*analysis.petri_reach_graph, graph);
+  }
+  validate_footprint(analysis.model_footprint, graph);
+  static const std::set<std::string> models = {
+      "process_tree", "powl", "inductive", "alpha", "heuristic", "dfg"};
+  if (!models.contains(analysis.model)) {
+    throw std::invalid_argument("unknown footprints model: " + analysis.model);
+  }
+  if (analysis.log_model) {
+    for (const auto& pair : *analysis.log_model) {
+      validate_footprint_pair(pair, graph);
+    }
+  }
+  if (analysis.log_extensive) {
+    validate_footprints_extensive(*analysis.log_extensive, graph);
+  }
+  if (analysis.trace_extensive) {
+    if (analysis.trace_extensive->size() != log.traces.size()) {
+      throw std::invalid_argument(
+          "trace-extensive footprints must contain one result per trace");
+    }
+    for (const auto& result : *analysis.trace_extensive) {
+      validate_footprints_extensive(result, graph);
+    }
+  }
+  if (!std::isfinite(analysis.precision) ||
+      !std::isfinite(analysis.log_fitness) ||
+      !std::isfinite(analysis.perc_fit_traces)) {
+    throw std::invalid_argument("footprints metrics must be finite");
+  }
+}
+
+std::vector<std::size_t> resolve_footprint_activities(
+    const std::set<std::string>& activities,
+    const DirectlyFollowsGraph& graph) {
+  std::vector<std::size_t> resolved;
+  resolved.reserve(activities.size());
+  for (const auto& activity : activities) {
+    resolved.push_back(footprint_activity_id(graph, activity));
+  }
+  std::sort(resolved.begin(), resolved.end());
+  return resolved;
+}
+
+void write_footprint_ids(std::ostream& out,
+                         const std::set<std::string>& activities,
+                         const DirectlyFollowsGraph& graph) {
+  const auto resolved = resolve_footprint_activities(activities, graph);
+  out << '[';
+  for (std::size_t i = 0; i < resolved.size(); ++i) {
+    out << resolved[i] << (i + 1 < resolved.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+void write_footprint_pairs(std::ostream& out,
+                           const std::set<FootprintPair>& pairs,
+                           const DirectlyFollowsGraph& graph) {
+  std::vector<std::pair<std::size_t, std::size_t>> resolved;
+  resolved.reserve(pairs.size());
+  for (const auto& pair : pairs) {
+    resolved.emplace_back(footprint_activity_id(graph, pair.first),
+                          footprint_activity_id(graph, pair.second));
+  }
+  std::sort(resolved.begin(), resolved.end());
+  out << '[';
+  for (std::size_t i = 0; i < resolved.size(); ++i) {
+    out << "{\"source\": " << resolved[i].first
+        << ", \"target\": " << resolved[i].second << '}'
+        << (i + 1 < resolved.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+void write_footprint(std::ostream& out, const Footprint& footprint,
+                     const DirectlyFollowsGraph& graph) {
+  out << '{';
+  bool emitted = false;
+  const auto field = [&](std::string_view name) {
+    if (emitted) out << ", ";
+    emitted = true;
+    write_json_string(out, name);
+    out << ": ";
+  };
+  if (footprint.dfg_present) {
+    field("dfg");
+    struct ResolvedDfg {
+      std::size_t source;
+      std::size_t target;
+      std::uint64_t count;
+    };
+    std::vector<ResolvedDfg> resolved;
+    resolved.reserve(footprint.dfg.size());
+    for (const auto& [pair, count] : footprint.dfg) {
+      resolved.push_back({footprint_activity_id(graph, pair.first),
+                          footprint_activity_id(graph, pair.second), count});
+    }
+    std::sort(resolved.begin(), resolved.end(),
+              [](const auto& lhs, const auto& rhs) {
+                return std::tie(lhs.source, lhs.target, lhs.count) <
+                       std::tie(rhs.source, rhs.target, rhs.count);
+              });
+    out << '[';
+    for (std::size_t i = 0; i < resolved.size(); ++i) {
+      out << "{\"source\": " << resolved[i].source
+          << ", \"target\": " << resolved[i].target
+          << ", \"count\": " << resolved[i].count << '}'
+          << (i + 1 < resolved.size() ? ", " : "");
+    }
+    out << ']';
+  }
+  field("sequence");
+  write_footprint_pairs(out, footprint.sequence, graph);
+  field("parallel");
+  write_footprint_pairs(out, footprint.parallel, graph);
+  if (footprint.start_activities_present) {
+    field("start_activities");
+    write_footprint_ids(out, footprint.start_activities, graph);
+  }
+  if (footprint.end_activities_present) {
+    field("end_activities");
+    write_footprint_ids(out, footprint.end_activities, graph);
+  }
+  field("activities");
+  write_footprint_ids(out, footprint.activities, graph);
+  if (footprint.skippable) {
+    field("skippable");
+    out << (*footprint.skippable ? "true" : "false");
+  }
+  if (footprint.activities_always_happening) {
+    field("activities_always_happening");
+    write_footprint_ids(out, *footprint.activities_always_happening, graph);
+  }
+  if (footprint.min_trace_length_present) {
+    field("min_trace_length");
+    if (footprint.min_trace_length) {
+      out << *footprint.min_trace_length;
+    } else {
+      out << "null";
+    }
+  }
+  if (footprint.max_trace_length_without_loops) {
+    field("max_trace_length_without_loops");
+    out << *footprint.max_trace_length_without_loops;
+  }
+  if (footprint.trace) {
+    field("trace");
+    out << '[';
+    for (std::size_t i = 0; i < footprint.trace->size(); ++i) {
+      out << footprint_activity_id(graph, (*footprint.trace)[i])
+          << (i + 1 < footprint.trace->size() ? ", " : "");
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
+void write_footprints_extensive_fields(
+    std::ostream& out, const FootprintsExtensiveResult& result,
+    const DirectlyFollowsGraph& graph) {
+  out << "\"footprints\": ";
+  write_footprint_pairs(out, result.footprints, graph);
+  out << ", \"start_activities\": ";
+  write_footprint_ids(out, result.start_activities, graph);
+  out << ", \"end_activities\": ";
+  write_footprint_ids(out, result.end_activities, graph);
+  out << ", \"activities_always_happening\": ";
+  write_footprint_ids(out, result.activities_always_happening, graph);
+  out << ", \"min_length_fit\": "
+      << (result.min_length_fit ? "true" : "false")
+      << ", \"is_footprints_fit\": "
+      << (result.is_footprints_fit ? "true" : "false")
+      << ", \"is_fit\": " << (result.is_fit ? "true" : "false");
+}
+
+void write_footprints_extensive(std::ostream& out,
+                                const FootprintsExtensiveResult& result,
+                                const DirectlyFollowsGraph& graph) {
+  out << '{';
+  write_footprints_extensive_fields(out, result, graph);
+  out << '}';
+}
+
+void write_footprints_analysis(std::ostream& out,
+                               const FootprintsAnalysis& analysis,
+                               const EventLog& log,
+                               const DirectlyFollowsGraph& graph) {
+  out << "{\"discovery\": {";
+  bool emitted = false;
+  const auto discovery = [&](std::string_view name,
+                             const Footprint& footprint) {
+    if (emitted) out << ", ";
+    emitted = true;
+    write_json_string(out, name);
+    out << ": ";
+    write_footprint(out, footprint, graph);
+  };
+  if (analysis.entire_event_log) {
+    discovery("entire_event_log", *analysis.entire_event_log);
+  }
+  if (analysis.trace_by_trace) {
+    if (emitted) out << ", ";
+    emitted = true;
+    out << "\"trace_by_trace\": [";
+    for (std::size_t i = 0; i < analysis.trace_by_trace->size(); ++i) {
+      out << "{\"trace_index\": " << i << ", \"case_id\": ";
+      write_json_string(out, log.traces[i].case_id);
+      out << ", \"footprint\": ";
+      write_footprint(out, (*analysis.trace_by_trace)[i], graph);
+      out << '}' << (i + 1 < analysis.trace_by_trace->size() ? ", " : "");
+    }
+    out << ']';
+  }
+  if (analysis.dfg) discovery("dfg", *analysis.dfg);
+  if (analysis.process_tree) discovery("process_tree", *analysis.process_tree);
+  if (analysis.powl) discovery("powl", *analysis.powl);
+  if (analysis.petri_reach_graph) {
+    discovery("petri_reach_graph", *analysis.petri_reach_graph);
+  }
+  out << "}, \"conformance\": {\"model\": ";
+  write_json_string(out, analysis.model);
+  if (analysis.log_model) {
+    out << ", \"log_model\": {\"strict\": "
+        << (analysis.strict ? "true" : "false")
+        << ", \"violations\": ";
+    write_footprint_pairs(out, *analysis.log_model, graph);
+    out << ", \"is_fit\": "
+        << (analysis.log_model->empty() ? "true" : "false") << '}';
+  }
+  if (analysis.log_extensive) {
+    out << ", \"log_extensive\": ";
+    write_footprints_extensive(out, *analysis.log_extensive, graph);
+  }
+  if (analysis.trace_extensive) {
+    out << ", \"trace_extensive\": [";
+    for (std::size_t i = 0; i < analysis.trace_extensive->size(); ++i) {
+      out << "{\"trace_index\": " << i << ", \"case_id\": ";
+      write_json_string(out, log.traces[i].case_id);
+      out << ", ";
+      write_footprints_extensive_fields(
+          out, (*analysis.trace_extensive)[i], graph);
+      out << '}' << (i + 1 < analysis.trace_extensive->size() ? ", " : "");
+    }
+    out << ']';
+  }
+  out << "}, \"metrics\": {\"precision\": " << analysis.precision
+      << ", \"log_fitness\": " << analysis.log_fitness
+      << ", \"perc_fit_traces\": " << analysis.perc_fit_traces << "}}";
+}
+
 void write_place_list(std::ostream& out, const std::vector<std::size_t>& places) {
   out << '[';
   for (std::size_t i = 0; i < places.size(); ++i) {
@@ -122,6 +804,10 @@ void write_heuristics_net(std::ostream& out,
     const auto id = graph.activity_id(net.activities[local]);
     return id ? *id : local;
   };
+  const auto resolve_name = [&](const std::string& name) {
+    const auto id = graph.activity_id(name);
+    return id ? *id : std::size_t{0};
+  };
   const auto write_ids = [&](const std::vector<std::size_t>& locals) {
     out << '[';
     for (std::size_t i = 0; i < locals.size(); ++i) {
@@ -130,19 +816,152 @@ void write_heuristics_net(std::ostream& out,
     out << ']';
   };
 
-  out << "{\"edges\": [";
+  out << "{\"variant\": \""
+      << (net.variant == HeuristicMinerVariant::kPlusPlus ? "plusplus"
+                                                          : "classic")
+      << "\", \"decoration\": \""
+      << (net.decoration == HeuristicNetDecoration::kPerformance
+              ? "performance"
+              : "frequency")
+      << "\", \"performance_aggregation\": \"";
+  switch (net.performance_aggregation) {
+    case HeuristicPerformanceAggregation::kMean: out << "mean"; break;
+    case HeuristicPerformanceAggregation::kMedian: out << "median"; break;
+    case HeuristicPerformanceAggregation::kMinimum: out << "min"; break;
+    case HeuristicPerformanceAggregation::kMaximum: out << "max"; break;
+    case HeuristicPerformanceAggregation::kStandardDeviation:
+      out << "stdev";
+      break;
+    case HeuristicPerformanceAggregation::kSum: out << "sum"; break;
+    case HeuristicPerformanceAggregation::kRawValues:
+      out << "raw_values";
+      break;
+    case HeuristicPerformanceAggregation::kAll: out << "all"; break;
+  }
+  out << "\", \"edges\": [";
   for (std::size_t i = 0; i < net.edges.size(); ++i) {
     const auto& edge = net.edges[i];
     out << "{\"source\": " << resolve(edge.source)
         << ", \"target\": " << resolve(edge.target)
         << ", \"dependency\": " << edge.dependency
-        << ", \"frequency\": " << edge.frequency << '}'
+        << ", \"frequency\": " << edge.frequency
+        << ", \"representation\": " << edge.representation
+        << ", \"length_two_loop\": "
+        << (edge.length_two_loop ? "true" : "false") << '}'
         << (i + 1 < net.edges.size() ? ", " : "");
   }
   out << "], \"start_activities\": ";
   write_ids(net.start_activities);
   out << ", \"end_activities\": ";
   write_ids(net.end_activities);
+  out << ", \"active_activities\": ";
+  write_ids(net.active_activities);
+  out << ", \"activity_statistics\": [";
+  for (std::size_t i = 0; i < net.activity_statistics.size(); ++i) {
+    const auto& stat = net.activity_statistics[i];
+    out << "{\"activity\": " << resolve(stat.activity)
+        << ", \"occurrences\": " << stat.occurrences
+        << ", \"start_occurrences\": " << stat.start_occurrences
+        << ", \"end_occurrences\": " << stat.end_occurrences
+        << ", \"mean_sojourn_seconds\": " << stat.mean_sojourn_seconds << '}'
+        << (i + 1 < net.activity_statistics.size() ? ", " : "");
+  }
+  out << "], \"relation_statistics\": [";
+  for (std::size_t i = 0; i < net.relation_statistics.size(); ++i) {
+    const auto& stat = net.relation_statistics[i];
+    out << "{\"source\": " << resolve(stat.source)
+        << ", \"target\": " << resolve(stat.target)
+        << ", \"eventually_follows_frequency\": "
+        << stat.eventually_follows_frequency
+        << ", \"direct_adjacency_frequency\": "
+        << stat.direct_adjacency_frequency
+        << ", \"mean_wait_seconds\": " << stat.mean_wait_seconds
+        << ", \"raw_frequency\": " << stat.raw_frequency
+        << ", \"cleaned_frequency\": " << stat.cleaned_frequency
+        << ", \"representation\": " << stat.representation
+        << ", \"length_two_loop\": "
+        << (stat.length_two_loop ? "true" : "false")
+        << ", \"wait_samples\": [";
+    for (std::size_t j = 0; j < stat.wait_samples.size(); ++j) {
+      out << stat.wait_samples[j]
+          << (j + 1 < stat.wait_samples.size() ? ", " : "");
+    }
+    out << "], \"median_wait_seconds\": " << stat.median_wait_seconds
+        << ", \"min_wait_seconds\": " << stat.min_wait_seconds
+        << ", \"max_wait_seconds\": " << stat.max_wait_seconds
+        << ", \"stdev_wait_seconds\": " << stat.stdev_wait_seconds
+        << ", \"sum_wait_seconds\": " << stat.sum_wait_seconds << '}'
+        << (i + 1 < net.relation_statistics.size() ? ", " : "");
+  }
+  out << "], \"concurrency_statistics\": [";
+  for (std::size_t i = 0; i < net.concurrency_statistics.size(); ++i) {
+    const auto& stat = net.concurrency_statistics[i];
+    out << "{\"first\": " << resolve(stat.first)
+        << ", \"second\": " << resolve(stat.second)
+        << ", \"frequency\": " << stat.frequency << '}'
+        << (i + 1 < net.concurrency_statistics.size() ? ", " : "");
+  }
+  out << "], \"raw_activity_statistics\": [";
+  for (std::size_t i = 0; i < net.raw_activity_statistics.size(); ++i) {
+    const auto& stat = net.raw_activity_statistics[i];
+    out << "{\"activity\": " << resolve_name(stat.activity)
+        << ", \"occurrences\": " << stat.occurrences
+        << ", \"mean_sojourn_seconds\": " << stat.mean_sojourn_seconds << '}'
+        << (i + 1 < net.raw_activity_statistics.size() ? ", " : "");
+  }
+  out << "], \"raw_concurrency_statistics\": [";
+  for (std::size_t i = 0; i < net.raw_concurrency_statistics.size(); ++i) {
+    const auto& stat = net.raw_concurrency_statistics[i];
+    out << "{\"first\": " << resolve_name(stat.first)
+        << ", \"second\": " << resolve_name(stat.second)
+        << ", \"frequency\": " << stat.frequency << '}'
+        << (i + 1 < net.raw_concurrency_statistics.size() ? ", " : "");
+  }
+  const auto write_frequency_dfg = [&](const HeuristicFrequencyDfg& dfg) {
+    out << '[';
+    std::size_t index = 0;
+    for (const auto& [pair, count] : dfg) {
+      out << "{\"source\": " << resolve_name(pair.first)
+          << ", \"target\": " << resolve_name(pair.second)
+          << ", \"count\": " << count << '}'
+          << (++index < dfg.size() ? ", " : "");
+    }
+    out << ']';
+  };
+  out << "], \"raw_dfg\": ";
+  write_frequency_dfg(net.raw_dfg);
+  out << ", \"cleaned_dfg\": ";
+  write_frequency_dfg(net.cleaned_dfg);
+  out << ", \"window_two_dfg\": ";
+  write_frequency_dfg(net.window_two_dfg);
+  out << ", \"frequency_triples\": [";
+  {
+    std::size_t index = 0;
+    for (const auto& [triple, count] : net.frequency_triples) {
+      const auto& [first, middle, last] = triple;
+      out << "{\"first\": " << resolve_name(first)
+          << ", \"middle\": " << resolve_name(middle)
+          << ", \"last\": " << resolve_name(last)
+          << ", \"count\": " << count << '}'
+          << (++index < net.frequency_triples.size() ? ", " : "");
+    }
+  }
+  const auto write_bundles = [&](const auto& by_activity) {
+    out << '[';
+    for (std::size_t activity = 0; activity < by_activity.size(); ++activity) {
+      out << "{\"activity\": " << resolve(activity) << ", \"bundles\": [";
+      for (std::size_t i = 0; i < by_activity[activity].size(); ++i) {
+        write_ids(by_activity[activity][i]);
+        out << (i + 1 < by_activity[activity].size() ? ", " : "");
+      }
+      out << "]}" << (activity + 1 < by_activity.size() ? ", " : "");
+    }
+    out << ']';
+  };
+  out << "], \"output_bundles\": ";
+  write_bundles(net.output_bundles);
+  out << ", \"input_bundles\": ";
+  write_bundles(net.input_bundles);
   out << '}';
 }
 
@@ -909,7 +1728,17 @@ void write_analysis_json(std::ostream& out,
                          const ModelDecoration* heuristic_decoration,
                          const TemporalProfile* temporal_profile,
                          const MinimumSelfDistances* minimum_self_distances,
-                         const TransitionSystem* transition_system) {
+                         const TransitionSystem* transition_system,
+                         const PowlNode* powl,
+                         const PetriNet* powl_petri,
+                         const ModelDecoration* powl_decoration,
+                         const LogSkeletonModel* log_skeleton,
+                         const std::vector<LogSkeletonConformance>*
+                             log_skeleton_conformance,
+                         const DeclareModel* declare,
+                         const std::vector<DeclareConformance>*
+                             declare_conformance,
+                         const FootprintsAnalysis* footprints) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -925,6 +1754,19 @@ void write_analysis_json(std::ostream& out,
       transition_system != nullptr
           ? resolve_transition_system(*transition_system, log, graph)
           : ResolvedTransitionSystem{};
+  if (log_skeleton != nullptr) {
+    validate_log_skeleton_model(*log_skeleton, graph);
+  }
+  if (log_skeleton_conformance != nullptr) {
+    validate_log_skeleton_conformance(log, *log_skeleton_conformance, graph);
+  }
+  if (declare != nullptr) validate_declare_model(*declare, graph);
+  if (declare_conformance != nullptr) {
+    validate_declare_conformance(log, *declare_conformance, graph);
+  }
+  if (footprints != nullptr) {
+    validate_footprints_analysis(*footprints, log, graph);
+  }
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -1028,6 +1870,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"process_tree\": ";
     write_process_tree_node(out, tree->root(), *tree, graph);
   }
+  if (powl != nullptr) {
+    out << ",\n  \"powl\": ";
+    write_powl_node(out, *powl, graph);
+  }
   if (net != nullptr) {
     out << ",\n  \"petri_net\": ";
     write_petri_net(out, *net, graph);
@@ -1051,6 +1897,34 @@ void write_analysis_json(std::ostream& out,
       out << ",\n  \"heuristic_petri_net_decoration\": ";
       write_model_decoration(out, *heuristic_decoration);
     }
+  }
+  if (powl_petri != nullptr) {
+    out << ",\n  \"powl_petri_net\": ";
+    write_petri_net(out, *powl_petri, graph);
+    if (powl_decoration != nullptr) {
+      out << ",\n  \"powl_petri_net_decoration\": ";
+      write_model_decoration(out, *powl_decoration);
+    }
+  }
+  if (log_skeleton != nullptr) {
+    out << ",\n  \"log_skeleton\": ";
+    write_log_skeleton_model(out, *log_skeleton, graph);
+  }
+  if (log_skeleton_conformance != nullptr) {
+    out << ",\n  \"log_skeleton_conformance\": ";
+    write_log_skeleton_conformance(out, log, *log_skeleton_conformance, graph);
+  }
+  if (declare != nullptr) {
+    out << ",\n  \"declare\": ";
+    write_declare_model(out, *declare, graph);
+  }
+  if (declare_conformance != nullptr) {
+    out << ",\n  \"declare_conformance\": ";
+    write_declare_conformance(out, log, *declare_conformance, graph);
+  }
+  if (footprints != nullptr) {
+    out << ",\n  \"footprints\": ";
+    write_footprints_analysis(out, *footprints, log, graph);
   }
   if (heuristics != nullptr) {
     out << ",\n  \"heuristics_net\": ";
@@ -1110,14 +1984,27 @@ std::string analysis_json(std::string_view dataset,
                           const ModelDecoration* heuristic_decoration,
                           const TemporalProfile* temporal_profile,
                           const MinimumSelfDistances* minimum_self_distances,
-                          const TransitionSystem* transition_system) {
+                          const TransitionSystem* transition_system,
+                          const PowlNode* powl,
+                          const PetriNet* powl_petri,
+                          const ModelDecoration* powl_decoration,
+                          const LogSkeletonModel* log_skeleton,
+                          const std::vector<LogSkeletonConformance>*
+                              log_skeleton_conformance,
+                          const DeclareModel* declare,
+                          const std::vector<DeclareConformance>*
+                              declare_conformance,
+                          const FootprintsAnalysis* footprints) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
                       eventually_follows, decisions, petri_decoration,
                       spectrum, inductive_net, inductive_decoration,
                       heuristic_petri, heuristic_decoration, temporal_profile,
-                      minimum_self_distances, transition_system);
+                      minimum_self_distances, transition_system, powl,
+                      powl_petri, powl_decoration, log_skeleton,
+                      log_skeleton_conformance, declare, declare_conformance,
+                      footprints);
   return out.str();
 }
 

@@ -283,34 +283,164 @@ std::optional<PowlNode> make_concurrency(const UVCL& log, State& s) {
 }
 
 std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
-  (void)s;
   if (log.empty()) return std::nullopt;
-  // A single trace variant is handled by the strict/tau-loop fall-throughs,
-  // which split it at repeated start activities. Treating A,B,A directly as
-  // LOOP(A,B) changes PM4Py's observable model (it is LOOP(SEQ(A,B),tau)).
-  if (log.size() == 1) return std::nullopt;
-  const auto acts = activities(log);
-  if (acts.size() > 1) {
-    std::string common;
-    bool closed = true;
-    std::set<std::string> middle;
-    for (const auto& [seq, count] : log) {
-      (void)count;
-      if (seq.empty() || seq.front() != seq.back()) { closed = false; break; }
-      if (common.empty()) common = seq.front(); else if (common != seq.front()) { closed = false; break; }
-      for (std::size_t i = 1; i + 1 < seq.size(); ++i) middle.insert(seq[i]);
-    }
-    if (!closed || middle.empty()) return std::nullopt;
-    std::vector<PowlNode> redo_children;
-    for (const auto& a : middle) redo_children.push_back(PowlNode::transition(a));
-    PowlNode redo = redo_children.size() == 1 ? std::move(redo_children.front()) : PowlNode::xor_node(std::move(redo_children));
-    return PowlNode::loop(PowlNode::transition(common), std::move(redo));
+  const auto relations = compute_relations(log);
+  if (relations.dfg.empty()) return std::nullopt;
+
+  std::set<std::string> starts;
+  std::set<std::string> ends;
+  for (const auto& [activity, count] : relations.starts) {
+    (void)count;
+    starts.insert(activity);
   }
-  const auto& a = acts.front();
-  bool repeated = false;
-  for (const auto& [seq, count] : log) { (void)count; repeated = repeated || seq.size() > 1; }
-  if (!repeated) return std::nullopt;
-  return PowlNode::transition(a, PowlFrequency{1, std::nullopt});
+  for (const auto& [activity, count] : relations.ends) {
+    (void)count;
+    ends.insert(activity);
+  }
+  std::set<std::string> boundary = starts;
+  boundary.insert(ends.begin(), ends.end());
+
+  // The do group starts with every trace boundary. Redo candidates are the
+  // weakly connected components left after removing all boundary nodes and
+  // every edge incident to them.
+  std::vector<std::set<std::string>> groups{boundary};
+  std::set<std::string> seen = boundary;
+  for (const auto& root : relations.acts) {
+    if (seen.count(root) != 0) continue;
+    std::vector<std::string> component{root};
+    seen.insert(root);
+    for (std::size_t position = 0; position < component.size(); ++position) {
+      for (const auto& candidate : relations.acts) {
+        if (seen.count(candidate) != 0 ||
+            boundary.count(candidate) != 0) {
+          continue;
+        }
+        if (has(relations.dfg, component[position], candidate) ||
+            has(relations.dfg, candidate, component[position])) {
+          seen.insert(candidate);
+          component.push_back(candidate);
+        }
+      }
+    }
+    groups.emplace_back(component.begin(), component.end());
+  }
+
+  const auto merge_into_do = [&](const std::string& activity) {
+    for (std::size_t index = 1; index < groups.size(); ++index) {
+      if (groups[index].count(activity) == 0) continue;
+      groups.front().insert(groups[index].begin(), groups[index].end());
+      groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
+      return;
+    }
+  };
+
+  // A start that cannot also end must lead directly into the do part; dually,
+  // an end that cannot also start must be reached directly from the do part.
+  for (const auto& start : starts) {
+    if (ends.count(start) != 0) continue;
+    for (const auto& [edge, count] : relations.dfg) {
+      (void)count;
+      if (edge.first == start) merge_into_do(edge.second);
+    }
+  }
+  for (const auto& end : ends) {
+    if (starts.count(end) != 0) continue;
+    for (const auto& [edge, count] : relations.dfg) {
+      (void)count;
+      if (edge.second == end) merge_into_do(edge.first);
+    }
+  }
+
+  // A redo component that returns to one possible start must return to every
+  // start. Likewise, if one possible end enters it, every end must enter it.
+  // Incomplete components belong to the do group instead.
+  for (std::size_t index = 1; index < groups.size();) {
+    bool complete = true;
+    for (const auto& activity : groups[index]) {
+      const bool reaches_a_start =
+          std::any_of(starts.begin(), starts.end(), [&](const auto& start) {
+            return has(relations.dfg, activity, start);
+          });
+      if (reaches_a_start &&
+          std::any_of(starts.begin(), starts.end(), [&](const auto& start) {
+            return !has(relations.dfg, activity, start);
+          })) {
+        complete = false;
+        break;
+      }
+    }
+    if (!complete) {
+      groups.front().insert(groups[index].begin(), groups[index].end());
+      groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
+    } else {
+      ++index;
+    }
+  }
+  for (std::size_t index = 1; index < groups.size();) {
+    bool complete = true;
+    for (const auto& activity : groups[index]) {
+      const bool reached_from_an_end =
+          std::any_of(ends.begin(), ends.end(), [&](const auto& end) {
+            return has(relations.dfg, end, activity);
+          });
+      if (reached_from_an_end &&
+          std::any_of(ends.begin(), ends.end(), [&](const auto& end) {
+            return !has(relations.dfg, end, activity);
+          })) {
+        complete = false;
+        break;
+      }
+    }
+    if (!complete) {
+      groups.front().insert(groups[index].begin(), groups[index].end());
+      groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
+    } else {
+      ++index;
+    }
+  }
+  if (groups.size() <= 1) return std::nullopt;
+
+  std::set<std::string> redo;
+  for (std::size_t index = 1; index < groups.size(); ++index)
+    redo.insert(groups[index].begin(), groups[index].end());
+  if (redo.empty()) return std::nullopt;
+  const auto& do_activities = groups.front();
+
+  // Project by alternating maximal do/redo slices. Whole-trace projection
+  // loses repeated do executions and can turn ordered redo behavior into a
+  // flat activity choice.
+  UVCL do_log;
+  UVCL redo_log;
+  for (const auto& [sequence, count] : log) {
+    Sequence do_slice;
+    Sequence redo_slice;
+    const auto flush_do = [&]() {
+      if (do_slice.empty()) return;
+      add_checked(do_log[do_slice], count);
+      do_slice.clear();
+    };
+    const auto flush_redo = [&]() {
+      if (redo_slice.empty()) return;
+      add_checked(redo_log[redo_slice], count);
+      redo_slice.clear();
+    };
+    for (const auto& activity : sequence) {
+      if (do_activities.count(activity) != 0) {
+        flush_redo();
+        do_slice.push_back(activity);
+      } else if (redo.count(activity) != 0) {
+        flush_do();
+        redo_slice.push_back(activity);
+      } else {
+        flush_do();
+        flush_redo();
+      }
+    }
+    flush_redo();
+    // The loop projection retains an empty trailing do slice.
+    add_checked(do_log[do_slice], count);
+  }
+  return PowlNode::loop(recurse(do_log, s), recurse(redo_log, s));
 }
 
 std::vector<std::vector<std::vector<std::size_t>>> enumerate_partitions(std::size_t n, std::size_t k) {

@@ -107,6 +107,90 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+/** Recursive POWL model emitted by the POWL discovery miner. */
+export type PowlNode =
+  | { kind: "transition"; activity: number; frequency: { minimum: number; maximum: number | null } }
+  | { kind: "silent" }
+  | { kind: "xor" | "loop"; children: PowlNode[] }
+  | { kind: "strict_partial_order"; children: PowlNode[]; order: Array<{ source: number; target: number }> };
+
+/** One ordered relation in a classic log-skeleton model. */
+export interface LogSkeletonRelation {
+  source: number;
+  target: number;
+}
+
+/** The six constraint families emitted by log-skeleton discovery. */
+export interface LogSkeletonModel {
+  equivalence: LogSkeletonRelation[];
+  always_after: LogSkeletonRelation[];
+  always_before: LogSkeletonRelation[];
+  never_together: LogSkeletonRelation[];
+  directly_follows: LogSkeletonRelation[];
+  /** Allowed occurrence counts per activity id (as JSON object keys). */
+  activ_freq: Record<string, number[]>;
+}
+
+export interface LogSkeletonPairDeviation {
+  constraint: string;
+  source: number;
+  target: number;
+}
+
+export interface LogSkeletonFrequencyDeviation {
+  constraint: string;
+  activity: number;
+  observed_frequency: number;
+  allowed_frequencies: number[];
+}
+
+export type LogSkeletonDeviation =
+  | LogSkeletonPairDeviation
+  | LogSkeletonFrequencyDeviation;
+
+/** Per-trace conformance result for a log-skeleton model. */
+export interface LogSkeletonConformanceTrace {
+  case_id: string;
+  deviations: LogSkeletonDeviation[];
+  no_dev_total: number;
+  no_constr_total: number;
+  dev_fitness: number;
+  is_fit: boolean;
+}
+
+export const DECLARE_TEMPLATES = [
+  "existence", "exactly_one", "init", "responded_existence", "response",
+  "precedence", "succession", "altresponse", "altprecedence", "altsuccession",
+  "chainresponse", "chainprecedence", "chainsuccession", "absence", "coexistence",
+  "noncoexistence", "nonsuccession", "nonchainsuccession",
+] as const;
+export type DeclareTemplate = (typeof DECLARE_TEMPLATES)[number];
+export interface DeclareUnaryRule {
+  activity: number;
+  support: number;
+  confidence: number;
+}
+export interface DeclareBinaryRule {
+  source: number;
+  target: number;
+  support: number;
+  confidence: number;
+}
+export type DeclareRule = DeclareUnaryRule | DeclareBinaryRule;
+export type DeclareModel = Partial<Record<DeclareTemplate, DeclareRule[]>>;
+export type DeclareDeviation =
+  | { template: DeclareTemplate | string; activity: number }
+  | { template: DeclareTemplate | string; source: number; target: number };
+export interface DeclareConformanceTrace {
+  trace_index?: number;
+  case_id: string;
+  deviations: DeclareDeviation[];
+  no_constr_total: number;
+  no_dev_total: number;
+  dev_fitness: number;
+  is_fit: boolean;
+}
+
 /** One place's replay decoration: tokens through it, and how long they rest. */
 export interface PetriPlaceDecoration {
   /** Tokens consumed from this place across the cleanly replaying cases. */
@@ -136,12 +220,78 @@ export interface HeuristicEdge {
   dependency: number;
   /** Direct successions observed (|source > target|). */
   frequency: number;
+  /** Frequency count or mean wait, according to the selected decoration. */
+  representation?: number;
+  /** True when classic discovery rescued this relation as a length-two loop. */
+  length_two_loop?: boolean;
 }
 
 export interface HeuristicsNet {
+  variant?: "classic" | "plusplus";
+  decoration?: "frequency" | "performance";
+  performance_aggregation?:
+    | "mean"
+    | "median"
+    | "min"
+    | "max"
+    | "stdev"
+    | "sum"
+    | "raw_values"
+    | "all";
   edges: HeuristicEdge[];
   start_activities: number[];
   end_activities: number[];
+  active_activities?: number[];
+  activity_statistics?: {
+    activity: number;
+    occurrences: number;
+    start_occurrences: number;
+    end_occurrences: number;
+    mean_sojourn_seconds: number;
+  }[];
+  relation_statistics?: {
+    source: number;
+    target: number;
+    eventually_follows_frequency: number;
+    direct_adjacency_frequency: number;
+    mean_wait_seconds: number;
+    raw_frequency?: number;
+    cleaned_frequency?: number;
+    representation?: number;
+    length_two_loop?: boolean;
+    wait_samples?: number[];
+    median_wait_seconds?: number;
+    min_wait_seconds?: number;
+    max_wait_seconds?: number;
+    stdev_wait_seconds?: number;
+    sum_wait_seconds?: number;
+  }[];
+  concurrency_statistics?: {
+    first: number;
+    second: number;
+    frequency: number;
+  }[];
+  raw_activity_statistics?: {
+    activity: number;
+    occurrences: number;
+    mean_sojourn_seconds: number;
+  }[];
+  raw_concurrency_statistics?: {
+    first: number;
+    second: number;
+    frequency: number;
+  }[];
+  raw_dfg?: { source: number; target: number; count: number }[];
+  cleaned_dfg?: { source: number; target: number; count: number }[];
+  window_two_dfg?: { source: number; target: number; count: number }[];
+  frequency_triples?: {
+    first: number;
+    middle: number;
+    last: number;
+    count: number;
+  }[];
+  output_bundles?: { activity: number; bundles: number[][] }[];
+  input_bundles?: { activity: number; bundles: number[][] }[];
 }
 
 export interface VariantConformance {
@@ -239,6 +389,82 @@ export interface Footprints {
   log_only: FootprintRelation[];
   /** Successions the model allows the log never shows (precision gaps). */
   model_only: FootprintRelation[];
+}
+
+export const FOOTPRINTS_DISCOVERY_VARIANTS = [
+  "entire_event_log", "trace_by_trace", "dfg", "petri_reach_graph",
+  "process_tree", "powl",
+] as const;
+export type FootprintsDiscoveryVariant = (typeof FOOTPRINTS_DISCOVERY_VARIANTS)[number];
+export const FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS: FootprintsDiscoveryVariant[] = [
+  "entire_event_log", "dfg", "process_tree", "powl",
+];
+export type FootprintsModelVariant = "process_tree" | "powl" | "inductive" | "alpha" | "heuristic" | "dfg";
+export const FOOTPRINTS_CONFORMANCE_VARIANTS = [
+  "log_model", "log_extensive", "trace_extensive",
+] as const;
+export type FootprintsConformanceVariant = (typeof FOOTPRINTS_CONFORMANCE_VARIANTS)[number];
+
+/** A PM4Py aggregate footprint record; optional keys are variant-dependent. */
+export interface AggregateFootprint {
+  sequence: FootprintRelation[];
+  parallel: FootprintRelation[];
+  dfg?: EdgeStat[];
+  start_activities?: number[];
+  end_activities?: number[];
+  activities?: number[];
+  skippable?: boolean;
+  activities_always_happening?: number[];
+  min_trace_length?: number;
+  max_trace_length_without_loops?: number;
+  trace?: number[];
+}
+export interface FootprintsLogModelConformance {
+  strict: boolean;
+  violations: FootprintRelation[];
+  is_fit: boolean;
+}
+export interface FootprintsExtensiveConformance {
+  footprints: FootprintRelation[];
+  start_activities: number[];
+  end_activities: number[];
+  activities_always_happening: number[];
+  min_length_fit: boolean;
+  is_footprints_fit: boolean;
+  is_fit: boolean;
+}
+export interface FootprintsTraceExtensiveConformance extends FootprintsExtensiveConformance {
+  trace_index: number;
+  case_id: string;
+}
+export interface FootprintsTraceDiscovery {
+  trace_index: number;
+  case_id: string;
+  footprint: AggregateFootprint;
+}
+export interface AggregateFootprintsDiscovery {
+  entire_event_log?: AggregateFootprint;
+  trace_by_trace?: FootprintsTraceDiscovery[];
+  dfg?: AggregateFootprint;
+  petri_reach_graph?: AggregateFootprint;
+  process_tree?: AggregateFootprint;
+  powl?: AggregateFootprint;
+}
+export interface AggregateFootprintsConformance {
+  model: FootprintsModelVariant;
+  log_model?: FootprintsLogModelConformance;
+  log_extensive?: FootprintsExtensiveConformance;
+  trace_extensive?: FootprintsTraceExtensiveConformance[];
+}
+export interface AggregateFootprintsMetrics {
+  precision?: number;
+  log_fitness?: number;
+  perc_fit_traces?: number;
+}
+export interface AggregateFootprints {
+  discovery?: AggregateFootprintsDiscovery;
+  conformance?: AggregateFootprintsConformance;
+  metrics?: AggregateFootprintsMetrics;
 }
 
 /** Conformance results for one discovered model. */
@@ -454,6 +680,19 @@ export interface MineraExport {
   inductive_petri_net_decoration?: PetriDecoration;
   heuristic_petri_net?: PetriNetModel;
   heuristic_petri_net_decoration?: PetriDecoration;
+  /** POWL discovery model and its converted workflow net, when available. */
+  powl?: PowlNode;
+  powl_petri_net?: PetriNetModel;
+  powl_petri_net_decoration?: PetriDecoration;
+  /** Classic log-skeleton relations and allowed activity frequencies. */
+  log_skeleton?: LogSkeletonModel;
+  /** Trace-order log-skeleton conformance results. */
+  log_skeleton_conformance?: LogSkeletonConformanceTrace[];
+  /** Classic declarative Declare model and trace diagnostics. */
+  declare?: DeclareModel;
+  declare_conformance?: DeclareConformanceTrace[];
+  /** Aggregate footprints discovery and relational conformance. */
+  footprints?: AggregateFootprints;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */

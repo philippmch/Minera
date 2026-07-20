@@ -5,6 +5,12 @@ import {
   type MinerOptions,
   type TimeFilterMode,
 } from "../api";
+import {
+  DECLARE_TEMPLATES,
+  FOOTPRINTS_CONFORMANCE_VARIANTS,
+  FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
+  FOOTPRINTS_DISCOVERY_VARIANTS,
+} from "../types";
 import { type CaseAttributeStat, type EventAttributeStat } from "../types";
 
 interface FiltersProps {
@@ -84,9 +90,88 @@ export function Filters({
   const [noiseThreshold, setNoiseThreshold] = useState("");
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "dfg">("log");
   const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("plus");
+  const [heuristicVariant, setHeuristicVariant] =
+    useState<"classic" | "plusplus">("classic");
   const [dependencyThreshold, setDependencyThreshold] = useState("");
   const [andThreshold, setAndThreshold] = useState("");
   const [minEdgeFrequency, setMinEdgeFrequency] = useState("");
+  const [heuristicMinActivityCount, setHeuristicMinActivityCount] = useState("");
+  const [heuristicDecoration, setHeuristicDecoration] =
+    useState<"frequency" | "performance">("frequency");
+  const [
+    heuristicPerformanceAggregation,
+    setHeuristicPerformanceAggregation,
+  ] = useState<
+    "mean" | "median" | "min" | "max" | "stdev" | "sum" | "raw_values" | "all"
+  >("mean");
+  const [
+    heuristicDfgPreCleaningNoiseThreshold,
+    setHeuristicDfgPreCleaningNoiseThreshold,
+  ] = useState("0.05");
+  const [
+    heuristicLoopLengthTwoThreshold,
+    setHeuristicLoopLengthTwoThreshold,
+  ] = useState("0.5");
+  const [heuristicKeepOncePerCase, setHeuristicKeepOncePerCase] =
+    useState(false);
+  const [heuristicMostCommonPaths, setHeuristicMostCommonPaths] = useState("");
+  const [
+    heuristicStartTimestampAttribute,
+    setHeuristicStartTimestampAttribute,
+  ] = useState("start_timestamp");
+  const [
+    heuristicLifecycleInstanceAttribute,
+    setHeuristicLifecycleInstanceAttribute,
+  ] = useState("concept:instance");
+  const [powlVariant, setPowlVariant] = useState<"tree" | "brute_force" | "maximal" | "dynamic_clustering" | "dynamic_clustering_plain">("maximal");
+  const [powlFilteringType, setPowlFilteringType] = useState<"decreasing_factor" | "dynamic">("decreasing_factor");
+  const [powlFilteringThreshold, setPowlFilteringThreshold] = useState("");
+  const [powlOrderFrequencyRatio, setPowlOrderFrequencyRatio] = useState("1");
+  const [powlBruteForceActivityLimit, setPowlBruteForceActivityLimit] = useState("");
+  const [tokenReplayVariant, setTokenReplayVariant] =
+    useState<"forward" | "backwards">("forward");
+  const [
+    tokenReplayStopImmediatelyUnfit,
+    setTokenReplayStopImmediatelyUnfit,
+  ] = useState(false);
+  const logSkeletonFamilies = [
+    ["equivalence", "Equivalence"],
+    ["always_after", "Always-after"],
+    ["always_before", "Always-before"],
+    ["never_together", "Never-together"],
+    ["directly_follows", "Directly-follows"],
+    ["activ_freq", "Activity frequency"],
+  ] as const;
+  const [logSkeletonNoiseThreshold, setLogSkeletonNoiseThreshold] = useState("");
+  const [logSkeletonConstraints, setLogSkeletonConstraints] = useState<Set<string>>(
+    () => new Set(logSkeletonFamilies.map(([name]) => name)),
+  );
+  const declareFamilies = [
+    ["existence", "Existence"], ["exactly_one", "Exactly-one"], ["init", "Init"],
+    ["responded_existence", "Responded existence"], ["response", "Response"],
+    ["precedence", "Precedence"], ["succession", "Succession"], ["altresponse", "Alternate response"],
+    ["altprecedence", "Alternate precedence"], ["altsuccession", "Alternate succession"],
+    ["chainresponse", "Chain response"], ["chainprecedence", "Chain precedence"],
+    ["chainsuccession", "Chain succession"], ["absence", "Absence"], ["coexistence", "Coexistence"],
+    ["noncoexistence", "Non-coexistence"], ["nonsuccession", "Non-succession"],
+    ["nonchainsuccession", "Non-chain succession"],
+  ] as const;
+  const [declareConsideredActivities, setDeclareConsideredActivities] = useState("");
+  const [declareAllowedTemplates, setDeclareAllowedTemplates] = useState<Set<string>>(
+    () => new Set(DECLARE_TEMPLATES),
+  );
+  const [declareMinSupportRatio, setDeclareMinSupportRatio] = useState("");
+  const [declareMinConfidenceRatio, setDeclareMinConfidenceRatio] = useState("");
+  const [declareAutoSelectionMultiplier, setDeclareAutoSelectionMultiplier] = useState("0.8");
+  const [footprintsDiscoveryVariants, setFootprintsDiscoveryVariants] = useState<Set<string>>(
+    () => new Set(FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS),
+  );
+  const [footprintsModel, setFootprintsModel] = useState<MinerOptions["footprintsModel"]>("process_tree");
+  const [footprintsConformanceVariants, setFootprintsConformanceVariants] = useState<Set<string>>(
+    () => new Set(["log_model"]),
+  );
+  const [footprintsStrict, setFootprintsStrict] = useState(false);
+  const [footprintsEnableActAlwaysExecuted, setFootprintsEnableActAlwaysExecuted] = useState(true);
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -101,6 +186,54 @@ export function Filters({
   const toggleLifecycle = toggle(setRemovedLifecycles);
   const toggleValue = toggle(setRemovedValues);
   const toggleCaseValue = toggle(setRemovedCaseValues);
+  const toggleLogSkeletonConstraint = (name: string) => {
+    setLogSkeletonConstraints((previous) => {
+      // Empty means backend default-all, so keep at least one selected.
+      if (previous.size === 1 && previous.has(name)) return previous;
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+  const toggleDeclareTemplate = (name: string) => {
+    setDeclareAllowedTemplates((previous) => {
+      if (previous.size === 1 && previous.has(name)) return previous;
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+  const toggleFootprintsDiscovery = (name: string) => {
+    setFootprintsDiscoveryVariants((previous) => {
+      if (name === "petri_reach_graph" && footprintsModel === "dfg") return previous;
+      if (previous.size === 1 && previous.has(name)) return previous;
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      if (name === "petri_reach_graph" && next.has(name)) setFootprintsModel("process_tree");
+      return next;
+    });
+  };
+  const selectFootprintsModel = (model: MinerOptions["footprintsModel"]) => {
+    setFootprintsModel(model);
+    if (model === "dfg") {
+      setFootprintsDiscoveryVariants((previous) => {
+        const next = new Set(previous);
+        next.delete("petri_reach_graph");
+        if (next.size === 0) next.add("entire_event_log");
+        return next;
+      });
+    }
+  };
+  const toggleFootprintsConformance = (name: string) => {
+    setFootprintsConformanceVariants((previous) => {
+      if (previous.size === 1 && previous.has(name)) return previous;
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
 
   const pickAttributeKey = (key: string) => {
     setAttributeKey(key);
@@ -123,6 +256,32 @@ export function Filters({
   const toFloat = (value: string) => {
     const n = Number.parseFloat(value);
     return Number.isFinite(n) ? n : undefined;
+  };
+  const toPowlThreshold = (value: string) => {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) && n >= 0 && n < 1 ? n : undefined;
+  };
+  const toPowlRatio = (value: string) => {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) && n > 0.5 && n <= 1 ? n : undefined;
+  };
+  const toPowlActivityLimit = (value: string) => {
+    if (value.trim() === "") return undefined;
+    const n = Number(value);
+    return Number.isInteger(n) && n >= 0 ? n : undefined;
+  };
+  const toLogSkeletonNoise = (value: string) => {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+  };
+  const toDeclareRatio = (value: string) => {
+    if (value.trim() === "") return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+  };
+  const toDeclareActivities = (value: string) => {
+    const names = value.split(",").map((name) => name.trim()).filter(Boolean);
+    return names.length ? [...new Set(names)] : undefined;
   };
 
   const apply = () => {
@@ -155,6 +314,8 @@ export function Filters({
       successionAction === action && successionRelation === relation
         ? successionPair
         : undefined;
+    const declareAutoSelectionActive =
+      declareMinSupportRatio.trim() === "" && declareMinConfidenceRatio.trim() === "";
     onApply({
       topVariants: toInt(topVariants),
       minVariantFrequency: toInt(minFrequency),
@@ -191,9 +352,70 @@ export function Filters({
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
       alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
+      heuristicVariant:
+        heuristicVariant !== "classic" ? heuristicVariant : undefined,
       dependencyThreshold: toFloat(dependencyThreshold),
       andThreshold: toFloat(andThreshold),
       minEdgeFrequency: toInt(minEdgeFrequency),
+      heuristicMinActivityCount: toInt(heuristicMinActivityCount),
+      heuristicDecoration:
+        heuristicDecoration !== "frequency" ? heuristicDecoration : undefined,
+      heuristicPerformanceAggregation:
+        heuristicPerformanceAggregation !== "mean"
+          ? heuristicPerformanceAggregation
+          : undefined,
+      heuristicDfgPreCleaningNoiseThreshold: toFloat(
+        heuristicDfgPreCleaningNoiseThreshold,
+      ),
+      heuristicLoopLengthTwoThreshold: toFloat(
+        heuristicLoopLengthTwoThreshold,
+      ),
+      heuristicKeepOncePerCase: heuristicKeepOncePerCase || undefined,
+      heuristicMostCommonPaths:
+        heuristicMostCommonPaths.trim() || undefined,
+      heuristicStartTimestampAttribute:
+        heuristicStartTimestampAttribute !== "start_timestamp"
+          ? heuristicStartTimestampAttribute
+          : undefined,
+      heuristicLifecycleInstanceAttribute:
+        heuristicLifecycleInstanceAttribute !== "concept:instance"
+          ? heuristicLifecycleInstanceAttribute
+          : undefined,
+      powlVariant: powlVariant !== "maximal" ? powlVariant : undefined,
+      powlFilteringType:
+        powlFilteringType !== "decreasing_factor" ? powlFilteringType : undefined,
+      powlFilteringThreshold: toPowlThreshold(powlFilteringThreshold),
+      powlOrderFrequencyRatio: toPowlRatio(powlOrderFrequencyRatio),
+      powlBruteForceActivityLimit: toPowlActivityLimit(powlBruteForceActivityLimit),
+      tokenReplayVariant:
+        tokenReplayVariant !== "forward" ? tokenReplayVariant : undefined,
+      tokenReplayStopImmediatelyUnfit:
+        tokenReplayStopImmediatelyUnfit || undefined,
+      logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
+      logSkeletonConstraints:
+        logSkeletonConstraints.size === logSkeletonFamilies.length
+          ? undefined
+          : [...logSkeletonConstraints],
+      declareConsideredActivities: toDeclareActivities(declareConsideredActivities),
+      declareAllowedTemplates:
+        declareAllowedTemplates.size === declareFamilies.length
+          ? undefined
+          : [...declareAllowedTemplates],
+      declareMinSupportRatio: toDeclareRatio(declareMinSupportRatio),
+      declareMinConfidenceRatio: toDeclareRatio(declareMinConfidenceRatio),
+      declareAutoSelectionMultiplier: declareAutoSelectionActive
+        ? toDeclareRatio(declareAutoSelectionMultiplier)
+        : undefined,
+      footprintsDiscoveryVariants:
+        footprintsDiscoveryVariants.size === FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length &&
+        FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.every((name) => footprintsDiscoveryVariants.has(name))
+          ? undefined : [...footprintsDiscoveryVariants],
+      footprintsModel: footprintsModel !== "process_tree" ? footprintsModel : undefined,
+      footprintsConformanceVariants:
+        footprintsConformanceVariants.size === 1 && footprintsConformanceVariants.has("log_model")
+          ? undefined : [...footprintsConformanceVariants],
+      footprintsStrict: footprintsStrict || undefined,
+      footprintsEnableActAlwaysExecuted: footprintsEnableActAlwaysExecuted ? undefined : false,
     });
   };
 
@@ -225,9 +447,38 @@ export function Filters({
     setNoiseThreshold("");
     setInductiveVariant("log");
     setAlphaVariant("plus");
+    setHeuristicVariant("classic");
     setDependencyThreshold("");
     setAndThreshold("");
     setMinEdgeFrequency("");
+    setHeuristicMinActivityCount("");
+    setHeuristicDecoration("frequency");
+    setHeuristicPerformanceAggregation("mean");
+    setHeuristicDfgPreCleaningNoiseThreshold("0.05");
+    setHeuristicLoopLengthTwoThreshold("0.5");
+    setHeuristicKeepOncePerCase(false);
+    setHeuristicMostCommonPaths("");
+    setHeuristicStartTimestampAttribute("start_timestamp");
+    setHeuristicLifecycleInstanceAttribute("concept:instance");
+    setPowlVariant("maximal");
+    setPowlFilteringType("decreasing_factor");
+    setPowlFilteringThreshold("");
+    setPowlOrderFrequencyRatio("1");
+    setPowlBruteForceActivityLimit("");
+    setTokenReplayVariant("forward");
+    setTokenReplayStopImmediatelyUnfit(false);
+    setLogSkeletonNoiseThreshold("");
+    setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
+    setDeclareConsideredActivities("");
+    setDeclareAllowedTemplates(new Set(DECLARE_TEMPLATES));
+    setDeclareMinSupportRatio("");
+    setDeclareMinConfidenceRatio("");
+    setDeclareAutoSelectionMultiplier("0.8");
+    setFootprintsDiscoveryVariants(new Set(FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS));
+    setFootprintsModel("process_tree");
+    setFootprintsConformanceVariants(new Set(["log_model"]));
+    setFootprintsStrict(false);
+    setFootprintsEnableActAlwaysExecuted(true);
     onApply({});
   };
 
@@ -251,9 +502,42 @@ export function Filters({
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
     alphaVariant !== "plus" ||
+    heuristicVariant !== "classic" ||
     dependencyThreshold !== "" ||
     andThreshold !== "" ||
-    minEdgeFrequency !== "";
+    minEdgeFrequency !== "" ||
+    heuristicMinActivityCount !== "" ||
+    heuristicDecoration !== "frequency" ||
+    heuristicPerformanceAggregation !== "mean" ||
+    heuristicDfgPreCleaningNoiseThreshold !== "0.05" ||
+    heuristicLoopLengthTwoThreshold !== "0.5" ||
+    heuristicKeepOncePerCase ||
+    heuristicMostCommonPaths.trim() !== "" ||
+    heuristicStartTimestampAttribute !== "start_timestamp" ||
+    heuristicLifecycleInstanceAttribute !== "concept:instance";
+
+  const powlDirty =
+    powlVariant !== "maximal" ||
+    powlFilteringType !== "decreasing_factor" ||
+    powlFilteringThreshold !== "" && powlFilteringThreshold !== "0" ||
+    powlOrderFrequencyRatio !== "" && powlOrderFrequencyRatio !== "1" ||
+    powlBruteForceActivityLimit !== "" && powlBruteForceActivityLimit !== "0";
+  const tokenReplayDirty =
+    tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit;
+  const logSkeletonDirty =
+    logSkeletonNoiseThreshold !== "" ||
+    logSkeletonConstraints.size !== logSkeletonFamilies.length;
+  const declareDirty =
+    declareConsideredActivities.trim() !== "" ||
+    declareAllowedTemplates.size !== declareFamilies.length ||
+    declareMinSupportRatio !== "" || declareMinConfidenceRatio !== "" ||
+    declareAutoSelectionMultiplier !== "" && declareAutoSelectionMultiplier !== "0.8";
+  const footprintsDirty =
+    footprintsModel !== "process_tree" || footprintsStrict || !footprintsEnableActAlwaysExecuted ||
+    footprintsDiscoveryVariants.size !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
+    FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !footprintsDiscoveryVariants.has(name)) ||
+    footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model");
+  const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty || declareDirty || footprintsDirty;
 
   return (
     <section className="filters reveal">
@@ -334,6 +618,234 @@ export function Filters({
                 <option value="traces_intersecting">cases touching it</option>
               </select>
             </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>POWL discovery algorithm</span>
+              <select value={powlVariant} onChange={(e) => setPowlVariant(e.target.value as typeof powlVariant)}>
+                <option value="maximal">maximal (default)</option>
+                <option value="tree">tree</option>
+                <option value="brute_force">brute force</option>
+                <option value="dynamic_clustering">dynamic clustering</option>
+                <option value="dynamic_clustering_plain">dynamic clustering (plain)</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>POWL filtering</span>
+              <select value={powlFilteringType} onChange={(e) => setPowlFilteringType(e.target.value as typeof powlFilteringType)}>
+                <option value="decreasing_factor">decreasing factor (default)</option>
+                <option value="dynamic">dynamic</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>POWL filter threshold</span>
+              <input type="number" min={0} max={0.99} step={0.05} placeholder="0" value={powlFilteringThreshold} onChange={(e) => setPowlFilteringThreshold(e.target.value)} />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>POWL order-frequency ratio</span>
+              <input type="number" min={0.51} max={1} step={0.01} placeholder="1" value={powlOrderFrequencyRatio} onChange={(e) => setPowlOrderFrequencyRatio(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>POWL brute-force activity limit</span>
+              <input type="number" min={0} step={1} placeholder="0 = unlimited" value={powlBruteForceActivityLimit} onChange={(e) => setPowlBruteForceActivityLimit(e.target.value)} />
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Token replay</span>
+              <select
+                value={tokenReplayVariant}
+                onChange={(e) =>
+                  setTokenReplayVariant(
+                    e.target.value as typeof tokenReplayVariant,
+                  )
+                }
+              >
+                <option value="forward">forward (default)</option>
+                <option value="backwards">backwards</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>On an unfit event</span>
+              <select
+                value={tokenReplayStopImmediatelyUnfit ? "stop" : "continue"}
+                onChange={(e) =>
+                  setTokenReplayStopImmediatelyUnfit(e.target.value === "stop")
+                }
+              >
+                <option value="continue">continue replay (default)</option>
+                <option value="stop">stop the trace immediately</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Log skeleton noise threshold</span>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                placeholder="0 (default)"
+                title="Ignore infrequent log-skeleton constraints; 0 keeps every observed constraint"
+                value={logSkeletonNoiseThreshold}
+                onChange={(event) => setLogSkeletonNoiseThreshold(event.target.value)}
+              />
+            </label>
+            <div className="filters-field filters-field-wide">
+              <span title="Constraint families to mine and check">Log skeleton constraints</span>
+              <div className="filter-chips" role="group" aria-label="Log skeleton constraints">
+                {logSkeletonFamilies.map(([name, label]) => {
+                  const selected = logSkeletonConstraints.has(name);
+                  return (
+                    <button
+                      type="button"
+                      key={name}
+                      className={selected ? "filter-chip active" : "filter-chip"}
+                      aria-pressed={selected}
+                      title={selected ? `Disable ${label}` : `Enable ${label}`}
+                      onClick={() => toggleLogSkeletonConstraint(name)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <small>At least one family stays selected; all six is the default.</small>
+            </div>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field filters-field-wide">
+              <span>Declare considered activities <small>(comma-separated; blank = infer)</small></span>
+              <input
+                type="text"
+                placeholder="A, B, C"
+                value={declareConsideredActivities}
+                onChange={(event) => setDeclareConsideredActivities(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Declare min support ratio</span>
+              <input
+                type="number" min={0} max={1} step={0.05} placeholder="auto"
+                value={declareMinSupportRatio}
+                onChange={(event) => setDeclareMinSupportRatio(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Declare min confidence ratio</span>
+              <input
+                type="number" min={0} max={1} step={0.05} placeholder="auto"
+                value={declareMinConfidenceRatio}
+                onChange={(event) => setDeclareMinConfidenceRatio(event.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span
+                title="Used only when both minimum support and confidence are left blank"
+              >
+                Declare auto-selection multiplier
+              </span>
+              <input
+                type="number" min={0} max={1} step={0.05} placeholder="0.8"
+                value={declareAutoSelectionMultiplier}
+                disabled={declareMinSupportRatio.trim() !== "" || declareMinConfidenceRatio.trim() !== ""}
+                title="Active only when both explicit threshold fields are blank"
+                onChange={(event) => setDeclareAutoSelectionMultiplier(event.target.value)}
+              />
+              {(declareMinSupportRatio.trim() !== "" || declareMinConfidenceRatio.trim() !== "") && (
+                <small>Disabled while an explicit support or confidence threshold is set.</small>
+              )}
+            </label>
+          </div>
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Declare templates <small>(at least one; all eighteen is the default)</small>
+            </span>
+            <div className="filter-chips" role="group" aria-label="Declare templates">
+              {declareFamilies.map(([name, label]) => {
+                const selected = declareAllowedTemplates.has(name);
+                return (
+                  <button
+                    type="button" key={name}
+                    className={selected ? "filter-chip active" : "filter-chip"}
+                    aria-pressed={selected}
+                    title={selected ? `Disable ${label}` : `Enable ${label}`}
+                    onClick={() => toggleDeclareTemplate(name)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Footprints discovery variants <small>(at least one; four common variants are the default)</small>
+            </span>
+            <div className="filter-chips" role="group" aria-label="Footprints discovery variants">
+              {FOOTPRINTS_DISCOVERY_VARIANTS.map((name) => {
+                const selected = footprintsDiscoveryVariants.has(name);
+                const disabled = name === "petri_reach_graph" && footprintsModel === "dfg";
+                return (
+                  <button type="button" key={name}
+                    className={selected ? "filter-chip active" : "filter-chip"}
+                    aria-pressed={selected} disabled={disabled}
+                    title={disabled ? "Petri reachability requires a Petri-net-backed model" : undefined}
+                    onClick={() => toggleFootprintsDiscovery(name)}>
+                    {name.replaceAll("_", " ")}
+                  </button>
+                );
+              })}
+            </div>
+            {footprintsModel === "dfg" && <small>Petri reachability is unavailable with the DFG model.</small>}
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Footprints model</span>
+              <select value={footprintsModel} onChange={(event) => selectFootprintsModel(event.target.value as MinerOptions["footprintsModel"])}>
+                <option value="process_tree">process tree (default)</option>
+                <option value="powl">POWL</option>
+                <option value="inductive">inductive</option>
+                <option value="alpha">Alpha</option>
+                <option value="heuristic">heuristic</option>
+                <option value="dfg" disabled={footprintsDiscoveryVariants.has("petri_reach_graph")}>DFG</option>
+              </select>
+              {footprintsDiscoveryVariants.has("petri_reach_graph") && <small>DFG is disabled while Petri reachability is selected.</small>}
+            </label>
+            <label className="filters-field">
+              <span>Footprints flags</span>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={footprintsStrict} onChange={(event) => setFootprintsStrict(event.target.checked)} /> strict log-model checks
+              </label>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={footprintsEnableActAlwaysExecuted} onChange={(event) => setFootprintsEnableActAlwaysExecuted(event.target.checked)} /> activity-always-executed checks
+              </label>
+            </label>
+          </div>
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Footprints conformance variants <small>(at least one; log-model is the default)</small>
+            </span>
+            <div className="filter-chips" role="group" aria-label="Footprints conformance variants">
+              {FOOTPRINTS_CONFORMANCE_VARIANTS.map((name) => {
+                const selected = footprintsConformanceVariants.has(name);
+                return (
+                  <button type="button" key={name}
+                    className={selected ? "filter-chip active" : "filter-chip"}
+                    aria-pressed={selected} onClick={() => toggleFootprintsConformance(name)}>
+                    {name.replaceAll("_", " ")}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="filters-row">
@@ -724,13 +1236,27 @@ export function Filters({
           </div>
           <div className="filters-row">
             <label className="filters-field">
+              <span>Heuristic variant</span>
+              <select
+                value={heuristicVariant}
+                onChange={(e) =>
+                  setHeuristicVariant(
+                    e.target.value as "classic" | "plusplus",
+                  )
+                }
+              >
+                <option value="classic">classic (default)</option>
+                <option value="plusplus">Miner++ (interval concurrency)</option>
+              </select>
+            </label>
+            <label className="filters-field">
               <span>Heuristic: dependency threshold</span>
               <input
                 type="number"
                 min={-1}
                 max={1}
                 step={0.05}
-                placeholder="0.9"
+                placeholder="0.5"
                 value={dependencyThreshold}
                 onChange={(e) => setDependencyThreshold(e.target.value)}
               />
@@ -747,7 +1273,7 @@ export function Filters({
               />
             </label>
             <label className="filters-field">
-              <span>Heuristic: min edge frequency</span>
+              <span>Heuristic: min path frequency</span>
               <input
                 type="number"
                 min={1}
@@ -755,6 +1281,133 @@ export function Filters({
                 value={minEdgeFrequency}
                 onChange={(e) => setMinEdgeFrequency(e.target.value)}
               />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Heuristic: min activity count</span>
+              <input
+                type="number"
+                min={1}
+                placeholder="1"
+                value={heuristicMinActivityCount}
+                onChange={(e) => setHeuristicMinActivityCount(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Heuristic decoration</span>
+              <select
+                value={heuristicDecoration}
+                onChange={(e) =>
+                  setHeuristicDecoration(
+                    e.target.value as "frequency" | "performance",
+                  )
+                }
+              >
+                <option value="frequency">frequency (default)</option>
+                <option value="performance">performance</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Miner++: start-time attribute</span>
+              <input
+                type="text"
+                value={heuristicStartTimestampAttribute}
+                disabled={heuristicVariant !== "plusplus"}
+                onChange={(e) =>
+                  setHeuristicStartTimestampAttribute(e.target.value)
+                }
+              />
+            </label>
+            <label className="filters-field">
+              <span>Miner++: lifecycle instance</span>
+              <input
+                type="text"
+                value={heuristicLifecycleInstanceAttribute}
+                disabled={heuristicVariant !== "plusplus"}
+                onChange={(e) =>
+                  setHeuristicLifecycleInstanceAttribute(e.target.value)
+                }
+              />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Classic: DFG pre-clean noise</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={heuristicDfgPreCleaningNoiseThreshold}
+                disabled={heuristicVariant !== "classic"}
+                onChange={(e) =>
+                  setHeuristicDfgPreCleaningNoiseThreshold(e.target.value)
+                }
+              />
+            </label>
+            <label className="filters-field">
+              <span>Classic: length-two loop threshold</span>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={heuristicLoopLengthTwoThreshold}
+                disabled={heuristicVariant !== "classic"}
+                onChange={(e) =>
+                  setHeuristicLoopLengthTwoThreshold(e.target.value)
+                }
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={heuristicKeepOncePerCase}
+                disabled={heuristicVariant !== "classic"}
+                onChange={(e) => setHeuristicKeepOncePerCase(e.target.checked)}
+              />
+              <span>Classic: one path count per case</span>
+            </label>
+            <label className="filters-field">
+              <span>Classic: pre-clean path exemptions</span>
+              <input
+                type="text"
+                placeholder="A -> B, C -> D"
+                value={heuristicMostCommonPaths}
+                disabled={heuristicVariant !== "classic"}
+                onChange={(e) => setHeuristicMostCommonPaths(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Performance aggregation</span>
+              <select
+                value={heuristicPerformanceAggregation}
+                disabled={heuristicDecoration !== "performance"}
+                onChange={(e) =>
+                  setHeuristicPerformanceAggregation(
+                    e.target.value as
+                      | "mean"
+                      | "median"
+                      | "min"
+                      | "max"
+                      | "stdev"
+                      | "sum"
+                      | "raw_values"
+                      | "all",
+                  )
+                }
+              >
+                <option value="mean">mean (default)</option>
+                <option value="median">median</option>
+                <option value="min">minimum</option>
+                <option value="max">maximum</option>
+                <option value="stdev">standard deviation</option>
+                <option value="sum">sum</option>
+                <option value="raw_values">raw values</option>
+                <option value="all">all summaries</option>
+              </select>
             </label>
           </div>
 
@@ -765,7 +1418,7 @@ export function Filters({
             <button
               className="filters-reset"
               onClick={reset}
-              disabled={mining || !dirty}
+              disabled={mining || !formDirty}
             >
               Reset
             </button>

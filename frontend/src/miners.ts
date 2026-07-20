@@ -5,7 +5,14 @@
 // how to render it. An artifact the backend does not yet produce falls back to
 // an honest "not available yet" placeholder.
 
-export type ModelArtifact = "process-tree" | "petri-net" | "dependency-graph";
+export type ModelArtifact =
+  | "process-tree"
+  | "petri-net"
+  | "dependency-graph"
+  | "powl"
+  | "log-skeleton"
+  | "declare"
+  | "footprints";
 
 export interface MinerVariant {
   id: string;
@@ -83,7 +90,67 @@ export const MINER_GROUPS: MinerGroup[] = [
       },
     ],
   },
+  {
+    id: "powl",
+    name: "POWL",
+    tagline:
+      "Partially ordered workflow languages: expressive choices, loops and concurrency with frequencies.",
+    variants: [
+      {
+        id: "configured",
+        name: "Configured discovery",
+        description:
+          "Discover a POWL model using the algorithm and filtering settings selected in Miner settings.",
+        artifact: "powl",
+      },
+    ],
+  },
+  {
+    id: "log_skeleton",
+    name: "Log Skeleton",
+    tagline:
+      "Constraint-based discovery: equivalence, ordering, co-occurrence and activity frequencies.",
+    variants: [
+      {
+        id: "classic",
+        name: "Classic",
+        description:
+          "Mine a compact set of behavioral constraints from the event log and inspect their trace-level deviations.",
+        artifact: "log-skeleton",
+      },
+    ],
+  },
+  {
+    id: "declare",
+    name: "Declare",
+    tagline:
+      "Declarative constraints: discover and inspect unary and binary templates with support and confidence.",
+    variants: [
+      {
+        id: "classic",
+        name: "Classic",
+        description:
+          "Mine all eighteen classic Declare template families, with optional activity/template filters and ratio thresholds.",
+        artifact: "declare",
+      },
+    ],
+  },
+  {
+    id: "footprints",
+    name: "Footprints",
+    tagline:
+      "Aggregate process footprints across logs, graphs, trees, nets, and POWL models.",
+    variants: [
+      {
+        id: "configured",
+        name: "Configured discovery",
+        description:
+          "Discover and compare footprint variants using the settings selected in Miner settings.",
+        artifact: "footprints",
+      },
+    ],
+  },
 ];
 
-export const DEFAULT_GROUP = MINER_GROUPS[0];
-export const DEFAULT_VARIANT = MINER_GROUPS[0].variants[0];
+export const DEFAULT_GROUP = MINER_GROUPS.find((group) => group.id === "inductive")!;
+export const DEFAULT_VARIANT = DEFAULT_GROUP.variants[0];

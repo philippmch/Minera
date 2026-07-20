@@ -2,13 +2,16 @@
 // CSV event logs with the native core via POST /api/mine.
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -20,17 +23,23 @@
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/declare.hpp"
+#include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
+#include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_skeleton.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
+#include "minera/powl_conversion.hpp"
+#include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/request_params.hpp"
@@ -57,7 +66,9 @@ struct MinedSession {
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
   minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
+  minera::DeclareModel declare;  // classic Declare, for on-demand playout
   std::string dataset;       // uploaded file name, echoed into XES exports
+  minera::TokenReplayOptions token_replay;
 };
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
@@ -66,6 +77,107 @@ std::string form_field(const httplib::Request& request,
                        const std::string& name) {
   return request.has_file(name) ? request.get_file_value(name).content
                                 : std::string{};
+}
+
+minera::FootprintsAnalysis analyze_footprints(
+    const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
+    const minera::ProcessTree& tree, const minera::PowlNode& powl,
+    const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
+    const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
+    const minera::FootprintsOptions& options) {
+  minera::FootprintsAnalysis analysis;
+  analysis.model = options.model;
+  analysis.strict = options.strict;
+  std::optional<minera::Footprint> log_footprint;
+  std::optional<std::vector<minera::Footprint>> trace_footprints;
+  std::optional<minera::Footprint> dfg_footprint;
+  std::optional<minera::Footprint> tree_footprint;
+  std::optional<minera::Footprint> powl_footprint;
+  const auto& log_fp = [&]() -> const minera::Footprint& {
+    if (!log_footprint) log_footprint = minera::discover_footprints(log);
+    return *log_footprint;
+  }();
+  const auto traces = [&]() -> const std::vector<minera::Footprint>& {
+    if (!trace_footprints) {
+      trace_footprints = minera::discover_trace_footprints(log);
+    }
+    return *trace_footprints;
+  };
+  const auto dfg_fp = [&]() -> const minera::Footprint& {
+    if (!dfg_footprint) {
+      dfg_footprint = minera::discover_dfg_footprints(graph);
+    }
+    return *dfg_footprint;
+  };
+  const auto tree_fp = [&]() -> const minera::Footprint& {
+    if (!tree_footprint) tree_footprint = minera::discover_footprints(tree);
+    return *tree_footprint;
+  };
+  const auto powl_fp = [&]() -> const minera::Footprint& {
+    if (!powl_footprint) powl_footprint = minera::discover_footprints(powl);
+    return *powl_footprint;
+  };
+
+  if (options.discovery_variants.contains("entire_event_log")) {
+    analysis.entire_event_log = log_fp;
+  }
+  if (options.discovery_variants.contains("trace_by_trace")) {
+    analysis.trace_by_trace = traces();
+  }
+  if (options.discovery_variants.contains("dfg")) analysis.dfg = dfg_fp();
+  if (options.discovery_variants.contains("process_tree")) {
+    analysis.process_tree = tree_fp();
+  }
+  if (options.discovery_variants.contains("powl")) analysis.powl = powl_fp();
+
+  const minera::PetriNet* selected_petri = nullptr;
+  if (options.model == "process_tree" || options.model == "inductive") {
+    selected_petri = &inductive_net;
+  } else if (options.model == "powl") {
+    selected_petri = &powl_net;
+  } else if (options.model == "alpha") {
+    selected_petri = &alpha_net;
+  } else if (options.model == "heuristic") {
+    selected_petri = &heuristic_net;
+  }
+  if (options.model == "process_tree") {
+    analysis.model_footprint = tree_fp();
+  } else if (options.model == "powl") {
+    analysis.model_footprint = powl_fp();
+  } else if (options.model == "dfg") {
+    analysis.model_footprint = dfg_fp();
+  } else {
+    analysis.model_footprint =
+        minera::discover_footprints(*selected_petri);
+  }
+  if (options.discovery_variants.contains("petri_reach_graph")) {
+    if (selected_petri == nullptr) {
+      throw std::invalid_argument(
+          "petri_reach_graph requires a Petri-capable footprints model");
+    }
+    analysis.petri_reach_graph =
+        minera::discover_footprints(*selected_petri);
+  }
+  if (options.conformance_variants.contains("log_model")) {
+    analysis.log_model = minera::check_footprints_log_model(
+        log_fp, analysis.model_footprint, {options.strict});
+  }
+  if (options.conformance_variants.contains("log_extensive")) {
+    analysis.log_extensive = minera::check_footprints_log_extensive(
+        log_fp, analysis.model_footprint);
+  }
+  const auto trace_results = minera::check_footprints_trace_extensive(
+      traces(), analysis.model_footprint,
+      {options.enable_act_always_executed});
+  if (options.conformance_variants.contains("trace_extensive")) {
+    analysis.trace_extensive = trace_results;
+  }
+  analysis.precision = minera::fp_precision(log_fp, analysis.model_footprint);
+  const auto fitness =
+      minera::fp_fitness(traces(), analysis.model_footprint, trace_results);
+  analysis.log_fitness = fitness.log_fitness;
+  analysis.perc_fit_traces = fitness.perc_fit_traces;
+  return analysis;
 }
 
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
@@ -85,9 +197,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       csv = file.content;
       if (!file.filename.empty()) dataset = file.filename;
 
-      params = minera::parse_mine_params([&](std::string_view name) {
-        return form_field(request, std::string(name));
-      });
+      params = minera::parse_mine_params(
+          [&](std::string_view name) {
+            return form_field(request, std::string(name));
+          },
+          [&](std::string_view name) {
+            return request.has_file(std::string(name));
+          });
     } else {
       csv = request.body;
     }
@@ -99,7 +215,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (params.filter.any()) {
       log = minera::filter_event_log(log, params.filter);
     }
-    const auto graph = minera::discover_directly_follows_graph(log);
+    auto graph = minera::discover_directly_follows_graph(log);
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(log);
@@ -108,32 +224,60 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto tree = minera::discover_process_tree(log, params.inductive);
     const auto net = minera::discover_petri_net(log, params.alpha);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
+    const auto powl = minera::discover_powl(log, params.powl);
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
+    const auto powl_net = minera::to_petri_net(powl);
+    const auto footprints =
+        analyze_footprints(log, graph, tree, powl, inductive_net, net,
+                           heuristic_net, powl_net, params.footprints);
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
     const auto eventually = minera::discover_eventually_follows(log, graph);
+    const auto log_skeleton =
+        minera::discover_log_skeleton(log, params.log_skeleton);
+    const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
+        log, log_skeleton, params.log_skeleton);
+    const auto declare =
+        minera::discover_declare(log, params.declare_options);
+    const auto declare_conformance =
+        minera::check_declare_conformance(log, declare);
+    for (const auto& [family, rules] : declare.rules) {
+      (void)family;
+      for (const auto& rule : rules) {
+        graph.ensure_activity(rule.first);
+        if (rule.binary) graph.ensure_activity(rule.second);
+      }
+    }
+    for (const auto& result : declare_conformance) {
+      for (const auto& deviation : result.deviations) {
+        graph.ensure_activity(deviation.first);
+        if (deviation.binary) graph.ensure_activity(deviation.second);
+      }
+    }
 
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
-                                      minera::check_conformance(log, petri),
+                                      minera::check_conformance(
+                                          log, petri, params.token_replay),
                                       minera::check_footprints(log, petri),
                                       std::nullopt};
     };
     const std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
-        model("heuristic", heuristic_net)};
+        model("heuristic", heuristic_net), model("powl", powl_net)};
 
     // Frequency/performance annotations for every miner's Petri-net view:
     // one more token replay per net, cheap enough to compute up front.
     const auto petri_decoration = minera::decorate_model(log, net);
     const auto inductive_decoration = minera::decorate_model(log, inductive_net);
     const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
+    const auto powl_decoration = minera::decorate_model(log, powl_net);
 
     const std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
@@ -141,7 +285,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         /*decisions=*/nullptr, &petri_decoration, /*spectrum=*/nullptr,
         &inductive_net, &inductive_decoration, &heuristic_net,
         &heuristic_decoration, &temporal_profile, &minimum_self_distances,
-        &transition_system);
+        &transition_system, &powl, &powl_net, &powl_decoration,
+        &log_skeleton, &log_skeleton_conformance, &declare,
+        &declare_conformance, &footprints);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.
@@ -151,8 +297,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->nets.emplace("inductive", inductive_net);
     session->nets.emplace("alpha", net);
     session->nets.emplace("heuristic", heuristic_net);
+    session->nets.emplace("powl", powl_net);
     session->tree = tree;
+    session->declare = declare;
     session->dataset = dataset;
+    session->token_replay = params.token_replay;
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
@@ -209,7 +358,8 @@ void handle_check_model(const httplib::Request& request,
 
     const minera::ModelConformance conformance{
         "imported", minera::final_marking_reachable(imported),
-        minera::check_conformance(session->log, imported),
+        minera::check_conformance(session->log, imported,
+                                  session->token_replay),
         minera::check_footprints(session->log, imported), std::nullopt};
     const auto body =
         minera::imported_model_json(conformance, next_session->graph);
@@ -227,7 +377,7 @@ void handle_check_model(const httplib::Request& request,
 }
 
 // On-demand alignment of one model from the most recent mine. Expects a `miner`
-// query parameter ("inductive" | "alpha" | "heuristic").
+// query parameter ("inductive" | "alpha" | "heuristic" | "powl").
 void handle_align(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
@@ -298,7 +448,7 @@ void handle_decide(const httplib::Request& request,
 }
 
 // Exports one model from the most recent mine as standard PNML. Expects a
-// `miner` query parameter ("inductive" | "alpha" | "heuristic").
+// `miner` query parameter ("inductive" | "alpha" | "heuristic" | "powl").
 void handle_pnml(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
@@ -328,7 +478,7 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
 // Exports one model from the most recent mine as BPMN 2.0. The `miner` query
 // parameter picks it (default "inductive"). The inductive model converts from
 // its block-structured process tree, which maps cleanly onto BPMN; any other
-// model ("alpha" | "heuristic" | "imported") converts from its workflow net
+// model ("alpha" | "heuristic" | "powl" | "imported") converts from its workflow net
 // by the net's token semantics.
 // Exports the most recent mine's inductive process tree as PTML — the only
 // miner producing a block-structured tree, so no `miner` parameter.
@@ -381,9 +531,12 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
 }
 
 // Simulates one model from the most recent mine into a synthetic event log,
-// served as XES. The `miner` query parameter picks the model ("inductive" |
-// "alpha" | "heuristic" | "imported", default inductive); `traces` sets how
-// many cases to generate (default 100, capped at 10000).
+// served as XES. The `miner` query parameter picks a Petri model
+// ("inductive" | "alpha" | "heuristic" | "powl" | "imported", default
+// inductive) or the classic Declare model ("declare"). `traces` defaults to
+// 100 for Petri models and 1000 for Declare, capped at 10000. Declare also
+// accepts min_length, max_length, and seed; Petri models retain their existing
+// mode=extensive/max_length behavior.
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -401,42 +554,101 @@ void handle_playout(const httplib::Request& request,
   const std::string miner = request.has_param("miner")
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
+  const bool is_declare = miner == "declare";
   const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
+  if (!is_declare && it == session->nets.end()) {
     response.status = 400;
     response.set_content(error_json("unknown miner: " + miner),
                          "application/json");
     return;
   }
 
-  minera::PlayoutOptions options;
-  if (request.has_param("traces")) {
-    const auto requested = std::atoll(request.get_param_value("traces").c_str());
-    if (requested < 1 || requested > 10000) {
-      response.status = 400;
-      response.set_content(error_json("traces must be between 1 and 10000"),
-                           "application/json");
+  const auto reject = [&](std::string message) {
+    response.status = 400;
+    response.set_content(error_json(message), "application/json");
+  };
+  const auto parse_bounded =
+      [&](std::string_view name, std::uint64_t minimum,
+          std::uint64_t maximum) -> std::optional<std::uint64_t> {
+    const auto value = request.get_param_value(std::string(name));
+    std::uint64_t parsed = 0;
+    const auto result =
+        std::from_chars(value.data(), value.data() + value.size(), parsed);
+    if (value.empty() || result.ec != std::errc{} ||
+        result.ptr != value.data() + value.size() || parsed < minimum ||
+        parsed > maximum) {
+      reject(std::string(name) + " must be between " +
+             std::to_string(minimum) + " and " + std::to_string(maximum));
+      return std::nullopt;
+    }
+    return parsed;
+  };
+  const std::string mode = request.has_param("mode")
+                               ? request.get_param_value("mode")
+                               : std::string{};
+  if (is_declare) {
+    if (mode == "extensive") {
+      reject("mode=extensive is not supported for Declare playout");
       return;
     }
-    options.traces = static_cast<std::size_t>(requested);
+    minera::DeclarePlayoutOptions options;
+    if (request.has_param("traces")) {
+      const auto parsed = parse_bounded("traces", 1, 10000);
+      if (!parsed) return;
+      options.n_traces = static_cast<int>(*parsed);
+    }
+    if (request.has_param("min_length")) {
+      const auto parsed = parse_bounded("min_length", 0, 1000);
+      if (!parsed) return;
+      options.min_length = static_cast<int>(*parsed);
+    }
+    if (request.has_param("max_length")) {
+      const auto parsed = parse_bounded("max_length", 0, 1000);
+      if (!parsed) return;
+      options.max_length = static_cast<int>(*parsed);
+    }
+    if (request.has_param("seed")) {
+      const auto parsed =
+          parse_bounded("seed", 0, std::numeric_limits<std::uint64_t>::max());
+      if (!parsed) return;
+      options.seed = *parsed;
+    }
+    if (options.min_length > options.max_length) {
+      reject("min_length must not exceed max_length");
+      return;
+    }
+    try {
+      const auto log = minera::declare_playout(session->declare, options);
+      response.set_content(minera::to_xes(log, "declare playout"),
+                           "application/xml");
+    } catch (const std::exception& error) {
+      reject(error.what());
+    }
+    return;
+  }
+
+  if (request.has_param("min_length") || request.has_param("seed") ||
+      (request.has_param("max_length") && mode != "extensive")) {
+    reject("min_length, max_length, and seed are Declare-only unless "
+           "max_length is used with Petri mode=extensive");
+    return;
+  }
+  minera::PlayoutOptions options;
+  if (request.has_param("traces")) {
+    const auto parsed = parse_bounded("traces", 1, 10000);
+    if (!parsed) return;
+    options.traces = static_cast<std::size_t>(*parsed);
   }
 
   // mode=extensive enumerates the model's distinct traces (shortest first,
   // capped by `traces` and `max_length`) instead of sampling randomly.
-  if (request.get_param_value("mode") == "extensive") {
+  if (mode == "extensive") {
     minera::ExtensivePlayoutOptions extensive;
     extensive.max_traces = options.traces;
     if (request.has_param("max_length")) {
-      const auto requested =
-          std::atoll(request.get_param_value("max_length").c_str());
-      if (requested < 1 || requested > 1000) {
-        response.status = 400;
-        response.set_content(
-            error_json("max_length must be between 1 and 1000"),
-            "application/json");
-        return;
-      }
-      extensive.max_length = static_cast<std::size_t>(requested);
+      const auto parsed = parse_bounded("max_length", 1, 1000);
+      if (!parsed) return;
+      extensive.max_length = static_cast<std::size_t>(*parsed);
     }
     const auto log = minera::extensive_playout(it->second, extensive);
     response.set_content(minera::to_xes(log, miner + " playout"),
