@@ -26,6 +26,7 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -180,6 +181,48 @@ minera::FootprintsAnalysis analyze_footprints(
   return analysis;
 }
 
+minera::DfgStatisticalVariant dfg_statistical_variant(
+    std::string_view name) {
+  if (name == "frequency_triples")
+    return minera::DfgStatisticalVariant::kFrequencyTriples;
+  if (name == "performance" || name == "performance_greedy")
+    return minera::DfgStatisticalVariant::kPerformance;
+  if (name == "case_attributes")
+    return minera::DfgStatisticalVariant::kCaseAttributes;
+  if (name == "clean" || name == "clean_polars")
+    return minera::DfgStatisticalVariant::kClean;
+  if (name == "clean_time")
+    return minera::DfgStatisticalVariant::kCleanTime;
+  return minera::DfgStatisticalVariant::kNative;
+}
+
+minera::DfgVariantsAnalysis analyze_dfg_variants(
+    const minera::EventLog& log,
+    const std::vector<std::string>& statistical_variants,
+    const std::vector<std::string>& causal_variants,
+    const minera::DfgStatisticalOptions& shared_options) {
+  minera::DfgVariantsAnalysis result;
+  result.statistical.reserve(statistical_variants.size());
+  for (const auto& name : statistical_variants) {
+    auto options = shared_options;
+    options.variant = dfg_statistical_variant(name);
+    result.statistical.push_back(
+        {name, minera::discover_dfg_statistics(log, options)});
+  }
+  if (!causal_variants.empty()) {
+    const auto frequency = minera::discover_frequency_dfg(log, shared_options);
+    result.causal.reserve(causal_variants.size());
+    for (const auto& name : causal_variants) {
+      const auto variant = name == "heuristic"
+                               ? minera::DfgCausalVariant::kHeuristic
+                               : minera::DfgCausalVariant::kAlpha;
+      result.causal.push_back(
+          {name, minera::discover_dfg_causality(frequency, variant)});
+    }
+  }
+  return result;
+}
+
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   try {
     std::string csv;
@@ -216,6 +259,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       log = minera::filter_event_log(log, params.filter);
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
+    if (!params.dfg_statistical_variants.empty() ||
+        !params.dfg_causal_variants.empty()) {
+      dfg_variants_analysis = analyze_dfg_variants(
+          log, params.dfg_statistical_variants, params.dfg_causal_variants,
+          params.dfg_statistics);
+    }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(log);
@@ -287,7 +337,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         &heuristic_decoration, &temporal_profile, &minimum_self_distances,
         &transition_system, &powl, &powl_net, &powl_decoration,
         &log_skeleton, &log_skeleton_conformance, &declare,
-        &declare_conformance, &footprints);
+        &declare_conformance, &footprints,
+        dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all three up front.

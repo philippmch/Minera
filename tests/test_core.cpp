@@ -4158,6 +4158,103 @@ void json_export_carries_footprints_contract() {
   expect_rejected(bad_metric);
 }
 
+void json_export_carries_dfg_variants_contract() {
+  const auto log = transition_test_log({{"a", "b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  minera::DfgVariantsAnalysis variants;
+
+  minera::DfgStatisticalAnalysis frequency;
+  frequency.variant = minera::DfgStatisticalVariant::kNative;
+  frequency.frequency_dfg[{"a", "b"}] = 2;
+  variants.statistical.push_back({"frequency_greedy", frequency});
+
+  minera::DfgStatisticalAnalysis triples;
+  triples.variant = minera::DfgStatisticalVariant::kFrequencyTriples;
+  triples.frequency_triples[{"a", "b", "a"}] = 3;
+  variants.statistical.push_back({"frequency_triples", triples});
+
+  minera::DfgStatisticalAnalysis performance;
+  performance.variant = minera::DfgStatisticalVariant::kPerformance;
+  minera::DfgPerformanceStatistics performance_edge;
+  performance_edge.summary = {2, 3.0, 3.0, 2.0, 4.0,
+                              std::sqrt(2.0), 6.0};
+  performance_edge.raw_values = {2.0, 4.0};
+  performance_edge.value = performance_edge.summary;
+  performance.performance_dfg[{"a", "b"}] = performance_edge;
+  variants.statistical.push_back({"performance_greedy", performance});
+
+  minera::DfgStatisticalAnalysis case_attributes;
+  case_attributes.variant = minera::DfgStatisticalVariant::kCaseAttributes;
+  case_attributes.case_attributes.edges[{"a", "b"}]["concept:name"]["c1"] =
+      1;
+  case_attributes.case_attributes.nodes["a"]["region"]["EU"] = 2;
+  variants.statistical.push_back({"case_attributes", case_attributes});
+
+  minera::DfgStatisticalAnalysis clean;
+  clean.variant = minera::DfgStatisticalVariant::kClean;
+  clean.clean.graph[{"a", "b"}] = 1;
+  clean.clean.start_activities["a"] = 1;
+  clean.clean.end_activities["b"] = 1;
+  variants.statistical.push_back({"clean_polars", clean});
+
+  minera::DfgStatisticalAnalysis clean_time;
+  clean_time.variant = minera::DfgStatisticalVariant::kCleanTime;
+  clean_time.clean_time["b"] = 5.5;
+  variants.statistical.push_back({"clean_time", clean_time});
+
+  minera::DfgCausalAnalysis causal;
+  causal.variant = minera::DfgCausalVariant::kHeuristic;
+  causal.relations[{"a", "b"}] = 0.75;
+  causal.relations[{"b", "a"}] = -0.75;
+  variants.causal.push_back({"heuristic", causal});
+
+  const auto json = minera::analysis_json(
+      "test", log, graph,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, &variants);
+  for (const char* fragment :
+       {"\"dfg_variants\"", "\"statistical\"",
+        "\"variant\": \"frequency_greedy\"",
+        "\"frequency_dfg\": [{\"source\": 0, \"target\": 1, "
+        "\"count\": 2}]",
+        "\"frequency_triples\": [{\"first\": 0, \"middle\": 1, "
+        "\"last\": 0, \"count\": 3}]",
+        "\"variant\": \"performance_greedy\"", "\"raw_values\": [2, 4]",
+        "\"value\": {\"count\": 2", "\"case_attributes\"",
+        "\"attribute\": \"concept:name\"", "\"value\": \"c1\"",
+        "\"variant\": \"clean_polars\"", "\"start_activities\"",
+        "\"mean_seconds_from_case_start\": 5.5", "\"causal\"",
+        "\"variant\": \"heuristic\"", "\"value\": -0.75"}) {
+    assert(json.find(fragment) != std::string::npos);
+  }
+  assert(minera::analysis_json("test", log, graph).find("\"dfg_variants\"") ==
+         std::string::npos);
+
+  auto invalid = variants;
+  invalid.statistical.front().analysis.frequency_dfg.clear();
+  invalid.statistical.front().analysis.frequency_dfg[{"a", "missing"}] = 1;
+  std::ostringstream stream;
+  bool threw = false;
+  try {
+    minera::write_analysis_json(
+        stream, "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, &invalid);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  assert(stream.str().empty());
+}
+
 void transition_system_forward_backward_views() {
   const auto log = transition_test_log({{"a", "b", "a"}});
   const auto forward = minera::discover_transition_system(log);
@@ -4454,5 +4551,6 @@ int main() {
   transition_system_positional_options_and_invalid_enums();
   json_export_carries_declare_contract();
   json_export_carries_footprints_contract();
+  json_export_carries_dfg_variants_contract();
   return 0;
 }

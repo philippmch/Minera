@@ -467,6 +467,89 @@ export interface AggregateFootprints {
   metrics?: AggregateFootprintsMetrics;
 }
 
+export type DfgStatisticalVariant =
+  | "native"
+  | "frequency"
+  | "frequency_greedy"
+  | "frequency_triples"
+  | "performance"
+  | "performance_greedy"
+  | "case_attributes"
+  | "clean"
+  | "clean_polars"
+  | "clean_time";
+export type DfgCausalVariant = "alpha" | "heuristic";
+
+export interface DfgPerformanceSummary {
+  count: number;
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  stdev: number;
+  sum: number;
+}
+export interface DfgPerformanceEdge {
+  source: number;
+  target: number;
+  summary: DfgPerformanceSummary;
+  raw_values: number[];
+  value: number | number[] | DfgPerformanceSummary;
+}
+export interface DfgAttributeValueCount {
+  value: string;
+  count: number;
+}
+export interface DfgNamedAttributeCounts {
+  attribute: string;
+  values: DfgAttributeValueCount[];
+}
+export interface DfgCaseAttributeEdge {
+  source: number;
+  target: number;
+  attributes: DfgNamedAttributeCounts[];
+}
+export interface DfgCaseAttributeNode {
+  activity: number;
+  attributes: DfgNamedAttributeCounts[];
+}
+export interface DfgBoundaryActivity {
+  activity: number;
+  count: number;
+}
+export interface DfgStatisticalAnalysis {
+  variant: DfgStatisticalVariant;
+  frequency_dfg?: EdgeStat[];
+  frequency_triples?: Array<{
+    first: number;
+    middle: number;
+    last: number;
+    count: number;
+  }>;
+  performance_dfg?: DfgPerformanceEdge[];
+  case_attributes?: {
+    edges: DfgCaseAttributeEdge[];
+    nodes: DfgCaseAttributeNode[];
+  };
+  clean?: {
+    dfg: EdgeStat[];
+    start_activities: DfgBoundaryActivity[];
+    end_activities: DfgBoundaryActivity[];
+  };
+  clean_time?: Array<{
+    activity: number;
+    mean_seconds_from_case_start: number;
+  }>;
+}
+export interface DfgCausalAnalysis {
+  variant: DfgCausalVariant;
+  relations: Array<{ source: number; target: number; value: number }>;
+}
+export interface DfgVariantsAnalysis {
+  statistical: DfgStatisticalAnalysis[];
+  causal: DfgCausalAnalysis[];
+}
+
 /** Conformance results for one discovered model. */
 export interface ModelConformance {
   /** Whether the model's final marking is reachable — the bar for alignment. */
@@ -693,6 +776,8 @@ export interface MineraExport {
   declare_conformance?: DeclareConformanceTrace[];
   /** Aggregate footprints discovery and relational conformance. */
   footprints?: AggregateFootprints;
+  /** Opt-in PM4Py statistical DFG and causal-discovery variants. */
+  dfg_variants?: DfgVariantsAnalysis;
   /** Heuristic Miner dependency graph; absent in exports from older versions. */
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */

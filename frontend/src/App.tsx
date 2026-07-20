@@ -25,6 +25,7 @@ import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
 import { EventuallyFollows } from "./components/EventuallyFollows";
+import { DfgVariants } from "./components/DfgVariants";
 import { Filters } from "./components/Filters";
 import {
   alignModel,
@@ -422,6 +423,7 @@ export default function App() {
           />
           <VariantList data={data} selected={selectedVariant} onSelect={setSelectedVariant} />
           <ActivityTable data={data} />
+          <DfgVariants data={data} />
           <EventuallyFollows data={data} />
         </main>
       )}

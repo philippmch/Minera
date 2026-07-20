@@ -28,6 +28,7 @@ add_library(minera_core
   src/declare_playout.cpp
   src/declare_streaming.cpp
   src/decision_mining.cpp
+  src/dfg_variants.cpp
   src/directly_follows_graph.cpp
   src/event_ordering.cpp
   src/eventually_follows.cpp
@@ -215,4 +216,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_heuristic_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_heuristic_variants_tests COMMAND minera_heuristic_variants_tests)
+
+  add_executable(minera_dfg_variants_tests
+    tests/test_dfg_variants.cpp
+  )
+  target_link_libraries(minera_dfg_variants_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_variants_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
+
+  add_test(NAME minera_dfg_variants_tests COMMAND minera_dfg_variants_tests)
 endif()

@@ -172,6 +172,30 @@ export function Filters({
   );
   const [footprintsStrict, setFootprintsStrict] = useState(false);
   const [footprintsEnableActAlwaysExecuted, setFootprintsEnableActAlwaysExecuted] = useState(true);
+  const dfgStatisticalNames = [
+    "native", "frequency", "frequency_greedy", "frequency_triples", "performance",
+    "performance_greedy", "case_attributes", "clean", "clean_polars", "clean_time",
+  ] as const;
+  const dfgCausalNames = ["alpha", "heuristic"] as const;
+  const [dfgStatisticalVariants, setDfgStatisticalVariants] = useState<Set<string>>(new Set());
+  const [dfgCausalVariants, setDfgCausalVariants] = useState<Set<string>>(new Set());
+  const [dfgWindow, setDfgWindow] = useState("1");
+  const [dfgKeepOncePerCase, setDfgKeepOncePerCase] = useState(false);
+  const [dfgPerformanceAggregation, setDfgPerformanceAggregation] = useState<NonNullable<MinerOptions["dfgPerformanceAggregation"]>>("mean");
+  const [dfgStartTimestampAttribute, setDfgStartTimestampAttribute] = useState("start_timestamp");
+  const [dfgBusinessHours, setDfgBusinessHours] = useState(false);
+  const [dfgBusinessHourSlots, setDfgBusinessHourSlots] = useState("");
+  const [dfgCaseAttributes, setDfgCaseAttributes] = useState("concept:name");
+  const [dfgReturnNodeAttributes, setDfgReturnNodeAttributes] = useState(false);
+  const dfgFrequencyOptionsActive =
+    dfgCausalVariants.size > 0 ||
+    ["native", "frequency", "frequency_greedy"].some((name) =>
+      dfgStatisticalVariants.has(name));
+  const dfgPerformanceOptionsActive =
+    dfgStatisticalVariants.has("performance") ||
+    dfgStatisticalVariants.has("performance_greedy");
+  const dfgCaseAttributeOptionsActive =
+    dfgStatisticalVariants.has("case_attributes");
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -234,6 +258,14 @@ export function Filters({
       return next;
     });
   };
+  const toggleDfgVariant = (
+    setter: typeof setDfgStatisticalVariants,
+    name: string,
+  ) => setter((previous) => {
+    const next = new Set(previous);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    return next;
+  });
 
   const pickAttributeKey = (key: string) => {
     setAttributeKey(key);
@@ -416,6 +448,27 @@ export function Filters({
           ? undefined : [...footprintsConformanceVariants],
       footprintsStrict: footprintsStrict || undefined,
       footprintsEnableActAlwaysExecuted: footprintsEnableActAlwaysExecuted ? undefined : false,
+      dfgStatisticalVariants: dfgStatisticalVariants.size ? [...dfgStatisticalVariants] : undefined,
+      dfgCausalVariants: dfgCausalVariants.size ? [...dfgCausalVariants] : undefined,
+      dfgWindow: dfgFrequencyOptionsActive
+        ? toPowlActivityLimit(dfgWindow) : undefined,
+      dfgKeepOncePerCase: dfgFrequencyOptionsActive && dfgKeepOncePerCase
+        ? true : undefined,
+      dfgPerformanceAggregation: dfgPerformanceOptionsActive
+        ? dfgPerformanceAggregation : undefined,
+      dfgStartTimestampAttribute: dfgPerformanceOptionsActive
+        ? dfgStartTimestampAttribute.trim() || undefined : undefined,
+      dfgBusinessHours:
+        dfgPerformanceOptionsActive && dfgBusinessHours ? true : undefined,
+      dfgBusinessHourSlots:
+        dfgPerformanceOptionsActive && dfgBusinessHours
+          ? dfgBusinessHourSlots.trim() || undefined : undefined,
+      dfgCaseAttributes: dfgCaseAttributeOptionsActive
+        ? dfgCaseAttributes.split(",").map((name) => name.trim()).filter(Boolean)
+        : undefined,
+      dfgReturnNodeAttributes:
+        dfgCaseAttributeOptionsActive && dfgReturnNodeAttributes
+          ? true : undefined,
     });
   };
 
@@ -479,6 +532,16 @@ export function Filters({
     setFootprintsConformanceVariants(new Set(["log_model"]));
     setFootprintsStrict(false);
     setFootprintsEnableActAlwaysExecuted(true);
+    setDfgStatisticalVariants(new Set());
+    setDfgCausalVariants(new Set());
+    setDfgWindow("1");
+    setDfgKeepOncePerCase(false);
+    setDfgPerformanceAggregation("mean");
+    setDfgStartTimestampAttribute("start_timestamp");
+    setDfgBusinessHours(false);
+    setDfgBusinessHourSlots("");
+    setDfgCaseAttributes("concept:name");
+    setDfgReturnNodeAttributes(false);
     onApply({});
   };
 
@@ -537,7 +600,9 @@ export function Filters({
     footprintsDiscoveryVariants.size !== FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.length ||
     FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !footprintsDiscoveryVariants.has(name)) ||
     footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model");
-  const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty || declareDirty || footprintsDirty;
+  const dfgDirty =
+    dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0;
+  const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty || declareDirty || footprintsDirty || dfgDirty;
 
   return (
     <section className="filters reveal">
@@ -846,6 +911,87 @@ export function Filters({
                 );
               })}
             </div>
+          </div>
+
+          <div className="filters-activities">
+            <span className="filters-field-label">
+              Statistical DFG analyses <small>(optional; select any variants to include)</small>
+            </span>
+            <div className="filter-chips" role="group" aria-label="Statistical DFG variants">
+              {dfgStatisticalNames.map((name) => {
+                const selected = dfgStatisticalVariants.has(name);
+                return <button type="button" key={name}
+                  className={selected ? "filter-chip active" : "filter-chip"}
+                  aria-pressed={selected}
+                  onClick={() => toggleDfgVariant(setDfgStatisticalVariants, name)}>
+                  {name.replaceAll("_", " ")}
+                </button>;
+              })}
+            </div>
+          </div>
+          <div className="filters-activities">
+            <span className="filters-field-label">Causal DFG analyses <small>(optional)</small></span>
+            <div className="filter-chips" role="group" aria-label="Causal DFG variants">
+              {dfgCausalNames.map((name) => {
+                const selected = dfgCausalVariants.has(name);
+                return <button type="button" key={name}
+                  className={selected ? "filter-chip active" : "filter-chip"}
+                  aria-pressed={selected}
+                  onClick={() => toggleDfgVariant(setDfgCausalVariants, name)}>{name}</button>;
+              })}
+            </div>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>DFG window</span>
+              <input type="number" min={0} step={1} value={dfgWindow}
+                disabled={!dfgFrequencyOptionsActive}
+                onChange={(event) => setDfgWindow(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Performance aggregation</span>
+              <select value={dfgPerformanceAggregation}
+                disabled={!dfgPerformanceOptionsActive}
+                onChange={(event) => setDfgPerformanceAggregation(event.target.value as NonNullable<MinerOptions["dfgPerformanceAggregation"]>)}>
+                {(["mean", "median", "min", "max", "stdev", "sum", "raw_values", "all"] as const).map((name) => <option key={name} value={name}>{name.replaceAll("_", " ")}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Start timestamp attribute</span>
+              <input type="text" value={dfgStartTimestampAttribute}
+                disabled={!dfgPerformanceOptionsActive}
+                onChange={(event) => setDfgStartTimestampAttribute(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Case attributes <small>(comma-separated)</small></span>
+              <input type="text" value={dfgCaseAttributes}
+                disabled={!dfgCaseAttributeOptionsActive}
+                onChange={(event) => setDfgCaseAttributes(event.target.value)} />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field filters-field-wide">
+              <span>Business-hour slots <small>(weekly seconds, start-end pairs)</small></span>
+              <input type="text" placeholder="25200-61200,111600-147600"
+                value={dfgBusinessHourSlots}
+                disabled={!dfgPerformanceOptionsActive || !dfgBusinessHours}
+                onChange={(event) => setDfgBusinessHourSlots(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>DFG flags</span>
+              <label className="checkbox-field"><input type="checkbox"
+                checked={dfgKeepOncePerCase}
+                disabled={!dfgFrequencyOptionsActive}
+                onChange={(event) => setDfgKeepOncePerCase(event.target.checked)} /> keep each edge once per case</label>
+              <label className="checkbox-field"><input type="checkbox"
+                checked={dfgBusinessHours}
+                disabled={!dfgPerformanceOptionsActive}
+                onChange={(event) => setDfgBusinessHours(event.target.checked)} /> use business hours</label>
+              <label className="checkbox-field"><input type="checkbox"
+                checked={dfgReturnNodeAttributes}
+                disabled={!dfgCaseAttributeOptionsActive}
+                onChange={(event) => setDfgReturnNodeAttributes(event.target.checked)} /> return node attributes</label>
+            </label>
           </div>
 
           <div className="filters-row">

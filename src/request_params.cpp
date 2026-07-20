@@ -89,6 +89,31 @@ std::vector<std::string> split_csv(std::string_view value) {
   return parts;
 }
 
+std::vector<BusinessHourSlot> parse_business_hour_slots(
+    std::string_view value, std::string_view name) {
+  std::vector<BusinessHourSlot> slots;
+  for (const auto& part : split_csv(value)) {
+    auto separator = part.find(':');
+    if (separator == std::string::npos) separator = part.find('-');
+    if (separator == std::string::npos || separator == 0 ||
+        separator + 1 == part.size()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected start-end second pairs");
+    }
+    const double start =
+        parse_finite_double(std::string_view(part).substr(0, separator), name);
+    const double end = parse_finite_double(
+        std::string_view(part).substr(separator + 1), name);
+    if (start < 0.0 || start >= end || end > 604800.0) {
+      throw std::invalid_argument(
+          std::string(name) +
+          ": slots must satisfy 0 <= start < end <= 604800");
+    }
+    slots.push_back({start, end});
+  }
+  return slots;
+}
+
 std::string error_json(std::string_view message) {
   std::ostringstream out;
   out << "{\"error\": \"";
@@ -587,6 +612,110 @@ MineParams parse_mine_params(const FieldLookup& field,
     throw std::invalid_argument(
         "footprints_model=dfg cannot be combined with "
         "petri_reach_graph discovery");
+  }
+
+  const auto parse_dfg_variants =
+      [&](std::string_view field_name,
+          const std::vector<std::string>& catalog,
+          std::vector<std::string>& destination) {
+        const auto value = field(field_name);
+        const bool supplied = present ? present(field_name) : !value.empty();
+        if (!supplied) return;
+        const auto requested = split_csv(value);
+        if (requested.empty()) {
+          throw std::invalid_argument(std::string(field_name) +
+                                      ": expected a non-empty list");
+        }
+        for (const auto& name : requested) {
+          if (std::find(catalog.begin(), catalog.end(), name) ==
+              catalog.end()) {
+            throw std::invalid_argument(std::string(field_name) +
+                                        ": unknown variant '" + name + "'");
+          }
+        }
+        destination.clear();
+        for (const auto& name : catalog) {
+          if (std::find(requested.begin(), requested.end(), name) !=
+              requested.end()) {
+            destination.push_back(name);
+          }
+        }
+      };
+  parse_dfg_variants(
+      "dfg_statistical_variants",
+      {"native", "frequency", "frequency_greedy", "frequency_triples",
+       "performance", "performance_greedy", "case_attributes", "clean",
+       "clean_polars", "clean_time"},
+      params.dfg_statistical_variants);
+  parse_dfg_variants("dfg_causal_variants", {"alpha", "heuristic"},
+                     params.dfg_causal_variants);
+  if (const auto value = field("dfg_window");
+      present ? present("dfg_window") : !value.empty()) {
+    params.dfg_statistics.window = parse_nonnegative_size(value, "dfg_window");
+  }
+  if (const auto value = field("dfg_keep_once_per_case");
+      present ? present("dfg_keep_once_per_case") : !value.empty()) {
+    params.dfg_statistics.keep_once_per_case =
+        parse_boolean(value, "dfg_keep_once_per_case");
+  }
+  if (const auto value = field("dfg_performance_aggregation");
+      present ? present("dfg_performance_aggregation") : !value.empty()) {
+    if (value == "mean")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kMean;
+    else if (value == "median")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kMedian;
+    else if (value == "min")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kMinimum;
+    else if (value == "max")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kMaximum;
+    else if (value == "stdev")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kStandardDeviation;
+    else if (value == "sum")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kSum;
+    else if (value == "raw_values")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kRawValues;
+    else if (value == "all")
+      params.dfg_statistics.performance_aggregation =
+          DfgPerformanceAggregation::kAll;
+    else
+      throw std::invalid_argument(
+          "dfg_performance_aggregation: expected mean, median, min, max, "
+          "stdev, sum, raw_values, or all, got '" +
+          value + "'");
+  }
+  if (const auto value = field("dfg_start_timestamp_attribute");
+      present ? present("dfg_start_timestamp_attribute") : !value.empty()) {
+    params.dfg_statistics.start_timestamp_attribute = value;
+  }
+  if (const auto value = field("dfg_business_hours");
+      present ? present("dfg_business_hours") : !value.empty()) {
+    params.dfg_statistics.use_business_hours =
+        parse_boolean(value, "dfg_business_hours");
+  }
+  if (const auto value = field("dfg_business_hour_slots");
+      present ? present("dfg_business_hour_slots") : !value.empty()) {
+    params.dfg_statistics.business_hour_slots =
+        parse_business_hour_slots(value, "dfg_business_hour_slots");
+  }
+  if (const auto value = field("dfg_case_attributes");
+      present ? present("dfg_case_attributes") : !value.empty()) {
+    auto attributes = split_csv(value);
+    std::sort(attributes.begin(), attributes.end());
+    attributes.erase(std::unique(attributes.begin(), attributes.end()),
+                     attributes.end());
+    params.dfg_statistics.case_attributes = std::move(attributes);
+  }
+  if (const auto value = field("dfg_return_node_attributes");
+      present ? present("dfg_return_node_attributes") : !value.empty()) {
+    params.dfg_statistics.return_node_attributes =
+        parse_boolean(value, "dfg_return_node_attributes");
   }
 
   return params;

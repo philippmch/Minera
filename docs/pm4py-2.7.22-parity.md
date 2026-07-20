@@ -67,7 +67,7 @@ are reconciled.
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Missing** |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
-| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial** — frequency DFG, performance timing, causal relations, eventually-follows, and minimum self-distance with witnesses exist |
+| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial** — all DFG statistical aliases and both causal variants are complete, as are eventually-follows and minimum self-distance with witnesses; the three correlation-miner variants remain |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Partial** — temporal profile and connected performance spectrum |
@@ -92,7 +92,7 @@ are reconciled.
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Missing** |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters; LTL/segments/DFG/OCEL gaps |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
-| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
+| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal DFG results, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Missing** |
@@ -172,6 +172,47 @@ unknown/missing activities, non-finite direct-call behavior, and empty inputs.
 The model and trace diagnostics are serialized with prevalidated activity IDs,
 available through CLI/server requests, and rendered in the frontend with all
 settings exposed.
+
+## DFG statistical and causal parity evidence
+
+The statistical DFG surface exposes NATIVE, FREQUENCY, and FREQUENCY_GREEDY
+as individually named aliases of the same windowed counter. A zero window
+counts one self-pair per event, positive windows connect exactly the two
+positions at that distance, and optional per-case deduplication is applied
+independently inside each trace. FREQ_TRIPLES counts overlapping contiguous
+triples and intentionally ignores the window and deduplication settings.
+
+PERFORMANCE and PERFORMANCE_GREEDY are named aliases over adjacent waiting
+times. A target's configured start-timestamp attribute falls back to its
+complete timestamp; negative waits clamp to zero. Mean, median, minimum,
+maximum, sum, sample standard deviation, raw observations, and the complete
+summary are selectable. Timestamp parsing is strict. Weekly business-hour
+slots support the pinned Monday-Friday default, caller-defined ranges,
+timezone-bearing timestamps, and multiweek intervals.
+
+CASE_ATTRIBUTES counts every requested trace attribute on directly-following
+edges, maps `concept:name` to the native case id, skips missing attributes, and
+optionally returns per-event node annotations. CLEAN preserves the pinned
+columnar algorithm's unusual boundary rule: start/end counts include every
+non-empty case, while only a non-boundary current row owns an edge to its next
+row. CLEAN_POLARS is an adapter alias. CLEAN_TIME computes each activity's
+mean offset per case before averaging those case means.
+
+Causal ALPHA emits a relation only when its positive reverse is absent.
+Causal HEURISTIC emits both directions with
+`(forward-reverse)/(forward+reverse+1)`, including synthesized zero-reverse
+entries and the pinned self-relation assignment behavior. Focused tests cover
+all aliases, windows including zero, deduplication, triples, every performance
+aggregation, timestamp fallback and rejection, custom business hours, missing
+case attributes, node counts, CLEAN boundary/tie behavior, CLEAN_TIME repeated
+activities, zero-frequency reverses, and self loops.
+
+Every variant remains individually selectable through the native API, strict
+request fields, CLI, and local server. Deterministic JSON resolves all
+activities against the shared registry and preserves alias names; the frontend
+exposes all settings and renders frequency, triple, performance,
+case-attribute, clean-time, and causal artifacts. Correlation mining is tracked
+separately and remains the outstanding part of the graph/statistical row.
 
 ## Footprints parity evidence
 

@@ -10,6 +10,7 @@
 #include <set>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -1705,6 +1706,335 @@ void write_transition_system(std::ostream& out, const TransitionSystem& system,
   out << "]}";
 }
 
+std::size_t dfg_variant_activity_id(
+    const DirectlyFollowsGraph& graph, const std::string& activity) {
+  const auto id = graph.activity_id(activity);
+  if (!id) {
+    throw std::invalid_argument(
+        "DFG variant activity is not registered: " + activity);
+  }
+  return *id;
+}
+
+void validate_dfg_performance_statistics(
+    const DfgPerformanceStatistics& statistics) {
+  const auto finite = [](double value) { return std::isfinite(value); };
+  const auto& summary = statistics.summary;
+  if (!finite(summary.mean) || !finite(summary.median) ||
+      !finite(summary.minimum) || !finite(summary.maximum) ||
+      !finite(summary.standard_deviation) || !finite(summary.sum)) {
+    throw std::invalid_argument(
+        "DFG performance statistics must be finite");
+  }
+  if (!std::all_of(statistics.raw_values.begin(),
+                   statistics.raw_values.end(), finite)) {
+    throw std::invalid_argument("DFG performance samples must be finite");
+  }
+  std::visit(
+      [&](const auto& value) {
+        using Value = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<Value, double>) {
+          if (!finite(value)) {
+            throw std::invalid_argument(
+                "DFG selected performance value must be finite");
+          }
+        } else if constexpr (std::is_same_v<Value, std::vector<double>>) {
+          if (!std::all_of(value.begin(), value.end(), finite)) {
+            throw std::invalid_argument(
+                "DFG selected performance samples must be finite");
+          }
+        } else {
+          if (!finite(value.mean) || !finite(value.median) ||
+              !finite(value.minimum) || !finite(value.maximum) ||
+              !finite(value.standard_deviation) || !finite(value.sum)) {
+            throw std::invalid_argument(
+                "DFG selected performance summary must be finite");
+          }
+        }
+      },
+      statistics.value);
+}
+
+void validate_dfg_variants(const DfgVariantsAnalysis& variants,
+                           const DirectlyFollowsGraph& graph) {
+  const auto validate_pair =
+      [&](const DfgActivityPair& pair) {
+        (void)dfg_variant_activity_id(graph, pair.first);
+        (void)dfg_variant_activity_id(graph, pair.second);
+      };
+  for (const auto& named : variants.statistical) {
+    if (named.name.empty()) {
+      throw std::invalid_argument("DFG statistical variant name is empty");
+    }
+    const auto& analysis = named.analysis;
+    for (const auto& [pair, count] : analysis.frequency_dfg) {
+      (void)count;
+      validate_pair(pair);
+    }
+    for (const auto& [triple, count] : analysis.frequency_triples) {
+      (void)count;
+      (void)dfg_variant_activity_id(graph, std::get<0>(triple));
+      (void)dfg_variant_activity_id(graph, std::get<1>(triple));
+      (void)dfg_variant_activity_id(graph, std::get<2>(triple));
+    }
+    for (const auto& [pair, statistics] : analysis.performance_dfg) {
+      validate_pair(pair);
+      validate_dfg_performance_statistics(statistics);
+    }
+    for (const auto& [pair, attributes] : analysis.case_attributes.edges) {
+      (void)attributes;
+      validate_pair(pair);
+    }
+    for (const auto& [activity, attributes] :
+         analysis.case_attributes.nodes) {
+      (void)attributes;
+      (void)dfg_variant_activity_id(graph, activity);
+    }
+    for (const auto& [pair, count] : analysis.clean.graph) {
+      (void)count;
+      validate_pair(pair);
+    }
+    for (const auto& [activity, count] :
+         analysis.clean.start_activities) {
+      (void)count;
+      (void)dfg_variant_activity_id(graph, activity);
+    }
+    for (const auto& [activity, count] : analysis.clean.end_activities) {
+      (void)count;
+      (void)dfg_variant_activity_id(graph, activity);
+    }
+    for (const auto& [activity, value] : analysis.clean_time) {
+      (void)dfg_variant_activity_id(graph, activity);
+      if (!std::isfinite(value)) {
+        throw std::invalid_argument("DFG clean-time value must be finite");
+      }
+    }
+  }
+  for (const auto& named : variants.causal) {
+    if (named.name.empty()) {
+      throw std::invalid_argument("DFG causal variant name is empty");
+    }
+    for (const auto& [pair, value] : named.analysis.relations) {
+      validate_pair(pair);
+      if (!std::isfinite(value)) {
+        throw std::invalid_argument("DFG causal value must be finite");
+      }
+    }
+  }
+}
+
+void write_dfg_frequency(std::ostream& out, const DfgFrequency& dfg,
+                         const DirectlyFollowsGraph& graph) {
+  out << '[';
+  std::size_t emitted = 0;
+  for (const auto& [pair, count] : dfg) {
+    if (emitted++ != 0) out << ", ";
+    out << "{\"source\": " << dfg_variant_activity_id(graph, pair.first)
+        << ", \"target\": " << dfg_variant_activity_id(graph, pair.second)
+        << ", \"count\": " << count << '}';
+  }
+  out << ']';
+}
+
+void write_dfg_performance_summary(
+    std::ostream& out, const DfgPerformanceSummary& summary) {
+  out << "{\"count\": " << summary.count << ", \"mean\": " << summary.mean
+      << ", \"median\": " << summary.median
+      << ", \"min\": " << summary.minimum
+      << ", \"max\": " << summary.maximum
+      << ", \"stdev\": " << summary.standard_deviation
+      << ", \"sum\": " << summary.sum << '}';
+}
+
+void write_double_vector(std::ostream& out,
+                         const std::vector<double>& values) {
+  out << '[';
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    out << values[i] << (i + 1 < values.size() ? ", " : "");
+  }
+  out << ']';
+}
+
+void write_dfg_performance_value(std::ostream& out,
+                                 const DfgPerformanceValue& value) {
+  std::visit(
+      [&](const auto& selected) {
+        using Value = std::decay_t<decltype(selected)>;
+        if constexpr (std::is_same_v<Value, double>) {
+          out << selected;
+        } else if constexpr (std::is_same_v<Value, std::vector<double>>) {
+          write_double_vector(out, selected);
+        } else {
+          write_dfg_performance_summary(out, selected);
+        }
+      },
+      value);
+}
+
+void write_dfg_named_attribute_counts(
+    std::ostream& out, const DfgNamedAttributeCounts& attributes) {
+  out << '[';
+  std::size_t attribute_index = 0;
+  for (const auto& [attribute, values] : attributes) {
+    if (attribute_index++ != 0) out << ", ";
+    out << "{\"attribute\": ";
+    write_json_string(out, attribute);
+    out << ", \"values\": [";
+    std::size_t value_index = 0;
+    for (const auto& [value, count] : values) {
+      if (value_index++ != 0) out << ", ";
+      out << "{\"value\": ";
+      write_json_string(out, value);
+      out << ", \"count\": " << count << '}';
+    }
+    out << "]}";
+  }
+  out << ']';
+}
+
+void write_dfg_statistical_analysis(
+    std::ostream& out, const DfgNamedStatisticalAnalysis& named,
+    const DirectlyFollowsGraph& graph) {
+  out << "{\"variant\": ";
+  write_json_string(out, named.name);
+  const auto& analysis = named.analysis;
+  switch (analysis.variant) {
+    case DfgStatisticalVariant::kNative:
+      out << ", \"frequency_dfg\": ";
+      write_dfg_frequency(out, analysis.frequency_dfg, graph);
+      break;
+    case DfgStatisticalVariant::kFrequencyTriples: {
+      out << ", \"frequency_triples\": [";
+      std::size_t emitted = 0;
+      for (const auto& [triple, count] : analysis.frequency_triples) {
+        if (emitted++ != 0) out << ", ";
+        out << "{\"first\": "
+            << dfg_variant_activity_id(graph, std::get<0>(triple))
+            << ", \"middle\": "
+            << dfg_variant_activity_id(graph, std::get<1>(triple))
+            << ", \"last\": "
+            << dfg_variant_activity_id(graph, std::get<2>(triple))
+            << ", \"count\": " << count << '}';
+      }
+      out << ']';
+      break;
+    }
+    case DfgStatisticalVariant::kPerformance: {
+      out << ", \"performance_dfg\": [";
+      std::size_t emitted = 0;
+      for (const auto& [pair, statistics] : analysis.performance_dfg) {
+        if (emitted++ != 0) out << ", ";
+        out << "{\"source\": "
+            << dfg_variant_activity_id(graph, pair.first)
+            << ", \"target\": "
+            << dfg_variant_activity_id(graph, pair.second)
+            << ", \"summary\": ";
+        write_dfg_performance_summary(out, statistics.summary);
+        out << ", \"raw_values\": ";
+        write_double_vector(out, statistics.raw_values);
+        out << ", \"value\": ";
+        write_dfg_performance_value(out, statistics.value);
+        out << '}';
+      }
+      out << ']';
+      break;
+    }
+    case DfgStatisticalVariant::kCaseAttributes: {
+      out << ", \"case_attributes\": {\"edges\": [";
+      std::size_t emitted = 0;
+      for (const auto& [pair, attributes] : analysis.case_attributes.edges) {
+        if (emitted++ != 0) out << ", ";
+        out << "{\"source\": "
+            << dfg_variant_activity_id(graph, pair.first)
+            << ", \"target\": "
+            << dfg_variant_activity_id(graph, pair.second)
+            << ", \"attributes\": ";
+        write_dfg_named_attribute_counts(out, attributes);
+        out << '}';
+      }
+      out << "], \"nodes\": [";
+      emitted = 0;
+      for (const auto& [activity, attributes] :
+           analysis.case_attributes.nodes) {
+        if (emitted++ != 0) out << ", ";
+        out << "{\"activity\": "
+            << dfg_variant_activity_id(graph, activity)
+            << ", \"attributes\": ";
+        write_dfg_named_attribute_counts(out, attributes);
+        out << '}';
+      }
+      out << "]}";
+      break;
+    }
+    case DfgStatisticalVariant::kClean:
+      out << ", \"clean\": {\"dfg\": ";
+      write_dfg_frequency(out, analysis.clean.graph, graph);
+      out << ", \"start_activities\": [";
+      {
+        std::size_t emitted = 0;
+        for (const auto& [activity, count] :
+             analysis.clean.start_activities) {
+          if (emitted++ != 0) out << ", ";
+          out << "{\"activity\": "
+              << dfg_variant_activity_id(graph, activity)
+              << ", \"count\": " << count << '}';
+        }
+      }
+      out << "], \"end_activities\": [";
+      {
+        std::size_t emitted = 0;
+        for (const auto& [activity, count] : analysis.clean.end_activities) {
+          if (emitted++ != 0) out << ", ";
+          out << "{\"activity\": "
+              << dfg_variant_activity_id(graph, activity)
+              << ", \"count\": " << count << '}';
+        }
+      }
+      out << "]}";
+      break;
+    case DfgStatisticalVariant::kCleanTime: {
+      out << ", \"clean_time\": [";
+      std::size_t emitted = 0;
+      for (const auto& [activity, value] : analysis.clean_time) {
+        if (emitted++ != 0) out << ", ";
+        out << "{\"activity\": "
+            << dfg_variant_activity_id(graph, activity)
+            << ", \"mean_seconds_from_case_start\": " << value << '}';
+      }
+      out << ']';
+      break;
+    }
+  }
+  out << '}';
+}
+
+void write_dfg_variants(std::ostream& out,
+                        const DfgVariantsAnalysis& variants,
+                        const DirectlyFollowsGraph& graph) {
+  out << "{\"statistical\": [";
+  for (std::size_t i = 0; i < variants.statistical.size(); ++i) {
+    write_dfg_statistical_analysis(out, variants.statistical[i], graph);
+    out << (i + 1 < variants.statistical.size() ? ", " : "");
+  }
+  out << "], \"causal\": [";
+  for (std::size_t i = 0; i < variants.causal.size(); ++i) {
+    const auto& named = variants.causal[i];
+    out << "{\"variant\": ";
+    write_json_string(out, named.name);
+    out << ", \"relations\": [";
+    std::size_t emitted = 0;
+    for (const auto& [pair, value] : named.analysis.relations) {
+      if (emitted++ != 0) out << ", ";
+      out << "{\"source\": " << dfg_variant_activity_id(graph, pair.first)
+          << ", \"target\": " << dfg_variant_activity_id(graph, pair.second)
+          << ", \"value\": " << value << '}';
+    }
+    out << "]}";
+    out << (i + 1 < variants.causal.size() ? ", " : "");
+  }
+  out << "]}";
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -1738,7 +2068,8 @@ void write_analysis_json(std::ostream& out,
                          const DeclareModel* declare,
                          const std::vector<DeclareConformance>*
                              declare_conformance,
-                         const FootprintsAnalysis* footprints) {
+                         const FootprintsAnalysis* footprints,
+                         const DfgVariantsAnalysis* dfg_variants) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -1766,6 +2097,9 @@ void write_analysis_json(std::ostream& out,
   }
   if (footprints != nullptr) {
     validate_footprints_analysis(*footprints, log, graph);
+  }
+  if (dfg_variants != nullptr) {
+    validate_dfg_variants(*dfg_variants, graph);
   }
   out << "{\n";
   out << "  \"dataset\": ";
@@ -1926,6 +2260,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"footprints\": ";
     write_footprints_analysis(out, *footprints, log, graph);
   }
+  if (dfg_variants != nullptr) {
+    out << ",\n  \"dfg_variants\": ";
+    write_dfg_variants(out, *dfg_variants, graph);
+  }
   if (heuristics != nullptr) {
     out << ",\n  \"heuristics_net\": ";
     write_heuristics_net(out, *heuristics, graph);
@@ -1994,7 +2332,8 @@ std::string analysis_json(std::string_view dataset,
                           const DeclareModel* declare,
                           const std::vector<DeclareConformance>*
                               declare_conformance,
-                          const FootprintsAnalysis* footprints) {
+                          const FootprintsAnalysis* footprints,
+                          const DfgVariantsAnalysis* dfg_variants) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2004,7 +2343,7 @@ std::string analysis_json(std::string_view dataset,
                       minimum_self_distances, transition_system, powl,
                       powl_petri, powl_decoration, log_skeleton,
                       log_skeleton_conformance, declare, declare_conformance,
-                      footprints);
+                      footprints, dfg_variants);
   return out.str();
 }
 

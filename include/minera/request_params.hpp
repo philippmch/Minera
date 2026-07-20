@@ -9,6 +9,7 @@
 #include "minera/conformance.hpp"
 #include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/dfg_variants.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
@@ -53,6 +54,11 @@ struct MineParams {
   LogSkeletonOptions log_skeleton;
   DeclareDiscoveryOptions declare_options;
   FootprintsOptions footprints;
+  // Empty vectors keep these analyses opt-in. String ids intentionally retain
+  // PM4Py aliases that map to the same native enum value.
+  std::vector<std::string> dfg_statistical_variants;
+  std::vector<std::string> dfg_causal_variants;
+  DfgStatisticalOptions dfg_statistics;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.
@@ -65,10 +71,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // Builds the discovery options from a mine request's form fields. The
 // single-callback overload treats absent and empty fields alike, preserving the
 // original defaults. With FieldPresence, explicitly present empty Declare list
-// fields become engaged empty filters, while footprint list fields can reject
-// an explicit empty list; omitted fields retain their defaults. A `time_mode`
-// value that is not one of the three known modes throws std::invalid_argument,
-// so the caller can report it instead of silently mining with the wrong filter.
+// fields become engaged empty filters, while footprint and DFG variant lists
+// can reject an explicit empty list; omitted fields retain their defaults. A
+// `time_mode` value that is not one of the three known modes throws
+// std::invalid_argument, so the caller can report it instead of silently mining
+// with the wrong filter.
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field);
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field,
                                            const FieldPresence& present);

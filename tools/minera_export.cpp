@@ -23,6 +23,7 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
+#include "minera/dfg_variants.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
@@ -72,6 +73,107 @@ std::vector<std::string> split_csv(std::string_view value) {
     }
   }
   return parts;
+}
+
+std::vector<std::string> canonical_dfg_variants(
+    std::string_view value, const std::vector<std::string>& catalog,
+    std::string_view option) {
+  const auto requested = split_csv(value);
+  if (requested.empty()) {
+    throw std::invalid_argument(std::string(option) +
+                                " expects a non-empty list");
+  }
+  for (const auto& name : requested) {
+    if (std::find(catalog.begin(), catalog.end(), name) == catalog.end()) {
+      throw std::invalid_argument(std::string(option) +
+                                  " unknown variant '" + name + "'");
+    }
+  }
+  std::vector<std::string> result;
+  for (const auto& name : catalog) {
+    if (std::find(requested.begin(), requested.end(), name) !=
+        requested.end()) {
+      result.push_back(name);
+    }
+  }
+  return result;
+}
+
+std::vector<minera::BusinessHourSlot> parse_dfg_business_hour_slots(
+    std::string_view value) {
+  std::vector<minera::BusinessHourSlot> slots;
+  for (const auto& part : split_csv(value)) {
+    auto separator = part.find(':');
+    if (separator == std::string::npos) separator = part.find('-');
+    if (separator == std::string::npos || separator == 0 ||
+        separator + 1 == part.size()) {
+      throw std::invalid_argument(
+          "--dfg-business-hour-slots expects start-end second pairs");
+    }
+    const auto parse = [&](std::string_view text) {
+      std::string owned(text);
+      char* end = nullptr;
+      const double result = std::strtod(owned.c_str(), &end);
+      if (end != owned.c_str() + owned.size() || !std::isfinite(result)) {
+        throw std::invalid_argument(
+            "--dfg-business-hour-slots expects finite seconds");
+      }
+      return result;
+    };
+    const double start =
+        parse(std::string_view(part).substr(0, separator));
+    const double end =
+        parse(std::string_view(part).substr(separator + 1));
+    if (start < 0.0 || start >= end || end > 604800.0) {
+      throw std::invalid_argument(
+          "--dfg-business-hour-slots requires "
+          "0 <= start < end <= 604800");
+    }
+    slots.push_back({start, end});
+  }
+  return slots;
+}
+
+minera::DfgStatisticalVariant dfg_statistical_variant(
+    std::string_view name) {
+  if (name == "frequency_triples")
+    return minera::DfgStatisticalVariant::kFrequencyTriples;
+  if (name == "performance" || name == "performance_greedy")
+    return minera::DfgStatisticalVariant::kPerformance;
+  if (name == "case_attributes")
+    return minera::DfgStatisticalVariant::kCaseAttributes;
+  if (name == "clean" || name == "clean_polars")
+    return minera::DfgStatisticalVariant::kClean;
+  if (name == "clean_time")
+    return minera::DfgStatisticalVariant::kCleanTime;
+  return minera::DfgStatisticalVariant::kNative;
+}
+
+minera::DfgVariantsAnalysis analyze_dfg_variants(
+    const minera::EventLog& log,
+    const std::vector<std::string>& statistical_variants,
+    const std::vector<std::string>& causal_variants,
+    const minera::DfgStatisticalOptions& shared_options) {
+  minera::DfgVariantsAnalysis result;
+  result.statistical.reserve(statistical_variants.size());
+  for (const auto& name : statistical_variants) {
+    auto options = shared_options;
+    options.variant = dfg_statistical_variant(name);
+    result.statistical.push_back(
+        {name, minera::discover_dfg_statistics(log, options)});
+  }
+  if (!causal_variants.empty()) {
+    const auto frequency = minera::discover_frequency_dfg(log, shared_options);
+    result.causal.reserve(causal_variants.size());
+    for (const auto& name : causal_variants) {
+      const auto variant = name == "heuristic"
+                               ? minera::DfgCausalVariant::kHeuristic
+                               : minera::DfgCausalVariant::kAlpha;
+      result.causal.push_back(
+          {name, minera::discover_dfg_causality(frequency, variant)});
+    }
+  }
+  return result;
 }
 
 minera::FootprintsAnalysis analyze_footprints(
@@ -302,6 +404,21 @@ int usage(const char* program) {
                "  --footprints-strict <bool> Strict log-model footprint checking\n"
                "  --footprints-enable-act-always-executed <bool>\n"
                "                            Check always-executed trace activities\n"
+               "  --dfg-statistical-variants <a,b,...> Statistical DFG analyses:\n"
+               "                            native, frequency, frequency_greedy,\n"
+               "                            frequency_triples, performance,\n"
+               "                            performance_greedy, case_attributes,\n"
+               "                            clean, clean_polars, clean_time\n"
+               "  --dfg-causal-variants <a,b> Causality: alpha, heuristic\n"
+               "  --dfg-window <n>          Frequency window, including 0\n"
+               "  --dfg-keep-once-per-case Count each frequency edge once/case\n"
+               "  --dfg-performance-aggregation <id> mean, median, min, max,\n"
+               "                            stdev, sum, raw_values, or all\n"
+               "  --dfg-start-timestamp-attribute <name> Performance start time\n"
+               "  --dfg-business-hours     Measure performance in business time\n"
+               "  --dfg-business-hour-slots <start-end,...> Weekly seconds\n"
+               "  --dfg-case-attributes <a,b,...> Attributes for case DFG\n"
+               "  --dfg-return-node-attributes Include case attributes on nodes\n"
                "  --decisions <miner>       Mine the decision points of one\n"
                "                            model (inductive, alpha, heuristic,\n"
                "                            or powl): which attribute values\n"
@@ -413,6 +530,9 @@ int main(int argc, char** argv) {
   minera::DeclarePlayoutOptions declare_playout_options;
   bool declare_playout_options_used = false;
   minera::FootprintsOptions footprints_options;
+  std::vector<std::string> dfg_statistical_variants;
+  std::vector<std::string> dfg_causal_variants;
+  minera::DfgStatisticalOptions dfg_statistics_options;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -424,12 +544,14 @@ int main(int argc, char** argv) {
       std::exit(2);
     }
   };
-  const auto parse_window = [](const char* value) -> std::size_t {
+  const auto parse_nonnegative_size =
+      [](const char* value, std::string_view option) -> std::size_t {
     std::size_t parsed = 0;
     const auto end = value + std::strlen(value);
     const auto result = std::from_chars(value, end, parsed);
     if (result.ec != std::errc{} || result.ptr != end)
-      throw std::invalid_argument("--transition-window expects a non-negative integer");
+      throw std::invalid_argument(std::string(option) +
+                                  " expects a non-negative integer");
     return parsed;
   };
   const auto parse_declare_playout_int =
@@ -737,6 +859,97 @@ int main(int argc, char** argv) {
       } else {
         footprints_options.enable_act_always_executed = parsed;
       }
+    } else if (arg == "--dfg-statistical-variants" ||
+               arg == "--dfg-causal-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        if (arg == "--dfg-statistical-variants") {
+          dfg_statistical_variants = canonical_dfg_variants(
+              value,
+              {"native", "frequency", "frequency_greedy",
+               "frequency_triples", "performance", "performance_greedy",
+               "case_attributes", "clean", "clean_polars", "clean_time"},
+              arg);
+        } else {
+          dfg_causal_variants = canonical_dfg_variants(
+              value, {"alpha", "heuristic"}, arg);
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--dfg-window") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        dfg_statistics_options.window =
+            parse_nonnegative_size(value, "--dfg-window");
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--dfg-keep-once-per-case") {
+      dfg_statistics_options.keep_once_per_case = true;
+    } else if (arg == "--dfg-performance-aggregation") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view aggregation = value;
+      if (aggregation == "mean")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kMean;
+      else if (aggregation == "median")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kMedian;
+      else if (aggregation == "min")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kMinimum;
+      else if (aggregation == "max")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kMaximum;
+      else if (aggregation == "stdev")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kStandardDeviation;
+      else if (aggregation == "sum")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kSum;
+      else if (aggregation == "raw_values")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kRawValues;
+      else if (aggregation == "all")
+        dfg_statistics_options.performance_aggregation =
+            minera::DfgPerformanceAggregation::kAll;
+      else {
+        std::cerr << "error: --dfg-performance-aggregation expects mean, "
+                     "median, min, max, stdev, sum, raw_values, or all\n";
+        return 2;
+      }
+    } else if (arg == "--dfg-start-timestamp-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      dfg_statistics_options.start_timestamp_attribute = value;
+    } else if (arg == "--dfg-business-hours") {
+      dfg_statistics_options.use_business_hours = true;
+    } else if (arg == "--dfg-business-hour-slots") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        dfg_statistics_options.business_hour_slots =
+            parse_dfg_business_hour_slots(value);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+    } else if (arg == "--dfg-case-attributes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      auto attributes = split_csv(value);
+      std::sort(attributes.begin(), attributes.end());
+      attributes.erase(std::unique(attributes.begin(), attributes.end()),
+                       attributes.end());
+      dfg_statistics_options.case_attributes = std::move(attributes);
+    } else if (arg == "--dfg-return-node-attributes") {
+      dfg_statistics_options.return_node_attributes = true;
     } else if (arg == "--spectrum") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -754,7 +967,10 @@ int main(int argc, char** argv) {
       else { std::cerr << "error: --transition-direction expects forward or backward\n"; return 2; }
     } else if (arg == "--transition-window") {
       const auto* value = next(); if (!value) return usage(argv[0]);
-      try { transition_options.window = parse_window(value); }
+      try {
+        transition_options.window =
+            parse_nonnegative_size(value, "--transition-window");
+      }
       catch (const std::exception& error) { std::cerr << "error: " << error.what() << "\n"; return 2; }
     } else if (arg == "--transition-include-data") {
       transition_options.include_data = true;
@@ -823,7 +1039,8 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
-        powl_options.brute_force_activity_limit = parse_window(value);
+        powl_options.brute_force_activity_limit = parse_nonnegative_size(
+            value, "--powl-brute-force-activity-limit");
       } catch (const std::exception&) {
         std::cerr << "error: --powl-brute-force-activity-limit expects a "
                      "non-negative integer\n";
@@ -1131,6 +1348,12 @@ int main(int argc, char** argv) {
       log = minera::filter_event_log(log, filter);
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
+    if (!dfg_statistical_variants.empty() || !dfg_causal_variants.empty()) {
+      dfg_variants_analysis =
+          analyze_dfg_variants(log, dfg_statistical_variants,
+                               dfg_causal_variants, dfg_statistics_options);
+    }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(log);
@@ -1272,7 +1495,8 @@ int main(int argc, char** argv) {
           &heuristic_decoration, &temporal_profile, &minimum_self_distances,
           &transition_system, &powl, &powl_net, &powl_decoration,
           &log_skeleton, &log_skeleton_conformance, &declare,
-          &declare_conformance, &footprints);
+          &declare_conformance, &footprints,
+          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1287,7 +1511,8 @@ int main(int argc, char** argv) {
           &temporal_profile, &minimum_self_distances, &transition_system,
           &powl, &powl_net, &powl_decoration, &log_skeleton,
           &log_skeleton_conformance, &declare, &declare_conformance,
-          &footprints);
+          &footprints,
+          dfg_variants_analysis ? &*dfg_variants_analysis : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.
