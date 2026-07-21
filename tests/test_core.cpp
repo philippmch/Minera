@@ -2318,9 +2318,22 @@ void json_export_carries_the_alignment_contract() {
   const auto json = minera::analysis_json("test", deviating, graph, &tree,
                                           nullptr, nullptr, &conformance);
   for (const char* key : {"\"alignments\"", "\"total_cost\"", "\"moves\"",
-                          "\"cost\"", "\"type\"", "\"model\"", "\"sync\""}) {
+                          "\"cost\"", "\"type\"", "\"model\"", "\"sync\"",
+                          "\"variant\"", "\"diagnostics\"",
+                          "\"optimal_alignments\""}) {
     assert(json.find(key) != std::string::npos);
   }
+
+  const minera::ProcessTree tau_tree({}, minera::ProcessTreeNode::tau());
+  const auto tau_net = minera::to_petri_net(tau_tree);
+  const auto unknown = log_from_variants({{"unknown"}});
+  const auto tau_graph = minera::discover_directly_follows_graph(unknown);
+  minera::AlignmentOptions tau_options;
+  tau_options.variant = minera::AlignmentVariant::kStateEquationAStar;
+  const auto tau_json = minera::alignment_json(
+      minera::check_alignment(unknown, tau_net, tau_options), tau_graph);
+  assert(tau_json.find("\"activity\": null") != std::string::npos);
+  assert(tau_json.find("\"silent\": true") != std::string::npos);
 }
 
 void final_marking_reachable_distinguishes_sound_nets() {

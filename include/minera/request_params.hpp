@@ -80,6 +80,14 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 // explicit empty list has different semantics from using the default.
 using FieldPresence = std::function<bool(std::string_view)>;
 
+// Parses alignment search settings shared by the HTTP server, CLI and tests.
+// Fields use the wire names documented by /api/align (alignment_variant,
+// max_states, max_align_time, ...).  Invalid or dependent settings throw
+// std::invalid_argument rather than silently falling back to defaults.
+[[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field);
+[[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field,
+                                                       const FieldPresence& present);
+
 // Builds the discovery options from a mine request's form fields. The
 // single-callback overload treats absent and empty fields alike, preserving the
 // original defaults. With FieldPresence, explicitly present empty Declare list

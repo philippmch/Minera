@@ -141,6 +141,84 @@ std::string error_json(std::string_view message) {
   return out.str();
 }
 
+AlignmentOptions parse_alignment_params(const FieldLookup& field) {
+  return parse_alignment_params(field, FieldPresence{});
+}
+
+AlignmentOptions parse_alignment_params(const FieldLookup& field,
+                                        const FieldPresence& present) {
+  AlignmentOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) -> std::string {
+    const auto value = field(name);
+    if (!supplied(name) || value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    }
+    return value;
+  };
+  if (supplied("alignment_variant")) {
+    const auto value = field("alignment_variant");
+    if (value == "state_equation_a_star" || value == "VERSION_STATE_EQUATION_A_STAR") options.variant = AlignmentVariant::kStateEquationAStar;
+    else if (value == "dijkstra_no_heuristics" || value == "VERSION_DIJKSTRA_NO_HEURISTICS") options.variant = AlignmentVariant::kDijkstraNoHeuristics;
+    else if (value == "dijkstra_less_memory" || value == "VERSION_DIJKSTRA_LESS_MEMORY") options.variant = AlignmentVariant::kDijkstraLessMemory;
+    else if (value == "discounted_a_star" || value == "VERSION_DISCOUNTED_A_STAR") options.variant = AlignmentVariant::kDiscountedAStar;
+    else if (value == "generator_dijkstra_no_heuristics") options.variant = AlignmentVariant::kGeneratorDijkstraNoHeuristics;
+    else if (value == "generator_dijkstra_less_memory") options.variant = AlignmentVariant::kGeneratorDijkstraLessMemory;
+    else throw std::invalid_argument("alignment_variant: unknown variant '" + value + "'");
+  }
+  if (supplied("max_states")) options.max_states = parse_positive_size(require("max_states"), "max_states");
+  if (supplied("max_alignments")) options.max_alignments = parse_positive_size(require("max_alignments"), "max_alignments");
+  if (supplied("max_align_time")) {
+    options.max_total_time_seconds = parse_finite_double(require("max_align_time"), "max_align_time");
+    if (options.max_total_time_seconds < 0) throw std::invalid_argument("max_align_time: expected a non-negative number");
+  }
+  if (supplied("max_align_time_trace")) {
+    options.max_time_seconds = parse_finite_double(require("max_align_time_trace"), "max_align_time_trace");
+    if (options.max_time_seconds < 0) throw std::invalid_argument("max_align_time_trace: expected a non-negative number");
+  }
+  if (supplied("exponent")) {
+    options.exponent = parse_finite_double(require("exponent"), "exponent");
+    if (options.exponent <= 1.0) throw std::invalid_argument("exponent: expected a value greater than 1");
+  }
+  if (supplied("exponent") && supplied("theta"))
+    throw std::invalid_argument("exponent and theta cannot both be supplied");
+  if (supplied("theta")) {
+    options.exponent = parse_finite_double(require("theta"), "theta");
+    if (options.exponent <= 1.0) throw std::invalid_argument("theta: expected a value greater than 1");
+  }
+  if (supplied("synchronous_dijkstra")) options.synchronous_dijkstra = parse_boolean(require("synchronous_dijkstra"), "synchronous_dijkstra");
+  if (supplied("cost_profile")) {
+    const auto value = field("cost_profile");
+    if (value == "legacy") options.cost_profile = AlignmentCostProfile::kLegacyUnit;
+    else if (value == "pm4py") options.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+    else throw std::invalid_argument("cost_profile: expected legacy or pm4py");
+  }
+  const auto parse_cost = [&](std::string_view name, std::optional<double>& destination) {
+    if (!supplied(name)) return;
+    const double parsed = parse_finite_double(require(name), name);
+    if (parsed < 0) throw std::invalid_argument(std::string(name) + ": expected a non-negative number");
+    destination = parsed;
+  };
+  parse_cost("trace_cost", options.default_trace_cost);
+  parse_cost("model_cost", options.default_model_cost);
+  parse_cost("silent_model_cost", options.default_silent_cost);
+  parse_cost("sync_cost", options.default_sync_cost);
+  if (options.variant != AlignmentVariant::kDiscountedAStar) {
+    for (const auto name : {std::string_view{"exponent"}, std::string_view{"theta"}})
+      if (supplied(name)) throw std::invalid_argument(std::string(name) + ": requires alignment_variant=discounted_a_star");
+  }
+  if (supplied("max_alignments") &&
+      options.variant != AlignmentVariant::kGeneratorDijkstraNoHeuristics &&
+      options.variant != AlignmentVariant::kGeneratorDijkstraLessMemory)
+    throw std::invalid_argument("max_alignments: requires a generator alignment variant");
+  if (supplied("synchronous_dijkstra") &&
+      options.variant != AlignmentVariant::kDiscountedAStar)
+    throw std::invalid_argument("synchronous_dijkstra: requires alignment_variant=discounted_a_star");
+  return options;
+}
+
 MineParams parse_mine_params(const FieldLookup& field) {
   return parse_mine_params(field, FieldPresence{});
 }

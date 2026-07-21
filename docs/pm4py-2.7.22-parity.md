@@ -55,7 +55,7 @@ are reconciled.
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Missing** |
 | Concept drift | Bose feature extraction and drift detection | **Missing** |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator variants | **Partial** — optimal A* behavior exists; named search/cost variants missing |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Missing** |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
@@ -403,3 +403,59 @@ concurrency denominator, all performance summaries, raw statistics, absence
 of default connect-all repair, DFG inference/overrides, and overlapping maximal
 cliques. Full native tests, frontend tests/build, and headless CLI JSON smokes
 validate the integrated path.
+
+## Petri-net alignment parity evidence
+
+The six explicit Petri-net alignment variants are implemented as clean-room
+searches over one compact, isomorphic synchronous-product state:
+`(marking, trace position)`. State-equation A* adds a full remaining-trace LP
+lower bound (place-balance rows plus one row per remaining event, with model,
+log, and synchronous columns); its solve count is reported in diagnostics.
+Dijkstra without heuristics traverses that product uniformly. The less-memory
+variants apply Pareto dominance over marking, trace position, and cost while
+preserving the optimum; focused tests compare their costs with the full
+frontier under fractional custom costs.
+
+Cost semantics are selectable rather than silently changed: the legacy profile
+keeps unit visible log/model deviations and free silent routing, while the
+PM4Py profile charges 10,000 for visible log/model moves, 1 for silent moves,
+and 0 for synchronous moves.
+Per-activity, per-position, and per-transition overrides are supported, as are
+API callbacks for trace, model, and synchronous moves. Callback values are
+resolved once for each concrete trace/model pair, reject non-finite or negative
+costs, and remain stable even for repeated labels; tests cover overrides,
+fractional costs, callback statefulness, and invalid values.
+
+Discounted A* honors both the `exponent` and request-layer `theta` spelling
+(greater than one). Its synchronous-Dijkstra scheduling toggle is an adapter
+over the same compact product representation: only successor scheduling differs
+from the explicit order, so both schedules retain equal optima. The native API,
+request parser, CLI, and frontend expose these controls and preserve the
+legacy state-equation/unit-cost defaults when no explicit options are supplied.
+Like the pinned PM4Py 2.7.22 implementation, discounted search closes a state
+by `(marking, trace position)` rather than treating the same product state at
+every path depth as distinct. Its optimum is therefore over simple
+product-state paths. This avoids an ill-defined cyclic objective in which
+repeating a positive-cost loop can push a later move toward an unattained
+discounted infimum; it also makes zero- and positive-cost cycles terminate
+deterministically within the configured limits.
+
+Generator Dijkstra variants retain deduplicated equal-cost optimal paths, with
+`max_alignments` as an explicit cap. No-heuristics and less-memory generators
+agree on the optimum, tied alternatives are retained up to the cap, and cyclic
+models cannot produce more than the requested collection. State, whole-log,
+and per-trace time limits are enforced; a reachable search that hits a limit
+reports `computed=false, exhausted=true` rather than a fabricated optimum.
+Diagnostics include visited/queued states, traversed arcs, closed-set size,
+visited markings, and LP solves.
+
+Silent (`tau`) model moves remain explicit routing moves in diagnostics and
+alignments, while weighted input/output arc multiplicity is preserved when
+testing enabledness and firing. A genuinely unreachable final marking is
+reported as unsound (`exhausted=false`), distinct from a bounded or timed-out
+search. Focused `tests/test_alignment_variants.cpp` regressions cover all six
+variants, PM4Py/legacy cost profiles, custom costs and callbacks, full-product
+LP solving, less-memory dominance, discounted exponent and scheduling parity,
+generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
+and invalid-cost handling; request, CLI, and frontend tests cover the exposed
+adapters.

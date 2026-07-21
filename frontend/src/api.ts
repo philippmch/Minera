@@ -1,6 +1,7 @@
 import {
   type ActivityStat,
   type Alignments,
+  type AlignmentOptions,
   DECLARE_TEMPLATES,
   FOOTPRINTS_CONFORMANCE_VARIANTS,
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
@@ -572,10 +573,33 @@ export async function mineCsv(
  * model. The server defers this costlier computation to here so a mine never
  * pays for alignments the user may not open.
  */
-export async function alignModel(miner: string): Promise<Alignments> {
+/** Stable query serialization used by the alignment cache and request API. */
+export function alignmentQuery(options: AlignmentOptions = {}): string {
+  const query = new URLSearchParams();
+  const add = (name: string, value: unknown) => {
+    if (value !== undefined && value !== null && value !== "") query.set(name, String(value));
+  };
+  add("alignment_variant", options.variant);
+  add("max_states", options.max_states);
+  add("max_align_time", options.max_align_time);
+  add("max_align_time_trace", options.max_align_time_trace);
+  add("max_alignments", options.max_alignments);
+  add("exponent", options.exponent);
+  if (options.synchronous_dijkstra !== undefined) add("synchronous_dijkstra", options.synchronous_dijkstra);
+  add("cost_profile", options.cost_profile);
+  add("trace_cost", options.trace_cost);
+  add("model_cost", options.model_cost);
+  add("silent_model_cost", options.silent_model_cost);
+  add("sync_cost", options.sync_cost);
+  return query.toString();
+}
+
+export async function alignModel(miner: string, options: AlignmentOptions = {}): Promise<Alignments> {
   let response: Response;
   try {
-    response = await fetch(`/api/align?miner=${encodeURIComponent(miner)}`, {
+    const query = alignmentQuery(options);
+    const params = [`miner=${encodeURIComponent(miner)}`, query].filter(Boolean).join("&");
+    response = await fetch(`/api/align?${params}`, {
       method: "POST",
     });
   } catch {

@@ -1,6 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   type Alignments as AlignmentsResult,
+  type AlignmentMove,
+  type AlignmentDiagnostics,
+  type AlignmentOptions,
+  type AlignmentVariant,
+  type AlignmentCostProfile,
+  DEFAULT_ALIGNMENT_OPTIONS,
   type Decisions as DecisionsResult,
   type DecisionPoint,
   type MineraExport,
@@ -39,7 +45,7 @@ export function Conformance({
   onCheckModel,
 }: {
   data: MineraExport;
-  onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
+  onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
   onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
   onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
 }) {
@@ -735,17 +741,20 @@ function Alignments({
   minerId: string;
   minerName: string;
   model: ModelConformance;
-  onRequestAlignment: (minerId: string) => Promise<AlignmentsResult>;
+  onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
 }) {
   const embedded = model.alignments;
   const [fetched, setFetched] = useState<AlignmentsResult | null>(embedded ?? null);
+  const [draftOptions, setDraftOptions] = useState<AlignmentOptions>({ ...DEFAULT_ALIGNMENT_OPTIONS });
+  const [appliedOptions, setAppliedOptions] = useState<AlignmentOptions>({ ...DEFAULT_ALIGNMENT_OPTIONS });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const requestRef = useRef(onRequestAlignment);
   requestRef.current = onRequestAlignment;
 
   useEffect(() => {
-    if (embedded) {
+    const isDefault = isDefaultAlignmentOptions(appliedOptions);
+    if (embedded && isDefault) {
       setFetched(embedded);
       return;
     }
@@ -755,7 +764,7 @@ function Alignments({
     setError(null);
     setLoading(true);
     requestRef
-      .current(minerId)
+      .current(minerId, appliedOptions)
       .then((result) => !cancelled && setFetched(result))
       .catch((cause) =>
         !cancelled && setError(cause instanceof Error ? cause.message : String(cause)),
@@ -764,7 +773,19 @@ function Alignments({
     return () => {
       cancelled = true;
     };
-  }, [minerId, model.sound, embedded]);
+  }, [minerId, model.sound, embedded, appliedOptions]);
+
+  const settings = (
+    <AlignmentSettings
+      draft={draftOptions}
+      onChange={setDraftOptions}
+      applied={appliedOptions}
+      onApply={(next) => {
+        setError(null);
+        setAppliedOptions(next);
+      }}
+    />
+  );
 
   // Known up front from the mine: an unsound model can't be aligned at all.
   if (!model.sound) {
@@ -772,7 +793,9 @@ function Alignments({
   }
   if (error) {
     return (
-      <section className="panel conf-panel">
+      <>
+        {settings}
+        <section className="panel conf-panel">
         <div className="conf-notice">
           <span className="conf-notice-mark">⚠</span>
           <div>
@@ -780,21 +803,133 @@ function Alignments({
             <p>{error}</p>
           </div>
         </div>
-      </section>
+        </section>
+      </>
     );
   }
   if (loading || !fetched) {
     return (
-      <section className="panel conf-panel">
-        <p className="conf-loading">Computing optimal alignments</p>
-      </section>
+      <>
+        {settings}
+        <section className="panel conf-panel">
+          <p className="conf-loading">Computing optimal alignments</p>
+        </section>
+      </>
     );
   }
   // Sound but the search could not finish (reachable yet unbounded/too large).
   if (!fetched.computed) {
-    return <AlignmentNotice minerName={minerName} exhausted={fetched.exhausted} />;
+    return <>{settings}<AlignmentNotice minerName={minerName} exhausted={fetched.exhausted} /></>;
   }
-  return <AlignmentResultView data={data} alignments={fetched} />;
+  return <>{settings}<AlignmentResultView data={data} alignments={fetched} /></>;
+}
+
+const ALIGNMENT_VARIANTS: { value: AlignmentVariant; label: string }[] = [
+  { value: "state_equation_a_star", label: "State-equation A*" },
+  { value: "dijkstra_no_heuristics", label: "Dijkstra (no heuristics)" },
+  { value: "dijkstra_less_memory", label: "Dijkstra (less memory)" },
+  { value: "discounted_a_star", label: "Discounted A*" },
+  { value: "generator_dijkstra_no_heuristics", label: "Generator Dijkstra (all optima)" },
+  { value: "generator_dijkstra_less_memory", label: "Generator Dijkstra (less memory)" },
+];
+
+function isDefaultAlignmentOptions(options: AlignmentOptions): boolean {
+  return options.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
+    options.cost_profile === DEFAULT_ALIGNMENT_OPTIONS.cost_profile &&
+    Object.keys(options).every((key) => key === "variant" || key === "cost_profile");
+}
+
+function AlignmentSettings({
+  draft,
+  applied,
+  onChange,
+  onApply,
+}: {
+  draft: AlignmentOptions;
+  applied: AlignmentOptions;
+  onChange: (options: AlignmentOptions) => void;
+  onApply: (options: AlignmentOptions) => void;
+}) {
+  const variant = draft.variant ?? DEFAULT_ALIGNMENT_OPTIONS.variant;
+  const generator = variant.startsWith("generator_");
+  const discounted = variant === "discounted_a_star";
+  const numeric = (key: keyof AlignmentOptions, value: string) => {
+    const next = value.trim() === "" ? undefined : Number(value);
+    onChange({ ...draft, [key]: next });
+  };
+  const invalid = isInvalidAlignmentOptions(draft);
+  const appliedKey = JSON.stringify(applied);
+  const draftKey = JSON.stringify(draft);
+  const value = (key: keyof AlignmentOptions) => {
+    const v = draft[key];
+    return v === undefined ? "" : String(v);
+  };
+  return (
+    <section className="panel conf-panel align-settings">
+      <div className="panel-head">
+        <h2>Alignment settings</h2>
+        <span className="panel-meta">PM4Py-compatible search controls</span>
+      </div>
+      <div className="align-settings-grid">
+        <label>Variant<select value={variant} onChange={(e) => onChange({ ...draft, variant: e.target.value as AlignmentVariant })}>
+          {ALIGNMENT_VARIANTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select></label>
+        <label>Cost profile<select value={draft.cost_profile ?? "legacy"} onChange={(e) => onChange({ ...draft, cost_profile: e.target.value as AlignmentCostProfile })}>
+          <option value="legacy">Legacy (unit deviations)</option><option value="pm4py">PM4Py costs</option>
+        </select></label>
+        <label>State limit<input type="number" min={1} step={1} value={value("max_states")} onChange={(e) => numeric("max_states", e.target.value)} placeholder="default" /></label>
+        <label>Global timeout (s)<input type="number" min={0} step={0.1} value={value("max_align_time")} onChange={(e) => numeric("max_align_time", e.target.value)} placeholder="none" /></label>
+        <label>Per-trace timeout (s)<input type="number" min={0} step={0.1} value={value("max_align_time_trace")} onChange={(e) => numeric("max_align_time_trace", e.target.value)} placeholder="none" /></label>
+        <label className={!generator ? "disabled" : ""}>Maximum alternatives<input disabled={!generator} type="number" min={1} step={1} value={value("max_alignments")} onChange={(e) => numeric("max_alignments", e.target.value)} placeholder="default" /></label>
+        <label className={!discounted ? "disabled" : ""}>Discount exponent<input disabled={!discounted} type="number" min={1.01} step={0.1} value={value("exponent")} onChange={(e) => numeric("exponent", e.target.value)} placeholder="2" /></label>
+        <label className={!discounted ? "disabled checkbox-label" : "checkbox-label"}><input disabled={!discounted} type="checkbox" checked={draft.synchronous_dijkstra ?? true} onChange={(e) => onChange({ ...draft, synchronous_dijkstra: e.target.checked })} /> Synchronous Dijkstra</label>
+      </div>
+      <div className="align-costs">
+        <span className="align-settings-caption">Move costs (profile defaults can be overridden)</span>
+        {([ ["trace_cost", "Trace/log"], ["model_cost", "Visible model"], ["silent_model_cost", "Silent model"], ["sync_cost", "Synchronous"] ] as const).map(([key, label]) => (
+          <label key={key}>{label}<input type="number" min={0} step={1} value={value(key)} onChange={(e) => numeric(key, e.target.value)} placeholder="default" /></label>
+        ))}
+      </div>
+      <div className="align-settings-actions">
+        {invalid && <span className="conf-inline-note">Enter valid non-negative numbers; limits and alternatives must be whole numbers, and the discount exponent must be greater than 1.</span>}
+        <button type="button" className="button" disabled={invalid || draftKey === appliedKey} onClick={() => onApply(cleanAlignmentOptions(draft))}>Apply</button>
+        <button type="button" className="button secondary" disabled={draftKey === JSON.stringify(DEFAULT_ALIGNMENT_OPTIONS)} onClick={() => { const reset = { ...DEFAULT_ALIGNMENT_OPTIONS }; onChange(reset); onApply(reset); }}>Reset</button>
+      </div>
+    </section>
+  );
+}
+
+/** Whether alignment settings contain an invalid value that applies to the selected variant. */
+export function isInvalidAlignmentOptions(draft: AlignmentOptions): boolean {
+  const variant = draft.variant ?? DEFAULT_ALIGNMENT_OPTIONS.variant;
+  const generator = variant.startsWith("generator_");
+  const discounted = variant === "discounted_a_star";
+  return (
+    (draft.max_states !== undefined && (!Number.isInteger(draft.max_states) || draft.max_states < 1)) ||
+    (draft.max_align_time !== undefined && (!Number.isFinite(draft.max_align_time) || draft.max_align_time < 0)) ||
+    (draft.max_align_time_trace !== undefined && (!Number.isFinite(draft.max_align_time_trace) || draft.max_align_time_trace < 0)) ||
+    (generator && draft.max_alignments !== undefined && (!Number.isInteger(draft.max_alignments) || draft.max_alignments < 1)) ||
+    (discounted && draft.exponent !== undefined && (!Number.isFinite(draft.exponent) || draft.exponent <= 1)) ||
+    [draft.trace_cost, draft.model_cost, draft.silent_model_cost, draft.sync_cost].some(
+      (value) => value !== undefined && (!Number.isFinite(value) || value < 0),
+    )
+  );
+}
+
+export function cleanAlignmentOptions(options: AlignmentOptions): AlignmentOptions {
+  const clean: AlignmentOptions = {
+    variant: options.variant ?? DEFAULT_ALIGNMENT_OPTIONS.variant,
+    cost_profile: options.cost_profile ?? DEFAULT_ALIGNMENT_OPTIONS.cost_profile,
+  };
+  for (const key of ["max_states", "max_align_time", "max_align_time_trace", "trace_cost", "model_cost", "silent_model_cost", "sync_cost"] as const) {
+    if (options[key] !== undefined) clean[key] = options[key];
+  }
+  if (options.variant?.startsWith("generator_") && options.max_alignments !== undefined) clean.max_alignments = options.max_alignments;
+  if (options.variant === "discounted_a_star") {
+    if (options.exponent !== undefined) clean.exponent = options.exponent;
+    if (options.synchronous_dijkstra !== undefined) clean.synchronous_dijkstra = options.synchronous_dijkstra;
+  }
+  return clean;
 }
 
 // Explains why a model could not be aligned: unsound (unreachable end state) or
@@ -814,10 +949,10 @@ function AlignmentNotice({
           <h3>Alignments unavailable for the {minerName} model</h3>
           {exhausted ? (
             <p>
-              The {minerName} model is reachable but admits{" "}
-              <strong>unbounded behavior</strong>, so the alignment search hit its
-              limit before finding optimal alignments — the numbers wouldn't be
-              trustworthy.
+              The {minerName} model is reachable, but the alignment search hit a
+              configured state or time limit before finding optimal alignments.
+              This can happen because the model is complex or admits unbounded
+              behavior, so partial numbers are not shown.
             </p>
           ) : (
             <p>
@@ -836,6 +971,27 @@ function AlignmentNotice({
       </div>
     </section>
   );
+}
+
+/** Safe display label for ordinary and silent alignment moves. */
+export function alignmentMoveLabel(
+  move: AlignmentMove,
+  activities: MineraExport["activities"],
+): string {
+  if (move.silent || move.activity === null) return "τ";
+  return activities[move.activity]?.name ?? "?";
+}
+
+function alignmentDiagnosticItems(diagnostics?: AlignmentDiagnostics) {
+  if (!diagnostics) return [];
+  return [
+    ["Visited states", diagnostics.visited_states],
+    ["Queued states", diagnostics.queued_states],
+    ["Traversed arcs", diagnostics.traversed_arcs],
+    ["LP solves", diagnostics.lp_solved],
+    ["Closed set", diagnostics.closed_set_length],
+    ["Visited markings", diagnostics.num_visited_markings],
+  ].filter((item): item is [string, number] => item[1] !== undefined);
 }
 
 // Renders a computed alignment result: cost-based gauges and, per deviating
@@ -882,6 +1038,19 @@ function AlignmentResultView({
 
   return (
     <div className="conformance reveal">
+      {(alignments.variant || alignments.alignment_variant || alignments.diagnostics) && (
+        <section className="panel conf-panel align-diagnostics">
+          <div className="panel-head">
+            <h2>Alignment run</h2>
+            <span className="panel-meta">{(alignments.variant ?? alignments.alignment_variant)?.replaceAll("_", " ") ?? "legacy export"}</span>
+          </div>
+          {alignments.diagnostics && (
+            <div className="align-diagnostics-grid">
+              {alignmentDiagnosticItems(alignments.diagnostics).map(([label, value]) => <span key={label}><strong>{label}</strong>{numberFormat.format(value)}</span>)}
+            </div>
+          )}
+        </section>
+      )}
       <section className="conf-metrics">
         {metrics.map((metric) => (
           <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
@@ -997,18 +1166,42 @@ function AlignmentResultView({
                   </div>
                   <div className="align-moves">
                     {variant.moves.map((move, i) => {
-                      const name = data.activities[move.activity]?.name ?? "?";
+                      const name = alignmentMoveLabel(move, data.activities);
                       return (
                         <span
                           key={i}
-                          className={`align-move ${move.type}`}
-                          title={`${move.type}: ${name}`}
+                          className={`align-move ${move.type}${move.silent || move.activity === null ? " silent" : ""}`}
+                          title={move.silent || move.activity === null ? "model (silent): τ" : `${move.type}: ${name}`}
                         >
                           {name}
                         </span>
                       );
                     })}
                   </div>
+                  {alignmentDiagnosticItems(variant.diagnostics).length > 0 && (
+                    <div className="align-variant-diagnostics">
+                      {alignmentDiagnosticItems(variant.diagnostics).map(([label, value]) => (
+                        <span key={label} title={label}>{label}: {numberFormat.format(value)}</span>
+                      ))}
+                    </div>
+                  )}
+                  {(() => {
+                    const alternatives = variant.alternatives ?? variant.optimal_alignments;
+                    return alternatives && alternatives.length > 0 ? (
+                      <details className="align-alternatives">
+                        <summary>{numberFormat.format(alternatives.length)} equal-optimal alignments (including primary)</summary>
+                        {alternatives.map((moves, altIndex) => (
+                          <div className="align-moves" key={altIndex}>
+                            {moves.map((move, i) => {
+                              const name = alignmentMoveLabel(move, data.activities);
+                              const silent = move.silent || move.activity === null;
+                              return <span key={i} className={`align-move ${move.type}${silent ? " silent" : ""}`} title={silent ? "model (silent): τ" : `${move.type}: ${name}`}>{name}</span>;
+                            })}
+                          </div>
+                        ))}
+                      </details>
+                    ) : null;
+                  })()}
                 </li>
               );
             })}

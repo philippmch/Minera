@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -117,6 +119,56 @@ enum class AlignmentMoveType {
 struct AlignmentMove {
   AlignmentMoveType type;
   std::string activity;  // the activity name involved in the move
+  std::size_t transition = static_cast<std::size_t>(-1);  // model transition id
+};
+
+// PM4Py's alignment algorithm family.  The generator variants retain all
+// equal-cost optimal paths (subject to AlignmentOptions::max_alignments).
+enum class AlignmentVariant {
+  kStateEquationAStar,
+  kDijkstraNoHeuristics,
+  kDijkstraLessMemory,
+  kDiscountedAStar,
+  kGeneratorDijkstraNoHeuristics,
+  kGeneratorDijkstraLessMemory,
+};
+
+enum class AlignmentCostProfile { kLegacyUnit, kPm4PyStandard };
+
+struct AlignmentOptions {
+  AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
+  AlignmentCostProfile cost_profile = AlignmentCostProfile::kLegacyUnit;
+  std::size_t max_states = 200000;
+  double max_time_seconds = 0.0;  // per trace; zero means unlimited
+  double max_total_time_seconds = 0.0;
+  std::size_t max_alignments = 32;
+  double exponent = 2.0;          // discounted A* depth exponent
+  bool synchronous_dijkstra = true;
+  // nullopt derives PM4Py-standard or legacy values from cost_profile.
+  std::optional<double> default_trace_cost;
+  std::optional<double> default_model_cost;
+  std::optional<double> default_sync_cost;
+  std::optional<double> default_silent_cost;
+  std::unordered_map<std::string, double> trace_costs;
+  std::unordered_map<std::string, double> model_costs;
+  std::unordered_map<std::string, double> sync_costs;
+  std::vector<double> trace_costs_by_position;
+  std::vector<double> model_costs_by_transition;
+  std::vector<double> sync_costs_by_transition;
+  // Optional PM4Py-style callables. The second argument is the trace event
+  // index for trace costs and the transition index for model/sync costs.
+  std::function<double(const std::string&, std::size_t)> trace_cost_function;
+  std::function<double(const std::string&, std::size_t)> model_cost_function;
+  std::function<double(const std::string&, std::size_t)> sync_cost_function;
+};
+
+struct AlignmentDiagnostics {
+  std::size_t visited_states = 0;
+  std::size_t queued_states = 0;
+  std::size_t traversed_arcs = 0;
+  std::size_t lp_solved = 0;
+  std::size_t closed_set_length = 0;
+  std::size_t num_visited_markings = 0;
 };
 
 // The optimal (least-cost) alignment of one trace variant against the model.
@@ -124,8 +176,10 @@ struct VariantAlignment {
   std::vector<std::string> activities;  // activity names, in trace order
   std::uint64_t count = 0;              // traces collapsing to this variant
   std::vector<AlignmentMove> moves;     // the alignment, in execution order
-  std::uint64_t cost = 0;               // total cost (log + visible model moves)
+  double cost = 0.0;                    // total cost (log + visible model moves)
   double fitness = 1.0;                 // 1 - cost / worst-case cost, in [0, 1]
+  std::vector<std::vector<AlignmentMove>> optimal_alignments;
+  AlignmentDiagnostics diagnostics;
 };
 
 // Alignment-based conformance of an event log against a discovered process
@@ -149,7 +203,9 @@ struct AlignmentResult {
   double precision = 1.0;
   std::uint64_t fitting_traces = 0;  // traces with a perfect (cost-0) alignment
   std::uint64_t trace_count = 0;
-  std::uint64_t total_cost = 0;      // summed optimal cost over all traces
+  double total_cost = 0.0;           // summed optimal cost over all traces
+  AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
+  AlignmentDiagnostics diagnostics;
   std::vector<VariantAlignment> variants;  // worst-fitting first
 };
 
@@ -206,6 +262,12 @@ struct ActivityDeviation {
                                               const ProcessTree& tree);
 [[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
                                               const PetriNet& net);
+[[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
+                                              const PetriNet& net,
+                                              const AlignmentOptions& options);
+[[nodiscard]] AlignmentResult check_alignment(const EventLog& event_log,
+                                              const ProcessTree& tree,
+                                              const AlignmentOptions& options);
 
 // The conformance of one discovered model, so the frontend can offer any miner
 // against any method. `miner` is the UI registry id ("inductive", "alpha",

@@ -1640,6 +1640,50 @@ input[type="range"]::-moz-range-thumb {
 
 .conf-panel { border-top: 1px solid var(--line); }
 
+.align-settings-grid,
+.align-costs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px 16px;
+  padding: 14px 0;
+}
+.align-settings-grid label,
+.align-costs label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-70);
+}
+.align-settings-grid input,
+.align-settings-grid select,
+.align-costs input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 6px 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.align-settings-grid label.disabled { opacity: 0.45; }
+.checkbox-label { flex-direction: row !important; align-items: center; padding-top: 22px; }
+.align-costs { border-top: 1px solid var(--line-soft); }
+.align-settings-caption { grid-column: 1 / -1; font-size: 11px; color: var(--ink-45); }
+.align-settings-actions { display: flex; align-items: center; gap: 10px; padding-top: 4px; }
+.align-settings-actions .button { border: 1px solid var(--line); border-radius: 2px; padding: 7px 13px; background: var(--ink); color: var(--paper); cursor: pointer; font: 11px var(--font-mono); }
+.align-settings-actions .button.secondary { background: transparent; color: var(--ink-70); }
+.align-settings-actions .button:disabled { opacity: .4; cursor: default; }
+.align-settings-actions .conf-inline-note { margin: 0 auto 0 0; padding: 0; border: 0; background: none; color: var(--poor); }
+.align-diagnostics-grid { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 12px 0 2px; }
+.align-diagnostics-grid span { display: flex; flex-direction: column; gap: 2px; font: 12px var(--font-mono); color: var(--ink-70); }
+.align-diagnostics-grid strong { font: 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-45); }
+.align-alternatives { margin-top: 9px; font-size: 11px; color: var(--ink-45); }
+.align-alternatives summary { cursor: pointer; }
+.align-alternatives .align-moves { margin-top: 7px; }
+.align-move.silent { font-family: serif; font-style: italic; border-style: dashed; }
+.align-variant-diagnostics { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 7px; font: 10px var(--font-mono); color: var(--ink-45); }
+
 .conf-tokens {
   display: grid;
   grid-template-columns: repeat(4, max-content);

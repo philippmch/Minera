@@ -322,10 +322,44 @@ export interface Conformance {
 /** One move of an optimal alignment between a trace and the model. */
 export type AlignmentMoveType = "sync" | "log" | "model";
 
+/** Petri-net alignment search variants exposed by the PM4Py-compatible API. */
+export type AlignmentVariant =
+  | "state_equation_a_star"
+  | "dijkstra_no_heuristics"
+  | "dijkstra_less_memory"
+  | "discounted_a_star"
+  | "generator_dijkstra_no_heuristics"
+  | "generator_dijkstra_less_memory";
+
+export type AlignmentCostProfile = "legacy" | "pm4py";
+
+/** Optional controls for one deferred alignment request. */
+export interface AlignmentOptions {
+  variant?: AlignmentVariant;
+  max_states?: number;
+  max_align_time?: number;
+  max_align_time_trace?: number;
+  max_alignments?: number;
+  exponent?: number;
+  synchronous_dijkstra?: boolean;
+  cost_profile?: AlignmentCostProfile;
+  trace_cost?: number;
+  model_cost?: number;
+  silent_model_cost?: number;
+  sync_cost?: number;
+}
+
+export const DEFAULT_ALIGNMENT_OPTIONS: Required<Pick<AlignmentOptions, "variant" | "cost_profile">> = {
+  variant: "state_equation_a_star",
+  cost_profile: "legacy",
+};
+
 export interface AlignmentMove {
   type: AlignmentMoveType;
-  /** Activity id of the move; indexes into activities. */
-  activity: number;
+  /** Activity id of the move; null for a silent model (tau) transition. */
+  activity: number | null;
+  /** Explicit marker for a silent model move; absent on older exports. */
+  silent?: boolean;
 }
 
 export interface VariantAlignment {
@@ -337,6 +371,22 @@ export interface VariantAlignment {
   cost: number;
   /** 1 - cost / worst-case cost, in [0, 1]. */
   fitness: number;
+  /** Equal-optimal alternatives returned by generator variants, when present. */
+  alternatives?: AlignmentMove[][];
+  /** PM4Py-compatible spelling accepted for older/newer server exports. */
+  optimal_alignments?: AlignmentMove[][];
+  /** Search work for this trace variant, absent in older exports. */
+  diagnostics?: AlignmentDiagnostics;
+}
+
+export interface AlignmentDiagnostics {
+  visited_states?: number;
+  queued_states?: number;
+  traversed_arcs?: number;
+  /** Number of marking-equation LP solves performed (0 when no LP was used). */
+  lp_solved?: number;
+  closed_set_length?: number;
+  num_visited_markings?: number;
 }
 
 export interface Alignments {
@@ -361,6 +411,11 @@ export interface Alignments {
   total_cost: number;
   /** Variants worst-fitting first. */
   variants: VariantAlignment[];
+  /** Search variant selected by the caller (absent in older exports). */
+  variant?: AlignmentVariant;
+  /** Canonical PM4Py/server spelling, accepted alongside `variant`. */
+  alignment_variant?: AlignmentVariant;
+  diagnostics?: AlignmentDiagnostics;
   /**
    * Per-activity move tallies across the log, most deviating first. Absent
    * in exports from older minera versions.

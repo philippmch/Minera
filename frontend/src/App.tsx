@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
+  type AlignmentOptions,
+  DEFAULT_ALIGNMENT_OPTIONS,
   type CaseAttributeStat,
   type Decisions,
   type EventAttributeStat,
@@ -82,13 +84,19 @@ export default function App() {
   // Returns a model's alignments: embedded (CLI exports), cached, or fetched
   // from the backend (server mines defer it). Stable except across data loads.
   const requestAlignment = useCallback(
-    async (minerId: string): Promise<Alignments> => {
+    async (minerId: string, options: AlignmentOptions = {}): Promise<Alignments> => {
+      const effective = { ...DEFAULT_ALIGNMENT_OPTIONS, ...options };
+      const cacheKey = `${minerId}|${JSON.stringify(effective)}`;
       const embedded = data?.conformance?.[minerId]?.alignments;
-      if (embedded) return embedded;
-      const cached = alignCache.current[minerId];
+      const isDefault =
+        effective.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
+        effective.cost_profile === DEFAULT_ALIGNMENT_OPTIONS.cost_profile &&
+        Object.keys(effective).length === 2;
+      if (embedded && isDefault) return embedded;
+      const cached = alignCache.current[cacheKey];
       if (cached) return cached;
-      const result = await alignModel(minerId);
-      alignCache.current = { ...alignCache.current, [minerId]: result };
+      const result = await alignModel(minerId, options);
+      alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },
     [data],
@@ -108,8 +116,9 @@ export default function App() {
   // decisions are dropped.
   const requestModelCheck = useCallback(async (file: File) => {
     const result = await checkModel(file);
-    const { imported: _dropped, ...rest } = alignCache.current;
-    alignCache.current = rest;
+    alignCache.current = Object.fromEntries(
+      Object.entries(alignCache.current).filter(([key]) => !key.startsWith("imported|")),
+    );
     const { imported: _droppedDecisions, ...restDecisions } = decideCache.current;
     decideCache.current = restDecisions;
     return result;
