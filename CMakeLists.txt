@@ -30,8 +30,10 @@ add_library(minera_core
   src/declare_playout.cpp
   src/declare_streaming.cpp
   src/decision_mining.cpp
+  src/dfg_alignment.cpp
   src/dfg_variants.cpp
   src/directly_follows_graph.cpp
+  src/edit_distance_alignment.cpp
   src/event_ordering.cpp
   src/eventually_follows.cpp
   src/footprints.cpp
@@ -251,4 +253,20 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_alignment_variants_tests PRIVATE cxx_std_20)
   target_compile_options(minera_alignment_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_alignment_variants_tests COMMAND minera_alignment_variants_tests)
+
+  add_executable(minera_dfg_alignment_tests
+    tests/test_dfg_alignment.cpp
+  )
+  target_link_libraries(minera_dfg_alignment_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_alignment_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_alignment_tests COMMAND minera_dfg_alignment_tests)
+
+  add_executable(minera_edit_distance_alignment_tests
+    tests/test_edit_distance_alignment.cpp
+  )
+  target_link_libraries(minera_edit_distance_alignment_tests PRIVATE minera::core)
+  target_compile_features(minera_edit_distance_alignment_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_edit_distance_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_edit_distance_alignment_tests COMMAND minera_edit_distance_alignment_tests)
 endif()

@@ -27,6 +27,8 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/dfg_alignment.hpp"
+#include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
@@ -512,6 +514,43 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+void handle_align_dfg(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+  try {
+    const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
+    const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
+    auto options = minera::parse_dfg_alignment_params(lookup, present);
+    const auto projection = present("projection") ? lookup("projection") : std::string("none");
+    if (projection != "none" && projection != "log" && projection != "metrics") throw std::invalid_argument("projection expects none, log, or metrics");
+    minera::DfgStatisticalOptions dopt; dopt.window = 1; const auto dfg = minera::discover_frequency_dfg(session->log, dopt);
+    std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:session->log.traces) if(!t.events.empty()){++starts[t.events.front().activity];++ends[t.events.back().activity];}
+    const auto result = minera::align_log_on_dfg(session->log, dfg, starts, ends, options);
+    if (projection == "log") { const auto projected = minera::project_log_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
+    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(session->log, dfg, starts, ends, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
+    else response.set_content(minera::dfg_alignment_json(result), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+void handle_align_edit_distance(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("reference_log")) throw std::invalid_argument("missing form field: reference_log");
+    const auto& file = request.get_file_value("reference_log");
+    std::stringstream input(file.content);
+    const auto reference = minera::looks_like_xes(file.filename, file.content) ? minera::import_xes_event_log(input) : minera::import_csv_event_log(input);
+    const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
+    const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
+    const auto options = minera::parse_edit_distance_params(lookup, present);
+    const auto projection = present("projection") ? lookup("projection") : std::string("none");
+    if (projection != "none" && projection != "log") throw std::invalid_argument("projection expects none or log");
+    const auto result = minera::align_edit_distance(session->log, reference, options);
+    if (projection == "log") { const auto projected = minera::project_log_on_alignments(session->log, result); response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
+    else response.set_content(minera::edit_distance_json(result, options.perform_anti_alignment), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
 // On-demand decision mining of one model from the most recent mine: which
 // attribute values steer a case down which branch of the net. Expects a
 // `miner` query parameter like /api/align.
@@ -829,11 +868,15 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
+  server.Options("/api/align-dfg", preflight);
+  server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Post("/api/align-dfg", handle_align_dfg);
+  server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);

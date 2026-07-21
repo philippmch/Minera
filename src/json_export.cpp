@@ -2481,7 +2481,13 @@ void write_analysis_json(std::ostream& out,
                          const DfgVariantsAnalysis* dfg_variants,
                          const CorrelationVariantsAnalysis*
                              correlation_mining,
-                         const BatchDiscovery* batch_discovery) {
+                         const BatchDiscovery* batch_discovery,
+                         const DfgAlignmentLogResult* dfg_alignment,
+                         const std::vector<EditDistanceAlignment>* edit_distance,
+                         bool edit_anti,
+                         const DfgAlignmentProjection* dfg_projection,
+                         const EventLog* dfg_projected_log,
+                         const EventLog* edit_projected_log) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2725,6 +2731,15 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"batch_discovery\": ";
     write_batch_discovery(out, *batch_discovery, graph);
   }
+  if (dfg_alignment != nullptr) {
+    out << ",\n  \"dfg_alignment\": ";
+    // The embedded shape intentionally matches the standalone writer.
+    out << dfg_alignment_json(*dfg_alignment, dfg_projection, dfg_projected_log);
+  }
+  if (edit_distance != nullptr) {
+    out << ",\n  \"edit_distance\": ";
+    out << edit_distance_json(*edit_distance, edit_anti, edit_projected_log);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -2763,7 +2778,13 @@ std::string analysis_json(std::string_view dataset,
                           const DfgVariantsAnalysis* dfg_variants,
                           const CorrelationVariantsAnalysis*
                               correlation_mining,
-                          const BatchDiscovery* batch_discovery) {
+                          const BatchDiscovery* batch_discovery,
+                          const DfgAlignmentLogResult* dfg_alignment,
+                          const std::vector<EditDistanceAlignment>* edit_distance,
+                          bool edit_anti,
+                          const DfgAlignmentProjection* dfg_projection,
+                          const EventLog* dfg_projected_log,
+                          const EventLog* edit_projected_log) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2774,7 +2795,8 @@ std::string analysis_json(std::string_view dataset,
                       powl_petri, powl_decoration, log_skeleton,
                       log_skeleton_conformance, declare, declare_conformance,
                       footprints, dfg_variants, correlation_mining,
-                      batch_discovery);
+                      batch_discovery, dfg_alignment, edit_distance, edit_anti,
+                      dfg_projection, dfg_projected_log, edit_projected_log);
   return out.str();
 }
 
@@ -2789,6 +2811,153 @@ std::string alignment_json(const AlignmentResult& alignment,
   std::ostringstream out;
   write_alignments(out, alignment, graph);
   return out.str();
+}
+
+namespace {
+const char* attribute_kind_name(AttributeKind kind) {
+  switch (kind) {
+    case AttributeKind::kString: return "string";
+    case AttributeKind::kDate: return "date";
+    case AttributeKind::kInt: return "int";
+    case AttributeKind::kFloat: return "float";
+    case AttributeKind::kBoolean: return "boolean";
+    case AttributeKind::kId: return "id";
+  }
+  throw std::invalid_argument("projected log contains an invalid attribute kind");
+}
+
+void write_attribute_kinds(std::ostream& out,
+                           const std::vector<EventAttribute>& attributes) {
+  out << '{';
+  for (std::size_t i = 0; i < attributes.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, attributes[i].key);
+    out << ':';
+    write_json_string(out, attribute_kind_name(attributes[i].kind));
+  }
+  out << '}';
+}
+
+void write_projected_log(std::ostream& out, const EventLog& log) {
+  out << "{";
+  if (!log.attributes.empty()) {
+    out << "\"attributes\":";
+    write_attribute_object(out, log.attributes);
+    out << ",\"attribute_kinds\":";
+    write_attribute_kinds(out, log.attributes);
+    out << ',';
+  }
+  out << "\"traces\":[";
+  for (std::size_t i=0;i<log.traces.size();++i) {
+    if (i) out << ',';
+    const auto& t=log.traces[i];
+    out << "{\"case_id\":"; write_json_string(out,t.case_id);
+    if(!t.attributes.empty()) {
+      out<<",\"attributes\":";
+      write_attribute_object(out, t.attributes);
+      out<<",\"attribute_kinds\":";
+      write_attribute_kinds(out, t.attributes);
+    }
+    out << ",\"events\":[";
+    for (std::size_t j=0;j<t.events.size();++j) {
+      if(j)out<<',';
+      const auto& e=t.events[j];
+      out<<"{\"activity\":"; write_json_string(out,e.activity);
+      out << ",\"timestamp\":"; write_json_string(out,e.timestamp);
+      out << ",\"resource\":"; write_json_string(out,e.resource);
+      out << ",\"lifecycle\":"; write_json_string(out,e.lifecycle);
+      out << ",\"input_order\":" << e.input_order;
+      if(!e.attributes.empty()) {
+        out<<",\"attributes\":";
+        write_attribute_object(out, e.attributes);
+        out<<",\"attribute_kinds\":";
+        write_attribute_kinds(out, e.attributes);
+      }
+      out<<'}';
+    }
+    out << "]}";
+  }
+  out << "]}";
+}
+}
+
+std::string dfg_alignment_json(const DfgAlignmentLogResult& result,
+                               const DfgAlignmentProjection* projection,
+                               const EventLog* projected_log) {
+  std::ostringstream out;
+  out << "{\"family\": \"DFG\", \"variant\": \"CLASSIC\", \"unique_variants\": "
+      << result.unique_variants << ", \"alignments\": [";
+  for (std::size_t i = 0; i < result.alignments.size(); ++i) {
+    const auto& a = result.alignments[i];
+    out << "{\"cost\": " << a.cost << ", \"internal_cost\": " << a.internal_cost
+        << ", \"fitness\": " << a.fitness << ", \"best_worst_cost\": "
+        << a.best_worst_cost << ", \"visited_states\": " << a.visited_states
+        << ", \"closed\": " << a.closed << ", \"closed_states\": " << a.closed_states
+        << ", \"moves\": [";
+    for (std::size_t j = 0; j < a.alignment.size(); ++j) {
+      const auto& m = a.alignment[j];
+      out << "{\"log\": "; write_json_string(out, m.log);
+      out << ", \"model\": "; write_json_string(out, m.model); out << '}';
+      if (j + 1 < a.alignment.size()) out << ',';
+    }
+    out << "]}";
+    if (i + 1 < result.alignments.size()) out << ',';
+  }
+  out << ']';
+  if (projection != nullptr) {
+    out << ", \"projected_dfg\": {\"edges\": [";
+    std::size_t n = 0;
+    for (const auto& kv : projection->dfg) {
+      if (n++) out << ',';
+      out << "{\"source\": "; write_json_string(out, kv.first.first);
+      out << ", \"target\": "; write_json_string(out, kv.first.second);
+      out << ", \"sync\": " << kv.second.sync << ", \"model_move\": " << kv.second.mm << '}';
+    }
+    out << "], \"activities\": ["; n = 0;
+    for (const auto& kv : projection->activities) {
+      if (n++) out << ',';
+      out << "{\"activity\": "; write_json_string(out, kv.first);
+      out << ", \"sync\": " << kv.second.sync << ", \"model_move\": " << kv.second.mm
+          << ", \"log_move\": " << kv.second.lm << '}';
+    }
+    out << "]}";
+  }
+  if (projected_log != nullptr) {
+    out << ", \"projected_log\": ";
+    write_projected_log(out, *projected_log);
+  }
+  out << '}';
+  return out.str();
+}
+
+std::string edit_distance_json(const std::vector<EditDistanceAlignment>& result,
+                               bool anti_alignment,
+                               const EventLog* projected_log) {
+  std::ostringstream out;
+  std::size_t source_events = 0, target_events = 0;
+  out << "{\"family\": \"EDIT_DISTANCE\", \"variant\": \"EDIT_DISTANCE\", \"anti\": "
+      << (anti_alignment ? "true" : "false") << ", \"source_count\": " << result.size()
+      << ", \"alignments\": [";
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    const auto& a = result[i]; source_events += a.source_variant.size(); target_events += a.target_variant.size();
+    if (i) out << ',';
+    out << "{\"source_variant\": [";
+    for (std::size_t j=0;j<a.source_variant.size();++j){if(j)out<<',';write_json_string(out,a.source_variant[j]);}
+    out << "], \"target_variant\": [";
+    for (std::size_t j=0;j<a.target_variant.size();++j){if(j)out<<',';write_json_string(out,a.target_variant[j]);}
+    out << "], \"target_index\": " << a.target_index << ", \"cost\": " << a.cost
+        << ", \"fitness\": " << a.fitness << ", \"best_worst_cost\": " << a.best_worst_cost
+        << ", \"bwc\": " << a.bwc << ", \"denominator\": " << a.denominator << ", \"moves\": [";
+    for (std::size_t j=0;j<a.alignment.size();++j) { const auto& m=a.alignment[j]; if(j)out<<','; out<<"{\"type\": ";
+      const char* type = m.type==EditDistanceMoveType::kSynchronous?"sync":(m.type==EditDistanceMoveType::kLog?"log":"model"); write_json_string(out,type);
+      out << ", \"log\": "; write_json_string(out, m.log.empty()?">>":m.log);
+      out << ", \"model\": "; write_json_string(out, m.model.empty()?">>":m.model); out << '}'; }
+    out << "]}";
+  }
+  out << "], \"source_event_count\": " << source_events
+      << ", \"target_event_count\": " << target_events;
+  if (projected_log) { out << ", \"projected_log\": "; write_projected_log(out,*projected_log); }
+  out << '}'; return out.str();
 }
 
 std::string imported_model_json(const ModelConformance& model,

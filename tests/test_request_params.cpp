@@ -767,6 +767,51 @@ void parse_alignment_params_rejects_invalid_and_dependent_values() {
   assert(threw);
 }
 
+void parse_dfg_and_edit_alignment_params_contract() {
+  const auto d = minera::parse_dfg_alignment_params(fields({
+      {"dfg_variant", "CLASSIC"}, {"dfg_max_states", "0"},
+      {"dfg_max_time_ms", "12"}, {"dfg_sync_cost", R"(A=1,B:2,A=3,A\,B=4,A\=B=5,A\:B=6,A\\B=7,\sA=8,A\s=9,A\tB=10)"},
+      {"dfg_model_move_cost", "A=4"}, {"dfg_log_move_cost", "B=5"},
+      {"dfg_internal_log_move_cost", "A=0.25"}}));
+  assert(d.max_visited_states == 0 && d.max_time_ms == 12);
+  assert(d.sync_cost.at("A") == 3.0 && d.sync_cost.at("B") == 2.0);
+  assert(d.sync_cost.at("A,B") == 4.0 && d.sync_cost.at("A=B") == 5.0);
+  assert(d.sync_cost.at("A:B") == 6.0 && d.sync_cost.at("A\\B") == 7.0);
+  assert(d.sync_cost.at(" A") == 8.0 && d.sync_cost.at("A ") == 9.0);
+  assert(d.sync_cost.at("A\tB") == 10.0);
+  assert(d.model_move_cost.at("A") == 4.0 && d.log_move_cost.at("B") == 5.0);
+  assert(d.internal_log_move_cost.at("A") == 0.25);
+  const auto e = minera::parse_edit_distance_params(fields({
+      {"edit_variant", "Variants.EDIT_DISTANCE"}, {"anti", "1"},
+      {"deviation_cost", "7"}}));
+  assert(e.perform_anti_alignment && e.deviation_cost == 7);
+
+  const auto expect_throw = [](std::map<std::string, std::string> values,
+                               bool dfg) {
+    bool threw = false;
+    try { if (dfg) (void)minera::parse_dfg_alignment_params(fields(std::move(values)));
+          else (void)minera::parse_edit_distance_params(fields(std::move(values))); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  };
+  expect_throw({{"dfg_variant", "bogus"}}, true);
+  expect_throw({{"dfg_sync_cost", "=1"}}, true);
+  expect_throw({{"dfg_sync_cost", "A=-1"}}, true);
+  expect_throw({{"dfg_sync_cost", "A=nan"}}, true);
+  expect_throw({{"dfg_sync_cost", "A=inf"}}, true);
+  expect_throw({{"dfg_sync_cost", R"(A\q=1)"}}, true);
+  expect_throw({{"dfg_sync_cost", R"(A\)"}}, true);
+  expect_throw({{"edit_variant", "EDIT_DISTANCE"}, {"anti", "maybe"}}, false);
+  expect_throw({{"deviation_cost", "0"}}, false);
+  expect_throw({{"deviation_cost", "-2"}}, false);
+  const std::map<std::string, std::string> empty{{"dfg_log_move_cost", ""}};
+  const auto lookup = fields(empty);
+  bool threw = false;
+  try { (void)minera::parse_dfg_alignment_params(lookup, [](std::string_view n) { return n == "dfg_log_move_cost"; }); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
@@ -927,5 +972,6 @@ int main() {
   parse_mine_params_rejects_invalid_dfg_variant_options();
   parse_alignment_params_maps_variants_and_costs();
   parse_alignment_params_rejects_invalid_and_dependent_values();
+  parse_dfg_and_edit_alignment_params_contract();
   return 0;
 }

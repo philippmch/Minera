@@ -56,11 +56,11 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Missing** |
 | Concept drift | Bose feature extraction and drift detection | **Missing** |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Missing** |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial** - DFG classic and edit distance (`EDIT_DISTANCE`) are complete (core); decomposed recomposition and all four process-tree variants remain missing |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
-| Conformance: advanced | anti-alignments and multi-alignments (discounted A*) | **Missing** |
+| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Missing** - edit-distance `perform_anti_alignment` is complete under the other-alignments row; Petri anti/multi-alignments remain absent |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Missing** |
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** |
@@ -459,3 +459,48 @@ LP solving, less-memory dominance, discounted exponent and scheduling parity,
 generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
 and invalid-cost handling; request, CLI, and frontend tests cover the exposed
 adapters.
+
+## DFG classic and edit-distance alignment parity evidence
+
+DFG alignment implements the pinned `CLASSIC` variant over a complete
+start/DFG/end frequency model. Start and end activity maps are included even
+when a supplied frequency is zero; edge frequencies are informational rather
+than hidden enablement flags. The model is validated as connected from its
+starts to its ends, and disconnected graphs or graphs without a start-to-end
+path fail explicitly. Default PM4Py-shaped costs are zero for synchronous moves
+and 10,000 for visible model/log moves. Per-activity synchronous, model, log,
+and internal-log costs are configurable: the reported cost can differ from the
+search's internal cost (for example, unknown labels may have a free internal
+move), and both are serialized.
+
+Whole-log alignment caches exact activity variants in an ordered map, reports
+`unique_variants`, and restores results to the original trace order. Trace
+results include fitness, best/worst cost, visited and closed-state diagnostics;
+visited-state and elapsed-time bounds are enforced and report a bounded-search
+failure instead of fabricating an optimum. The log projection preserves event,
+trace, and scalar log attributes, replaces reserved projection metadata, keeps
+synchronous timestamps/resources/lifecycle values, and marks
+`@@is_conforming`. The metrics projection counts synchronous/model/log activity
+moves and DFG edge moves, including a final log-only move (the corrected
+last-move accounting).
+
+`EDIT_DISTANCE` computes Levenshtein distance for every source variant and picks
+the minimum (or maximum when `perform_anti_alignment` is enabled); duplicate
+target variants retain their first occurrence, with deterministic lexical
+tie-breaking. Reconstruction follows `difflib.SequenceMatcher` matching-block
+semantics, including the default autojunk suppression for popular symbols in
+large targets, but uses ordered maps for deterministic clean-room behavior (the
+pinned hash-order implementation could choose a different tied path). A
+substitution is represented as two moves (one log-only and one model-only), so
+deviation cost, fitness, and the PM4Py best/worst-cost denominator (`bwc`) are
+explicit and auditable. Empty source logs return no alignments; an empty target
+log and non-positive deviation cost are rejected.
+
+Edit-distance log projection uses each trace's independently selected target
+variant, including heterogeneous selections. It preserves source trace
+metadata, records `@@original_trace` and `@@aligned_variant`, keeps timestamps
+from synchronous source events, timestamps inserted model events at the current
+source time, omits source-only moves, and marks each projected event's
+`@@is_conforming` value. Scalar EventLog log attributes (including these
+projection markers) and their XES scalar types round-trip through the XES
+importer/exporter.

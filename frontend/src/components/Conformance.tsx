@@ -11,9 +11,13 @@ import {
   type DecisionPoint,
   type MineraExport,
   type ModelConformance,
+  type DfgAlignmentOptions,
+  type DfgAlignmentResult,
+  type EditDistanceOptions,
+  type EditDistanceResult,
   numberFormat,
 } from "../types";
-import { type ImportedModelCheck } from "../api";
+import { parseDfgCostMapInput, type ImportedModelCheck } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -43,11 +47,15 @@ export function Conformance({
   onRequestAlignment,
   onRequestDecisions,
   onCheckModel,
+  onRequestDfg,
+  onRequestEditDistance,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
   onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
   onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
+  onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
+  onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
 }) {
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
@@ -264,9 +272,45 @@ export function Conformance({
             </div>
           </section>
         ))}
+      <OtherAlignments data={data} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} />
     </div>
   );
 }
+
+function OtherAlignments({ data, onRequestDfg, onRequestEditDistance }: {
+  data: MineraExport;
+  onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
+  onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
+}) {
+  const [dfg, setDfg] = useState<DfgAlignmentResult | null>(null);
+  const [edit, setEdit] = useState<EditDistanceResult | null>(null);
+  const [reference, setReference] = useState<File | null>(null);
+  const [dfgOptions, setDfgOptions] = useState<DfgAlignmentOptions>({ variant: "CLASSIC", projection: "none" });
+  const [editOptions, setEditOptions] = useState<EditDistanceOptions>({ variant: "EDIT_DISTANCE", projection: "none" });
+  const [busy, setBusy] = useState<"dfg" | "edit" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [costText, setCostText] = useState<Record<string, string>>({ sync_cost: "", model_move_cost: "", log_move_cost: "", internal_log_move_cost: "" });
+  useEffect(() => { setDfg(null); setEdit(null); setReference(null); setError(null); }, [data]);
+  const runDfg = async () => { if (!onRequestDfg) return; setBusy("dfg"); setError(null); try { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); setDfg(await onRequestDfg({ ...dfgOptions, ...maps })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runEdit = async () => { if (!onRequestEditDistance || !reference) return; setBusy("edit"); setError(null); try { setEdit(await onRequestEditDistance(reference, editOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">DFG classic · edit distance</span></div>
+    <div className="other-align-grid">
+      <div className="other-align-card"><h3>DFG classic</h3><p>Align the latest mined log against its directly-follows graph.</p>
+        <div className="align-settings-grid"><label>State limit<input type="number" min={1} value={dfgOptions.max_states ?? ""} onChange={e => setDfgOptions({ ...dfgOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Time limit (ms)<input type="number" min={1} value={dfgOptions.max_time_ms ?? ""} onChange={e => setDfgOptions({ ...dfgOptions, max_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Projection<select value={dfgOptions.projection ?? "none"} onChange={e => setDfgOptions({ ...dfgOptions, projection: e.target.value as DfgAlignmentOptions["projection"] })}><option value="none">None</option><option value="log">Projected log</option><option value="metrics">Metrics</option></select></label><label>Sync costs<input placeholder="A=1,B=2" value={costText.sync_cost} onChange={e => setCostText({ ...costText, sync_cost: e.target.value })} /></label><label>Model-move costs<input placeholder="A=1,B=2" value={costText.model_move_cost} onChange={e => setCostText({ ...costText, model_move_cost: e.target.value })} /></label><label>Log-move costs<input placeholder="A=1,B=2" value={costText.log_move_cost} onChange={e => setCostText({ ...costText, log_move_cost: e.target.value })} /></label><label>Internal-log costs<input placeholder="A=1,B=2" value={costText.internal_log_move_cost} onChange={e => setCostText({ ...costText, internal_log_move_cost: e.target.value })} /></label></div>
+        <small>Escape delimiters with a backslash; use \s, \t, \n, or \r for whitespace in activity names.</small>
+        <button className="button" disabled={!onRequestDfg || busy !== null} onClick={() => void runDfg()}>{busy === "dfg" ? "Aligning…" : "Run DFG alignment"}</button>{dfg && <DfgResult result={dfg} />}
+      </div>
+      <div className="other-align-card"><h3>Edit distance</h3><p>Compare mined traces with a reference CSV/XES log.</p><label className="file-picker">Reference log<input type="file" accept=".csv,.xes,.xml" onChange={e => setReference(e.target.files?.[0] ?? null)} /></label>
+        <div className="align-settings-grid"><label>Mode<select value={editOptions.anti ? "anti" : "closest"} onChange={e => setEditOptions({ ...editOptions, anti: e.target.value === "anti" })}><option value="closest">Closest</option><option value="anti">Anti-alignment</option></select></label><label>Deviation cost<input type="number" min={1} value={editOptions.deviation_cost ?? ""} onChange={e => setEditOptions({ ...editOptions, deviation_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Projection<select value={editOptions.projection ?? "none"} onChange={e => setEditOptions({ ...editOptions, projection: e.target.value as EditDistanceOptions["projection"] })}><option value="none">None</option><option value="log">Projected log</option></select></label></div>
+        <button className="button" disabled={!onRequestEditDistance || !reference || busy !== null} onClick={() => void runEdit()}>{busy === "edit" ? "Aligning…" : "Run edit-distance alignment"}</button>{edit && <EditDistanceResultView result={edit} />}
+      </div>
+    </div>{error && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error}</p></div>}
+  </section>;
+}
+
+function DfgResult({ result }: { result: DfgAlignmentResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.alignments.length)}</strong> traces · {numberFormat.format(result.unique_variants)} unique variants searched</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · internal {numberFormat.format(a.internal_cost)} · states {numberFormat.format(a.visited_states)} · closed {numberFormat.format(a.closed_states)}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.log === ">>" ? "model" : m.model === ">>" ? "log" : "sync"}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol>{result.projected_dfg && <small>{result.projected_dfg.edges.length} projected edges · {result.projected_dfg.activities.length} activities</small>}</div>; }
+function EditDistanceResultView({ result }: { result: EditDistanceResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.source_count)}</strong> source traces · {result.anti ? "anti-alignment" : "closest alignment"}</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · best/worst {numberFormat.format(a.best_worst_cost)} · denominator {numberFormat.format(a.denominator)} · target #{a.target_index}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.type}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol></div>; }
 
 // Token-replay results: quality gauges, the token tally, and per-variant
 // deviation. Rendered when the "token-replay" method is selected.
