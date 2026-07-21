@@ -356,6 +356,85 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field,
   return options;
 }
 
+ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
+    const FieldLookup& field) {
+  return parse_process_tree_alignment_params(field, FieldPresence{});
+}
+
+ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  ProcessTreeAlignmentOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) -> std::string {
+    const auto value = field(name);
+    if (!supplied(name) || value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    }
+    return value;
+  };
+  const auto normalize = [](std::string value) {
+    std::string out;
+    out.reserve(value.size());
+    for (const char c : value) {
+      if (c == '-' || c == ' ' || c == '.') out.push_back('_');
+      else out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    return out;
+  };
+  if (supplied("pt_alignment_variant")) {
+    const auto raw = require("pt_alignment_variant");
+    auto value = normalize(raw);
+    if (value.rfind("variants_", 0) == 0) value.erase(0, 9);
+    if (value == "search_graph_pt" || value == "search_graph" ||
+        value == "searchgraphpt" || value == "search_graph_pt_variant") {
+      options.variant = ProcessTreeAlignmentVariant::kSearchGraphPt;
+    } else if (value == "dynamic_programming" || value == "dynamic_programming_pt" ||
+               value == "dynamicprogramming") {
+      options.variant = ProcessTreeAlignmentVariant::kDynamicProgramming;
+    } else if (value == "milp") {
+      options.variant = ProcessTreeAlignmentVariant::kMilp;
+    } else if (value == "approximated_original" || value == "approximatedoriginal" ||
+               value == "approx_original") {
+      options.variant = ProcessTreeAlignmentVariant::kApproximatedOriginal;
+    } else {
+      throw std::invalid_argument("pt_alignment_variant: unknown variant '" + raw + "'");
+    }
+  }
+  const auto parse_bound = [&](std::string_view name, std::size_t& target) {
+    if (supplied(name)) target = parse_nonnegative_size(require(name), name);
+  };
+  parse_bound("pt_alignment_max_states", options.max_states);
+  parse_bound("pt_alignment_max_trace_length", options.max_trace_length);
+  parse_bound("pt_alignment_max_process_tree_height", options.max_process_tree_height);
+  if (supplied("pt_alignment_batch_size")) {
+    options.batch_size = parse_positive_size(require("pt_alignment_batch_size"),
+                                              "pt_alignment_batch_size");
+  }
+  const auto parse_ms = [&](std::string_view name, double& target) {
+    if (!supplied(name)) return;
+    const auto parsed = parse_finite_double(require(name), name);
+    if (parsed < 0.0) {
+      throw std::invalid_argument(std::string(name) + ": expected a non-negative finite number");
+    }
+    target = parsed / 1000.0;
+  };
+  parse_ms("pt_alignment_max_time_ms", options.max_time_seconds);
+  parse_ms("pt_alignment_max_total_time_ms", options.max_total_time_seconds);
+  parse_ms("pt_alignment_max_trace_time_ms", options.max_trace_time_seconds);
+  parse_ms("pt_alignment_max_per_trace_time_ms", options.max_per_trace_time_seconds);
+  if (supplied("pt_alignment_use_global_cache")) {
+    options.use_global_cache = parse_boolean(require("pt_alignment_use_global_cache"),
+                                              "pt_alignment_use_global_cache");
+  }
+  if (supplied("pt_alignment_clear_cache")) {
+    options.clear_cache = parse_boolean(require("pt_alignment_clear_cache"),
+                                         "pt_alignment_clear_cache");
+  }
+  return options;
+}
+
 MineParams parse_mine_params(const FieldLookup& field) {
   return parse_mine_params(field, FieldPresence{});
 }

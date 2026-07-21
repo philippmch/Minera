@@ -29,6 +29,7 @@
 #include "minera/transition_system.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
+#include "minera/process_tree_alignment.hpp"
 
 namespace minera {
 
@@ -108,7 +109,8 @@ void write_analysis_json(std::ostream& out,
                          bool edit_anti = false,
                          const DfgAlignmentProjection* dfg_projection = nullptr,
                          const EventLog* dfg_projected_log = nullptr,
-                         const EventLog* edit_projected_log = nullptr);
+                         const EventLog* edit_projected_log = nullptr,
+                         const ProcessTreeAlignmentResult* process_tree_alignment = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -149,7 +151,11 @@ void write_analysis_json(std::ostream& out,
     bool edit_anti = false,
     const DfgAlignmentProjection* dfg_projection = nullptr,
     const EventLog* dfg_projected_log = nullptr,
-    const EventLog* edit_projected_log = nullptr);
+    const EventLog* edit_projected_log = nullptr,
+    const ProcessTreeAlignmentResult* process_tree_alignment = nullptr);
+
+[[nodiscard]] std::string process_tree_alignment_json(
+    const ProcessTreeAlignmentResult& result);
 
 [[nodiscard]] std::string dfg_alignment_json(
     const DfgAlignmentLogResult& result,

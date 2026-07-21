@@ -117,6 +117,36 @@ and tracks every family as complete, partial, or missing.
   `dfg_variant`, `dfg_max_states`, `dfg_max_time_ms`, `dfg_*_cost`, and
   `projection`) and multipart `POST /api/align-edit-distance` (file field
   `reference_log`, `edit_variant`, `anti`, `deviation_cost`, and `projection`).
+- **Process-tree alignments**: the same **Other alignments** panel aligns the
+  mined inductive process tree with four selectable variants: `SEARCH_GRAPH_PT`
+  (the default residual-expression Dijkstra search), `DYNAMIC_PROGRAMMING`
+  (recursive subtree DP with an exact residual search for loops), `MILP`
+  (an exact integer shortest-path residual A*/branch-and-bound search with
+  native search diagnostics and no external LP solver; loops must be binary),
+  and `APPROXIMATED_ORIGINAL`
+  (exact search below configurable trace-length/tree-height thresholds, then
+  recursive sequence/XOR/parallel decomposition with an exact loop fallback).
+  These are deterministic, collision-free native implementations and
+  dependency-free clean-room equivalents of the PM4Py variants; `MILP` does
+  not claim to invoke literal PuLP. `POST /api/align-process-tree` runs the
+  deferred request. The CLI embeds results with `--align-process-tree` and
+  accepts `--pt-alignment-variant`, `--pt-alignment-max-states`,
+  `--pt-alignment-max-time-ms`, `--pt-alignment-max-total-time-ms`, DP cache
+  controls (`--pt-alignment-use-global-cache`,
+  `--pt-alignment-batch-size`, `--pt-alignment-clear-cache`), and approximation
+  thresholds/timeouts (`--pt-alignment-max-trace-length`,
+  `--pt-alignment-max-process-tree-height`,
+  `--pt-alignment-max-trace-time-ms`,
+  `--pt-alignment-max-per-trace-time-ms`). State and time values of `0` mean
+  unlimited; native validation still rejects malformed, negative, non-finite,
+  or unsafe combinations (including non-positive DP batches and non-binary
+  MILP loops). Results use the `PROCESS_TREE` JSON family with variant,
+  aggregate and per-trace cost/fitness, `sync`/`log`/`model` moves, diagnostics,
+  and explicit `computed`, `completed`, `timed_out`, and `exhausted` flags.
+  Empty PM4Py-style fitness denominators remain `0.0`, including an empty log
+  against a silent tree. N-ary loop redo/exit children are normalized to an
+  XOR for search/DP/approximation; the MILP variant explicitly requires the
+  binary form.
 - **Model annotations (frequency & performance)**: token replay of the
   cleanly fitting cases decorates the discovered model itself — per
   transition, how often it actually fired (so a path the log never takes is
@@ -435,6 +465,17 @@ one pair, use the rightmost `=` as their separator, and therefore need no such
 escaping. Edit-distance `log` projection selects and records the appropriate
 reference variant independently for each source trace, including heterogeneous
 logs.
+
+Process-tree alignment defaults are `SEARCH_GRAPH_PT`, unlimited state,
+per-trace, and whole-log bounds (`0`), DP global cache off, batch size `1000`,
+and cache clearing on. Approximation thresholds default to trace length `1`,
+tree height `1`, and unlimited approximation timeouts (`0`); those controls
+apply only to `APPROXIMATED_ORIGINAL`, while cache/batch controls apply only to
+`DYNAMIC_PROGRAMMING`. A bounded or timed-out request is returned as an
+explicit incomplete result rather than an invented optimum, and diagnostics
+include visited/queued states, traversed arcs, native residual-search counts,
+and aligned-trace counts (`lp_solved` remains zero because no external LP
+solver is used).
 
 `--decisions <miner>` additionally mines the decision points of one
 discovered model — which attribute values steer a case down which branch —

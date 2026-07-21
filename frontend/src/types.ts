@@ -518,6 +518,65 @@ export interface EditDistanceResult {
   projected_log?: unknown;
 }
 
+/** Process-tree alignment search variants exposed by the deferred API. */
+export type ProcessTreeAlignmentVariant =
+  | "SEARCH_GRAPH_PT"
+  | "DYNAMIC_PROGRAMMING"
+  | "MILP"
+  | "APPROXIMATED_ORIGINAL";
+
+export interface ProcessTreeAlignmentOptions {
+  variant?: ProcessTreeAlignmentVariant;
+  max_states?: number;
+  max_time_ms?: number;
+  max_total_time_ms?: number;
+  use_global_cache?: boolean;
+  batch_size?: number;
+  clear_cache?: boolean;
+  max_trace_length?: number;
+  max_process_tree_height?: number;
+  max_trace_time_ms?: number;
+  max_per_trace_time_ms?: number;
+}
+
+export interface ProcessTreeAlignmentMove {
+  type: "sync" | "log" | "model";
+  log: string;
+  model: string;
+  activity: string;
+}
+
+export interface ProcessTreeAlignmentTrace {
+  trace: string[];
+  cost: number;
+  fitness: number;
+  completed: boolean;
+  timed_out: boolean;
+  moves: ProcessTreeAlignmentMove[];
+}
+
+export interface ProcessTreeAlignmentDiagnostics {
+  visited_states: number;
+  queued_states: number;
+  traversed_arcs: number;
+  lp_solved: number;
+  traces_aligned: number;
+  message: string;
+}
+
+export interface ProcessTreeAlignmentResult {
+  family: "PROCESS_TREE";
+  variant: ProcessTreeAlignmentVariant;
+  computed: boolean;
+  completed: boolean;
+  timed_out: boolean;
+  exhausted: boolean;
+  total_cost: number;
+  fitness: number;
+  diagnostics: ProcessTreeAlignmentDiagnostics;
+  traces: ProcessTreeAlignmentTrace[];
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -533,6 +592,23 @@ export function isEditDistanceResult(value: unknown): value is EditDistanceResul
   return value.alignments.every((a) => isRecord(a) && Array.isArray(a.source_variant) &&
     Array.isArray(a.target_variant) && finite(a.cost) && finite(a.fitness) && Array.isArray(a.moves) &&
     a.moves.every((m) => isRecord(m) && (m.type === "sync" || m.type === "log" || m.type === "model") && typeof m.log === "string" && typeof m.model === "string"));
+}
+
+export function isProcessTreeAlignmentResult(value: unknown): value is ProcessTreeAlignmentResult {
+  if (!isRecord(value) || value.family !== "PROCESS_TREE" ||
+      !["SEARCH_GRAPH_PT", "DYNAMIC_PROGRAMMING", "MILP", "APPROXIMATED_ORIGINAL"].includes(value.variant as string) ||
+      typeof value.computed !== "boolean" || typeof value.completed !== "boolean" ||
+      typeof value.timed_out !== "boolean" || typeof value.exhausted !== "boolean" ||
+      !finite(value.total_cost) || !finite(value.fitness) || !isRecord(value.diagnostics) ||
+      !Array.isArray(value.traces)) return false;
+  const d = value.diagnostics;
+  if (!["visited_states", "queued_states", "traversed_arcs", "lp_solved", "traces_aligned"].every((key) => Number.isInteger(d[key]) && (d[key] as number) >= 0) || typeof d.message !== "string") return false;
+  return value.traces.every((trace) => isRecord(trace) && Array.isArray(trace.trace) &&
+    trace.trace.every((activity) => typeof activity === "string") && finite(trace.cost) &&
+    finite(trace.fitness) && typeof trace.completed === "boolean" && typeof trace.timed_out === "boolean" && Array.isArray(trace.moves) &&
+    trace.moves.every((move) => isRecord(move) &&
+      (move.type === "sync" || move.type === "log" || move.type === "model") &&
+      typeof move.log === "string" && typeof move.model === "string" && typeof move.activity === "string"));
 }
 
 export const FOOTPRINTS_DISCOVERY_VARIANTS = [

@@ -49,6 +49,7 @@ add_library(minera_core
   src/performance_spectrum.cpp
   src/petri_net.cpp
   src/playout.cpp
+  src/process_tree_alignment.cpp
   src/powl.cpp
   src/powl_conversion.cpp
   src/powl_discovery.cpp
@@ -253,6 +254,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_alignment_variants_tests PRIVATE cxx_std_20)
   target_compile_options(minera_alignment_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_alignment_variants_tests COMMAND minera_alignment_variants_tests)
+
+  add_executable(minera_process_tree_alignment_tests
+    tests/test_process_tree_alignment.cpp
+  )
+  target_link_libraries(minera_process_tree_alignment_tests PRIVATE minera::core)
+  target_compile_features(minera_process_tree_alignment_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_tree_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_tree_alignment_tests COMMAND minera_process_tree_alignment_tests)
 
   add_executable(minera_dfg_alignment_tests
     tests/test_dfg_alignment.cpp

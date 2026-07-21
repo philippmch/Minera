@@ -56,7 +56,7 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Missing** |
 | Concept drift | Bose feature extraction and drift detection | **Missing** |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial** - DFG classic and edit distance (`EDIT_DISTANCE`) are complete (core); decomposed recomposition and all four process-tree variants remain missing |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Partial** — DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are complete (core); decomposed recomposition remains missing |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
@@ -459,6 +459,68 @@ LP solving, less-memory dominance, discounted exponent and scheduling parity,
 generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
 and invalid-cost handling; request, CLI, and frontend tests cover the exposed
 adapters.
+
+## Process-tree alignment parity evidence
+
+The four selectable process-tree variants are implemented in the native
+`include/minera/process_tree_alignment.hpp` / `src/process_tree_alignment.cpp`
+pair and exposed by the strict request parser, `minera_export`, the local
+server, and the frontend's **Other alignments** panel. They are deterministic,
+collision-free clean-room implementations with dependency-free exact residual
+fallbacks. This preserves PM4Py's behavioral questions without copying its
+Python implementation; `MILP` does not claim to invoke literal PuLP.
+
+* `SEARCH_GRAPH_PT` is the default residual-expression Dijkstra search, using
+  canonical interned residuals for stable, collision-free state identity.
+* `DYNAMIC_PROGRAMMING` recursively aligns subtrees with memoized subtree/trace
+  pairs; loops use the exact residual fallback. Optional global caching has a
+  positive `batch_size` and `clear_cache` controls periodic eviction.
+* `MILP` is an exact integer shortest-path residual A*/branch-and-bound
+  equivalent to the pinned unit-cost MILP objective. It is dependency-free and
+  performs no external LP solves (`lp_solved` therefore remains zero); native
+  residual-search counters are reported instead. Its formulation validates
+  loops as binary; non-binary loops are rejected.
+* `APPROXIMATED_ORIGINAL` uses exact residual alignment below configurable
+  trace-length/tree-height thresholds, then recursively decomposes sequence,
+  XOR, and parallel nodes. Loops always use the exact residual fallback, whose
+  count is reported in the diagnostic message.
+
+`ProcessTreeAlignmentOptions` defaults to `SEARCH_GRAPH_PT`, `max_states = 0`,
+per-trace and whole-log time limits of `0`, `use_global_cache = false`,
+`batch_size = 1000`, `clear_cache = true`, approximation thresholds
+`max_trace_length = 1` and `max_process_tree_height = 1`, and approximation
+trace/per-trace time limits of `0`. A zero state or time bound means unlimited;
+native validation still rejects negative/non-finite values, a zero DP batch,
+and unsupported cache settings on non-recursive variants. Request and CLI time
+fields are milliseconds (`pt_alignment_max_time_ms`,
+`pt_alignment_max_total_time_ms`, `pt_alignment_max_trace_time_ms`, and
+`pt_alignment_max_per_trace_time_ms`). CLI selection starts with
+`--align-process-tree` and `--pt-alignment-variant` plus the corresponding
+`--pt-alignment-*` bounds, cache, and threshold flags. The deferred HTTP entry
+point is `POST /api/align-process-tree`.
+
+The JSON result has `family: "PROCESS_TREE"`, the selected `variant`, aggregate
+`total_cost`/`fitness`, per-trace `trace`, `cost`, `fitness`, `moves` (`sync`,
+`log`, or `model` with log/model/activity labels), and diagnostics for visited,
+queued, and traversed states, native residual-search counters, aligned traces,
+and a message (`lp_solved` is zero because no external LP solver is used).
+`computed`, `completed`, `timed_out`, and `exhausted` are explicit at
+both result and trace level: a state/time bound yields an incomplete result and
+never a fabricated optimum. As in PM4Py, an empty fitness denominator reports
+`0.0` (including an empty trace/log against a silent tree). Native n-ary loop
+redo/exit children are normalized to an XOR for search/DP/approximation; MILP's
+binary validation is deliberate and tested. The recursive variants also use
+deterministic duplicate-label event assignment and retain model moves so the
+rendered explanation sums to the reported cost.
+
+Focused validation is in `tests/test_process_tree_alignment.cpp`, with request
+mapping/rejection coverage in `tests/test_request_params.cpp`, JSON checks in
+`tests/test_core.cpp`, and frontend query/result checks in
+`frontend/src/app-logic.test.ts`. Tests cover all four variants, exact
+sequence/XOR/parallel/loop behavior, repeated traces and DP cache batches,
+approximation thresholds and loop fallback diagnostics, timeout/state
+completion flags, empty-denominator fitness, n-ary normalization, and MILP's
+binary-loop rejection.
 
 ## DFG classic and edit-distance alignment parity evidence
 

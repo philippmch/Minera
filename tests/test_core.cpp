@@ -28,6 +28,7 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/process_tree_alignment.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/transition_system.hpp"
@@ -51,6 +52,36 @@
 #include <vector>
 
 namespace {
+
+void process_tree_alignment_json_carries_failure_and_moves() {
+  minera::ProcessTreeAlignmentResult result;
+  result.variant = minera::ProcessTreeAlignmentVariant::kMilp;
+  result.computed = false;
+  result.completed = false;
+  result.exhausted = true;
+  result.diagnostics.message = std::string("quote \"") + " and slash " +
+                              std::string(1, '\\');
+  minera::ProcessTreeTraceAlignment trace;
+  trace.trace = {"a"};
+  trace.completed = true;
+  trace.timed_out = false;
+  trace.moves.push_back({minera::ProcessTreeAlignmentMoveType::kSynchronous,
+                         "a", "a", "a"});
+  trace.moves.push_back({minera::ProcessTreeAlignmentMoveType::kLog,
+                         "x", "", "x"});
+  trace.moves.push_back({minera::ProcessTreeAlignmentMoveType::kModel,
+                         "", "b", "b"});
+  result.traces.push_back(std::move(trace));
+  const auto json = minera::process_tree_alignment_json(result);
+  assert(json.find("\"family\": \"PROCESS_TREE\"") != std::string::npos);
+  assert(json.find("\"variant\": \"MILP\"") != std::string::npos);
+  assert(json.find("\"trace\": [\"a\"]") != std::string::npos);
+  assert(json.find("\"timed_out\": false") != std::string::npos);
+  assert(json.find("\"type\": \"sync\"") != std::string::npos);
+  assert(json.find("\"type\": \"log\"") != std::string::npos);
+  assert(json.find("\"type\": \"model\"") != std::string::npos);
+  assert(json.find("quote \\\" and slash") != std::string::npos);
+}
 
 minera::EventLog temporal_log(std::initializer_list<std::vector<std::string>> rows) {
   minera::EventLog log;
@@ -4721,6 +4752,7 @@ void json_export_carries_dfg_and_edit_alignment_contract() {
 }
 
 int main() {
+  process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();
   minimum_self_distance_json_resolves_ids_and_validates_before_writing();

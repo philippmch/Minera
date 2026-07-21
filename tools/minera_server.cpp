@@ -48,6 +48,7 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
@@ -514,6 +515,42 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+// On-demand alignment directly against the latest inductive process tree.
+void handle_align_process_tree(const httplib::Request& request,
+                               httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      if (request.has_param(key)) return request.get_param_value(key);
+      if (request.has_file(key)) return request.get_file_value(key).content;
+      return std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) || request.has_file(key);
+    };
+    const auto options = minera::parse_process_tree_alignment_params(lookup, present);
+    const auto result = minera::align_process_tree(session->log, session->tree,
+                                                   options);
+    response.set_content(minera::process_tree_alignment_json(result),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_align_dfg(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
@@ -868,6 +905,7 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
+  server.Options("/api/align-process-tree", preflight);
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
@@ -875,6 +913,7 @@ int main(int argc, char** argv) {
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Post("/api/align-process-tree", handle_align_process_tree);
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
