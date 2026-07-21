@@ -15,6 +15,8 @@ import {
   type DfgAlignmentResult,
   type EditDistanceOptions,
   type EditDistanceResult,
+  type ProcessTreeAlignmentOptions,
+  type ProcessTreeAlignmentResult,
   numberFormat,
 } from "../types";
 import { parseDfgCostMapInput, type ImportedModelCheck } from "../api";
@@ -49,6 +51,7 @@ export function Conformance({
   onCheckModel,
   onRequestDfg,
   onRequestEditDistance,
+  onRequestProcessTree,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -56,6 +59,7 @@ export function Conformance({
   onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
+  onRequestProcessTree?: (options?: ProcessTreeAlignmentOptions) => Promise<ProcessTreeAlignmentResult>;
 }) {
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
@@ -272,30 +276,58 @@ export function Conformance({
             </div>
           </section>
         ))}
-      <OtherAlignments data={data} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} />
+      <OtherAlignments data={data} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} />
     </div>
   );
 }
 
-function OtherAlignments({ data, onRequestDfg, onRequestEditDistance }: {
+function OtherAlignments({ data, onRequestDfg, onRequestEditDistance, onRequestProcessTree }: {
   data: MineraExport;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
+  onRequestProcessTree?: (options?: ProcessTreeAlignmentOptions) => Promise<ProcessTreeAlignmentResult>;
 }) {
   const [dfg, setDfg] = useState<DfgAlignmentResult | null>(null);
   const [edit, setEdit] = useState<EditDistanceResult | null>(null);
+  const [processTree, setProcessTree] = useState<ProcessTreeAlignmentResult | null>(null);
   const [reference, setReference] = useState<File | null>(null);
   const [dfgOptions, setDfgOptions] = useState<DfgAlignmentOptions>({ variant: "CLASSIC", projection: "none" });
   const [editOptions, setEditOptions] = useState<EditDistanceOptions>({ variant: "EDIT_DISTANCE", projection: "none" });
-  const [busy, setBusy] = useState<"dfg" | "edit" | null>(null);
+  const [processTreeOptions, setProcessTreeOptions] = useState<ProcessTreeAlignmentOptions>({ variant: "SEARCH_GRAPH_PT" });
+  const [busy, setBusy] = useState<"dfg" | "edit" | "process-tree" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [costText, setCostText] = useState<Record<string, string>>({ sync_cost: "", model_move_cost: "", log_move_cost: "", internal_log_move_cost: "" });
-  useEffect(() => { setDfg(null); setEdit(null); setReference(null); setError(null); }, [data]);
+  useEffect(() => { setDfg(null); setEdit(null); setProcessTree(null); setReference(null); setError(null); }, [data]);
   const runDfg = async () => { if (!onRequestDfg) return; setBusy("dfg"); setError(null); try { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); setDfg(await onRequestDfg({ ...dfgOptions, ...maps })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   const runEdit = async () => { if (!onRequestEditDistance || !reference) return; setBusy("edit"); setError(null); try { setEdit(await onRequestEditDistance(reference, editOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runProcessTree = async () => { if (!onRequestProcessTree || !data.process_tree) return; setBusy("process-tree"); setError(null); try { setProcessTree(await onRequestProcessTree(processTreeOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   return <section className="panel conf-panel other-alignments">
-    <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">DFG classic · edit distance</span></div>
+    <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">Process tree · DFG classic · edit distance</span></div>
     <div className="other-align-grid">
+      <div className="other-align-card">
+        <h3>Process tree</h3>
+        <p>Align the latest mined inductive process tree against every trace.</p>
+        <div className="align-settings-grid">
+          <label>Variant<select value={processTreeOptions.variant ?? "SEARCH_GRAPH_PT"} onChange={e => setProcessTreeOptions({ ...processTreeOptions, variant: e.target.value as ProcessTreeAlignmentOptions["variant"] })}><option value="SEARCH_GRAPH_PT">Search graph</option><option value="DYNAMIC_PROGRAMMING">Dynamic programming</option><option value="MILP">MILP</option><option value="APPROXIMATED_ORIGINAL">Approximated original</option></select></label>
+          <label>State limit<input type="number" min={0} value={processTreeOptions.max_states ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label>
+          <label>Per-trace time (ms)<input type="number" min={0} value={processTreeOptions.max_time_ms ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label>
+          <label>Total time (ms)<input type="number" min={0} value={processTreeOptions.max_total_time_ms ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_total_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label>
+          {processTreeOptions.variant === "DYNAMIC_PROGRAMMING" && <>
+            <label>Global cache<select value={String(processTreeOptions.use_global_cache ?? false)} onChange={e => setProcessTreeOptions({ ...processTreeOptions, use_global_cache: e.target.value === "true" })}><option value="false">Off</option><option value="true">On</option></select></label>
+            <label>Batch size<input type="number" min={1} value={processTreeOptions.batch_size ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, batch_size: e.target.value ? Number(e.target.value) : undefined })} /></label>
+            <label>Clear cache<select value={String(processTreeOptions.clear_cache ?? true)} onChange={e => setProcessTreeOptions({ ...processTreeOptions, clear_cache: e.target.value === "true" })}><option value="true">Before run</option><option value="false">Keep</option></select></label>
+          </>}
+          {processTreeOptions.variant === "APPROXIMATED_ORIGINAL" && <>
+            <label>Max trace length<input type="number" min={0} value={processTreeOptions.max_trace_length ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_trace_length: e.target.value ? Number(e.target.value) : undefined })} /></label>
+            <label>Max tree height<input type="number" min={0} value={processTreeOptions.max_process_tree_height ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_process_tree_height: e.target.value ? Number(e.target.value) : undefined })} /></label>
+            <label>Trace timeout (ms)<input type="number" min={0} value={processTreeOptions.max_trace_time_ms ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_trace_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label>
+            <label>Per-trace timeout (ms)<input type="number" min={0} value={processTreeOptions.max_per_trace_time_ms ?? ""} onChange={e => setProcessTreeOptions({ ...processTreeOptions, max_per_trace_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label>
+          </>}
+        </div>
+        <button className="button" disabled={!onRequestProcessTree || busy !== null || !data.process_tree} onClick={() => void runProcessTree()}>{busy === "process-tree" ? "Aligning…" : "Run process-tree alignment"}</button>
+        {!data.process_tree && <small>No inductive process tree is present in this analysis.</small>}
+        {processTree && <ProcessTreeResultView result={processTree} />}
+      </div>
       <div className="other-align-card"><h3>DFG classic</h3><p>Align the latest mined log against its directly-follows graph.</p>
         <div className="align-settings-grid"><label>State limit<input type="number" min={1} value={dfgOptions.max_states ?? ""} onChange={e => setDfgOptions({ ...dfgOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Time limit (ms)<input type="number" min={1} value={dfgOptions.max_time_ms ?? ""} onChange={e => setDfgOptions({ ...dfgOptions, max_time_ms: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Projection<select value={dfgOptions.projection ?? "none"} onChange={e => setDfgOptions({ ...dfgOptions, projection: e.target.value as DfgAlignmentOptions["projection"] })}><option value="none">None</option><option value="log">Projected log</option><option value="metrics">Metrics</option></select></label><label>Sync costs<input placeholder="A=1,B=2" value={costText.sync_cost} onChange={e => setCostText({ ...costText, sync_cost: e.target.value })} /></label><label>Model-move costs<input placeholder="A=1,B=2" value={costText.model_move_cost} onChange={e => setCostText({ ...costText, model_move_cost: e.target.value })} /></label><label>Log-move costs<input placeholder="A=1,B=2" value={costText.log_move_cost} onChange={e => setCostText({ ...costText, log_move_cost: e.target.value })} /></label><label>Internal-log costs<input placeholder="A=1,B=2" value={costText.internal_log_move_cost} onChange={e => setCostText({ ...costText, internal_log_move_cost: e.target.value })} /></label></div>
         <small>Escape delimiters with a backslash; use \s, \t, \n, or \r for whitespace in activity names.</small>
@@ -311,6 +343,19 @@ function OtherAlignments({ data, onRequestDfg, onRequestEditDistance }: {
 
 function DfgResult({ result }: { result: DfgAlignmentResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.alignments.length)}</strong> traces · {numberFormat.format(result.unique_variants)} unique variants searched</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · internal {numberFormat.format(a.internal_cost)} · states {numberFormat.format(a.visited_states)} · closed {numberFormat.format(a.closed_states)}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.log === ">>" ? "model" : m.model === ">>" ? "log" : "sync"}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol>{result.projected_dfg && <small>{result.projected_dfg.edges.length} projected edges · {result.projected_dfg.activities.length} activities</small>}</div>; }
 function EditDistanceResultView({ result }: { result: EditDistanceResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.source_count)}</strong> source traces · {result.anti ? "anti-alignment" : "closest alignment"}</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · best/worst {numberFormat.format(a.best_worst_cost)} · denominator {numberFormat.format(a.denominator)} · target #{a.target_index}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.type}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol></div>; }
+
+function ProcessTreeResultView({ result }: { result: ProcessTreeAlignmentResult }) {
+  return <div className="other-result">
+    <p><strong>{numberFormat.format(result.traces.length)}</strong> traces · {percent(result.fitness)} fitness · total cost {numberFormat.format(result.total_cost)}</p>
+    <p className="variant-count">Variant {result.variant.replaceAll("_", " ")} · {result.computed ? "computed" : "not computed"} · {result.completed ? "completed" : "incomplete"}{result.timed_out ? " · timed out" : ""}{result.exhausted ? " · search exhausted" : ""}</p>
+    <small>Visited {numberFormat.format(result.diagnostics.visited_states)} states · queued {numberFormat.format(result.diagnostics.queued_states)} · aligned {numberFormat.format(result.diagnostics.traces_aligned)} traces</small>
+    {result.diagnostics.message && <p className="variant-count">{result.diagnostics.message}</p>}
+    <ol className="variant-list">{result.traces.slice(0, 30).map((trace, index) => <li className="variant" key={index}>
+      <div className="variant-top"><span className={`conf-pill ${grade(trace.fitness)}`}>{percent(trace.fitness)}</span><span className="variant-count">cost {numberFormat.format(trace.cost)} · {trace.completed ? "complete" : "incomplete"}{trace.timed_out ? " · timed out" : ""}</span></div>
+      <div className="align-moves">{trace.moves.map((move, moveIndex) => <span className={`align-move ${move.type}`} title={move.activity} key={moveIndex}>{move.log || "∅"} / {move.model || "∅"}</span>)}</div>
+    </li>)}</ol>
+  </div>;
+}
 
 // Token-replay results: quality gauges, the token tally, and per-variant
 // deviation. Rendered when the "token-replay" method is selected.

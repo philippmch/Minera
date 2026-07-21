@@ -80,6 +80,75 @@ void write_process_tree_node(std::ostream& out,
   out << '}';
 }
 
+std::string_view process_tree_alignment_variant_name(ProcessTreeAlignmentVariant variant) {
+  switch (variant) {
+    case ProcessTreeAlignmentVariant::kSearchGraphPt: return "SEARCH_GRAPH_PT";
+    case ProcessTreeAlignmentVariant::kDynamicProgramming: return "DYNAMIC_PROGRAMMING";
+    case ProcessTreeAlignmentVariant::kMilp: return "MILP";
+    case ProcessTreeAlignmentVariant::kApproximatedOriginal: return "APPROXIMATED_ORIGINAL";
+  }
+  return "SEARCH_GRAPH_PT";
+}
+
+std::string_view process_tree_alignment_move_type_name(ProcessTreeAlignmentMoveType type) {
+  switch (type) {
+    case ProcessTreeAlignmentMoveType::kSynchronous: return "sync";
+    case ProcessTreeAlignmentMoveType::kLog: return "log";
+    case ProcessTreeAlignmentMoveType::kModel: return "model";
+  }
+  return "sync";
+}
+
+void write_process_tree_alignment(std::ostream& out,
+                                  const ProcessTreeAlignmentResult& result) {
+  out << "{\"family\": \"PROCESS_TREE\", \"variant\": ";
+  write_json_string(out, process_tree_alignment_variant_name(result.variant));
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"completed\": " << (result.completed ? "true" : "false")
+      << ", \"timed_out\": " << (result.timed_out ? "true" : "false")
+      << ", \"exhausted\": " << (result.exhausted ? "true" : "false")
+      << ", \"total_cost\": " << result.total_cost
+      << ", \"fitness\": " << result.fitness
+      << ", \"diagnostics\": {\"visited_states\": "
+      << result.diagnostics.visited_states
+      << ", \"queued_states\": " << result.diagnostics.queued_states
+      << ", \"traversed_arcs\": " << result.diagnostics.traversed_arcs
+      << ", \"lp_solved\": " << result.diagnostics.lp_solved
+      << ", \"traces_aligned\": " << result.diagnostics.traces_aligned
+      << ", \"message\": ";
+  write_json_string(out, result.diagnostics.message);
+  out << "}, \"traces\": [";
+  for (std::size_t i = 0; i < result.traces.size(); ++i) {
+    const auto& trace = result.traces[i];
+    if (i != 0) out << ", ";
+    out << "{\"trace\": [";
+    for (std::size_t j = 0; j < trace.trace.size(); ++j) {
+      if (j != 0) out << ", ";
+      write_json_string(out, trace.trace[j]);
+    }
+    out << "], \"cost\": " << trace.cost
+        << ", \"fitness\": " << trace.fitness
+        << ", \"completed\": " << (trace.completed ? "true" : "false")
+        << ", \"timed_out\": " << (trace.timed_out ? "true" : "false")
+        << ", \"moves\": [";
+    for (std::size_t j = 0; j < trace.moves.size(); ++j) {
+      const auto& move = trace.moves[j];
+      if (j != 0) out << ", ";
+      out << "{\"type\": ";
+      write_json_string(out, process_tree_alignment_move_type_name(move.type));
+      out << ", \"log\": ";
+      write_json_string(out, move.log_activity);
+      out << ", \"model\": ";
+      write_json_string(out, move.model_activity);
+      out << ", \"activity\": ";
+      write_json_string(out, move.activity);
+      out << '}';
+    }
+    out << "]}";
+  }
+  out << "]}";
+}
+
 void write_powl_node(std::ostream& out, const PowlNode& node,
                      const DirectlyFollowsGraph& graph) {
   switch (node.kind()) {
@@ -2487,7 +2556,8 @@ void write_analysis_json(std::ostream& out,
                          bool edit_anti,
                          const DfgAlignmentProjection* dfg_projection,
                          const EventLog* dfg_projected_log,
-                         const EventLog* edit_projected_log) {
+                         const EventLog* edit_projected_log,
+                         const ProcessTreeAlignmentResult* process_tree_alignment) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2740,6 +2810,10 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"edit_distance\": ";
     out << edit_distance_json(*edit_distance, edit_anti, edit_projected_log);
   }
+  if (process_tree_alignment != nullptr) {
+    out << ",\n  \"process_tree_alignment\": ";
+    write_process_tree_alignment(out, *process_tree_alignment);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -2784,7 +2858,8 @@ std::string analysis_json(std::string_view dataset,
                           bool edit_anti,
                           const DfgAlignmentProjection* dfg_projection,
                           const EventLog* dfg_projected_log,
-                          const EventLog* edit_projected_log) {
+                          const EventLog* edit_projected_log,
+                          const ProcessTreeAlignmentResult* process_tree_alignment) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2796,7 +2871,8 @@ std::string analysis_json(std::string_view dataset,
                       log_skeleton_conformance, declare, declare_conformance,
                       footprints, dfg_variants, correlation_mining,
                       batch_discovery, dfg_alignment, edit_distance, edit_anti,
-                      dfg_projection, dfg_projected_log, edit_projected_log);
+                      dfg_projection, dfg_projected_log, edit_projected_log,
+                      process_tree_alignment);
   return out.str();
 }
 
@@ -2810,6 +2886,12 @@ std::string alignment_json(const AlignmentResult& alignment,
                            const DirectlyFollowsGraph& graph) {
   std::ostringstream out;
   write_alignments(out, alignment, graph);
+  return out.str();
+}
+
+std::string process_tree_alignment_json(const ProcessTreeAlignmentResult& result) {
+  std::ostringstream out;
+  write_process_tree_alignment(out, result);
   return out.str();
 }
 

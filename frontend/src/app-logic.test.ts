@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, processTreeAlignmentQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
@@ -9,7 +9,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("DFG and edit-distance contracts", () => {
   it("serializes DFG options and cost maps deterministically", () => {
@@ -36,6 +36,36 @@ describe("DFG and edit-distance contracts", () => {
     expect(isDfgAlignmentResult({ ...dfg, family: "EDIT_DISTANCE" })).toBe(false);
     const edit = { family: "EDIT_DISTANCE", variant: "EDIT_DISTANCE", anti: false, source_count: 1, alignments: [{ source_variant: ["A"], target_variant: ["A"], target_index: 0, cost: 0, fitness: 1, best_worst_cost: 0, bwc: 0, denominator: 0, moves: [{ type: "sync", log: "A", model: "A" }] }] };
     expect(isEditDistanceResult(edit)).toBe(true);
+  });
+});
+
+describe("process-tree alignment contract", () => {
+  it("omits native defaults and prunes variant-specific controls", () => {
+    expect(processTreeAlignmentQuery({})).toBe("");
+    const params = new URLSearchParams(processTreeAlignmentQuery({
+      variant: "APPROXIMATED_ORIGINAL", max_states: 0, max_time_ms: 0,
+      max_trace_length: 0, max_process_tree_height: 4, batch_size: 2,
+    }));
+    expect(params.get("pt_alignment_variant")).toBe("APPROXIMATED_ORIGINAL");
+    expect(params.get("pt_alignment_max_process_tree_height")).toBe("4");
+    expect(params.get("pt_alignment_max_trace_length")).toBe("0");
+    expect(params.has("pt_alignment_batch_size")).toBe(false);
+  });
+  it("rejects invalid bounds", () => {
+    expect(() => processTreeAlignmentQuery({ max_states: -1 })).toThrow(/non-negative/);
+    expect(() => processTreeAlignmentQuery({ batch_size: 0 })).toThrow(/positive/);
+    expect(() => processTreeAlignmentQuery({ max_time_ms: Number.NaN })).toThrow(/finite/);
+  });
+  it("guards the process-tree response shape", () => {
+    const result = {
+      family: "PROCESS_TREE", variant: "MILP", computed: true, completed: true,
+      timed_out: false, exhausted: false, total_cost: 0, fitness: 1,
+      diagnostics: { visited_states: 1, queued_states: 0, traversed_arcs: 1, lp_solved: 1, traces_aligned: 1, message: "" },
+      traces: [{ trace: ["A"], cost: 0, fitness: 1, completed: true, timed_out: false, moves: [{ type: "sync", log: "A", model: "A", activity: "A" }] }],
+    };
+    expect(isProcessTreeAlignmentResult(result)).toBe(true);
+    expect(isProcessTreeAlignmentResult({ ...result, family: "DFG" })).toBe(false);
+    expect(isProcessTreeAlignmentResult({ ...result, diagnostics: { ...result.diagnostics, lp_solved: -1 } })).toBe(false);
   });
 });
 import {

@@ -13,8 +13,11 @@ import {
   type DfgAlignmentResult,
   type EditDistanceOptions,
   type EditDistanceResult,
+  type ProcessTreeAlignmentOptions,
+  type ProcessTreeAlignmentResult,
   isDfgAlignmentResult,
   isEditDistanceResult,
+  isProcessTreeAlignmentResult,
   isMineraExport,
 } from "./types";
 
@@ -746,6 +749,88 @@ export async function alignEditDistance(reference: File, options: EditDistanceOp
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isEditDistanceResult(parsed)) throw new Error("the Minera backend returned an invalid edit-distance alignment");
+  return parsed;
+}
+
+export const DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS: Required<ProcessTreeAlignmentOptions> = {
+  variant: "SEARCH_GRAPH_PT",
+  max_states: 0,
+  max_time_ms: 0,
+  max_total_time_ms: 0,
+  use_global_cache: false,
+  batch_size: 1000,
+  clear_cache: true,
+  max_trace_length: 1,
+  max_process_tree_height: 1,
+  max_trace_time_ms: 0,
+  max_per_trace_time_ms: 0,
+};
+
+function nonNegativeInteger(value: number | undefined, name: string): boolean {
+  if (value === undefined) return true;
+  if (!Number.isInteger(value) || value < 0) throw new Error(`${name} must be a non-negative integer`);
+  return true;
+}
+
+function nonNegativeTime(value: number | undefined, name: string): boolean {
+  if (value === undefined) return true;
+  if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be a non-negative finite number`);
+  return true;
+}
+
+/** Stable query serialization for process-tree alignment requests. */
+export function processTreeAlignmentQuery(options: ProcessTreeAlignmentOptions = {}): string {
+  const variant = options.variant ?? DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.variant;
+  if (!["SEARCH_GRAPH_PT", "DYNAMIC_PROGRAMMING", "MILP", "APPROXIMATED_ORIGINAL"].includes(variant)) {
+    throw new Error("pt_alignment_variant is invalid");
+  }
+  nonNegativeInteger(options.max_states, "pt_alignment_max_states");
+  nonNegativeTime(options.max_time_ms, "pt_alignment_max_time_ms");
+  nonNegativeTime(options.max_total_time_ms, "pt_alignment_max_total_time_ms");
+  nonNegativeInteger(options.max_trace_length, "pt_alignment_max_trace_length");
+  nonNegativeInteger(options.max_process_tree_height, "pt_alignment_max_process_tree_height");
+  nonNegativeTime(options.max_trace_time_ms, "pt_alignment_max_trace_time_ms");
+  nonNegativeTime(options.max_per_trace_time_ms, "pt_alignment_max_per_trace_time_ms");
+  if (options.batch_size !== undefined && (!Number.isInteger(options.batch_size) || options.batch_size < 1)) {
+    throw new Error("pt_alignment_batch_size must be a positive integer");
+  }
+  if (options.use_global_cache !== undefined && typeof options.use_global_cache !== "boolean") throw new Error("pt_alignment_use_global_cache must be boolean");
+  if (options.clear_cache !== undefined && typeof options.clear_cache !== "boolean") throw new Error("pt_alignment_clear_cache must be boolean");
+
+  const query = new URLSearchParams();
+  const add = (name: string, value: unknown) => { if (value !== undefined && value !== null && value !== "") query.set(name, String(value)); };
+  if (variant !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.variant) add("pt_alignment_variant", variant);
+  if (options.max_states !== undefined && options.max_states !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_states) add("pt_alignment_max_states", options.max_states);
+  if (options.max_time_ms !== undefined && options.max_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_time_ms) add("pt_alignment_max_time_ms", options.max_time_ms);
+  if (options.max_total_time_ms !== undefined && options.max_total_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_total_time_ms) add("pt_alignment_max_total_time_ms", options.max_total_time_ms);
+  // DP-only controls are ignored by the native parser for other variants.
+  if (variant === "DYNAMIC_PROGRAMMING") {
+    if (options.use_global_cache !== undefined && options.use_global_cache !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.use_global_cache) add("pt_alignment_use_global_cache", options.use_global_cache);
+    if (options.batch_size !== undefined && options.batch_size !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.batch_size) add("pt_alignment_batch_size", options.batch_size);
+    if (options.clear_cache !== undefined && options.clear_cache !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.clear_cache) add("pt_alignment_clear_cache", options.clear_cache);
+  }
+  if (variant === "APPROXIMATED_ORIGINAL") {
+    if (options.max_trace_length !== undefined && options.max_trace_length !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_trace_length) add("pt_alignment_max_trace_length", options.max_trace_length);
+    if (options.max_process_tree_height !== undefined && options.max_process_tree_height !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_process_tree_height) add("pt_alignment_max_process_tree_height", options.max_process_tree_height);
+    if (options.max_trace_time_ms !== undefined && options.max_trace_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_trace_time_ms) add("pt_alignment_max_trace_time_ms", options.max_trace_time_ms);
+    if (options.max_per_trace_time_ms !== undefined && options.max_per_trace_time_ms !== DEFAULT_PROCESS_TREE_ALIGNMENT_OPTIONS.max_per_trace_time_ms) add("pt_alignment_max_per_trace_time_ms", options.max_per_trace_time_ms);
+  }
+  return query.toString();
+}
+
+export async function alignProcessTree(options: ProcessTreeAlignmentOptions = {}): Promise<ProcessTreeAlignmentResult> {
+  let response: Response;
+  try {
+    const query = processTreeAlignmentQuery(options);
+    response = await fetch(`/api/align-process-tree${query ? `?${query}` : ""}`, { method: "POST" });
+  } catch (cause) {
+    if (cause instanceof Error && cause.message.startsWith("pt_alignment_")) throw cause;
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isProcessTreeAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid process-tree alignment");
   return parsed;
 }
 

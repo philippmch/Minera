@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -44,6 +45,7 @@
 #include "minera/powl_conversion.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
+#include "minera/process_tree_alignment.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
 #include "minera/temporal_profile.hpp"
@@ -422,6 +424,20 @@ int usage(const char* program) {
                "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
                "  --edit-projection <mode>  none or log\n"
                "                            on large, badly fitting logs\n"
+               "  --align-process-tree     Embed process-tree alignments\n"
+               "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
+               "                            DYNAMIC_PROGRAMMING, MILP, or\n"
+               "                            APPROXIMATED_ORIGINAL\n"
+               "  --pt-alignment-max-states <n> State bound (0 = unlimited)\n"
+               "  --pt-alignment-max-time-ms <n> Per-trace time (0 = unlimited)\n"
+               "  --pt-alignment-max-total-time-ms <n> Whole-log time\n"
+               "  --pt-alignment-use-global-cache <bool>\n"
+               "  --pt-alignment-batch-size <n> Positive batch size\n"
+               "  --pt-alignment-clear-cache <bool>\n"
+               "  --pt-alignment-max-trace-length <n> Approximation threshold\n"
+               "  --pt-alignment-max-process-tree-height <n> Approximation threshold\n"
+               "  --pt-alignment-max-trace-time-ms <n> Approximation trace time\n"
+               "  --pt-alignment-max-per-trace-time-ms <n> Approximation per-trace time\n"
                "  --alignment-variant <id> state_equation_a_star (default),\n"
                "                            dijkstra_no_heuristics,\n"
                "                            dijkstra_less_memory, discounted_a_star,\n"
@@ -582,6 +598,9 @@ int main(int argc, char** argv) {
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   bool no_alignments = false;
+  bool align_process_tree = false;
+  std::map<std::string, std::string> pt_alignment_fields;
+  minera::ProcessTreeAlignmentOptions pt_alignment_options;
   bool align_dfg = false;
   std::string dfg_projection = "none";
   minera::DfgAlignmentOptions dfg_alignment_options;
@@ -804,6 +823,25 @@ int main(int argc, char** argv) {
       decisions_miner = value;
     } else if (arg == "--no-alignments") {
       no_alignments = true;
+    } else if (arg == "--align-process-tree") {
+      align_process_tree = true;
+    } else if (arg == "--pt-alignment-variant" ||
+               arg == "--pt-alignment-max-states" ||
+               arg == "--pt-alignment-max-time-ms" ||
+               arg == "--pt-alignment-max-total-time-ms" ||
+               arg == "--pt-alignment-use-global-cache" ||
+               arg == "--pt-alignment-batch-size" ||
+               arg == "--pt-alignment-clear-cache" ||
+               arg == "--pt-alignment-max-trace-length" ||
+               arg == "--pt-alignment-max-process-tree-height" ||
+               arg == "--pt-alignment-max-trace-time-ms" ||
+               arg == "--pt-alignment-max-per-trace-time-ms") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      pt_alignment_fields[key] = value;
+      align_process_tree = true;
     } else if (arg == "--align-dfg" || arg == "--dfg-max-states" || arg == "--dfg-max-time-ms" || arg == "--dfg-projection" || arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost" || arg == "--align-edit-distance" || arg == "--edit-anti" || arg == "--edit-deviation-cost" || arg == "--edit-projection") {
       if (arg == "--align-dfg") { align_dfg = true; }
       else if (arg == "--edit-anti") { edit_anti = true; edit_options.perform_anti_alignment = true; edit_option_used = true; }
@@ -1640,6 +1678,18 @@ int main(int argc, char** argv) {
     std::cerr << "error: edit-distance options require --align-edit-distance <file>\n";
     return 2;
   }
+  if (align_process_tree) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = pt_alignment_fields.find(std::string(name));
+      return it == pt_alignment_fields.end() ? std::string{} : it->second;
+    };
+    try {
+      pt_alignment_options = minera::parse_process_tree_alignment_params(lookup);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
 
   if (footprints_options.model == "dfg" &&
       footprints_options.discovery_variants.contains("petri_reach_graph")) {
@@ -1711,6 +1761,11 @@ int main(int argc, char** argv) {
     const auto transition_system =
         minera::discover_transition_system(log, transition_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
+    std::optional<minera::ProcessTreeAlignmentResult> process_tree_alignment_result;
+    if (align_process_tree) {
+      process_tree_alignment_result =
+          minera::align_process_tree(log, tree, pt_alignment_options);
+    }
     const auto net = minera::discover_petri_net(log, alpha_options);
     const auto heuristics =
         minera::discover_heuristics_net(log, heuristic_options);
@@ -1864,7 +1919,8 @@ int main(int argc, char** argv) {
           edit_result ? &*edit_result : nullptr, edit_anti,
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
-          edit_projected_log ? &*edit_projected_log : nullptr);
+          edit_projected_log ? &*edit_projected_log : nullptr,
+          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1888,7 +1944,8 @@ int main(int argc, char** argv) {
           edit_result ? &*edit_result : nullptr, edit_anti,
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
-          edit_projected_log ? &*edit_projected_log : nullptr);
+          edit_projected_log ? &*edit_projected_log : nullptr,
+          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

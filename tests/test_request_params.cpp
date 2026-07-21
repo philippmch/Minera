@@ -767,6 +767,42 @@ void parse_alignment_params_rejects_invalid_and_dependent_values() {
   assert(threw);
 }
 
+void parse_process_tree_alignment_params_maps_variants_and_limits() {
+  for (const auto& value : {"SEARCH_GRAPH_PT", "search_graph_pt",
+                            "Variants.SEARCH_GRAPH_PT", "DYNAMIC_PROGRAMMING", "MILP",
+                            "Variants.APPROXIMATED_ORIGINAL"}) {
+    const auto p = minera::parse_process_tree_alignment_params(
+        fields({{"pt_alignment_variant", value}}));
+    (void)p;
+  }
+  const auto p = minera::parse_process_tree_alignment_params(fields({
+      {"pt_alignment_variant", "dynamic-programming"},
+      {"pt_alignment_max_states", "0"},
+      {"pt_alignment_max_time_ms", "1500"},
+      {"pt_alignment_max_total_time_ms", "0"},
+      {"pt_alignment_max_trace_length", "0"},
+      {"pt_alignment_max_process_tree_height", "3"},
+      {"pt_alignment_use_global_cache", "true"},
+      {"pt_alignment_batch_size", "2"},
+      {"pt_alignment_clear_cache", "false"}}));
+  assert(p.variant == minera::ProcessTreeAlignmentVariant::kDynamicProgramming);
+  assert(p.max_states == 0 && p.max_time_seconds == 1.5);
+  assert(p.max_total_time_seconds == 0.0 && p.max_trace_length == 0);
+  assert(p.max_process_tree_height == 3 && p.use_global_cache && p.batch_size == 2 && !p.clear_cache);
+}
+
+void parse_process_tree_alignment_params_rejects_bad_values() {
+  for (const auto& item : {std::pair{"pt_alignment_batch_size", "0"},
+                           std::pair{"pt_alignment_max_time_ms", "-1"},
+                           std::pair{"pt_alignment_max_time_ms", "nan"},
+                           std::pair{"pt_alignment_variant", "unknown"}}) {
+    bool threw = false;
+    try { (void)minera::parse_process_tree_alignment_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 void parse_dfg_and_edit_alignment_params_contract() {
   const auto d = minera::parse_dfg_alignment_params(fields({
       {"dfg_variant", "CLASSIC"}, {"dfg_max_states", "0"},
@@ -973,5 +1009,7 @@ int main() {
   parse_alignment_params_maps_variants_and_costs();
   parse_alignment_params_rejects_invalid_and_dependent_values();
   parse_dfg_and_edit_alignment_params_contract();
+  parse_process_tree_alignment_params_maps_variants_and_limits();
+  parse_process_tree_alignment_params_rejects_bad_values();
   return 0;
 }

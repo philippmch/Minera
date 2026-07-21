@@ -22,6 +22,7 @@
 #include "minera/batches.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
+#include "minera/process_tree_alignment.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -102,6 +103,16 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field);
 [[nodiscard]] AlignmentOptions parse_alignment_params(const FieldLookup& field,
                                                        const FieldPresence& present);
+
+// Parses process-tree alignment settings. Wire fields use the canonical
+// `pt_alignment_` prefix (for example `pt_alignment_variant` and
+// `pt_alignment_max_time_ms`). Time limits are expressed in milliseconds on
+// the wire and converted to the core's seconds representation. Zero means
+// unlimited where supported by the core.
+[[nodiscard]] ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
+    const FieldLookup& field);
+[[nodiscard]] ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 // Builds the discovery options from a mine request's form fields. The
 // single-callback overload treats absent and empty fields alike, preserving the

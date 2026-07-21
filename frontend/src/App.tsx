@@ -4,6 +4,7 @@ import {
   type AlignmentOptions,
   type DfgAlignmentOptions,
   type EditDistanceOptions,
+  type ProcessTreeAlignmentOptions,
   DEFAULT_ALIGNMENT_OPTIONS,
   type CaseAttributeStat,
   type Decisions,
@@ -37,6 +38,8 @@ import {
   alignModel,
   alignDfg,
   alignEditDistance,
+  alignProcessTree,
+  processTreeAlignmentQuery,
   checkModel,
   decideModel,
   mineCsv,
@@ -82,6 +85,7 @@ export default function App() {
   const decideCache = useRef<Record<string, Decisions>>({});
   const dfgCache = useRef<Record<string, import("./types").DfgAlignmentResult>>({});
   const editCache = useRef<Record<string, import("./types").EditDistanceResult>>({});
+  const processTreeCache = useRef<Record<string, import("./types").ProcessTreeAlignmentResult>>({});
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -131,6 +135,13 @@ export default function App() {
     editCache.current = { ...editCache.current, [key]: result };
     return result;
   }, []);
+  const requestProcessTree = useCallback(async (options: ProcessTreeAlignmentOptions = {}) => {
+    const key = processTreeAlignmentQuery(options);
+    if (processTreeCache.current[key]) return processTreeCache.current[key];
+    const result = await alignProcessTree(options);
+    processTreeCache.current = { ...processTreeCache.current, [key]: result };
+    return result;
+  }, []);
 
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
@@ -151,6 +162,7 @@ export default function App() {
     decideCache.current = {};
     dfgCache.current = {};
     editCache.current = {};
+    processTreeCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -446,6 +458,7 @@ export default function App() {
             onCheckModel={requestModelCheck}
             onRequestDfg={requestDfg}
             onRequestEditDistance={requestEditDistance}
+            onRequestProcessTree={requestProcessTree}
           />
         </main>
       )}
