@@ -407,6 +407,22 @@ int usage(const char* program) {
                "                            export (token replay and footprints\n"
                "                            stay); alignments dominate runtime\n"
                "                            on large, badly fitting logs\n"
+               "  --alignment-variant <id> state_equation_a_star (default),\n"
+               "                            dijkstra_no_heuristics,\n"
+               "                            dijkstra_less_memory, discounted_a_star,\n"
+               "                            generator_dijkstra_no_heuristics, or\n"
+               "                            generator_dijkstra_less_memory\n"
+               "  --alignment-max-states <n> Positive state search limit\n"
+               "  --alignment-max-align-time <f> Whole-log time limit (seconds)\n"
+               "  --alignment-max-align-time-trace <f> Per-trace time limit\n"
+               "  --alignment-max-alignments <n> Equal-optimal generator limit\n"
+               "  --alignment-exponent <f> Discounted A* exponent (>1)\n"
+               "  --alignment-synchronous-dijkstra <bool> Discounted sync Dijkstra\n"
+               "  --alignment-cost-profile <id> legacy (default) or pm4py\n"
+               "  --alignment-trace-cost <f> Log move cost\n"
+               "  --alignment-model-cost <f> Visible model move cost\n"
+               "  --alignment-silent-model-cost <f> Silent model move cost\n"
+               "  --alignment-sync-cost <f> Synchronous move cost\n"
                "  --token-replay-variant <id> Token replay: forward (default)\n"
                "                            or backwards\n"
                "  --token-replay-stop-immediately-unfit\n"
@@ -551,6 +567,15 @@ int main(int argc, char** argv) {
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   bool no_alignments = false;
+  minera::AlignmentOptions alignment_options;
+  bool alignment_option_used = false;
+  bool alignment_max_alignments_used = false;
+  bool alignment_exponent_used = false;
+  bool alignment_synchronous_dijkstra_used = false;
+  bool alignment_trace_cost_used = false;
+  bool alignment_model_cost_used = false;
+  bool alignment_silent_cost_used = false;
+  bool alignment_sync_cost_used = false;
   std::vector<std::string> spectrum_activities;  // empty = no spectrum
   bool spectrum_requested = false;
   bool spectrum_option_used = false;
@@ -747,6 +772,59 @@ int main(int argc, char** argv) {
       decisions_miner = value;
     } else if (arg == "--no-alignments") {
       no_alignments = true;
+    } else if (arg == "--alignment-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view v = value;
+      if (v == "state_equation_a_star" || v == "VERSION_STATE_EQUATION_A_STAR") alignment_options.variant = minera::AlignmentVariant::kStateEquationAStar;
+      else if (v == "dijkstra_no_heuristics" || v == "VERSION_DIJKSTRA_NO_HEURISTICS") alignment_options.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;
+      else if (v == "dijkstra_less_memory" || v == "VERSION_DIJKSTRA_LESS_MEMORY") alignment_options.variant = minera::AlignmentVariant::kDijkstraLessMemory;
+      else if (v == "discounted_a_star" || v == "VERSION_DISCOUNTED_A_STAR") alignment_options.variant = minera::AlignmentVariant::kDiscountedAStar;
+      else if (v == "generator_dijkstra_no_heuristics") alignment_options.variant = minera::AlignmentVariant::kGeneratorDijkstraNoHeuristics;
+      else if (v == "generator_dijkstra_less_memory") alignment_options.variant = minera::AlignmentVariant::kGeneratorDijkstraLessMemory;
+      else { std::cerr << "error: --alignment-variant: unknown variant\n"; return 2; }
+      alignment_option_used = true;
+    } else if (arg == "--alignment-max-states" || arg == "--alignment-max-alignments") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::size_t parsed = 0;
+      try { parsed = parse_positive_size(value, arg); }
+      catch (const std::invalid_argument& error) { std::cerr << "error: " << error.what() << '\n'; return 2; }
+      if (arg == "--alignment-max-states") alignment_options.max_states = parsed;
+      else { alignment_options.max_alignments = parsed; alignment_max_alignments_used = true; }
+      alignment_option_used = true;
+    } else if (arg == "--alignment-max-align-time" || arg == "--alignment-max-align-time-trace" ||
+               arg == "--alignment-exponent" || arg == "--alignment-trace-cost" ||
+               arg == "--alignment-model-cost" || arg == "--alignment-silent-model-cost" ||
+               arg == "--alignment-sync-cost") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      char* end = nullptr;
+      const double parsed = std::strtod(value, &end);
+      if (end == value || *end != '\0' || !std::isfinite(parsed) || parsed < 0.0)
+      { std::cerr << "error: " << arg << " expects a finite non-negative number\n"; return 2; }
+      if (arg == "--alignment-max-align-time") alignment_options.max_total_time_seconds = parsed;
+      else if (arg == "--alignment-max-align-time-trace") alignment_options.max_time_seconds = parsed;
+      else if (arg == "--alignment-exponent") { if (parsed <= 1.0) { std::cerr << "error: --alignment-exponent expects > 1\n"; return 2; } alignment_options.exponent = parsed; alignment_exponent_used = true; }
+      else if (arg == "--alignment-trace-cost") { alignment_options.default_trace_cost = parsed; alignment_trace_cost_used = true; }
+      else if (arg == "--alignment-model-cost") { alignment_options.default_model_cost = parsed; alignment_model_cost_used = true; }
+      else if (arg == "--alignment-silent-model-cost") { alignment_options.default_silent_cost = parsed; alignment_silent_cost_used = true; }
+      else { alignment_options.default_sync_cost = parsed; alignment_sync_cost_used = true; }
+      alignment_option_used = true;
+    } else if (arg == "--alignment-synchronous-dijkstra") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try { alignment_options.synchronous_dijkstra = parse_boolean(value, arg); }
+      catch (const std::invalid_argument& error) { std::cerr << "error: " << error.what() << '\n'; return 2; }
+      alignment_option_used = true;
+      alignment_synchronous_dijkstra_used = true;
+    } else if (arg == "--alignment-cost-profile") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (std::string_view(value) == "legacy") alignment_options.cost_profile = minera::AlignmentCostProfile::kLegacyUnit;
+      else if (std::string_view(value) == "pm4py") alignment_options.cost_profile = minera::AlignmentCostProfile::kPm4PyStandard;
+      else { std::cerr << "error: --alignment-cost-profile expects legacy or pm4py\n"; return 2; }
+      alignment_option_used = true;
     } else if (arg == "--token-replay-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -1488,6 +1566,29 @@ int main(int argc, char** argv) {
     std::cerr << "error: --batch-* options require --batches\n";
     return 2;
   }
+  if (alignment_option_used) {
+    if (no_alignments) {
+      std::cerr << "error: alignment options cannot be combined with --no-alignments\n";
+      return 2;
+    }
+    const bool generator =
+        alignment_options.variant == minera::AlignmentVariant::kGeneratorDijkstraNoHeuristics ||
+        alignment_options.variant == minera::AlignmentVariant::kGeneratorDijkstraLessMemory;
+    if (alignment_max_alignments_used && !generator) {
+      std::cerr << "error: --alignment-max-alignments requires a generator alignment variant\n";
+      return 2;
+    }
+    if (alignment_exponent_used &&
+        alignment_options.variant != minera::AlignmentVariant::kDiscountedAStar) {
+      std::cerr << "error: --alignment-exponent requires --alignment-variant discounted_a_star\n";
+      return 2;
+    }
+    if (alignment_synchronous_dijkstra_used &&
+        alignment_options.variant != minera::AlignmentVariant::kDiscountedAStar) {
+      std::cerr << "error: --alignment-synchronous-dijkstra requires --alignment-variant discounted_a_star\n";
+      return 2;
+    }
+  }
 
   if (footprints_options.model == "dfg" &&
       footprints_options.discovery_variants.contains("petri_reach_graph")) {
@@ -1592,7 +1693,9 @@ int main(int argc, char** argv) {
           minera::check_footprints(log, petri),
           no_alignments ? std::optional<minera::AlignmentResult>{}
                         : std::optional<minera::AlignmentResult>(
-                              minera::check_alignment(log, petri))};
+                              alignment_option_used
+                                  ? minera::check_alignment(log, petri, alignment_options)
+                                  : minera::check_alignment(log, petri))};
     };
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),

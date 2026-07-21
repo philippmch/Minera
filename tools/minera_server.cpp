@@ -494,7 +494,16 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 
   try {
-    const auto alignment = minera::check_alignment(session->log, it->second);
+    const auto lookup = [&](std::string_view name) {
+      return request.has_param(std::string(name))
+                 ? request.get_param_value(std::string(name))
+                 : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_alignment_params(lookup, present);
+    const auto alignment = minera::check_alignment(session->log, it->second, options);
     response.set_content(minera::alignment_json(alignment, session->graph),
                          "application/json");
   } catch (const std::exception& error) {

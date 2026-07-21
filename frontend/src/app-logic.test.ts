@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mineFormEntries, type FilterOptions } from "./api";
+import { alignmentQuery, mineFormEntries, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
@@ -10,6 +10,11 @@ import {
   maxEdgeCount,
 } from "./app-logic";
 import { type EdgeStat, type MineraExport, type Trace } from "./types";
+import {
+  alignmentMoveLabel,
+  cleanAlignmentOptions,
+  isInvalidAlignmentOptions,
+} from "./components/Conformance";
 
 function exp(over: Partial<MineraExport> = {}): MineraExport {
   return {
@@ -33,6 +38,104 @@ describe("initialTab", () => {
   it("falls back to the graph for trace-less (older) exports", () => {
     expect(initialTab(exp())).toBe("dfg");
     expect(initialTab(exp({ traces: [] }))).toBe("dfg");
+  });
+});
+
+describe("alignmentQuery", () => {
+  it("serializes every alignment control for the deferred server request", () => {
+    const query = alignmentQuery({
+      variant: "discounted_a_star",
+      max_states: 42,
+      max_align_time: 1.5,
+      max_align_time_trace: 0.2,
+      max_alignments: 7,
+      exponent: 1.1,
+      synchronous_dijkstra: true,
+      cost_profile: "pm4py",
+      trace_cost: 10000,
+      model_cost: 10000,
+      silent_model_cost: 1,
+      sync_cost: 0,
+    });
+    const params = new URLSearchParams(query);
+    expect(params.get("alignment_variant")).toBe("discounted_a_star");
+    expect(params.get("variant")).toBeNull();
+    expect(params.get("max_states")).toBe("42");
+    expect(params.get("max_align_time_trace")).toBe("0.2");
+    expect(params.get("synchronous_dijkstra")).toBe("true");
+    expect(params.get("cost_profile")).toBe("pm4py");
+    expect(params.get("silent_model_cost")).toBe("1");
+  });
+
+  it("omits unset controls so the legacy request remains compatible", () => {
+    expect(alignmentQuery({})).toBe("");
+  });
+
+  it("drops controls that do not apply after switching variants", () => {
+    const generator = cleanAlignmentOptions({
+      variant: "generator_dijkstra_less_memory",
+      cost_profile: "legacy",
+      max_alignments: 3,
+      exponent: 2,
+      synchronous_dijkstra: true,
+    });
+    expect(generator.max_alignments).toBe(3);
+    expect(generator.exponent).toBeUndefined();
+    expect(generator.synchronous_dijkstra).toBeUndefined();
+    const discounted = cleanAlignmentOptions({
+      variant: "discounted_a_star",
+      cost_profile: "pm4py",
+      max_alignments: 3,
+      exponent: 1.5,
+      synchronous_dijkstra: true,
+    });
+    expect(discounted.max_alignments).toBeUndefined();
+    expect(discounted.exponent).toBe(1.5);
+    expect(discounted.synchronous_dijkstra).toBe(true);
+  });
+
+  it("ignores stale invalid variant-specific values after switching away", () => {
+    const generatorDraft = {
+      variant: "generator_dijkstra_less_memory" as const,
+      max_alignments: 0,
+    };
+    expect(isInvalidAlignmentOptions(generatorDraft)).toBe(true);
+    expect(
+      isInvalidAlignmentOptions({ ...generatorDraft, variant: "state_equation_a_star" }),
+    ).toBe(false);
+
+    const discountedDraft = {
+      variant: "discounted_a_star" as const,
+      exponent: 1,
+    };
+    expect(isInvalidAlignmentOptions(discountedDraft)).toBe(true);
+    expect(
+      isInvalidAlignmentOptions({ ...discountedDraft, variant: "state_equation_a_star" }),
+    ).toBe(false);
+  });
+
+  it("omits the synchronous default but preserves an explicit false override", () => {
+    const defaults = cleanAlignmentOptions({
+      variant: "discounted_a_star",
+      cost_profile: "legacy",
+    });
+    expect(defaults.synchronous_dijkstra).toBeUndefined();
+    expect(new URLSearchParams(alignmentQuery(defaults)).has("synchronous_dijkstra")).toBe(false);
+
+    const disabled = cleanAlignmentOptions({
+      variant: "discounted_a_star",
+      cost_profile: "legacy",
+      synchronous_dijkstra: false,
+    });
+    expect(disabled.synchronous_dijkstra).toBe(false);
+    expect(new URLSearchParams(alignmentQuery(disabled)).get("synchronous_dijkstra")).toBe("false");
+  });
+
+  it("labels silent tau moves without indexing the activity catalog", () => {
+    const activities = [{ name: "A", count: 1, start_count: 1, end_count: 1 }];
+    expect(alignmentMoveLabel({ type: "sync", activity: 0 }, activities)).toBe("A");
+    expect(alignmentMoveLabel({ type: "model", activity: null, silent: true }, activities)).toBe("τ");
+    expect(alignmentMoveLabel({ type: "model", activity: null }, activities)).toBe("τ");
   });
 });
 

@@ -1008,13 +1008,51 @@ std::string_view move_type_name(AlignmentMoveType type) {
 void write_alignments(std::ostream& out,
                       const AlignmentResult& alignments,
                       const DirectlyFollowsGraph& graph) {
+  const auto variant_name = [](AlignmentVariant variant) {
+    switch (variant) {
+      case AlignmentVariant::kStateEquationAStar: return "state_equation_a_star";
+      case AlignmentVariant::kDijkstraNoHeuristics: return "dijkstra_no_heuristics";
+      case AlignmentVariant::kDijkstraLessMemory: return "dijkstra_less_memory";
+      case AlignmentVariant::kDiscountedAStar: return "discounted_a_star";
+      case AlignmentVariant::kGeneratorDijkstraNoHeuristics: return "generator_dijkstra_no_heuristics";
+      case AlignmentVariant::kGeneratorDijkstraLessMemory: return "generator_dijkstra_less_memory";
+    }
+    return "state_equation_a_star";
+  };
+  const auto write_move = [&](const AlignmentMove& move) {
+    const auto id = graph.activity_id(move.activity);
+    out << "{\"type\": \"" << move_type_name(move.type) << "\"";
+    if (move.activity.empty()) {
+      out << ", \"activity\": null, \"silent\": true";
+    } else {
+      out << ", \"activity\": " << (id ? *id : 0);
+    }
+    out << '}';
+  };
+  const auto write_moves = [&](const std::vector<AlignmentMove>& moves) {
+    out << '[';
+    for (std::size_t j = 0; j < moves.size(); ++j) {
+      write_move(moves[j]);
+      out << (j + 1 < moves.size() ? ", " : "");
+    }
+    out << ']';
+  };
   out << "{\"computed\": " << (alignments.computed ? "true" : "false")
       << ", \"exhausted\": " << (alignments.exhausted ? "true" : "false")
       << ", \"fitness\": " << alignments.fitness
       << ", \"precision\": " << alignments.precision
       << ", \"fitting_traces\": " << alignments.fitting_traces
       << ", \"trace_count\": " << alignments.trace_count
-      << ", \"total_cost\": " << alignments.total_cost << ", \"variants\": [";
+      << ", \"total_cost\": " << alignments.total_cost
+      << ", \"variant\": \"" << variant_name(alignments.variant) << "\""
+      << ", \"diagnostics\": {\"visited_states\": "
+      << alignments.diagnostics.visited_states
+      << ", \"queued_states\": " << alignments.diagnostics.queued_states
+      << ", \"traversed_arcs\": " << alignments.diagnostics.traversed_arcs
+      << ", \"lp_solved\": " << alignments.diagnostics.lp_solved
+      << ", \"closed_set_length\": " << alignments.diagnostics.closed_set_length
+      << ", \"num_visited_markings\": " << alignments.diagnostics.num_visited_markings
+      << "}, \"variants\": [";
   const auto& variants = alignments.variants;
   for (std::size_t i = 0; i < variants.size(); ++i) {
     const auto& variant = variants[i];
@@ -1024,13 +1062,20 @@ void write_alignments(std::ostream& out,
       out << (id ? *id : 0) << (j + 1 < variant.activities.size() ? ", " : "");
     }
     out << "], \"count\": " << variant.count << ", \"cost\": " << variant.cost
-        << ", \"fitness\": " << variant.fitness << ", \"moves\": [";
-    for (std::size_t j = 0; j < variant.moves.size(); ++j) {
-      const auto& move = variant.moves[j];
-      const auto id = graph.activity_id(move.activity);
-      out << "{\"type\": \"" << move_type_name(move.type)
-          << "\", \"activity\": " << (id ? *id : 0) << '}'
-          << (j + 1 < variant.moves.size() ? ", " : "");
+        << ", \"fitness\": " << variant.fitness
+        << ", \"diagnostics\": {\"visited_states\": "
+        << variant.diagnostics.visited_states
+        << ", \"queued_states\": " << variant.diagnostics.queued_states
+        << ", \"traversed_arcs\": " << variant.diagnostics.traversed_arcs
+        << ", \"lp_solved\": " << variant.diagnostics.lp_solved
+        << ", \"closed_set_length\": " << variant.diagnostics.closed_set_length
+        << ", \"num_visited_markings\": " << variant.diagnostics.num_visited_markings
+        << "}, \"moves\": ";
+    write_moves(variant.moves);
+    out << ", \"optimal_alignments\": [";
+    for (std::size_t k = 0; k < variant.optimal_alignments.size(); ++k) {
+      write_moves(variant.optimal_alignments[k]);
+      if (k + 1 < variant.optimal_alignments.size()) out << ", ";
     }
     out << "]}" << (i + 1 < variants.size() ? ", " : "");
   }

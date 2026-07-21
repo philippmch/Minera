@@ -733,6 +733,40 @@ void parse_mine_params_rejects_invalid_dfg_variant_options() {
   }
 }
 
+void parse_alignment_params_maps_variants_and_costs() {
+  const auto p = minera::parse_alignment_params(fields({
+      {"alignment_variant", "discounted_a_star"},
+      {"max_states", "17"}, {"max_align_time", "1.5"},
+      {"max_align_time_trace", "0.5"}, {"exponent", "2.5"},
+      {"synchronous_dijkstra", "true"}, {"cost_profile", "pm4py"},
+      {"trace_cost", "3"}, {"model_cost", "4"},
+      {"silent_model_cost", "2"}, {"sync_cost", "0.2"}}));
+  assert(p.variant == minera::AlignmentVariant::kDiscountedAStar);
+  assert(p.max_states == 17 && p.max_total_time_seconds == 1.5);
+  assert(p.max_time_seconds == 0.5 && p.exponent == 2.5);
+  assert(p.synchronous_dijkstra && p.default_trace_cost.value() == 3.0);
+  assert(p.default_model_cost.value() == 4.0 && p.default_silent_cost.value() == 2.0);
+}
+
+void parse_alignment_params_rejects_invalid_and_dependent_values() {
+  bool threw = false;
+  try { (void)minera::parse_alignment_params(fields({{"max_states", "0"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_alignment_params(fields({{"exponent", "1"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_alignment_params(fields({{"alignment_variant", "dijkstra_no_heuristics"}, {"max_alignments", "2"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_alignment_params(fields({{"alignment_variant", "discounted_a_star"}, {"exponent", "2"}, {"theta", "3"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
@@ -891,5 +925,7 @@ int main() {
   parse_mine_params_maps_dfg_variant_options();
   parse_mine_params_preserves_explicit_empty_dfg_attributes();
   parse_mine_params_rejects_invalid_dfg_variant_options();
+  parse_alignment_params_maps_variants_and_costs();
+  parse_alignment_params_rejects_invalid_and_dependent_values();
   return 0;
 }

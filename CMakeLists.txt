@@ -243,4 +243,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_temporal_behavioral_tests PRIVATE cxx_std_20)
   target_compile_options(minera_temporal_behavioral_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_temporal_behavioral_tests COMMAND minera_temporal_behavioral_tests)
+
+  add_executable(minera_alignment_variants_tests
+    tests/test_alignment_variants.cpp
+  )
+  target_link_libraries(minera_alignment_variants_tests PRIVATE minera::core)
+  target_compile_features(minera_alignment_variants_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_alignment_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_alignment_variants_tests COMMAND minera_alignment_variants_tests)
 endif()

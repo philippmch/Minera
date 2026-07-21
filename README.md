@@ -392,6 +392,20 @@ note when that risk applies. The frontend's Alignments view then computes
 them on demand against a running server, exactly as it does for server-mined
 logs.
 
+Alignment search remains backward-compatible by default (state-equation A*
+with legacy unit costs), but can be selected explicitly: `--alignment-variant`
+accepts `state_equation_a_star`, `dijkstra_no_heuristics`,
+`dijkstra_less_memory`, `discounted_a_star`,
+`generator_dijkstra_no_heuristics`, or `generator_dijkstra_less_memory`.
+`--alignment-cost-profile legacy|pm4py` selects cost semantics; state/time
+limits (`--alignment-max-states`, `--alignment-max-align-time`,
+`--alignment-max-align-time-trace`), generator `--alignment-max-alignments`,
+discounted `--alignment-exponent`/`--alignment-synchronous-dijkstra`, and move-cost
+overrides are available as separate flags. The Conformance tab's Alignment
+settings exposes the same variant, profile, limits, generator cap, discounted
+controls, and move costs; Apply sends a deferred alignment request to the
+server, while `--no-alignments` remains the export opt-out.
+
 `--decisions <miner>` additionally mines the decision points of one
 discovered model — which attribute values steer a case down which branch —
 and embeds the rules in the export under `decisions`.

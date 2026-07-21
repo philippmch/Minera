@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <chrono>
 #include <limits>
 #include <optional>
 #include <queue>
@@ -1083,7 +1084,11 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
 // alignable within the search cap.
 class Aligner {
  public:
-  explicit Aligner(const PetriNet& net) : net_(net) {
+  explicit Aligner(
+      const PetriNet& net, const AlignmentOptions& options = AlignmentOptions{},
+      std::chrono::steady_clock::time_point deadline =
+          std::chrono::steady_clock::time_point::max())
+      : net_(net) {
     for (std::size_t i = 0; i < net_.activities().size(); ++i) {
       name_to_activity_.emplace(net_.activities()[i], i);
     }
@@ -1106,15 +1111,34 @@ class Aligner {
       }
     }
 
-    if (const auto cost = shortest_model_run()) {
+    if (deadline == std::chrono::steady_clock::time_point::max()) {
+      const double limit = options.max_total_time_seconds > 0.0 &&
+                                   options.max_time_seconds > 0.0
+                               ? std::min(options.max_total_time_seconds,
+                                          options.max_time_seconds)
+                               : (options.max_total_time_seconds > 0.0
+                                      ? options.max_total_time_seconds
+                                      : options.max_time_seconds);
+      if (limit > 0.0)
+        deadline = std::chrono::steady_clock::now() +
+                   std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                       std::chrono::duration<double>(limit));
+    }
+    bool preflight_exhausted = false;
+    if (const auto cost = shortest_model_run(options, deadline, preflight_exhausted)) {
       reachable_ = true;
       empty_run_cost_ = *cost;
     }
+    reachability_exhausted_ = preflight_exhausted;
   }
 
   // Whether the net's final marking is reachable from its initial marking — the
   // minimum bar for it to be a workflow net the aligner can score.
   [[nodiscard]] bool reachable() const { return reachable_; }
+
+  [[nodiscard]] bool reachability_exhausted() const {
+    return reachability_exhausted_;
+  }
 
   [[nodiscard]] std::optional<std::size_t> activity_id(
       const std::string& name) const {
@@ -1127,9 +1151,60 @@ class Aligner {
   // half of the worst-case alignment cost used to normalize fitness.
   [[nodiscard]] std::uint64_t empty_run_cost() const { return empty_run_cost_; }
 
+  [[nodiscard]] double weighted_empty_run_cost(const AlignmentOptions& options) const {
+    const double model_default = options.default_model_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+    const double silent_default = options.default_silent_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 1.0 : 0.0);
+    auto transition_cost = [&](std::size_t t) {
+      const auto& tr = net_.transitions()[t];
+      const std::string name = tr.silent() ? std::string{} : net_.activities()[*tr.activity];
+      auto it = options.model_costs.find(name);
+      double value = tr.silent() ? silent_default
+                                 : (it == options.model_costs.end() ? model_default : it->second);
+      if (t < options.model_costs_by_transition.size()) value = options.model_costs_by_transition[t];
+      if (options.model_cost_function) value = options.model_cost_function(name, t);
+      return value;
+    };
+    Marking start(net_.place_count(), 0);
+    start[net_.source()] = 1;
+    std::priority_queue<std::pair<double, Marking>,
+                        std::vector<std::pair<double, Marking>>,
+                        std::greater<>> queue;
+    std::unordered_map<Marking, double, MarkingHash> best{{start, 0.0}};
+    queue.push({0.0, start});
+    std::size_t expanded = 0;
+    const std::size_t budget = options.max_states == 0 ? kAlignSearchCap : options.max_states;
+    const auto started = std::chrono::steady_clock::now();
+    while (!queue.empty() && expanded++ < budget) {
+      const double time_limit = options.max_total_time_seconds > 0.0 && options.max_time_seconds > 0.0
+                                    ? std::min(options.max_total_time_seconds, options.max_time_seconds)
+                                    : (options.max_total_time_seconds > 0.0 ? options.max_total_time_seconds
+                                                                           : options.max_time_seconds);
+      if (time_limit > 0.0 &&
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count() >=
+              time_limit)
+        return std::numeric_limits<double>::infinity();
+      auto [cost, marking] = queue.top(); queue.pop();
+      const auto found = best.find(marking);
+      if (found == best.end() || cost > found->second + 1e-9) continue;
+      if (marking == final_) return cost;
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        if (!enabled(marking, t)) continue;
+        const double next_cost = cost + transition_cost(t);
+        Marking next = fire(marking, t);
+        const auto old = best.find(next);
+        if (old != best.end() && old->second <= next_cost + 1e-9) continue;
+        best[next] = next_cost;
+        queue.push({next_cost, std::move(next)});
+      }
+    }
+    return std::numeric_limits<double>::infinity();
+  }
+
   struct Outcome {
     std::vector<AlignmentMove> moves;
-    std::uint64_t cost = 0;
+    double cost = 0.0;
     bool capped = false;  // search hit its bound before reaching the goal
     // The model marking the optimal alignment is in right before it consumes
     // log event d (after any model/silent moves scheduled first), for
@@ -1600,11 +1675,394 @@ class Aligner {
     return outcome;
   }
 
+  struct ConfiguredOutcome {
+    Outcome primary;
+    std::vector<std::vector<AlignmentMove>> alternatives;
+    AlignmentDiagnostics diagnostics;
+    bool invalid_cost = false;
+  };
+
+  // Clean-room implementation of PM4Py's Dijkstra/generator/discounted
+  // variants.  The search deliberately keeps the product state explicit and
+  // uses floating point edge costs, which is required by discounted A* and
+  // custom PM4Py cost functions.
+  [[nodiscard]] ConfiguredOutcome align_configured(
+      const std::vector<std::optional<std::size_t>>& ids,
+      const std::vector<std::string>& names,
+      const AlignmentOptions& input_options) const {
+    AlignmentOptions options = input_options;
+    bool callback_invalid = false;
+    // Resolve callbacks exactly once for this concrete trace/model pair. The
+    // search and LP then consume stable vectors, avoiding repeated/stateful
+    // callback evaluation and making invalid values deterministic.
+    if (options.model_cost_function || options.sync_cost_function) {
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        const auto& tr = net_.transitions()[t];
+        const std::string name = tr.silent() ? std::string{} : net_.activities()[*tr.activity];
+        if (options.model_cost_function) {
+          const double value = options.model_cost_function(name, t);
+          if (!std::isfinite(value) || value < 0.0) callback_invalid = true;
+          options.model_costs_by_transition.resize(net_.transitions().size());
+          options.model_costs_by_transition[t] = value;
+        }
+        if (options.sync_cost_function && !tr.silent()) {
+          const double value = options.sync_cost_function(name, t);
+          if (!std::isfinite(value) || value < 0.0) callback_invalid = true;
+          options.sync_costs_by_transition.resize(net_.transitions().size());
+          options.sync_costs_by_transition[t] = value;
+        }
+      }
+      options.model_cost_function = {};
+      options.sync_cost_function = {};
+    }
+    if (options.trace_cost_function) {
+      options.trace_costs_by_position.resize(names.size());
+      for (std::size_t i = 0; i < names.size(); ++i) {
+        options.trace_costs_by_position[i] = options.trace_cost_function(names[i], i);
+        if (!std::isfinite(options.trace_costs_by_position[i]) || options.trace_costs_by_position[i] < 0.0)
+          callback_invalid = true;
+      }
+      options.trace_cost_function = {};
+    }
+    if (callback_invalid) {
+      ConfiguredOutcome invalid;
+      invalid.primary.capped = true;
+      invalid.invalid_cost = true;
+      return invalid;
+    }
+    using Clock = std::chrono::steady_clock;
+    const bool generator =
+        options.variant == AlignmentVariant::kGeneratorDijkstraNoHeuristics ||
+        options.variant == AlignmentVariant::kGeneratorDijkstraLessMemory;
+    const bool less_memory =
+        options.variant == AlignmentVariant::kDijkstraLessMemory ||
+        options.variant == AlignmentVariant::kGeneratorDijkstraLessMemory;
+    const bool discounted = options.variant == AlignmentVariant::kDiscountedAStar;
+    const double exponent = options.exponent > 1e-9 ? options.exponent : 1.0;
+    const double default_trace = options.default_trace_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+    const double default_model = options.default_model_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+    const double default_sync = options.default_sync_cost.value_or(0.0);
+    const double default_silent = options.default_silent_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 1.0 : 0.0);
+    const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
+                                                        : options.max_states;
+    const std::size_t alignment_limit = options.max_alignments == 0 ? 32 : options.max_alignments;
+    const std::size_t len = ids.size();
+    const std::size_t pc = net_.place_count();
+    using State = Marking;
+    State start(pc, 0);
+    start[net_.source()] = 1;
+    start.push_back(0);
+    State goal = final_;
+    goal.push_back(static_cast<int>(len));
+
+    struct Node {
+      double cost = 0.0;
+      double priority = 0.0;
+      std::uint64_t seq = 0;
+      std::size_t depth = 0;
+      bool discounted_order = false;
+      State state;
+      std::vector<AlignmentMove> moves;
+      std::vector<Marking> prefixes;
+      std::vector<State> path_states;
+      bool operator>(const Node& o) const {
+        if (priority != o.priority) return priority > o.priority;
+        if (cost != o.cost) return cost > o.cost;
+        if (discounted_order && depth != o.depth) return depth < o.depth;
+        return seq > o.seq;
+      }
+    };
+    std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
+    // PM4Py's discounted variant closes product states (marking + trace
+    // position), deliberately ignoring path depth.  This keeps cyclic models
+    // finite and deterministic rather than chasing an unattained discounted
+    // infimum through repeated positive-cost cycles.
+    std::unordered_map<State, double, MarkingHash> best;
+    std::unordered_map<Marking, std::vector<std::pair<std::size_t, double>>, MarkingHash>
+        pareto_positions;
+    best.emplace(start, 0.0);
+    std::size_t lp_solved = 0;
+    const auto lookup_cost = [](const std::unordered_map<std::string, double>& table,
+                                const std::string& name, double fallback) {
+      const auto it = table.find(name);
+      return it == table.end() ? fallback : it->second;
+    };
+    const auto model_cost_for = [&](std::size_t t) {
+      const auto& tr = net_.transitions()[t];
+      const std::string name = tr.silent() ? std::string{} : net_.activities()[*tr.activity];
+      const auto found = options.model_costs.find(name);
+      double value = tr.silent()
+                         ? default_silent
+                         : (found == options.model_costs.end() ? default_model : found->second);
+      if (t < options.model_costs_by_transition.size()) value = options.model_costs_by_transition[t];
+      if (options.model_cost_function) value = options.model_cost_function(name, t);
+      return value;
+    };
+    const auto trace_cost_for = [&](std::size_t d) {
+      const std::string& name = names[d];
+      double value = lookup_cost(options.trace_costs, name, default_trace);
+      if (d < options.trace_costs_by_position.size()) value = options.trace_costs_by_position[d];
+      if (options.trace_cost_function) value = options.trace_cost_function(name, d);
+      return value;
+    };
+    const auto sync_cost_for = [&](std::size_t t) {
+      const std::string& name = net_.activities()[*net_.transitions()[t].activity];
+      double value = lookup_cost(options.sync_costs, name, default_sync);
+      if (t < options.sync_costs_by_transition.size()) value = options.sync_costs_by_transition[t];
+      if (options.sync_cost_function) value = options.sync_cost_function(name, t);
+      return value;
+    };
+    const auto lp_heuristic = [&](const State& state) {
+      // The marking-equation bound is in undiscounted units and may
+      // overestimate a discounted suffix.  Discounted search therefore uses
+      // a zero heuristic (Dijkstra), preserving optimal goal termination.
+      if (options.variant != AlignmentVariant::kStateEquationAStar || discounted)
+        return 0.0;
+      const std::size_t pos = static_cast<std::size_t>(state.back());
+      const std::size_t remaining = len - pos;
+      const std::size_t tcount = net_.transitions().size();
+      std::size_t sync_count = 0;
+      for (std::size_t d = pos; d < len; ++d) {
+        if (!ids[d]) continue;
+        for (std::size_t t = 0; t < tcount; ++t)
+          if (!net_.transitions()[t].silent() && *net_.transitions()[t].activity == *ids[d]) ++sync_count;
+      }
+      const std::size_t vars = tcount + remaining + sync_count;
+      const std::size_t rows = pc + remaining;
+      std::vector<std::vector<double>> a(rows, std::vector<double>(vars, 0.0));
+      std::vector<double> b(rows, 0.0), c(vars, 0.0);
+      for (std::size_t p = 0; p < pc; ++p) b[p] = double(final_[p] - state[p]);
+      for (std::size_t t = 0; t < tcount; ++t) {
+        for (const auto& [p, coef] : incidence_[t]) a[p][t] = coef;
+        c[t] = model_cost_for(t);
+      }
+      std::size_t col = tcount;
+      for (std::size_t d = pos; d < len; ++d) {
+        const std::size_t row = pc + (d - pos);
+        b[row] = 1.0;
+        a[row][col] = 1.0;
+        c[col] = trace_cost_for(d);
+        ++col;
+        if (!ids[d]) continue;
+        for (std::size_t t = 0; t < tcount; ++t) {
+          if (net_.transitions()[t].silent() || *net_.transitions()[t].activity != *ids[d]) continue;
+          for (const auto& [p, coef] : incidence_[t]) a[p][col] = coef;
+          a[row][col] = 1.0;
+          c[col] = sync_cost_for(t);
+          ++col;
+        }
+      }
+      ++lp_solved;
+      auto lp = solve_lp(std::move(a), std::move(b), c);
+      if (!lp.feasible || lp.aborted) return 0.0;
+      return std::max(0.0, lp.objective);
+    };
+    frontier.push(Node{0.0, lp_heuristic(start), 0, 0, discounted, start, {}, {}, {start}});
+    std::unordered_set<State, MarkingHash> discounted_closed;
+    std::unordered_map<State, std::unordered_set<std::string>, MarkingHash>
+        generator_seen;
+    const auto start_time = Clock::now();
+    std::size_t seq = 1;
+    std::size_t expanded = 0;
+    std::size_t arcs = 0;
+    bool invalid_cost = false;
+    std::size_t queued_total = 0;
+    double goal_cost = std::numeric_limits<double>::infinity();
+    std::vector<Node> goals;
+    const auto move_key = [](const std::vector<AlignmentMove>& moves) {
+      std::string key;
+      for (const auto& m : moves) {
+        key.push_back(static_cast<char>('0' + static_cast<int>(m.type)));
+        key += std::to_string(m.transition);
+        key.push_back(':');
+        key += m.activity;
+        key.push_back(';');
+      }
+      return key;
+    };
+    const auto timed_out = [&]() {
+      return options.max_time_seconds > 0.0 &&
+             std::chrono::duration<double>(Clock::now() - start_time).count() >=
+                 options.max_time_seconds;
+    };
+    while (!frontier.empty() && expanded < budget && !timed_out()) {
+      Node node = frontier.top();
+      frontier.pop();
+      const auto it_best = best.find(node.state);
+      if (it_best == best.end() || node.cost > it_best->second + 1e-9) continue;
+      if (discounted && !discounted_closed.insert(node.state).second) continue;
+      if (!generator && node.state == goal) {
+        if (node.prefixes.size() == len)
+          node.prefixes.push_back(Marking(final_.begin(), final_.end()));
+        goals.push_back(std::move(node));
+        goal_cost = goals.front().cost;
+        break;
+      }
+      if (generator && node.state == goal) {
+        if (node.cost > goal_cost + 1e-9) break;
+        if (!std::isfinite(goal_cost)) goal_cost = node.cost;
+        if (node.prefixes.size() == len)
+          node.prefixes.push_back(Marking(final_.begin(), final_.end()));
+        const auto key = move_key(node.moves);
+        auto& seen = generator_seen[node.state];
+        if (seen.insert(key).second && goals.size() < alignment_limit) {
+          goals.push_back(std::move(node));
+        }
+        if (goals.size() >= alignment_limit) break;
+        continue;
+      }
+      ++expanded;
+      const std::size_t pos = static_cast<std::size_t>(node.state.back());
+      const double factor = discounted
+                                ? std::pow(exponent, -static_cast<double>(node.depth))
+                                : 1.0;
+      auto push = [&](State next, double edge_cost, AlignmentMove move,
+                      bool consume) {
+        ++arcs;
+        if (!std::isfinite(edge_cost) || edge_cost < 0.0) {
+          invalid_cost = true;
+          return;
+        }
+        Node child = node;
+        child.state = std::move(next);
+        if (discounted && discounted_closed.find(child.state) != discounted_closed.end()) return;
+        if (generator && std::find(child.path_states.begin(), child.path_states.end(), child.state) !=
+                             child.path_states.end()) return;
+        child.path_states.push_back(child.state);
+        child.depth = node.depth + 1;
+        child.cost = node.cost + edge_cost * factor;
+        child.priority = child.cost + lp_heuristic(child.state);
+        if (consume) {
+          child.prefixes.push_back(Marking(node.state.begin(), node.state.end() - 1));
+        }
+        // Configured PM4Py variants retain tau/model routing moves explicitly;
+        // an empty activity denotes a silent transition.
+        if (!move.activity.empty() || move.type == AlignmentMoveType::kModel)
+          child.moves.push_back(std::move(move));
+        if (less_memory) {
+          Marking marking(child.state.begin(), child.state.end() - 1);
+          const std::size_t child_pos = static_cast<std::size_t>(child.state.back());
+          auto& frontier_points = pareto_positions[marking];
+          for (const auto& [prior_pos, prior_cost] : frontier_points)
+            if ((!generator || prior_pos > child_pos || prior_cost < child.cost - 1e-9) &&
+                prior_pos >= child_pos && prior_cost <= child.cost + 1e-9) return;
+          frontier_points.erase(
+              std::remove_if(frontier_points.begin(), frontier_points.end(),
+                             [&](const auto& point) {
+                               return child_pos >= point.first &&
+                                      child.cost <= point.second + 1e-9;
+                             }),
+              frontier_points.end());
+          frontier_points.emplace_back(child_pos, child.cost);
+        }
+        const auto old = best.find(child.state);
+        if (!generator) {
+          if (old != best.end()) {
+            if (child.cost > old->second + 1e-9) return;
+            if (!discounted && old->second <= child.cost + 1e-9) return;
+            if (child.cost >= old->second - 1e-9) {
+              // Discounted equal-cost arrivals remain queued so depth tie
+              // ordering can select the deeper pinned path.
+              frontier.push(std::move(child));
+              ++queued_total;
+              return;
+            }
+          }
+          best[child.state] = child.cost;
+        } else if (old == best.end() || child.cost < old->second - 1e-9) {
+          best[child.state] = child.cost;
+        } else if (child.cost > old->second + 1e-9) {
+          return;
+        }
+        frontier.push(std::move(child));
+        ++queued_total;
+      };
+      // Explicit mode enumerates the raw log successor first, matching the
+      // pinned non-synchronous product ordering; compact mode emits it after
+      // model successors so synchronous destinations are coalesced eagerly.
+      if (!options.synchronous_dijkstra && pos < len) {
+        State next = node.state;
+        next.back() = static_cast<int>(pos + 1);
+        const std::string& activity = names[pos];
+        double trace_cost = lookup_cost(options.trace_costs, activity, default_trace);
+        if (pos < options.trace_costs_by_position.size()) trace_cost = options.trace_costs_by_position[pos];
+        if (options.trace_cost_function) trace_cost = options.trace_cost_function(activity, pos);
+        push(std::move(next), trace_cost, {AlignmentMoveType::kLog, activity}, true);
+      }
+      for (std::size_t order = 0; order < net_.transitions().size(); ++order) {
+        const std::size_t t = options.synchronous_dijkstra
+                                  ? order
+                                  : net_.transitions().size() - 1 - order;
+        if (!enabled(node.state, t)) continue;
+        const auto& tr = net_.transitions()[t];
+        State fired = node.state;
+        for (const auto p : tr.inputs) --fired[p];
+        for (const auto p : tr.outputs) ++fired[p];
+        if (tr.silent()) {
+          push(std::move(fired), model_cost_for(t),
+               {AlignmentMoveType::kModel, {}, t}, false);
+          continue;
+        }
+        const std::string& activity = net_.activities()[*tr.activity];
+        double model_cost = lookup_cost(options.model_costs, activity, default_model);
+        if (t < options.model_costs_by_transition.size())
+          model_cost = options.model_costs_by_transition[t];
+        if (options.model_cost_function) model_cost = options.model_cost_function(activity, t);
+        push(fired, model_cost,
+             {AlignmentMoveType::kModel, activity, t}, false);
+        if (pos < len && ids[pos] && *ids[pos] == *tr.activity) {
+          State synced = fired;
+          synced.back() = static_cast<int>(pos + 1);
+          double sync_cost = lookup_cost(options.sync_costs, activity, default_sync);
+          if (t < options.sync_costs_by_transition.size())
+            sync_cost = options.sync_costs_by_transition[t];
+          if (options.sync_cost_function) sync_cost = options.sync_cost_function(activity, t);
+          push(std::move(synced), sync_cost,
+               {AlignmentMoveType::kSynchronous, activity, t}, true);
+        }
+      }
+      if (options.synchronous_dijkstra && pos < len) {
+        State next = node.state;
+        next.back() = static_cast<int>(pos + 1);
+        const std::string& activity = names[pos];
+        double trace_cost = lookup_cost(options.trace_costs, activity, default_trace);
+        if (pos < options.trace_costs_by_position.size())
+          trace_cost = options.trace_costs_by_position[pos];
+        if (options.trace_cost_function) trace_cost = options.trace_cost_function(activity, pos);
+        push(std::move(next), trace_cost,
+             {AlignmentMoveType::kLog, activity}, true);
+      }
+    }
+    ConfiguredOutcome result;
+    result.diagnostics.visited_states = expanded;
+    result.diagnostics.queued_states = queued_total;
+    result.diagnostics.traversed_arcs = arcs;
+    result.diagnostics.lp_solved = lp_solved;
+    result.diagnostics.closed_set_length = best.size();
+    result.diagnostics.num_visited_markings = result.diagnostics.closed_set_length;
+    if (goals.empty() || invalid_cost) {
+      result.primary.capped = true;
+      result.invalid_cost = invalid_cost;
+      return result;
+    }
+    auto& primary = goals.front();
+    result.primary.cost = primary.cost;
+    result.primary.moves = std::move(primary.moves);
+    result.primary.prefix_markings = std::move(primary.prefixes);
+    for (std::size_t i = 1; i < goals.size(); ++i)
+      result.alternatives.push_back(std::move(goals[i].moves));
+    return result;
+  }
+
  private:
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
-    for (const std::size_t place : net_.transitions()[t].inputs) {
-      if (marking[place] <= 0) return false;
-    }
+    std::unordered_map<std::size_t, std::size_t> required;
+    for (const std::size_t place : net_.transitions()[t].inputs) ++required[place];
+    for (const auto& [place, count] : required)
+      if (marking[place] < static_cast<int>(count)) return false;
     return true;
   }
 
@@ -1619,7 +2077,10 @@ class Aligner {
   // Cheapest count of visible transitions on any run from the initial to the
   // final marking, found by the same uniform-cost search with no trace, or
   // std::nullopt when the final marking is unreachable within the search bound.
-  [[nodiscard]] std::optional<std::uint64_t> shortest_model_run() const {
+  [[nodiscard]] std::optional<std::uint64_t> shortest_model_run(
+      const AlignmentOptions& options,
+      std::chrono::steady_clock::time_point deadline,
+      bool& exhausted) const {
     Marking start(net_.place_count(), 0);
     start[net_.source()] = 1;
     std::priority_queue<std::pair<std::uint64_t, Marking>,
@@ -1628,8 +2089,15 @@ class Aligner {
         frontier;
     std::unordered_map<Marking, std::uint64_t, MarkingHash> best{{start, 0}};
     frontier.push({0, start});
+    const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
+                                                        : options.max_states;
     std::size_t expanded = 0;
-    while (!frontier.empty() && expanded++ < kAlignSearchCap) {
+    while (!frontier.empty() && expanded < budget) {
+      if (std::chrono::steady_clock::now() >= deadline) {
+        exhausted = true;
+        return std::nullopt;
+      }
+      ++expanded;
       auto [cost, marking] = frontier.top();  // top() is const&: this copies
       frontier.pop();
       const auto it = best.find(marking);
@@ -1646,6 +2114,7 @@ class Aligner {
         frontier.push({next_cost, std::move(next)});
       }
     }
+    exhausted = !frontier.empty();
     return std::nullopt;  // final marking unreachable: the net is not a sound WF-net
   }
 
@@ -1653,6 +2122,7 @@ class Aligner {
   std::unordered_map<std::string, std::size_t> name_to_activity_;
   Marking final_;
   bool reachable_ = false;
+  bool reachability_exhausted_ = false;
   std::uint64_t empty_run_cost_ = 0;
   // Per-transition sparse LP column for the marking-equation heuristic:
   // produced minus consumed tokens per place.
@@ -1939,6 +2409,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
     // Not a sound workflow net (e.g. an Alpha net whose sink is unreachable):
     // report that alignments could not be computed rather than fake numbers.
     result.computed = false;
+    result.exhausted = aligner.reachability_exhausted();
     return result;
   }
 
@@ -1999,10 +2470,222 @@ AlignmentResult check_alignment(const EventLog& event_log,
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,
+                                const PetriNet& net,
+                                const AlignmentOptions& input_options) {
+  AlignmentResult result;
+  AlignmentOptions options = input_options;
+  result.variant = options.variant;
+  result.trace_count = event_log.trace_count();
+  if (result.trace_count == 0) return result;
+  const auto total_start = std::chrono::steady_clock::now();
+  const auto valid_table = [](const std::unordered_map<std::string, double>& table) {
+    for (const auto& [_, value] : table)
+      if (!std::isfinite(value) || value < 0.0) return false;
+    return true;
+  };
+  const auto valid_vector = [](const std::vector<double>& values) {
+    for (const double value : values)
+      if (!std::isfinite(value) || value < 0.0) return false;
+    return true;
+  };
+  const auto valid_optional = [](const std::optional<double>& value) {
+    return !value || (std::isfinite(*value) && *value >= 0.0);
+  };
+  if (!valid_optional(options.default_trace_cost) ||
+      !valid_optional(options.default_model_cost) ||
+      !valid_optional(options.default_sync_cost) ||
+      !valid_optional(options.default_silent_cost) ||
+      !valid_table(options.trace_costs) || !valid_table(options.model_costs) ||
+      !valid_table(options.sync_costs) ||
+      !valid_vector(options.trace_costs_by_position) ||
+      !valid_vector(options.model_costs_by_transition) ||
+      !valid_vector(options.sync_costs_by_transition) ||
+      (options.variant == AlignmentVariant::kDiscountedAStar &&
+       (!std::isfinite(options.exponent) || options.exponent <= 0.0))) {
+    result.computed = false;
+    return result;
+  }
+  bool callback_invalid = false;
+  if (options.model_cost_function || options.sync_cost_function) {
+    for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+      const auto& tr = net.transitions()[t];
+      const std::string name = tr.silent() ? std::string{} : net.activities()[*tr.activity];
+      if (options.model_cost_function) {
+        const double value = options.model_cost_function(name, t);
+        if (!std::isfinite(value) || value < 0.0) callback_invalid = true;
+        options.model_costs_by_transition.resize(net.transitions().size());
+        options.model_costs_by_transition[t] = value;
+      }
+      if (options.sync_cost_function && !tr.silent()) {
+        const double value = options.sync_cost_function(name, t);
+        if (!std::isfinite(value) || value < 0.0) callback_invalid = true;
+        options.sync_costs_by_transition.resize(net.transitions().size());
+        options.sync_costs_by_transition[t] = value;
+      }
+    }
+    options.model_cost_function = {};
+    options.sync_cost_function = {};
+  }
+  if (callback_invalid) {
+    result.computed = false;
+    return result;
+  }
+  const double preflight_limit =
+      options.max_total_time_seconds > 0.0 && options.max_time_seconds > 0.0
+          ? std::min(options.max_total_time_seconds, options.max_time_seconds)
+          : (options.max_total_time_seconds > 0.0 ? options.max_total_time_seconds
+                                                   : options.max_time_seconds);
+  const auto preflight_deadline =
+      preflight_limit > 0.0
+          ? total_start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                             std::chrono::duration<double>(preflight_limit))
+          : std::chrono::steady_clock::time_point::max();
+  const Aligner aligner(net, options, preflight_deadline);
+  if (!aligner.reachable()) {
+    result.computed = false;
+    result.exhausted = aligner.reachability_exhausted();
+    return result;
+  }
+  const auto variants = collect_variants(event_log, aligner);
+  std::vector<std::vector<Marking>> variant_markings;
+  variant_markings.reserve(variants.size());
+  double total_worst = 0.0;
+  double weighted_empty = 0.0;
+  AlignmentOptions baseline_options = options;
+  if (options.max_total_time_seconds > 0.0) {
+    const double elapsed = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - total_start).count();
+    const double remaining = options.max_total_time_seconds - elapsed;
+    if (remaining <= 0.0) {
+      result.computed = false;
+      result.exhausted = true;
+      return result;
+    }
+    if (baseline_options.max_time_seconds <= 0.0 ||
+        remaining < baseline_options.max_time_seconds)
+      baseline_options.max_time_seconds = remaining;
+  }
+  if (options.variant == AlignmentVariant::kDiscountedAStar ||
+      options.model_cost_function || options.sync_cost_function || options.trace_cost_function) {
+    const auto empty = aligner.align_configured({}, {}, baseline_options);
+    if (empty.primary.capped) {
+      result.computed = false;
+      result.exhausted = true;
+      return result;
+    }
+    weighted_empty = empty.primary.cost;
+  } else {
+    weighted_empty = aligner.weighted_empty_run_cost(baseline_options);
+  }
+  if (!std::isfinite(weighted_empty)) {
+    result.computed = false;
+    result.exhausted = true;
+    return result;
+  }
+  const double baseline_model_cost = weighted_empty;
+  for (const auto& variant : variants) {
+    if (options.max_total_time_seconds > 0.0 &&
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
+                .count() >= options.max_total_time_seconds) {
+      result.computed = false;
+      result.exhausted = true;
+      return result;
+    }
+    AlignmentOptions trace_options = options;
+    if (options.max_total_time_seconds > 0.0) {
+      const double elapsed = std::chrono::duration<double>(
+          std::chrono::steady_clock::now() - total_start).count();
+      const double remaining = std::max(0.0, options.max_total_time_seconds - elapsed);
+      if (trace_options.max_time_seconds <= 0.0 || remaining < trace_options.max_time_seconds)
+        trace_options.max_time_seconds = remaining;
+    }
+    if (trace_options.trace_cost_function) {
+      trace_options.trace_costs_by_position.resize(variant.names.size());
+      for (std::size_t i = 0; i < variant.names.size(); ++i) {
+        trace_options.trace_costs_by_position[i] =
+            trace_options.trace_cost_function(variant.names[i], i);
+        if (!std::isfinite(trace_options.trace_costs_by_position[i]) ||
+            trace_options.trace_costs_by_position[i] < 0.0) {
+          result.computed = false;
+          result.exhausted = false;
+          return result;
+        }
+      }
+      trace_options.trace_cost_function = {};
+    }
+    auto configured = aligner.align_configured(variant.ids, variant.names, trace_options);
+    result.diagnostics.visited_states += configured.diagnostics.visited_states;
+    result.diagnostics.queued_states = std::max(
+        result.diagnostics.queued_states, configured.diagnostics.queued_states);
+    result.diagnostics.traversed_arcs += configured.diagnostics.traversed_arcs;
+    result.diagnostics.lp_solved += configured.diagnostics.lp_solved;
+    result.diagnostics.closed_set_length = std::max(
+        result.diagnostics.closed_set_length, configured.diagnostics.closed_set_length);
+    result.diagnostics.num_visited_markings = std::max(
+        result.diagnostics.num_visited_markings,
+        configured.diagnostics.num_visited_markings);
+    if (configured.invalid_cost) {
+      result.computed = false;
+      result.exhausted = false;
+      return result;
+    }
+    if (configured.primary.capped) {
+      result.computed = false;
+      result.exhausted = true;
+      result.variants.clear();
+      return result;
+    }
+    const double profile_trace = options.default_trace_cost.value_or(
+        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+    double trace_worst = 0.0;
+    for (std::size_t i = 0; i < variant.names.size(); ++i) {
+      const auto trace_it = options.trace_costs.find(variant.names[i]);
+      double value = trace_it == options.trace_costs.end() ? profile_trace : trace_it->second;
+      if (i < trace_options.trace_costs_by_position.size())
+        value = trace_options.trace_costs_by_position[i];
+      trace_worst += value;
+    }
+    const double worst = trace_worst + baseline_model_cost;
+    const double fitness = worst <= 1e-12
+                               ? 1.0
+                               : std::clamp(1.0 - configured.primary.cost / worst, 0.0, 1.0);
+    result.total_cost += configured.primary.cost * variant.count;
+    total_worst += worst * variant.count;
+    if (configured.primary.cost <= 1e-9) result.fitting_traces += variant.count;
+    VariantAlignment item{variant.names, variant.count,
+                          std::move(configured.primary.moves),
+                          configured.primary.cost, fitness};
+    item.diagnostics = configured.diagnostics;
+    item.optimal_alignments.push_back(item.moves);
+    for (auto& alt : configured.alternatives)
+      item.optimal_alignments.push_back(std::move(alt));
+    result.variants.push_back(std::move(item));
+    variant_markings.push_back(std::move(configured.primary.prefix_markings));
+  }
+  result.fitness = total_worst <= 1e-12
+                     ? 1.0
+                     : std::clamp(1.0 - result.total_cost / total_worst, 0.0, 1.0);
+  const Replayer replayer(net);
+  result.precision = compute_alignment_precision(variants, variant_markings, replayer);
+  std::stable_sort(result.variants.begin(), result.variants.end(),
+                   [](const VariantAlignment& a, const VariantAlignment& b) {
+                     if (a.fitness != b.fitness) return a.fitness < b.fitness;
+                     return a.count > b.count;
+                   });
+  return result;
+}
+
+AlignmentResult check_alignment(const EventLog& event_log,
                                 const ProcessTree& tree) {
   // A process tree always translates to a sound workflow net, so this path
   // never reports computed == false.
   return check_alignment(event_log, to_petri_net(tree));
+}
+
+AlignmentResult check_alignment(const EventLog& event_log,
+                                const ProcessTree& tree,
+                                const AlignmentOptions& options) {
+  return check_alignment(event_log, to_petri_net(tree), options);
 }
 
 std::vector<ActivityDeviation> summarize_alignment_moves(
@@ -2010,6 +2693,7 @@ std::vector<ActivityDeviation> summarize_alignment_moves(
   std::unordered_map<std::string, ActivityDeviation> by_activity;
   for (const auto& variant : alignment.variants) {
     for (const auto& move : variant.moves) {
+      if (move.activity.empty()) continue;  // silent tau routing is not an activity deviation
       auto& tally = by_activity[move.activity];
       if (tally.activity.empty()) tally.activity = move.activity;
       switch (move.type) {
