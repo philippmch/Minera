@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, mineFormEntries, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
@@ -9,7 +9,35 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+
+describe("DFG and edit-distance contracts", () => {
+  it("serializes DFG options and cost maps deterministically", () => {
+    const p = new URLSearchParams(dfgAlignmentQuery({ variant: "CLASSIC", max_states: 10, projection: "metrics", sync_cost: { B: 2, A: 1 } }));
+    expect(p.get("dfg_variant")).toBe("CLASSIC");
+    expect(p.get("dfg_sync_cost")).toBe("A=1,B=2");
+    expect(p.get("projection")).toBe("metrics");
+    expect(new URLSearchParams(dfgAlignmentQuery({ max_states: 0, max_time_ms: -1 })).toString()).toBe("");
+    const escaped = new URLSearchParams(dfgAlignmentQuery({ sync_cost: { "A,B": 1, "A=B": 2, "A:B": 3, "A\\B": 4 } }));
+    expect(escaped.get("dfg_sync_cost")).toBe("A\\,B=1,A\\:B=3,A\\=B=2,A\\\\B=4");
+    expect(parseDfgCostMapInput(escaped.get("dfg_sync_cost")!)).toEqual({ "A,B": 1, "A=B": 2, "A:B": 3, "A\\B": 4 });
+    const whitespace = new URLSearchParams(dfgAlignmentQuery({ sync_cost: { " A": 5, "A ": 6, "A\tB": 7 } })).get("dfg_sync_cost")!;
+    expect(whitespace).toBe("\\sA=5,A\\tB=7,A\\s=6");
+    expect(parseDfgCostMapInput(whitespace)).toEqual({ " A": 5, "A ": 6, "A\tB": 7 });
+    expect(() => parseDfgCostMapInput("A=1,broken")).toThrow(/activity=value/);
+    expect(() => parseDfgCostMapInput("A\\q=1")).toThrow(/invalid escape/);
+  });
+  it("prunes absent edit options", () => {
+    expect(editDistanceFormEntries({ variant: "EDIT_DISTANCE", anti: false, projection: "none" })).toEqual([["edit_variant", "EDIT_DISTANCE"], ["anti", "false"], ["projection", "none"]]);
+  });
+  it("guards compatible alignment results and rejects wrong families", () => {
+    const dfg = { family: "DFG", variant: "CLASSIC", unique_variants: 1, alignments: [{ cost: 0, internal_cost: 0, fitness: 1, best_worst_cost: 0, visited_states: 1, closed: 1, closed_states: 1, moves: [{ log: "A", model: "A" }] }] };
+    expect(isDfgAlignmentResult(dfg)).toBe(true);
+    expect(isDfgAlignmentResult({ ...dfg, family: "EDIT_DISTANCE" })).toBe(false);
+    const edit = { family: "EDIT_DISTANCE", variant: "EDIT_DISTANCE", anti: false, source_count: 1, alignments: [{ source_variant: ["A"], target_variant: ["A"], target_index: 0, cost: 0, fitness: 1, best_worst_cost: 0, bwc: 0, denominator: 0, moves: [{ type: "sync", log: "A", model: "A" }] }] };
+    expect(isEditDistanceResult(edit)).toBe(true);
+  });
+});
 import {
   alignmentMoveLabel,
   cleanAlignmentOptions,

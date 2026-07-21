@@ -27,6 +27,8 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/transition_system.hpp"
+#include "minera/dfg_alignment.hpp"
+#include "minera/edit_distance_alignment.hpp"
 
 namespace minera {
 
@@ -100,7 +102,13 @@ void write_analysis_json(std::ostream& out,
                          const DfgVariantsAnalysis* dfg_variants = nullptr,
                          const CorrelationVariantsAnalysis*
                              correlation_mining = nullptr,
-                         const BatchDiscovery* batch_discovery = nullptr);
+                         const BatchDiscovery* batch_discovery = nullptr,
+                         const DfgAlignmentLogResult* dfg_alignment = nullptr,
+                         const std::vector<EditDistanceAlignment>* edit_distance = nullptr,
+                         bool edit_anti = false,
+                         const DfgAlignmentProjection* dfg_projection = nullptr,
+                         const EventLog* dfg_projected_log = nullptr,
+                         const EventLog* edit_projected_log = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -135,7 +143,23 @@ void write_analysis_json(std::ostream& out,
     const FootprintsAnalysis* footprints = nullptr,
     const DfgVariantsAnalysis* dfg_variants = nullptr,
     const CorrelationVariantsAnalysis* correlation_mining = nullptr,
-    const BatchDiscovery* batch_discovery = nullptr);
+    const BatchDiscovery* batch_discovery = nullptr,
+    const DfgAlignmentLogResult* dfg_alignment = nullptr,
+    const std::vector<EditDistanceAlignment>* edit_distance = nullptr,
+    bool edit_anti = false,
+    const DfgAlignmentProjection* dfg_projection = nullptr,
+    const EventLog* dfg_projected_log = nullptr,
+    const EventLog* edit_projected_log = nullptr);
+
+[[nodiscard]] std::string dfg_alignment_json(
+    const DfgAlignmentLogResult& result,
+    const DfgAlignmentProjection* projection = nullptr,
+    const EventLog* projected_log = nullptr);
+
+[[nodiscard]] std::string edit_distance_json(
+    const std::vector<EditDistanceAlignment>& result,
+    bool anti_alignment = false,
+    const EventLog* projected_log = nullptr);
 
 // Serializes a decision-mining result — per decision point, the branch
 // frequencies and the mined rule tree — as one standalone object: the same

@@ -16,7 +16,9 @@ and tracks every family as complete, partial, or missing.
   reading and writing the common `concept:name` / `time:timestamp` /
   `org:resource` attribute subset — so a log can be cleaned and filtered in
   Minera, then handed to any other XES-speaking tool (CLI `--xes`, or the
-  frontend's **Download log as XES** button).
+  frontend's **Download log as XES** button). Scalar log-level, case-level, and
+  generic event attributes retain their XES types through import/export
+  round-trips, including alignment projection metadata.
 - In-memory event log model grouped into traces.
 - Directly-follows graph discovery with activity, start/end, edge, and variant
   counts.
@@ -103,6 +105,18 @@ and tracks every family as complete, partial, or missing.
   shows (precision), and lists the deviating pairs. Token replay and footprints
   are robust on unsound nets; alignments report that they can't be computed when
   a net (e.g. an Alpha net with concurrency) has an unreachable final marking.
+- **DFG classic and edit-distance alignments**: the Conformance tab's **Other
+  alignments** panel can align the current log to its directly-follows graph
+  (`CLASSIC`) or compare it with a reference CSV/XES log using
+  `EDIT_DISTANCE`. DFG requests expose state/time bounds, per-activity move
+  costs, and `none`/`log`/`metrics` projections. Edit-distance requests choose
+  closest or anti-alignment mode, a positive deviation cost, and `none`/`log`
+  projection; log projection records the independently selected target variant
+  on each source trace, so heterogeneous selections are supported. The native
+  server routes are `POST /api/align-dfg` (query fields such as
+  `dfg_variant`, `dfg_max_states`, `dfg_max_time_ms`, `dfg_*_cost`, and
+  `projection`) and multipart `POST /api/align-edit-distance` (file field
+  `reference_log`, `edit_variant`, `anti`, `deviation_cost`, and `projection`).
 - **Model annotations (frequency & performance)**: token replay of the
   cleanly fitting cases decorates the discovered model itself — per
   transition, how often it actually fired (so a path the log never takes is
@@ -405,6 +419,22 @@ overrides are available as separate flags. The Conformance tab's Alignment
 settings exposes the same variant, profile, limits, generator cap, discounted
 controls, and move costs; Apply sends a deferred alignment request to the
 server, while `--no-alignments` remains the export opt-out.
+
+The same other-alignments operations are available in `minera_export`: pass
+`--align-dfg` with optional `--dfg-max-states`, `--dfg-max-time-ms`,
+`--dfg-sync-cost a=f`, `--dfg-model-move-cost a=f`, `--dfg-log-move-cost a=f`,
+`--dfg-internal-log-move-cost a=f`, and `--dfg-projection none|log|metrics`;
+pass `--align-edit-distance reference.csv` (or `.xes`) with optional
+`--edit-anti`, `--edit-deviation-cost <n>`, and `--edit-projection none|log`.
+The frontend exposes these controls in the Conformance tab's **Other
+alignments** panel and runs them on demand against the latest mined session.
+Frontend and HTTP DFG cost maps accept `activity=value` entries separated by
+commas; escape `,`, `:`, `=`, and `\` inside an activity name with a backslash,
+and encode whitespace as `\s`, `\t`, `\n`, or `\r`. CLI cost options each carry
+one pair, use the rightmost `=` as their separator, and therefore need no such
+escaping. Edit-distance `log` projection selects and records the appropriate
+reference variant independently for each source trace, including heterogeneous
+logs.
 
 `--decisions <miner>` additionally mines the decision points of one
 discovered model — which attribute values steer a case down which branch —

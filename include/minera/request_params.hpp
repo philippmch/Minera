@@ -20,6 +20,8 @@
 #include "minera/transition_system.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
+#include "minera/dfg_alignment.hpp"
+#include "minera/edit_distance_alignment.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -79,6 +81,19 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 // present field whose value is empty. This matters for options where an
 // explicit empty list has different semantics from using the default.
 using FieldPresence = std::function<bool(std::string_view)>;
+
+// Standalone conformance option parsers. Wire fields use the dfg_* and
+// edit_* prefixes; map values are comma-separated `activity=value` pairs
+// (a colon is accepted as a compatibility separator). Explicitly present
+// empty values are rejected for every option.
+[[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
+    const FieldLookup& field);
+[[nodiscard]] DfgAlignmentOptions parse_dfg_alignment_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] EditDistanceOptions parse_edit_distance_params(
+    const FieldLookup& field);
+[[nodiscard]] EditDistanceOptions parse_edit_distance_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 // Parses alignment search settings shared by the HTTP server, CLI and tests.
 // Fields use the wire names documented by /api/align (alignment_variant,

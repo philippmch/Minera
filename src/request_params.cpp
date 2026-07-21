@@ -61,6 +61,85 @@ bool parse_boolean(std::string_view value, std::string_view name) {
                               ": expected true, false, 1, or 0, got '" +
                               std::string(value) + "'");
 }
+
+std::map<std::string, double> parse_cost_map(std::string_view value,
+                                             std::string_view name) {
+  if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a value");
+  std::map<std::string, double> result;
+  std::vector<std::string> items;
+  std::size_t begin = 0;
+  bool escaped = false;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i < value.size() && escaped) {
+      escaped = false;
+      continue;
+    }
+    if (i < value.size() && value[i] == '\\') {
+      escaped = true;
+      continue;
+    }
+    if (i == value.size() || value[i] == ',') {
+      auto item = std::string(value.substr(begin, i - begin));
+      const auto first = item.find_first_not_of(' '), last = item.find_last_not_of(' ');
+      if (first != std::string::npos) items.push_back(item.substr(first, last - first + 1));
+      begin = i + 1;
+    }
+  }
+  if (escaped)
+    throw std::invalid_argument(std::string(name) + ": dangling escape");
+  for (const auto& item : items) {
+    std::size_t sep = std::string::npos;
+    escaped = false;
+    for (std::size_t i = 0; i < item.size(); ++i) {
+      if (escaped) {
+        escaped = false;
+      } else if (item[i] == '\\') {
+        escaped = true;
+      } else if (item[i] == '=' || item[i] == ':') {
+        sep = i;
+        break;
+      }
+    }
+    if (sep == std::string::npos || sep == 0 || sep + 1 >= item.size())
+      throw std::invalid_argument(std::string(name) + ": expected activity=value pairs");
+    std::string activity;
+    activity.reserve(sep);
+    for (std::size_t i = 0; i < sep; ++i) {
+      if (item[i] != '\\') {
+        activity.push_back(item[i]);
+        continue;
+      }
+      if (++i >= sep || (item[i] != '\\' && item[i] != ',' &&
+                         item[i] != '=' && item[i] != ':' &&
+                         item[i] != 's' && item[i] != 't' &&
+                         item[i] != 'n' && item[i] != 'r'))
+        throw std::invalid_argument(std::string(name) + ": invalid escape");
+      switch (item[i]) {
+        case 's': activity.push_back(' '); break;
+        case 't': activity.push_back('\t'); break;
+        case 'n': activity.push_back('\n'); break;
+        case 'r': activity.push_back('\r'); break;
+        default: activity.push_back(item[i]); break;
+      }
+    }
+    if (activity == ">>" || activity.empty())
+      throw std::invalid_argument(std::string(name) + ": activity must not be a gap");
+    const double cost = parse_finite_double(std::string_view(item).substr(sep + 1), name);
+    if (cost < 0.0) throw std::invalid_argument(std::string(name) + ": costs must be non-negative");
+    result[activity] = cost;
+  }
+  if (result.empty()) throw std::invalid_argument(std::string(name) + ": expected a non-empty map");
+  return result;
+}
+
+std::uint64_t parse_positive_u64(std::string_view value, std::string_view name) {
+  if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a positive integer");
+  std::uint64_t parsed = 0;
+  const auto r = std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (r.ec != std::errc{} || r.ptr != value.data() + value.size() || parsed == 0)
+    throw std::invalid_argument(std::string(name) + ": expected a positive integer");
+  return parsed;
+}
 }
 
 bool ends_with_ci(std::string_view value, std::string_view suffix) {
@@ -139,6 +218,64 @@ std::string error_json(std::string_view message) {
   }
   out << "\"}";
   return out.str();
+}
+
+DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field) {
+  return parse_dfg_alignment_params(field, FieldPresence{});
+}
+
+DfgAlignmentOptions parse_dfg_alignment_params(const FieldLookup& field,
+                                               const FieldPresence& present) {
+  DfgAlignmentOptions o;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (!supplied(n) || v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v; };
+  if (supplied("dfg_variant") || supplied("variant")) {
+    const auto n = supplied("dfg_variant") ? "dfg_variant" : "variant";
+    const auto v = require(n);
+    if (v != "classic" && v != "CLASSIC" && v != "DFG_CLASSIC" && v != "Variants.CLASSIC")
+      throw std::invalid_argument(std::string(n)+": expected classic");
+  }
+  auto parse_bound = [&](std::string_view n, std::size_t& dst) {
+    if (!supplied(n)) return;
+    dst = parse_nonnegative_size(require(n), n);
+  };
+  parse_bound("dfg_max_states", o.max_visited_states);
+  if (supplied("max_visited_states")) parse_bound("max_visited_states", o.max_visited_states);
+  if (supplied("dfg_max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("dfg_max_time_ms"), "dfg_max_time_ms");
+  if (supplied("max_time_ms")) o.max_time_ms = parse_nonnegative_size(require("max_time_ms"), "max_time_ms");
+  const auto map_field = [&](std::string_view canonical, std::initializer_list<std::string_view> aliases,
+                             std::map<std::string,double>& dst) {
+    std::string_view found = canonical;
+    if (!supplied(found)) for (auto a : aliases) if (supplied(a)) { found = a; break; }
+    if (supplied(found)) dst = parse_cost_map(require(found), found);
+  };
+  map_field("dfg_sync_cost", {"sync_cost", "sync_costs", "dfg_sync_costs"}, o.sync_cost);
+  map_field("dfg_model_move_cost", {"model_move_cost", "model_costs", "dfg_model_cost", "dfg_model_move_costs"}, o.model_move_cost);
+  map_field("dfg_log_move_cost", {"log_move_cost", "log_costs", "dfg_log_cost", "dfg_log_move_costs"}, o.log_move_cost);
+  map_field("dfg_internal_log_move_cost", {"internal_log_move_cost", "internal_costs", "dfg_internal_cost", "dfg_internal_log_move_costs"}, o.internal_log_move_cost);
+  return o;
+}
+
+EditDistanceOptions parse_edit_distance_params(const FieldLookup& field) {
+  return parse_edit_distance_params(field, FieldPresence{});
+}
+
+EditDistanceOptions parse_edit_distance_params(const FieldLookup& field,
+                                               const FieldPresence& present) {
+  EditDistanceOptions o;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (!supplied(n) || v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v; };
+  const std::string_view variant_name = supplied("edit_variant") ? "edit_variant" : (supplied("variant") ? "variant" : "");
+  if (!variant_name.empty()) {
+    const auto v = require(variant_name);
+    if (v != "EDIT_DISTANCE" && v != "edit_distance" && v != "Variants.EDIT_DISTANCE")
+      throw std::invalid_argument(std::string(variant_name)+": expected EDIT_DISTANCE");
+  }
+  const std::string_view anti_name = supplied("anti") ? "anti" : (supplied("perform_anti_alignment") ? "perform_anti_alignment" : "");
+  if (!anti_name.empty()) o.perform_anti_alignment = parse_boolean(require(anti_name), anti_name);
+  const std::string_view cost_name = supplied("deviation_cost") ? "deviation_cost" : (supplied("edit_deviation_cost") ? "edit_deviation_cost" : "");
+  if (!cost_name.empty()) o.deviation_cost = parse_positive_u64(require(cost_name), cost_name);
+  return o;
 }
 
 AlignmentOptions parse_alignment_params(const FieldLookup& field) {

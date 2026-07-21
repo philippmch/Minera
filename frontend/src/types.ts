@@ -446,6 +446,95 @@ export interface Footprints {
   model_only: FootprintRelation[];
 }
 
+/** Classic directly-follows-graph alignment request controls. */
+export type DfgAlignmentVariant = "CLASSIC";
+export type DfgAlignmentProjection = "none" | "log" | "metrics";
+export type DfgCostMap = Record<string, number>;
+export interface DfgAlignmentOptions {
+  variant?: DfgAlignmentVariant;
+  max_states?: number;
+  max_time_ms?: number;
+  sync_cost?: DfgCostMap;
+  model_move_cost?: DfgCostMap;
+  log_move_cost?: DfgCostMap;
+  internal_log_move_cost?: DfgCostMap;
+  projection?: DfgAlignmentProjection;
+}
+export interface DfgAlignmentMove { log: string; model: string; }
+export interface DfgAlignmentTrace {
+  cost: number;
+  internal_cost: number;
+  fitness: number;
+  best_worst_cost: number;
+  visited_states: number;
+  closed: number;
+  closed_states: number;
+  moves: DfgAlignmentMove[];
+}
+export interface DfgProjectedEdge { source: string; target: string; sync: number; model_move: number; }
+export interface DfgProjectedActivity { activity: string; sync: number; model_move: number; log_move: number; }
+export interface DfgAlignmentProjectionResult {
+  edges: DfgProjectedEdge[];
+  activities: DfgProjectedActivity[];
+}
+export interface DfgAlignmentResult {
+  family: "DFG";
+  variant: "CLASSIC";
+  unique_variants: number;
+  alignments: DfgAlignmentTrace[];
+  projected_dfg?: DfgAlignmentProjectionResult;
+  projected_log?: unknown;
+}
+
+export type EditDistanceVariant = "EDIT_DISTANCE";
+export interface EditDistanceOptions {
+  variant?: EditDistanceVariant;
+  anti?: boolean;
+  deviation_cost?: number;
+  projection?: "none" | "log";
+}
+export interface EditDistanceMove {
+  type: "sync" | "log" | "model";
+  log: string;
+  model: string;
+}
+export interface EditDistanceTrace {
+  source_variant: string[];
+  target_variant: string[];
+  target_index: number;
+  cost: number;
+  fitness: number;
+  best_worst_cost: number;
+  bwc: number;
+  denominator: number;
+  moves: EditDistanceMove[];
+}
+export interface EditDistanceResult {
+  family: "EDIT_DISTANCE";
+  variant: "EDIT_DISTANCE";
+  anti: boolean;
+  source_count: number;
+  alignments: EditDistanceTrace[];
+  projected_log?: unknown;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResult {
+  if (!isRecord(value) || value.family !== "DFG" || value.variant !== "CLASSIC" ||
+      !Number.isInteger(value.unique_variants) || !Array.isArray(value.alignments)) return false;
+  return value.alignments.every((a) => isRecord(a) && finite(a.cost) && finite(a.internal_cost) &&
+    finite(a.fitness) && Array.isArray(a.moves) && a.moves.every((m) => isRecord(m) && typeof m.log === "string" && typeof m.model === "string"));
+}
+export function isEditDistanceResult(value: unknown): value is EditDistanceResult {
+  if (!isRecord(value) || value.family !== "EDIT_DISTANCE" || value.variant !== "EDIT_DISTANCE" ||
+      typeof value.anti !== "boolean" || !Number.isInteger(value.source_count) || !Array.isArray(value.alignments)) return false;
+  return value.alignments.every((a) => isRecord(a) && Array.isArray(a.source_variant) &&
+    Array.isArray(a.target_variant) && finite(a.cost) && finite(a.fitness) && Array.isArray(a.moves) &&
+    a.moves.every((m) => isRecord(m) && (m.type === "sync" || m.type === "log" || m.type === "model") && typeof m.log === "string" && typeof m.model === "string"));
+}
+
 export const FOOTPRINTS_DISCOVERY_VARIANTS = [
   "entire_event_log", "trace_by_trace", "dfg", "petri_reach_graph",
   "process_tree", "powl",

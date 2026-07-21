@@ -1933,6 +1933,7 @@ class Aligner {
                              child.path_states.end()) return;
         child.path_states.push_back(child.state);
         child.depth = node.depth + 1;
+        child.seq = seq++;
         child.cost = node.cost + edge_cost * factor;
         child.priority = child.cost + lp_heuristic(child.state);
         if (consume) {

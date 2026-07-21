@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Alignments,
   type AlignmentOptions,
+  type DfgAlignmentOptions,
+  type EditDistanceOptions,
   DEFAULT_ALIGNMENT_OPTIONS,
   type CaseAttributeStat,
   type Decisions,
@@ -33,6 +35,8 @@ import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
 import {
   alignModel,
+  alignDfg,
+  alignEditDistance,
   checkModel,
   decideModel,
   mineCsv,
@@ -76,6 +80,8 @@ export default function App() {
   const alignCache = useRef<Record<string, Alignments>>({});
   // Decision mining, deferred and cached the same way.
   const decideCache = useRef<Record<string, Decisions>>({});
+  const dfgCache = useRef<Record<string, import("./types").DfgAlignmentResult>>({});
+  const editCache = useRef<Record<string, import("./types").EditDistanceResult>>({});
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -111,6 +117,21 @@ export default function App() {
     return result;
   }, []);
 
+  const requestDfg = useCallback(async (options: DfgAlignmentOptions = {}) => {
+    const key = JSON.stringify(options);
+    if (dfgCache.current[key]) return dfgCache.current[key];
+    const result = await alignDfg(options);
+    dfgCache.current = { ...dfgCache.current, [key]: result };
+    return result;
+  }, []);
+  const requestEditDistance = useCallback(async (reference: File, options: EditDistanceOptions = {}) => {
+    const key = `${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
+    if (editCache.current[key]) return editCache.current[key];
+    const result = await alignEditDistance(reference, options);
+    editCache.current = { ...editCache.current, [key]: result };
+    return result;
+  }, []);
+
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
   // decisions are dropped.
@@ -128,6 +149,8 @@ export default function App() {
     setData(parsed);
     alignCache.current = {};
     decideCache.current = {};
+    dfgCache.current = {};
+    editCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -190,6 +213,8 @@ export default function App() {
         // results belong to the previous analysis.
         alignCache.current = {};
         decideCache.current = {};
+        dfgCache.current = {};
+        editCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
@@ -419,6 +444,8 @@ export default function App() {
             onRequestAlignment={requestAlignment}
             onRequestDecisions={source ? requestDecisions : undefined}
             onCheckModel={requestModelCheck}
+            onRequestDfg={requestDfg}
+            onRequestEditDistance={requestEditDistance}
           />
         </main>
       )}

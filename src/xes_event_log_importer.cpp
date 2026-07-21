@@ -140,6 +140,19 @@ EventLog import_xes_event_log(
             }
           }
         }
+      } else if (!in_trace && parent == "log") {
+        if (const auto* key = detail::attribute(token.attributes, "key")) {
+          if (const auto* value = detail::attribute(token.attributes, "value")) {
+            // The log name is supplied separately by Minera's XES exporter;
+            // retain every other scalar log attribute, including derived
+            // projection metadata such as @@aligned_dfg.
+            if (*key != "concept:name") {
+              if (const auto kind = attribute_kind_of(token.name)) {
+                log.attributes.push_back(EventAttribute{*key, *value, *kind});
+              }
+            }
+          }
+        }
       }
 
       if (token.self_closing) {

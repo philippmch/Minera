@@ -25,6 +25,8 @@
 #include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/dfg_alignment.hpp"
+#include "minera/edit_distance_alignment.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
@@ -43,11 +45,12 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/resource_analysis.hpp"
+#include "minera/request_params.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/transition_system.hpp"
-#include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
 
@@ -406,6 +409,18 @@ int usage(const char* program) {
                "  --no-alignments           Skip the optimal alignments in the\n"
                "                            export (token replay and footprints\n"
                "                            stay); alignments dominate runtime\n"
+               "  --align-dfg              Embed classic DFG alignments\n"
+               "  --dfg-max-states <n>     DFG alignment state bound\n"
+               "  --dfg-max-time-ms <n>    DFG alignment time bound\n"
+               "  --dfg-sync-cost a=f      Per-activity sync cost\n"
+               "  --dfg-model-move-cost a=f  Per-activity model cost\n"
+               "  --dfg-log-move-cost a=f  Per-activity log cost\n"
+               "  --dfg-internal-log-move-cost a=f  Internal log cost\n"
+               "  --dfg-projection <mode>  none, log, or metrics\n"
+               "  --align-edit-distance <file>  Align against CSV/XES reference\n"
+               "  --edit-anti              Use farthest (anti) alignment\n"
+               "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
+               "  --edit-projection <mode>  none or log\n"
                "                            on large, badly fitting logs\n"
                "  --alignment-variant <id> state_equation_a_star (default),\n"
                "                            dijkstra_no_heuristics,\n"
@@ -567,6 +582,14 @@ int main(int argc, char** argv) {
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   bool no_alignments = false;
+  bool align_dfg = false;
+  std::string dfg_projection = "none";
+  minera::DfgAlignmentOptions dfg_alignment_options;
+  std::filesystem::path edit_reference;
+  bool edit_anti = false;
+  bool edit_option_used = false;
+  std::string edit_projection = "none";
+  minera::EditDistanceOptions edit_options;
   minera::AlignmentOptions alignment_options;
   bool alignment_option_used = false;
   bool alignment_max_alignments_used = false;
@@ -638,6 +661,15 @@ int main(int argc, char** argv) {
     if (text == "false" || text == "0") return false;
     throw std::invalid_argument(std::string(option) +
                                 " expects true, false, 1, or 0");
+  };
+  const auto parse_dfg_cost = [](const char* value, std::string_view option) {
+    const std::string text = value; const auto sep = text.rfind('=');
+    if (sep == std::string::npos || sep == 0 || sep + 1 >= text.size()) throw std::invalid_argument(std::string(option)+" expects activity=value");
+    char* end = nullptr; const double cost = std::strtod(text.c_str()+sep+1, &end);
+    if (end == text.c_str()+sep+1 || *end != '\0' || !std::isfinite(cost) || cost < 0.0) throw std::invalid_argument(std::string(option)+" expects a finite non-negative value");
+    const auto activity = text.substr(0, sep);
+    if (activity == ">>") throw std::invalid_argument(std::string(option)+" does not accept the gap activity");
+    return std::pair<std::string,double>{activity, cost};
   };
   const auto parse_declare_playout_int =
       [](const char* value, std::string_view name,
@@ -772,6 +804,21 @@ int main(int argc, char** argv) {
       decisions_miner = value;
     } else if (arg == "--no-alignments") {
       no_alignments = true;
+    } else if (arg == "--align-dfg" || arg == "--dfg-max-states" || arg == "--dfg-max-time-ms" || arg == "--dfg-projection" || arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost" || arg == "--align-edit-distance" || arg == "--edit-anti" || arg == "--edit-deviation-cost" || arg == "--edit-projection") {
+      if (arg == "--align-dfg") { align_dfg = true; }
+      else if (arg == "--edit-anti") { edit_anti = true; edit_options.perform_anti_alignment = true; edit_option_used = true; }
+      else {
+        const auto* value = next(); if (!value) return usage(argv[0]);
+        try {
+          if (arg == "--dfg-max-states") { dfg_alignment_options.max_visited_states = parse_nonnegative_size(value, arg); align_dfg = true; }
+          else if (arg == "--dfg-max-time-ms") { dfg_alignment_options.max_time_ms = static_cast<std::uint64_t>(parse_nonnegative_size(value, arg)); align_dfg = true; }
+          else if (arg == "--dfg-projection") { dfg_projection = value; if (dfg_projection != "none" && dfg_projection != "log" && dfg_projection != "metrics") throw std::invalid_argument("--dfg-projection expects none, log, or metrics"); align_dfg = true; }
+          else if (arg == "--dfg-sync-cost" || arg == "--dfg-model-move-cost" || arg == "--dfg-log-move-cost" || arg == "--dfg-internal-log-move-cost") { const auto kv = parse_dfg_cost(value, arg); if (arg == "--dfg-sync-cost") dfg_alignment_options.sync_cost[kv.first] = kv.second; else if (arg == "--dfg-model-move-cost") dfg_alignment_options.model_move_cost[kv.first] = kv.second; else if (arg == "--dfg-log-move-cost") dfg_alignment_options.log_move_cost[kv.first] = kv.second; else dfg_alignment_options.internal_log_move_cost[kv.first] = kv.second; align_dfg = true; }
+          else if (arg == "--align-edit-distance") edit_reference = value;
+          else if (arg == "--edit-deviation-cost") { edit_options.deviation_cost = static_cast<std::uint64_t>(parse_positive_size(value, arg)); edit_option_used = true; }
+          else { edit_projection = value; if (edit_projection != "none" && edit_projection != "log") throw std::invalid_argument("--edit-projection expects none or log"); edit_option_used = true; }
+        } catch (const std::invalid_argument& error) { std::cerr << "error: " << error.what() << '\n'; return 2; }
+      }
     } else if (arg == "--alignment-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -1589,6 +1636,10 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
+  if (edit_option_used && edit_reference.empty()) {
+    std::cerr << "error: edit-distance options require --align-edit-distance <file>\n";
+    return 2;
+  }
 
   if (footprints_options.model == "dfg" &&
       footprints_options.discovery_variants.contains("petri_reach_graph")) {
@@ -1621,6 +1672,27 @@ int main(int argc, char** argv) {
       log = minera::filter_event_log(log, filter);
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    std::optional<minera::DfgAlignmentLogResult> dfg_alignment_result;
+    std::optional<minera::DfgAlignmentProjection> dfg_projection_result;
+    std::optional<minera::EventLog> dfg_projected_log;
+    if (align_dfg) {
+      minera::DfgStatisticalOptions dfg_opts; dfg_opts.window = 1;
+      const auto dfg = minera::discover_frequency_dfg(log, dfg_opts);
+      std::map<std::string, std::uint64_t> starts, ends;
+      for (const auto& t : log.traces) if (!t.events.empty()) { ++starts[t.events.front().activity]; ++ends[t.events.back().activity]; }
+      dfg_alignment_result = minera::align_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
+      if (dfg_projection == "metrics") dfg_projection_result = minera::project_alignments_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
+      if (dfg_projection == "log") dfg_projected_log = minera::project_log_on_dfg(log, dfg, starts, ends, dfg_alignment_options);
+    }
+    std::optional<std::vector<minera::EditDistanceAlignment>> edit_result;
+    std::optional<minera::EventLog> edit_projected_log;
+    if (!edit_reference.empty()) {
+      const auto reference = minera::ends_with_ci(edit_reference.string(), ".xes")
+          ? minera::import_xes_event_log(edit_reference)
+          : minera::import_csv_event_log(edit_reference, options);
+      edit_result = minera::align_edit_distance(log, reference, edit_options);
+      if (edit_projection == "log") { edit_projected_log = minera::project_log_on_alignments(log, *edit_result); }
+    }
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!dfg_statistical_variants.empty() || !dfg_causal_variants.empty()) {
       dfg_variants_analysis =
@@ -1787,7 +1859,12 @@ int main(int argc, char** argv) {
           dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
           correlation_variants_analysis ? &*correlation_variants_analysis
                                         : nullptr,
-          batch_ptr);
+          batch_ptr,
+          dfg_alignment_result ? &*dfg_alignment_result : nullptr,
+          edit_result ? &*edit_result : nullptr, edit_anti,
+          dfg_projection_result ? &*dfg_projection_result : nullptr,
+          dfg_projected_log ? &*dfg_projected_log : nullptr,
+          edit_projected_log ? &*edit_projected_log : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1806,7 +1883,12 @@ int main(int argc, char** argv) {
           dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
           correlation_variants_analysis ? &*correlation_variants_analysis
                                         : nullptr,
-          batch_ptr);
+          batch_ptr,
+          dfg_alignment_result ? &*dfg_alignment_result : nullptr,
+          edit_result ? &*edit_result : nullptr, edit_anti,
+          dfg_projection_result ? &*dfg_projection_result : nullptr,
+          dfg_projected_log ? &*dfg_projected_log : nullptr,
+          edit_projected_log ? &*edit_projected_log : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

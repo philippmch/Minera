@@ -9,6 +9,8 @@
 #include "minera/declare.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/dfg_alignment.hpp"
+#include "minera/edit_distance_alignment.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -3197,6 +3199,8 @@ void xes_export_round_trips_generic_attributes() {
   // <int> stays an <int>; a date that no longer parses degrades to a string
   // instead of emitting an invalid xs:dateTime.
   minera::EventLog log;
+  log.attributes.push_back(
+      {"@@aligned_variant", "a,b", minera::AttributeKind::kString});
   minera::Trace trace;
   trace.case_id = "c1";
   minera::Event event;
@@ -3213,6 +3217,8 @@ void xes_export_round_trips_generic_attributes() {
   log.traces.push_back(trace);
 
   const auto xes = minera::to_xes(log);
+  assert(xes.find("<string key=\"@@aligned_variant\" value=\"a,b\"/>") !=
+         std::string::npos);
   assert(xes.find("<int key=\"amount\" value=\"100\"/>") != std::string::npos);
   assert(xes.find("<date key=\"due\" value=\"2026-03-01T10:00:00.000Z\"/>") !=
          std::string::npos);
@@ -3221,6 +3227,7 @@ void xes_export_round_trips_generic_attributes() {
 
   std::istringstream input(xes);
   const auto reread = minera::import_xes_event_log(input);
+  assert(*reread.attribute("@@aligned_variant") == "a,b");
   const auto& back = reread.traces.front().events.front();
   assert(back.attributes.size() == 4);
   assert(back.attributes[0].kind == minera::AttributeKind::kInt);
@@ -4689,6 +4696,30 @@ void transition_system_positional_options_and_invalid_enums() {
 
 }  // namespace
 
+void json_export_carries_dfg_and_edit_alignment_contract() {
+  minera::EventLog log;
+  minera::Trace t; t.case_id = "c1"; t.events.push_back({"c1", "A"}); t.events.push_back({"c1", "C"});
+  log.traces.push_back(t); log.attributes.push_back({"log_tag", "x", minera::AttributeKind::kString});
+  minera::DfgFrequency dfg{{{"A", "B"}, 1}};
+  std::map<std::string, std::uint64_t> starts{{"A",1}}, ends{{"B",1}};
+  const auto d = minera::align_log_on_dfg(log, dfg, starts, ends);
+  const auto metrics = minera::project_alignments_on_dfg(log, dfg, starts, ends);
+  const auto projected = minera::project_log_on_dfg(log, dfg, starts, ends);
+  const auto dj = minera::dfg_alignment_json(d, &metrics, &projected);
+  assert(dj.find("\"family\": \"DFG\"") != std::string::npos);
+  assert(dj.find("\"variant\": \"CLASSIC\"") != std::string::npos);
+  assert(dj.find("\"unique_variants\": 1") != std::string::npos);
+  assert(dj.find("\"cost\"") != std::string::npos && dj.find("\"visited_states\"") != std::string::npos);
+  assert(dj.find("\"projected_dfg\"") != std::string::npos && dj.find("\"projected_log\"") != std::string::npos);
+  minera::EventLog target; minera::Trace tt; tt.case_id = "r"; tt.events.push_back({"r", "B"}); target.traces.push_back(tt);
+  const auto e = minera::align_edit_distance(log, target);
+  const auto ej = minera::edit_distance_json(e, false);
+  assert(ej.find("\"family\": \"EDIT_DISTANCE\"") != std::string::npos);
+  assert(ej.find("\"source_count\": 1") != std::string::npos && ej.find("\"target_index\"") != std::string::npos);
+  assert(ej.find("\"source_event_count\"") != std::string::npos && ej.find("\"target_event_count\"") != std::string::npos);
+  assert(ej.find("\"log\": \">>\"") != std::string::npos || ej.find("\"model\": \">>\"") != std::string::npos);
+}
+
 int main() {
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();
@@ -4730,6 +4761,7 @@ int main() {
   json_export_carries_the_petri_net_contract();
   json_export_carries_recursive_powl_contract();
   json_export_carries_log_skeleton_contract();
+  json_export_carries_dfg_and_edit_alignment_contract();
   conformance_is_perfect_on_the_discovery_log();
   conformance_is_perfect_for_every_operator();
   conformance_counts_unmodeled_activities();

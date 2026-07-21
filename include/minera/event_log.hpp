@@ -69,6 +69,17 @@ void order_events_by_time(std::vector<Event>& events);
 
 struct EventLog {
   std::vector<Trace> traces;
+  // Scalar log-level XES attributes and derived-model projection markers.
+  // Kept after traces so existing aggregate initializers that provide only
+  // the trace vector remain source-compatible.
+  std::vector<EventAttribute> attributes;
+
+  [[nodiscard]] const std::string* attribute(std::string_view key) const {
+    for (const auto& entry : attributes) {
+      if (entry.key == key) return &entry.value;
+    }
+    return nullptr;
+  }
 
   [[nodiscard]] std::size_t trace_count() const noexcept {
     return traces.size();

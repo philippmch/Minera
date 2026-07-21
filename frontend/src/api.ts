@@ -9,6 +9,12 @@ import {
   type Decisions,
   type MineraExport,
   type ModelConformance,
+  type DfgAlignmentOptions,
+  type DfgAlignmentResult,
+  type EditDistanceOptions,
+  type EditDistanceResult,
+  isDfgAlignmentResult,
+  isEditDistanceResult,
   isMineraExport,
 } from "./types";
 
@@ -619,6 +625,128 @@ export async function alignModel(miner: string, options: AlignmentOptions = {}):
     throw new Error("the Minera backend returned an invalid alignment");
   }
   return parsed as Alignments;
+}
+
+function escapeCostActivity(name: string): string {
+  let escaped = "";
+  for (const char of name) {
+    if (char === " ") escaped += "\\s";
+    else if (char === "\t") escaped += "\\t";
+    else if (char === "\n") escaped += "\\n";
+    else if (char === "\r") escaped += "\\r";
+    else if ("\\,=:".includes(char)) escaped += `\\${char}`;
+    else escaped += char;
+  }
+  return escaped;
+}
+
+/** Parse the escaped activity=cost syntax used by DFG cost controls. */
+export function parseDfgCostMapInput(value: string): Record<string, number> | undefined {
+  if (!value.trim()) return undefined;
+  const items: string[] = [];
+  let begin = 0;
+  let escaped = false;
+  for (let i = 0; i <= value.length; i += 1) {
+    if (i < value.length && escaped) { escaped = false; continue; }
+    if (i < value.length && value[i] === "\\") { escaped = true; continue; }
+    if (i === value.length || value[i] === ",") {
+      const item = value.slice(begin, i).trim();
+      if (!item) throw new Error("cost maps must contain activity=value pairs");
+      items.push(item);
+      begin = i + 1;
+    }
+  }
+  if (escaped) throw new Error("cost-map activity has a dangling escape");
+
+  const result: Record<string, number> = {};
+  for (const item of items) {
+    let separator = -1;
+    escaped = false;
+    for (let i = 0; i < item.length; i += 1) {
+      if (escaped) { escaped = false; continue; }
+      if (item[i] === "\\") { escaped = true; continue; }
+      if (item[i] === "=" || item[i] === ":") { separator = i; break; }
+    }
+    if (separator <= 0 || separator + 1 >= item.length)
+      throw new Error(`invalid cost entry "${item}"; expected activity=value`);
+    let activity = "";
+    for (let i = 0; i < separator; i += 1) {
+      if (item[i] !== "\\") { activity += item[i]; continue; }
+      i += 1;
+      if (i >= separator || !"\\,=:stnr".includes(item[i]))
+        throw new Error(`invalid escape in cost activity "${item.slice(0, separator)}"`);
+      activity += item[i] === "s" ? " " : item[i] === "t" ? "\t" : item[i] === "n" ? "\n" : item[i] === "r" ? "\r" : item[i];
+    }
+    const rawCost = item.slice(separator + 1).trim();
+    const cost = Number(rawCost);
+    if (!activity || activity === ">>" || !rawCost || !Number.isFinite(cost) || cost < 0)
+      throw new Error(`invalid cost entry "${item}"; costs must be finite and non-negative`);
+    result[activity] = cost;
+  }
+  return result;
+}
+
+function encodeCostMap(map?: Record<string, number>): string | undefined {
+  if (!map) return undefined;
+  const entries = Object.entries(map).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  for (const [name, value] of entries) {
+    if (!name || name === ">>" || !Number.isFinite(value) || value < 0)
+      throw new Error("DFG cost maps require non-gap activities and finite non-negative costs");
+  }
+  return entries.length ? entries.map(([name, value]) => `${escapeCostActivity(name)}=${value}`).join(",") : undefined;
+}
+
+/** Deterministic query serialization for classic DFG alignment requests. */
+export function dfgAlignmentQuery(options: DfgAlignmentOptions = {}): string {
+  const q = new URLSearchParams();
+  const add = (name: string, value: unknown) => { if (value !== undefined && value !== null && value !== "") q.set(name, String(value)); };
+  add("dfg_variant", options.variant);
+  const maxStates = options.max_states;
+  const maxTimeMs = options.max_time_ms;
+  if (typeof maxStates === "number" && Number.isInteger(maxStates) && maxStates > 0) add("dfg_max_states", maxStates);
+  if (typeof maxTimeMs === "number" && Number.isInteger(maxTimeMs) && maxTimeMs > 0) add("dfg_max_time_ms", maxTimeMs);
+  add("dfg_sync_cost", encodeCostMap(options.sync_cost));
+  add("dfg_model_move_cost", encodeCostMap(options.model_move_cost));
+  add("dfg_log_move_cost", encodeCostMap(options.log_move_cost));
+  add("dfg_internal_log_move_cost", encodeCostMap(options.internal_log_move_cost));
+  add("projection", options.projection);
+  return q.toString();
+}
+
+export async function alignDfg(options: DfgAlignmentOptions = {}): Promise<DfgAlignmentResult> {
+  let response: Response;
+  try { response = await fetch(`/api/align-dfg${dfgAlignmentQuery(options) ? `?${dfgAlignmentQuery(options)}` : ""}`, { method: "POST" }); }
+  catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isDfgAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid DFG alignment");
+  return parsed;
+}
+
+/** Stable form serialization for edit-distance alignment controls. */
+export function editDistanceFormEntries(options: EditDistanceOptions = {}): Array<[string, string]> {
+  const entries: Array<[string, string]> = [];
+  if (options.variant) entries.push(["edit_variant", options.variant]);
+  if (options.anti !== undefined) entries.push(["anti", String(options.anti)]);
+  const deviationCost = options.deviation_cost;
+  if (typeof deviationCost === "number" && Number.isInteger(deviationCost) && deviationCost > 0) entries.push(["deviation_cost", String(deviationCost)]);
+  if (options.projection) entries.push(["projection", options.projection]);
+  return entries;
+}
+
+export async function alignEditDistance(reference: File, options: EditDistanceOptions = {}): Promise<EditDistanceResult> {
+  const form = new FormData();
+  form.append("reference_log", reference, reference.name);
+  for (const [name, value] of editDistanceFormEntries(options)) form.append(name, value);
+  let response: Response;
+  try { response = await fetch("/api/align-edit-distance", { method: "POST", body: form }); }
+  catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isEditDistanceResult(parsed)) throw new Error("the Minera backend returned an invalid edit-distance alignment");
+  return parsed;
 }
 
 /**

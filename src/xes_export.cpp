@@ -101,6 +101,13 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
          "  </global>\n";
   out << "  <classifier name=\"Activity\" keys=\"concept:name\"/>\n";
   write_string_attribute(out, "  ", "concept:name", name);
+  for (const auto& attribute : log.attributes) {
+    // Avoid two log-name attributes when a caller constructed one manually;
+    // the explicit `name` argument remains authoritative.
+    if (attribute.key != "concept:name") {
+      write_typed_attribute(out, "  ", attribute);
+    }
+  }
 
   for (const auto& trace : log.traces) {
     out << "  <trace>\n";
