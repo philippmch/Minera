@@ -31,6 +31,7 @@ add_library(minera_core
   src/declare_streaming.cpp
   src/decision_mining.cpp
   src/dfg_alignment.cpp
+  src/decomposed_alignment.cpp
   src/dfg_variants.cpp
   src/directly_follows_graph.cpp
   src/edit_distance_alignment.cpp
@@ -47,9 +48,12 @@ add_library(minera_core
   src/minimum_self_distance.cpp
   src/performance.cpp
   src/performance_spectrum.cpp
+  src/petri_anti_alignment.cpp
+  src/petri_multi_alignment.cpp
   src/petri_net.cpp
   src/playout.cpp
   src/process_tree_alignment.cpp
+  src/process_tree_reduction.cpp
   src/powl.cpp
   src/powl_conversion.cpp
   src/powl_discovery.cpp
@@ -263,6 +267,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_process_tree_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_process_tree_alignment_tests COMMAND minera_process_tree_alignment_tests)
 
+  add_executable(minera_process_tree_reduction_tests
+    tests/test_process_tree_reduction.cpp
+  )
+  target_link_libraries(minera_process_tree_reduction_tests PRIVATE minera::core)
+  target_compile_features(minera_process_tree_reduction_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_tree_reduction_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_tree_reduction_tests COMMAND minera_process_tree_reduction_tests)
+
   add_executable(minera_dfg_alignment_tests
     tests/test_dfg_alignment.cpp
   )
@@ -278,4 +290,20 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_edit_distance_alignment_tests PRIVATE cxx_std_20)
   target_compile_options(minera_edit_distance_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_edit_distance_alignment_tests COMMAND minera_edit_distance_alignment_tests)
+
+  add_executable(minera_decomposed_alignment_tests
+    tests/test_decomposed_alignment.cpp
+  )
+  target_link_libraries(minera_decomposed_alignment_tests PRIVATE minera::core)
+  target_compile_features(minera_decomposed_alignment_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_decomposed_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_decomposed_alignment_tests COMMAND minera_decomposed_alignment_tests)
+
+  add_executable(minera_petri_anti_multi_alignment_tests
+    tests/test_petri_anti_multi_alignment.cpp
+  )
+  target_link_libraries(minera_petri_anti_multi_alignment_tests PRIVATE minera::core)
+  target_compile_features(minera_petri_anti_multi_alignment_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_petri_anti_multi_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_petri_anti_multi_alignment_tests COMMAND minera_petri_anti_multi_alignment_tests)
 endif()

@@ -147,6 +147,22 @@ and tracks every family as complete, partial, or missing.
   against a silent tree. N-ary loop redo/exit children are normalized to an
   XOR for search/DP/approximation; the MILP variant explicitly requires the
   binary form.
+- **Decomposed and advanced native conformance**: the C++ API now includes
+  decomposed Petri-net alignment via `RECOMPOS_MAXIMAL`, plus Petri-net
+  anti-alignments and multi-alignments via `VERSION_DISCOUNTED_A_STAR`.
+  Decomposed alignment uses real place/silent-transition components, projected
+  component searches, cached border-agreement repair, all-owner component
+  merging, and causal DAG recomposition without substituting a whole-net
+  result. Anti-/multi-alignment retain tau transitions, weighted arcs,
+  arbitrary markings, the pinned geometric discounted-edit objectives, and
+  their ordinary precision/maximum-distance diagnostics. These are currently
+  native-library entry points; CLI/server/frontend adapters are the next
+  integration checkpoint.
+- **Trace-based process-tree reduction**: `TREE_TR_BASED` removes optional
+  non-root subtrees whose activities do not occur in a trace, then applies the
+  pinned folding rules without mutating the source tree. It preserves root
+  replacement quirks, XOR tau ordering, mixed loop/tau behavior, and custom
+  string activity keys.
 - **Model annotations (frequency & performance)**: token replay of the
   cleanly fitting cases decorates the discovered model itself — per
   transition, how often it actually fired (so a path the log never takes is
