@@ -40,6 +40,7 @@ struct ConformanceResult {
   std::uint64_t consumed = 0;
   std::uint64_t missing = 0;
   std::uint64_t remaining = 0;
+  std::vector<std::uint64_t> transition_frequencies;
 
   std::vector<VariantConformance> variants;  // worst-fitting first
 };
@@ -172,6 +173,12 @@ struct AlignmentDiagnostics {
 };
 
 // The optimal (least-cost) alignment of one trace variant against the model.
+struct ProjectedAlignmentMove {
+  std::string activity;
+  std::size_t transition = static_cast<std::size_t>(-1);
+  std::vector<int> marking_before;
+  std::vector<int> marking_after;
+};
 struct VariantAlignment {
   std::vector<std::string> activities;  // activity names, in trace order
   std::uint64_t count = 0;              // traces collapsing to this variant
@@ -180,6 +187,11 @@ struct VariantAlignment {
   double fitness = 1.0;                 // 1 - cost / worst-case cost, in [0, 1]
   std::vector<std::vector<AlignmentMove>> optimal_alignments;
   AlignmentDiagnostics diagnostics;
+  double worst_cost = 0.0;  // denominator used for PM4Py log-fitness
+  // Visible model projection (synchronous + model-only moves); tau and
+  // log-only moves are omitted. Transition ids remain available for duplicate
+  // labels in evaluator variants that opt into task identities.
+  std::vector<ProjectedAlignmentMove> projected_model_moves;
 };
 
 // Alignment-based conformance of an event log against a discovered process

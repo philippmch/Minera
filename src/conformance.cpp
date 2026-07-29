@@ -497,9 +497,10 @@ class Replayer {
   }
 
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
-    for (const std::size_t place : net_.transitions()[t].inputs) {
-      if (marking[place] <= 0) return false;
-    }
+    std::unordered_map<std::size_t, std::size_t> required;
+    for (const std::size_t place : net_.transitions()[t].inputs) ++required[place];
+    for (const auto& [place, count] : required)
+      if (marking[place] < static_cast<int>(count)) return false;
     return true;
   }
 
@@ -767,13 +768,17 @@ double compute_precision(const std::vector<Variant>& variants,
   for (const auto& variant : variants) {
     std::size_t current = 0;
     nodes[current].freq += variant.count;
-    for (const auto& id : variant.ids) {
+    for (std::size_t depth = 0; depth < variant.ids.size(); ++depth) {
+      const auto& id = variant.ids[depth];
       if (id) nodes[current].observed.insert(*id);
       const auto [it, inserted] =
           nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
       if (inserted) nodes.emplace_back();
       current = it->second;
-      nodes[current].freq += variant.count;
+      // PM4Py scores proper prefixes only.  A node reached by the final
+      // event is terminal and contributes no weight; a shorter variant that
+      // shares a prefix contributes only when another event follows it.
+      if (depth + 1 < variant.ids.size()) nodes[current].freq += variant.count;
     }
   }
 
@@ -854,8 +859,10 @@ double compute_alignment_precision(
           nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
       if (inserted) nodes.emplace_back();
       current = it->second;
-      nodes[current].freq += variant.count;
-      nodes[current].markings.insert(markings[d + 1]);
+      if (d + 1 < variant.ids.size()) {
+        nodes[current].freq += variant.count;
+        nodes[current].markings.insert(markings[d + 1]);
+      }
     }
   }
 
@@ -893,7 +900,11 @@ double compute_generalization(const std::vector<std::uint64_t>& executions) {
   if (executions.empty()) return 1.0;
   double rarity = 0.0;
   for (const auto count : executions) {
-    if (count > 0) rarity += 1.0 / std::sqrt(double(count));
+    // PM4Py penalises transitions which were never exercised as strongly as
+    // a transition seen once.  Silent transitions are included by the caller
+    // (their firings are part of the replay), so this remains a model-level
+    // measure rather than an activity-only shortcut.
+    rarity += count == 0 ? 1.0 : 1.0 / std::sqrt(double(count));
   }
   return 1.0 - rarity / double(executions.size());
 }
@@ -906,7 +917,11 @@ double compute_simplicity(const PetriNet& net) {
   if (nodes == 0) return 1.0;
   std::size_t arcs = 0;
   for (const auto& transition : net.transitions()) {
-    arcs += transition.inputs.size() + transition.outputs.size();
+    // Inputs/outputs may contain repeated place ids to encode a weighted arc;
+    // arc-degree simplicity counts distinct arc objects, not multiplicity.
+    std::unordered_set<std::size_t> in(transition.inputs.begin(), transition.inputs.end());
+    std::unordered_set<std::size_t> out(transition.outputs.begin(), transition.outputs.end());
+    arcs += in.size() + out.size();
   }
   // Every arc joins one place and one transition, so it adds 2 to the total
   // degree.
@@ -1211,6 +1226,7 @@ class Aligner {
     // d = 0..len-1, plus the final marking at index len. These are the states
     // alignment-based precision inspects. Empty when the search was capped.
     std::vector<Marking> prefix_markings;
+    std::vector<ProjectedAlignmentMove> projected_model_moves;
   };
 
   // Optimal alignment of one trace (activity ids; std::nullopt = activity absent
@@ -1444,6 +1460,7 @@ class Aligner {
         std::uint32_t prev = 0;
         AlignmentMoveType type = AlignmentMoveType::kModel;
         std::int32_t ref = -1;  // kLog: trace position; otherwise: activity id
+        std::int32_t transition = -1;
         bool silent = false;
         bool exact = false;   // h is the LP value, not an inherited bound
         bool closed = false;  // expanded with an exact h: g is final
@@ -1489,6 +1506,7 @@ class Aligner {
       const auto relax = [&](State next, std::uint64_t cost, std::uint32_t prev,
                              AlignmentMoveType type, std::int32_t ref,
                              bool silent, std::uint64_t bound,
+                             std::int32_t transition,
                              bool bound_exact) {
         const auto [id, inserted] = intern(std::move(next));
         Entry& entry = entries[id];
@@ -1502,6 +1520,7 @@ class Aligner {
         entry.prev = prev;
         entry.type = type;
         entry.ref = ref;
+        entry.transition = transition;
         entry.silent = silent;
         frontier.push({cost + entry.heuristic, cost, seq++, id});
       };
@@ -1581,7 +1600,7 @@ class Aligner {
           next.back() = static_cast<int>(pos + 1);
           relax(std::move(next), g + 1, node.state, AlignmentMoveType::kLog,
                 static_cast<std::int32_t>(pos), false, h_less_one,
-                !use_lp || walked_log);
+                -1, !use_lp || walked_log);
         }
 
         // Model moves (and the synchronous move when the labels agree).
@@ -1593,7 +1612,7 @@ class Aligner {
           for (const std::size_t place : transition.outputs) ++fired[place];
           if (transition.silent()) {
             relax(std::move(fired), g, node.state, AlignmentMoveType::kModel,
-                  -1, true, h, !use_lp || walked_model(t));
+                  -1, true, h, static_cast<std::int32_t>(t), !use_lp || walked_model(t));
             continue;
           }
           const auto activity = static_cast<std::int32_t>(*transition.activity);
@@ -1607,14 +1626,14 @@ class Aligner {
             synced.back() = static_cast<int>(pos + 1);
             relax(std::move(fired), g + 1, node.state,
                   AlignmentMoveType::kModel, activity, false, h_less_one,
-                  !use_lp || walked_model(t));
+                  static_cast<std::int32_t>(t), !use_lp || walked_model(t));
             relax(std::move(synced), g, node.state,
                   AlignmentMoveType::kSynchronous, activity, false, h,
-                  !use_lp || walked_sync(k));
+                  static_cast<std::int32_t>(t), !use_lp || walked_sync(k));
           } else {
             relax(std::move(fired), g + 1, node.state,
                   AlignmentMoveType::kModel, activity, false, h_less_one,
-                  !use_lp || walked_model(t));
+                  static_cast<std::int32_t>(t), !use_lp || walked_model(t));
           }
         }
       }
@@ -1631,7 +1650,9 @@ class Aligner {
               {entry.type, entry.type == AlignmentMoveType::kLog
                                ? names[static_cast<std::size_t>(entry.ref)]
                                : net_.activities()[static_cast<std::size_t>(
-                                     entry.ref)]});
+                                     entry.ref)],
+               entry.transition < 0 ? static_cast<std::size_t>(-1)
+                                    : static_cast<std::size_t>(entry.transition)});
         }
         id = entry.prev;
         path.push_back(id);
@@ -1655,6 +1676,10 @@ class Aligner {
         }
       }
       outcome.prefix_markings[len] = strip(*by_id[path.back()]);
+      for (std::size_t i=0;i+1<path.size();++i) {
+        const auto& e=entries[path[i+1]]; if (e.silent || e.type==AlignmentMoveType::kLog || e.transition<0) continue;
+        outcome.projected_model_moves.push_back({net_.activities()[static_cast<std::size_t>(e.ref)], static_cast<std::size_t>(e.transition), strip(*by_id[path[i]]), strip(*by_id[path[i+1]])});
+      }
       return outcome;
     };
 
@@ -2051,6 +2076,14 @@ class Aligner {
     }
     auto& primary = goals.front();
     result.primary.cost = primary.cost;
+    for (std::size_t i=0; i<primary.moves.size() && i+1<primary.path_states.size(); ++i) {
+      const auto& mv=primary.moves[i];
+      if (mv.activity.empty() || mv.type==AlignmentMoveType::kLog || mv.transition==static_cast<std::size_t>(-1)) continue;
+      auto before=primary.path_states[i]; if(!before.empty()) before.pop_back();
+      auto after=primary.path_states[i+1]; if(!after.empty()) after.pop_back();
+      result.primary.projected_model_moves.push_back({mv.activity,mv.transition,
+        std::move(before), std::move(after)});
+    }
     result.primary.moves = std::move(primary.moves);
     result.primary.prefix_markings = std::move(primary.prefixes);
     for (std::size_t i = 1; i < goals.size(); ++i)
@@ -2375,6 +2408,7 @@ ConformanceResult check_conformance(const EventLog& event_log,
 
   result.precision = compute_precision(variants, replayer);
   result.generalization = compute_generalization(executions);
+  result.transition_frequencies = executions;
   result.simplicity = compute_simplicity(net);
 
   // Surface the least-fitting variants first; break ties by frequency so the
@@ -2445,8 +2479,10 @@ AlignmentResult check_alignment(const EventLog& event_log,
     if (outcome.cost == 0) result.fitting_traces += variant.count;
 
     result.variants.push_back(VariantAlignment{
-        variant.names, variant.count, std::move(outcome.moves), outcome.cost,
-        fitness});
+      variant.names, variant.count, std::move(outcome.moves), outcome.cost,
+      fitness});
+    result.variants.back().worst_cost = static_cast<double>(worst);
+    result.variants.back().projected_model_moves = outcome.projected_model_moves;
     variant_markings.push_back(std::move(outcome.prefix_markings));
   }
 
@@ -2657,6 +2693,8 @@ AlignmentResult check_alignment(const EventLog& event_log,
                           std::move(configured.primary.moves),
                           configured.primary.cost, fitness};
     item.diagnostics = configured.diagnostics;
+    item.worst_cost = worst;
+    item.projected_model_moves = configured.primary.projected_model_moves;
     item.optimal_alignments.push_back(item.moves);
     for (auto& alt : configured.alternatives)
       item.optimal_alignments.push_back(std::move(alt));

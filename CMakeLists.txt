@@ -35,6 +35,7 @@ add_library(minera_core
   src/dfg_variants.cpp
   src/directly_follows_graph.cpp
   src/edit_distance_alignment.cpp
+  src/evaluation.cpp
   src/event_ordering.cpp
   src/eventually_follows.cpp
   src/footprints.cpp
@@ -306,4 +307,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_petri_anti_multi_alignment_tests PRIVATE cxx_std_20)
   target_compile_options(minera_petri_anti_multi_alignment_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_petri_anti_multi_alignment_tests COMMAND minera_petri_anti_multi_alignment_tests)
+
+  add_executable(minera_evaluation_tests
+    tests/test_evaluation.cpp
+  )
+  target_link_libraries(minera_evaluation_tests PRIVATE minera::core)
+  target_compile_features(minera_evaluation_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_evaluation_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_evaluation_tests COMMAND minera_evaluation_tests)
 endif()
