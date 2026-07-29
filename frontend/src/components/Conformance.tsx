@@ -1009,14 +1009,14 @@ function AlignmentSettings({
     <section className="panel conf-panel align-settings">
       <div className="panel-head">
         <h2>Alignment settings</h2>
-        <span className="panel-meta">PM4Py-compatible search controls</span>
+        <span className="panel-meta">Search controls</span>
       </div>
       <div className="align-settings-grid">
         <label>Variant<select value={variant} onChange={(e) => onChange({ ...draft, variant: e.target.value as AlignmentVariant })}>
           {ALIGNMENT_VARIANTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select></label>
         <label>Cost profile<select value={draft.cost_profile ?? "legacy"} onChange={(e) => onChange({ ...draft, cost_profile: e.target.value as AlignmentCostProfile })}>
-          <option value="legacy">Legacy (unit deviations)</option><option value="pm4py">PM4Py costs</option>
+          <option value="legacy">Legacy (unit deviations)</option><option value="standard">Standard costs</option>
         </select></label>
         <label>State limit<input type="number" min={1} step={1} value={value("max_states")} onChange={(e) => numeric("max_states", e.target.value)} placeholder="default" /></label>
         <label>Global timeout (s)<input type="number" min={0} step={0.1} value={value("max_align_time")} onChange={(e) => numeric("max_align_time", e.target.value)} placeholder="none" /></label>

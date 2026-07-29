@@ -14,7 +14,7 @@ using Sequence = std::vector<Token>;
 struct Node { std::vector<std::size_t> marking; std::vector<std::size_t> path; double priority = 0.0; };
 struct MarkingLess { bool operator()(const std::vector<std::size_t>& a, const std::vector<std::size_t>& b) const noexcept { return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end()); } };
 
-// Keep the pinned PM4Py distinction between prefix handling and modeled-cell
+// Keep the pinned distinction between prefix handling and modeled-cell
 // handling: null transitions are silent, prefixes recognize exact "tau" and
 // labels beginning with 'n', and modeled cells additionally recognize
 // labels containing "skip".

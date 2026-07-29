@@ -46,7 +46,7 @@ struct ConformanceResult {
 };
 
 // Token-replay implementation variation. FORWARD is the modern replay used
-// by default; BACKWARDS retains PM4Py's deprecated reverse-routing behaviour.
+// by default; BACKWARDS retains the deprecated reverse-routing behaviour.
 enum class TokenReplayVariant {
   kForward,
   kBackwards,
@@ -123,7 +123,7 @@ struct AlignmentMove {
   std::size_t transition = static_cast<std::size_t>(-1);  // model transition id
 };
 
-// PM4Py's alignment algorithm family.  The generator variants retain all
+// Alignment algorithm family. The generator variants retain all
 // equal-cost optimal paths (subject to AlignmentOptions::max_alignments).
 enum class AlignmentVariant {
   kStateEquationAStar,
@@ -134,7 +134,7 @@ enum class AlignmentVariant {
   kGeneratorDijkstraLessMemory,
 };
 
-enum class AlignmentCostProfile { kLegacyUnit, kPm4PyStandard };
+enum class AlignmentCostProfile { kLegacyUnit, kStandard };
 
 struct AlignmentOptions {
   AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
@@ -145,7 +145,7 @@ struct AlignmentOptions {
   std::size_t max_alignments = 32;
   double exponent = 2.0;          // discounted A* depth exponent
   bool synchronous_dijkstra = true;
-  // nullopt derives PM4Py-standard or legacy values from cost_profile.
+  // nullopt derives standard or legacy values from cost_profile.
   std::optional<double> default_trace_cost;
   std::optional<double> default_model_cost;
   std::optional<double> default_sync_cost;
@@ -156,7 +156,7 @@ struct AlignmentOptions {
   std::vector<double> trace_costs_by_position;
   std::vector<double> model_costs_by_transition;
   std::vector<double> sync_costs_by_transition;
-  // Optional PM4Py-style callables. The second argument is the trace event
+  // Optional cost callables. The second argument is the trace event
   // index for trace costs and the transition index for model/sync costs.
   std::function<double(const std::string&, std::size_t)> trace_cost_function;
   std::function<double(const std::string&, std::size_t)> model_cost_function;
@@ -187,7 +187,7 @@ struct VariantAlignment {
   double fitness = 1.0;                 // 1 - cost / worst-case cost, in [0, 1]
   std::vector<std::vector<AlignmentMove>> optimal_alignments;
   AlignmentDiagnostics diagnostics;
-  double worst_cost = 0.0;  // denominator used for PM4Py log-fitness
+  double worst_cost = 0.0;  // denominator used for log-fitness
   // Visible model projection (synchronous + model-only moves); tau and
   // log-only moves are omitted. Transition ids remain available for duplicate
   // labels in evaluator variants that opt into task identities.

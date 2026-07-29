@@ -135,7 +135,7 @@ describe("alignmentQuery", () => {
       max_alignments: 7,
       exponent: 1.1,
       synchronous_dijkstra: true,
-      cost_profile: "pm4py",
+      cost_profile: "standard",
       trace_cost: 10000,
       model_cost: 10000,
       silent_model_cost: 1,
@@ -147,7 +147,7 @@ describe("alignmentQuery", () => {
     expect(params.get("max_states")).toBe("42");
     expect(params.get("max_align_time_trace")).toBe("0.2");
     expect(params.get("synchronous_dijkstra")).toBe("true");
-    expect(params.get("cost_profile")).toBe("pm4py");
+    expect(params.get("cost_profile")).toBe("standard");
     expect(params.get("silent_model_cost")).toBe("1");
   });
 
@@ -168,7 +168,7 @@ describe("alignmentQuery", () => {
     expect(generator.synchronous_dijkstra).toBeUndefined();
     const discounted = cleanAlignmentOptions({
       variant: "discounted_a_star",
-      cost_profile: "pm4py",
+      cost_profile: "standard",
       max_alignments: 3,
       exponent: 1.5,
       synchronous_dijkstra: true,

@@ -24,7 +24,7 @@ struct MarkingLess {
   }
 };
 
-// PM4Py's pinned label conventions distinguish the prefix handling from
+// The pinned label conventions distinguish the prefix handling from
 // interior modeled-cell handling.  Null transitions are always silent; the
 // prefix additionally recognizes the exact label "tau" and labels starting
 // with 'n', while modeled cells also recognize labels containing "skip".
@@ -149,7 +149,7 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
     double best = std::numeric_limits<double>::infinity();
     for (const auto& v : variants) {
       const auto d = discounted_distance(run, variant_sequence(v), options.exponent);
-      // PM4Py's tail starts after the complete DP matrix (model + variant
+      // The tail starts after the complete DP matrix (model + variant
       // coordinates), while the normalization divisor uses model length.
       const double tail = std::pow(options.exponent, -static_cast<double>(run.size() + v.size())) / (options.exponent - 1.0);
       best = std::min(best, (d + tail) / divisor);
@@ -165,7 +165,7 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
     }
   };
   std::priority_queue<Node, std::vector<Node>, Compare> queue((Compare{&net}));
-  // PM4Py seeds the prefix queue with g=0; bounds are computed after each
+  // The prefix queue is seeded with g=0; bounds are computed after each
   // fired transition (and at final markings without the tail fraction).
   Node start{initial, {}, 0.0}; queue.push(start);
   std::map<std::vector<std::size_t>, std::size_t, MarkingLess> closed;
@@ -207,7 +207,7 @@ PetriAntiAlignmentResult anti_align_petri(const PetriNet& net, const EventLog& l
     const auto d = ordinary_insert_delete(result.activities, v);
     const auto den = best_node.path.size() + v.size();
     const double n = den == 0 ? 0.0 : d / static_cast<double>(den);
-    // PM4Py discounts precision by the complete transition run, including
+  // Precision is discounted by the complete transition run, including
     // silent moves (whose edit contribution is nevertheless zero).
     nearest = std::min(nearest, n / std::pow(1.0 + options.epsilon, static_cast<double>(best_node.path.size())));
   }

@@ -89,7 +89,7 @@ function CaseRow({
 }
 
 // Downloads the mined log — after any filters applied at mine time — as
-// standard XES, the interchange format read by ProM, PM4Py, and friends. The
+// standard XES, the interchange format read by process-mining tools. The
 // file is serialized server-side from the cached session, so it matches what
 // Minera actually analyzed.
 function XesButton({ dataset }: { dataset: string }) {

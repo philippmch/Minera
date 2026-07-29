@@ -266,7 +266,7 @@ DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& n
   if(comps.empty()){out.complete=false;return out;} out.diagnostics.decompositions=1; out.diagnostics.components=comps.size(); out.diagnostics.whole_net_fallback=false;
   const auto started=std::chrono::steady_clock::now(); auto deadline=std::chrono::steady_clock::time_point::max(); if(o.max_time_total>0) deadline=started+std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(o.max_time_total));
 
-  // Empty trace computes PM4Py best-worst cost using the decomposed model.
+  // Empty trace computes the standard best-worst cost using the decomposed model.
   // BWC is a whole-net replay metric; it is not used to generate result moves.
   std::vector<std::size_t> all_places(net.place_count()), all_trans(net.transitions().size()); std::iota(all_places.begin(),all_places.end(),0); std::iota(all_trans.begin(),all_trans.end(),0);
   auto full_local=make_local(net,all_places,all_trans,initial,final); auto bw_search=search(full_local,{},o,deadline,out.diagnostics); if(!bw_search.found){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(e.activity); out.traces.push_back(std::move(row));} return out;} double bw=bw_search.cost; out.best_worst_cost=bw;

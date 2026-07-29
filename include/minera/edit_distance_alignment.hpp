@@ -9,7 +9,7 @@
 
 namespace minera {
 
-// PM4Py exposes this algorithm through Variants.EDIT_DISTANCE. Native code
+// The algorithm is exposed through a variant selector. Native code
 // has one implementation, but retaining the selector keeps call sites
 // source-compatible with a multi-variant registry.
 enum class EditDistanceVariant {
@@ -34,7 +34,7 @@ struct EditDistanceMove {
   std::string model_activity;
   // Convenience name for clients that only need the activity of a move.
   std::string activity;
-  // PM4Py/DFG-shaped spellings (`>>` is represented by an empty string).
+  // DFG-shaped spellings (`>>` is represented by an empty string).
   std::string log;
   std::string model;
 };
@@ -42,7 +42,7 @@ struct EditDistanceMove {
 struct EditDistanceOptions {
   EditDistanceVariant variant = EditDistanceVariant::kEditDistance;
   bool perform_anti_alignment = false;
-  // PM4Py's standard move cost. It is deliberately configurable for callers
+  // Standard move cost. It is deliberately configurable for callers
   // that need a different scale, but must remain finite and positive.
   std::uint64_t deviation_cost = 10000;
 };
@@ -68,7 +68,7 @@ struct EditDistanceAlignment {
     const EventLog& source, const EventLog& target,
     EditDistanceOptions options = {});
 
-// PM4Py-shaped aliases.
+// Convenience aliases.
 [[nodiscard]] inline std::vector<EditDistanceAlignment> apply_edit_distance(
     const EventLog& source, const EventLog& target,
     EditDistanceOptions options = {}) {

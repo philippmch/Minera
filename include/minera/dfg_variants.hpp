@@ -80,7 +80,7 @@ using DfgPerformanceValue =
 struct DfgPerformanceStatistics {
   DfgPerformanceSummary summary;
   std::vector<double> raw_values;
-  // The selected PM4Py-shaped result: scalar for mean/median/min/max/stdev/sum,
+  // The selected result: scalar for mean/median/min/max/stdev/sum,
   // the observation vector for raw_values, and the full summary for all.
   DfgPerformanceValue value = 0.0;
 };
@@ -118,7 +118,7 @@ struct DfgStatisticalOptions {
   // Empty selects Monday-Friday 07:00-17:00.
   std::vector<BusinessHourSlot> business_hour_slots;
 
-  // The PM4Py default is the XES case id, concept:name. Minera also accepts
+  // The default is the XES case id, concept:name. Minera also accepts
   // case_id as a spelling for Trace::case_id.
   std::vector<std::string> case_attributes = {"concept:name"};
   bool return_node_attributes = false;

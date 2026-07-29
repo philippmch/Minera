@@ -72,7 +72,7 @@ std::vector<LogSkeletonPair> sorted_pairs(const std::set<LogSkeletonPair>& pairs
 LogSkeletonModel discover_log_skeleton(const EventLog& log,
                                        const LogSkeletonOptions& options) {
   LogSkeletonModel model;
-  // The native API preserves PM4Py's raw arithmetic for unusual callers.
+  // The native API preserves the raw arithmetic for unusual callers.
   // User-facing request/CLI boundaries validate the conventional [0,1] range.
   const double noise = options.noise_threshold;
   VariantMap variants;
@@ -179,7 +179,7 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
       });
       std::size_t cumulative = 0;
       std::vector<std::size_t> allowed;
-      // PM4Py truncates its ranked working list at the first bucket whose
+      // The ranking truncates its working list at the first bucket whose
       // cumulative variant weight reaches the event-count threshold.
       for (const auto& [frequency, count] : ranked) {
         allowed.push_back(frequency);
@@ -234,7 +234,7 @@ LogSkeletonConformance check_log_skeleton_conformance(
         LogSkeletonDeviation deviation;
         deviation.constraint = "activ_freq";
         deviation.activity = activity;
-        // PM4Py reports an unknown activity as the absent (zero) model
+        // An unknown activity is reported as the absent (zero) model
         // frequency, rather than echoing its observed count.
         deviation.observed_frequency = 0;
         result.deviations.push_back(std::move(deviation));

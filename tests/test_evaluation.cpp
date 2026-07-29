@@ -14,7 +14,7 @@ void weighted_input_enablement() {
   PetriNet n; auto p=n.add_place(), q=n.add_place(); n.set_source(p); n.set_sink(q); n.set_activities({"A"}); n.add_transition(0,{p,p},{q});
   auto r=evaluate_precision(log({{"A"}}),n,PrecisionVariant::ETCONFORMANCE_TOKEN);
   // A single token must not satisfy a two-token preset.  The disabled model
-  // therefore has no escaping edge and PM4Py's precision is exactly one.
+  // therefore has no escaping edge and precision is exactly one.
   assert(r.computed && std::abs(r.precision-1.0)<1e-12);
 }
 void cardoso_deduplicates_weighted_outputs() {

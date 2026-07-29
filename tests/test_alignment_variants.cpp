@@ -73,11 +73,11 @@ int main() {
   assert(custom_result.computed);
   assert(std::abs(custom_result.total_cost - 4.25) < 1e-9);
 
-  // PM4Py's standard profile is explicitly selectable and charges visible
+  // The standard profile is explicitly selectable and charges visible
   // deviations at 10000 while silent routing costs one.
   minera::AlignmentOptions pm;
   pm.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;
-  pm.cost_profile = minera::AlignmentCostProfile::kPm4PyStandard;
+  pm.cost_profile = minera::AlignmentCostProfile::kStandard;
   const auto pm_result = minera::check_alignment(log_of({"a"}), model, pm);
   assert(pm_result.computed);
   assert(pm_result.total_cost >= 10000.0);
@@ -229,7 +229,7 @@ int main() {
   const auto discounted_cycle = minera::check_alignment(log_of({"a"}), cycle, cycle_options);
   assert(discounted_cycle.computed);
 
-  // Positive-cost discounted cycles remain finite under PM4Py's simple-state
+  // Positive-cost discounted cycles remain finite under the simple-state
   // closure and must still terminate with a goal.
   minera::PetriNet positive_cycle;
   positive_cycle.add_place();
@@ -250,7 +250,7 @@ int main() {
       minera::check_alignment(log_of({"unknown"}), positive_cycle, positive_options);
   assert(positive_result.computed);
 
-  // Discounted PM4Py semantics close by product state.  Equal-cost arrivals
+  // Discounted semantics close by product state. Equal-cost arrivals
   // remain queued, and the tuple ordering prefers the deeper tied prefix at a
   // merge; both successor scheduling modes must agree on that pinned result.
   minera::PetriNet merged;

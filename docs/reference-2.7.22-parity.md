@@ -1,24 +1,24 @@
-# PM4Py 2.7.22 parity contract
+# Reference 2.7.22 parity contract
 
-Minera targets behavioral feature parity with PM4Py **2.7.22**, tag commit
+Minera targets behavioral feature parity with the **2.7.22 reference release**, tag commit
 `0715c31f3f1d85924107d6aa5329806db69df899`. The target is pinned so “all
 variations” is finite, reviewable, and testable. Moving the target requires a
 separate catalogue diff and must not silently reopen completed rows.
 
-PM4Py's open-source implementation is AGPL-3.0. Minera therefore uses public
+The upstream open-source implementation is AGPL-3.0. Minera therefore uses public
 documentation, published papers, independently written implementations, and
-canonicalized black-box fixtures. PM4Py source may be inventoried for names and
+canonicalized black-box fixtures. Upstream source may be inventoried for names and
 dispatch structure, but code is not copied into Minera.
 
 Run the reproducible catalogue audit against an exact checkout:
 
 ```powershell
-node scripts/audit-pm4py-catalog.mjs C:\path\to\pm4py-2.7.22
+node scripts/audit-reference-catalog.mjs C:\path\to\reference-2.7.22
 ```
 
 At the pinned tag the source catalogue contains 18 algorithm domains, 86
 `algorithm.py` packages, 182 implementation files under `variants` trees, 779
-Python files under `pm4py/algo`, 348 under `objects`, 156 under `statistics`,
+Python files under `algo`, 348 under `objects`, 156 under `statistics`,
 and 142 under `visualization`.
 
 ## What parity means
@@ -31,7 +31,7 @@ Status values are:
 - **Partial**: a useful equivalent exists, but at least one named behavioral
   variant, parameter family, diagnostic, or model conversion is absent.
 - **Missing**: no public behavioral equivalent exists.
-- **Adapter**: PM4Py has separate EventLog/pandas/polars implementations of the
+- **Adapter**: The reference implementation has separate EventLog/pandas/polars implementations of the
   same semantics. One native C++ implementation is sufficient; these do not
   count as separate process-mining algorithms.
 - **Integration**: backend, renderer, connector, or optional ML/LLM surface.
@@ -48,7 +48,7 @@ This is the human-owned acceptance matrix. The audit script is the
 machine-owned list of exact modules; a release may not claim parity unless both
 are reconciled.
 
-| Domain | PM4Py families and behavioral variants | Minera status |
+| Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — final-marking reachability only |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Missing** |
@@ -72,11 +72,11 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Missing** |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete (core)** — PM4Py-style dynamic fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport EMD are available; JSON/CLI/server/frontend adapters remain integration work |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete (core)** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport EMD are available; JSON/CLI/server/frontend adapters remain integration work |
 | Label splitting | contextual | **Missing** |
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
-| Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, PM4Py-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
+| Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — workflow-net sampled/extensive playout and Declare classic playout are present |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
 
@@ -418,7 +418,7 @@ frontier under fractional custom costs.
 
 Cost semantics are selectable rather than silently changed: the legacy profile
 keeps unit visible log/model deviations and free silent routing, while the
-PM4Py profile charges 10,000 for visible log/model moves, 1 for silent moves,
+The reference profile charges 10,000 for visible log/model moves, 1 for silent moves,
 and 0 for synchronous moves.
 Per-activity, per-position, and per-transition overrides are supported, as are
 API callbacks for trace, model, and synchronous moves. Callback values are
@@ -432,7 +432,7 @@ over the same compact product representation: only successor scheduling differs
 from the explicit order, so both schedules retain equal optima. The native API,
 request parser, CLI, and frontend expose these controls and preserve the
 legacy state-equation/unit-cost defaults when no explicit options are supplied.
-Like the pinned PM4Py 2.7.22 implementation, discounted search closes a state
+Like the pinned 2.7.22 reference implementation, discounted search closes a state
 by `(marking, trace position)` rather than treating the same product state at
 every path depth as distinct. Its optimum is therefore over simple
 product-state paths. This avoids an ill-defined cyclic objective in which
@@ -454,7 +454,7 @@ alignments, while weighted input/output arc multiplicity is preserved when
 testing enabledness and firing. A genuinely unreachable final marking is
 reported as unsound (`exhausted=false`), distinct from a bounded or timed-out
 search. Focused `tests/test_alignment_variants.cpp` regressions cover all six
-variants, PM4Py/legacy cost profiles, custom costs and callbacks, full-product
+variants, reference/legacy cost profiles, custom costs and callbacks, full-product
 LP solving, less-memory dominance, discounted exponent and scheduling parity,
 generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
 and invalid-cost handling; request, CLI, and frontend tests cover the exposed
@@ -467,7 +467,7 @@ The four selectable process-tree variants are implemented in the native
 pair and exposed by the strict request parser, `minera_export`, the local
 server, and the frontend's **Other alignments** panel. They are deterministic,
 collision-free clean-room implementations with dependency-free exact residual
-fallbacks. This preserves PM4Py's behavioral questions without copying its
+fallbacks. This preserves the reference implementation's behavioral questions without copying its
 Python implementation; `MILP` does not claim to invoke literal PuLP.
 
 * `SEARCH_GRAPH_PT` is the default residual-expression Dijkstra search, using
@@ -506,7 +506,7 @@ queued, and traversed states, native residual-search counters, aligned traces,
 and a message (`lp_solved` is zero because no external LP solver is used).
 `computed`, `completed`, `timed_out`, and `exhausted` are explicit at
 both result and trace level: a state/time bound yields an incomplete result and
-never a fabricated optimum. As in PM4Py, an empty fitness denominator reports
+never a fabricated optimum. As in the reference implementation, an empty fitness denominator reports
 `0.0` (including an empty trace/log against a silent tree). Native n-ary loop
 redo/exit children are normalized to an XOR for search/DP/approximation; MILP's
 binary validation is deliberate and tested. The recursive variants also use
@@ -529,7 +529,7 @@ start/DFG/end frequency model. Start and end activity maps are included even
 when a supplied frequency is zero; edge frequencies are informational rather
 than hidden enablement flags. The model is validated as connected from its
 starts to its ends, and disconnected graphs or graphs without a start-to-end
-path fail explicitly. Default PM4Py-shaped costs are zero for synchronous moves
+path fail explicitly. Default alignment costs are zero for synchronous moves
 and 10,000 for visible model/log moves. Per-activity synchronous, model, log,
 and internal-log costs are configurable: the reported cost can differ from the
 search's internal cost (for example, unknown labels may have a free internal
@@ -554,7 +554,7 @@ semantics, including the default autojunk suppression for popular symbols in
 large targets, but uses ordered maps for deterministic clean-room behavior (the
 pinned hash-order implementation could choose a different tied path). A
 substitution is represented as two moves (one log-only and one model-only), so
-deviation cost, fitness, and the PM4Py best/worst-cost denominator (`bwc`) are
+deviation cost, fitness, and the reference best/worst-cost denominator (`bwc`) are
 explicit and auditable. Empty source logs return no alignments; an empty target
 log and non-positive deviation cost are rejected.
 

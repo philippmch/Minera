@@ -59,7 +59,7 @@ struct ProcessTreeAlignmentOptions {
   double max_trace_time_seconds = 0.0;
   double max_per_trace_time_seconds = 0.0;
 
-  // Kept for source compatibility with PM4Py's DP parameters.
+  // Kept for source compatibility with the DP parameter vocabulary.
   bool use_global_cache = false;
   std::size_t batch_size = 1000;
   bool clear_cache = true;

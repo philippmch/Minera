@@ -453,7 +453,7 @@ int usage(const char* program) {
                "  --alignment-max-alignments <n> Equal-optimal generator limit\n"
                "  --alignment-exponent <f> Discounted A* exponent (>1)\n"
                "  --alignment-synchronous-dijkstra <bool> Discounted sync Dijkstra\n"
-               "  --alignment-cost-profile <id> legacy (default) or pm4py\n"
+               "  --alignment-cost-profile <id> legacy (default) or standard\n"
                "  --alignment-trace-cost <f> Log move cost\n"
                "  --alignment-model-cost <f> Visible model move cost\n"
                "  --alignment-silent-model-cost <f> Silent model move cost\n"
@@ -1021,8 +1021,8 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       if (std::string_view(value) == "legacy") alignment_options.cost_profile = minera::AlignmentCostProfile::kLegacyUnit;
-      else if (std::string_view(value) == "pm4py") alignment_options.cost_profile = minera::AlignmentCostProfile::kPm4PyStandard;
-      else { std::cerr << "error: --alignment-cost-profile expects legacy or pm4py\n"; return 2; }
+      else if (std::string_view(value) == "standard") alignment_options.cost_profile = minera::AlignmentCostProfile::kStandard;
+      else { std::cerr << "error: --alignment-cost-profile expects legacy or standard\n"; return 2; }
       alignment_option_used = true;
     } else if (arg == "--token-replay-variant") {
       const auto* value = next();

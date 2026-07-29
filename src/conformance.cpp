@@ -144,7 +144,7 @@ class Replayer {
     bool fitting = true;
   };
 
-  // Legacy PM4Py backwards token replay. Unlike forward replay, unknown
+  // Legacy backwards token replay. Unlike forward replay, unknown
   // labels are ignored and silent routing is discovered by walking required
   // input markings backwards from a visible transition.
   [[nodiscard]] BackwardsOutcome replay_backwards(
@@ -775,7 +775,7 @@ double compute_precision(const std::vector<Variant>& variants,
           nodes[current].children.emplace(id ? *id : kAbsent, nodes.size());
       if (inserted) nodes.emplace_back();
       current = it->second;
-      // PM4Py scores proper prefixes only.  A node reached by the final
+      // The evaluator scores proper prefixes only. A node reached by the final
       // event is terminal and contributes no weight; a shorter variant that
       // shares a prefix contributes only when another event follows it.
       if (depth + 1 < variant.ids.size()) nodes[current].freq += variant.count;
@@ -900,7 +900,7 @@ double compute_generalization(const std::vector<std::uint64_t>& executions) {
   if (executions.empty()) return 1.0;
   double rarity = 0.0;
   for (const auto count : executions) {
-    // PM4Py penalises transitions which were never exercised as strongly as
+    // The evaluator penalises transitions which were never exercised as strongly as
     // a transition seen once.  Silent transitions are included by the caller
     // (their firings are part of the replay), so this remains a model-level
     // measure rather than an activity-only shortcut.
@@ -1168,9 +1168,9 @@ class Aligner {
 
   [[nodiscard]] double weighted_empty_run_cost(const AlignmentOptions& options) const {
     const double model_default = options.default_model_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 10000.0 : 1.0);
     const double silent_default = options.default_silent_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 1.0 : 0.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 1.0 : 0.0);
     auto transition_cost = [&](std::size_t t) {
       const auto& tr = net_.transitions()[t];
       const std::string name = tr.silent() ? std::string{} : net_.activities()[*tr.activity];
@@ -1707,10 +1707,10 @@ class Aligner {
     bool invalid_cost = false;
   };
 
-  // Clean-room implementation of PM4Py's Dijkstra/generator/discounted
+  // Clean-room implementation of the Dijkstra/generator/discounted
   // variants.  The search deliberately keeps the product state explicit and
   // uses floating point edge costs, which is required by discounted A* and
-  // custom PM4Py cost functions.
+  // custom cost functions.
   [[nodiscard]] ConfiguredOutcome align_configured(
       const std::vector<std::optional<std::size_t>>& ids,
       const std::vector<std::string>& names,
@@ -1765,12 +1765,12 @@ class Aligner {
     const bool discounted = options.variant == AlignmentVariant::kDiscountedAStar;
     const double exponent = options.exponent > 1e-9 ? options.exponent : 1.0;
     const double default_trace = options.default_trace_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 10000.0 : 1.0);
     const double default_model = options.default_model_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 10000.0 : 1.0);
     const double default_sync = options.default_sync_cost.value_or(0.0);
     const double default_silent = options.default_silent_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 1.0 : 0.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 1.0 : 0.0);
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
     const std::size_t alignment_limit = options.max_alignments == 0 ? 32 : options.max_alignments;
@@ -1801,7 +1801,7 @@ class Aligner {
       }
     };
     std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
-    // PM4Py's discounted variant closes product states (marking + trace
+    // The discounted variant closes product states (marking + trace
     // position), deliberately ignoring path depth.  This keeps cyclic models
     // finite and deterministic rather than chasing an unattained discounted
     // infimum through repeated positive-cost cycles.
@@ -1964,7 +1964,7 @@ class Aligner {
         if (consume) {
           child.prefixes.push_back(Marking(node.state.begin(), node.state.end() - 1));
         }
-        // Configured PM4Py variants retain tau/model routing moves explicitly;
+        // Configured variants retain tau/model routing moves explicitly;
         // an empty activity denotes a silent transition.
         if (!move.activity.empty() || move.type == AlignmentMoveType::kModel)
           child.moves.push_back(std::move(move));
@@ -2673,7 +2673,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
       return result;
     }
     const double profile_trace = options.default_trace_cost.value_or(
-        options.cost_profile == AlignmentCostProfile::kPm4PyStandard ? 10000.0 : 1.0);
+        options.cost_profile == AlignmentCostProfile::kStandard ? 10000.0 : 1.0);
     double trace_worst = 0.0;
     for (std::size_t i = 0; i < variant.names.size(); ++i) {
       const auto trace_it = options.trace_costs.find(variant.names[i]);

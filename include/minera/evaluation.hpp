@@ -12,8 +12,8 @@
 
 namespace minera {
 
-// Native, PM4Py-compatible evaluation variants.  Upper-case enumerators are
-// intentionally retained because they mirror PM4Py's public constants.
+// Native evaluation variants. Upper-case enumerators are retained for
+// compatibility with the public evaluator vocabulary.
 enum class ReplayFitnessVariant { AUTO, TOKEN_BASED, ALIGNMENT_BASED,
                                   kTokenBased = TOKEN_BASED,
                                   kAlignmentBased = ALIGNMENT_BASED,
@@ -40,7 +40,7 @@ using SimplicityMethod = SimplicityVariant;
 struct ReplayFitnessResult {
   ReplayFitnessVariant variant = ReplayFitnessVariant::TOKEN_BASED;
   double fitness = 0.0;
-  double log_fitness = 0.0;  // PM4Py alias
+  double log_fitness = 0.0;  // alias for fitness
   double average_trace_fitness = 0.0;
   double percentage_fit_traces = 0.0;
   std::uint64_t fitting_traces = 0;
@@ -81,7 +81,7 @@ struct GeneralizationResult {
 
 struct SimplicityOptions {
   // Optional caller-provided initial marking. For extended cyclomatic,
-  // empty reconstructs PM4Py's default: one token in every empty-preset place.
+  // empty reconstructs the default: one token in every empty-preset place.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
   std::size_t max_states = 100000;
@@ -112,7 +112,7 @@ struct StochasticLanguage {
 using DistanceFunction = std::function<double(const std::vector<std::string>&,
                                               const std::vector<std::string>&)>;
 struct EmdOptions {
-  bool normalize_masses = true;  // PM4Py default for unequal mass
+  bool normalize_masses = true;  // default for unequal mass
   bool strict_equal_mass = false;
   DistanceFunction distance;
 };
@@ -152,7 +152,7 @@ struct EmdResult {
 [[nodiscard]] double normalized_levenshtein_distance(const std::vector<std::string>&,
                                                      const std::vector<std::string>&);
 
-// Short aliases used by clients that model the PM4Py evaluator modules as
+// Short aliases used by clients that model evaluator modules as
 // free functions rather than selecting an evaluator object.
 inline ReplayFitnessResult replay_fitness(const EventLog& l, const PetriNet& n,
                                           ReplayFitnessVariant v = ReplayFitnessVariant::AUTO) {

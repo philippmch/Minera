@@ -740,7 +740,7 @@ void parse_alignment_params_maps_variants_and_costs() {
       {"alignment_variant", "discounted_a_star"},
       {"max_states", "17"}, {"max_align_time", "1.5"},
       {"max_align_time_trace", "0.5"}, {"exponent", "2.5"},
-      {"synchronous_dijkstra", "true"}, {"cost_profile", "pm4py"},
+      {"synchronous_dijkstra", "true"}, {"cost_profile", "standard"},
       {"trace_cost", "3"}, {"model_cost", "4"},
       {"silent_model_cost", "2"}, {"sync_cost", "0.2"}}));
   assert(p.variant == minera::AlignmentVariant::kDiscountedAStar);

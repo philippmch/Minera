@@ -21,7 +21,7 @@ struct TimedEvent {
 std::vector<SpectrumObservation> sample_points(
     std::vector<SpectrumObservation> points, std::size_t sample_size) {
   if (points.size() <= sample_size) return points;
-  // PM4Py's points_subset partitions the points into sample_size buckets and
+  // The points_subset operation partitions the points into sample_size buckets and
   // chooses each bucket's midpoint. The first and last points are retained as
   // extrema, hence the result can contain sample_size + 2 rows.
   std::vector<std::size_t> indices;

@@ -269,7 +269,7 @@ std::vector<EditDistanceAlignment> align_edit_distance(
         throw std::invalid_argument("edit-distance denominator overflows size_t");
       alignment.denominator = checked_cost(source_variant.size() + shortest,
                                            options.deviation_cost);
-      // PM4Py calls this complete worst-case denominator `bwc` (the shortest
+      // The complete worst-case denominator `bwc` (the shortest
       // target plus every source event as a deviation), not merely the target
       // component of that sum.
       alignment.best_worst_cost = alignment.denominator;

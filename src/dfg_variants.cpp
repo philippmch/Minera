@@ -317,7 +317,7 @@ DfgCleanAnalysis discover_clean_dfg(const EventLog& log) {
     if (events.empty()) continue;
     ++result.start_activities[events.front().event->activity];
     ++result.end_activities[events.back().event->activity];
-    // Intentional PM4Py CLEAN oddity: the first event never owns an edge and
+    // Intentional CLEAN oddity: the first event never owns an edge and
     // the last event cannot own one. A length-three case keeps middle->last.
     for (std::size_t i = 1; i + 1 < events.size(); ++i) {
       ++result.graph[{events[i].event->activity,

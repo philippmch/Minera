@@ -322,7 +322,7 @@ export interface Conformance {
 /** One move of an optimal alignment between a trace and the model. */
 export type AlignmentMoveType = "sync" | "log" | "model";
 
-/** Petri-net alignment search variants exposed by the PM4Py-compatible API. */
+/** Petri-net alignment search variants exposed by the compatible API. */
 export type AlignmentVariant =
   | "state_equation_a_star"
   | "dijkstra_no_heuristics"
@@ -331,7 +331,7 @@ export type AlignmentVariant =
   | "generator_dijkstra_no_heuristics"
   | "generator_dijkstra_less_memory";
 
-export type AlignmentCostProfile = "legacy" | "pm4py";
+export type AlignmentCostProfile = "legacy" | "standard";
 
 /** Optional controls for one deferred alignment request. */
 export interface AlignmentOptions {
@@ -373,7 +373,7 @@ export interface VariantAlignment {
   fitness: number;
   /** Equal-optimal alternatives returned by generator variants, when present. */
   alternatives?: AlignmentMove[][];
-  /** PM4Py-compatible spelling accepted for older/newer server exports. */
+  /** Compatible spelling accepted for older/newer server exports. */
   optimal_alignments?: AlignmentMove[][];
   /** Search work for this trace variant, absent in older exports. */
   diagnostics?: AlignmentDiagnostics;
@@ -413,7 +413,7 @@ export interface Alignments {
   variants: VariantAlignment[];
   /** Search variant selected by the caller (absent in older exports). */
   variant?: AlignmentVariant;
-  /** Canonical PM4Py/server spelling, accepted alongside `variant`. */
+  /** Canonical server spelling, accepted alongside `variant`. */
   alignment_variant?: AlignmentVariant;
   diagnostics?: AlignmentDiagnostics;
   /**
@@ -577,7 +577,7 @@ export interface ProcessTreeAlignmentResult {
   traces: ProcessTreeAlignmentTrace[];
 }
 
-/** Decomposed Petri-net alignment (PM4Py RECOMPOS_MAXIMAL). */
+/** Decomposed Petri-net alignment (recomposition variant). */
 export type DecomposedAlignmentVariant = "recompos_maximal";
 export interface DecomposedAlignmentOptions {
   variant?: DecomposedAlignmentVariant;
@@ -792,7 +792,7 @@ export const FOOTPRINTS_CONFORMANCE_VARIANTS = [
 ] as const;
 export type FootprintsConformanceVariant = (typeof FOOTPRINTS_CONFORMANCE_VARIANTS)[number];
 
-/** A PM4Py aggregate footprint record; optional keys are variant-dependent. */
+/** An aggregate footprint record; optional keys are variant-dependent. */
 export interface AggregateFootprint {
   sequence: FootprintRelation[];
   parallel: FootprintRelation[];
@@ -1019,7 +1019,7 @@ export interface Performance {
   activities?: ActivityPerformance[];
 }
 
-/** Server-computed PM4Py performance spectrum observations. */
+/** Server-computed performance spectrum observations. */
 export interface PerformanceSpectrumObservation {
   case_id: string;
   activities: string[];
@@ -1231,7 +1231,7 @@ export interface MineraExport {
   declare_conformance?: DeclareConformanceTrace[];
   /** Aggregate footprints discovery and relational conformance. */
   footprints?: AggregateFootprints;
-  /** Opt-in PM4Py statistical DFG and causal-discovery variants. */
+  /** Opt-in statistical DFG and causal-discovery variants. */
   dfg_variants?: DfgVariantsAnalysis;
   /** Opt-in classic/split/trace-based correlation-miner variants. */
   correlation_mining?: CorrelationVariantsAnalysis;
@@ -1239,9 +1239,9 @@ export interface MineraExport {
   heuristics_net?: HeuristicsNet;
   /** Time perspective (edge waiting times, case throughput); absent in older exports. */
   performance?: Performance;
-  /** Optional PM4Py performance spectrum analysis. */
+  /** Optional performance spectrum analysis. */
   performance_spectrum?: PerformanceSpectrumExport;
-  /** Optional PM4Py batch discovery analysis. */
+  /** Optional batch discovery analysis. */
   batch_discovery?: BatchDiscoveryExport;
   /** Organizational perspective (handover-of-work network); absent in older exports. */
   resources?: ResourceNetwork;
@@ -1255,7 +1255,7 @@ export interface MineraExport {
   temporal_profile?: TemporalProfileEntry[];
   /** Minimum self-distance and witness activities; absent in older exports. */
   minimum_self_distances?: MinimumSelfDistanceEntry[];
-  /** PM4Py view-based transition system; absent in older exports. */
+  /** View-based transition system; absent in older exports. */
   transition_system?: TransitionSystemExport;
   /**
    * Generic event attributes by key, with each key's most frequent values.

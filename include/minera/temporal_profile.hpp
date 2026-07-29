@@ -25,7 +25,7 @@ struct TemporalProfileEntry {
   // Population-free sample standard deviation. It is zero for one sample.
   double standard_deviation_seconds = 0.0;
 
-  // Convenient short spelling for callers that use PM4Py's ``stddev`` term.
+  // Convenient short spelling for callers that use the ``stddev`` term.
   [[nodiscard]] double stddev() const noexcept {
     return standard_deviation_seconds;
   }
@@ -41,7 +41,7 @@ struct TemporalProfile {
 
 struct TemporalProfileOptions {
   // Empty means Event.timestamp. The aliases allow callers to describe the
-  // PM4Py source-completion/target-start terminology explicitly. When both a
+  // Source-completion/target-start terminology is explicit. When both a
   // primary field and its alias are set, the primary field takes precedence.
   std::string source_timestamp_attribute;
   std::string target_timestamp_attribute;
@@ -49,7 +49,7 @@ struct TemporalProfileOptions {
   std::string target_start_timestamp_attribute;
 
   bool use_business_hours = false;
-  // Empty means the PM4Py-compatible Monday-Friday 07:00-17:00 schedule.
+  // Empty means the compatible Monday-Friday 07:00-17:00 schedule.
   std::vector<BusinessHourSlot> business_hour_slots;
 
   // Used by conformance checking; discovery ignores this value.
@@ -89,7 +89,7 @@ check_temporal_profile_conformance(const EventLog& log,
   return check_temporal_profile_conformance(log, profile, options);
 }
 
-// PM4Py-style spelling retained as a readable alias.
+// Readable spelling retained as an alias.
 [[nodiscard]] inline std::vector<TemporalDeviation> conformance_temporal_profile(
     const EventLog& log, const TemporalProfile& profile,
     const TemporalProfileOptions& options = {}) {

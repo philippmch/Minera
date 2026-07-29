@@ -502,7 +502,7 @@ bool valid_partition(const Relations& r, const std::vector<std::vector<std::size
     if (rel.reverse) graph[y].push_back(x);
   }
   // Every order-minimal block must contain a DFG start and every
-  // order-maximal block a DFG end (PM4Py's partition validity criterion).
+  // order-maximal block a DFG end (the partition validity criterion).
   for (std::size_t i = 0; i < blocks.size(); ++i) {
     bool has_start = false, has_end = false;
     for (const auto a : blocks[i]) {
@@ -566,7 +566,7 @@ std::optional<PowlNode> make_po(const UVCL& log, State& s) {
     auto relation = [&](const Cluster& x, const Cluster& y) {
       Rel out;
       if (weighted) {
-        // PM4Py's frequency variant counts a cluster direction once per
+        // The frequency variant counts a cluster direction once per
         // UVCL trace, then applies that trace's multiplicity.  Repeated
         // activity pairs must not inflate support within one sequence.
         for (const auto& [seq, count] : log) {
@@ -650,7 +650,7 @@ std::optional<PowlNode> make_po(const UVCL& log, State& s) {
       }
       if (restart) { inferred.clear(); continue; }
       // Merge unresolved (choice/weak) pairs.  For a two-node PO with equal
-      // empty neighbourhoods PM4Py preserves the observable unordered PO.
+      // empty neighbourhoods the observable unordered PO is preserved.
       for (std::size_t i = 0; i < cs.size() && !changed; ++i) for (std::size_t j = i + 1; j < cs.size() && !changed; ++j) {
         const auto a = relation(cs[i], cs[j]);
         const bool ef = inferred.count({i, j}) != 0, eb = inferred.count({j, i}) != 0;

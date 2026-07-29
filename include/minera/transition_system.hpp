@@ -105,7 +105,7 @@ class TransitionSystem {
     const EventLog& event_log,
     const TransitionSystemOptions& options = {});
 
-// Convenience overload matching PM4Py's positional discovery parameters.
+// Convenience overload matching the positional discovery parameters.
 [[nodiscard]] TransitionSystem discover_transition_system(
     const EventLog& event_log,
     TransitionDirection direction,

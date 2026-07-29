@@ -102,19 +102,19 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
       EventLog probe;
       probe.traces.push_back(Trace{});
       AlignmentOptions pm;
-      pm.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+      pm.cost_profile = AlignmentCostProfile::kStandard;
       variant = check_alignment(probe, net, pm).computed
                     ? ReplayFitnessVariant::ALIGNMENT_BASED
                     : ReplayFitnessVariant::TOKEN_BASED;
     }
     out.variant = variant;
-    // PM4Py's evaluators have no observations from which to compute a score;
+    // Evaluators have no observations from which to compute a score;
     // unlike the legacy conformance API, their empty-log metrics are zero.
     return out;
   }
   if (variant == ReplayFitnessVariant::AUTO) {
     AlignmentOptions options;
-    options.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+    options.cost_profile = AlignmentCostProfile::kStandard;
     const auto alignment = check_alignment(log, net, options);
     if (alignment.computed) {
       out.variant = ReplayFitnessVariant::ALIGNMENT_BASED;
@@ -146,7 +146,7 @@ ReplayFitnessResult evaluate_replay_fitness(const EventLog& log, const PetriNet&
     out.average_trace_fitness = av/double(out.trace_count);
     if (out.token_result.produced==0 || out.token_result.consumed==0) out.fitness=out.log_fitness=out.average_trace_fitness=0.0;
   } else {
-    AlignmentOptions pm_options; pm_options.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+    AlignmentOptions pm_options; pm_options.cost_profile = AlignmentCostProfile::kStandard;
     out.alignment_result=check_alignment(log,net,pm_options); out.computed=out.alignment_result.computed;
     out.exhausted=out.alignment_result.exhausted; out.fitness=out.computed?out.alignment_result.fitness:0.0;
     out.log_fitness=out.fitness; out.fitting_traces=out.alignment_result.fitting_traces; out.total_cost=out.alignment_result.total_cost;
@@ -305,7 +305,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   }
   if (variant == PrecisionVariant::AUTO) {
     AlignmentOptions pm;
-    pm.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+      pm.cost_profile = AlignmentCostProfile::kStandard;
     EventLog probe;
     probe.traces.push_back(Trace{});
     const auto soundness = check_alignment(probe, net, pm);
@@ -320,7 +320,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   }
 
   AlignmentOptions pm;
-  pm.cost_profile = AlignmentCostProfile::kPm4PyStandard;
+  pm.cost_profile = AlignmentCostProfile::kStandard;
   // Check model easy-soundness independently of the input log.  The legacy
   // alignment API intentionally treats an empty log as trivially computable,
   // which would otherwise mask an unreachable final marking here.
@@ -674,7 +674,7 @@ EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb
   auto consolidate=[](StochasticLanguage& x){std::map<std::vector<std::string>,double> c;for(auto&t:x.traces)c[t.activities]+=t.weight;x.traces.clear();x.total_mass=0;for(auto&[k,w]:c){x.traces.push_back({k,w});x.total_mass+=w;}}; consolidate(a); consolidate(b);
   double ma=0,mb=0; for(auto&t:a.traces){if(!std::isfinite(t.weight)||t.weight<0){out.computed=false;out.error="invalid language weight";return out;}ma+=t.weight;}for(auto&t:b.traces){if(!std::isfinite(t.weight)||t.weight<0){out.computed=false;out.error="invalid language weight";return out;}mb+=t.weight;} if(a.traces.empty()&&b.traces.empty()){out.distance=0;return out;} if(ma<=0||mb<=0){out.computed=false;out.error="stochastic language has zero mass";return out;}
   if(std::abs(ma-mb)>1e-9){
-    // Strict mode is deliberately checked before PM4Py's default
+    // Strict mode is deliberately checked before the default
     // normalization: callers opting into it asked to detect unequal mass,
     // not to silently rescale it away.
     if(opt.strict_equal_mass){out.computed=false;out.error="masses must be equal";return out;}

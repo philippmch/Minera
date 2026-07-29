@@ -94,7 +94,7 @@ int main() {
     assert(PowlNode::parse(whitespace_po.serialize()) == whitespace_po);
   }
 
-  // Raw PM4Py labels consume their full grammar item and operator-like
+  // Raw labels consume their full grammar item and operator-like
   // prefixes are recognized only when followed by their delimiters.
   assert(PowlNode::parse("Receive Invoice") ==
          PowlNode::transition("Receive Invoice"));

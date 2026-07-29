@@ -383,7 +383,7 @@ void pnml_export_carries_the_net_structure() {
   const auto net = minera::to_petri_net(tree);
   const auto pnml = minera::to_pnml(net, "inductive net");
 
-  // Structural keys ProM/PM4Py read.
+  // Structural keys read by ProM.
   for (const char* key : {"<pnml", "<net", "<place", "<transition", "<arc",
                           "initialMarking", "finalmarkings"}) {
     assert(pnml.find(key) != std::string::npos);
