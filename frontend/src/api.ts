@@ -15,9 +15,21 @@ import {
   type EditDistanceResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
+  type DecomposedAlignmentOptions,
+  type DecomposedAlignmentResult,
+  type PetriAntiAlignmentOptions,
+  type PetriAntiAlignmentResult,
+  type PetriMultiAlignmentOptions,
+  type PetriMultiAlignmentResult,
+  type ProcessTreeReductionOptions,
+  type ProcessTreeReductionResult,
   isDfgAlignmentResult,
   isEditDistanceResult,
   isProcessTreeAlignmentResult,
+  isDecomposedAlignmentResult,
+  isPetriAntiAlignmentResult,
+  isPetriMultiAlignmentResult,
+  isProcessTreeReductionResult,
   isMineraExport,
 } from "./types";
 
@@ -689,6 +701,14 @@ export function parseDfgCostMapInput(value: string): Record<string, number> | un
   return result;
 }
 
+/** Parse comma-separated non-negative marking place ids. */
+export function parseMarkingInput(value: string): number[] | undefined {
+  if (!value.trim()) return undefined;
+  const entries = value.split(",").map((part) => part.trim());
+  if (entries.some((part) => !/^\d+$/.test(part))) throw new Error("markings must be comma-separated non-negative integers");
+  return entries.map((part) => Number(part));
+}
+
 function encodeCostMap(map?: Record<string, number>): string | undefined {
   if (!map) return undefined;
   const entries = Object.entries(map).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
@@ -832,6 +852,94 @@ export async function alignProcessTree(options: ProcessTreeAlignmentOptions = {}
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isProcessTreeAlignmentResult(parsed)) throw new Error("the Minera backend returned an invalid process-tree alignment");
   return parsed;
+}
+
+function advancedQuery(options: Record<string, unknown>): string {
+  const query = new URLSearchParams();
+  const add = (name: string, value: unknown) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) { if (value.length) query.set(name, value.join(",")); return; }
+    if (typeof value === "object") {
+      if (["activity_log_costs", "activity_model_costs", "activity_sync_costs"].includes(name)) {
+        const encoded = encodeCostMap(value as Record<string, number>);
+        if (encoded) query.set(name, encoded);
+        return;
+      }
+      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+      if (entries.some(([, item]) => typeof item !== "number" || !Number.isFinite(item) || item < 0)) throw new Error(`${name} must contain finite non-negative costs`);
+      if (entries.length) query.set(name, entries.map(([key, item]) => `${key}=${item}`).join(","));
+      return;
+    }
+    query.set(name, String(value));
+  };
+  Object.keys(options).sort().forEach((name) => add(name, options[name]));
+  return query.toString();
+}
+function checkedNumber(value: number | undefined, name: string, integer = false) {
+  if (value === undefined) return;
+  if (!Number.isFinite(value) || value < 0 || (integer && !Number.isInteger(value))) throw new Error(`${name} must be a non-negative ${integer ? "integer" : "number"}`);
+}
+function checkedOptions(options: Record<string, unknown>, integerKeys: string[] = []) {
+  for (const [name, value] of Object.entries(options)) {
+    if (typeof value === "number") checkedNumber(value, name, integerKeys.includes(name));
+    if (typeof value === "boolean" || typeof value === "string" || Array.isArray(value)) continue;
+    if (value !== undefined && value !== null && typeof value !== "number" && !["activity_log_costs", "activity_model_costs", "activity_sync_costs"].includes(name)) throw new Error(`${name} is invalid`);
+  }
+  for (const key of ["initial_marking", "final_marking"]) {
+    const value = options[key];
+    if (Array.isArray(value) && value.some((item) => !Number.isInteger(item) || (item as number) < 0)) throw new Error(`${key} must contain non-negative integers`);
+  }
+}
+export function decomposedAlignmentQuery(options: DecomposedAlignmentOptions = {}): string {
+  const o: Record<string, unknown> = { ...options, variant: options.variant ?? "recompos_maximal" };
+  checkedOptions(o, ["max_states", "max_total_states"]);
+  if (typeof o.max_states === "number" && o.max_states < 1) throw new Error("max_states must be positive");
+  if (typeof o.max_total_states === "number" && o.max_total_states < 1) throw new Error("max_total_states must be positive");
+  return advancedQuery(o);
+}
+export function petriAntiAlignmentQuery(options: PetriAntiAlignmentOptions = {}): string {
+  const o: Record<string, unknown> = { ...options, variant: options.variant ?? "version_discounted_a_star" };
+  checkedOptions(o, ["marking_limit", "max_states"]);
+  if (typeof o.marking_limit === "number" && o.marking_limit < 1) throw new Error("marking_limit must be positive");
+  if (typeof o.exponent === "number" && o.exponent <= 1) throw new Error("exponent must be greater than 1");
+  return advancedQuery(o);
+}
+export function petriMultiAlignmentQuery(options: PetriMultiAlignmentOptions = {}): string {
+  const o: Record<string, unknown> = { ...options, variant: options.variant ?? "version_discounted_a_star" };
+  checkedOptions(o, ["marking_limit", "max_states"]);
+  if (typeof o.marking_limit === "number" && o.marking_limit < 1) throw new Error("marking_limit must be positive");
+  if (typeof o.exponent === "number" && o.exponent <= 1) throw new Error("exponent must be greater than 1");
+  return advancedQuery(o);
+}
+export function processTreeReductionQuery(options: ProcessTreeReductionOptions = {}): string {
+  return advancedQuery(options.variant ? { ...options } : { activity_key: options.activity_key });
+}
+async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
+  let response: Response;
+  try { response = await fetch(path, { method: "POST" }); }
+  catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!guard(parsed)) throw new Error(`the Minera backend returned an invalid ${label}`);
+  return parsed;
+}
+export function alignDecomposed(miner: string, options: DecomposedAlignmentOptions = {}): Promise<DecomposedAlignmentResult> {
+  const query = new URLSearchParams(decomposedAlignmentQuery(options)); query.set("miner", miner);
+  return postChecked(`/api/align-decomposed?${query.toString()}`, isDecomposedAlignmentResult, "decomposed alignment");
+}
+export function alignPetriAnti(miner: string, options: PetriAntiAlignmentOptions = {}): Promise<PetriAntiAlignmentResult> {
+  const query = new URLSearchParams(petriAntiAlignmentQuery(options)); query.set("miner", miner);
+  return postChecked(`/api/align-petri-anti?${query.toString()}`, isPetriAntiAlignmentResult, "Petri anti-alignment");
+}
+export function alignPetriMulti(miner: string, options: PetriMultiAlignmentOptions = {}): Promise<PetriMultiAlignmentResult> {
+  const query = new URLSearchParams(petriMultiAlignmentQuery(options)); query.set("miner", miner);
+  return postChecked(`/api/align-petri-multi?${query.toString()}`, isPetriMultiAlignmentResult, "Petri multi-alignment");
+}
+export function reduceProcessTree(traceIndex: number, options: ProcessTreeReductionOptions = {}): Promise<ProcessTreeReductionResult> {
+  if (!Number.isInteger(traceIndex) || traceIndex < 0) return Promise.reject(new Error("trace_index must be a non-negative integer"));
+  const query = new URLSearchParams(processTreeReductionQuery(options)); query.set("trace_index", String(traceIndex));
+  return postChecked(`/api/reduce-process-tree?${query.toString()}`, isProcessTreeReductionResult, "process-tree reduction");
 }
 
 /**

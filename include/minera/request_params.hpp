@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,6 +24,10 @@
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/process_tree_alignment.hpp"
+#include "minera/decomposed_alignment.hpp"
+#include "minera/petri_anti_alignment.hpp"
+#include "minera/petri_multi_alignment.hpp"
+#include "minera/process_tree_reduction.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -83,6 +88,11 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 // explicit empty list has different semantics from using the default.
 using FieldPresence = std::function<bool(std::string_view)>;
 
+// Parse the escaped activity=cost grammar shared by HTTP requests and CLI
+// adapters. Commas, separators, backslashes, and whitespace may be escaped.
+[[nodiscard]] std::map<std::string, double> parse_activity_costs(
+    std::string_view value, std::string_view name = "activity_costs");
+
 // Standalone conformance option parsers. Wire fields use the dfg_* and
 // edit_* prefixes; map values are comma-separated `activity=value` pairs
 // (a colon is accepted as a compatibility separator). Explicitly present
@@ -125,5 +135,22 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field);
 [[nodiscard]] MineParams parse_mine_params(const FieldLookup& field,
                                            const FieldPresence& present);
+
+[[nodiscard]] DecomposedAlignmentOptions parse_decomposed_alignment_params(
+    const FieldLookup& field);
+[[nodiscard]] DecomposedAlignmentOptions parse_decomposed_alignment_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] PetriAntiAlignmentOptions parse_petri_anti_alignment_params(
+    const FieldLookup& field);
+[[nodiscard]] PetriAntiAlignmentOptions parse_petri_anti_alignment_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] PetriMultiAlignmentOptions parse_petri_multi_alignment_params(
+    const FieldLookup& field);
+[[nodiscard]] PetriMultiAlignmentOptions parse_petri_multi_alignment_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
+    const FieldLookup& field);
+[[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

@@ -155,14 +155,15 @@ and tracks every family as complete, partial, or missing.
   merging, and causal DAG recomposition without substituting a whole-net
   result. Anti-/multi-alignment retain tau transitions, weighted arcs,
   arbitrary markings, the pinned geometric discounted-edit objectives, and
-  their ordinary precision/maximum-distance diagnostics. These are currently
-  native-library entry points; CLI/server/frontend adapters are the next
-  integration checkpoint.
+  their ordinary precision/maximum-distance diagnostics. The complete option
+  sets and result diagnostics are available through the C++ API, JSON export,
+  CLI, local server, and frontend conformance workspace.
 - **Trace-based process-tree reduction**: `TREE_TR_BASED` removes optional
   non-root subtrees whose activities do not occur in a trace, then applies the
   pinned folding rules without mutating the source tree. It preserves root
   replacement quirks, XOR tau ordering, mixed loop/tau behavior, and custom
-  string activity keys.
+  string activity keys. A selected trace can be reduced through the CLI,
+  local server, or frontend, with the reduced recursive tree embedded in JSON.
 - **Model annotations (frequency & performance)**: token replay of the
   cleanly fitting cases decorates the discovered model itself — per
   transition, how often it actually fired (so a path the log never takes is

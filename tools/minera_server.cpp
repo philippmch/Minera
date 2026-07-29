@@ -50,6 +50,10 @@
 #include "minera/process_tree.hpp"
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
+#include "minera/decomposed_alignment.hpp"
+#include "minera/petri_anti_alignment.hpp"
+#include "minera/petri_multi_alignment.hpp"
+#include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/minimum_self_distance.hpp"
@@ -551,6 +555,35 @@ void handle_align_process_tree(const httplib::Request& request,
   }
 }
 
+void handle_align_decomposed(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
+  const auto miner = request.get_param_value("miner"); const auto it=session->nets.find(miner);
+  if (it==session->nets.end()) { response.status=400; response.set_content(error_json("unknown miner: "+miner),"application/json"); return; }
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_decomposed_alignment_params(lookup,present); const auto r=minera::align_decomposed(session->log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+  catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
+}
+
+void handle_align_petri_anti(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
+  const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_anti_alignment_params(lookup,present); const auto r=minera::anti_align_petri(it->second,session->log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+}
+
+void handle_align_petri_multi(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
+  const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_multi_alignment_params(lookup,present); const auto r=minera::multi_align_petri(it->second,session->log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+}
+
+void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+  if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
+  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=session->log.traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto reduced=minera::reduce_process_tree(session->tree,session->log.traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+}
+
 void handle_align_dfg(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status = 409; response.set_content(error_json("no mined log; mine a log first"), "application/json"); return; }
@@ -906,6 +939,10 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/align-process-tree", preflight);
+  server.Options("/api/align-decomposed", preflight);
+  server.Options("/api/align-petri-anti", preflight);
+  server.Options("/api/align-petri-multi", preflight);
+  server.Options("/api/reduce-process-tree", preflight);
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
@@ -914,6 +951,10 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
   server.Post("/api/align-process-tree", handle_align_process_tree);
+  server.Post("/api/align-decomposed", handle_align_decomposed);
+  server.Post("/api/align-petri-anti", handle_align_petri_anti);
+  server.Post("/api/align-petri-multi", handle_align_petri_multi);
+  server.Post("/api/reduce-process-tree", handle_reduce_process_tree);
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);

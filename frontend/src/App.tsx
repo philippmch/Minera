@@ -5,6 +5,10 @@ import {
   type DfgAlignmentOptions,
   type EditDistanceOptions,
   type ProcessTreeAlignmentOptions,
+  type DecomposedAlignmentOptions,
+  type PetriAntiAlignmentOptions,
+  type PetriMultiAlignmentOptions,
+  type ProcessTreeReductionOptions,
   DEFAULT_ALIGNMENT_OPTIONS,
   type CaseAttributeStat,
   type Decisions,
@@ -40,6 +44,14 @@ import {
   alignEditDistance,
   alignProcessTree,
   processTreeAlignmentQuery,
+  alignDecomposed,
+  alignPetriAnti,
+  alignPetriMulti,
+  reduceProcessTree,
+  decomposedAlignmentQuery,
+  petriAntiAlignmentQuery,
+  petriMultiAlignmentQuery,
+  processTreeReductionQuery,
   checkModel,
   decideModel,
   mineCsv,
@@ -86,6 +98,10 @@ export default function App() {
   const dfgCache = useRef<Record<string, import("./types").DfgAlignmentResult>>({});
   const editCache = useRef<Record<string, import("./types").EditDistanceResult>>({});
   const processTreeCache = useRef<Record<string, import("./types").ProcessTreeAlignmentResult>>({});
+  const decomposedCache = useRef<Record<string, import("./types").DecomposedAlignmentResult>>({});
+  const petriAntiCache = useRef<Record<string, import("./types").PetriAntiAlignmentResult>>({});
+  const petriMultiCache = useRef<Record<string, import("./types").PetriMultiAlignmentResult>>({});
+  const reductionCache = useRef<Record<string, import("./types").ProcessTreeReductionResult>>({});
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -142,6 +158,26 @@ export default function App() {
     processTreeCache.current = { ...processTreeCache.current, [key]: result };
     return result;
   }, []);
+  const requestDecomposed = useCallback(async (miner: string, options: DecomposedAlignmentOptions = {}) => {
+    const key = `${miner}|${decomposedAlignmentQuery(options)}`;
+    if (decomposedCache.current[key]) return decomposedCache.current[key];
+    const result = await alignDecomposed(miner, options); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
+  }, []);
+  const requestPetriAnti = useCallback(async (miner: string, options: PetriAntiAlignmentOptions = {}) => {
+    const key = `${miner}|${petriAntiAlignmentQuery(options)}`;
+    if (petriAntiCache.current[key]) return petriAntiCache.current[key];
+    const result = await alignPetriAnti(miner, options); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
+  }, []);
+  const requestPetriMulti = useCallback(async (miner: string, options: PetriMultiAlignmentOptions = {}) => {
+    const key = `${miner}|${petriMultiAlignmentQuery(options)}`;
+    if (petriMultiCache.current[key]) return petriMultiCache.current[key];
+    const result = await alignPetriMulti(miner, options); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
+  }, []);
+  const requestReduction = useCallback(async (traceIndex: number, options: ProcessTreeReductionOptions = {}) => {
+    const key = `${traceIndex}|${processTreeReductionQuery(options)}`;
+    if (reductionCache.current[key]) return reductionCache.current[key];
+    const result = await reduceProcessTree(traceIndex, options); reductionCache.current = { ...reductionCache.current, [key]: result }; return result;
+  }, []);
 
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
   // replaces the server's cached "imported" net, so its stale alignments and
@@ -153,6 +189,9 @@ export default function App() {
     );
     const { imported: _droppedDecisions, ...restDecisions } = decideCache.current;
     decideCache.current = restDecisions;
+    decomposedCache.current = Object.fromEntries(Object.entries(decomposedCache.current).filter(([key]) => !key.startsWith("imported|")));
+    petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.startsWith("imported|")));
+    petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.startsWith("imported|")));
     return result;
   }, []);
 
@@ -163,6 +202,10 @@ export default function App() {
     dfgCache.current = {};
     editCache.current = {};
     processTreeCache.current = {};
+    decomposedCache.current = {};
+    petriAntiCache.current = {};
+    petriMultiCache.current = {};
+    reductionCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -227,6 +270,11 @@ export default function App() {
         decideCache.current = {};
         dfgCache.current = {};
         editCache.current = {};
+        processTreeCache.current = {};
+        decomposedCache.current = {};
+        petriAntiCache.current = {};
+        petriMultiCache.current = {};
+        reductionCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
@@ -459,6 +507,10 @@ export default function App() {
             onRequestDfg={requestDfg}
             onRequestEditDistance={requestEditDistance}
             onRequestProcessTree={requestProcessTree}
+            onRequestDecomposed={requestDecomposed}
+            onRequestPetriAnti={requestPetriAnti}
+            onRequestPetriMulti={requestPetriMulti}
+            onRequestReduction={requestReduction}
           />
         </main>
       )}

@@ -56,11 +56,11 @@ are reconciled.
 | Comparison | Petri-net element-usage comparison | **Missing** |
 | Concept drift | Bose feature extraction and drift detection | **Missing** |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
-| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete (core)** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs; decomposed CLI/server/frontend adapters remain integration work |
+| Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
-| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete (core)** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, and arbitrary native markings are implemented; adapters remain integration work |
+| Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Missing** |
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** |
@@ -76,7 +76,7 @@ are reconciled.
 | Label splitting | contextual | **Missing** |
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
-| Reduction | process-tree transition-reduction based | **Complete (core)** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, and PM4Py-compatible folding are available through the native API |
+| Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, PM4Py-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — workflow-net sampled/extensive playout and Declare classic playout are present |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
 

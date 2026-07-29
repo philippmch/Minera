@@ -2557,7 +2557,12 @@ void write_analysis_json(std::ostream& out,
                          const DfgAlignmentProjection* dfg_projection,
                          const EventLog* dfg_projected_log,
                          const EventLog* edit_projected_log,
-                         const ProcessTreeAlignmentResult* process_tree_alignment) {
+                         const ProcessTreeAlignmentResult* process_tree_alignment,
+                         const DecomposedAlignmentResult* decomposed_alignment,
+                         const PetriAntiAlignmentResult* petri_anti_alignment,
+                         const PetriMultiAlignmentResult* petri_multi_alignment,
+                         const ProcessTree* reduced_process_tree,
+                         std::size_t reduced_trace_index) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2814,6 +2819,20 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"process_tree_alignment\": ";
     write_process_tree_alignment(out, *process_tree_alignment);
   }
+  if (decomposed_alignment != nullptr) {
+    out << ",\n  \"decomposed_alignment\": " << decomposed_alignment_json(*decomposed_alignment);
+  }
+  if (petri_anti_alignment != nullptr) {
+    out << ",\n  \"petri_anti_alignment\": " << petri_anti_alignment_json(*petri_anti_alignment);
+  }
+  if (petri_multi_alignment != nullptr) {
+    out << ",\n  \"petri_multi_alignment\": " << petri_multi_alignment_json(*petri_multi_alignment);
+  }
+  if (reduced_process_tree != nullptr) {
+    out << ",\n  \"process_tree_reduction\": "
+        << process_tree_reduction_json(*reduced_process_tree, graph,
+                                       reduced_trace_index);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -2859,7 +2878,12 @@ std::string analysis_json(std::string_view dataset,
                           const DfgAlignmentProjection* dfg_projection,
                           const EventLog* dfg_projected_log,
                           const EventLog* edit_projected_log,
-                          const ProcessTreeAlignmentResult* process_tree_alignment) {
+                          const ProcessTreeAlignmentResult* process_tree_alignment,
+                          const DecomposedAlignmentResult* decomposed_alignment,
+                          const PetriAntiAlignmentResult* petri_anti_alignment,
+                          const PetriMultiAlignmentResult* petri_multi_alignment,
+                          const ProcessTree* reduced_process_tree,
+                          std::size_t reduced_trace_index) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2872,7 +2896,9 @@ std::string analysis_json(std::string_view dataset,
                       footprints, dfg_variants, correlation_mining,
                       batch_discovery, dfg_alignment, edit_distance, edit_anti,
                       dfg_projection, dfg_projected_log, edit_projected_log,
-                      process_tree_alignment);
+                      process_tree_alignment, decomposed_alignment,
+                      petri_anti_alignment, petri_multi_alignment,
+                      reduced_process_tree, reduced_trace_index);
   return out.str();
 }
 
@@ -2893,6 +2919,30 @@ std::string process_tree_alignment_json(const ProcessTreeAlignmentResult& result
   std::ostringstream out;
   write_process_tree_alignment(out, result);
   return out.str();
+}
+
+std::string decomposed_alignment_json(const DecomposedAlignmentResult& result) {
+  std::ostringstream out;
+  out << "{\"algorithm\":\"decomposed_alignment\",\"variant\":\"recompos_maximal\",\"complete\":" << (result.complete?"true":"false")
+      << ",\"timed_out\":" << (result.timed_out?"true":"false") << ",\"exhausted\":" << (result.exhausted?"true":"false")
+      << ",\"fitness\":" << result.fitness << ",\"best_worst_cost\":" << result.best_worst_cost << ",\"trace_count\":" << result.trace_count << ",\"total_cost\":" << result.total_cost
+      << ",\"diagnostics\":{\"decompositions\":" << result.diagnostics.decompositions << ",\"components\":" << result.diagnostics.components << ",\"merges\":" << result.diagnostics.merges << ",\"cache_hits\":" << result.diagnostics.cache_hits << ",\"cache_misses\":" << result.diagnostics.cache_misses << ",\"border_disagreements\":" << result.diagnostics.border_disagreements << ",\"agreement_iterations\":" << result.diagnostics.agreement_iterations << ",\"visited_states\":" << result.diagnostics.visited_states << ",\"queued_states\":" << result.diagnostics.queued_states << ",\"traversed_arcs\":" << result.diagnostics.traversed_arcs << ",\"whole_net_fallback\":" << (result.diagnostics.whole_net_fallback?"true":"false") << ",\"note\":"; write_json_string(out,result.diagnostics.note); out << "},\"traces\":[";
+  for (std::size_t i=0;i<result.traces.size();++i) { if(i) out<<','; const auto& t=result.traces[i]; out<<"{\"activities\":["; for(std::size_t j=0;j<t.activities.size();++j){if(j)out<<',';write_json_string(out,t.activities[j]);} out<<"],\"count\":"<<t.count<<",\"complete\":"<<(t.complete?"true":"false")<<",\"timed_out\":"<<(t.timed_out?"true":"false")<<",\"exhausted\":"<<(t.exhausted?"true":"false")<<",\"cost\":"<<t.cost<<",\"fitness\":"<<t.fitness<<",\"best_worst_cost\":"<<t.best_worst_cost<<",\"moves\":["; for(std::size_t j=0;j<t.alignment.size();++j){if(j)out<<',';const auto&m=t.alignment[j];out<<"{\"log\":";if(m.log)write_json_string(out,*m.log);else out<<"null";out<<",\"model\":";if(m.model)write_json_string(out,*m.model);else out<<"null";out<<",\"transition\":"<<(m.transition==static_cast<std::size_t>(-1)?-1:static_cast<long long>(m.transition))<<"}";} out<<"]}"; }
+  out << "]}"; return out.str();
+}
+
+std::string petri_anti_alignment_json(const PetriAntiAlignmentResult& result) {
+  std::ostringstream out; out << "{\"algorithm\":\"petri_anti_alignment\",\"variant\":\"version_discounted_a_star\",\"activities\":["; for(std::size_t i=0;i<result.activities.size();++i){if(i)out<<',';write_json_string(out,result.activities[i]);} out<<"],\"transitions\":["; for(std::size_t i=0;i<result.transitions.size();++i){if(i)out<<',';out<<result.transitions[i];} out<<"],\"cost\":"<<result.cost<<",\"objective\":"<<result.objective<<",\"precision\":"<<result.precision<<",\"diagnostics\":{\"visited_states\":"<<result.diagnostics.visited_states<<",\"queued_states\":"<<result.diagnostics.queued_states<<",\"traversed_arcs\":"<<result.diagnostics.traversed_arcs<<",\"exhausted\":"<<(result.diagnostics.exhausted?"true":"false")<<"}}"; return out.str();
+}
+
+std::string petri_multi_alignment_json(const PetriMultiAlignmentResult& result) {
+  std::ostringstream out; out << "{\"algorithm\":\"petri_multi_alignment\",\"variant\":\"version_discounted_a_star\",\"activities\":["; for(std::size_t i=0;i<result.activities.size();++i){if(i)out<<',';write_json_string(out,result.activities[i]);} out<<"],\"transitions\":["; for(std::size_t i=0;i<result.transitions.size();++i){if(i)out<<',';out<<result.transitions[i];} out<<"],\"cost\":"<<result.cost<<",\"objective\":"<<result.objective<<",\"max_distance_to_log\":"<<result.max_distance_to_log<<",\"diagnostics\":{\"visited_states\":"<<result.diagnostics.visited_states<<",\"queued_states\":"<<result.diagnostics.queued_states<<",\"traversed_arcs\":"<<result.diagnostics.traversed_arcs<<",\"exhausted\":"<<(result.diagnostics.exhausted?"true":"false")<<"}}"; return out.str();
+}
+
+std::string process_tree_reduction_json(const ProcessTree& result,
+                                         const DirectlyFollowsGraph& graph,
+                                         std::size_t trace_index) {
+  std::ostringstream out; out << "{\"algorithm\":\"process_tree_reduction\",\"variant\":\"tree_tr_based\",\"trace_index\":" << trace_index << ",\"process_tree\":"; write_process_tree_node(out,result.root(),result,graph); out << '}'; return out.str();
 }
 
 namespace {

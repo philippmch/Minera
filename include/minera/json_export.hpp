@@ -30,6 +30,10 @@
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/process_tree_alignment.hpp"
+#include "minera/decomposed_alignment.hpp"
+#include "minera/petri_anti_alignment.hpp"
+#include "minera/petri_multi_alignment.hpp"
+#include "minera/process_tree_reduction.hpp"
 
 namespace minera {
 
@@ -110,7 +114,12 @@ void write_analysis_json(std::ostream& out,
                          const DfgAlignmentProjection* dfg_projection = nullptr,
                          const EventLog* dfg_projected_log = nullptr,
                          const EventLog* edit_projected_log = nullptr,
-                         const ProcessTreeAlignmentResult* process_tree_alignment = nullptr);
+                         const ProcessTreeAlignmentResult* process_tree_alignment = nullptr,
+                         const DecomposedAlignmentResult* decomposed_alignment = nullptr,
+                         const PetriAntiAlignmentResult* petri_anti_alignment = nullptr,
+                         const PetriMultiAlignmentResult* petri_multi_alignment = nullptr,
+                         const ProcessTree* reduced_process_tree = nullptr,
+                         std::size_t reduced_trace_index = 0);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -152,10 +161,25 @@ void write_analysis_json(std::ostream& out,
     const DfgAlignmentProjection* dfg_projection = nullptr,
     const EventLog* dfg_projected_log = nullptr,
     const EventLog* edit_projected_log = nullptr,
-    const ProcessTreeAlignmentResult* process_tree_alignment = nullptr);
+    const ProcessTreeAlignmentResult* process_tree_alignment = nullptr,
+    const DecomposedAlignmentResult* decomposed_alignment = nullptr,
+    const PetriAntiAlignmentResult* petri_anti_alignment = nullptr,
+    const PetriMultiAlignmentResult* petri_multi_alignment = nullptr,
+    const ProcessTree* reduced_process_tree = nullptr,
+    std::size_t reduced_trace_index = 0);
 
 [[nodiscard]] std::string process_tree_alignment_json(
     const ProcessTreeAlignmentResult& result);
+
+[[nodiscard]] std::string decomposed_alignment_json(
+    const DecomposedAlignmentResult& result);
+[[nodiscard]] std::string petri_anti_alignment_json(
+    const PetriAntiAlignmentResult& result);
+[[nodiscard]] std::string petri_multi_alignment_json(
+    const PetriMultiAlignmentResult& result);
+[[nodiscard]] std::string process_tree_reduction_json(
+    const ProcessTree& result, const DirectlyFollowsGraph& graph,
+    std::size_t trace_index);
 
 [[nodiscard]] std::string dfg_alignment_json(
     const DfgAlignmentLogResult& result,
