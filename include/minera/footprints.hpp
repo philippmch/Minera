@@ -19,7 +19,7 @@ namespace minera {
 
 using FootprintPair = std::pair<std::string, std::string>;
 
-// PM4Py's footprint dictionary, represented with ordered containers so JSON
+// The footprint dictionary, represented with ordered containers so JSON
 // and diagnostics are deterministic. Optional fields are deliberately kept
 // optional: the DFG variant, for example, omits dfg and min_trace_length.
 struct Footprint {
@@ -46,7 +46,7 @@ Footprint discover_dfg_footprints(
     const std::map<FootprintPair, std::uint64_t>& dfg);
 Footprint discover_dfg_footprints(const DirectlyFollowsGraph& graph);
 
-// Model-discovery variants from PM4Py's footprints algorithm. These return
+// Model-discovery variants from the footprints algorithm. These return
 // only the fields defined by the corresponding variant; absent fields are
 // signalled by the *_present flags (or a disengaged optional).
 Footprint discover_footprints(const PetriNet& net);

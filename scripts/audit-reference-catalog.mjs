@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Build a reproducible source catalogue for a pinned PM4Py checkout.
+ * Build a reproducible source catalogue for a pinned reference checkout.
  *
  * This script inventories names and paths only. It never imports or executes
- * PM4Py, so optional Python dependencies are unnecessary. The resulting JSON
- * is evidence for Minera's parity checklist, not a compatibility layer.
+ * the reference package, so optional Python dependencies are unnecessary. The
+ * resulting JSON is evidence for Minera's parity checklist, not a compatibility
+ * layer.
  */
 
 import { execFileSync } from "node:child_process";
@@ -17,20 +18,53 @@ process.stdout.on("error", (error) => {
   throw error;
 });
 
-function gitValue(checkout, ...args) {
-  return execFileSync("git", ["-C", checkout, ...args], {
+function gitValue(referenceRoot, ...args) {
+  return execFileSync("git", ["-C", referenceRoot, ...args], {
     encoding: "utf8",
   }).trim();
+}
+
+function ignoredDirectory(name) {
+  return name === "__pycache__" || name.startsWith(".");
 }
 
 function filesBelow(root) {
   const files = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const path = resolve(root, entry.name);
-    if (entry.isDirectory()) files.push(...filesBelow(path));
+    if (entry.isDirectory()) {
+      if (!ignoredDirectory(entry.name)) files.push(...filesBelow(path));
+    }
     else files.push(path);
   }
   return files;
+}
+
+function isDirectory(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function findLibraryRoot(referenceRoot) {
+  const candidates = [referenceRoot];
+  for (const entry of readdirSync(referenceRoot, { withFileTypes: true })) {
+    if (entry.isDirectory() && !ignoredDirectory(entry.name))
+      candidates.push(resolve(referenceRoot, entry.name));
+  }
+  const matches = candidates.filter(
+    (candidate) =>
+      isDirectory(resolve(candidate, "algo")) &&
+      isDirectory(resolve(candidate, "objects")),
+  );
+  if (matches.length !== 1) {
+    throw new Error(
+      `could not locate exactly one reference package below ${referenceRoot}`,
+    );
+  }
+  return matches[0];
 }
 
 function enumVariants(algorithmFile) {
@@ -49,8 +83,8 @@ function enumVariants(algorithmFile) {
   return variants.length === 0 ? ["default"] : variants;
 }
 
-function relativeModule(pm4pyRoot, path) {
-  return relative(pm4pyRoot, path)
+function relativeModule(libraryRoot, path) {
+  return relative(libraryRoot, path)
     .replace(/\.py$/, "")
     .split(sep)
     .join(".");
@@ -60,19 +94,16 @@ function pythonFileCount(root) {
   return filesBelow(root).filter((path) => path.endsWith(".py")).length;
 }
 
-function catalogue(checkout) {
-  const pm4pyRoot = resolve(checkout, "pm4py");
-  const algoRoot = resolve(pm4pyRoot, "algo");
-  if (!statSync(algoRoot).isDirectory()) {
-    throw new Error(`${checkout} is not a PM4Py checkout`);
-  }
+function catalogue(referenceRoot) {
+  const libraryRoot = findLibraryRoot(referenceRoot);
+  const algoRoot = resolve(libraryRoot, "algo");
 
   const algoFiles = filesBelow(algoRoot).filter((path) => path.endsWith(".py"));
   const algorithmFiles = algoFiles
     .filter((path) => path.endsWith(`${sep}algorithm.py`))
     .sort();
   const algorithms = algorithmFiles.map((path) => ({
-    package: relativeModule(pm4pyRoot, resolve(path, "..")),
+    package: relativeModule(libraryRoot, resolve(path, "..")),
     declared_variants: enumVariants(path),
   }));
   const variantModules = algoFiles
@@ -81,15 +112,19 @@ function catalogue(checkout) {
         path.includes(`${sep}variants${sep}`) &&
         !path.endsWith(`${sep}__init__.py`),
     )
-    .map((path) => relativeModule(pm4pyRoot, path))
+    .map((path) => relativeModule(libraryRoot, path))
     .sort();
   const domains = readdirSync(algoRoot)
-    .filter((name) => statSync(resolve(algoRoot, name)).isDirectory())
+    .filter(
+      (name) =>
+        !ignoredDirectory(name) &&
+        isDirectory(resolve(algoRoot, name)),
+    )
     .sort();
 
   return {
-    tag: gitValue(checkout, "describe", "--tags", "--exact-match"),
-    commit: gitValue(checkout, "rev-parse", "HEAD"),
+    tag: gitValue(referenceRoot, "describe", "--tags", "--exact-match"),
+    commit: gitValue(referenceRoot, "rev-parse", "HEAD"),
     domains,
     algorithm_packages: algorithms,
     variant_modules: variantModules,
@@ -98,12 +133,12 @@ function catalogue(checkout) {
       algorithm_packages: algorithms.length,
       variant_modules: variantModules.length,
       algo_python_files: algoFiles.length,
-      object_python_files: pythonFileCount(resolve(pm4pyRoot, "objects")),
+      object_python_files: pythonFileCount(resolve(libraryRoot, "objects")),
       statistics_python_files: pythonFileCount(
-        resolve(pm4pyRoot, "statistics"),
+        resolve(libraryRoot, "statistics"),
       ),
       visualization_python_files: pythonFileCount(
-        resolve(pm4pyRoot, "visualization"),
+        resolve(libraryRoot, "visualization"),
       ),
     },
   };
@@ -112,7 +147,7 @@ function catalogue(checkout) {
 function parseArguments(argv) {
   if (argv.length === 0) {
     throw new Error(
-      "usage: audit-pm4py-catalog.mjs CHECKOUT [--expected-tag TAG] [-o FILE]",
+      "usage: audit-reference-catalog.mjs CHECKOUT [--expected-tag TAG] [-o FILE]",
     );
   }
   const options = { checkout: resolve(argv[0]), expectedTag: "2.7.22" };
@@ -132,7 +167,7 @@ function parseArguments(argv) {
 const options = parseArguments(process.argv.slice(2));
 const result = catalogue(options.checkout);
 if (result.tag !== options.expectedTag) {
-  throw new Error(`expected PM4Py ${options.expectedTag}, found ${result.tag}`);
+  throw new Error(`expected reference tag ${options.expectedTag}, found ${result.tag}`);
 }
 
 const rendered = `${JSON.stringify(result, null, 2)}\n`;

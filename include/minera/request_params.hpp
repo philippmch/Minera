@@ -65,8 +65,8 @@ struct MineParams {
   LogSkeletonOptions log_skeleton;
   DeclareDiscoveryOptions declare_options;
   FootprintsOptions footprints;
-  // Empty vectors keep these analyses opt-in. String ids intentionally retain
-  // PM4Py aliases that map to the same native enum value.
+  // Empty vectors keep these analyses opt-in. String ids map to the native
+  // enum values.
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
   DfgStatisticalOptions dfg_statistics;

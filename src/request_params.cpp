@@ -368,8 +368,8 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field,
   if (supplied("cost_profile")) {
     const auto value = field("cost_profile");
     if (value == "legacy") options.cost_profile = AlignmentCostProfile::kLegacyUnit;
-    else if (value == "pm4py") options.cost_profile = AlignmentCostProfile::kPm4PyStandard;
-    else throw std::invalid_argument("cost_profile: expected legacy or pm4py");
+    else if (value == "standard") options.cost_profile = AlignmentCostProfile::kStandard;
+    else throw std::invalid_argument("cost_profile: expected legacy or standard");
   }
   const auto parse_cost = [&](std::string_view name, std::optional<double>& destination) {
     if (!supplied(name)) return;
@@ -1105,7 +1105,7 @@ MineParams parse_mine_params(const FieldLookup& field,
 
   // Correlation miner variants are deliberately opt-in. Keep a canonical
   // catalog order and deduplicate aliases/repeated selections so callers can
-  // execute each requested PM4Py variant exactly once.
+  // execute each requested variant exactly once.
   const auto parse_correlation_variants = [&]() {
     constexpr std::string_view field_name = "correlation_variants";
     const auto value = field(field_name);

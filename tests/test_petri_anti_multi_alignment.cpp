@@ -92,7 +92,7 @@ int main() {
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 
-  // Pinned PM4Py label conventions: prefix handling recognizes exact tau and
+  // Pinned label conventions: prefix handling recognizes exact tau and
   // n*-labels, while modeled cells additionally recognize *skip*.  Ordinary
   // precision/max-distance deletion recognizes all tau/skip substrings.
   const char* visible_labels[] = {"tau", "n_hidden", "xskipx", "containstau"};

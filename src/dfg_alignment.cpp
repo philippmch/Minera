@@ -43,7 +43,7 @@ Model make_model(const DfgFrequency& dfg,
   m.nodes.push_back("\x01START"); m.nodes.push_back("\x01END");
   m.out.resize(m.nodes.size());
   for (const auto& e : dfg) m.out[m.id[e.first.first]].push_back(m.id[e.first.second]);
-  // Frequencies are informational; PM4Py treats a supplied key as a valid
+  // Frequencies are informational; the evaluator treats a supplied key as a valid
   // start/end activity even when its count happens to be zero.
   for (const auto& e : sa) m.out[m.start].push_back(m.id[e.first]);
   for (const auto& e : ea) m.out[m.id[e.first]].push_back(m.end);
@@ -113,7 +113,7 @@ DfgAlignmentResult align_impl(const std::vector<std::string>& trace,
       if (has_log) for (auto v : m.out[cur.node]) if (v != m.end && m.nodes[v] == la) { sync_possible = true; break; }
       const bool unknown_log = has_log && !m.id.count(la);
       for(auto v:m.out[cur.node]) {
-        if (unknown_log) continue;  // PM4Py schedules the LM before routing the model
+        if (unknown_log) continue;  // The evaluator schedules the LM before routing the model
         if(v==m.end) { push(v,cur.pos,false,0,0,{kGap,kGap}); continue; }
         const auto& a=m.nodes[v];
         if(has_log && la==a) push(v,cur.pos+1,false,get_cost(o.sync_cost,a,0),get_cost(o.sync_cost,a,0),{a,a});

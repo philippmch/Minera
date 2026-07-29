@@ -143,7 +143,7 @@ export interface MinerOptions {
   heuristicStartTimestampAttribute?: string;
   /** Miner++ generic event attribute distinguishing lifecycle instances. */
   heuristicLifecycleInstanceAttribute?: string;
-  /** PM4Py view-based transition-system options. */
+  /** View-based transition-system options. */
   transitionView?: "sequence" | "set" | "multiset";
   transitionDirection?: "forward" | "backward";
   transitionWindow?: number;
@@ -154,7 +154,7 @@ export interface MinerOptions {
   powlFilteringThreshold?: number;
   powlOrderFrequencyRatio?: number;
   powlBruteForceActivityLimit?: number;
-  /** PM4Py-compatible token-replay variation used for model conformance. */
+  /** Reference-compatible token-replay variation used for model conformance. */
   tokenReplayVariant?: "forward" | "backwards";
   tokenReplayStopImmediatelyUnfit?: boolean;
   /** Classic log-skeleton noise threshold (default 0). */
@@ -167,13 +167,13 @@ export interface MinerOptions {
   declareMinSupportRatio?: number;
   declareMinConfidenceRatio?: number;
   declareAutoSelectionMultiplier?: number;
-  /** Aggregate PM4Py footprints discovery/conformance settings. */
+  /** Aggregate footprints discovery/conformance settings. */
   footprintsDiscoveryVariants?: string[];
   footprintsModel?: "process_tree" | "powl" | "inductive" | "alpha" | "heuristic" | "dfg";
   footprintsConformanceVariants?: string[];
   footprintsStrict?: boolean;
   footprintsEnableActAlwaysExecuted?: boolean;
-  /** Optional PM4Py statistical and causal DFG analyses. */
+  /** Optional statistical and causal DFG analyses. */
   dfgStatisticalVariants?: string[];
   dfgCausalVariants?: string[];
   dfgWindow?: number;
@@ -185,17 +185,17 @@ export interface MinerOptions {
   dfgBusinessHourSlots?: string;
   dfgCaseAttributes?: string[];
   dfgReturnNodeAttributes?: boolean;
-  /** Optional PM4Py correlation-mining analyses. */
+  /** Optional correlation-mining analyses. */
   correlationVariants?: string[];
   correlationStartTimestampAttribute?: string;
   correlationExactTimeMatching?: boolean;
   correlationSampleSize?: number;
-  /** PM4Py performance spectrum (opt-in when activities are supplied). */
+  /** Performance spectrum (opt-in when activities are supplied). */
   spectrumActivities?: string[];
   spectrumVariant?: "connected" | "disconnected";
   spectrumSampleSize?: number;
   spectrumSortLog?: boolean;
-  /** PM4Py batch discovery (opt-in). */
+  /** Batch discovery (opt-in). */
   batches?: boolean;
   batchMergeDistanceSeconds?: number;
   batchMinSize?: number;

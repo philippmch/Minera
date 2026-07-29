@@ -9,7 +9,7 @@
 namespace minera {
 
 // Serializes an event log as XES (eXtensible Event Stream, IEEE 1849-2016) —
-// the standard interchange format read by ProM, PM4Py, and other
+// the standard interchange format read by ProM and other
 // process-mining tools. Each trace carries its case id as `concept:name`;
 // each event carries its activity as `concept:name`, its timestamp as
 // `time:timestamp`, and — when present — its resource as `org:resource`.

@@ -35,7 +35,7 @@ struct DecomposedAlignmentOptions {
   std::size_t max_total_states = 2000000;
   bool use_cache = true;
   bool clear_cache = false;
-  // PM4Py standard costs.
+  // Standard costs.
   double log_move_cost = 10000.0;
   double model_move_cost = 10000.0;
   double tau_model_cost = 1.0;
@@ -84,7 +84,7 @@ struct DecomposedAlignmentResult {
   double total_cost = 0.0;
   DecomposedAlignmentDiagnostics diagnostics;
   std::vector<DecomposedAlignmentTrace> traces;
-  // PM4Py terminology: one row per source trace, including duplicate variants.
+  // One row per source trace, including duplicate variants.
   [[nodiscard]] const std::vector<DecomposedAlignmentTrace>& alignments() const noexcept {
     return traces;
   }

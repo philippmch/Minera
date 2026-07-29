@@ -1,10 +1,10 @@
 # Minera
 
-Minera is an early C++ process mining core built to explore PM4Py-style
+Minera is an early C++ process mining core built to explore process-mining
 workflows with native performance.
 
-The compatibility target is pinned to **PM4Py 2.7.22**. The
-[feature/variant parity contract](docs/pm4py-2.7.22-parity.md) separates true
+The compatibility target is pinned to the **2.7.22 reference release**. The
+[feature/variant parity contract](docs/reference-2.7.22-parity.md) separates true
 algorithm semantics from Python dataframe adapters and optional integrations,
 and tracks every family as complete, partial, or missing.
 
@@ -127,7 +127,7 @@ and tracks every family as complete, partial, or missing.
   (exact search below configurable trace-length/tree-height thresholds, then
   recursive sequence/XOR/parallel decomposition with an exact loop fallback).
   These are deterministic, collision-free native implementations and
-  dependency-free clean-room equivalents of the PM4Py variants; `MILP` does
+  dependency-free clean-room equivalents of the reference variants; `MILP` does
   not claim to invoke literal PuLP. `POST /api/align-process-tree` runs the
   deferred request. The CLI embeds results with `--align-process-tree` and
   accepts `--pt-alignment-variant`, `--pt-alignment-max-states`,
@@ -143,7 +143,7 @@ and tracks every family as complete, partial, or missing.
   MILP loops). Results use the `PROCESS_TREE` JSON family with variant,
   aggregate and per-trace cost/fitness, `sync`/`log`/`model` moves, diagnostics,
   and explicit `computed`, `completed`, `timed_out`, and `exhausted` flags.
-  Empty PM4Py-style fitness denominators remain `0.0`, including an empty log
+  Empty fitness denominators remain `0.0`, including an empty log
   against a silent tree. N-ary loop redo/exit children are normalized to an
   XOR for search/DP/approximation; the MILP variant explicitly requires the
   binary form.
@@ -178,7 +178,7 @@ and tracks every family as complete, partial, or missing.
   `petri_net_decoration` (alpha), `inductive_petri_net(_decoration)`, and
   `heuristic_petri_net(_decoration)`, each aligned index-for-index with its
   net.
-- **Transition-system discovery**: reproduce PM4Py's view-based transition
+- **Transition-system discovery**: reproduce the reference implementation's view-based transition
   system in sequence, set, and multiset variants, with forward/backward
   windows and optional stable event occurrence references (`--transition-view`,
   `--transition-direction`, `--transition-window`, `--transition-include-data`).
@@ -235,7 +235,7 @@ and tracks every family as complete, partial, or missing.
   another within a case — plus per-resource workload counts.
 - **PNML export and import**: any discovered model can be written as PNML
   (ISO/IEC 15909-2), the standard Petri-net interchange format read by ProM and
-  PM4Py — and a PNML workflow net from any of those tools can be read back for
+  another process-mining tool — and a PNML workflow net from any of those tools can be read back for
   conformance checking. Every miner reuses the same workflow-net translation
   used for conformance, so the exported net is exactly what Minera checks.
 - **Process-tree PTML export and import**: the Inductive Miner's
@@ -380,7 +380,7 @@ events first; discovery lives in tabs:
   the replay covers; the Heuristic Miner's dependency and
   frequency thresholds are live sliders that re-mine the net in the browser,
   **Download … as PNML / as BPMN** buttons export any miner's model for
-  ProM/PM4Py or a BPM suite (the inductive tree also **as PTML**), and **Simulate log (XES)** plays the model out
+  ProM or a BPM suite (the inductive tree also **as PTML**), and **Simulate log (XES)** plays the model out
   into a synthetic 100-case log,
 - **Conformance** — pick any miner (or upload a PNML workflow net, a BPMN
   2.0 process, or a PTML process tree from another tool) and any method: fitness, precision, generalization, and simplicity of
@@ -458,7 +458,7 @@ with legacy unit costs), but can be selected explicitly: `--alignment-variant`
 accepts `state_equation_a_star`, `dijkstra_no_heuristics`,
 `dijkstra_less_memory`, `discounted_a_star`,
 `generator_dijkstra_no_heuristics`, or `generator_dijkstra_less_memory`.
-`--alignment-cost-profile legacy|pm4py` selects cost semantics; state/time
+`--alignment-cost-profile legacy|standard` selects cost semantics; state/time
 limits (`--alignment-max-states`, `--alignment-max-align-time`,
 `--alignment-max-align-time-trace`), generator `--alignment-max-alignments`,
 discounted `--alignment-exponent`/`--alignment-synchronous-dijkstra`, and move-cost

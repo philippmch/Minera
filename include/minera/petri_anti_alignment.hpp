@@ -13,12 +13,12 @@ enum class PetriAlignmentVariant {
   VERSION_DISCOUNTED_A_STAR = kDiscountedAStar,
 };
 
-// Options for PM4Py VERSION_DISCOUNTED_A_STAR anti-alignment. Search may
+// Options for the discounted A* anti-alignment. Search may
 // revisit a marking; marking_limit bounds the number of closed expansions.
 struct PetriAntiAlignmentOptions {
   PetriAlignmentVariant variant = PetriAlignmentVariant::kDiscountedAStar;
   double exponent = 2.0;
-  double epsilon = 0.005;  // PM4Py length-divisor parameter
+  double epsilon = 0.005;  // length-divisor parameter
   std::size_t marking_limit = 100000;
   std::size_t max_states = 0;  // compatibility alias; zero uses marking_limit
   std::vector<std::size_t> initial_marking;

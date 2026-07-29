@@ -93,7 +93,7 @@ struct DfgAlignmentProjection {
     const std::map<std::string, std::uint64_t>& end_activities,
     const DfgAlignmentOptions& options = {});
 
-// PM4Py-shaped aliases.
+// Convenience aliases.
 inline DfgAlignmentResult apply_trace(const std::vector<std::string>& t,
     const DfgFrequency& d, const std::map<std::string,std::uint64_t>& s,
     const std::map<std::string,std::uint64_t>& e, const DfgAlignmentOptions& o={})

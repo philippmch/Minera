@@ -55,7 +55,7 @@ void write_pnml(std::ostream& out,
   }
 
   // Transitions. Visible transitions are labeled with their activity name;
-  // silent ones get an invisible toolspecific flag (the convention PM4Py/ProM
+  // silent ones get an invisible toolspecific flag (the convention used by ProM
   // read) and a tau label so the file is still human-readable.
   const auto& transitions = net.transitions();
   const auto& activities = net.activities();
@@ -95,7 +95,7 @@ void write_pnml(std::ostream& out,
   out << "    </page>\n";
 
   // The final marking (one token on the sink) under the convention used by
-  // ProM/PM4Py for accepting workflow nets.
+  // ProM for accepting workflow nets.
   out << "    <finalmarkings>\n";
   out << "      <marking>\n";
   out << "        <place idref=\"p" << net.sink()

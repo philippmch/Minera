@@ -10,7 +10,7 @@
 
 namespace minera {
 
-// Classic PM4Py log-skeleton relation pair.  Relations are stored in
+// Classic log-skeleton relation pair. Relations are stored in
 // deterministic lexicographic order by the discovery implementation.
 struct LogSkeletonPair {
   std::string source;
@@ -46,7 +46,7 @@ struct LogSkeletonModel {
 struct LogSkeletonDeviation {
   // A relation violation fills `relation`; an activ_freq violation fills
   // `activity`, `observed_frequency`, and (when known) allowed_frequencies.
-  // This compact typed representation stands in for PM4Py's heterogeneous
+  // This compact typed representation stands in for the heterogeneous
   // tuple/set diagnostics while retaining deterministic ordering.
   std::string constraint;
   LogSkeletonPair relation;

@@ -40,7 +40,7 @@ struct DeclareConstraint {
 
 struct DeclareModel {
   // All 18 families are present (possibly empty), in lexical-independent
-  // PM4Py order. Rules within a family are ordered by activity keys.
+  // Stable order. Rules within a family are ordered by activity keys.
   std::map<std::string, std::vector<DeclareConstraint>> rules;
 
   DeclareModel();
@@ -49,7 +49,7 @@ struct DeclareModel {
 };
 
 struct DeclareDiscoveryOptions {
-  // nullopt means PM4Py's default (infer activities / enable all templates);
+  // nullopt means the default (infer activities / enable all templates);
   // an engaged empty vector is an explicit empty filter.
   std::optional<std::vector<std::string>> considered_activities;
   std::optional<std::vector<std::string>> allowed_templates;

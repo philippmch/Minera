@@ -30,7 +30,7 @@ export interface Spectrum {
   activities?: string[];
 }
 
-/** Convert a server-returned PM4Py spectrum into the renderer's line model. */
+/** Convert a server-returned spectrum into the renderer's line model. */
 export function serverSpectrumToSpectrum(value: PerformanceSpectrumExport): Spectrum {
   const lines: SpectrumLine[] = [];
   let minTime = Infinity;

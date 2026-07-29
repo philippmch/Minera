@@ -141,7 +141,7 @@ Footprint discover_dfg_footprints(
   fp.dfg_present = false;
   fp.min_trace_length_present = false;
   fp.min_trace_length.reset();
-  // The PM4Py DFG variant intentionally omits the dfg field. Build the
+  // The DFG variant intentionally omits the dfg field. Build the
   // relations from the input map, then leave fp.dfg empty and mark it absent.
   Footprint relations;
   relations.dfg = dfg;

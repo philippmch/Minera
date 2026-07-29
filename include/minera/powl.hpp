@@ -17,7 +17,7 @@ enum class PowlNodeKind {
 };
 
 struct PowlFrequency {
-  int minimum = 1;                         // PM4Py's min frequency: 0 or 1
+  int minimum = 1;                         // Minimum frequency: 0 or 1
   std::optional<int> maximum = 1;          // one, or null for unbounded
   friend bool operator==(const PowlFrequency&, const PowlFrequency&) = default;
 };

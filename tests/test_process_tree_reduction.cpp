@@ -111,7 +111,7 @@ int main() {
   assert(same(minera::reduce_process_tree(repeated_tau, trace({"A", "B"})).root(),
               first_tau_retained));
 
-  // PM4Py folding keeps mixed binary loops intact, whichever child is tau.
+  // Folding keeps mixed binary loops intact, whichever child is tau.
   const ProcessTree tau_redo(
       {"A"}, loop({ProcessTreeNode::leaf(0), ProcessTreeNode::tau()}));
   assert(same(minera::reduce_process_tree(tau_redo, trace({"A"})).root(),

@@ -9,7 +9,7 @@
 
 namespace minera {
 
-// Options for PM4Py VERSION_DISCOUNTED_A_STAR multi-alignment.
+// Options for the discounted A* multi-alignment.
 struct PetriMultiAlignmentOptions {
   PetriAlignmentVariant variant = PetriAlignmentVariant::kDiscountedAStar;
   double exponent = 2.0;

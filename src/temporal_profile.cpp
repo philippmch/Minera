@@ -85,7 +85,7 @@ std::optional<double> event_local_instant(const Event& event,
   return local_wall_instant(*value);
 }
 
-// Business-hour semantics follow PM4Py's wall-clock treatment: timezone
+// Business-hour semantics follow the wall-clock treatment: timezone
 // offsets are validated but ignored when selecting the weekday and clock
 // time. Ordinary durations continue to use the absolute UTC instants above.
 std::optional<double> local_wall_instant(std::string_view text) {

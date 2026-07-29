@@ -4045,7 +4045,7 @@ void heuristic_miner_connect_all_false_may_leave_gaps() {
   assert(a2_out == 1);
 }
 
-// Transition-system discovery: PM4Py-compatible views plus Minera occurrence
+// Transition-system discovery: compatible views plus Minera occurrence
 // data. Kept as one isolated section so its contract is easy to audit.
 minera::EventLog transition_test_log(
     std::initializer_list<std::vector<std::string>> traces) {

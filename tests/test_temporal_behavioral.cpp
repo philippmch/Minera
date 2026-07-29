@@ -148,7 +148,7 @@ int main() {
                             observation.activities ==
                                 std::vector<std::string>({"D", "D"});
   assert(found_compressed_pair);
-  // Exact PM4Py midpoint sampling: n=11,m=4 -> indices 0,1,3,6,9,10.
+  // Exact midpoint sampling: n=11,m=4 -> indices 0,1,3,6,9,10.
   minera::EventLog many;
   for (int i = 0; i < 11; ++i) {
     minera::Trace mt;

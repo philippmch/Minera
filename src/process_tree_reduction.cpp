@@ -116,7 +116,7 @@ ProcessTreeNode reduce_node(const ProcessTreeNode& node, const Metadata& metadat
     reduced.children.push_back(reduce_node(node.children[i], metadata.children[i],
                                            trace_activities, false));
   }
-  // Children are visited first to mirror PM4Py's bottom-up node order.  The
+  // Children are visited first to mirror the bottom-up node order. The
   // metadata remains that of the original (unmodified) subtree, as in the
   // footprint-based implementation.
   if (!is_root && metadata.skippable && disjoint(metadata, trace_activities)) {

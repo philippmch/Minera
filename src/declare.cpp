@@ -131,7 +131,7 @@ Statuses evaluate(const std::vector<std::string>& trace,
         if (value.has_value()) put(f, a, *value, b, true);
       }
     }
-    // Step 2 in PM4Py zero-fills all ordered keys of an allowed family.
+    // Step 2 zero-fills all ordered keys of an allowed family.
     for (const auto& a : activities)
       for (const auto& b : activities)
         if (a != b) {
@@ -329,7 +329,7 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
   }
   for (const auto& candidate : candidates) {
     const auto [support, confidence] = stats_for(rows, weights, candidate);
-    // PM4Py uses positive comparisons (`>=`); spelling these as negated
+    // The reference uses positive comparisons (`>=`); spelling these as negated
     // `<` would accidentally accept NaN thresholds.
     if (!(support >= row_count * min_support) || support == 0 ||
         !(confidence >= support * min_confidence))

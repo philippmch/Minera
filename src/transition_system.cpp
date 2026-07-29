@@ -59,7 +59,7 @@ TransitionSystem discover_transition_system(const EventLog& event_log,
   for (std::size_t trace_index = 0; trace_index < event_log.traces.size(); ++trace_index) {
     const auto& trace = event_log.traces[trace_index];
     const std::size_t n = trace.events.size();
-    if (n == 0) continue;  // PM4Py contributes no path for an empty trace.
+    if (n == 0) continue;  // No path is contributed for an empty trace.
 
     std::vector<std::string> activities;
     activities.reserve(n);

@@ -71,7 +71,7 @@ int main() {
   const auto tie_model = discover_log_skeleton(make_log({{"A", "A"}, {"A"}}), tie_noise);
   assert(tie_model.activ_freq.at("A") == std::vector<std::size_t>({2}));
 
-  // The core preserves PM4Py's raw threshold arithmetic; user-facing parsers
+  // The core preserves raw threshold arithmetic; user-facing parsers
   // validate [0,1], but direct callers are not silently normalized.
   LogSkeletonOptions negative_noise;
   negative_noise.noise_threshold = -0.5;

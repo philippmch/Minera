@@ -8,7 +8,7 @@
 
 namespace minera {
 
-// Trace-based process-tree reduction, corresponding to PM4Py's
+// Trace-based process-tree reduction, corresponding to the reference
 // TREE_TR_BASED variant.
 enum class ProcessTreeReductionVariant {
   kTreeTrBased,

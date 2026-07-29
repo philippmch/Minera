@@ -36,7 +36,7 @@ int main() {
   const ProcessTree loop_tree({"A"},
       ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
           {ProcessTreeNode::leaf(0), ProcessTreeNode::tau()}});
-  // PM4Py's relation cleanup classifies the symmetric self-relation as
+  // Relation cleanup classifies the symmetric self-relation as
   // parallel, so it is removed from sequence.
   const auto loop_fp = discover_footprints(loop_tree);
   assert(!loop_fp.sequence.count({"A", "A"}));

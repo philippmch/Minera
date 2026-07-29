@@ -7,8 +7,8 @@
 
 namespace minera {
 
-// Clean-room implementations of the public PM4Py POWL discovery variants.
-// kDynamicClustering is PM4Py's frequency based dynamic clustering variant;
+// Clean-room implementations of the public POWL discovery variants.
+// kDynamicClustering is the frequency-based dynamic clustering variant;
 // kDynamicClusteringPlain exposes the otherwise-unreachable unweighted
 // implementation so callers can select every source variation explicitly.
 enum class PowlDiscoveryVariant {

@@ -233,7 +233,7 @@ PlusAbstraction build_plus_abstraction(
           interval.complete - interval.start;
     }
 
-    // PM4Py's PLUSPLUS abstraction keeps only the first activity that starts
+    // The PLUSPLUS abstraction keeps only the first activity that starts
     // after each interval has completed.
     for (std::size_t i = 0; i < intervals.size(); ++i) {
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
@@ -397,7 +397,7 @@ std::vector<HeuristicBundle> plus_bundles(
     }
   }
 
-  // PM4Py converts the AND-pair graph through maximal cliques. Cliques may
+  // The AND-pair graph is converted through maximal cliques. Cliques may
   // overlap (unlike classic's transitive partitioning), which is significant
   // for shapes such as b--c--d where {b,c} and {c,d} are distinct bundles.
   return maximal_cliques(neighbours, adjacent);
