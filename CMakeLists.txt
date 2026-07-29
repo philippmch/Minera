@@ -51,6 +51,7 @@ add_library(minera_core
   src/performance_spectrum.cpp
   src/petri_anti_alignment.cpp
   src/petri_multi_alignment.cpp
+  src/petri_analysis.cpp
   src/petri_net.cpp
   src/playout.cpp
   src/process_tree_alignment.cpp
@@ -315,4 +316,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_evaluation_tests PRIVATE cxx_std_20)
   target_compile_options(minera_evaluation_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_evaluation_tests COMMAND minera_evaluation_tests)
+
+  add_executable(minera_petri_analysis_tests
+    tests/test_petri_analysis.cpp
+  )
+  target_link_libraries(minera_petri_analysis_tests PRIVATE minera::core)
+  target_compile_features(minera_petri_analysis_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_petri_analysis_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_petri_analysis_tests COMMAND minera_petri_analysis_tests)
 endif()
