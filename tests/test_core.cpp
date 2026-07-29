@@ -4751,6 +4751,153 @@ void json_export_carries_dfg_and_edit_alignment_contract() {
   assert(ej.find("\"log\": \">>\"") != std::string::npos || ej.find("\"model\": \">>\"") != std::string::npos);
 }
 
+void json_export_carries_evaluation_contract() {
+  minera::ReplayFitnessResult fitness;
+  fitness.variant = minera::ReplayFitnessVariant::ALIGNMENT_BASED;
+  fitness.fitness = 0.75;
+  fitness.log_fitness = 0.7;
+  fitness.average_trace_fitness = 0.8;
+  fitness.percentage_fit_traces = 50.0;
+  fitness.fitting_traces = 1;
+  fitness.trace_count = 2;
+  fitness.total_cost = 3.0;
+  fitness.error = "bad \"quote\" \\\"path";
+  const auto fj = minera::replay_fitness_json(fitness);
+  assert(fj.find("\"variant\": \"alignment_based\"") != std::string::npos);
+  assert(fj.find("\"percentage_of_fitting_traces\": 50") != std::string::npos);
+  assert(fj.find("bad \\\"quote\\\"") != std::string::npos);
+  assert(fj.find("token_replay") == std::string::npos);
+
+  minera::PrecisionResult precision;
+  precision.variant = minera::PrecisionVariant::AUTOMATON_AFTER_ALIGN;
+  precision.precision = 0.25;
+  const auto pj = minera::precision_json(precision);
+  assert(pj.find("\"variant\": \"automaton_after_align\"") != std::string::npos);
+  assert(pj.find("\"precision\": 0.25") != std::string::npos);
+
+  minera::GeneralizationResult generalization;
+  generalization.generalization = 0.5;
+  generalization.executed_transitions = 2;
+  generalization.transition_count = 3;
+  generalization.transition_frequencies = {2, 1, 0};
+  const auto gj = minera::generalization_json(generalization);
+  assert(gj.find("\"score\": 0.5") != std::string::npos);
+  assert(gj.find("\"transition_frequencies\": [2, 1, 0]") != std::string::npos);
+
+  minera::SimplicityResult simplicity;
+  simplicity.variant = minera::SimplicityVariant::EXTENDED_CARDOSO;
+  simplicity.simplicity = 0.4;
+  simplicity.complexity = 3.0;
+  simplicity.value = 7.0;
+  simplicity.vertices = 4;
+  simplicity.edges = 5;
+  simplicity.strongly_connected_components = 2;
+  const auto sj = minera::simplicity_json(simplicity);
+  assert(sj.find("\"variant\": \"extended_cardoso\"") != std::string::npos);
+  assert(sj.find("\"strongly_connected_components\": 2") != std::string::npos);
+
+  minera::EmdResult emd;
+  emd.distance = std::numeric_limits<double>::quiet_NaN();
+  emd.computed = false;
+  emd.normalized = true;
+  emd.error = "distance unavailable";
+  const auto ej = minera::emd_json(emd);
+  assert(ej.find("\"distance\": null") != std::string::npos);
+  assert(ej.find("\"computed\": false") != std::string::npos);
+  assert(ej.find("\"normalized\": true") != std::string::npos);
+
+  minera::ModelEvaluation model;
+  model.miner = "miner \"one\"";
+  model.replay_fitness = fitness;
+  const auto mj = minera::model_evaluation_json(model);
+  assert(mj.find("\"miner\": \"miner \\\"one\\\"\"") != std::string::npos);
+  assert(mj.find("replay_fitness") != std::string::npos);
+
+  minera::EventLog log;
+  log.traces.push_back({"case", {{"case", "A"}}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto alignment_detail = minera::replay_fitness_json(fitness, &graph);
+  assert(alignment_detail.find("\"alignments\":") != std::string::npos);
+  assert(alignment_detail.find("\"token_replay\":") == std::string::npos);
+  fitness.variant = minera::ReplayFitnessVariant::TOKEN_BASED;
+  const auto token_detail = minera::replay_fitness_json(fitness, &graph);
+  assert(token_detail.find("\"token_replay\":") != std::string::npos);
+  assert(token_detail.find("\"alignments\":") == std::string::npos);
+  precision.variant = minera::PrecisionVariant::ETCONFORMANCE_TOKEN;
+  const auto token_precision = minera::precision_json(precision, &graph);
+  assert(token_precision.find("\"token_replay\":") != std::string::npos);
+  assert(token_precision.find("\"alignments\":") == std::string::npos);
+  precision.variant = minera::PrecisionVariant::ALIGN_ETCONFORMANCE;
+  const auto alignment_precision = minera::precision_json(precision, &graph);
+  assert(alignment_precision.find("\"alignments\":") != std::string::npos);
+  assert(alignment_precision.find("\"token_replay\":") == std::string::npos);
+  const std::vector<minera::ModelEvaluation> evaluations{model};
+  const auto embedded = minera::analysis_json(
+      "evaluation", log, graph,
+      /*tree*/ nullptr, /*net*/ nullptr, /*heuristics*/ nullptr,
+      /*conformance*/ nullptr, /*performance*/ nullptr, /*resources*/ nullptr,
+      /*variant_durations*/ nullptr, /*eventually_follows*/ nullptr,
+      /*decisions*/ nullptr, /*petri_decoration*/ nullptr, /*spectrum*/ nullptr,
+      /*inductive_net*/ nullptr, /*inductive_decoration*/ nullptr,
+      /*heuristic_petri*/ nullptr, /*heuristic_decoration*/ nullptr,
+      /*temporal_profile*/ nullptr, /*minimum_self_distances*/ nullptr,
+      /*transition_system*/ nullptr, /*powl*/ nullptr, /*powl_petri*/ nullptr,
+      /*powl_decoration*/ nullptr, /*log_skeleton*/ nullptr,
+      /*log_skeleton_conformance*/ nullptr, /*declare*/ nullptr,
+      /*declare_conformance*/ nullptr, /*footprints*/ nullptr,
+      /*dfg_variants*/ nullptr, /*correlation_mining*/ nullptr,
+      /*batch_discovery*/ nullptr, /*dfg_alignment*/ nullptr,
+      /*edit_distance*/ nullptr, /*edit_anti*/ false,
+      /*dfg_projection*/ nullptr, /*dfg_projected_log*/ nullptr,
+      /*edit_projected_log*/ nullptr, /*process_tree_alignment*/ nullptr,
+      /*decomposed_alignment*/ nullptr, /*petri_anti_alignment*/ nullptr,
+      /*petri_multi_alignment*/ nullptr, /*reduced_process_tree*/ nullptr,
+      /*reduced_trace_index*/ 0, /*evaluation*/ &evaluations,
+      /*earth_movers_distance*/ &emd);
+  assert(embedded.find("\"evaluation\":") != std::string::npos);
+  assert(embedded.find("\"earth_movers_distance\":") != std::string::npos);
+  const auto omitted = minera::analysis_json("evaluation", log, graph);
+  assert(omitted.find("\"evaluation\":") == std::string::npos);
+  assert(omitted.find("\"earth_movers_distance\":") == std::string::npos);
+
+  auto duplicate = model;
+  duplicate.precision = precision;
+  const std::vector<minera::ModelEvaluation> duplicate_evaluations{
+      model, duplicate};
+  bool rejected_duplicate = false;
+  try {
+    (void)minera::analysis_json(
+        "evaluation", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, false,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        0, &duplicate_evaluations);
+  } catch (const std::invalid_argument&) {
+    rejected_duplicate = true;
+  }
+  assert(rejected_duplicate);
+
+  auto unnamed = model;
+  unnamed.miner.clear();
+  const std::vector<minera::ModelEvaluation> unnamed_evaluations{unnamed};
+  bool rejected_unnamed = false;
+  try {
+    (void)minera::analysis_json(
+        "evaluation", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, false,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        0, &unnamed_evaluations);
+  } catch (const std::invalid_argument&) {
+    rejected_unnamed = true;
+  }
+  assert(rejected_unnamed);
+}
+
 int main() {
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
@@ -4916,5 +5063,6 @@ int main() {
   json_export_carries_footprints_contract();
   json_export_carries_dfg_variants_contract();
   json_export_carries_correlation_mining_contract();
+  json_export_carries_evaluation_contract();
   return 0;
 }

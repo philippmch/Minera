@@ -412,9 +412,9 @@ int usage(const char* program) {
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
-               "  --no-alignments           Skip the optimal alignments in the\n"
-               "                            export (token replay and footprints\n"
-               "                            stay); alignments dominate runtime\n"
+               "  --no-alignments           Skip the standard per-model alignment\n"
+               "                            section; token replay, footprints, and\n"
+               "                            explicitly selected evaluations stay\n"
                "  --align-dfg              Embed classic DFG alignments\n"
                "  --dfg-max-states <n>     DFG alignment state bound\n"
                "  --dfg-max-time-ms <n>    DFG alignment time bound\n"
@@ -427,7 +427,23 @@ int usage(const char* program) {
                "  --edit-anti              Use farthest (anti) alignment\n"
                "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
                "  --edit-projection <mode>  none or log\n"
-               "                            on large, badly fitting logs\n"
+               "  --evaluation-family <id> Model evaluation: replay_fitness,\n"
+               "                            precision, generalization, or simplicity\n"
+               "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
+               "  --precision-variant <id> auto, etconformance_token,\n"
+               "                            align_etconformance, or automaton_after_align\n"
+               "  --precision-use-task-ids <bool> Distinguish duplicate task labels\n"
+               "  --precision-max-states <n> Positive precision search limit\n"
+               "  --generalization-variant <id> generalization_token\n"
+               "  --simplicity-variant <id> arc_degree, extended_cardoso,\n"
+               "                            or extended_cyclomatic\n"
+               "  --simplicity-arc-degree-k <f> Non-negative arc-degree target\n"
+               "  --simplicity-max-states <n> Positive simplicity search limit\n"
+               "  --simplicity-initial-marking <n,...> Initial place marking\n"
+               "  --simplicity-final-marking <n,...> Final place marking\n"
+               "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
+               "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
+               "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
                "                            DYNAMIC_PROGRAMMING, MILP, or\n"
@@ -641,6 +657,12 @@ int main(int argc, char** argv) {
   bool edit_option_used = false;
   std::string edit_projection = "none";
   minera::EditDistanceOptions edit_options;
+  std::map<std::string, std::string> evaluation_fields;
+  bool evaluation_requested = false;
+  std::optional<minera::EvaluationParams> evaluation_params;
+  std::filesystem::path emd_reference;
+  minera::EmdOptions emd_options;
+  bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
   bool alignment_option_used = false;
   bool alignment_max_alignments_used = false;
@@ -765,6 +787,49 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+
+    if (arg == "--evaluation-family" || arg == "--fitness-variant" ||
+        arg == "--precision-variant" ||
+        arg == "--precision-use-task-ids" ||
+        arg == "--precision-max-states" ||
+        arg == "--generalization-variant" ||
+        arg == "--simplicity-variant" ||
+        arg == "--simplicity-arc-degree-k" ||
+        arg == "--simplicity-max-states" ||
+        arg == "--simplicity-initial-marking" ||
+        arg == "--simplicity-final-marking") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      evaluation_fields.insert_or_assign(std::move(key), value);
+      evaluation_requested = true;
+      continue;
+    }
+    if (arg == "--emd-reference") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      emd_reference = value;
+      continue;
+    }
+    if (arg == "--emd-normalize-masses" ||
+        arg == "--emd-strict-equal-mass") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const bool parsed = parse_boolean(value, arg);
+        if (arg == "--emd-normalize-masses") {
+          emd_options.normalize_masses = parsed;
+        } else {
+          emd_options.strict_equal_mass = parsed;
+        }
+        emd_option_used = true;
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
 
     // Native alignment adapters are handled before the legacy option chain to
     // keep this already-large parser within MSVC's block nesting limit.
@@ -1806,6 +1871,25 @@ int main(int argc, char** argv) {
     std::cerr << "error: edit-distance options require --align-edit-distance <file>\n";
     return 2;
   }
+  if (emd_option_used && emd_reference.empty()) {
+    std::cerr << "error: EMD options require --emd-reference <file>\n";
+    return 2;
+  }
+  if (evaluation_requested) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = evaluation_fields.find(std::string(name));
+      return it == evaluation_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return evaluation_fields.contains(std::string(name));
+    };
+    try {
+      evaluation_params = minera::parse_evaluation_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
   if (align_process_tree) {
     const auto lookup = [&](std::string_view name) {
       const auto it = pt_alignment_fields.find(std::string(name));
@@ -1871,6 +1955,15 @@ int main(int argc, char** argv) {
       edit_result = minera::align_edit_distance(log, reference, edit_options);
       if (edit_projection == "log") { edit_projected_log = minera::project_log_on_alignments(log, *edit_result); }
     }
+    std::optional<minera::EmdResult> emd_result;
+    if (!emd_reference.empty()) {
+      const auto reference = minera::ends_with_ci(emd_reference.string(), ".xes")
+          ? minera::import_xes_event_log(emd_reference)
+          : minera::import_csv_event_log(emd_reference, options);
+      emd_result = minera::evaluate_emd(
+          minera::derive_stochastic_language(log),
+          minera::derive_stochastic_language(reference), emd_options);
+    }
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!dfg_statistical_variants.empty() || !dfg_causal_variants.empty()) {
       dfg_variants_analysis =
@@ -1926,10 +2019,9 @@ int main(int argc, char** argv) {
 
     // Check every discovered model both ways, keyed by miner id. The export is
     // offline, so embed the alignments too (the server defers them instead)
-    // unless --no-alignments opted out: optimal alignments dominate the whole
-    // run on a large log a model fits badly, where every variant needs a deep
-    // search (the marking-equation LP per visited state is the honest price
-    // of optimality).
+    // unless --no-alignments opted out of this standard export section.
+    // Evaluations are independent and may still select an alignment-based
+    // metric explicitly.
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
@@ -1939,7 +2031,7 @@ int main(int argc, char** argv) {
     if (!no_alignments && log.traces.size() > 1000) {
       std::cerr << "note: computing optimal alignments for every model; on a "
                    "large or badly fitting log this can take minutes "
-                   "(--no-alignments skips them)\n";
+                   "(--no-alignments skips this export section)\n";
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
       return minera::ModelConformance{
@@ -1955,6 +2047,11 @@ int main(int argc, char** argv) {
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
         model("heuristic", heuristic_net), model("powl", powl_net)};
+    std::vector<std::pair<std::string, const minera::PetriNet*>>
+        available_models = {{"inductive", &inductive_net},
+                            {"alpha", &net},
+                            {"heuristic", &heuristic_net},
+                            {"powl", &powl_net}};
 
     // Optionally check the log against a user-supplied model too — a PNML
     // workflow net, a BPMN 2.0 process, or a PTML process tree, all landing
@@ -1964,6 +2061,7 @@ int main(int argc, char** argv) {
     const int check_flags = (check_pnml.empty() ? 0 : 1) +
                             (check_bpmn.empty() ? 0 : 1) +
                             (check_ptml.empty() ? 0 : 1);
+    std::optional<minera::PetriNet> imported_net;
     if (check_flags > 1) {
       std::cerr << "error: pass only one of --check-pnml, --check-bpmn, and "
                    "--check-ptml (they share the conformance id "
@@ -1971,15 +2069,46 @@ int main(int argc, char** argv) {
       return 2;
     }
     if (check_flags == 1) {
-      const auto imported =
+      imported_net =
           !check_pnml.empty()   ? minera::import_pnml(check_pnml)
           : !check_bpmn.empty() ? minera::import_bpmn(check_bpmn)
                                 : minera::to_petri_net(
                                       minera::import_ptml(check_ptml));
-      for (const auto& activity : imported.activities()) {
+      for (const auto& activity : imported_net->activities()) {
         graph.ensure_activity(activity);
       }
-      conformance.push_back(model("imported", imported));
+      conformance.push_back(model("imported", *imported_net));
+      available_models.emplace_back("imported", &*imported_net);
+    }
+    std::optional<std::vector<minera::ModelEvaluation>> evaluation;
+    if (evaluation_params) {
+      evaluation.emplace();
+      evaluation->reserve(available_models.size());
+      for (const auto& [miner, petri] : available_models) {
+        minera::ModelEvaluation result;
+        result.miner = miner;
+        switch (evaluation_params->family) {
+          case minera::EvaluationFamily::kReplayFitness:
+            result.replay_fitness = minera::evaluate_replay_fitness(
+                log, *petri, evaluation_params->replay_fitness_variant);
+            break;
+          case minera::EvaluationFamily::kPrecision:
+            result.precision = minera::evaluate_precision(
+                log, *petri, evaluation_params->precision_variant,
+                evaluation_params->precision_options);
+            break;
+          case minera::EvaluationFamily::kGeneralization:
+            result.generalization = minera::evaluate_generalization(
+                log, *petri, evaluation_params->generalization_variant);
+            break;
+          case minera::EvaluationFamily::kSimplicity:
+            result.simplicity = minera::evaluate_simplicity(
+                *petri, evaluation_params->simplicity_variant,
+                evaluation_params->simplicity_options);
+            break;
+        }
+        evaluation->push_back(std::move(result));
+      }
     }
     const auto dataset = input.filename().string();
 
@@ -2070,7 +2199,9 @@ int main(int argc, char** argv) {
           petri_anti_result ? &*petri_anti_result : nullptr,
           petri_multi_result ? &*petri_multi_result : nullptr,
           reduced_tree_result ? &*reduced_tree_result : nullptr,
-          reduce_trace_index.value_or(0));
+          reduce_trace_index.value_or(0),
+          evaluation ? &*evaluation : nullptr,
+          emd_result ? &*emd_result : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -2100,7 +2231,9 @@ int main(int argc, char** argv) {
           petri_anti_result ? &*petri_anti_result : nullptr,
           petri_multi_result ? &*petri_multi_result : nullptr,
           reduced_tree_result ? &*reduced_tree_result : nullptr,
-          reduce_trace_index.value_or(0));
+          reduce_trace_index.value_or(0),
+          evaluation ? &*evaluation : nullptr,
+          emd_result ? &*emd_result : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

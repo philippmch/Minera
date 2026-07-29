@@ -715,6 +715,58 @@ export function isEditDistanceResult(value: unknown): value is EditDistanceResul
     a.moves.every((m) => isRecord(m) && (m.type === "sync" || m.type === "log" || m.type === "model") && typeof m.log === "string" && typeof m.model === "string"));
 }
 
+const metric = (value: unknown): value is number | null => value === null || finite(value);
+const nullableString = (value: unknown): value is string | null => value === null || typeof value === "string";
+const optionalRecord = (value: unknown): boolean => value === undefined || isRecord(value);
+const evaluationNonNegativeInt = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
+
+function isReplayFitnessEvaluation(value: unknown): value is ReplayFitnessEvaluation {
+  return isRecord(value) && ["token_based", "alignment_based"].includes(value.variant as string) &&
+    typeof value.computed === "boolean" && typeof value.exhausted === "boolean" && nullableString(value.error) &&
+    metric(value.fitness) && metric(value.log_fitness) && metric(value.average_trace_fitness) &&
+    metric(value.percentage_of_fitting_traces) && evaluationNonNegativeInt(value.fitting_traces) &&
+    evaluationNonNegativeInt(value.trace_count) && metric(value.total_cost) && optionalRecord(value.token_replay) &&
+    optionalRecord(value.alignments);
+}
+
+function isPrecisionEvaluation(value: unknown): value is PrecisionEvaluation {
+  return isRecord(value) && ["etconformance_token", "align_etconformance", "automaton_after_align"].includes(value.variant as string) &&
+    typeof value.computed === "boolean" && typeof value.exhausted === "boolean" && nullableString(value.error) &&
+    metric(value.precision) && optionalRecord(value.token_replay) && optionalRecord(value.alignments);
+}
+
+function isGeneralizationEvaluation(value: unknown): value is GeneralizationEvaluation {
+  return isRecord(value) && value.variant === "generalization_token" && typeof value.computed === "boolean" &&
+    nullableString(value.error) && metric(value.score) && evaluationNonNegativeInt(value.executed_transitions) &&
+    evaluationNonNegativeInt(value.transition_count) && Array.isArray(value.transition_frequencies) &&
+    value.transition_frequencies.every(evaluationNonNegativeInt);
+}
+
+function isSimplicityEvaluation(value: unknown): value is SimplicityEvaluation {
+  return isRecord(value) && ["arc_degree", "extended_cardoso", "extended_cyclomatic"].includes(value.variant as string) &&
+    typeof value.computed === "boolean" && typeof value.exhausted === "boolean" && nullableString(value.error) &&
+    metric(value.simplicity) && metric(value.complexity) && metric(value.value) && evaluationNonNegativeInt(value.vertices) &&
+    evaluationNonNegativeInt(value.edges) && evaluationNonNegativeInt(value.strongly_connected_components);
+}
+
+/** Validates a standalone response from the model-quality endpoint. */
+export function isModelEvaluation(value: unknown): value is ModelEvaluation {
+  if (!isRecord(value) || typeof value.miner !== "string") return false;
+  const present = [value.replay_fitness, value.precision, value.generalization, value.simplicity]
+    .filter((item) => item !== undefined).length;
+  if (present !== 1) return false;
+  return (value.replay_fitness === undefined || isReplayFitnessEvaluation(value.replay_fitness)) &&
+    (value.precision === undefined || isPrecisionEvaluation(value.precision)) &&
+    (value.generalization === undefined || isGeneralizationEvaluation(value.generalization)) &&
+    (value.simplicity === undefined || isSimplicityEvaluation(value.simplicity));
+}
+
+/** Validates the stochastic-language distance endpoint response. */
+export function isEmdResult(value: unknown): value is EmdResult {
+  return isRecord(value) && metric(value.distance) && typeof value.computed === "boolean" &&
+    typeof value.normalized === "boolean" && nullableString(value.error);
+}
+
 export function isProcessTreeAlignmentResult(value: unknown): value is ProcessTreeAlignmentResult {
   if (!isRecord(value) || value.family !== "PROCESS_TREE" ||
       !["SEARCH_GRAPH_PT", "DYNAMIC_PROGRAMMING", "MILP", "APPROXIMATED_ORIGINAL"].includes(value.variant as string) ||
@@ -975,6 +1027,104 @@ export interface ModelConformance {
 /** Per-miner conformance, keyed by miner id ("inductive", "alpha", "heuristic"). */
 export type ConformanceModels = Record<string, ModelConformance>;
 
+/** Model-quality evaluator families and their complete native variant set. */
+export type EvaluationFamily =
+  | "replay_fitness"
+  | "precision"
+  | "generalization"
+  | "simplicity";
+export type ReplayFitnessVariant = "auto" | "token_based" | "alignment_based";
+export type PrecisionVariant =
+  | "auto"
+  | "etconformance_token"
+  | "align_etconformance"
+  | "automaton_after_align";
+export type GeneralizationVariant = "generalization_token";
+export type SimplicityVariant =
+  | "arc_degree"
+  | "extended_cardoso"
+  | "extended_cyclomatic";
+
+/** Query options accepted by the model-quality endpoint. */
+export interface EvaluationOptions {
+  evaluation_family?: EvaluationFamily;
+  fitness_variant?: ReplayFitnessVariant;
+  precision_variant?: PrecisionVariant;
+  precision_use_task_ids?: boolean;
+  precision_max_states?: number;
+  generalization_variant?: GeneralizationVariant;
+  simplicity_variant?: SimplicityVariant;
+  simplicity_arc_degree_k?: number;
+  simplicity_max_states?: number;
+  simplicity_initial_marking?: number[];
+  simplicity_final_marking?: number[];
+}
+
+type EvaluationMetric = number | null;
+export interface ReplayFitnessEvaluation {
+  variant: Exclude<ReplayFitnessVariant, "auto">;
+  computed: boolean;
+  exhausted: boolean;
+  error: string | null;
+  fitness: EvaluationMetric;
+  log_fitness: EvaluationMetric;
+  average_trace_fitness: EvaluationMetric;
+  percentage_of_fitting_traces: EvaluationMetric;
+  fitting_traces: number;
+  trace_count: number;
+  total_cost: EvaluationMetric;
+  token_replay?: Conformance;
+  alignments?: Alignments;
+}
+export interface PrecisionEvaluation {
+  variant: Exclude<PrecisionVariant, "auto">;
+  computed: boolean;
+  exhausted: boolean;
+  error: string | null;
+  precision: EvaluationMetric;
+  token_replay?: Conformance;
+  alignments?: Alignments;
+}
+export interface GeneralizationEvaluation {
+  variant: GeneralizationVariant;
+  computed: boolean;
+  error: string | null;
+  score: EvaluationMetric;
+  executed_transitions: number;
+  transition_count: number;
+  transition_frequencies: number[];
+}
+export interface SimplicityEvaluation {
+  variant: SimplicityVariant;
+  computed: boolean;
+  exhausted: boolean;
+  error: string | null;
+  simplicity: EvaluationMetric;
+  complexity: EvaluationMetric;
+  value: EvaluationMetric;
+  vertices: number;
+  edges: number;
+  strongly_connected_components: number;
+}
+export interface ModelEvaluation {
+  miner: string;
+  replay_fitness?: ReplayFitnessEvaluation;
+  precision?: PrecisionEvaluation;
+  generalization?: GeneralizationEvaluation;
+  simplicity?: SimplicityEvaluation;
+}
+
+export interface EmdOptions {
+  normalize_masses?: boolean;
+  strict_equal_mass?: boolean;
+}
+export interface EmdResult {
+  distance: EvaluationMetric;
+  computed: boolean;
+  normalized: boolean;
+  error: string | null;
+}
+
 /** Summary statistics over a set of durations, in seconds. */
 export interface DurationStats {
   count: number;
@@ -1202,6 +1352,10 @@ export interface MineraExport {
    * exports from older minera versions.
    */
   conformance?: ConformanceModels;
+  /** Optional model-quality evaluations embedded by a CLI export. */
+  evaluation?: Record<string, Omit<ModelEvaluation, "miner">>;
+  /** Optional stochastic-language distance embedded by a CLI export. */
+  earth_movers_distance?: EmdResult;
   /** Alpha Miner Petri net; absent in exports from older minera versions. */
   petri_net?: PetriNetModel;
   /**
