@@ -242,6 +242,41 @@ void conformance_deviation_order_is_fixed() {
   assert(result.deviations[1].template_name == kDeclareResponse);
   assert(result.deviations[2].template_name == kDeclareAbsence);
 }
+
+void missing_exactly_one_activity_does_not_create_empty_occurrences() {
+  DeclareModel model;
+  model.add(kDeclareExactlyOne, {"A", {}, false});
+  model.add(kDeclareResponse, {"A", "B", true});
+  model.add(kDeclarePrecedence, {"A", "B", true});
+
+  // The absent A violates EXACTLY_ONE, is a vacuous response activation, and
+  // cannot satisfy precedence for the observed B.  In particular, checking
+  // EXACTLY_ONE must not insert an empty A occurrence that later predicates
+  // treat as present.
+  const auto result = check_declare_conformance(
+      std::vector<std::string>{"B"}, model);
+  assert(!result.is_fit);
+  assert(result.no_constr_total == 3);
+  assert(result.no_dev_total == 2);
+  bool saw_exactly_one = false;
+  bool saw_precedence = false;
+  bool saw_response = false;
+  for (const auto& deviation : result.deviations) {
+    saw_exactly_one |= deviation.template_name == kDeclareExactlyOne;
+    saw_precedence |= deviation.template_name == kDeclarePrecedence;
+    saw_response |= deviation.template_name == kDeclareResponse;
+  }
+  assert(saw_exactly_one);
+  assert(saw_precedence);
+  assert(!saw_response);
+
+  DeclareModel exactly_one_only;
+  exactly_one_only.add(kDeclareExactlyOne, {"A", {}, false});
+  const auto absent = check_declare_conformance(
+      std::vector<std::string>{"B"}, exactly_one_only);
+  assert(!absent.is_fit);
+  assert(absent.no_dev_total == 1);
+}
 }  // namespace
 
 int main() {
@@ -254,5 +289,6 @@ int main() {
   explicit_empty_and_unusual_activity_keys();
   threshold_edge_values_follow_positive_predicates();
   conformance_deviation_order_is_fixed();
+  missing_exactly_one_activity_does_not_create_empty_occurrences();
   std::cout << "declare tests passed\n";
 }

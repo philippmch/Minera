@@ -50,7 +50,8 @@ bool has(const std::set<std::string>& allowed, const char* family) {
 
 bool in(const std::unordered_map<std::string, std::vector<int>>& idx,
         const std::string& a) {
-  return idx.find(a) != idx.end();
+  const auto it = idx.find(a);
+  return it != idx.end() && !it->second.empty();
 }
 
 bool alt_response(const std::vector<std::string>& trace,
@@ -358,14 +359,17 @@ DeclareConformance check_declare_conformance(const std::vector<std::string>& tra
     for (const auto& c : it->second) if (!predicate(c)) add_dev(family, c);
   };
   check(kDeclareExistence, [&](const auto& c){ return in(idx,c.first); });
-  check(kDeclareExactlyOne, [&](const auto& c){ return idx[c.first].size()==1; });
+  check(kDeclareExactlyOne, [&](const auto& c){
+    const auto it = idx.find(c.first);
+    return it != idx.end() && it->second.size() == 1;
+  });
   check(kDeclareInit, [&](const auto& c){ return !trace.empty() && trace.front()==c.first; });
   check(kDeclareRespondedExistence, [&](const auto& c){ return !in(idx,c.first)||in(idx,c.second); });
   check(kDeclareCoexistence, [&](const auto& c){ return in(idx,c.first)==in(idx,c.second); });
   check(kDeclareNonCoexistence, [&](const auto& c){ return !(in(idx,c.first)&&in(idx,c.second)); });
-  check(kDeclareResponse, [&](const auto& c){ return !in(idx,c.first)||(in(idx,c.second)&&idx[c.first].back()<idx[c.second].back()); });
-  check(kDeclarePrecedence, [&](const auto& c){ return !in(idx,c.second)||(in(idx,c.first)&&idx[c.first].front()<idx[c.second].front()); });
-  check(kDeclareSuccession, [&](const auto& c){ return (!in(idx,c.first)&&!in(idx,c.second)) || (in(idx,c.first)&&in(idx,c.second)&&idx[c.first].front()<idx[c.second].front()&&idx[c.first].back()<idx[c.second].back()); });
+  check(kDeclareResponse, [&](const auto& c){ return !in(idx,c.first)||(in(idx,c.second)&&idx.at(c.first).back()<idx.at(c.second).back()); });
+  check(kDeclarePrecedence, [&](const auto& c){ return !in(idx,c.second)||(in(idx,c.first)&&idx.at(c.first).front()<idx.at(c.second).front()); });
+  check(kDeclareSuccession, [&](const auto& c){ return (!in(idx,c.first)&&!in(idx,c.second)) || (in(idx,c.first)&&in(idx,c.second)&&idx.at(c.first).front()<idx.at(c.second).front()&&idx.at(c.first).back()<idx.at(c.second).back()); });
   check(kDeclareAltResponse, [&](const auto& c){ return alt_response(trace,idx,c.first,c.second); });
   check(kDeclareChainResponse, [&](const auto& c){ return chain_response(trace,idx,c.first,c.second); });
   check(kDeclareAltPrecedence, [&](const auto& c){ return alt_precedence(idx,c.first,c.second); });
@@ -373,7 +377,7 @@ DeclareConformance check_declare_conformance(const std::vector<std::string>& tra
   check(kDeclareAltSuccession, [&](const auto& c){ return alt_response(trace,idx,c.first,c.second)&&alt_precedence(idx,c.first,c.second); });
   check(kDeclareChainSuccession, [&](const auto& c){ return chain_response(trace,idx,c.first,c.second)&&chain_precedence(trace,idx,c.first,c.second); });
   check(kDeclareAbsence, [&](const auto& c){ return !in(idx,c.first); });
-  check(kDeclareNonSuccession, [&](const auto& c){ return !in(idx,c.first)&&!in(idx,c.second) || !(in(idx,c.first)&&in(idx,c.second)&&idx[c.first].front()<idx[c.second].front()&&idx[c.first].back()<idx[c.second].back()); });
+  check(kDeclareNonSuccession, [&](const auto& c){ return !in(idx,c.first)&&!in(idx,c.second) || !(in(idx,c.first)&&in(idx,c.second)&&idx.at(c.first).front()<idx.at(c.second).front()&&idx.at(c.first).back()<idx.at(c.second).back()); });
   check(kDeclareNonChainSuccession, [&](const auto& c){ return !in(idx,c.first)||!in(idx,c.second)||!(chain_response(trace,idx,c.first,c.second)&&chain_precedence(trace,idx,c.first,c.second)); });
   result.no_dev_total = static_cast<int>(result.deviations.size());
   result.dev_fitness = result.no_constr_total > 0 ? 1.0 - static_cast<double>(result.no_dev_total) / result.no_constr_total : 1.0;
