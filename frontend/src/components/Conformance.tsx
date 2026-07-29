@@ -17,9 +17,17 @@ import {
   type EditDistanceResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
+  type DecomposedAlignmentOptions,
+  type DecomposedAlignmentResult,
+  type PetriAntiAlignmentOptions,
+  type PetriAntiAlignmentResult,
+  type PetriMultiAlignmentOptions,
+  type PetriMultiAlignmentResult,
+  type ProcessTreeReductionOptions,
+  type ProcessTreeReductionResult,
   numberFormat,
 } from "../types";
-import { parseDfgCostMapInput, type ImportedModelCheck } from "../api";
+import { parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -52,6 +60,10 @@ export function Conformance({
   onRequestDfg,
   onRequestEditDistance,
   onRequestProcessTree,
+  onRequestDecomposed,
+  onRequestPetriAnti,
+  onRequestPetriMulti,
+  onRequestReduction,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -60,6 +72,10 @@ export function Conformance({
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
   onRequestProcessTree?: (options?: ProcessTreeAlignmentOptions) => Promise<ProcessTreeAlignmentResult>;
+  onRequestDecomposed?: (miner: string, options?: DecomposedAlignmentOptions) => Promise<DecomposedAlignmentResult>;
+  onRequestPetriAnti?: (miner: string, options?: PetriAntiAlignmentOptions) => Promise<PetriAntiAlignmentResult>;
+  onRequestPetriMulti?: (miner: string, options?: PetriMultiAlignmentOptions) => Promise<PetriMultiAlignmentResult>;
+  onRequestReduction?: (traceIndex: number, options?: ProcessTreeReductionOptions) => Promise<ProcessTreeReductionResult>;
 }) {
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
@@ -276,16 +292,21 @@ export function Conformance({
             </div>
           </section>
         ))}
-      <OtherAlignments data={data} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} />
+      <OtherAlignments data={data} importedAvailable={Boolean(imported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} />
     </div>
   );
 }
 
-function OtherAlignments({ data, onRequestDfg, onRequestEditDistance, onRequestProcessTree }: {
+function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditDistance, onRequestProcessTree, onRequestDecomposed, onRequestPetriAnti, onRequestPetriMulti, onRequestReduction }: {
   data: MineraExport;
+  importedAvailable?: boolean;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
   onRequestProcessTree?: (options?: ProcessTreeAlignmentOptions) => Promise<ProcessTreeAlignmentResult>;
+  onRequestDecomposed?: (miner: string, options?: DecomposedAlignmentOptions) => Promise<DecomposedAlignmentResult>;
+  onRequestPetriAnti?: (miner: string, options?: PetriAntiAlignmentOptions) => Promise<PetriAntiAlignmentResult>;
+  onRequestPetriMulti?: (miner: string, options?: PetriMultiAlignmentOptions) => Promise<PetriMultiAlignmentResult>;
+  onRequestReduction?: (traceIndex: number, options?: ProcessTreeReductionOptions) => Promise<ProcessTreeReductionResult>;
 }) {
   const [dfg, setDfg] = useState<DfgAlignmentResult | null>(null);
   const [edit, setEdit] = useState<EditDistanceResult | null>(null);
@@ -294,16 +315,45 @@ function OtherAlignments({ data, onRequestDfg, onRequestEditDistance, onRequestP
   const [dfgOptions, setDfgOptions] = useState<DfgAlignmentOptions>({ variant: "CLASSIC", projection: "none" });
   const [editOptions, setEditOptions] = useState<EditDistanceOptions>({ variant: "EDIT_DISTANCE", projection: "none" });
   const [processTreeOptions, setProcessTreeOptions] = useState<ProcessTreeAlignmentOptions>({ variant: "SEARCH_GRAPH_PT" });
-  const [busy, setBusy] = useState<"dfg" | "edit" | "process-tree" | null>(null);
+  const petriMiners = [
+    data.inductive_petri_net ? "inductive" : null,
+    data.petri_net ? "alpha" : null,
+    data.heuristic_petri_net ? "heuristic" : null,
+    data.powl_petri_net ? "powl" : null,
+    importedAvailable ? "imported" : null,
+  ].filter((miner): miner is string => miner !== null);
+  const petriMinerKey = petriMiners.join("|");
+  const [petriMiner, setPetriMiner] = useState(petriMiners[0] ?? "inductive");
+  const [decomposed, setDecomposed] = useState<DecomposedAlignmentResult | null>(null);
+  const [anti, setAnti] = useState<PetriAntiAlignmentResult | null>(null);
+  const [multi, setMulti] = useState<PetriMultiAlignmentResult | null>(null);
+  const [reduced, setReduced] = useState<ProcessTreeReductionResult | null>(null);
+  const [advancedOptions, setAdvancedOptions] = useState<PetriAntiAlignmentOptions>({ variant: "version_discounted_a_star" });
+  const [multiOptions, setMultiOptions] = useState<PetriMultiAlignmentOptions>({ variant: "version_discounted_a_star" });
+  const [decomposedOptions, setDecomposedOptions] = useState<DecomposedAlignmentOptions>({ variant: "recompos_maximal" });
+  const [decomposedText, setDecomposedText] = useState({ initial_marking: "", final_marking: "", activity_log_costs: "", activity_model_costs: "", activity_sync_costs: "" });
+  const [petriText, setPetriText] = useState({ antiInitial: "", antiFinal: "", multiInitial: "", multiFinal: "" });
+  const [traceIndex, setTraceIndex] = useState(0);
+  const [reductionOptions, setReductionOptions] = useState<ProcessTreeReductionOptions>({ variant: "tree_tr_based" });
+  const [busy, setBusy] = useState<"dfg" | "edit" | "process-tree" | "decomposed" | "anti" | "multi" | "reduction" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [costText, setCostText] = useState<Record<string, string>>({ sync_cost: "", model_move_cost: "", log_move_cost: "", internal_log_move_cost: "" });
-  useEffect(() => { setDfg(null); setEdit(null); setProcessTree(null); setReference(null); setError(null); }, [data]);
+  useEffect(() => { setDfg(null); setEdit(null); setProcessTree(null); setDecomposed(null); setAnti(null); setMulti(null); setReduced(null); setReference(null); setError(null); setTraceIndex(0); }, [data]);
+  useEffect(() => { setPetriMiner((current) => petriMiners.includes(current) ? current : (petriMiners[0] ?? "")); }, [petriMinerKey]);
   const runDfg = async () => { if (!onRequestDfg) return; setBusy("dfg"); setError(null); try { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); setDfg(await onRequestDfg({ ...dfgOptions, ...maps })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   const runEdit = async () => { if (!onRequestEditDistance || !reference) return; setBusy("edit"); setError(null); try { setEdit(await onRequestEditDistance(reference, editOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   const runProcessTree = async () => { if (!onRequestProcessTree || !data.process_tree) return; setBusy("process-tree"); setError(null); try { setProcessTree(await onRequestProcessTree(processTreeOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const parseCostMap = (value: string) => value.trim() ? parseDfgCostMapInput(value) : undefined;
+  const runDecomposed = async () => { if (!onRequestDecomposed) return; setBusy("decomposed"); setError(null); try { setDecomposed(await onRequestDecomposed(petriMiner, { ...decomposedOptions, initial_marking: parseMarkingInput(decomposedText.initial_marking), final_marking: parseMarkingInput(decomposedText.final_marking), activity_log_costs: parseCostMap(decomposedText.activity_log_costs), activity_model_costs: parseCostMap(decomposedText.activity_model_costs), activity_sync_costs: parseCostMap(decomposedText.activity_sync_costs) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runAnti = async () => { if (!onRequestPetriAnti) return; setBusy("anti"); setError(null); try { setAnti(await onRequestPetriAnti(petriMiner, { ...advancedOptions, initial_marking: parseMarkingInput(petriText.antiInitial), final_marking: parseMarkingInput(petriText.antiFinal) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runMulti = async () => { if (!onRequestPetriMulti) return; setBusy("multi"); setError(null); try { setMulti(await onRequestPetriMulti(petriMiner, { ...multiOptions, initial_marking: parseMarkingInput(petriText.multiInitial), final_marking: parseMarkingInput(petriText.multiFinal) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runReduction = async () => { if (!onRequestReduction || !data.process_tree || !data.traces?.length) return; setBusy("reduction"); setError(null); try { setReduced(await onRequestReduction(traceIndex, reductionOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   return <section className="panel conf-panel other-alignments">
-    <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">Process tree · DFG classic · edit distance</span></div>
+    <div className="panel-head"><h2>Other alignments</h2><span className="panel-meta">Native decomposed · Petri anti/multi · process-tree reduction</span></div>
     <div className="other-align-grid">
+      <div className="other-align-card"><h3>Decomposed recomposition</h3><p>RECOMPOS_MAXIMAL alignment over a selected Petri miner.</p><label>Petri miner<select value={petriMiner} onChange={e => setPetriMiner(e.target.value)}>{petriMiners.map(m => <option key={m} value={m}>{m}</option>)}</select></label><div className="align-settings-grid"><label>Border threshold<input type="number" min={0} value={decomposedOptions.threshold_border_agreement ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, threshold_border_agreement: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Trace time (s)<input type="number" min={0} step={0.1} value={decomposedOptions.max_time_trace ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_time_trace: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Total time (s)<input type="number" min={0} step={0.1} value={decomposedOptions.max_time_total ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_time_total: e.target.value ? Number(e.target.value) : undefined })} /></label><label>State limit<input type="number" min={1} value={decomposedOptions.max_states ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Total states<input type="number" min={1} value={decomposedOptions.max_total_states ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_total_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Use cache<select value={String(decomposedOptions.use_cache ?? true)} onChange={e => setDecomposedOptions({ ...decomposedOptions, use_cache: e.target.value === "true" })}><option value="true">On</option><option value="false">Off</option></select></label><label>Clear cache<select value={String(decomposedOptions.clear_cache ?? false)} onChange={e => setDecomposedOptions({ ...decomposedOptions, clear_cache: e.target.value === "true" })}><option value="false">Keep</option><option value="true">Before run</option></select></label><label>Log cost<input type="number" min={0} value={decomposedOptions.log_move_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, log_move_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Model cost<input type="number" min={0} value={decomposedOptions.model_move_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, model_move_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Tau cost<input type="number" min={0} value={decomposedOptions.tau_model_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, tau_model_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Sync cost<input type="number" min={0} value={decomposedOptions.sync_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, sync_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Initial marking<input placeholder="0,1" value={decomposedText.initial_marking} onChange={e => setDecomposedText({ ...decomposedText, initial_marking: e.target.value })} /></label><label>Final marking<input placeholder="2,3" value={decomposedText.final_marking} onChange={e => setDecomposedText({ ...decomposedText, final_marking: e.target.value })} /></label><label>Activity log costs<input placeholder="A=10000" value={decomposedText.activity_log_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_log_costs: e.target.value })} /></label><label>Activity model costs<input placeholder="A=10000" value={decomposedText.activity_model_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_model_costs: e.target.value })} /></label><label>Activity sync costs<input placeholder="A=0" value={decomposedText.activity_sync_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_sync_costs: e.target.value })} /></label></div>{petriMiners.length === 0 && <small>No Petri model is available in this analysis.</small>}<button className="button" disabled={!onRequestDecomposed || petriMiners.length === 0 || busy !== null} onClick={() => void runDecomposed()}>{busy === "decomposed" ? "Aligning…" : "Run decomposed alignment"}</button>{decomposed && <DecomposedResultView result={decomposed} />}</div>
+      <div className="other-align-card"><h3>Petri anti / multi</h3><p>VERSION_DISCOUNTED_A_STAR objectives over the selected miner.</p><label>Petri miner<select value={petriMiner} onChange={e => setPetriMiner(e.target.value)}>{petriMiners.map(m => <option key={m} value={m}>{m}</option>)}</select></label><div className="align-settings-grid"><label>Anti exponent<input type="number" min={1.01} step={0.1} value={advancedOptions.exponent ?? 2} onChange={e => setAdvancedOptions({ ...advancedOptions, exponent: Number(e.target.value) })} /></label><label>Anti limit<input type="number" min={1} value={advancedOptions.marking_limit ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, marking_limit: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Anti max states<input type="number" min={0} value={advancedOptions.max_states ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Anti epsilon<input type="number" min={0} step={0.001} value={advancedOptions.epsilon ?? 0.005} onChange={e => setAdvancedOptions({ ...advancedOptions, epsilon: Number(e.target.value) })} /></label><label>Anti initial<input placeholder="0,1" value={petriText.antiInitial} onChange={e => setPetriText({ ...petriText, antiInitial: e.target.value })} /></label><label>Anti final<input placeholder="2,3" value={petriText.antiFinal} onChange={e => setPetriText({ ...petriText, antiFinal: e.target.value })} /></label><label>Multi exponent<input type="number" min={1.01} step={0.1} value={multiOptions.exponent ?? 2} onChange={e => setMultiOptions({ ...multiOptions, exponent: Number(e.target.value) })} /></label><label>Multi limit<input type="number" min={1} value={multiOptions.marking_limit ?? ""} onChange={e => setMultiOptions({ ...multiOptions, marking_limit: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Multi max states<input type="number" min={0} value={multiOptions.max_states ?? ""} onChange={e => setMultiOptions({ ...multiOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Multi initial<input placeholder="0,1" value={petriText.multiInitial} onChange={e => setPetriText({ ...petriText, multiInitial: e.target.value })} /></label><label>Multi final<input placeholder="2,3" value={petriText.multiFinal} onChange={e => setPetriText({ ...petriText, multiFinal: e.target.value })} /></label></div><button className="button" disabled={!onRequestPetriAnti || petriMiners.length === 0 || busy !== null} onClick={() => void runAnti()}>{busy === "anti" ? "Aligning…" : "Run anti-alignment"}</button><button className="button" disabled={!onRequestPetriMulti || petriMiners.length === 0 || busy !== null} onClick={() => void runMulti()}>{busy === "multi" ? "Aligning…" : "Run multi-alignment"}</button>{anti && <PetriResultView kind="anti" result={anti} />}{multi && <PetriResultView kind="multi" result={multi} />}</div>
+      <div className="other-align-card"><h3>Process-tree reduction</h3><p>Reduce the inductive tree for one trace using TREE_TR_BASED.</p><label>Trace<select value={traceIndex} onChange={e => setTraceIndex(Number(e.target.value))}>{(data.traces ?? []).map((trace, i) => <option key={i} value={i}>#{i + 1} · {trace.case_id}</option>)}</select></label><label>Activity key<input placeholder="concept:name" value={reductionOptions.activity_key ?? ""} onChange={e => setReductionOptions({ ...reductionOptions, activity_key: e.target.value || undefined })} /></label><button className="button" disabled={!onRequestReduction || !data.process_tree || !data.traces?.length || busy !== null} onClick={() => void runReduction()}>{busy === "reduction" ? "Reducing…" : "Reduce process tree"}</button>{reduced && <><small>Reduced tree returned for trace #{reduced.trace_index + 1}.</small><details><summary>Show reduced tree</summary><pre className="json-preview">{JSON.stringify(reduced.process_tree, null, 2)}</pre></details></>}</div>
       <div className="other-align-card">
         <h3>Process tree</h3>
         <p>Align the latest mined inductive process tree against every trace.</p>
@@ -342,6 +392,8 @@ function OtherAlignments({ data, onRequestDfg, onRequestEditDistance, onRequestP
 }
 
 function DfgResult({ result }: { result: DfgAlignmentResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.alignments.length)}</strong> traces · {numberFormat.format(result.unique_variants)} unique variants searched</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · internal {numberFormat.format(a.internal_cost)} · states {numberFormat.format(a.visited_states)} · closed {numberFormat.format(a.closed_states)}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.log === ">>" ? "model" : m.model === ">>" ? "log" : "sync"}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol>{result.projected_dfg && <small>{result.projected_dfg.edges.length} projected edges · {result.projected_dfg.activities.length} activities</small>}</div>; }
+function DecomposedResultView({ result }: { result: DecomposedAlignmentResult }) { const first = result.traces[0]; const moves = first?.moves ?? first?.alignment ?? []; return <div className="other-result"><p><strong>{numberFormat.format(result.traces.length)}</strong> traces · {percent(result.fitness)} fitness · cost {numberFormat.format(result.total_cost)}</p><small>Visited {numberFormat.format(result.diagnostics.visited_states)} states · queued {numberFormat.format(result.diagnostics.queued_states)} · merges {numberFormat.format(result.diagnostics.merges)} · {result.complete ? "complete" : "incomplete"}{result.timed_out ? " · timed out" : ""}{result.exhausted ? " · exhausted" : ""}</small>{first && <div className="align-moves">{moves.map((move, i) => <span className={`align-move ${move.log === ">>" ? "model" : move.model === ">>" ? "log" : "sync"}`} key={i}>{move.log ?? "τ"} / {move.model ?? "τ"}</span>)}</div>}</div>; }
+function PetriResultView({ kind, result }: { kind: "anti" | "multi"; result: PetriAntiAlignmentResult | PetriMultiAlignmentResult }) { return <div className="other-result"><p><strong>{kind === "anti" ? "Anti-alignment" : "Multi-alignment"}</strong> · objective {numberFormat.format(result.objective)}</p><div className="align-moves">{result.activities.map((activity, i) => <span className="align-move model" key={i}>{activity}</span>)}</div><small>Visible sequence</small><div className="align-moves">{result.transitions.map((transition, i) => <span className="align-move model" key={i}>t{transition}</span>)}</div><small>Transition sequence (includes silent moves) · visited {numberFormat.format(result.diagnostics.visited_states)} states · traversed {numberFormat.format(result.diagnostics.traversed_arcs)} · {result.diagnostics.exhausted ? "search exhausted" : "complete"}{kind === "anti" && "precision" in result ? ` · precision ${percent(result.precision)}` : kind === "multi" && "max_distance_to_log" in result ? ` · max distance ${numberFormat.format(result.max_distance_to_log)}` : ""}</small></div>; }
 function EditDistanceResultView({ result }: { result: EditDistanceResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.source_count)}</strong> source traces · {result.anti ? "anti-alignment" : "closest alignment"}</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · best/worst {numberFormat.format(a.best_worst_cost)} · denominator {numberFormat.format(a.denominator)} · target #{a.target_index}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.type}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol></div>; }
 
 function ProcessTreeResultView({ result }: { result: ProcessTreeAlignmentResult }) {

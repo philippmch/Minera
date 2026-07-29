@@ -46,6 +46,10 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree_alignment.hpp"
+#include "minera/decomposed_alignment.hpp"
+#include "minera/petri_anti_alignment.hpp"
+#include "minera/petri_multi_alignment.hpp"
+#include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
 #include "minera/temporal_profile.hpp"
@@ -454,6 +458,34 @@ int usage(const char* program) {
                "  --alignment-model-cost <f> Visible model move cost\n"
                "  --alignment-silent-model-cost <f> Silent model move cost\n"
                "  --alignment-sync-cost <f> Synchronous move cost\n"
+               "  --align-decomposed        Embed recompos_maximal decomposed alignment\n"
+               "  --decomposed-variant <id> recompos_maximal\n"
+               "  --decomposed-max-states <n> State bound\n"
+               "  --decomposed-max-total-states <n> Total state bound\n"
+               "  --decomposed-max-time-trace <f> Per-trace seconds\n"
+               "  --decomposed-max-time-total <f> Whole-log seconds\n"
+               "  --decomposed-threshold-border-agreement <f>\n"
+               "  --decomposed-log-move-cost <f>\n"
+               "  --decomposed-model-move-cost <f>\n"
+               "  --decomposed-tau-model-cost <f>\n"
+               "  --decomposed-sync-cost <f>\n"
+               "  --decomposed-activity-log-cost a=f\n"
+               "  --decomposed-activity-model-cost a=f\n"
+               "  --decomposed-activity-sync-cost a=f\n"
+               "  --decomposed-initial-marking <p0,p1,...>\n"
+               "  --decomposed-final-marking <p0,p1,...>\n"
+               "  --decomposed-use-cache <bool>  --decomposed-clear-cache <bool>\n"
+               "  --align-petri-anti         Embed version_discounted_a_star anti-alignment\n"
+               "  --align-petri-multi        Embed version_discounted_a_star multi-alignment\n"
+               "  --advanced-petri-miner <id> inductive, alpha, heuristic, or powl\n"
+               "  --petri-exponent <f>        Discount exponent (>1)\n"
+               "  --petri-epsilon <f>         Anti-alignment epsilon\n"
+               "  --petri-marking-limit <n>   Positive marking bound\n"
+               "  --petri-max-states <n>      Zero uses the marking limit\n"
+               "  --petri-initial-marking <p0,p1,...>\n"
+               "  --petri-final-marking <p0,p1,...>\n"
+               "  --reduce-process-tree <n>   Embed trace-based reduction for trace index\n"
+               "  --process-tree-reduction-activity-key <name>\n"
                "  --token-replay-variant <id> Token replay: forward (default)\n"
                "                            or backwards\n"
                "  --token-replay-stop-immediately-unfit\n"
@@ -618,6 +650,17 @@ int main(int argc, char** argv) {
   bool alignment_model_cost_used = false;
   bool alignment_silent_cost_used = false;
   bool alignment_sync_cost_used = false;
+  bool align_decomposed = false;
+  bool align_petri_anti = false;
+  bool align_petri_multi = false;
+  std::optional<std::size_t> reduce_trace_index;
+  std::string reduction_activity_key;
+  std::string advanced_petri_miner = "inductive";
+  bool advanced_petri_miner_used = false;
+  bool petri_option_used = false;
+  minera::DecomposedAlignmentOptions decomposed_options;
+  minera::PetriAntiAlignmentOptions petri_anti_options;
+  minera::PetriMultiAlignmentOptions petri_multi_options;
   std::vector<std::string> spectrum_activities;  // empty = no spectrum
   bool spectrum_requested = false;
   bool spectrum_option_used = false;
@@ -722,6 +765,77 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+
+    // Native alignment adapters are handled before the legacy option chain to
+    // keep this already-large parser within MSVC's block nesting limit.
+    if (arg == "--process-tree-reduction-activity-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      reduction_activity_key = value;
+      continue;
+    }
+    if (arg == "--advanced-petri-miner") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      advanced_petri_miner = value;
+      advanced_petri_miner_used = true;
+      if (advanced_petri_miner != "inductive" &&
+          advanced_petri_miner != "alpha" &&
+          advanced_petri_miner != "heuristic" &&
+          advanced_petri_miner != "powl") {
+        return usage(argv[0]);
+      }
+      continue;
+    }
+    if (arg == "--align-decomposed" || arg == "--align-petri-anti" || arg == "--align-petri-multi" || arg == "--reduce-process-tree") {
+      if (arg == "--align-decomposed") align_decomposed = true;
+      if (arg == "--align-petri-anti") align_petri_anti = true;
+      if (arg == "--align-petri-multi") align_petri_multi = true;
+      if (arg == "--reduce-process-tree") { const auto* v=next(); if(!v) return usage(argv[0]); std::size_t idx=0; const auto* e=v+std::strlen(v); const auto r=std::from_chars(v,e,idx); if(r.ec!=std::errc{}||r.ptr!=e) return usage(argv[0]); reduce_trace_index=idx; }
+      continue;
+    }
+    if (arg == "--decomposed-activity-log-cost" ||
+        arg == "--decomposed-activity-model-cost" ||
+        arg == "--decomposed-activity-sync-cost") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const auto costs = minera::parse_activity_costs(value, arg);
+        auto* destination = &decomposed_options.activity_log_costs;
+        if (arg == "--decomposed-activity-model-cost") {
+          destination = &decomposed_options.activity_model_costs;
+        } else if (arg == "--decomposed-activity-sync-cost") {
+          destination = &decomposed_options.activity_sync_costs;
+        }
+        for (const auto& [activity, cost] : costs) {
+          if (activity == ">>") return usage(argv[0]);
+          destination->insert_or_assign(activity, cost);
+        }
+      } catch (const std::exception& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      align_decomposed = true;
+      continue;
+    }
+    if (arg == "--decomposed-variant" || arg == "--decomposed-initial-marking" || arg == "--decomposed-final-marking" || arg == "--decomposed-max-states" || arg == "--decomposed-max-total-states" || arg == "--decomposed-max-time-trace" || arg == "--decomposed-max-time-total" || arg == "--decomposed-threshold-border-agreement" || arg == "--decomposed-use-cache" || arg == "--decomposed-clear-cache" || arg == "--decomposed-log-move-cost" || arg == "--decomposed-model-move-cost" || arg == "--decomposed-tau-model-cost" || arg == "--decomposed-sync-cost" || arg == "--petri-exponent" || arg == "--petri-epsilon" || arg == "--petri-marking-limit" || arg == "--petri-max-states" || arg == "--petri-initial-marking" || arg == "--petri-final-marking") {
+      try {
+      const auto* v=next(); if(!v) return usage(argv[0]); const std::string_view a=arg;
+      if(a=="--decomposed-variant"){if(std::string_view(v)!="recompos_maximal")return usage(argv[0]);align_decomposed=true;}
+      if(a=="--decomposed-max-states"){decomposed_options.max_states=parse_positive_size(v,arg);align_decomposed=true;}
+      if(a=="--decomposed-max-total-states"){decomposed_options.max_total_states=parse_positive_size(v,arg);align_decomposed=true;}
+      if(a=="--decomposed-max-time-trace"||a=="--decomposed-max-time-total"||a=="--decomposed-threshold-border-agreement"){char*e=nullptr;const double d=std::strtod(v,&e);if(e==v||*e!='\0'||!std::isfinite(d)||d<0)return usage(argv[0]);if(a=="--decomposed-max-time-trace")decomposed_options.max_time_trace=d;if(a=="--decomposed-max-time-total")decomposed_options.max_time_total=d;if(a=="--decomposed-threshold-border-agreement")decomposed_options.threshold_border_agreement=d;align_decomposed=true;}
+      if(a=="--decomposed-use-cache"){decomposed_options.use_cache=parse_boolean(v,arg);align_decomposed=true;} if(a=="--decomposed-clear-cache"){decomposed_options.clear_cache=parse_boolean(v,arg);align_decomposed=true;}
+      if(a=="--decomposed-log-move-cost"||a=="--decomposed-model-move-cost"||a=="--decomposed-tau-model-cost"||a=="--decomposed-sync-cost"){char*e=nullptr;const double d=std::strtod(v,&e);if(e==v||*e!='\0'||!std::isfinite(d)||d<0)return usage(argv[0]);if(a=="--decomposed-log-move-cost")decomposed_options.log_move_cost=d;if(a=="--decomposed-model-move-cost")decomposed_options.model_move_cost=d;if(a=="--decomposed-tau-model-cost")decomposed_options.tau_model_cost=d;if(a=="--decomposed-sync-cost")decomposed_options.sync_cost=d;align_decomposed=true;}
+      if(a=="--decomposed-initial-marking"||a=="--decomposed-final-marking"){std::vector<std::size_t> marks;std::size_t b=0;const std::string s=v;for(std::size_t j=0;j<=s.size();++j)if(j==s.size()||s[j]==','){marks.push_back(parse_nonnegative_size(s.substr(b,j-b).c_str(),arg));b=j+1;}if(a=="--decomposed-initial-marking")decomposed_options.initial_marking=marks;else decomposed_options.final_marking=marks;align_decomposed=true;}
+      if(a=="--petri-exponent"){petri_option_used=true;char*e=nullptr;const double d=std::strtod(v,&e);if(e==v||*e!='\0'||!std::isfinite(d)||d<=1)return usage(argv[0]);petri_anti_options.exponent=d;petri_multi_options.exponent=d;}
+      if(a=="--petri-epsilon"){petri_option_used=true;char*e=nullptr;const double d=std::strtod(v,&e);if(e==v||*e!='\0'||!std::isfinite(d)||d<0)return usage(argv[0]);petri_anti_options.epsilon=d;}
+      if(a=="--petri-marking-limit"){petri_option_used=true;petri_anti_options.marking_limit=petri_multi_options.marking_limit=parse_positive_size(v,arg);}
+      if(a=="--petri-max-states"){petri_option_used=true;const auto n=parse_nonnegative_size(v,arg);petri_anti_options.max_states=petri_multi_options.max_states=n;}
+      if(a=="--petri-initial-marking"||a=="--petri-final-marking"){petri_option_used=true;std::vector<std::size_t> marks;std::size_t b=0;const std::string s=v;for(std::size_t j=0;j<=s.size();++j)if(j==s.size()||s[j]==','){marks.push_back(parse_nonnegative_size(s.substr(b,j-b).c_str(),arg));b=j+1;}if(a=="--petri-initial-marking"){petri_anti_options.initial_marking=marks;petri_multi_options.initial_marking=marks;}else{petri_anti_options.final_marking=marks;petri_multi_options.final_marking=marks;}}
+      } catch (const std::exception& e) { std::cerr << "error: " << e.what() << '\n'; return 2; }
+      continue;
+    }
 
     if (arg == "-o") {
       const auto* value = next();
@@ -1647,6 +1761,20 @@ int main(int argc, char** argv) {
                  "--spectrum-sort-log require --spectrum\n";
     return 2;
   }
+  if (petri_option_used && !align_petri_anti && !align_petri_multi) {
+    std::cerr << "error: --petri-* options require --align-petri-anti or --align-petri-multi\n";
+    return 2;
+  }
+  if (advanced_petri_miner_used && !align_decomposed && !align_petri_anti &&
+      !align_petri_multi) {
+    std::cerr << "error: --advanced-petri-miner requires an advanced "
+                 "alignment request\n";
+    return 2;
+  }
+  if (!reduction_activity_key.empty() && !reduce_trace_index) {
+    std::cerr << "error: --process-tree-reduction-activity-key requires --reduce-process-tree\n";
+    return 2;
+  }
   if (batch_option_used && !batches) {
     std::cerr << "error: --batch-* options require --batches\n";
     return 2;
@@ -1901,6 +2029,23 @@ int main(int argc, char** argv) {
     const minera::BatchDiscovery* batch_ptr =
         batch_discovery ? &*batch_discovery : nullptr;
 
+    std::optional<minera::DecomposedAlignmentResult> decomposed_result;
+    std::optional<minera::PetriAntiAlignmentResult> petri_anti_result;
+    std::optional<minera::PetriMultiAlignmentResult> petri_multi_result;
+    std::optional<minera::ProcessTree> reduced_tree_result;
+    const minera::PetriNet* advanced_net = &inductive_net;
+    if (advanced_petri_miner == "alpha") advanced_net = &net;
+    else if (advanced_petri_miner == "heuristic") advanced_net = &heuristic_net;
+    else if (advanced_petri_miner == "powl") advanced_net = &powl_net;
+    if (align_decomposed) decomposed_result = minera::align_decomposed(log, *advanced_net, decomposed_options);
+    if (align_petri_anti) petri_anti_result = minera::anti_align_petri(*advanced_net, log, petri_anti_options);
+    if (align_petri_multi) petri_multi_result = minera::multi_align_petri(*advanced_net, log, petri_multi_options);
+    if (reduce_trace_index) {
+      if (*reduce_trace_index >= log.traces.size()) { std::cerr << "error: --reduce-process-tree trace index out of range\n"; return 2; }
+      minera::ProcessTreeReductionOptions ro; ro.activity_key = reduction_activity_key;
+      reduced_tree_result = minera::reduce_process_tree(tree, log.traces[*reduce_trace_index], ro);
+    }
+
     if (output.empty()) {
       minera::write_analysis_json(
           std::cout, dataset, log, graph, &tree, &net, &heuristics,
@@ -1920,7 +2065,12 @@ int main(int argc, char** argv) {
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
           edit_projected_log ? &*edit_projected_log : nullptr,
-          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr);
+          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr,
+          decomposed_result ? &*decomposed_result : nullptr,
+          petri_anti_result ? &*petri_anti_result : nullptr,
+          petri_multi_result ? &*petri_multi_result : nullptr,
+          reduced_tree_result ? &*reduced_tree_result : nullptr,
+          reduce_trace_index.value_or(0));
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -1945,7 +2095,12 @@ int main(int argc, char** argv) {
           dfg_projection_result ? &*dfg_projection_result : nullptr,
           dfg_projected_log ? &*dfg_projected_log : nullptr,
           edit_projected_log ? &*edit_projected_log : nullptr,
-          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr);
+          process_tree_alignment_result ? &*process_tree_alignment_result : nullptr,
+          decomposed_result ? &*decomposed_result : nullptr,
+          petri_anti_result ? &*petri_anti_result : nullptr,
+          petri_multi_result ? &*petri_multi_result : nullptr,
+          reduced_tree_result ? &*reduced_tree_result : nullptr,
+          reduce_trace_index.value_or(0));
     }
 
     // Optionally emit one discovered model as standard PNML.

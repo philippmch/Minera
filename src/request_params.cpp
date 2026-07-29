@@ -140,6 +140,40 @@ std::uint64_t parse_positive_u64(std::string_view value, std::string_view name) 
     throw std::invalid_argument(std::string(name) + ": expected a positive integer");
   return parsed;
 }
+
+std::vector<std::size_t> parse_marking(std::string_view value,
+                                       std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) + ": expected a non-empty marking");
+  std::vector<std::size_t> result;
+  std::size_t begin = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i != value.size() && value[i] != ',') continue;
+    auto token = value.substr(begin, i - begin);
+    const auto first = token.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos)
+      throw std::invalid_argument(std::string(name) + ": expected non-negative marking entries");
+    const auto last = token.find_last_not_of(" \t\r\n");
+    token = token.substr(first, last - first + 1);
+    result.push_back(parse_nonnegative_size(token, name));
+    begin = i + 1;
+  }
+  if (result.empty())
+    throw std::invalid_argument(std::string(name) + ": expected a non-empty marking");
+  return result;
+}
+
+template <typename Map>
+void parse_activity_cost_field(const FieldLookup& field,
+                               const FieldPresence& present,
+                               std::string_view name, Map& destination) {
+  const bool supplied = present ? present(name) : !field(name).empty();
+  if (!supplied) return;
+  const auto value = field(name);
+  const auto parsed = parse_cost_map(value, name);
+  destination.clear();
+  destination.insert(parsed.begin(), parsed.end());
+}
 }
 
 bool ends_with_ci(std::string_view value, std::string_view suffix) {
@@ -182,6 +216,11 @@ std::vector<std::string> split_csv(std::string_view value) {
     }
   }
   return parts;
+}
+
+std::map<std::string, double> parse_activity_costs(std::string_view value,
+                                                   std::string_view name) {
+  return parse_cost_map(value, name);
 }
 
 std::vector<BusinessHourSlot> parse_business_hour_slots(
@@ -433,6 +472,42 @@ ProcessTreeAlignmentOptions parse_process_tree_alignment_params(
                                          "pt_alignment_clear_cache");
   }
   return options;
+}
+
+DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& field) {
+  return parse_decomposed_alignment_params(field, FieldPresence{});
+}
+
+DecomposedAlignmentOptions parse_decomposed_alignment_params(const FieldLookup& field,
+                                                             const FieldPresence& present) {
+  DecomposedAlignmentOptions o;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (!supplied(n) || v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v; };
+  if (supplied("variant")) { const auto v=require("variant"); if(v!="recompos_maximal"&&v!="RECOMPOS_MAXIMAL"&&v!="Variants.RECOMPOS_MAXIMAL") throw std::invalid_argument("variant: expected recompos_maximal"); }
+  auto nonneg = [&](std::string_view n,double& d){ if(supplied(n)){ d=parse_finite_double(require(n),n); if(d<0) throw std::invalid_argument(std::string(n)+": expected a non-negative number"); }};
+  nonneg("threshold_border_agreement",o.threshold_border_agreement); nonneg("max_time_trace",o.max_time_trace); nonneg("max_time_total",o.max_time_total);
+  if(supplied("max_states")) o.max_states=parse_positive_size(require("max_states"),"max_states"); if(supplied("max_total_states")) o.max_total_states=parse_positive_size(require("max_total_states"),"max_total_states");
+  if(supplied("use_cache")) o.use_cache=parse_boolean(require("use_cache"),"use_cache"); if(supplied("clear_cache")) o.clear_cache=parse_boolean(require("clear_cache"),"clear_cache");
+  nonneg("log_move_cost",o.log_move_cost); nonneg("model_move_cost",o.model_move_cost); nonneg("tau_move_cost",o.tau_model_cost); nonneg("tau_model_cost",o.tau_model_cost); nonneg("sync_move_cost",o.sync_cost); nonneg("sync_cost",o.sync_cost);
+  parse_activity_cost_field(field,present,"activity_log_costs",o.activity_log_costs); parse_activity_cost_field(field,present,"activity_model_costs",o.activity_model_costs); parse_activity_cost_field(field,present,"activity_sync_costs",o.activity_sync_costs);
+  if(supplied("initial_marking")) o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking")) o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+}
+
+PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& field) { return parse_petri_anti_alignment_params(field, FieldPresence{}); }
+PetriAntiAlignmentOptions parse_petri_anti_alignment_params(const FieldLookup& field,const FieldPresence& present) {
+  PetriAntiAlignmentOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; const auto require=[&](std::string_view n){auto v=field(n);if(!supplied(n)||v.empty())throw std::invalid_argument(std::string(n)+": expected a value");return v;};
+  if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");}
+  if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("epsilon")){o.epsilon=parse_finite_double(require("epsilon"),"epsilon");if(o.epsilon<0)throw std::invalid_argument("epsilon: expected non-negative");}
+  if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+}
+PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup& field) { return parse_petri_multi_alignment_params(field, FieldPresence{}); }
+PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup& field,const FieldPresence& present) {
+  PetriMultiAlignmentOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; const auto require=[&](std::string_view n){auto v=field(n);if(!supplied(n)||v.empty())throw std::invalid_argument(std::string(n)+": expected a value");return v;};
+  if(supplied("variant")){auto v=require("variant");if(v!="version_discounted_a_star"&&v!="VERSION_DISCOUNTED_A_STAR"&&v!="discounted_a_star")throw std::invalid_argument("variant: expected version_discounted_a_star");} if(supplied("exponent")){o.exponent=parse_finite_double(require("exponent"),"exponent");if(o.exponent<=1)throw std::invalid_argument("exponent: expected > 1");} if(supplied("marking_limit"))o.marking_limit=parse_positive_size(require("marking_limit"),"marking_limit"); if(supplied("max_states"))o.max_states=parse_nonnegative_size(require("max_states"),"max_states"); if(supplied("initial_marking"))o.initial_marking=parse_marking(require("initial_marking"),"initial_marking"); if(supplied("final_marking"))o.final_marking=parse_marking(require("final_marking"),"final_marking"); return o;
+}
+ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field) { return parse_process_tree_reduction_params(field, FieldPresence{}); }
+ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field,const FieldPresence& present) {
+  ProcessTreeReductionOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; if(supplied("variant")){auto v=field("variant");if(v!="tree_tr_based"&&v!="TREE_TR_BASED")throw std::invalid_argument("variant: expected tree_tr_based");} if(supplied("activity_key"))o.activity_key=field("activity_key"); return o;
 }
 
 MineParams parse_mine_params(const FieldLookup& field) {

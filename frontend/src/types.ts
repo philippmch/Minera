@@ -577,6 +577,127 @@ export interface ProcessTreeAlignmentResult {
   traces: ProcessTreeAlignmentTrace[];
 }
 
+/** Decomposed Petri-net alignment (PM4Py RECOMPOS_MAXIMAL). */
+export type DecomposedAlignmentVariant = "recompos_maximal";
+export interface DecomposedAlignmentOptions {
+  variant?: DecomposedAlignmentVariant;
+  threshold_border_agreement?: number;
+  max_time_trace?: number;
+  max_time_total?: number;
+  max_states?: number;
+  max_total_states?: number;
+  use_cache?: boolean;
+  clear_cache?: boolean;
+  log_move_cost?: number;
+  model_move_cost?: number;
+  tau_model_cost?: number;
+  sync_cost?: number;
+  initial_marking?: number[];
+  final_marking?: number[];
+  activity_log_costs?: Record<string, number>;
+  activity_model_costs?: Record<string, number>;
+  activity_sync_costs?: Record<string, number>;
+}
+export interface DecomposedAlignmentMove {
+  log?: string | null;
+  model?: string | null;
+  transition?: number;
+}
+export interface DecomposedAlignmentTrace {
+  activities: string[];
+  count: number;
+  complete: boolean;
+  timed_out: boolean;
+  exhausted: boolean;
+  cost: number;
+  fitness: number;
+  best_worst_cost: number;
+  /** Native serializer calls this field `moves`; `alignment` is retained for older exports. */
+  moves?: DecomposedAlignmentMove[];
+  alignment?: DecomposedAlignmentMove[];
+}
+export interface DecomposedAlignmentDiagnostics {
+  decompositions: number;
+  components: number;
+  merges: number;
+  cache_hits: number;
+  cache_misses: number;
+  border_disagreements: number;
+  agreement_iterations: number;
+  visited_states: number;
+  queued_states: number;
+  traversed_arcs: number;
+  whole_net_fallback: boolean;
+  note: string;
+}
+export interface DecomposedAlignmentResult {
+  algorithm: "decomposed_alignment";
+  variant: DecomposedAlignmentVariant;
+  complete: boolean;
+  timed_out: boolean;
+  exhausted: boolean;
+  fitness: number;
+  best_worst_cost: number;
+  trace_count: number;
+  total_cost: number;
+  diagnostics: DecomposedAlignmentDiagnostics;
+  traces: DecomposedAlignmentTrace[];
+}
+
+export type PetriAdvancedAlignmentVariant = "version_discounted_a_star";
+export interface PetriAntiAlignmentOptions {
+  variant?: PetriAdvancedAlignmentVariant;
+  exponent?: number;
+  epsilon?: number;
+  marking_limit?: number;
+  max_states?: number;
+  initial_marking?: number[];
+  final_marking?: number[];
+}
+export interface PetriMultiAlignmentOptions {
+  variant?: PetriAdvancedAlignmentVariant;
+  exponent?: number;
+  marking_limit?: number;
+  max_states?: number;
+  initial_marking?: number[];
+  final_marking?: number[];
+}
+export interface PetriAdvancedAlignmentDiagnostics {
+  visited_states: number;
+  queued_states: number;
+  traversed_arcs: number;
+  exhausted: boolean;
+}
+export interface PetriAntiAlignmentResult {
+  algorithm: "petri_anti_alignment";
+  variant: PetriAdvancedAlignmentVariant;
+  activities: string[];
+  transitions: number[];
+  cost: number;
+  objective: number;
+  precision: number;
+  diagnostics: PetriAdvancedAlignmentDiagnostics;
+}
+export interface PetriMultiAlignmentResult {
+  algorithm: "petri_multi_alignment";
+  variant: PetriAdvancedAlignmentVariant;
+  activities: string[];
+  transitions: number[];
+  cost: number;
+  objective: number;
+  max_distance_to_log: number;
+  diagnostics: PetriAdvancedAlignmentDiagnostics;
+}
+
+export type ProcessTreeReductionVariant = "tree_tr_based";
+export interface ProcessTreeReductionOptions { variant?: ProcessTreeReductionVariant; activity_key?: string; }
+export interface ProcessTreeReductionResult {
+  algorithm: "process_tree_reduction";
+  variant: ProcessTreeReductionVariant;
+  trace_index: number;
+  process_tree: ProcessTreeNode;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -609,6 +730,52 @@ export function isProcessTreeAlignmentResult(value: unknown): value is ProcessTr
     trace.moves.every((move) => isRecord(move) &&
       (move.type === "sync" || move.type === "log" || move.type === "model") &&
       typeof move.log === "string" && typeof move.model === "string" && typeof move.activity === "string"));
+}
+
+const nonNegativeInt = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
+const validDecomposedMove = (value: unknown): value is DecomposedAlignmentMove =>
+  isRecord(value) && (value.log === undefined || value.log === null || typeof value.log === "string") &&
+  (value.model === undefined || value.model === null || typeof value.model === "string") &&
+  (value.transition === undefined || (Number.isInteger(value.transition) && (value.transition as number) >= -1));
+const validAdvancedDiagnostics = (value: unknown): value is PetriAdvancedAlignmentDiagnostics =>
+  isRecord(value) && nonNegativeInt(value.visited_states) && nonNegativeInt(value.queued_states) &&
+  nonNegativeInt(value.traversed_arcs) && typeof value.exhausted === "boolean";
+
+export function isDecomposedAlignmentResult(value: unknown): value is DecomposedAlignmentResult {
+  if (!isRecord(value) || value.algorithm !== "decomposed_alignment" || value.variant !== "recompos_maximal" ||
+      typeof value.complete !== "boolean" || typeof value.timed_out !== "boolean" || typeof value.exhausted !== "boolean" ||
+      !finite(value.fitness) || !finite(value.best_worst_cost) || !nonNegativeInt(value.trace_count) || !finite(value.total_cost) ||
+      !isRecord(value.diagnostics) || !Array.isArray(value.traces)) return false;
+  const d = value.diagnostics;
+  if (!["decompositions", "components", "merges", "cache_hits", "cache_misses", "border_disagreements", "agreement_iterations", "visited_states", "queued_states", "traversed_arcs"]
+    .every((key) => nonNegativeInt(d[key])) || typeof d.whole_net_fallback !== "boolean" || typeof d.note !== "string") return false;
+  return value.traces.every((trace) => isRecord(trace) && Array.isArray(trace.activities) && trace.activities.every((a) => typeof a === "string") &&
+    nonNegativeInt(trace.count) && typeof trace.complete === "boolean" && typeof trace.timed_out === "boolean" && typeof trace.exhausted === "boolean" &&
+    finite(trace.cost) && finite(trace.fitness) && finite(trace.best_worst_cost) &&
+    ((Array.isArray(trace.moves) && trace.moves.every(validDecomposedMove)) || (Array.isArray(trace.alignment) && trace.alignment.every(validDecomposedMove))));
+}
+
+function isPetriAdvancedResult(value: unknown, algorithm: string): value is PetriAntiAlignmentResult | PetriMultiAlignmentResult {
+  if (!isRecord(value) || value.algorithm !== algorithm || value.variant !== "version_discounted_a_star" ||
+      !Array.isArray(value.activities) || !value.activities.every((a) => typeof a === "string") || !Array.isArray(value.transitions) ||
+      !value.transitions.every((x) => Number.isInteger(x) && (x as number) >= -1) || !finite(value.cost) || !finite(value.objective) || !validAdvancedDiagnostics(value.diagnostics)) return false;
+  if (algorithm === "petri_anti_alignment" && !finite(value.precision)) return false;
+  if (algorithm === "petri_multi_alignment" && !finite(value.max_distance_to_log)) return false;
+  return true;
+}
+export function isPetriAntiAlignmentResult(value: unknown): value is PetriAntiAlignmentResult { return isPetriAdvancedResult(value, "petri_anti_alignment"); }
+export function isPetriMultiAlignmentResult(value: unknown): value is PetriMultiAlignmentResult { return isPetriAdvancedResult(value, "petri_multi_alignment"); }
+
+function isProcessTreeNode(value: unknown): value is ProcessTreeNode {
+  if (!isRecord(value) || !["sequence", "exclusive", "parallel", "loop", "activity", "tau"].includes(value.operator as string)) return false;
+  if (value.operator === "activity" && !nonNegativeInt(value.activity)) return false;
+  if (value.activity !== undefined && !nonNegativeInt(value.activity)) return false;
+  if (value.children !== undefined && (!Array.isArray(value.children) || !value.children.every(isProcessTreeNode))) return false;
+  return value.operator === "activity" || value.operator === "tau" ? value.children === undefined || value.children.length === 0 : Boolean(value.children && value.children.length > 0);
+}
+export function isProcessTreeReductionResult(value: unknown): value is ProcessTreeReductionResult {
+  return isRecord(value) && value.algorithm === "process_tree_reduction" && value.variant === "tree_tr_based" &&
+    nonNegativeInt(value.trace_index) && isProcessTreeNode(value.process_tree);
 }
 
 export const FOOTPRINTS_DISCOVERY_VARIANTS = [

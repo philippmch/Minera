@@ -5,6 +5,8 @@
 #undef NDEBUG
 
 #include "minera/request_params.hpp"
+#include "minera/json_export.hpp"
+#include "minera/directly_follows_graph.hpp"
 
 #include <cassert>
 #include <map>
@@ -803,6 +805,53 @@ void parse_process_tree_alignment_params_rejects_bad_values() {
   }
 }
 
+void parse_native_adapter_params_contract() {
+  const auto d = minera::parse_decomposed_alignment_params(fields({
+      {"variant", "recompos_maximal"}, {"max_states", "42"},
+      {"threshold_border_agreement", "2.5"}, {"initial_marking", "1, 0"},
+      {"tau_move_cost", "3"}, {"sync_cost", "0.5"},
+      {"activity_log_costs", "A\\,B=7"}}));
+  assert(d.max_states == 42 && d.initial_marking.size() == 2 &&
+         d.tau_model_cost == 3.0 && d.sync_cost == 0.5 &&
+         d.activity_log_costs.at("A,B") == 7.0);
+  assert(minera::parse_activity_costs("A\\=B:4", "costs").at("A=B") ==
+         4.0);
+  const auto a = minera::parse_petri_anti_alignment_params(fields({
+      {"variant", "version_discounted_a_star"}, {"exponent", "2"},
+      {"marking_limit", "10"}, {"max_states", "0"}}));
+  assert(a.marking_limit == 10 && a.max_states == 0);
+  bool threw = false;
+  try { (void)minera::parse_petri_multi_alignment_params(fields({{"marking_limit", "0"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  const auto r = minera::parse_process_tree_reduction_params(fields({
+      {"variant", "tree_tr_based"}, {"activity_key", "concept:name"}}));
+  assert(r.activity_key == "concept:name");
+}
+
+void native_json_contracts() {
+  minera::DecomposedAlignmentResult d; d.diagnostics.note = "ok";
+  minera::DecomposedAlignmentTrace dt;
+  dt.activities = {"A"}; dt.complete = true; dt.cost = 1.0; dt.fitness = 0.9;
+  dt.best_worst_cost = 2.0;
+  dt.alignment.push_back({std::string("A"), std::string("A"), 0});
+  d.traces.push_back(dt);
+  const auto dj = minera::decomposed_alignment_json(d);
+  assert(dj.find("\"algorithm\":\"decomposed_alignment\"") != std::string::npos &&
+         dj.find("\"diagnostics\"") != std::string::npos && dj.find("\"moves\"") != std::string::npos);
+  minera::PetriAntiAlignmentResult a; a.activities = {"A"}; a.transitions = {2};
+  const auto aj = minera::petri_anti_alignment_json(a);
+  assert(aj.find("petri_anti_alignment") != std::string::npos && aj.find("precision") != std::string::npos);
+  minera::PetriMultiAlignmentResult m; m.activities = {"A"};
+  const auto mj = minera::petri_multi_alignment_json(m);
+  assert(mj.find("petri_multi_alignment") != std::string::npos && mj.find("max_distance_to_log") != std::string::npos);
+  minera::DirectlyFollowsGraph graph;
+  minera::ProcessTree tree({}, minera::ProcessTreeNode::tau());
+  const auto rj = minera::process_tree_reduction_json(tree, graph, 3);
+  assert(rj.find("process_tree_reduction") != std::string::npos);
+  assert(rj.find("\"trace_index\":3") != std::string::npos && rj.find("\"process_tree\"") != std::string::npos);
+}
+
 void parse_dfg_and_edit_alignment_params_contract() {
   const auto d = minera::parse_dfg_alignment_params(fields({
       {"dfg_variant", "CLASSIC"}, {"dfg_max_states", "0"},
@@ -1011,5 +1060,7 @@ int main() {
   parse_dfg_and_edit_alignment_params_contract();
   parse_process_tree_alignment_params_maps_variants_and_limits();
   parse_process_tree_alignment_params_rejects_bad_values();
+  parse_native_adapter_params_contract();
+  native_json_contracts();
   return 0;
 }

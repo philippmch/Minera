@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, processTreeAlignmentQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   hasActiveFilters,
@@ -9,7 +9,33 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+
+describe("native alignment adapters", () => {
+  it("serializes advanced options deterministically", () => {
+    expect(decomposedAlignmentQuery({ max_states: 10, final_marking: [2, 1], initial_marking: [0], tau_model_cost: 1, sync_cost: 0 })).toBe("final_marking=2%2C1&initial_marking=0&max_states=10&sync_cost=0&tau_model_cost=1&variant=recompos_maximal");
+    expect(new URLSearchParams(decomposedAlignmentQuery({ activity_log_costs: { "A,B\\C": 2 } })).get("activity_log_costs")).toBe("A\\,B\\\\C=2");
+    expect(new URLSearchParams(petriAntiAlignmentQuery({ exponent: 2, epsilon: 0.005 })).get("variant")).toBe("version_discounted_a_star");
+    expect(new URLSearchParams(petriMultiAlignmentQuery({ marking_limit: 5 })).get("marking_limit")).toBe("5");
+    expect(new URLSearchParams(processTreeReductionQuery({ activity_key: "concept:name" })).get("activity_key")).toBe("concept:name");
+    expect(parseMarkingInput(" 0, 2,3 ")).toEqual([0, 2, 3]);
+    expect(() => parseMarkingInput("0,-1")).toThrow(/non-negative/);
+  });
+  it("guards native result discriminators and diagnostics", () => {
+    const diagnostics = { visited_states: 1, queued_states: 0, traversed_arcs: 1, exhausted: false };
+    const anti = { algorithm: "petri_anti_alignment", variant: "version_discounted_a_star", activities: ["A"], transitions: [0], cost: -1, objective: -1, precision: 0.5, diagnostics };
+    const multi = { algorithm: "petri_multi_alignment", variant: "version_discounted_a_star", activities: ["A"], transitions: [0], cost: 1, objective: 1, max_distance_to_log: 1, diagnostics };
+    expect(isPetriAntiAlignmentResult(anti)).toBe(true);
+    expect(isPetriMultiAlignmentResult(multi)).toBe(true);
+    expect(isPetriAntiAlignmentResult({ ...anti, algorithm: "petri_multi_alignment" })).toBe(false);
+    expect(isPetriMultiAlignmentResult({ ...multi, diagnostics: { ...diagnostics, visited_states: -1 } })).toBe(false);
+    const decomposed = { algorithm: "decomposed_alignment", variant: "recompos_maximal", complete: true, timed_out: false, exhausted: false, fitness: 1, best_worst_cost: 0, trace_count: 1, total_cost: 0, diagnostics: { decompositions: 1, components: 1, merges: 0, cache_hits: 0, cache_misses: 1, border_disagreements: 0, agreement_iterations: 1, visited_states: 1, queued_states: 1, traversed_arcs: 1, whole_net_fallback: false, note: "" }, traces: [{ activities: ["A"], count: 1, complete: true, timed_out: false, exhausted: false, cost: 0, fitness: 1, best_worst_cost: 0, alignment: [{ log: "A", model: "A", transition: 0 }] }] };
+    expect(isDecomposedAlignmentResult(decomposed)).toBe(true);
+    expect(isDecomposedAlignmentResult({ ...decomposed, traces: [{ ...decomposed.traces[0], alignment: [{ log: 1 }] }] })).toBe(false);
+    const reduced = { algorithm: "process_tree_reduction", variant: "tree_tr_based", trace_index: 0, process_tree: { operator: "activity", activity: 0 } };
+    expect(isProcessTreeReductionResult(reduced)).toBe(true);
+  });
+});
 
 describe("DFG and edit-distance contracts", () => {
   it("serializes DFG options and cost maps deterministically", () => {
