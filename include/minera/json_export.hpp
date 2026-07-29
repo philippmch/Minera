@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/evaluation.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
 #include "minera/decision_mining.hpp"
@@ -119,7 +120,9 @@ void write_analysis_json(std::ostream& out,
                          const PetriAntiAlignmentResult* petri_anti_alignment = nullptr,
                          const PetriMultiAlignmentResult* petri_multi_alignment = nullptr,
                          const ProcessTree* reduced_process_tree = nullptr,
-                         std::size_t reduced_trace_index = 0);
+                         std::size_t reduced_trace_index = 0,
+                         const std::vector<ModelEvaluation>* evaluation = nullptr,
+                         const EmdResult* earth_movers_distance = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -166,7 +169,24 @@ void write_analysis_json(std::ostream& out,
     const PetriAntiAlignmentResult* petri_anti_alignment = nullptr,
     const PetriMultiAlignmentResult* petri_multi_alignment = nullptr,
     const ProcessTree* reduced_process_tree = nullptr,
-    std::size_t reduced_trace_index = 0);
+    std::size_t reduced_trace_index = 0,
+    const std::vector<ModelEvaluation>* evaluation = nullptr,
+    const EmdResult* earth_movers_distance = nullptr);
+
+[[nodiscard]] std::string replay_fitness_json(
+    const ReplayFitnessResult& result,
+    const DirectlyFollowsGraph* graph = nullptr);
+[[nodiscard]] std::string precision_json(
+    const PrecisionResult& result,
+    const DirectlyFollowsGraph* graph = nullptr);
+[[nodiscard]] std::string generalization_json(
+    const GeneralizationResult& result);
+[[nodiscard]] std::string simplicity_json(
+    const SimplicityResult& result);
+[[nodiscard]] std::string emd_json(const EmdResult& result);
+[[nodiscard]] std::string model_evaluation_json(
+    const ModelEvaluation& result,
+    const DirectlyFollowsGraph* graph = nullptr);
 
 [[nodiscard]] std::string process_tree_alignment_json(
     const ProcessTreeAlignmentResult& result);

@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <charconv>
 #include <limits>
+#include <climits>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -160,6 +161,35 @@ std::vector<std::size_t> parse_marking(std::string_view value,
   }
   if (result.empty())
     throw std::invalid_argument(std::string(name) + ": expected a non-empty marking");
+  return result;
+}
+
+std::vector<int> parse_int_marking(std::string_view value,
+                                   std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a non-empty marking");
+  std::vector<int> result;
+  std::size_t begin = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i != value.size() && value[i] != ',') continue;
+    auto token = value.substr(begin, i - begin);
+    const auto first = token.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos)
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected non-negative marking entries");
+    const auto last = token.find_last_not_of(" \t\r\n");
+    token = token.substr(first, last - first + 1);
+    const auto parsed = parse_nonnegative_size(token, name);
+    if (parsed > static_cast<std::size_t>(INT_MAX))
+      throw std::invalid_argument(std::string(name) +
+                                  ": marking entry is out of range");
+    result.push_back(static_cast<int>(parsed));
+    begin = i + 1;
+  }
+  if (result.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a non-empty marking");
   return result;
 }
 
@@ -508,6 +538,137 @@ PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup&
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field) { return parse_process_tree_reduction_params(field, FieldPresence{}); }
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field,const FieldPresence& present) {
   ProcessTreeReductionOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; if(supplied("variant")){auto v=field("variant");if(v!="tree_tr_based"&&v!="TREE_TR_BASED")throw std::invalid_argument("variant: expected tree_tr_based");} if(supplied("activity_key"))o.activity_key=field("activity_key"); return o;
+}
+
+EvaluationParams parse_evaluation_params(const FieldLookup& field) {
+  return parse_evaluation_params(field, FieldPresence{});
+}
+
+EvaluationParams parse_evaluation_params(const FieldLookup& field,
+                                         const FieldPresence& present) {
+  EvaluationParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (!supplied(name) || value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    }
+    return value;
+  };
+
+  // Family selection is optional and defaults to replay fitness.  The
+  // selected family does not gate parsing of the remaining fields below.
+  if (supplied("evaluation_family")) {
+    const auto value = require("evaluation_family");
+    if (value == "replay_fitness") {
+      params.family = EvaluationFamily::kReplayFitness;
+    } else if (value == "precision") {
+      params.family = EvaluationFamily::kPrecision;
+    } else if (value == "generalization") {
+      params.family = EvaluationFamily::kGeneralization;
+    } else if (value == "simplicity") {
+      params.family = EvaluationFamily::kSimplicity;
+    } else {
+      throw std::invalid_argument(
+          "evaluation_family: expected replay_fitness, precision, "
+          "generalization, or simplicity, got '" + value + "'");
+    }
+  }
+
+  if (supplied("fitness_variant")) {
+    const auto value = require("fitness_variant");
+    if (value == "auto") {
+      params.replay_fitness_variant = ReplayFitnessVariant::AUTO;
+    } else if (value == "token_based") {
+      params.replay_fitness_variant = ReplayFitnessVariant::TOKEN_BASED;
+    } else if (value == "alignment_based") {
+      params.replay_fitness_variant = ReplayFitnessVariant::ALIGNMENT_BASED;
+    } else {
+      throw std::invalid_argument(
+          "fitness_variant: expected auto, token_based, or alignment_based, "
+          "got '" + value + "'");
+    }
+  }
+
+  if (supplied("precision_variant")) {
+    const auto value = require("precision_variant");
+    if (value == "auto") {
+      params.precision_variant = PrecisionVariant::AUTO;
+    } else if (value == "etconformance_token") {
+      params.precision_variant = PrecisionVariant::ETCONFORMANCE_TOKEN;
+    } else if (value == "align_etconformance") {
+      params.precision_variant = PrecisionVariant::ALIGN_ETCONFORMANCE;
+    } else if (value == "automaton_after_align") {
+      params.precision_variant = PrecisionVariant::AUTOMATON_AFTER_ALIGN;
+    } else {
+      throw std::invalid_argument(
+          "precision_variant: expected auto, etconformance_token, "
+          "align_etconformance, or automaton_after_align, got '" + value +
+          "'");
+    }
+  }
+  if (supplied("precision_use_task_ids")) {
+    params.precision_options.use_task_ids =
+        parse_boolean(require("precision_use_task_ids"),
+                      "precision_use_task_ids");
+  }
+  if (supplied("precision_max_states")) {
+    params.precision_options.max_states =
+        parse_positive_size(require("precision_max_states"),
+                            "precision_max_states");
+  }
+
+  if (supplied("generalization_variant")) {
+    const auto value = require("generalization_variant");
+    if (value != "generalization_token") {
+      throw std::invalid_argument(
+          "generalization_variant: expected generalization_token, got '" +
+          value + "'");
+    }
+    params.generalization_variant = GeneralizationVariant::GENERALIZATION_TOKEN;
+  }
+
+  if (supplied("simplicity_variant")) {
+    const auto value = require("simplicity_variant");
+    if (value == "arc_degree") {
+      params.simplicity_variant = SimplicityVariant::ARC_DEGREE;
+    } else if (value == "extended_cardoso") {
+      params.simplicity_variant = SimplicityVariant::EXTENDED_CARDOSO;
+    } else if (value == "extended_cyclomatic") {
+      params.simplicity_variant = SimplicityVariant::EXTENDED_CYCLOMATIC;
+    } else {
+      throw std::invalid_argument(
+          "simplicity_variant: expected arc_degree, extended_cardoso, or "
+          "extended_cyclomatic, got '" + value + "'");
+    }
+  }
+  if (supplied("simplicity_arc_degree_k")) {
+    params.simplicity_options.arc_degree_k =
+        parse_finite_double(require("simplicity_arc_degree_k"),
+                            "simplicity_arc_degree_k");
+    if (params.simplicity_options.arc_degree_k < 0.0) {
+      throw std::invalid_argument(
+          "simplicity_arc_degree_k: expected a non-negative number");
+    }
+  }
+  if (supplied("simplicity_max_states")) {
+    params.simplicity_options.max_states =
+        parse_positive_size(require("simplicity_max_states"),
+                            "simplicity_max_states");
+  }
+  if (supplied("simplicity_initial_marking")) {
+    params.simplicity_options.initial_marking =
+        parse_int_marking(require("simplicity_initial_marking"),
+                          "simplicity_initial_marking");
+  }
+  if (supplied("simplicity_final_marking")) {
+    params.simplicity_options.final_marking =
+        parse_int_marking(require("simplicity_final_marking"),
+                          "simplicity_final_marking");
+  }
+  return params;
 }
 
 MineParams parse_mine_params(const FieldLookup& field) {

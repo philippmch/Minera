@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
+  evaluationModelIds,
   hasActiveFilters,
   hasActiveMinerOptions,
   initialTab,
@@ -34,6 +35,47 @@ describe("native alignment adapters", () => {
     expect(isDecomposedAlignmentResult({ ...decomposed, traces: [{ ...decomposed.traces[0], alignment: [{ log: 1 }] }] })).toBe(false);
     const reduced = { algorithm: "process_tree_reduction", variant: "tree_tr_based", trace_index: 0, process_tree: { operator: "activity", activity: 0 } };
     expect(isProcessTreeReductionResult(reduced)).toBe(true);
+  });
+});
+
+describe("evaluation adapters", () => {
+  it("unions evaluator model ids from nets, existing results, and uploads", () => {
+    const data = {
+      dataset: "models", trace_count: 0, event_count: 0, activities: [], edges: [], variants: [],
+      petri_net: { place_count: 1, source: 0, sink: 0, transitions: [] },
+      powl_petri_net: { place_count: 1, source: 0, sink: 0, transitions: [] },
+      conformance: { heuristic: {} },
+      evaluation: { archived: {} },
+    } as unknown as MineraExport;
+    expect(evaluationModelIds(data, true)).toEqual(["alpha", "archived", "heuristic", "imported", "powl"]);
+  });
+
+  it("serializes every evaluation family setting with stable wire names", () => {
+    expect(evaluationQuery({
+      evaluation_family: "simplicity",
+      fitness_variant: "alignment_based",
+      precision_variant: "automaton_after_align",
+      precision_use_task_ids: true,
+      precision_max_states: 200,
+      generalization_variant: "generalization_token",
+      simplicity_variant: "extended_cyclomatic",
+      simplicity_arc_degree_k: 2.5,
+      simplicity_max_states: 300,
+      simplicity_initial_marking: [1, 0],
+      simplicity_final_marking: [0, 1],
+    })).toBe("evaluation_family=simplicity&fitness_variant=alignment_based&precision_variant=automaton_after_align&precision_use_task_ids=true&precision_max_states=200&generalization_variant=generalization_token&simplicity_variant=extended_cyclomatic&simplicity_arc_degree_k=2.5&simplicity_max_states=300&simplicity_initial_marking=1%2C0&simplicity_final_marking=0%2C1");
+    expect(evaluationQuery()).toBe("evaluation_family=replay_fitness");
+  });
+
+  it("validates supplied settings even when another family is selected", () => {
+    expect(() => evaluationQuery({ evaluation_family: "precision", simplicity_max_states: 0 })).toThrow(/positive integer/);
+    expect(() => evaluationQuery({ evaluation_family: "generalization", simplicity_initial_marking: [] })).toThrow(/non-negative integers/);
+    expect(() => evaluationQuery({ simplicity_arc_degree_k: Number.POSITIVE_INFINITY })).toThrow(/finite/);
+  });
+
+  it("serializes strict stochastic-language controls", () => {
+    expect(emdQuery({ normalize_masses: false, strict_equal_mass: true })).toBe("normalize_masses=false&strict_equal_mass=true");
+    expect(() => emdQuery({ normalize_masses: "yes" as unknown as boolean })).toThrow(/boolean/);
   });
 });
 

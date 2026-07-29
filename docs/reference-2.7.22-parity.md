@@ -72,7 +72,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Missing** |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete (core)** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport EMD are available; JSON/CLI/server/frontend adapters remain integration work |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Missing** |
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
@@ -103,7 +103,7 @@ are reconciled.
 ## Delivery order
 
 1. Stabilize the native semantic contracts and differential fixture format.
-2. Finish traditional discovery/conformance/evaluation variants.
+2. Finish remaining traditional discovery and conformance variants.
 3. Add OCEL 2 data, I/O, discovery, conformance, filtering, and visualization.
 4. Add declarative/POWL/transition-system and advanced simulation families.
 5. Add streaming, privacy, clustering/drift, transformations, and ML.
@@ -136,6 +136,30 @@ validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
+
+## Evaluation parity evidence
+
+Model evaluation covers token- and alignment-based replay fitness; token,
+alignment escaping-edge, and aligned-automaton precision; token-frequency
+generalization; arc-degree, extended Cardoso, and extended cyclomatic
+simplicity; and stochastic-language earth-mover distance. Automatic fitness
+and precision selection uses workflow-net soundness, while every concrete
+variation remains directly selectable. Precision exposes task-identity and
+search-state controls; simplicity exposes its arc-degree target, reachability
+bound, and explicit initial/final markings. Distance comparison accepts an
+external CSV or XES log and independently controls mass normalization and
+strict equal-mass validation.
+
+The shared request parser rejects empty, malformed, non-finite, negative, and
+out-of-range settings before evaluation. Results have standalone and embedded
+JSON forms, active-variation replay details, explicit completion/exhaustion
+state, and finite-or-null metrics. The CLI evaluates every built-in Petri model
+and an optional imported model; the local server evaluates any cached model and
+accepts multipart reference logs. The frontend exposes the complete option set,
+discovers models from actual nets as well as embedded results, and guards
+on-demand caches/results across analysis changes. Native evaluator, request,
+JSON, CLI, hidden-server, frontend-test, and production-build validation cover
+the full vertical.
 
 ## Token-replay parity evidence
 

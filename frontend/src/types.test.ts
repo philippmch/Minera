@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isMineraExport, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, type MineraExport } from "./types";
 
 describe("formatDuration", () => {
   it("renders a dash for non-positive or non-finite input", () => {
@@ -98,5 +98,42 @@ describe("isMineraExport", () => {
   it("rejects a non-finite trace_count", () => {
     expect(isMineraExport({ ...valid, trace_count: NaN })).toBe(false);
     expect(isMineraExport({ ...valid, trace_count: "1" })).toBe(false);
+  });
+});
+
+describe("model-quality result guards", () => {
+  it("accepts each evaluator family's standalone result", () => {
+    const common = { computed: true, error: null };
+    expect(isModelEvaluation({ miner: "inductive", replay_fitness: {
+      ...common, variant: "token_based", exhausted: false, fitness: 1, log_fitness: 1,
+      average_trace_fitness: 1, percentage_of_fitting_traces: 100, fitting_traces: 2,
+      trace_count: 2, total_cost: 0,
+    } })).toBe(true);
+    expect(isModelEvaluation({ miner: "alpha", precision: {
+      ...common, variant: "automaton_after_align", exhausted: false, precision: 0.75,
+      alignments: {},
+    } })).toBe(true);
+    expect(isModelEvaluation({ miner: "heuristic", generalization: {
+      ...common, variant: "generalization_token", score: 0.5, executed_transitions: 2,
+      transition_count: 3, transition_frequencies: [4, 0, 2],
+    } })).toBe(true);
+    expect(isModelEvaluation({ miner: "powl", simplicity: {
+      ...common, variant: "extended_cyclomatic", exhausted: false, simplicity: null,
+      complexity: null, value: null, vertices: 3, edges: 2, strongly_connected_components: 1,
+    } })).toBe(true);
+  });
+
+  it("rejects missing, multiple, or malformed evaluator families", () => {
+    expect(isModelEvaluation({ miner: "inductive" })).toBe(false);
+    expect(isModelEvaluation({ miner: "inductive", precision: {}, simplicity: {} })).toBe(false);
+    expect(isModelEvaluation({ miner: "inductive", precision: {
+      variant: "auto", computed: true, exhausted: false, error: null, precision: 1,
+    } })).toBe(false);
+  });
+
+  it("accepts computed and failed stochastic-language distances", () => {
+    expect(isEmdResult({ distance: 0.125, computed: true, normalized: true, error: null })).toBe(true);
+    expect(isEmdResult({ distance: null, computed: false, normalized: false, error: "unequal mass" })).toBe(true);
+    expect(isEmdResult({ distance: NaN, computed: false, normalized: false, error: null })).toBe(false);
   });
 });

@@ -829,6 +829,147 @@ void parse_native_adapter_params_contract() {
   assert(r.activity_key == "concept:name");
 }
 
+void parse_evaluation_params_defaults_and_variants() {
+  const auto defaults = minera::parse_evaluation_params(fields({}));
+  assert(defaults.family == minera::EvaluationFamily::kReplayFitness);
+  assert(defaults.replay_fitness_variant == minera::ReplayFitnessVariant::AUTO);
+  assert(defaults.precision_variant == minera::PrecisionVariant::AUTO);
+  assert(!defaults.precision_options.use_task_ids);
+  assert(defaults.precision_options.max_states == 100000);
+  assert(defaults.generalization_variant ==
+         minera::GeneralizationVariant::GENERALIZATION_TOKEN);
+  assert(defaults.simplicity_variant == minera::SimplicityVariant::ARC_DEGREE);
+  assert(defaults.simplicity_options.arc_degree_k == 2.0);
+  assert(defaults.simplicity_options.max_states == 100000);
+  assert(defaults.simplicity_options.initial_marking.empty());
+  assert(defaults.simplicity_options.final_marking.empty());
+
+  for (const auto& family : {"replay_fitness", "precision", "generalization",
+                             "simplicity"}) {
+    const auto parsed = minera::parse_evaluation_params(
+        fields({{"evaluation_family", family}}));
+    assert((family == std::string("replay_fitness") &&
+            parsed.family == minera::EvaluationFamily::kReplayFitness) ||
+           (family == std::string("precision") &&
+            parsed.family == minera::EvaluationFamily::kPrecision) ||
+           (family == std::string("generalization") &&
+            parsed.family == minera::EvaluationFamily::kGeneralization) ||
+           (family == std::string("simplicity") &&
+            parsed.family == minera::EvaluationFamily::kSimplicity));
+  }
+  for (const auto& value : {"auto", "token_based", "alignment_based"}) {
+    const auto parsed = minera::parse_evaluation_params(
+        fields({{"fitness_variant", value}}));
+    assert((value == std::string("auto") &&
+            parsed.replay_fitness_variant == minera::ReplayFitnessVariant::AUTO) ||
+           (value == std::string("token_based") &&
+            parsed.replay_fitness_variant == minera::ReplayFitnessVariant::TOKEN_BASED) ||
+           (value == std::string("alignment_based") &&
+            parsed.replay_fitness_variant == minera::ReplayFitnessVariant::ALIGNMENT_BASED));
+  }
+  for (const auto& value : {"auto", "etconformance_token", "align_etconformance",
+                            "automaton_after_align"}) {
+    const auto parsed = minera::parse_evaluation_params(
+        fields({{"precision_variant", value}}));
+    assert((value == std::string("auto") &&
+            parsed.precision_variant == minera::PrecisionVariant::AUTO) ||
+           (value == std::string("etconformance_token") &&
+            parsed.precision_variant == minera::PrecisionVariant::ETCONFORMANCE_TOKEN) ||
+           (value == std::string("align_etconformance") &&
+            parsed.precision_variant == minera::PrecisionVariant::ALIGN_ETCONFORMANCE) ||
+           (value == std::string("automaton_after_align") &&
+            parsed.precision_variant == minera::PrecisionVariant::AUTOMATON_AFTER_ALIGN));
+  }
+  for (const auto& value : {"arc_degree", "extended_cardoso",
+                            "extended_cyclomatic"}) {
+    const auto parsed = minera::parse_evaluation_params(
+        fields({{"simplicity_variant", value}}));
+    assert((value == std::string("arc_degree") &&
+            parsed.simplicity_variant == minera::SimplicityVariant::ARC_DEGREE) ||
+           (value == std::string("extended_cardoso") &&
+            parsed.simplicity_variant == minera::SimplicityVariant::EXTENDED_CARDOSO) ||
+           (value == std::string("extended_cyclomatic") &&
+            parsed.simplicity_variant == minera::SimplicityVariant::EXTENDED_CYCLOMATIC));
+  }
+  const auto all = minera::parse_evaluation_params(fields({
+      {"evaluation_family", "simplicity"},
+      {"fitness_variant", "alignment_based"},
+      {"precision_variant", "automaton_after_align"},
+      {"precision_use_task_ids", "true"},
+      {"precision_max_states", "1"},
+      {"generalization_variant", "generalization_token"},
+      {"simplicity_variant", "extended_cyclomatic"},
+      {"simplicity_arc_degree_k", "0"},
+      {"simplicity_max_states", "7"},
+      {"simplicity_initial_marking", "0, 1,2"},
+      {"simplicity_final_marking", "3,4"}}));
+  assert(all.precision_options.use_task_ids && all.precision_options.max_states == 1);
+  assert(all.simplicity_options.arc_degree_k == 0.0 &&
+         all.simplicity_options.max_states == 7);
+  assert((all.simplicity_options.initial_marking == std::vector<int>{0, 1, 2}));
+  assert((all.simplicity_options.final_marking == std::vector<int>{3, 4}));
+}
+
+void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
+  for (const auto& item : {
+           std::pair{"evaluation_family", "unknown"},
+           std::pair{"fitness_variant", "token"},
+           std::pair{"precision_variant", "align"},
+           std::pair{"precision_use_task_ids", "yes"},
+           std::pair{"precision_max_states", "0"},
+           std::pair{"precision_max_states", "184467440737095516160"},
+           std::pair{"generalization_variant", "token"},
+           std::pair{"simplicity_variant", "cardoso"},
+           std::pair{"simplicity_arc_degree_k", "-0.1"},
+           std::pair{"simplicity_arc_degree_k", "nan"},
+           std::pair{"simplicity_arc_degree_k", "inf"},
+           std::pair{"simplicity_max_states", "0"},
+           std::pair{"simplicity_max_states", "not-an-integer"},
+           std::pair{"simplicity_initial_marking", "1,,2"},
+           std::pair{"simplicity_initial_marking", "-1"},
+           std::pair{"simplicity_initial_marking", "999999999999999999999999"},
+           std::pair{"simplicity_final_marking", " , "}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_evaluation_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  for (const auto& field_name : {"evaluation_family", "precision_use_task_ids",
+                                 "simplicity_initial_marking"}) {
+    const std::map<std::string, std::string> explicit_empty = {
+        {field_name, ""}};
+    const auto lookup = [&explicit_empty](std::string_view key) -> std::string {
+      const auto it = explicit_empty.find(std::string(key));
+      return it == explicit_empty.end() ? std::string{} : it->second;
+    };
+    const auto present = [&explicit_empty](std::string_view key) {
+      return explicit_empty.contains(std::string(key));
+    };
+    bool threw = false;
+    try {
+      (void)minera::parse_evaluation_params(lookup, present);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+
+  // Validation is independent of the selected family.
+  bool threw = false;
+  try {
+    (void)minera::parse_evaluation_params(fields({
+        {"evaluation_family", "precision"},
+        {"simplicity_arc_degree_k", "nan"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void native_json_contracts() {
   minera::DecomposedAlignmentResult d; d.diagnostics.note = "ok";
   minera::DecomposedAlignmentTrace dt;
@@ -1061,6 +1202,8 @@ int main() {
   parse_process_tree_alignment_params_maps_variants_and_limits();
   parse_process_tree_alignment_params_rejects_bad_values();
   parse_native_adapter_params_contract();
+  parse_evaluation_params_defaults_and_variants();
+  parse_evaluation_params_rejects_invalid_and_explicit_empty_values();
   native_json_contracts();
   return 0;
 }

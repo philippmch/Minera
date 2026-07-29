@@ -181,3 +181,17 @@ export function isJsonExport(name: string): boolean {
 export function delimiterForFile(name: string): string | undefined {
   return /\.tsv$/i.test(name) ? "\t" : undefined;
 }
+
+/** Every Petri model that the quality evaluators can address in this view. */
+export function evaluationModelIds(data: MineraExport, importedAvailable = false): string[] {
+  const ids = new Set<string>([
+    ...Object.keys(data.conformance ?? {}),
+    ...Object.keys(data.evaluation ?? {}),
+  ]);
+  if (data.inductive_petri_net) ids.add("inductive");
+  if (data.petri_net) ids.add("alpha");
+  if (data.heuristic_petri_net) ids.add("heuristic");
+  if (data.powl_petri_net) ids.add("powl");
+  if (importedAvailable) ids.add("imported");
+  return [...ids].sort();
+}

@@ -13,6 +13,10 @@ import {
   type DfgAlignmentResult,
   type EditDistanceOptions,
   type EditDistanceResult,
+  type EvaluationOptions,
+  type ModelEvaluation,
+  type EmdOptions,
+  type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
   type DecomposedAlignmentOptions,
@@ -25,6 +29,8 @@ import {
   type ProcessTreeReductionResult,
   isDfgAlignmentResult,
   isEditDistanceResult,
+  isModelEvaluation,
+  isEmdResult,
   isProcessTreeAlignmentResult,
   isDecomposedAlignmentResult,
   isPetriAntiAlignmentResult,
@@ -769,6 +775,99 @@ export async function alignEditDistance(reference: File, options: EditDistanceOp
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isEditDistanceResult(parsed)) throw new Error("the Minera backend returned an invalid edit-distance alignment");
+  return parsed;
+}
+
+/** Stable, validated query serialization for one model-quality evaluation. */
+export function evaluationQuery(options: EvaluationOptions = {}): string {
+  const family = options.evaluation_family ?? "replay_fitness";
+  if (!["replay_fitness", "precision", "generalization", "simplicity"].includes(family)) {
+    throw new Error("evaluation_family is invalid");
+  }
+  if (options.fitness_variant !== undefined && !["auto", "token_based", "alignment_based"].includes(options.fitness_variant)) {
+    throw new Error("fitness_variant is invalid");
+  }
+  if (options.precision_variant !== undefined && !["auto", "etconformance_token", "align_etconformance", "automaton_after_align"].includes(options.precision_variant)) {
+    throw new Error("precision_variant is invalid");
+  }
+  if (options.generalization_variant !== undefined && options.generalization_variant !== "generalization_token") {
+    throw new Error("generalization_variant is invalid");
+  }
+  if (options.simplicity_variant !== undefined && !["arc_degree", "extended_cardoso", "extended_cyclomatic"].includes(options.simplicity_variant)) {
+    throw new Error("simplicity_variant is invalid");
+  }
+  if (options.precision_use_task_ids !== undefined && typeof options.precision_use_task_ids !== "boolean") {
+    throw new Error("precision_use_task_ids must be boolean");
+  }
+  for (const [name, value] of [
+    ["precision_max_states", options.precision_max_states],
+    ["simplicity_max_states", options.simplicity_max_states],
+  ] as const) {
+    if (value !== undefined && (!Number.isInteger(value) || value < 1)) throw new Error(`${name} must be a positive integer`);
+  }
+  if (options.simplicity_arc_degree_k !== undefined && (!Number.isFinite(options.simplicity_arc_degree_k) || options.simplicity_arc_degree_k < 0)) {
+    throw new Error("simplicity_arc_degree_k must be a finite non-negative number");
+  }
+  for (const [name, value] of [
+    ["simplicity_initial_marking", options.simplicity_initial_marking],
+    ["simplicity_final_marking", options.simplicity_final_marking],
+  ] as const) {
+    if (value !== undefined && (value.length === 0 || value.some((item) => !Number.isInteger(item) || item < 0))) {
+      throw new Error(`${name} must contain non-negative integers`);
+    }
+  }
+
+  const query = new URLSearchParams();
+  query.set("evaluation_family", family);
+  const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : String(value)); };
+  add("fitness_variant", options.fitness_variant);
+  add("precision_variant", options.precision_variant);
+  add("precision_use_task_ids", options.precision_use_task_ids);
+  add("precision_max_states", options.precision_max_states);
+  add("generalization_variant", options.generalization_variant);
+  add("simplicity_variant", options.simplicity_variant);
+  add("simplicity_arc_degree_k", options.simplicity_arc_degree_k);
+  add("simplicity_max_states", options.simplicity_max_states);
+  add("simplicity_initial_marking", options.simplicity_initial_marking);
+  add("simplicity_final_marking", options.simplicity_final_marking);
+  return query.toString();
+}
+
+/** Runs one selected quality evaluator against a cached model. */
+export async function evaluateModel(miner: string, options: EvaluationOptions = {}): Promise<ModelEvaluation> {
+  const query = new URLSearchParams(evaluationQuery(options));
+  query.set("miner", miner);
+  return postChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
+}
+
+/** Stable query serialization for stochastic-language distance controls. */
+export function emdQuery(options: EmdOptions = {}): string {
+  for (const [name, value] of Object.entries(options)) {
+    if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
+  }
+  const query = new URLSearchParams();
+  if (options.normalize_masses !== undefined) query.set("normalize_masses", String(options.normalize_masses));
+  if (options.strict_equal_mass !== undefined) query.set("strict_equal_mass", String(options.strict_equal_mass));
+  return query.toString();
+}
+
+/** Compares the cached log's stochastic language with an uploaded reference log. */
+export async function evaluateEmd(reference: File, options: EmdOptions = {}): Promise<EmdResult> {
+  const form = new FormData();
+  form.append("reference_log", reference, reference.name);
+  const query = emdQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/evaluate-emd${query ? `?${query}` : ""}`, { method: "POST", body: form });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isEmdResult(parsed)) throw new Error("the Minera backend returned an invalid stochastic-language distance");
   return parsed;
 }
 

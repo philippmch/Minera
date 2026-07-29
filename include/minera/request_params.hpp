@@ -8,6 +8,7 @@
 
 #include "minera/alpha_miner.hpp"
 #include "minera/conformance.hpp"
+#include "minera/evaluation.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
@@ -81,6 +82,24 @@ struct MineParams {
   BatchDiscoveryOptions batch_options;
 };
 
+enum class EvaluationFamily {
+  kReplayFitness,
+  kPrecision,
+  kGeneralization,
+  kSimplicity,
+};
+
+struct EvaluationParams {
+  EvaluationFamily family = EvaluationFamily::kReplayFitness;
+  ReplayFitnessVariant replay_fitness_variant = ReplayFitnessVariant::AUTO;
+  PrecisionVariant precision_variant = PrecisionVariant::AUTO;
+  PrecisionOptions precision_options;
+  GeneralizationVariant generalization_variant =
+      GeneralizationVariant::GENERALIZATION_TOKEN;
+  SimplicityVariant simplicity_variant = SimplicityVariant::ARC_DEGREE;
+  SimplicityOptions simplicity_options;
+};
+
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
 // Optional companion lookup that distinguishes an omitted field from a
@@ -151,6 +170,14 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
     const FieldLookup& field);
 [[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parse the model-quality evaluation request contract. Every supplied option
+// is validated, even when its family is not selected, so malformed values
+// cannot be hidden by an unrelated evaluation family.
+[[nodiscard]] EvaluationParams parse_evaluation_params(
+    const FieldLookup& field);
+[[nodiscard]] EvaluationParams parse_evaluation_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

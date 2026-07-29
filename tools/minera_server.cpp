@@ -519,6 +519,119 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+void handle_evaluate(const httplib::Request& request,
+                     httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  const std::string miner = request.get_param_value("miner");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+
+  try {
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto params = minera::parse_evaluation_params(lookup, present);
+    minera::ModelEvaluation result;
+    result.miner = miner;
+    switch (params.family) {
+      case minera::EvaluationFamily::kReplayFitness:
+        result.replay_fitness = minera::evaluate_replay_fitness(
+            session->log, it->second, params.replay_fitness_variant);
+        break;
+      case minera::EvaluationFamily::kPrecision:
+        result.precision = minera::evaluate_precision(
+            session->log, it->second, params.precision_variant,
+            params.precision_options);
+        break;
+      case minera::EvaluationFamily::kGeneralization:
+        result.generalization = minera::evaluate_generalization(
+            session->log, it->second, params.generalization_variant);
+        break;
+      case minera::EvaluationFamily::kSimplicity:
+        result.simplicity = minera::evaluate_simplicity(
+            it->second, params.simplicity_variant, params.simplicity_options);
+        break;
+    }
+    response.set_content(
+        minera::model_evaluation_json(result, &session->graph),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_evaluate_emd(const httplib::Request& request,
+                         httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+
+  try {
+    if (!request.is_multipart_form_data() ||
+        !request.has_file("reference_log")) {
+      throw std::invalid_argument("missing form field: reference_log");
+    }
+    const auto parse_boolean = [&](std::string_view name, bool fallback) {
+      const auto key = std::string(name);
+      if (!request.has_param(key)) return fallback;
+      const auto value = request.get_param_value(key);
+      if (value == "true" || value == "1") return true;
+      if (value == "false" || value == "0") return false;
+      throw std::invalid_argument(key +
+                                  " expects true, false, 1, or 0");
+    };
+    minera::EmdOptions options;
+    options.normalize_masses =
+        parse_boolean("normalize_masses", options.normalize_masses);
+    options.strict_equal_mass =
+        parse_boolean("strict_equal_mass", options.strict_equal_mass);
+
+    const auto& file = request.get_file_value("reference_log");
+    std::istringstream input(file.content);
+    const auto reference =
+        minera::looks_like_xes(file.filename, file.content)
+            ? minera::import_xes_event_log(input)
+            : minera::import_csv_event_log(input);
+    const auto result = minera::evaluate_emd(
+        minera::derive_stochastic_language(session->log),
+        minera::derive_stochastic_language(reference), options);
+    response.set_content(minera::emd_json(result), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // On-demand alignment directly against the latest inductive process tree.
 void handle_align_process_tree(const httplib::Request& request,
                                httplib::Response& response) {
@@ -938,6 +1051,8 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
+  server.Options("/api/evaluate", preflight);
+  server.Options("/api/evaluate-emd", preflight);
   server.Options("/api/align-process-tree", preflight);
   server.Options("/api/align-decomposed", preflight);
   server.Options("/api/align-petri-anti", preflight);
@@ -950,6 +1065,8 @@ int main(int argc, char** argv) {
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
+  server.Post("/api/evaluate", handle_evaluate);
+  server.Post("/api/evaluate-emd", handle_evaluate_emd);
   server.Post("/api/align-process-tree", handle_align_process_tree);
   server.Post("/api/align-decomposed", handle_align_decomposed);
   server.Post("/api/align-petri-anti", handle_align_petri_anti);

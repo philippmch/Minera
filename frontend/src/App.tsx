@@ -4,6 +4,9 @@ import {
   type AlignmentOptions,
   type DfgAlignmentOptions,
   type EditDistanceOptions,
+  type EvaluationOptions,
+  type ModelEvaluation,
+  type EmdOptions,
   type ProcessTreeAlignmentOptions,
   type DecomposedAlignmentOptions,
   type PetriAntiAlignmentOptions,
@@ -42,6 +45,10 @@ import {
   alignModel,
   alignDfg,
   alignEditDistance,
+  evaluateModel,
+  evaluationQuery,
+  evaluateEmd,
+  emdQuery,
   alignProcessTree,
   processTreeAlignmentQuery,
   alignDecomposed,
@@ -102,6 +109,11 @@ export default function App() {
   const petriAntiCache = useRef<Record<string, import("./types").PetriAntiAlignmentResult>>({});
   const petriMultiCache = useRef<Record<string, import("./types").PetriMultiAlignmentResult>>({});
   const reductionCache = useRef<Record<string, import("./types").ProcessTreeReductionResult>>({});
+  const evaluationCache = useRef<Record<string, ModelEvaluation>>({});
+  const emdCache = useRef<Record<string, import("./types").EmdResult>>({});
+  // Any result started under an older backend session may still resolve, but
+  // must never repopulate caches cleared for the new session.
+  const cacheGeneration = useRef(0);
 
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
@@ -121,8 +133,9 @@ export default function App() {
       if (embedded && isDefault) return embedded;
       const cached = alignCache.current[cacheKey];
       if (cached) return cached;
+      const generation = cacheGeneration.current;
       const result = await alignModel(minerId, options);
-      alignCache.current = { ...alignCache.current, [cacheKey]: result };
+      if (generation === cacheGeneration.current) alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },
     [data],
@@ -132,51 +145,77 @@ export default function App() {
   const requestDecisions = useCallback(async (minerId: string): Promise<Decisions> => {
     const cached = decideCache.current[minerId];
     if (cached) return cached;
+    const generation = cacheGeneration.current;
     const result = await decideModel(minerId);
-    decideCache.current = { ...decideCache.current, [minerId]: result };
+    if (generation === cacheGeneration.current) decideCache.current = { ...decideCache.current, [minerId]: result };
     return result;
   }, []);
 
   const requestDfg = useCallback(async (options: DfgAlignmentOptions = {}) => {
     const key = JSON.stringify(options);
     if (dfgCache.current[key]) return dfgCache.current[key];
+    const generation = cacheGeneration.current;
     const result = await alignDfg(options);
-    dfgCache.current = { ...dfgCache.current, [key]: result };
+    if (generation === cacheGeneration.current) dfgCache.current = { ...dfgCache.current, [key]: result };
     return result;
   }, []);
   const requestEditDistance = useCallback(async (reference: File, options: EditDistanceOptions = {}) => {
     const key = `${reference.name}|${reference.size}|${reference.lastModified}|${JSON.stringify(options)}`;
     if (editCache.current[key]) return editCache.current[key];
+    const generation = cacheGeneration.current;
     const result = await alignEditDistance(reference, options);
-    editCache.current = { ...editCache.current, [key]: result };
+    if (generation === cacheGeneration.current) editCache.current = { ...editCache.current, [key]: result };
+    return result;
+  }, []);
+  const requestEvaluation = useCallback(async (miner: string, options: EvaluationOptions = {}) => {
+    const key = `${miner}|${evaluationQuery(options)}`;
+    const cached = evaluationCache.current[key];
+    if (cached) return cached;
+    const generation = cacheGeneration.current;
+    const result = await evaluateModel(miner, options);
+    if (generation === cacheGeneration.current) evaluationCache.current = { ...evaluationCache.current, [key]: result };
+    return result;
+  }, []);
+  const requestEmd = useCallback(async (reference: File, options: EmdOptions = {}) => {
+    const key = `${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
+    const cached = emdCache.current[key];
+    if (cached) return cached;
+    const generation = cacheGeneration.current;
+    const result = await evaluateEmd(reference, options);
+    if (generation === cacheGeneration.current) emdCache.current = { ...emdCache.current, [key]: result };
     return result;
   }, []);
   const requestProcessTree = useCallback(async (options: ProcessTreeAlignmentOptions = {}) => {
     const key = processTreeAlignmentQuery(options);
     if (processTreeCache.current[key]) return processTreeCache.current[key];
+    const generation = cacheGeneration.current;
     const result = await alignProcessTree(options);
-    processTreeCache.current = { ...processTreeCache.current, [key]: result };
+    if (generation === cacheGeneration.current) processTreeCache.current = { ...processTreeCache.current, [key]: result };
     return result;
   }, []);
   const requestDecomposed = useCallback(async (miner: string, options: DecomposedAlignmentOptions = {}) => {
     const key = `${miner}|${decomposedAlignmentQuery(options)}`;
     if (decomposedCache.current[key]) return decomposedCache.current[key];
-    const result = await alignDecomposed(miner, options); decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current;
+    const result = await alignDecomposed(miner, options); if (generation === cacheGeneration.current) decomposedCache.current = { ...decomposedCache.current, [key]: result }; return result;
   }, []);
   const requestPetriAnti = useCallback(async (miner: string, options: PetriAntiAlignmentOptions = {}) => {
     const key = `${miner}|${petriAntiAlignmentQuery(options)}`;
     if (petriAntiCache.current[key]) return petriAntiCache.current[key];
-    const result = await alignPetriAnti(miner, options); petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current;
+    const result = await alignPetriAnti(miner, options); if (generation === cacheGeneration.current) petriAntiCache.current = { ...petriAntiCache.current, [key]: result }; return result;
   }, []);
   const requestPetriMulti = useCallback(async (miner: string, options: PetriMultiAlignmentOptions = {}) => {
     const key = `${miner}|${petriMultiAlignmentQuery(options)}`;
     if (petriMultiCache.current[key]) return petriMultiCache.current[key];
-    const result = await alignPetriMulti(miner, options); petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current;
+    const result = await alignPetriMulti(miner, options); if (generation === cacheGeneration.current) petriMultiCache.current = { ...petriMultiCache.current, [key]: result }; return result;
   }, []);
   const requestReduction = useCallback(async (traceIndex: number, options: ProcessTreeReductionOptions = {}) => {
     const key = `${traceIndex}|${processTreeReductionQuery(options)}`;
     if (reductionCache.current[key]) return reductionCache.current[key];
-    const result = await reduceProcessTree(traceIndex, options); reductionCache.current = { ...reductionCache.current, [key]: result }; return result;
+    const generation = cacheGeneration.current;
+    const result = await reduceProcessTree(traceIndex, options); if (generation === cacheGeneration.current) reductionCache.current = { ...reductionCache.current, [key]: result }; return result;
   }, []);
 
   // Checks an uploaded PNML or BPMN model against the mined log. A new upload
@@ -184,6 +223,7 @@ export default function App() {
   // decisions are dropped.
   const requestModelCheck = useCallback(async (file: File) => {
     const result = await checkModel(file);
+    cacheGeneration.current += 1;
     alignCache.current = Object.fromEntries(
       Object.entries(alignCache.current).filter(([key]) => !key.startsWith("imported|")),
     );
@@ -192,10 +232,12 @@ export default function App() {
     decomposedCache.current = Object.fromEntries(Object.entries(decomposedCache.current).filter(([key]) => !key.startsWith("imported|")));
     petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.startsWith("imported|")));
     petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.startsWith("imported|")));
+    evaluationCache.current = Object.fromEntries(Object.entries(evaluationCache.current).filter(([key]) => !key.startsWith("imported|")));
     return result;
   }, []);
 
   const openData = (parsed: MineraExport) => {
+    cacheGeneration.current += 1;
     setData(parsed);
     alignCache.current = {};
     decideCache.current = {};
@@ -206,6 +248,8 @@ export default function App() {
     petriAntiCache.current = {};
     petriMultiCache.current = {};
     reductionCache.current = {};
+    evaluationCache.current = {};
+    emdCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -263,6 +307,7 @@ export default function App() {
     setMining(true);
     mineCsv(source.file, { delimiter: source.delimiter, ...filters })
       .then((result) => {
+        cacheGeneration.current += 1;
         setData(result);
         // The re-mine replaced the server session, so cached on-demand
         // results belong to the previous analysis.
@@ -275,6 +320,8 @@ export default function App() {
         petriAntiCache.current = {};
         petriMultiCache.current = {};
         reductionCache.current = {};
+        evaluationCache.current = {};
+        emdCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
@@ -405,6 +452,7 @@ export default function App() {
         generator={data.generator}
         onOpenFile={loadFile}
         onHome={() => {
+          cacheGeneration.current += 1;
           setData(null);
           setError(null);
           setSource(null);
@@ -511,6 +559,8 @@ export default function App() {
             onRequestPetriAnti={requestPetriAnti}
             onRequestPetriMulti={requestPetriMulti}
             onRequestReduction={requestReduction}
+            onRequestEvaluation={requestEvaluation}
+            onRequestEmd={requestEmd}
           />
         </main>
       )}

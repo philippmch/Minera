@@ -1470,6 +1470,196 @@ void write_performance_spectrum(std::ostream& out,
   out << "]}";
 }
 
+const char* replay_fitness_variant_name(ReplayFitnessVariant variant) {
+  switch (variant) {
+    case ReplayFitnessVariant::AUTO: return "auto";
+    case ReplayFitnessVariant::TOKEN_BASED: return "token_based";
+    case ReplayFitnessVariant::ALIGNMENT_BASED: return "alignment_based";
+  }
+  return "auto";
+}
+
+const char* precision_variant_name(PrecisionVariant variant) {
+  switch (variant) {
+    case PrecisionVariant::AUTO: return "auto";
+    case PrecisionVariant::ETCONFORMANCE_TOKEN: return "etconformance_token";
+    case PrecisionVariant::ALIGN_ETCONFORMANCE: return "align_etconformance";
+    case PrecisionVariant::AUTOMATON_AFTER_ALIGN:
+      return "automaton_after_align";
+  }
+  return "auto";
+}
+
+const char* generalization_variant_name(GeneralizationVariant variant) {
+  switch (variant) {
+    case GeneralizationVariant::GENERALIZATION_TOKEN:
+      return "generalization_token";
+  }
+  return "generalization_token";
+}
+
+const char* simplicity_variant_name(SimplicityVariant variant) {
+  switch (variant) {
+    case SimplicityVariant::ARC_DEGREE: return "arc_degree";
+    case SimplicityVariant::EXTENDED_CARDOSO: return "extended_cardoso";
+    case SimplicityVariant::EXTENDED_CYCLOMATIC:
+      return "extended_cyclomatic";
+  }
+  return "arc_degree";
+}
+
+void write_finite_or_null(std::ostream& out, double value) {
+  if (std::isfinite(value)) out << value;
+  else out << "null";
+}
+
+void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
+                          const DirectlyFollowsGraph* graph) {
+  out << "{\"variant\": ";
+  write_json_string(out, replay_fitness_variant_name(result.variant));
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"exhausted\": " << (result.exhausted ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << ", \"fitness\": ";
+  write_finite_or_null(out, result.fitness);
+  out << ", \"log_fitness\": ";
+  write_finite_or_null(out, result.log_fitness);
+  out << ", \"average_trace_fitness\": ";
+  write_finite_or_null(out, result.average_trace_fitness);
+  out << ", \"percentage_of_fitting_traces\": ";
+  write_finite_or_null(out, result.percentage_fit_traces);
+  out << ", \"fitting_traces\": " << result.fitting_traces
+      << ", \"trace_count\": " << result.trace_count
+      << ", \"total_cost\": ";
+  write_finite_or_null(out, result.total_cost);
+  if (graph != nullptr && result.variant == ReplayFitnessVariant::TOKEN_BASED) {
+    out << ", \"token_replay\": ";
+    write_conformance(out, result.token_result, *graph);
+  } else if (graph != nullptr &&
+             result.variant == ReplayFitnessVariant::ALIGNMENT_BASED) {
+    out << ", \"alignments\": ";
+    write_alignments(out, result.alignment_result, *graph);
+  }
+  out << '}';
+}
+
+void write_precision(std::ostream& out, const PrecisionResult& result,
+                     const DirectlyFollowsGraph* graph) {
+  out << "{\"variant\": ";
+  write_json_string(out, precision_variant_name(result.variant));
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"exhausted\": " << (result.exhausted ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << ", \"precision\": ";
+  write_finite_or_null(out, result.precision);
+  if (graph != nullptr &&
+      result.variant == PrecisionVariant::ETCONFORMANCE_TOKEN) {
+    out << ", \"token_replay\": ";
+    write_conformance(out, result.token_result, *graph);
+  } else if (graph != nullptr &&
+             (result.variant == PrecisionVariant::ALIGN_ETCONFORMANCE ||
+              result.variant == PrecisionVariant::AUTOMATON_AFTER_ALIGN)) {
+    out << ", \"alignments\": ";
+    write_alignments(out, result.alignment_result, *graph);
+  }
+  out << '}';
+}
+
+void write_generalization(std::ostream& out,
+                          const GeneralizationResult& result) {
+  out << "{\"variant\": ";
+  write_json_string(out, generalization_variant_name(result.variant));
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << ", \"score\": ";
+  write_finite_or_null(out, result.generalization);
+  out << ", \"executed_transitions\": " << result.executed_transitions
+      << ", \"transition_count\": " << result.transition_count
+      << ", \"transition_frequencies\": [";
+  for (std::size_t i = 0; i < result.transition_frequencies.size(); ++i) {
+    if (i != 0) out << ", ";
+    out << result.transition_frequencies[i];
+  }
+  out << "]}";
+}
+
+void write_simplicity(std::ostream& out, const SimplicityResult& result) {
+  out << "{\"variant\": ";
+  write_json_string(out, simplicity_variant_name(result.variant));
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"exhausted\": " << (result.exhausted ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << ", \"simplicity\": ";
+  write_finite_or_null(out, result.simplicity);
+  out << ", \"complexity\": ";
+  write_finite_or_null(out, result.complexity);
+  out << ", \"value\": ";
+  write_finite_or_null(out, result.value);
+  out << ", \"vertices\": " << result.vertices
+      << ", \"edges\": " << result.edges
+      << ", \"strongly_connected_components\": "
+      << result.strongly_connected_components << '}';
+}
+
+void write_emd(std::ostream& out, const EmdResult& result) {
+  out << "{\"distance\": ";
+  write_finite_or_null(out, result.distance);
+  out << ", \"computed\": " << (result.computed ? "true" : "false")
+      << ", \"normalized\": " << (result.normalized ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << '}';
+}
+
+void write_model_evaluation(std::ostream& out, const ModelEvaluation& result,
+                            const DirectlyFollowsGraph* graph,
+                            bool include_miner) {
+  out << '{';
+  bool first = true;
+  const auto field = [&](std::string_view name, const auto& value) {
+    if (!first) out << ", ";
+    first = false;
+    write_json_string(out, name);
+    out << ": ";
+    value(out);
+  };
+  if (include_miner) {
+    field("miner", [&](std::ostream& stream) {
+      write_json_string(stream, result.miner);
+    });
+  }
+  if (result.replay_fitness) {
+    field("replay_fitness", [&](std::ostream& stream) {
+      write_replay_fitness(stream, *result.replay_fitness, graph);
+    });
+  }
+  if (result.precision) {
+    field("precision", [&](std::ostream& stream) {
+      write_precision(stream, *result.precision, graph);
+    });
+  }
+  if (result.generalization) {
+    field("generalization", [&](std::ostream& stream) {
+      write_generalization(stream, *result.generalization);
+    });
+  }
+  if (result.simplicity) {
+    field("simplicity", [&](std::ostream& stream) {
+      write_simplicity(stream, *result.simplicity);
+    });
+  }
+  out << '}';
+}
+
 void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
                                    const DirectlyFollowsGraph& graph) {
   if (spectrum.activities.size() < 2) {
@@ -2562,7 +2752,9 @@ void write_analysis_json(std::ostream& out,
                          const PetriAntiAlignmentResult* petri_anti_alignment,
                          const PetriMultiAlignmentResult* petri_multi_alignment,
                          const ProcessTree* reduced_process_tree,
-                         std::size_t reduced_trace_index) {
+                         std::size_t reduced_trace_index,
+                         const std::vector<ModelEvaluation>* evaluation,
+                         const EmdResult* earth_movers_distance) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2600,6 +2792,19 @@ void write_analysis_json(std::ostream& out,
   if (spectrum != nullptr) validate_performance_spectrum(*spectrum, graph);
   if (batch_discovery != nullptr) {
     validate_batch_discovery(*batch_discovery, log, graph);
+  }
+  if (evaluation != nullptr) {
+    std::set<std::string> miners;
+    for (const auto& result : *evaluation) {
+      if (result.miner.empty()) {
+        throw std::invalid_argument(
+            "evaluation result requires a non-empty miner name");
+      }
+      if (!miners.insert(result.miner).second) {
+        throw std::invalid_argument("duplicate evaluation miner: " +
+                                    result.miner);
+      }
+    }
   }
   out << "{\n";
   out << "  \"dataset\": ";
@@ -2833,6 +3038,20 @@ void write_analysis_json(std::ostream& out,
         << process_tree_reduction_json(*reduced_process_tree, graph,
                                        reduced_trace_index);
   }
+  if (evaluation != nullptr) {
+    out << ",\n  \"evaluation\": {";
+    for (std::size_t i = 0; i < evaluation->size(); ++i) {
+      if (i != 0) out << ", ";
+      write_json_string(out, (*evaluation)[i].miner);
+      out << ": ";
+      write_model_evaluation(out, (*evaluation)[i], &graph, false);
+    }
+    out << '}';
+  }
+  if (earth_movers_distance != nullptr) {
+    out << ",\n  \"earth_movers_distance\": ";
+    write_emd(out, *earth_movers_distance);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -2883,7 +3102,9 @@ std::string analysis_json(std::string_view dataset,
                           const PetriAntiAlignmentResult* petri_anti_alignment,
                           const PetriMultiAlignmentResult* petri_multi_alignment,
                           const ProcessTree* reduced_process_tree,
-                          std::size_t reduced_trace_index) {
+                          std::size_t reduced_trace_index,
+                          const std::vector<ModelEvaluation>* evaluation,
+                          const EmdResult* earth_movers_distance) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -2898,7 +3119,47 @@ std::string analysis_json(std::string_view dataset,
                       dfg_projection, dfg_projected_log, edit_projected_log,
                       process_tree_alignment, decomposed_alignment,
                       petri_anti_alignment, petri_multi_alignment,
-                      reduced_process_tree, reduced_trace_index);
+                      reduced_process_tree, reduced_trace_index, evaluation,
+                      earth_movers_distance);
+  return out.str();
+}
+
+std::string replay_fitness_json(const ReplayFitnessResult& result,
+                                const DirectlyFollowsGraph* graph) {
+  std::ostringstream out;
+  write_replay_fitness(out, result, graph);
+  return out.str();
+}
+
+std::string precision_json(const PrecisionResult& result,
+                           const DirectlyFollowsGraph* graph) {
+  std::ostringstream out;
+  write_precision(out, result, graph);
+  return out.str();
+}
+
+std::string generalization_json(const GeneralizationResult& result) {
+  std::ostringstream out;
+  write_generalization(out, result);
+  return out.str();
+}
+
+std::string simplicity_json(const SimplicityResult& result) {
+  std::ostringstream out;
+  write_simplicity(out, result);
+  return out.str();
+}
+
+std::string emd_json(const EmdResult& result) {
+  std::ostringstream out;
+  write_emd(out, result);
+  return out.str();
+}
+
+std::string model_evaluation_json(const ModelEvaluation& result,
+                                  const DirectlyFollowsGraph* graph) {
+  std::ostringstream out;
+  write_model_evaluation(out, result, graph, true);
   return out.str();
 }
 

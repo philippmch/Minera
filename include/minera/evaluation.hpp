@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -121,6 +122,16 @@ struct EmdResult {
   bool computed = true;
   bool normalized = false;
   std::string error;
+};
+
+// A request-scoped container for the selected model-quality evaluation.  Only
+// the result corresponding to the requested family is populated.
+struct ModelEvaluation {
+  std::string miner;
+  std::optional<ReplayFitnessResult> replay_fitness;
+  std::optional<PrecisionResult> precision;
+  std::optional<GeneralizationResult> generalization;
+  std::optional<SimplicityResult> simplicity;
 };
 
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(

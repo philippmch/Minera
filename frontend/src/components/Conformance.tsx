@@ -15,6 +15,11 @@ import {
   type DfgAlignmentResult,
   type EditDistanceOptions,
   type EditDistanceResult,
+  type EvaluationFamily,
+  type EvaluationOptions,
+  type ModelEvaluation,
+  type EmdOptions,
+  type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
   type DecomposedAlignmentOptions,
@@ -34,6 +39,7 @@ import {
   flattenDecisionRules,
 } from "../conformance";
 import { MINER_GROUPS } from "../miners";
+import { evaluationModelIds } from "../app-logic";
 
 type Step = "miner" | "method" | "result";
 
@@ -64,6 +70,8 @@ export function Conformance({
   onRequestPetriAnti,
   onRequestPetriMulti,
   onRequestReduction,
+  onRequestEvaluation,
+  onRequestEmd,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -76,26 +84,41 @@ export function Conformance({
   onRequestPetriAnti?: (miner: string, options?: PetriAntiAlignmentOptions) => Promise<PetriAntiAlignmentResult>;
   onRequestPetriMulti?: (miner: string, options?: PetriMultiAlignmentOptions) => Promise<PetriMultiAlignmentResult>;
   onRequestReduction?: (traceIndex: number, options?: ProcessTreeReductionOptions) => Promise<ProcessTreeReductionResult>;
+  onRequestEvaluation?: (miner: string, options?: EvaluationOptions) => Promise<ModelEvaluation>;
+  onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
 }) {
+  const analysisIdentity = useRef({ data, id: 0 });
+  if (analysisIdentity.current.data !== data) {
+    analysisIdentity.current = { data, id: analysisIdentity.current.id + 1 };
+  }
+  const analysisId = analysisIdentity.current.id;
   const [step, setStep] = useState<Step>("miner");
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
 
   // A user-uploaded PNML or BPMN model, checked server-side against the mined log.
   const [imported, setImported] = useState<ImportedModelCheck | null>(null);
+  const [importedAnalysisId, setImportedAnalysisId] = useState<number | null>(null);
+  const [importedGeneration, setImportedGeneration] = useState(0);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const uploadSequence = useRef(0);
 
   // A re-mine invalidates the uploaded model's results (and the server drops
   // its cached net), so fall back to the start of the wizard.
   useEffect(() => {
+    uploadSequence.current += 1;
     setImported(null);
+    setImportedAnalysisId(null);
+    setImportedGeneration(0);
+    setImporting(false);
     setImportError(null);
     setMinerId(null);
     setStep("miner");
   }, [data]);
 
   const isImported = minerId === IMPORTED;
+  const currentImported = importedAnalysisId === analysisId ? imported : null;
   const miner = MINER_GROUPS.find((g) => g.id === minerId) ?? null;
   // Used in prose ("The … model isn't sound"), so lowercase for the upload.
   const minerName = isImported ? "imported" : miner?.name ?? "";
@@ -113,16 +136,23 @@ export function Conformance({
 
   const uploadModel = async (file: File) => {
     if (!onCheckModel) return;
+    const sequence = ++uploadSequence.current;
+    const requestedAnalysis = analysisId;
     setImporting(true);
     setImportError(null);
     try {
       const result = await onCheckModel(file);
+      if (sequence !== uploadSequence.current || requestedAnalysis !== analysisIdentity.current.id) return;
       setImported(result);
+      setImportedAnalysisId(requestedAnalysis);
+      setImportedGeneration((current) => current + 1);
       chooseMiner(IMPORTED);
     } catch (cause) {
-      setImportError(cause instanceof Error ? cause.message : String(cause));
+      if (sequence === uploadSequence.current && requestedAnalysis === analysisIdentity.current.id) {
+        setImportError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
-      setImporting(false);
+      if (sequence === uploadSequence.current && requestedAnalysis === analysisIdentity.current.id) setImporting(false);
     }
   };
 
@@ -131,7 +161,7 @@ export function Conformance({
   // The imported model's results come from the upload (or are embedded when a
   // CLI export was produced with --check-pnml / --check-bpmn).
   const models = isImported
-    ? imported?.model ?? data.conformance?.[IMPORTED]
+    ? currentImported?.model ?? data.conformance?.[IMPORTED]
     : miner
       ? data.conformance?.[miner.id]
       : undefined;
@@ -140,7 +170,7 @@ export function Conformance({
   // An uploaded model can name activities the log never shows; its response
   // carries the extended registry, so the result panels resolve every id.
   const viewData =
-    isImported && imported ? { ...data, activities: imported.activities } : data;
+    isImported && currentImported ? { ...data, activities: currentImported.activities } : data;
 
   return (
     <div className="miner-flow reveal">
@@ -189,7 +219,7 @@ export function Conformance({
                 <span className="miner-card-go">Select →</span>
               </button>
             ))}
-            {imported || data.conformance?.[IMPORTED] ? (
+            {currentImported || data.conformance?.[IMPORTED] ? (
               <button className="miner-card" onClick={() => chooseMiner(IMPORTED)}>
                 <span className="miner-card-name">Imported model</span>
                 <span className="miner-card-count">PNML / BPMN / PTML</span>
@@ -292,12 +322,156 @@ export function Conformance({
             </div>
           </section>
         ))}
-      <OtherAlignments data={data} importedAvailable={Boolean(imported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} />
+      <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} />
+      <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
     </div>
   );
 }
 
-function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditDistance, onRequestProcessTree, onRequestDecomposed, onRequestPetriAnti, onRequestPetriMulti, onRequestReduction }: {
+function embeddedEvaluation(data: MineraExport, miner: string, family: EvaluationFamily): ModelEvaluation | null {
+  const value = data.evaluation?.[miner];
+  if (family === "replay_fitness" && value?.replay_fitness) return { miner, replay_fitness: value.replay_fitness };
+  if (family === "precision" && value?.precision) return { miner, precision: value.precision };
+  if (family === "generalization" && value?.generalization) return { miner, generalization: value.generalization };
+  if (family === "simplicity" && value?.simplicity) return { miner, simplicity: value.simplicity };
+  return null;
+}
+
+function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: {
+  data: MineraExport;
+  importedAvailable: boolean;
+  onRequestEvaluation?: (miner: string, options?: EvaluationOptions) => Promise<ModelEvaluation>;
+}) {
+  const modelIds = evaluationModelIds(data, importedAvailable);
+  const modelKey = modelIds.join("|");
+  const [miner, setMiner] = useState(modelIds[0] ?? "");
+  const [options, setOptions] = useState<EvaluationOptions>({
+    evaluation_family: "replay_fitness",
+    fitness_variant: "auto",
+    precision_variant: "auto",
+    precision_use_task_ids: false,
+    generalization_variant: "generalization_token",
+    simplicity_variant: "arc_degree",
+  });
+  const [markings, setMarkings] = useState({ initial: "", final: "" });
+  const [result, setResult] = useState<ModelEvaluation | null>(null);
+  const [resultSelectionKey, setResultSelectionKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<{ key: string; message: string } | null>(null);
+  const dataIdentity = useRef({ data, id: 0 });
+  if (dataIdentity.current.data !== data) dataIdentity.current = { data, id: dataIdentity.current.id + 1 };
+  const selectionKeyFor = (selectedMiner: string, selectedOptions: EvaluationOptions) =>
+    JSON.stringify([dataIdentity.current.id, selectedMiner, selectedOptions, markings]);
+  const selectionKey = selectionKeyFor(miner, options);
+  const selectionKeyRef = useRef(selectionKey);
+  const requestSequence = useRef(0);
+  selectionKeyRef.current = selectionKey;
+
+  useEffect(() => {
+    requestSequence.current += 1;
+    setLoading(false);
+  }, [selectionKey]);
+
+  useEffect(() => {
+    requestSequence.current += 1;
+    setLoading(false);
+    const next = modelIds.includes(miner) ? miner : (modelIds[0] ?? "");
+    setMiner(next);
+    const selected = options.evaluation_family ?? "replay_fitness";
+    const embedded = next ? embeddedEvaluation(data, next, selected) : null;
+    setResult(embedded);
+    setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null);
+    setError(null);
+  }, [data, modelKey]);
+
+  const family = options.evaluation_family ?? "replay_fitness";
+  const updateFamily = (next: EvaluationFamily) => {
+    const nextOptions = { ...options, evaluation_family: next };
+    setOptions(nextOptions);
+    const embedded = embeddedEvaluation(data, miner, next);
+    setResult(embedded);
+    setResultSelectionKey(embedded ? selectionKeyFor(miner, nextOptions) : null);
+    setError(null);
+  };
+  const run = async () => {
+    if (!miner || !onRequestEvaluation) return;
+    const sequence = ++requestSequence.current;
+    const requestedSelection = selectionKeyRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const request: EvaluationOptions = { ...options };
+      if (family === "simplicity") {
+        request.simplicity_initial_marking = parseMarkingInput(markings.initial);
+        request.simplicity_final_marking = parseMarkingInput(markings.final);
+      }
+      const next = await onRequestEvaluation(miner, request);
+      if (sequence === requestSequence.current && requestedSelection === selectionKeyRef.current) {
+        setResult(next);
+        setResultSelectionKey(requestedSelection);
+      }
+    } catch (cause) {
+      if (sequence === requestSequence.current && requestedSelection === selectionKeyRef.current) {
+        setError({ key: requestedSelection, message: cause instanceof Error ? cause.message : String(cause) });
+      }
+    } finally {
+      if (sequence === requestSequence.current) setLoading(false);
+    }
+  };
+
+  const numberOption = (name: "precision_max_states" | "simplicity_arc_degree_k" | "simplicity_max_states", value: string) =>
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Model quality evaluation</h2><span className="panel-meta">Fitness · precision · generalization · simplicity</span></div>
+    <div className="align-settings-grid">
+      <label>Model<select value={miner} onChange={(event) => { const next = event.target.value; setMiner(next); const embedded = embeddedEvaluation(data, next, options.evaluation_family ?? "replay_fitness"); setResult(embedded); setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null); setError(null); }} disabled={modelIds.length === 0}>{modelIds.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
+      <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option></select></label>
+      {family === "replay_fitness" && <label>Variant<select value={options.fitness_variant ?? "auto"} onChange={(event) => setOptions({ ...options, fitness_variant: event.target.value as EvaluationOptions["fitness_variant"] })}><option value="auto">Automatic</option><option value="token_based">Token based</option><option value="alignment_based">Alignment based</option></select></label>}
+      {family === "precision" && <>
+        <label>Variant<select value={options.precision_variant ?? "auto"} onChange={(event) => setOptions({ ...options, precision_variant: event.target.value as EvaluationOptions["precision_variant"] })}><option value="auto">Automatic</option><option value="etconformance_token">Token escaping edges</option><option value="align_etconformance">Alignment escaping edges</option><option value="automaton_after_align">Automaton after alignment</option></select></label>
+        <label>State limit<input type="number" min={1} step={1} value={options.precision_max_states ?? ""} placeholder="100000" onChange={(event) => numberOption("precision_max_states", event.target.value)} /></label>
+        <label className="checkbox-label"><input type="checkbox" checked={options.precision_use_task_ids ?? false} onChange={(event) => setOptions({ ...options, precision_use_task_ids: event.target.checked })} /> Use task identities</label>
+      </>}
+      {family === "generalization" && <label>Variant<select value="generalization_token" disabled><option value="generalization_token">Transition-frequency token</option></select></label>}
+      {family === "simplicity" && <>
+        <label>Variant<select value={options.simplicity_variant ?? "arc_degree"} onChange={(event) => setOptions({ ...options, simplicity_variant: event.target.value as EvaluationOptions["simplicity_variant"] })}><option value="arc_degree">Arc degree</option><option value="extended_cardoso">Extended Cardoso</option><option value="extended_cyclomatic">Extended cyclomatic</option></select></label>
+        {options.simplicity_variant === "arc_degree" && <label>Arc-degree k<input type="number" min={0} step={0.1} value={options.simplicity_arc_degree_k ?? ""} placeholder="2" onChange={(event) => numberOption("simplicity_arc_degree_k", event.target.value)} /></label>}
+        <label>State limit<input type="number" min={1} step={1} value={options.simplicity_max_states ?? ""} placeholder="100000" onChange={(event) => numberOption("simplicity_max_states", event.target.value)} /></label>
+        <label>Initial marking<input value={markings.initial} placeholder="0,1" onChange={(event) => setMarkings({ ...markings, initial: event.target.value })} /></label>
+        <label>Final marking<input value={markings.final} placeholder="2,3" onChange={(event) => setMarkings({ ...markings, final: event.target.value })} /></label>
+      </>}
+    </div>
+    {modelIds.length === 0 && <p className="conf-inline-note">No evaluable Petri model is available in this analysis.</p>}
+    <div className="align-settings-actions"><button type="button" className="button" disabled={!onRequestEvaluation || !miner || loading} onClick={() => void run()}>{loading ? "Evaluating…" : "Evaluate model"}</button></div>
+    {error?.key === selectionKey && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error.message}</p></div>}
+    {result && resultSelectionKey === selectionKey && <ModelEvaluationResultView result={result} />}
+  </section>;
+}
+
+function ModelEvaluationResultView({ result }: { result: ModelEvaluation }) {
+  const family = result.replay_fitness ?? result.precision ?? result.generalization ?? result.simplicity;
+  const error = family?.error;
+  if (!family) return null;
+  const metrics: Array<[string, number | null]> = result.replay_fitness ? [
+    ["Fitness", result.replay_fitness.fitness],
+    ["Average trace fitness", result.replay_fitness.average_trace_fitness],
+    ["Fitting traces", result.replay_fitness.percentage_of_fitting_traces === null ? null : result.replay_fitness.percentage_of_fitting_traces / 100],
+  ] : result.precision ? [["Precision", result.precision.precision]]
+    : result.generalization ? [["Generalization", result.generalization.score]]
+      : [["Simplicity", result.simplicity?.simplicity ?? null]];
+  return <div className="other-result">
+    <div className="conf-metrics">{metrics.map(([label, value]) => <div className={`conf-gauge ${value === null ? "poor" : grade(value)}`} key={label}><div className="conf-gauge-value">{value === null ? "—" : percent(value)}</div><div className="conf-gauge-label">{label}</div></div>)}</div>
+    <p><strong>{result.miner}</strong> · {family.variant.replaceAll("_", " ")} · {family.computed ? "computed" : "not computed"}{"exhausted" in family && family.exhausted ? " · search exhausted" : ""}</p>
+    {result.replay_fitness && <small>{numberFormat.format(result.replay_fitness.fitting_traces)} / {numberFormat.format(result.replay_fitness.trace_count)} fitting traces · total cost {result.replay_fitness.total_cost ?? "—"}</small>}
+    {result.generalization && <small>{numberFormat.format(result.generalization.executed_transitions)} / {numberFormat.format(result.generalization.transition_count)} transitions executed · frequencies {result.generalization.transition_frequencies.join(", ") || "none"}</small>}
+    {result.simplicity && <small>Complexity {result.simplicity.complexity ?? "—"} · raw value {result.simplicity.value ?? "—"} · {numberFormat.format(result.simplicity.vertices)} vertices · {numberFormat.format(result.simplicity.edges)} edges · {numberFormat.format(result.simplicity.strongly_connected_components)} strongly connected components</small>}
+    {error && <p className="conf-inline-note">{error}</p>}
+    {(result.replay_fitness?.token_replay || result.replay_fitness?.alignments || result.precision?.token_replay || result.precision?.alignments) && <details><summary>Replay details</summary><pre className="json-preview">{JSON.stringify(result.replay_fitness?.token_replay ?? result.replay_fitness?.alignments ?? result.precision?.token_replay ?? result.precision?.alignments, null, 2)}</pre></details>}
+  </div>;
+}
+
+function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditDistance, onRequestProcessTree, onRequestDecomposed, onRequestPetriAnti, onRequestPetriMulti, onRequestReduction, onRequestEmd }: {
   data: MineraExport;
   importedAvailable?: boolean;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
@@ -307,11 +481,17 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   onRequestPetriAnti?: (miner: string, options?: PetriAntiAlignmentOptions) => Promise<PetriAntiAlignmentResult>;
   onRequestPetriMulti?: (miner: string, options?: PetriMultiAlignmentOptions) => Promise<PetriMultiAlignmentResult>;
   onRequestReduction?: (traceIndex: number, options?: ProcessTreeReductionOptions) => Promise<ProcessTreeReductionResult>;
+  onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
 }) {
   const [dfg, setDfg] = useState<DfgAlignmentResult | null>(null);
   const [edit, setEdit] = useState<EditDistanceResult | null>(null);
   const [processTree, setProcessTree] = useState<ProcessTreeAlignmentResult | null>(null);
   const [reference, setReference] = useState<File | null>(null);
+  const [emdReference, setEmdReference] = useState<File | null>(null);
+  const [emd, setEmd] = useState<EmdResult | null>(data.earth_movers_distance ?? null);
+  const [emdResultSelectionKey, setEmdResultSelectionKey] = useState<string | null>(data.earth_movers_distance ? "embedded" : null);
+  const [emdOptions, setEmdOptions] = useState<EmdOptions>({ normalize_masses: true, strict_equal_mass: false });
+  const [emdError, setEmdError] = useState<string | null>(null);
   const [dfgOptions, setDfgOptions] = useState<DfgAlignmentOptions>({ variant: "CLASSIC", projection: "none" });
   const [editOptions, setEditOptions] = useState<EditDistanceOptions>({ variant: "EDIT_DISTANCE", projection: "none" });
   const [processTreeOptions, setProcessTreeOptions] = useState<ProcessTreeAlignmentOptions>({ variant: "SEARCH_GRAPH_PT" });
@@ -335,13 +515,42 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   const [petriText, setPetriText] = useState({ antiInitial: "", antiFinal: "", multiInitial: "", multiFinal: "" });
   const [traceIndex, setTraceIndex] = useState(0);
   const [reductionOptions, setReductionOptions] = useState<ProcessTreeReductionOptions>({ variant: "tree_tr_based" });
-  const [busy, setBusy] = useState<"dfg" | "edit" | "process-tree" | "decomposed" | "anti" | "multi" | "reduction" | null>(null);
+  const [busy, setBusy] = useState<"dfg" | "edit" | "emd" | "process-tree" | "decomposed" | "anti" | "multi" | "reduction" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [costText, setCostText] = useState<Record<string, string>>({ sync_cost: "", model_move_cost: "", log_move_cost: "", internal_log_move_cost: "" });
-  useEffect(() => { setDfg(null); setEdit(null); setProcessTree(null); setDecomposed(null); setAnti(null); setMulti(null); setReduced(null); setReference(null); setError(null); setTraceIndex(0); }, [data]);
+  const emdDataIdentity = useRef({ data, id: 0 });
+  if (emdDataIdentity.current.data !== data) emdDataIdentity.current = { data, id: emdDataIdentity.current.id + 1 };
+  const emdSelectionKey = JSON.stringify([emdDataIdentity.current.id, emdReference?.name, emdReference?.size, emdReference?.lastModified, emdOptions]);
+  const emdSelectionKeyRef = useRef(emdSelectionKey);
+  const emdRequestSequence = useRef(0);
+  emdSelectionKeyRef.current = emdSelectionKey;
+  const invalidateEmd = () => {
+    emdRequestSequence.current += 1;
+    setBusy((current) => current === "emd" ? null : current);
+    setEmdError(null);
+  };
+  useEffect(() => { emdRequestSequence.current += 1; setDfg(null); setEdit(null); setEmd(data.earth_movers_distance ?? null); setEmdResultSelectionKey(data.earth_movers_distance ? "embedded" : null); setEmdError(null); setProcessTree(null); setDecomposed(null); setAnti(null); setMulti(null); setReduced(null); setReference(null); setEmdReference(null); setBusy(null); setError(null); setTraceIndex(0); }, [data]);
   useEffect(() => { setPetriMiner((current) => petriMiners.includes(current) ? current : (petriMiners[0] ?? "")); }, [petriMinerKey]);
   const runDfg = async () => { if (!onRequestDfg) return; setBusy("dfg"); setError(null); try { const maps = Object.fromEntries(Object.entries(costText).map(([key, text]) => [key, parseDfgCostMapInput(text)])); setDfg(await onRequestDfg({ ...dfgOptions, ...maps })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   const runEdit = async () => { if (!onRequestEditDistance || !reference) return; setBusy("edit"); setError(null); try { setEdit(await onRequestEditDistance(reference, editOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
+  const runEmd = async () => {
+    if (!onRequestEmd || !emdReference) return;
+    const sequence = ++emdRequestSequence.current;
+    const requestedSelection = emdSelectionKeyRef.current;
+    setBusy("emd");
+    setEmdError(null);
+    try {
+      const next = await onRequestEmd(emdReference, emdOptions);
+      if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) {
+        setEmd(next);
+        setEmdResultSelectionKey(requestedSelection);
+      }
+    } catch (cause) {
+      if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) setEmdError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (sequence === emdRequestSequence.current && requestedSelection === emdSelectionKeyRef.current) setBusy(null);
+    }
+  };
   const runProcessTree = async () => { if (!onRequestProcessTree || !data.process_tree) return; setBusy("process-tree"); setError(null); try { setProcessTree(await onRequestProcessTree(processTreeOptions)); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
   const parseCostMap = (value: string) => value.trim() ? parseDfgCostMapInput(value) : undefined;
   const runDecomposed = async () => { if (!onRequestDecomposed) return; setBusy("decomposed"); setError(null); try { setDecomposed(await onRequestDecomposed(petriMiner, { ...decomposedOptions, initial_marking: parseMarkingInput(decomposedText.initial_marking), final_marking: parseMarkingInput(decomposedText.final_marking), activity_log_costs: parseCostMap(decomposedText.activity_log_costs), activity_model_costs: parseCostMap(decomposedText.activity_model_costs), activity_sync_costs: parseCostMap(decomposedText.activity_sync_costs) })); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); } };
@@ -387,6 +596,10 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
         <div className="align-settings-grid"><label>Mode<select value={editOptions.anti ? "anti" : "closest"} onChange={e => setEditOptions({ ...editOptions, anti: e.target.value === "anti" })}><option value="closest">Closest</option><option value="anti">Anti-alignment</option></select></label><label>Deviation cost<input type="number" min={1} value={editOptions.deviation_cost ?? ""} onChange={e => setEditOptions({ ...editOptions, deviation_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Projection<select value={editOptions.projection ?? "none"} onChange={e => setEditOptions({ ...editOptions, projection: e.target.value as EditDistanceOptions["projection"] })}><option value="none">None</option><option value="log">Projected log</option></select></label></div>
         <button className="button" disabled={!onRequestEditDistance || !reference || busy !== null} onClick={() => void runEdit()}>{busy === "edit" ? "Aligning…" : "Run edit-distance alignment"}</button>{edit && <EditDistanceResultView result={edit} />}
       </div>
+      <div className="other-align-card"><h3>Stochastic-language distance</h3><p>Compare trace distributions with a reference CSV/XES log using optimal transport.</p><label className="file-picker">Reference log<input type="file" accept=".csv,.xes,.xml" onChange={e => { invalidateEmd(); setEmdReference(e.target.files?.[0] ?? null); }} /></label>
+        <div className="align-settings-grid"><label>Normalize masses<select value={String(emdOptions.normalize_masses ?? true)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, normalize_masses: e.target.value === "true" }); }}><option value="true">On</option><option value="false">Off</option></select></label><label>Equal mass required<select value={String(emdOptions.strict_equal_mass ?? false)} onChange={e => { invalidateEmd(); setEmdOptions({ ...emdOptions, strict_equal_mass: e.target.value === "true" }); }}><option value="false">No</option><option value="true">Yes</option></select></label></div>
+        <button className="button" disabled={!onRequestEmd || !emdReference || busy !== null} onClick={() => void runEmd()}>{busy === "emd" ? "Comparing…" : "Compare stochastic languages"}</button>{emdError && <p className="conf-inline-note">{emdError}</p>}{emd && (emdResultSelectionKey === emdSelectionKey || (emdResultSelectionKey === "embedded" && !emdReference)) && <EmdResultView result={emd} />}
+      </div>
     </div>{error && <div className="conf-notice"><span className="conf-notice-mark">⚠</span><p>{error}</p></div>}
   </section>;
 }
@@ -395,6 +608,7 @@ function DfgResult({ result }: { result: DfgAlignmentResult }) { return <div cla
 function DecomposedResultView({ result }: { result: DecomposedAlignmentResult }) { const first = result.traces[0]; const moves = first?.moves ?? first?.alignment ?? []; return <div className="other-result"><p><strong>{numberFormat.format(result.traces.length)}</strong> traces · {percent(result.fitness)} fitness · cost {numberFormat.format(result.total_cost)}</p><small>Visited {numberFormat.format(result.diagnostics.visited_states)} states · queued {numberFormat.format(result.diagnostics.queued_states)} · merges {numberFormat.format(result.diagnostics.merges)} · {result.complete ? "complete" : "incomplete"}{result.timed_out ? " · timed out" : ""}{result.exhausted ? " · exhausted" : ""}</small>{first && <div className="align-moves">{moves.map((move, i) => <span className={`align-move ${move.log === ">>" ? "model" : move.model === ">>" ? "log" : "sync"}`} key={i}>{move.log ?? "τ"} / {move.model ?? "τ"}</span>)}</div>}</div>; }
 function PetriResultView({ kind, result }: { kind: "anti" | "multi"; result: PetriAntiAlignmentResult | PetriMultiAlignmentResult }) { return <div className="other-result"><p><strong>{kind === "anti" ? "Anti-alignment" : "Multi-alignment"}</strong> · objective {numberFormat.format(result.objective)}</p><div className="align-moves">{result.activities.map((activity, i) => <span className="align-move model" key={i}>{activity}</span>)}</div><small>Visible sequence</small><div className="align-moves">{result.transitions.map((transition, i) => <span className="align-move model" key={i}>t{transition}</span>)}</div><small>Transition sequence (includes silent moves) · visited {numberFormat.format(result.diagnostics.visited_states)} states · traversed {numberFormat.format(result.diagnostics.traversed_arcs)} · {result.diagnostics.exhausted ? "search exhausted" : "complete"}{kind === "anti" && "precision" in result ? ` · precision ${percent(result.precision)}` : kind === "multi" && "max_distance_to_log" in result ? ` · max distance ${numberFormat.format(result.max_distance_to_log)}` : ""}</small></div>; }
 function EditDistanceResultView({ result }: { result: EditDistanceResult }) { return <div className="other-result"><p><strong>{numberFormat.format(result.source_count)}</strong> source traces · {result.anti ? "anti-alignment" : "closest alignment"}</p><ol className="variant-list">{result.alignments.slice(0, 30).map((a, i) => <li className="variant" key={i}><div className="variant-top"><span className={`conf-pill ${grade(a.fitness)}`}>{percent(a.fitness)}</span><span className="variant-count">cost {numberFormat.format(a.cost)} · best/worst {numberFormat.format(a.best_worst_cost)} · denominator {numberFormat.format(a.denominator)} · target #{a.target_index}</span></div><div className="align-moves">{a.moves.map((m, j) => <span className={`align-move ${m.type}`} key={j}>{m.log} / {m.model}</span>)}</div></li>)}</ol></div>; }
+function EmdResultView({ result }: { result: EmdResult }) { return <div className="other-result"><p><strong>{result.distance === null ? "—" : result.distance.toFixed(6)}</strong> distance · {result.normalized ? "normalized masses" : "original masses"} · {result.computed ? "computed" : "not computed"}</p>{result.error && <small>{result.error}</small>}</div>; }
 
 function ProcessTreeResultView({ result }: { result: ProcessTreeAlignmentResult }) {
   return <div className="other-result">
