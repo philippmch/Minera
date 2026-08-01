@@ -55,4 +55,3 @@ using IlpMinerDiagnostics = ILPMinerDiagnostics;
 using IlpMinerResult = ILPMinerResult;
 
 }  // namespace minera
-
