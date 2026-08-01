@@ -1527,6 +1527,29 @@ void label_splitting_params_contract() {
   assert(threw);
 }
 
+void ilp_params_contract() {
+  const auto parsed = minera::parse_ilp_miner_params(fields({
+      {"ilp_activity_key", "concept:name"},
+      {"ilp_noise_threshold", "0.25"},
+      {"ilp_max_nodes", "17"}}));
+  assert(parsed.activity_key == "concept:name");
+  assert(parsed.noise_threshold == 0.25);
+  assert(parsed.max_nodes == 17);
+  for (const auto& item : {std::pair{"ilp_noise_threshold", "-0.1"},
+                           std::pair{"ilp_noise_threshold", "1.1"},
+                           std::pair{"ilp_max_nodes", "0"},
+                           std::pair{"ilp_activity_key", ""}}) {
+    bool threw = false;
+    const auto lookup = fields({item});
+    const auto present = [name = item.first](std::string_view key) {
+      return key == name;
+    };
+    try { (void)minera::parse_ilp_miner_params(lookup, present); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1591,5 +1614,6 @@ int main() {
   random_tree_params_contract();
   log_to_features_params_contract();
   label_splitting_params_contract();
+  ilp_params_contract();
   return 0;
 }

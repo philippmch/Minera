@@ -45,6 +45,7 @@ add_library(minera_core
   src/footprints_models.cpp
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
+  src/ilp_miner.cpp
   src/interval_tree.cpp
   src/label_splitting.cpp
   src/json_export.cpp
@@ -140,6 +141,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_ilp_miner_tests
+    tests/test_ilp_miner.cpp
+  )
+  target_link_libraries(minera_ilp_miner_tests PRIVATE minera::core)
+  target_compile_features(minera_ilp_miner_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ilp_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ilp_miner_tests COMMAND minera_ilp_miner_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

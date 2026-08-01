@@ -41,6 +41,7 @@
 #include "minera/random_tree.hpp"
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
+#include "minera/ilp_miner.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -157,6 +158,12 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 // present field whose value is empty. This matters for options where an
 // explicit empty list has different semantics from using the default.
 using FieldPresence = std::function<bool(std::string_view)>;
+
+// Strict request/CLI adapter for the bounded classic ILP miner. Wire names
+// are `ilp_activity_key`, `ilp_noise_threshold`, and `ilp_max_nodes`.
+[[nodiscard]] ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field);
+[[nodiscard]] ILPMinerOptions parse_ilp_miner_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI
 // adapters. Commas, separators, backslashes, and whitespace may be escaped.

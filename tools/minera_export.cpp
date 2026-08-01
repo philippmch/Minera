@@ -35,6 +35,7 @@
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
+#include "minera/ilp_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -334,6 +335,10 @@ int usage(const char* program) {
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
                "  --inductive-variant <id>  log (default: split the log and\n"
+               "  --ilp-mine                Emit standalone classic ILP JSON\n"
+               "  --ilp-activity-key <name> Event attribute used as activity\n"
+               "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
+               "  --ilp-max-nodes <n>       Positive ILP search bound\n"
                "                            recurse) or dfg (IMd: recurse on\n"
                "                            the directly-follows graph alone,\n"
                "                            scaling to huge logs)\n"
@@ -863,6 +868,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> merge_fields;
   bool random_tree_requested = false;
   std::map<std::string, std::string> random_tree_fields;
+  bool ilp_mine_requested = false;
+  std::map<std::string, std::string> ilp_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -942,6 +949,22 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--ilp-mine") {
+      ilp_mine_requested = true;
+      continue;
+    }
+    if (arg.rfind("--ilp-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> ilp_option_names = {
+          "ilp_activity_key", "ilp_noise_threshold", "ilp_max_nodes"};
+      if (!ilp_option_names.contains(key)) return usage(argv[0]);
+      ilp_fields.insert_or_assign(std::move(key), value);
+      ilp_mine_requested = true;
+      continue;
+    }
     if (arg == "--concept-drift") { concept_drift_requested = true; continue; }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
@@ -2439,6 +2462,28 @@ int main(int argc, char** argv) {
     }
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
+    }
+    if (ilp_mine_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = ilp_fields.find(std::string(name));
+        return it == ilp_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return ilp_fields.contains(std::string(name));
+      };
+      const auto options = minera::parse_ilp_miner_params(lookup, present);
+      const auto body = minera::ilp_miner_json(minera::mine_ilp(log, options));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
     }
     if (concept_drift_requested) {
       const auto lookup = [&](std::string_view name) {

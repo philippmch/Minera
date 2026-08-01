@@ -26,6 +26,8 @@ import {
   type IntervalTreeResult,
   type CaseRelationsResult,
   type RandomTreeResult,
+  type ILPMinerOptions,
+  type ILPMinerResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
   isLabelSplittingResult,
@@ -33,6 +35,7 @@ import {
   isIntervalTreeResult,
   isCaseRelationsResult,
   isRandomTreeResult,
+  isILPMinerResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1088,6 +1091,22 @@ export function petriMultiAlignmentQuery(options: PetriMultiAlignmentOptions = {
 export function processTreeReductionQuery(options: ProcessTreeReductionOptions = {}): string {
   return advancedQuery(options.variant ? { ...options } : { activity_key: options.activity_key });
 }
+/** Query string for the hidden cached-session ILP miner endpoint. */
+export function ilpMinerQuery(options: ILPMinerOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.activity_key !== undefined) query.set("ilp_activity_key", options.activity_key);
+  if (options.noise_threshold !== undefined) query.set("ilp_noise_threshold", String(options.noise_threshold));
+  if (options.max_nodes !== undefined) query.set("ilp_max_nodes", String(options.max_nodes));
+  return query.toString();
+}
+export const ilpMineQuery = ilpMinerQuery;
+/** Mines the most recently cached event log with the bounded classic ILP miner. */
+export function requestIlpMine(options: ILPMinerOptions = {}): Promise<ILPMinerResult> {
+  const query = ilpMinerQuery(options);
+  return postChecked(`/api/ilp-mine${query ? `?${query}` : ""}`, isILPMinerResult, "ILP miner");
+}
+export const mineIlp = requestIlpMine;
+export const requestILPMine = requestIlpMine;
 async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
   let response: Response;
   try { response = await fetch(path, { method: "POST" }); }
