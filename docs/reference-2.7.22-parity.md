@@ -203,7 +203,8 @@ limit. The common loop cut follows the reference behavior for:
 
 Focused regressions cover ordered multi-activity redo behavior, different
 start/end boundary activities, prefix/suffix false positives, incomplete
-boundary reachability, and single closed variants. Recursive POWL JSON, request
+start- and end-side boundary reachability, split return components, and single
+closed variants. Recursive POWL JSON, request
 validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless

@@ -338,7 +338,16 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
-      <StochasticPetriPlayoutPanel dataset={data.dataset} available={Boolean(data.petri_net || data.inductive_petri_net || data.heuristic_petri_net || data.powl_petri_net)} />
+      <StochasticPetriPlayoutPanel
+        key={`stochastic-playout-${analysisId}`}
+        dataset={data.dataset}
+        miners={[
+          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
+          data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
+          data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
+          data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
+        ].filter((miner): miner is { id: string; label: string } => miner !== null)}
+      />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
@@ -430,17 +439,19 @@ function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; avai
   </section>;
 }
 
-function StochasticPetriPlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
   const [options, setOptions] = useState<StochasticPlayoutOptions>({ traces: 1000, stop_at_final: true });
+  const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      const xes = await fetchPlayout("inductive", options);
+      const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
+      const xes = await fetchPlayout(selectedMiner, options);
       const blob = new Blob([xes], { type: "application/xml" });
       const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-stochastic-playout.xes`; anchor.click();
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-stochastic-playout.xes`; anchor.click();
       URL.revokeObjectURL(anchor.href);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
@@ -449,8 +460,9 @@ function StochasticPetriPlayoutPanel({ dataset, available }: { dataset: string; 
     setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
   return <section className="panel conf-panel other-alignments">
     <div className="panel-head"><h2>Stochastic Petri-net playout</h2><span className="panel-meta">Weighted random XES from a cached Petri net</span></div>
-    {!available ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
+    {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
       <div className="align-settings-grid">
+        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
         <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
         <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
         <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
