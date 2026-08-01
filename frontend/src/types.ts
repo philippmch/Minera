@@ -35,6 +35,23 @@ export interface ConceptDriftResult {
   change_timestamps: number[];
 }
 
+export type LogToTargetVariant = "next_activity" | "next_time" | "remaining_time";
+export interface LogToTargetResult {
+  family: "LOG_TO_TARGET";
+  variant: LogToTargetVariant;
+  classes: string[];
+  rows: number[][][];
+}
+export function isLogToTargetResult(value: unknown): value is LogToTargetResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LogToTargetResult>;
+  return candidate.family === "LOG_TO_TARGET"
+    && (candidate.variant === "next_activity" || candidate.variant === "next_time" || candidate.variant === "remaining_time")
+    && Array.isArray(candidate.classes) && candidate.classes.every((entry) => typeof entry === "string")
+    && Array.isArray(candidate.rows)
+    && candidate.rows.every((trace) => Array.isArray(trace) && trace.every((row) => Array.isArray(row) && row.every((entry) => typeof entry === "number" && Number.isFinite(entry))));
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {
