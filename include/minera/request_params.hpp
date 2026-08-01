@@ -34,6 +34,7 @@
 #include "minera/playout.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/concept_drift.hpp"
+#include "minera/log_to_target.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -88,6 +89,7 @@ struct MineParams {
 };
 
 using ConceptDriftParams = ConceptDriftOptions;
+using LogToTargetParams = LogToTargetOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -247,6 +249,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(
     const FieldLookup& field);
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] LogToTargetParams parse_log_to_target_params(
+    const FieldLookup& field);
+[[nodiscard]] LogToTargetParams parse_log_to_target_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

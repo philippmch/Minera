@@ -19,6 +19,8 @@ import {
   type PetriAnalysisResult,
   type EmdOptions,
   type ConceptDriftResult,
+  type LogToTargetResult,
+  isLogToTargetResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1480,4 +1482,39 @@ export async function requestConceptDrift(options: ConceptDriftOptions = {}): Pr
   const response = await fetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   return (await response.json()) as ConceptDriftResult;
+}
+
+export interface LogToTargetOptions {
+  target_variant?: "next_activity" | "next_time" | "remaining_time";
+  target_activity_key?: string;
+  target_timestamp_key?: string;
+  target_enable_padding?: boolean;
+  target_pad_size?: number;
+  target_activities?: string[];
+}
+
+export function logToTargetQuery(options: LogToTargetOptions = {}): string {
+  const query = new URLSearchParams();
+  const encodeActivity = (activity: string) => activity.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+  const entries: Array<[string, string | undefined]> = [
+    ["target_activity_key", options.target_activity_key],
+    ["target_activities", options.target_activities?.map(encodeActivity).join(",")],
+    ["target_enable_padding", options.target_enable_padding === undefined ? undefined : String(options.target_enable_padding)],
+    ["target_pad_size", options.target_pad_size === undefined ? undefined : String(options.target_pad_size)],
+    ["target_timestamp_key", options.target_timestamp_key],
+    ["target_variant", options.target_variant],
+  ];
+  for (const [key, value] of entries) if (value !== undefined) query.set(key, value);
+  return query.toString();
+}
+
+export async function requestLogToTarget(options: LogToTargetOptions = {}): Promise<LogToTargetResult> {
+  const query = logToTargetQuery(options);
+  const response = await fetch(`/api/transform-target${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isLogToTargetResult(payload)) {
+    throw new Error("the Minera backend returned an invalid target transformation");
+  }
+  return payload;
 }

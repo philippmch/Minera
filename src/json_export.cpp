@@ -3448,4 +3448,40 @@ std::string concept_drift_json(const ConceptDriftResult& result) {
   return out.str();
 }
 
+std::string log_to_target_json(const LogToTargetResult& result) {
+  const auto variant_name = [&]() -> std::string_view {
+    switch (result.variant) {
+      case LogToTargetVariant::NEXT_ACTIVITY: return "next_activity";
+      case LogToTargetVariant::NEXT_TIME: return "next_time";
+      case LogToTargetVariant::REMAINING_TIME: return "remaining_time";
+    }
+    return "next_activity";
+  };
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_TO_TARGET\",\"variant\":";
+  write_json_string(out, variant_name());
+  out << ",\"classes\":[";
+  for (std::size_t i = 0; i < result.classes.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.classes[i]);
+  }
+  out << "],\"rows\":[";
+  for (std::size_t i = 0; i < result.rows.size(); ++i) {
+    if (i) out << ',';
+    out << '[';
+    for (std::size_t j = 0; j < result.rows[i].size(); ++j) {
+      if (j) out << ',';
+      out << '[';
+      for (std::size_t k = 0; k < result.rows[i][j].size(); ++k) {
+        if (k) out << ',';
+        out << result.rows[i][j][k];
+      }
+      out << ']';
+    }
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 }  // namespace minera

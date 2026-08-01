@@ -104,6 +104,43 @@ void concept_drift_params_contract() {
   assert(threw);
 }
 
+void log_to_target_params_contract() {
+  const auto p = minera::parse_log_to_target_params(fields({
+      {"target_variant", "remaining_time"},
+      {"target_activity_key", "concept:name"},
+      {"target_timestamp_key", "started_at"},
+      {"target_enable_padding", "true"},
+      {"target_pad_size", "8"},
+      {"target_activities", "C, A, B"},
+  }));
+  assert(p.variant == minera::LogToTargetVariant::REMAINING_TIME);
+  assert(p.activity_key == "concept:name");
+  assert(p.timestamp_key == "started_at");
+  assert(p.enable_padding && p.pad_size == 8);
+  assert((p.activities == std::vector<std::string>{"C", "A", "B"}));
+  const auto escaped = minera::parse_log_to_target_params(fields({
+      {"target_activities", R"(Review\, senior,A\\B)"}}));
+  assert((escaped.activities ==
+          std::vector<std::string>{"Review, senior", "A\\B"}));
+
+  bool threw = false;
+  try {
+    (void)minera::parse_log_to_target_params(
+        fields({{"target_variant", "unknown"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_log_to_target_params(
+        fields({{"target_enable_padding", "true"}, {"target_pad_size", "bad"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1406,5 +1443,6 @@ int main() {
   parse_evaluation_params_rejects_invalid_and_explicit_empty_values();
   native_json_contracts();
   concept_drift_params_contract();
+  log_to_target_params_contract();
   return 0;
 }

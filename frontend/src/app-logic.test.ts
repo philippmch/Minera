@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, type FilterOptions } from "./api";
+import { describe, expect, it, vi } from "vitest";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -10,11 +10,33 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes concept drift controls", () => {
     expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true })).toBe("drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_window_size=2");
+  });
+  it("serializes target transformation controls and guards responses", () => {
+    expect(logToTargetQuery({
+      target_variant: "next_activity",
+      target_activity_key: "concept:name",
+      target_timestamp_key: "time:timestamp",
+      target_enable_padding: true,
+      target_pad_size: 4,
+      target_activities: ["Review, senior", "A\\B"],
+    })).toBe("target_activity_key=concept%3Aname&target_activities=Review%5C%2C+senior%2CA%5C%5CB&target_enable_padding=true&target_pad_size=4&target_timestamp_key=time%3Atimestamp&target_variant=next_activity");
+    expect(isLogToTargetResult({ family: "LOG_TO_TARGET", variant: "next_time", classes: [], rows: [[[1], [0]]] })).toBe(true);
+    expect(isLogToTargetResult({ family: "LOG_TO_TARGET", variant: "next_time", classes: [], rows: [[[{ bad: true }]]] })).toBe(false);
+  });
+  it("rejects malformed target responses instead of casting them", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ family: "LOG_TO_TARGET" }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(requestLogToTarget()).rejects.toThrow(/invalid target transformation/);
+      expect(fetchMock).toHaveBeenCalledWith("/api/transform-target", { method: "POST" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it("serializes advanced options deterministically", () => {
     expect(decomposedAlignmentQuery({ max_states: 10, final_marking: [2, 1], initial_marking: [0], tau_model_cost: 1, sync_cost: 0 })).toBe("final_marking=2%2C1&initial_marking=0&max_states=10&sync_cost=0&tau_model_cost=1&variant=recompos_maximal");

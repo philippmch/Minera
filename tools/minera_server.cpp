@@ -13,6 +13,7 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -39,6 +40,7 @@
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
+#include "minera/log_to_target.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -547,6 +549,46 @@ void handle_concept_drift(const httplib::Request& request,
     const auto options = minera::parse_concept_drift_params(lookup, present);
     const auto result = minera::detect_concept_drift(session->log, options);
     response.set_content(minera::concept_drift_json(result), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_log_to_target(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "target_variant",       "target_activity_key",
+        "target_timestamp_key", "target_enable_padding",
+        "target_pad_size",      "target_activities"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown target parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_log_to_target_params(lookup, present);
+    const auto result = minera::log_to_target(session->log, options);
+    response.set_content(minera::log_to_target_json(result),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -1402,6 +1444,7 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/concept-drift", preflight);
+  server.Options("/api/transform-target", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -1419,6 +1462,7 @@ int main(int argc, char** argv) {
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/concept-drift", handle_concept_drift);
+  server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);

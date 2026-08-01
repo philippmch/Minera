@@ -259,6 +259,42 @@ std::vector<std::string> split_csv(std::string_view value) {
   return parts;
 }
 
+// Target classes use a small escaped-list grammar so activity names may
+// contain commas: `\\,` is a comma and `\\\\` is a backslash.
+std::vector<std::string> split_target_activities(std::string_view value) {
+  if (value.empty()) return {};
+  std::vector<std::string> parts;
+  std::string current;
+  bool escaped = false;
+  const auto flush = [&]() {
+    const auto begin = current.find_first_not_of(" \t\r\n");
+    if (begin != std::string::npos) {
+      const auto end = current.find_last_not_of(" \t\r\n");
+      parts.push_back(current.substr(begin, end - begin + 1));
+    }
+    current.clear();
+  };
+  for (const char ch : value) {
+    if (escaped) {
+      if (ch != ',' && ch != '\\')
+        throw std::invalid_argument(
+            "target_activities: invalid escape (use \\, or \\\\)");
+      current.push_back(ch);
+      escaped = false;
+    } else if (ch == '\\') {
+      escaped = true;
+    } else if (ch == ',') {
+      flush();
+    } else {
+      current.push_back(ch);
+    }
+  }
+  if (escaped)
+    throw std::invalid_argument("target_activities: dangling escape");
+  flush();
+  return parts;
+}
+
 std::map<std::string, double> parse_activity_costs(std::string_view value,
                                                    std::string_view name) {
   return parse_cost_map(value, name);
@@ -1764,6 +1800,55 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
     params.seed = parse_nonnegative_u64(require("drift_seed"), "drift_seed");
   if (supplied("drift_include_timestamps"))
     params.include_timestamps = parse_boolean(require("drift_include_timestamps"), "drift_include_timestamps");
+  return params;
+}
+
+LogToTargetParams parse_log_to_target_params(const FieldLookup& field) {
+  return parse_log_to_target_params(field, {});
+}
+
+LogToTargetParams parse_log_to_target_params(const FieldLookup& field,
+                                             const FieldPresence& present) {
+  LogToTargetParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("target_variant")) {
+    const auto value = require("target_variant");
+    if (value == "next_activity" || value == "NEXT_ACTIVITY") {
+      params.variant = LogToTargetVariant::NEXT_ACTIVITY;
+    } else if (value == "next_time" || value == "NEXT_TIME") {
+      params.variant = LogToTargetVariant::NEXT_TIME;
+    } else if (value == "remaining_time" || value == "REMAINING_TIME") {
+      params.variant = LogToTargetVariant::REMAINING_TIME;
+    } else {
+      throw std::invalid_argument(
+          "target_variant: expected next_activity, next_time, or remaining_time");
+    }
+  }
+  if (supplied("target_activity_key"))
+    params.activity_key = require("target_activity_key");
+  if (supplied("target_timestamp_key"))
+    params.timestamp_key = require("target_timestamp_key");
+  if (supplied("target_enable_padding")) {
+    params.enable_padding = parse_boolean(require("target_enable_padding"),
+                                          "target_enable_padding");
+  }
+  if (supplied("target_pad_size"))
+    params.pad_size = parse_nonnegative_size(require("target_pad_size"),
+                                             "target_pad_size");
+  if (supplied("target_activities")) {
+    const auto value = require("target_activities");
+    params.activities = split_target_activities(value);
+    if (params.activities.empty())
+      throw std::invalid_argument("target_activities: expected a non-empty list");
+  }
   return params;
 }
 

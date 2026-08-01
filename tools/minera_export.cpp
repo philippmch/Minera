@@ -38,6 +38,7 @@
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
+#include "minera/log_to_target.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -421,6 +422,14 @@ int usage(const char* program) {
                "  --drift-max-no-change-points <n> Result cap\n"
                "  --drift-seed <n>         Non-negative RNG seed\n"
                "  --drift-include-timestamps <bool> Include timestamps\n"
+               "  --transform-target       Emit standalone target JSON\n"
+               "  --target-variant <id>    next_activity (default), next_time,\n"
+               "                            or remaining_time\n"
+               "  --target-activity-key <name> Event activity attribute\n"
+               "  --target-timestamp-key <name> Event timestamp attribute\n"
+               "  --target-enable-padding <bool> Pad rows to target size\n"
+               "  --target-pad-size <n>    Padded row count\n"
+               "  --target-activities <a,b,c> Explicit classes (\\, escapes commas)\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -797,6 +806,8 @@ int main(int argc, char** argv) {
   minera::CorrelationMinerOptions correlation_options;
   bool concept_drift_requested = false;
   std::map<std::string, std::string> concept_drift_fields;
+  bool target_requested = false;
+  std::map<std::string, std::string> target_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -884,6 +895,21 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       concept_drift_fields.insert_or_assign(std::move(key), value);
       concept_drift_requested = true;
+      continue;
+    }
+    if (arg == "--transform-target") { target_requested = true; continue; }
+    if (arg.rfind("--target-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> target_option_names = {
+          "target_variant",       "target_activity_key",
+          "target_timestamp_key", "target_enable_padding",
+          "target_pad_size",      "target_activities"};
+      if (!target_option_names.contains(key)) return usage(argv[0]);
+      target_fields.insert_or_assign(std::move(key), value);
+      target_requested = true;
       continue;
     }
 
@@ -2211,6 +2237,19 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_concept_drift_params(lookup, present);
       std::cout << minera::concept_drift_json(
           minera::detect_concept_drift(log, params)) << '\n';
+      return 0;
+    }
+    if (target_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = target_fields.find(std::string(name));
+        return it == target_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return target_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_log_to_target_params(lookup, present);
+      std::cout << minera::log_to_target_json(
+          minera::log_to_target(log, params)) << '\n';
       return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);

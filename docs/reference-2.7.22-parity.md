@@ -78,7 +78,7 @@ are reconciled.
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; object-centric playout, Monte Carlo, and random-model generators remain |
-| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
+| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — all three traditional target variants are native and adapter-wired; feature tables, interval/trie, embeddings, and OCEL transformations remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
@@ -186,6 +186,23 @@ timestamps. Strict request parsing, standalone JSON, CLI, cached-session
 server, frontend request/response types, and focused native/request tests are
 included. The current row remains partial pending differential edge-contract
 fixtures and the reference implementation's dataframe/lazyframe adapters.
+
+## Target-transformation evidence
+
+The native target transformation emits one numeric row per event, preserving
+trace and event order. `NEXT_ACTIVITY` produces sorted or caller-supplied
+one-hot classes and a zero row for each trace's final event; `NEXT_TIME`
+produces seconds until the next timestamp; and `REMAINING_TIME` produces
+seconds until the trace's final timestamp. Temporal variants require valid
+timestamps (including timezone offsets and fractional seconds), while custom
+activity/timestamp attributes, escaped comma-containing class names, and
+deterministic zero padding are supported.
+
+The three variants are exposed through strict `target_*` request parsing,
+standalone CLI JSON (`--transform-target`), local-server
+`POST /api/transform-target`, and the frontend query/result adapters. Empty
+logs, explicit class lists, unknown classes, invalid timestamps, and padding
+bounds have focused native, request, and frontend coverage.
 
 ## POWL parity evidence
 
