@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
@@ -25,6 +26,32 @@ struct PlayoutOptions {
   double event_interval = 1.0;
 };
 
+// Controls weighted stochastic playout of a Petri net.  Transition weights
+// are indexed by the transition's position in PetriNet::transitions(), rather
+// than by activity label (two transitions may legitimately share a label).
+// An empty vector means that every transition has weight 1.0.  When a vector
+// is supplied it must contain one entry per transition.
+struct StochasticPlayoutOptions {
+  // Number of cases to simulate.
+  std::size_t traces = 1000;
+  // Firing cap per case.  Silent firings count towards this cap, preventing
+  // an unsound net from livelocking without adding visible events.
+  std::size_t max_steps = 1000;
+  // Seed for transition choices; equal options reproduce equal logs.
+  std::uint64_t seed = 1;
+  // Timestamp of the first case's first event, seconds since the Unix epoch.
+  double start = 1767225600.0;
+  // Seconds between case starts and between visible events in a case.
+  double case_interval = 60.0;
+  double event_interval = 1.0;
+  // Per-transition non-negative weights.  Missing weights (an empty vector)
+  // default to 1.0; all-zero weights among enabled transitions are sampled
+  // uniformly.
+  std::vector<double> transition_weights;
+  // Stop a case as soon as the exact workflow final marking is reached.
+  bool stop_at_final = true;
+};
+
 // Plays out a workflow net into a synthetic event log: each case starts from
 // one token on the source place and fires uniformly random enabled
 // transitions until the final marking (a single token on the sink) is
@@ -34,6 +61,13 @@ struct PlayoutOptions {
 // imported ones. Case ids are "case_1".. in generation order.
 [[nodiscard]] EventLog playout(const PetriNet& net,
                                const PlayoutOptions& options = {});
+
+// Samples enabled Petri-net transitions according to transition_weights and
+// returns one synthetic trace per requested case.  Input arc multiplicity is
+// honoured when determining enablement (and when firing), silent transitions
+// route tokens without appending events, and max_steps bounds every firing.
+[[nodiscard]] EventLog stochastic_playout(
+    const PetriNet& net, const StochasticPlayoutOptions& options = {});
 
 struct ExtensivePlayoutOptions {
   // Longest visible trace to enumerate (events per case).

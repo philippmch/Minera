@@ -1095,6 +1095,18 @@ export interface ProcessTreePlayoutOptions {
   max_trace_cap?: number;
 }
 
+/** Controls weighted random execution of a Petri-net model. */
+export interface StochasticPlayoutOptions {
+  traces?: number;
+  max_steps?: number;
+  seed?: number;
+  transition_weights?: number[];
+  stop_at_final?: boolean;
+  start?: number;
+  case_interval?: number;
+  event_interval?: number;
+}
+
 export type DfgPlayoutVariant = "classic" | "performance";
 export interface DfgPlayoutOptions {
   variant?: DfgPlayoutVariant;

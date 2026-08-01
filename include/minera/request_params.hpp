@@ -31,6 +31,7 @@
 #include "minera/process_tree_reduction.hpp"
 #include "minera/process_tree_playout.hpp"
 #include "minera/dfg_playout.hpp"
+#include "minera/playout.hpp"
 #include "minera/petri_analysis.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
@@ -131,6 +132,7 @@ struct PetriAnalysisParams {
 // `playout_` prefix when parsed from request/CLI adapters.
 using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
 using DfgPlayoutParams = DfgPlayoutOptions;
+using StochasticPlayoutParams = StochasticPlayoutOptions;
 
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
@@ -228,6 +230,15 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] DfgPlayoutParams parse_dfg_playout_params(
     const FieldLookup& field);
 [[nodiscard]] DfgPlayoutParams parse_dfg_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parses stochastic Petri-net playout settings. Wire fields use the
+// `stochastic_` prefix. Transition weights are comma-separated finite,
+// non-negative values; the native simulator validates that their count
+// matches the selected net's transition count.
+[[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

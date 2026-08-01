@@ -951,7 +951,9 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
 // 100 for Petri models and 1000 for Declare, capped at 10000. Declare also
 // accepts min_length, max_length, and seed; process_tree accepts variant,
 // traces, max_steps, seed, min_length, max_length, max_loop_occurrences and
-// max_trace_cap.
+// max_trace_cap; mode=stochastic selects weighted Petri playout and accepts
+// stochastic_traces, stochastic_max_steps, stochastic_seed,
+// stochastic_transition_weights, and timing controls.
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -970,6 +972,51 @@ void handle_playout(const httplib::Request& request,
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
   const bool is_declare = miner == "declare";
+  const std::string mode = request.has_param("mode")
+                               ? request.get_param_value("mode")
+                               : std::string{};
+  const bool is_stochastic = mode == "stochastic" || miner == "stochastic";
+  if (is_stochastic) {
+    const std::string selected_miner = miner == "stochastic" ? "inductive" : miner;
+    const auto it = session->nets.find(selected_miner);
+    if (it == session->nets.end()) {
+      response.status = 400;
+      response.set_content(error_json("unknown miner: " + selected_miner),
+                           "application/json");
+      return;
+    }
+    const auto reject = [&](std::string message) {
+      response.status = 400;
+      response.set_content(error_json(message), "application/json");
+    };
+    try {
+      const auto lookup = [&](std::string_view name) {
+        const std::string key(name);
+        return request.has_param(key) ? request.get_param_value(key) : std::string{};
+      };
+      const auto present = [&](std::string_view name) {
+        return request.has_param(std::string(name));
+      };
+      auto options = minera::parse_stochastic_playout_params(lookup, present);
+      if (options.traces > 10000 || options.max_steps > 10000) {
+        reject("stochastic Petri playout bounds exceed the server safety limits");
+        return;
+      }
+      constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
+      if (options.traces != 0 && options.max_steps != 0 &&
+          options.traces > kMaxGeneratedEvents / options.max_steps) {
+        reject("stochastic Petri playout event budget exceeds the server "
+               "safety limit");
+        return;
+      }
+      const auto log = minera::stochastic_playout(it->second, options);
+      response.set_content(minera::to_xes(log, selected_miner + " stochastic playout"),
+                           "application/xml");
+    } catch (const std::exception& error) {
+      reject(error.what());
+    }
+    return;
+  }
   if (miner == "process_tree") {
     const auto lookup = [&](std::string_view name) {
       const std::string key(name.substr(std::string_view("playout_").size()));
@@ -1104,9 +1151,6 @@ void handle_playout(const httplib::Request& request,
     }
     return parsed;
   };
-  const std::string mode = request.has_param("mode")
-                               ? request.get_param_value("mode")
-                               : std::string{};
   if (is_declare) {
     if (mode == "extensive") {
       reject("mode=extensive is not supported for Declare playout");

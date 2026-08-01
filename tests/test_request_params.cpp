@@ -1301,6 +1301,40 @@ void parse_dfg_playout_params_rejects_invalid_bounds() {
   }
 }
 
+void parse_stochastic_playout_params_maps_controls() {
+  const auto parsed = minera::parse_stochastic_playout_params(fields({
+      {"stochastic_traces", "12"},
+      {"stochastic_max_steps", "99"},
+      {"stochastic_seed", "7"},
+      {"stochastic_transition_weights", "0.25, 2, 0"},
+      {"stochastic_stop_at_final", "false"},
+      {"stochastic_start", "1767225600"},
+      {"stochastic_case_interval", "2.5"},
+      {"stochastic_event_interval", "0.25"}}));
+  assert(parsed.traces == 12 && parsed.max_steps == 99 && parsed.seed == 7);
+  assert(parsed.transition_weights == std::vector<double>({0.25, 2, 0}));
+  assert(!parsed.stop_at_final && parsed.start == 1767225600.0);
+  assert(parsed.case_interval == 2.5 && parsed.event_interval == 0.25);
+}
+
+void parse_stochastic_playout_params_rejects_bad_values() {
+  for (const auto& item : {
+           std::pair{"stochastic_traces", "0"},
+           std::pair{"stochastic_max_steps", "-1"},
+           std::pair{"stochastic_transition_weights", "1,-0.1"},
+           std::pair{"stochastic_transition_weights", "1,"},
+           std::pair{"stochastic_stop_at_final", "maybe"},
+           std::pair{"stochastic_event_interval", "-1"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_stochastic_playout_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1329,6 +1363,8 @@ int main() {
   parse_process_tree_playout_params_rejects_bad_values();
   parse_dfg_playout_params_maps_controls_and_aliases();
   parse_dfg_playout_params_rejects_invalid_bounds();
+  parse_stochastic_playout_params_maps_controls();
+  parse_stochastic_playout_params_rejects_bad_values();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();
