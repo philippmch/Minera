@@ -44,6 +44,7 @@ add_library(minera_core
   src/footprints_models.cpp
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
+  src/interval_tree.cpp
   src/json_export.cpp
   src/log_filter.cpp
   src/log_to_target.cpp
@@ -387,4 +388,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_trie_tests PRIVATE cxx_std_20)
   target_compile_options(minera_trie_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_trie_tests COMMAND minera_trie_tests)
+
+  add_executable(minera_interval_tree_tests
+    tests/test_interval_tree.cpp
+  )
+  target_link_libraries(minera_interval_tree_tests PRIVATE minera::core)
+  target_compile_features(minera_interval_tree_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_interval_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_interval_tree_tests COMMAND minera_interval_tree_tests)
 endif()

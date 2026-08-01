@@ -40,6 +40,7 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/trie.hpp"
+#include "minera/interval_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -434,6 +435,12 @@ int usage(const char* program) {
                "  --trie                   Emit standalone log-trie JSON\n"
                "  --trie-activity-key <name> Event activity attribute\n"
                "  --trie-max-path-length <n> Positive variant path limit\n"
+               "  --interval-tree          Emit open-path interval JSON\n"
+               "  --interval-activity-key <name> Activity attribute\n"
+               "  --interval-start-timestamp-key <name> Start-time attribute\n"
+               "  --interval-timestamp-key <name> Completion-time attribute\n"
+               "  --interval-epsilon <f>   Non-negative boundary epsilon\n"
+               "  --interval-filter-activity-couple <a,b> Optional pair filter\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -814,6 +821,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> target_fields;
   bool trie_requested = false;
   std::map<std::string, std::string> trie_fields;
+  bool interval_requested = false;
+  std::map<std::string, std::string> interval_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -929,6 +938,21 @@ int main(int argc, char** argv) {
       if (!trie_option_names.contains(key)) return usage(argv[0]);
       trie_fields.insert_or_assign(std::move(key), value);
       trie_requested = true;
+      continue;
+    }
+    if (arg == "--interval-tree") { interval_requested = true; continue; }
+    if (arg.rfind("--interval-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> interval_option_names = {
+          "interval_activity_key", "interval_start_timestamp_key",
+          "interval_timestamp_key", "interval_epsilon",
+          "interval_filter_activity_couple"};
+      if (!interval_option_names.contains(key)) return usage(argv[0]);
+      interval_fields.insert_or_assign(std::move(key), value);
+      interval_requested = true;
       continue;
     }
 
@@ -2282,6 +2306,19 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_trie_params(lookup, present);
       std::cout << minera::trie_json(minera::discover_trie(log, params))
                 << '\n';
+      return 0;
+    }
+    if (interval_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = interval_fields.find(std::string(name));
+        return it == interval_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return interval_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_interval_tree_params(lookup, present);
+      std::cout << minera::interval_tree_json(
+          minera::discover_open_path_intervals(log, params)) << '\n';
       return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);

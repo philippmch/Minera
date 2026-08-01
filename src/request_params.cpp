@@ -1877,4 +1877,43 @@ TrieParams parse_trie_params(const FieldLookup& field,
   return params;
 }
 
+IntervalTreeParams parse_interval_tree_params(const FieldLookup& field) {
+  return parse_interval_tree_params(field, {});
+}
+
+IntervalTreeParams parse_interval_tree_params(const FieldLookup& field,
+                                              const FieldPresence& present) {
+  IntervalTreeParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("interval_activity_key"))
+    params.activity_key = require("interval_activity_key");
+  if (supplied("interval_start_timestamp_key"))
+    params.start_timestamp_key = require("interval_start_timestamp_key");
+  if (supplied("interval_timestamp_key"))
+    params.timestamp_key = require("interval_timestamp_key");
+  if (supplied("interval_epsilon")) {
+    params.epsilon = parse_finite_double(require("interval_epsilon"),
+                                         "interval_epsilon");
+    if (params.epsilon < 0.0)
+      throw std::invalid_argument("interval_epsilon must be non-negative");
+  }
+  if (supplied("interval_filter_activity_couple")) {
+    const auto parts = split_target_activities(
+        require("interval_filter_activity_couple"));
+    if (parts.size() != 2)
+      throw std::invalid_argument(
+          "interval_filter_activity_couple: expected two labels");
+    params.filter_activity_couple = std::make_pair(parts[0], parts[1]);
+  }
+  return params;
+}
+
 }  // namespace minera
