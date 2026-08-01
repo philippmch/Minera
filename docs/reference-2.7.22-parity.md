@@ -77,7 +77,7 @@ are reconciled.
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; Petri stochastic, object-centric playout, Monte Carlo, and random-model generators remain |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; object-centric playout, Monte Carlo, and random-model generators remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -96,6 +96,17 @@ variants are exposed by `minera_playout --dfg`, `minera_export
 controls. The native API preserves probability and estimated-occurrence trace
 attributes; map-shaped variant return remains represented through those
 attributes while the transport remains XES.
+
+Petri stochastic simulation evidence: the native `stochastic_playout` API uses
+transition-index weights, validates finite non-negative values and weighted
+input arcs, samples all-zero enabled sets uniformly, preserves silent routing,
+and stops at the exact workflow final marking unless configured otherwise.
+The seeded options are available through `--playout-variant stochastic`, the
+local server's `mode=stochastic` route, and the frontend controls, with strict
+trace/step/event-budget limits at adapter boundaries. The supported native
+contract takes an explicit transition-weight vector; source-log-derived
+activation estimates and object-centric stochastic simulators remain outside
+this traditional-log vertical.
 
 ## Data, object, conversion, and integration checklist
 

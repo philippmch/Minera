@@ -1,9 +1,11 @@
 #include "minera/playout.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <deque>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -21,6 +23,7 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
 
   std::vector<std::uint32_t> marking(net.place_count(), 0);
   std::vector<std::size_t> enabled;
+  std::vector<std::uint32_t> required(net.place_count(), 0);
 
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
@@ -41,9 +44,13 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
 
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
+        std::fill(required.begin(), required.end(), 0);
         bool ready = true;
         for (const auto place : transitions[t].inputs) {
-          if (marking[place] == 0) {
+          ++required[place];
+        }
+        for (std::size_t p = 0; p < required.size(); ++p) {
+          if (required[p] > marking[p]) {
             ready = false;
             break;
           }
@@ -82,6 +89,130 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
     log.traces.push_back(std::move(trace));
   }
 
+  return log;
+}
+
+EventLog stochastic_playout(const PetriNet& net,
+                            const StochasticPlayoutOptions& options) {
+  const auto& transitions = net.transitions();
+  const auto places = net.place_count();
+  if (net.source() >= places || net.sink() >= places) {
+    throw std::invalid_argument("Petri net source and sink must be valid places");
+  }
+  if (!std::isfinite(options.start) ||
+      !std::isfinite(options.case_interval) ||
+      !std::isfinite(options.event_interval)) {
+    throw std::invalid_argument("stochastic playout timestamps must be finite");
+  }
+  if (options.case_interval < 0.0 || options.event_interval < 0.0) {
+    throw std::invalid_argument(
+        "stochastic playout intervals must be non-negative");
+  }
+  if (!options.transition_weights.empty() &&
+      options.transition_weights.size() != transitions.size()) {
+    throw std::invalid_argument(
+        "transition_weights must be empty or match the transition count");
+  }
+  for (const double weight : options.transition_weights) {
+    if (!std::isfinite(weight) || weight < 0.0) {
+      throw std::invalid_argument(
+          "transition_weights must be finite and non-negative");
+    }
+  }
+  for (const auto& transition : transitions) {
+    for (const auto place : transition.inputs) {
+      if (place >= places) {
+        throw std::invalid_argument("Petri transition input place is invalid");
+      }
+    }
+    for (const auto place : transition.outputs) {
+      if (place >= places) {
+        throw std::invalid_argument("Petri transition output place is invalid");
+      }
+    }
+    if (transition.activity && *transition.activity >= net.activities().size()) {
+      throw std::invalid_argument("Petri transition activity is invalid");
+    }
+  }
+
+  std::mt19937_64 rng(options.seed);
+  EventLog log;
+  log.traces.reserve(options.traces);
+  std::vector<std::uint64_t> marking(places, 0);
+  std::vector<std::size_t> enabled;
+  std::vector<std::uint64_t> required(places, 0);
+  const auto is_final = [&](const std::vector<std::uint64_t>& candidate) {
+    for (std::size_t p = 0; p < candidate.size(); ++p) {
+      if (candidate[p] != (p == net.sink() ? 1U : 0U)) return false;
+    }
+    return true;
+  };
+
+  for (std::size_t c = 0; c < options.traces; ++c) {
+    Trace trace;
+    trace.case_id = "case_" + std::to_string(c + 1);
+    double now = options.start + static_cast<double>(c) * options.case_interval;
+    std::fill(marking.begin(), marking.end(), 0);
+    marking[net.source()] = 1;
+
+    for (std::size_t step = 0; step < options.max_steps; ++step) {
+      if (options.stop_at_final && is_final(marking)) break;
+
+      enabled.clear();
+      for (std::size_t t = 0; t < transitions.size(); ++t) {
+        const auto& transition = transitions[t];
+        if (transition.inputs.empty()) continue;
+        std::fill(required.begin(), required.end(), 0);
+        for (const auto place : transition.inputs) ++required[place];
+        bool ready = true;
+        for (std::size_t p = 0; p < places; ++p) {
+          if (required[p] > marking[p]) {
+            ready = false;
+            break;
+          }
+        }
+        if (ready) enabled.push_back(t);
+      }
+      if (enabled.empty()) break;
+
+      std::size_t selected = 0;
+      if (options.transition_weights.empty()) {
+        selected = enabled[std::uniform_int_distribution<std::size_t>(
+            0, enabled.size() - 1)(rng)];
+      } else {
+        double maximum = 0.0;
+        for (const auto t : enabled)
+          maximum = std::max(maximum, options.transition_weights[t]);
+        if (!(maximum > 0.0)) {
+          selected = enabled[std::uniform_int_distribution<std::size_t>(
+              0, enabled.size() - 1)(rng)];
+        } else {
+          std::vector<double> weights;
+          weights.reserve(enabled.size());
+          for (const auto t : enabled)
+            weights.push_back(options.transition_weights[t] / maximum);
+          const auto index =
+              std::discrete_distribution<std::size_t>(weights.begin(), weights.end())(rng);
+          selected = enabled[index];
+        }
+      }
+
+      const auto& fired = transitions[selected];
+      for (const auto place : fired.inputs) --marking[place];
+      for (const auto place : fired.outputs) ++marking[place];
+      if (!fired.silent()) {
+        Event event;
+        event.case_id = trace.case_id;
+        event.activity = net.activities()[*fired.activity];
+        event.timestamp = format_timestamp(now);
+        event.input_order = trace.events.size();
+        trace.events.push_back(std::move(event));
+        now += options.event_interval;
+      }
+    }
+
+    log.traces.push_back(std::move(trace));
+  }
   return log;
 }
 
@@ -171,8 +302,17 @@ EventLog extensive_playout(const PetriNet& net,
         continue;  // would exceed the visible-length bound
       }
       bool ready = true;
+      std::vector<std::uint32_t> required(state.marking.size(), 0);
       for (const auto place : transition.inputs) {
-        if (state.marking[place] == 0) {
+        if (place >= required.size()) {
+          ready = false;
+          break;
+        }
+        ++required[place];
+      }
+      if (!ready) continue;
+      for (std::size_t p = 0; p < required.size(); ++p) {
+        if (required[p] > state.marking[p]) {
           ready = false;
           break;
         }

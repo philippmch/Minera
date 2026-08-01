@@ -33,6 +33,7 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type ProcessTreePlayoutOptions,
+  type StochasticPlayoutOptions,
   type DfgPlayoutOptions,
   numberFormat,
 } from "../types";
@@ -333,6 +334,7 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
+      <StochasticPetriPlayoutPanel dataset={data.dataset} available={Boolean(data.petri_net || data.inductive_petri_net || data.heuristic_petri_net || data.powl_petri_net)} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
     </div>
   );
@@ -368,6 +370,41 @@ function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; avai
         <label>Max trace cap<input type="number" min={1} value={options.max_trace_cap ?? ""} onChange={e => number("max_trace_cap", e.target.value)} /></label>
       </div>
       <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      {error && <p className="conf-inline-note">{error}</p>}
+    </>}
+  </section>;
+}
+
+function StochasticPetriPlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+  const [options, setOptions] = useState<StochasticPlayoutOptions>({ traces: 1000, stop_at_final: true });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setError(null);
+    try {
+      const xes = await fetchPlayout("inductive", options);
+      const blob = new Blob([xes], { type: "application/xml" });
+      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-stochastic-playout.xes`; anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const number = (name: keyof StochasticPlayoutOptions, value: string) =>
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Stochastic Petri-net playout</h2><span className="panel-meta">Weighted random XES from a cached Petri net</span></div>
+    {!available ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
+      <div className="align-settings-grid">
+        <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
+        <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
+        <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
+        <label>Transition weights<input type="text" value={options.transition_weights?.join(",") ?? ""} onChange={e => setOptions({ ...options, transition_weights: e.target.value.trim() ? e.target.value.split(",").map(Number) : undefined })} placeholder="1,1,0.5 (optional)" /></label>
+        <label>Case interval (s)<input type="number" min={0} step={0.1} value={options.case_interval ?? ""} onChange={e => number("case_interval", e.target.value)} /></label>
+        <label>Event interval (s)<input type="number" min={0} step={0.1} value={options.event_interval ?? ""} onChange={e => number("event_interval", e.target.value)} /></label>
+        <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
+      </div>
+      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download stochastic playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;

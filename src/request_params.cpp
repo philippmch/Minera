@@ -1655,4 +1655,77 @@ DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field,
   return params;
 }
 
+StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field) {
+  return parse_stochastic_playout_params(field, {});
+}
+
+StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  StochasticPlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("stochastic_traces"))
+    params.traces = parse_positive_size(require("stochastic_traces"),
+                                        "stochastic_traces");
+  if (supplied("stochastic_max_steps"))
+    params.max_steps = parse_nonnegative_size(require("stochastic_max_steps"),
+                                              "stochastic_max_steps");
+  if (supplied("stochastic_seed"))
+    params.seed = parse_nonnegative_u64(require("stochastic_seed"),
+                                        "stochastic_seed");
+  if (supplied("stochastic_transition_weights")) {
+    const auto value = require("stochastic_transition_weights");
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= value.size(); ++i) {
+      if (i < value.size() && value[i] != ',') continue;
+      const auto token = value.substr(begin, i - begin);
+      const auto first = token.find_first_not_of(" \t\r\n");
+      if (first == std::string_view::npos)
+        throw std::invalid_argument(
+            "stochastic_transition_weights: expected non-negative values");
+      const auto last = token.find_last_not_of(" \t\r\n");
+      const double weight = parse_finite_double(
+          token.substr(first, last - first + 1),
+          "stochastic_transition_weights");
+      if (weight < 0.0)
+        throw std::invalid_argument(
+            "stochastic_transition_weights must be non-negative");
+      params.transition_weights.push_back(weight);
+      begin = i + 1;
+    }
+    if (params.transition_weights.empty())
+      throw std::invalid_argument(
+          "stochastic_transition_weights: expected a non-empty list");
+  }
+  if (supplied("stochastic_stop_at_final"))
+    params.stop_at_final = parse_boolean(require("stochastic_stop_at_final"),
+                                         "stochastic_stop_at_final");
+  if (supplied("stochastic_start"))
+    params.start = parse_finite_double(require("stochastic_start"),
+                                       "stochastic_start");
+  if (supplied("stochastic_case_interval")) {
+    params.case_interval = parse_finite_double(
+        require("stochastic_case_interval"), "stochastic_case_interval");
+    if (params.case_interval < 0.0)
+      throw std::invalid_argument(
+          "stochastic_case_interval must be non-negative");
+  }
+  if (supplied("stochastic_event_interval")) {
+    params.event_interval = parse_finite_double(
+        require("stochastic_event_interval"), "stochastic_event_interval");
+    if (params.event_interval < 0.0)
+      throw std::invalid_argument(
+          "stochastic_event_interval must be non-negative");
+  }
+  return params;
+}
+
 }  // namespace minera

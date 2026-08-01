@@ -30,6 +30,7 @@ import {
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
+  type StochasticPlayoutOptions,
   type DfgPlayoutOptions,
   isDfgAlignmentResult,
   isEditDistanceResult,
@@ -1284,6 +1285,41 @@ export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {})
   return params.toString();
 }
 
+export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): string {
+  const params = new URLSearchParams();
+  const integerFields: Array<[keyof StochasticPlayoutOptions, boolean]> = [
+    ["traces", true], ["max_steps", false], ["seed", false],
+  ];
+  for (const [name, positive] of integerFields) {
+    const value = options[name];
+    if (value !== undefined) {
+      validatePlayoutInteger(name, value as number, positive);
+      params.set(`stochastic_${name}`, String(value));
+    }
+  }
+  if (options.transition_weights !== undefined) {
+    if (!Array.isArray(options.transition_weights) || options.transition_weights.length === 0 ||
+        options.transition_weights.some((value) => !Number.isFinite(value) || value < 0)) {
+      throw new Error("transition_weights must be a non-empty list of finite non-negative numbers");
+    }
+    params.set("stochastic_transition_weights", options.transition_weights.join(","));
+  }
+  if (options.stop_at_final !== undefined) {
+    if (typeof options.stop_at_final !== "boolean") throw new Error("stop_at_final must be boolean");
+    params.set("stochastic_stop_at_final", options.stop_at_final ? "true" : "false");
+  }
+  for (const name of ["start", "case_interval", "event_interval"] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!Number.isFinite(value) || (name !== "start" && value < 0)) {
+        throw new Error(`${name} must be a finite ${name === "start" ? "number" : "non-negative number"}`);
+      }
+      params.set(`stochastic_${name}`, String(value));
+    }
+  }
+  return params.toString();
+}
+
 function validatePlayoutNumber(name: string, value: number, positive = false): void {
   if (!Number.isFinite(value) || !Number.isSafeInteger(value) || value < 0 || (positive && value === 0)) {
     throw new Error(`${name} must be a ${positive ? "positive" : "non-negative"} integer`);
@@ -1344,8 +1380,15 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
   return params.toString();
 }
 
-export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | DfgPlayoutOptions = {}): Promise<string> {
-  const query = miner === "dfg" ? dfgPlayoutQuery(options as DfgPlayoutOptions) : processTreePlayoutQuery(options as ProcessTreePlayoutOptions);
+export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions = {}): Promise<string> {
+  const stochastic = miner === "stochastic" || "transition_weights" in options || "stop_at_final" in options || "case_interval" in options || "event_interval" in options || "start" in options;
+  let query: string;
+  if (stochastic) {
+    const controls = stochasticPlayoutQuery(options as StochasticPlayoutOptions);
+    query = `mode=stochastic${controls ? `&${controls}` : ""}`;
+  } else {
+    query = miner === "dfg" ? dfgPlayoutQuery(options as DfgPlayoutOptions) : processTreePlayoutQuery(options as ProcessTreePlayoutOptions);
+  }
   let response: Response;
   try {
     response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);

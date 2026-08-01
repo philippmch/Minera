@@ -576,10 +576,10 @@ int usage(const char* program) {
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
-               "                            or declare/process_tree\n"
-               "                            or dfg\n"
+               "                            declare, process_tree, dfg, or\n"
+               "                            stochastic\n"
                "  --playout-variant <id>   Process-tree variant: BASIC_PLAYOUT,\n"
-               "                            EXTENSIVE, or TOPBOTTOM\n"
+               "                            EXTENSIVE, TOPBOTTOM, or stochastic\n"
                "  --playout-traces <n>     Process-tree sampled cases\n"
                "  --playout-max-steps <n> Visible sampling step cap\n"
                "  --playout-seed <u64>     Process-tree random seed\n"
@@ -588,6 +588,11 @@ int usage(const char* program) {
                "  --playout-max-loop-occurrences <n> Loop re-do limit\n"
                "  --playout-max-traces <n> Extensive trace cap\n"
                "  --playout-max-trace-cap <n> Alias for max-traces\n"
+               "  --stochastic-traces <n>  Weighted Petri cases\n"
+               "  --stochastic-max-steps <n> Firing cap per case\n"
+               "  --stochastic-seed <u64>  Weighted Petri random seed\n"
+               "  --stochastic-transition-weights <w,...> Transition weights\n"
+               "  --stochastic-stop-at-final <bool> Stop at final marking\n"
                "  --dfg-playout-variant <name> classic or performance\n"
                "  --dfg-playout-traces <n> DFG generated cases\n"
                "  --dfg-playout-max-events-per-trace <n> Event cap\n"
@@ -767,6 +772,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> dfg_playout_fields;
   bool dfg_playout_options_used = false;
   minera::DfgPlayoutOptions dfg_playout_options;
+  std::map<std::string, std::string> stochastic_playout_fields;
+  bool stochastic_playout_requested = false;
+  minera::StochasticPlayoutOptions stochastic_playout_options;
   minera::FootprintsOptions footprints_options;
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
@@ -927,6 +935,32 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       dfg_playout_fields.insert_or_assign(std::move(key), value);
       dfg_playout_options_used = true;
+      continue;
+    }
+
+    if (arg == "--stochastic-traces" || arg == "--stochastic-max-steps" ||
+        arg == "--stochastic-seed" ||
+        arg == "--stochastic-transition-weights" ||
+        arg == "--stochastic-stop-at-final" || arg == "--stochastic-start" ||
+        arg == "--stochastic-case-interval" ||
+        arg == "--stochastic-event-interval") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      stochastic_playout_fields.insert_or_assign(std::move(key), value);
+      stochastic_playout_requested = true;
+      continue;
+    }
+    if (arg == "--playout-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (std::string_view(value) == "stochastic") {
+        stochastic_playout_requested = true;
+      } else {
+        process_tree_playout_fields.insert_or_assign("playout_variant", value);
+        process_tree_playout_options_used = true;
+      }
       continue;
     }
 
@@ -1095,7 +1129,7 @@ int main(int argc, char** argv) {
         return 2;
       }
       declare_playout_options_used = true;
-    } else if (arg == "--playout-variant" || arg == "--playout-traces" ||
+    } else if (arg == "--playout-traces" ||
                arg == "--playout-max-steps" ||
                arg == "--playout-seed" || arg == "--playout-min-length" ||
                arg == "--playout-max-length" ||
@@ -2075,6 +2109,28 @@ int main(int argc, char** argv) {
     std::cerr << "error: --dfg-playout-* options require --playout-miner dfg\n";
     return 2;
   }
+  if (stochastic_playout_requested &&
+      (playout_miner == "declare" || playout_miner == "process_tree" ||
+       playout_miner == "dfg")) {
+    std::cerr << "error: stochastic playout requires a Petri --playout-miner\n";
+    return 2;
+  }
+  if (stochastic_playout_requested) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = stochastic_playout_fields.find(std::string(name));
+      return it == stochastic_playout_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return stochastic_playout_fields.contains(std::string(name));
+    };
+    try {
+      stochastic_playout_options =
+          minera::parse_stochastic_playout_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
   if (input.empty()) {
     return usage(argv[0]);
   }
@@ -2550,21 +2606,23 @@ int main(int argc, char** argv) {
     if (!playout_output.empty()) {
       std::optional<minera::EventLog> generated;
       const minera::PetriNet* selected = nullptr;
-      if (playout_miner == "inductive")
+      const bool stochastic = stochastic_playout_requested || playout_miner == "stochastic";
+      const std::string model_miner = playout_miner == "stochastic" ? "inductive" : playout_miner;
+      if (model_miner == "inductive")
         selected = &inductive_net;
-      else if (playout_miner == "alpha")
+      else if (model_miner == "alpha")
         selected = &net;
-      else if (playout_miner == "heuristic")
+      else if (model_miner == "heuristic")
         selected = &heuristic_net;
-      else if (playout_miner == "powl")
+      else if (model_miner == "powl")
         selected = &powl_net;
-      else if (playout_miner == "declare")
+      else if (model_miner == "declare")
         generated =
             minera::declare_playout(declare, declare_playout_options);
-      else if (playout_miner == "process_tree")
+      else if (model_miner == "process_tree")
         generated = minera::process_tree_playout(tree,
                                                  process_tree_playout_options);
-      else if (playout_miner == "dfg")
+      else if (model_miner == "dfg")
         generated = generate_dfg_playout(log, dfg_playout_options);
       else {
         std::cerr << "error: unknown --playout-miner '" << playout_miner
@@ -2572,14 +2630,24 @@ int main(int argc, char** argv) {
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
-      if (!generated) generated = minera::playout(*selected);
+      if (stochastic) {
+        if (selected == nullptr) {
+          std::cerr << "error: stochastic playout requires a Petri model\n";
+          return 2;
+        }
+        generated = minera::stochastic_playout(*selected, stochastic_playout_options);
+      } else if (!generated) {
+        generated = minera::playout(*selected);
+      }
       std::ofstream playout_file(playout_output);
       if (!playout_file) {
         std::cerr << "error: cannot open playout output file "
                   << playout_output << '\n';
         return 1;
       }
-      minera::write_xes(playout_file, *generated, playout_miner + " playout");
+      minera::write_xes(playout_file, *generated,
+                        (stochastic ? model_miner + " stochastic playout"
+                                    : playout_miner + " playout"));
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';
