@@ -52,6 +52,28 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
     && candidate.rows.every((trace) => Array.isArray(trace) && trace.every((row) => Array.isArray(row) && row.every((entry) => typeof entry === "number" && Number.isFinite(entry))));
 }
 
+export interface TrieNode {
+  label: string;
+  depth: number;
+  final: boolean;
+  children: TrieNode[];
+}
+export interface TrieResult {
+  family: "LOG_TO_TRIE";
+  root: TrieNode;
+}
+function isTrieNode(value: unknown): value is TrieNode {
+  if (!value || typeof value !== "object") return false;
+  const node = value as Partial<TrieNode>;
+  return typeof node.label === "string" && typeof node.depth === "number" && Number.isInteger(node.depth) && node.depth >= 0
+    && typeof node.final === "boolean" && Array.isArray(node.children)
+    && node.children.every(isTrieNode);
+}
+export function isTrieResult(value: unknown): value is TrieResult {
+  return !!value && typeof value === "object" && (value as Partial<TrieResult>).family === "LOG_TO_TRIE"
+    && isTrieNode((value as Partial<TrieResult>).root);
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

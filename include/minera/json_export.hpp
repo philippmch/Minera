@@ -38,6 +38,7 @@
 #include "minera/petri_usage_comparison.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/log_to_target.hpp"
+#include "minera/trie.hpp"
 
 namespace minera {
 
@@ -237,5 +238,6 @@ void write_analysis_json(std::ostream& out,
 
 [[nodiscard]] std::string concept_drift_json(const ConceptDriftResult& result);
 [[nodiscard]] std::string log_to_target_json(const LogToTargetResult& result);
+[[nodiscard]] std::string trie_json(const TrieModel& result);
 
 }  // namespace minera

@@ -1852,4 +1852,29 @@ LogToTargetParams parse_log_to_target_params(const FieldLookup& field,
   return params;
 }
 
+TrieParams parse_trie_params(const FieldLookup& field) {
+  return parse_trie_params(field, {});
+}
+
+TrieParams parse_trie_params(const FieldLookup& field,
+                             const FieldPresence& present) {
+  TrieParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("trie_activity_key"))
+    params.activity_key = require("trie_activity_key");
+  if (supplied("trie_max_path_length")) {
+    params.max_path_length = parse_positive_size(
+        require("trie_max_path_length"), "trie_max_path_length");
+  }
+  return params;
+}
+
 }  // namespace minera

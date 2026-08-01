@@ -3484,4 +3484,26 @@ std::string log_to_target_json(const LogToTargetResult& result) {
   return out.str();
 }
 
+namespace {
+void write_trie_node_json(std::ostream& out, const TrieNode& node) {
+  out << "{\"label\":";
+  write_json_string(out, node.label);
+  out << ",\"depth\":" << node.depth << ",\"final\":"
+      << (node.final ? "true" : "false") << ",\"children\":[";
+  for (std::size_t i = 0; i < node.children.size(); ++i) {
+    if (i) out << ',';
+    write_trie_node_json(out, node.children[i]);
+  }
+  out << "]}";
+}
+}  // namespace
+
+std::string trie_json(const TrieModel& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_TO_TRIE\",\"root\":";
+  write_trie_node_json(out, result.root);
+  out << '}';
+  return out.str();
+}
+
 }  // namespace minera

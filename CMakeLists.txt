@@ -72,6 +72,7 @@ add_library(minera_core
   src/timestamp.cpp
   src/temporal_profile.cpp
   src/transition_system.cpp
+  src/trie.cpp
   src/xes_event_log_importer.cpp
   src/xes_export.cpp
 )
@@ -378,4 +379,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_petri_usage_comparison_tests PRIVATE cxx_std_20)
   target_compile_options(minera_petri_usage_comparison_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_petri_usage_comparison_tests COMMAND minera_petri_usage_comparison_tests)
+
+  add_executable(minera_trie_tests
+    tests/test_trie.cpp
+  )
+  target_link_libraries(minera_trie_tests PRIVATE minera::core)
+  target_compile_features(minera_trie_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_trie_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_trie_tests COMMAND minera_trie_tests)
 endif()

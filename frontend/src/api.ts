@@ -20,7 +20,9 @@ import {
   type EmdOptions,
   type ConceptDriftResult,
   type LogToTargetResult,
+  type TrieResult,
   isLogToTargetResult,
+  isTrieResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1516,5 +1518,26 @@ export async function requestLogToTarget(options: LogToTargetOptions = {}): Prom
   if (!isLogToTargetResult(payload)) {
     throw new Error("the Minera backend returned an invalid target transformation");
   }
+  return payload;
+}
+
+export interface TrieOptions {
+  trie_activity_key?: string;
+  trie_max_path_length?: number;
+}
+
+export function trieQuery(options: TrieOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.trie_activity_key !== undefined) query.set("trie_activity_key", options.trie_activity_key);
+  if (options.trie_max_path_length !== undefined) query.set("trie_max_path_length", String(options.trie_max_path_length));
+  return query.toString();
+}
+
+export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult> {
+  const query = trieQuery(options);
+  const response = await fetch(`/api/trie${query ? `?${query}` : ""}`);
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isTrieResult(payload)) throw new Error("the Minera backend returned an invalid trie");
   return payload;
 }
