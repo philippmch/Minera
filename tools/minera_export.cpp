@@ -20,6 +20,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
+#include "minera/concept_drift.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/declare.hpp"
@@ -412,6 +413,14 @@ int usage(const char* program) {
                "  --spectrum-variant <id>  connected (default) or disconnected\n"
                "  --spectrum-sample-size <n> Positive spectrum sample size\n"
                "  --spectrum-sort-log <bool> Sort log before spectrum mining\n"
+               "  --concept-drift          Emit standalone concept-drift JSON\n"
+               "  --drift-sub-log-size <n> Positive raw sub-log size\n"
+               "  --drift-window-size <n> Positive comparison window size\n"
+               "  --drift-num-permutations <n> Permutation count\n"
+               "  --drift-threshold <f>    Threshold in [0,1]\n"
+               "  --drift-max-no-change-points <n> Result cap\n"
+               "  --drift-seed <n>         Non-negative RNG seed\n"
+               "  --drift-include-timestamps <bool> Include timestamps\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -786,6 +795,8 @@ int main(int argc, char** argv) {
   minera::DfgStatisticalOptions dfg_statistics_options;
   std::vector<std::string> correlation_variants;
   minera::CorrelationMinerOptions correlation_options;
+  bool concept_drift_requested = false;
+  std::map<std::string, std::string> concept_drift_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -865,6 +876,16 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--concept-drift") { concept_drift_requested = true; continue; }
+    if (arg.rfind("--drift-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      concept_drift_fields.insert_or_assign(std::move(key), value);
+      concept_drift_requested = true;
+      continue;
+    }
 
     if (arg == "--evaluation-family" || arg == "--fitness-variant" ||
         arg == "--precision-variant" ||
@@ -2178,6 +2199,19 @@ int main(int argc, char** argv) {
                    : minera::import_csv_event_log(input, options);
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
+    }
+    if (concept_drift_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = concept_drift_fields.find(std::string(name));
+        return it == concept_drift_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return concept_drift_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_concept_drift_params(lookup, present);
+      std::cout << minera::concept_drift_json(
+          minera::detect_concept_drift(log, params)) << '\n';
+      return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);
     std::optional<minera::DfgAlignmentLogResult> dfg_alignment_result;

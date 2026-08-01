@@ -36,6 +36,7 @@
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
 #include "minera/petri_usage_comparison.hpp"
+#include "minera/concept_drift.hpp"
 
 namespace minera {
 
@@ -232,5 +233,7 @@ void write_analysis_json(std::ostream& out,
 
 [[nodiscard]] std::string petri_usage_comparison_json(
     const PetriUsageComparison& result);
+
+[[nodiscard]] std::string concept_drift_json(const ConceptDriftResult& result);
 
 }  // namespace minera

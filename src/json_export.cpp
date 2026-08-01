@@ -3399,4 +3399,53 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
   return out.str();
 }
 
+std::string concept_drift_json(const ConceptDriftResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"CONCEPT_DRIFT\",\"activities\":[";
+  for (std::size_t i = 0; i < result.activities.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.activities[i]);
+  }
+  out << "],\"feature_vectors\":[";
+  for (std::size_t i = 0; i < result.feature_vectors.size(); ++i) {
+    if (i) out << ',';
+    out << '[';
+    for (std::size_t j = 0; j < result.feature_vectors[i].size(); ++j) {
+      if (j) out << ',';
+      out << result.feature_vectors[i][j];
+    }
+    out << ']';
+  }
+  out << "],\"sublogs\":[";
+  for (std::size_t i = 0; i < result.sublogs.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"trace_count\":" << result.sublogs[i].trace_count()
+        << ",\"event_count\":" << result.sublogs[i].event_count() << '}';
+  }
+  out << "],\"cumulative_sublogs\":[";
+  for (std::size_t i = 0; i < result.cumulative_sublogs.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"trace_count\":" << result.cumulative_sublogs[i].trace_count()
+        << ",\"event_count\":" << result.cumulative_sublogs[i].event_count() << '}';
+  }
+  out << "],\"sublog_start_timestamps\":[";
+  for (std::size_t i = 0; i < result.sublog_start_timestamps.size(); ++i) {
+    if (i) out << ',';
+    out << result.sublog_start_timestamps[i];
+  }
+  out << "],\"change_points\":[";
+  for (std::size_t i = 0; i < result.change_points.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"sublog_index\":" << result.change_points[i].sublog_index
+        << ",\"p_value\":" << result.change_points[i].p_value << '}';
+  }
+  out << "],\"change_timestamps\":[";
+  for (std::size_t i = 0; i < result.change_timestamps.size(); ++i) {
+    if (i) out << ',';
+    out << result.change_timestamps[i];
+  }
+  out << "]}";
+  return out.str();
+}
+
 }  // namespace minera

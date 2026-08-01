@@ -1728,4 +1728,43 @@ StochasticPlayoutParams parse_stochastic_playout_params(
   return params;
 }
 
+ConceptDriftParams parse_concept_drift_params(const FieldLookup& field) {
+  return parse_concept_drift_params(field, {});
+}
+
+ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
+                                             const FieldPresence& present) {
+  ConceptDriftParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("drift_sub_log_size"))
+    params.sub_log_size = parse_positive_size(require("drift_sub_log_size"), "drift_sub_log_size");
+  if (supplied("drift_window_size"))
+    params.window_size = parse_positive_size(require("drift_window_size"), "drift_window_size");
+  if (supplied("drift_num_permutations")) {
+    params.num_permutations = parse_positive_size(require("drift_num_permutations"), "drift_num_permutations");
+    if (params.num_permutations > 1'000'000)
+      throw std::invalid_argument("drift_num_permutations must be in [1, 1000000]");
+  }
+  if (supplied("drift_threshold")) {
+    params.threshold = parse_finite_double(require("drift_threshold"), "drift_threshold");
+    if (params.threshold < 0.0 || params.threshold > 1.0)
+      throw std::invalid_argument("drift_threshold must be finite and in [0,1]");
+  }
+  if (supplied("drift_max_no_change_points"))
+    params.max_no_change_points = parse_nonnegative_size(require("drift_max_no_change_points"), "drift_max_no_change_points");
+  if (supplied("drift_seed"))
+    params.seed = parse_nonnegative_u64(require("drift_seed"), "drift_seed");
+  if (supplied("drift_include_timestamps"))
+    params.include_timestamps = parse_boolean(require("drift_include_timestamps"), "drift_include_timestamps");
+  return params;
+}
+
 }  // namespace minera

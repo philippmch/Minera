@@ -33,6 +33,7 @@
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
 #include "minera/petri_analysis.hpp"
+#include "minera/concept_drift.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -85,6 +86,8 @@ struct MineParams {
   bool batches = false;
   BatchDiscoveryOptions batch_options;
 };
+
+using ConceptDriftParams = ConceptDriftOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -239,6 +242,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
     const FieldLookup& field);
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] ConceptDriftParams parse_concept_drift_params(
+    const FieldLookup& field);
+[[nodiscard]] ConceptDriftParams parse_concept_drift_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

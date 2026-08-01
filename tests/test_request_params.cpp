@@ -90,6 +90,20 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.batch_options.min_batch_size == 2);
 }
 
+void concept_drift_params_contract() {
+  const auto p = minera::parse_concept_drift_params(fields({
+      {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
+      {"drift_num_permutations", "5"}, {"drift_threshold", "0.25"},
+      {"drift_max_no_change_points", "4"}, {"drift_seed", "9"},
+      {"drift_include_timestamps", "true"}}));
+  assert(p.sub_log_size == 3 && p.window_size == 2 && p.num_permutations == 5);
+  assert(p.threshold == 0.25 && p.max_no_change_points == 4 && p.seed == 9 && p.include_timestamps);
+  bool threw = false;
+  try { (void)minera::parse_concept_drift_params(fields({{"drift_threshold", "2"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1391,5 +1405,6 @@ int main() {
   parse_evaluation_params_defaults_and_variants();
   parse_evaluation_params_rejects_invalid_and_explicit_empty_values();
   native_json_contracts();
+  concept_drift_params_contract();
   return 0;
 }

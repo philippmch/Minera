@@ -36,9 +36,10 @@ import {
   type StochasticPlayoutOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
+  type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck } from "../api";
+import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -80,6 +81,7 @@ export function Conformance({
   onRequestEvaluation,
   onRequestPetriAnalysis,
   onRequestEmd,
+  onRequestConceptDrift,
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
@@ -95,6 +97,7 @@ export function Conformance({
   onRequestEvaluation?: (miner: string, options?: EvaluationOptions) => Promise<ModelEvaluation>;
   onRequestPetriAnalysis?: (options?: PetriAnalysisOptions) => Promise<PetriAnalysisResult>;
   onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
+  onRequestConceptDrift?: (options?: ConceptDriftOptions) => Promise<ConceptDriftResult>;
 }) {
   const analysisIdentity = useRef({ data, id: 0 });
   if (analysisIdentity.current.data !== data) {
@@ -338,8 +341,30 @@ export function Conformance({
       <StochasticPetriPlayoutPanel dataset={data.dataset} available={Boolean(data.petri_net || data.inductive_petri_net || data.heuristic_petri_net || data.powl_petri_net)} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
       <PetriUsageComparisonPanel />
+      <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
     </div>
   );
+}
+
+function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftOptions) => Promise<ConceptDriftResult> }) {
+  const [result, setResult] = useState<ConceptDriftResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const run = async () => {
+    if (!onRequest) return;
+    const id = ++requestId.current;
+    setBusy(true); setError(null); setResult(null);
+    try {
+      const next = await onRequest();
+      if (id === requestId.current) setResult(next);
+    } catch (cause) {
+      if (id === requestId.current) setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (id === requestId.current) setBusy(false);
+    }
+  };
+  return <section className="panel other-align-card"><h3>Concept drift</h3><p>Detect distribution changes across consecutive sub-logs.</p><button className="button" disabled={!onRequest || busy} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>{error && <div className="error-banner">{error}</div>}{result && <small>{result.change_points.length} change point(s) across {result.sublogs.length} sub-logs.</small>}</section>;
 }
 
 function PetriUsageComparisonPanel() {
