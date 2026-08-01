@@ -38,6 +38,7 @@
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
+#include "minera/random_tree.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -96,6 +97,7 @@ using LogToTargetParams = LogToTargetOptions;
 using TrieParams = TrieOptions;
 using IntervalTreeParams = OpenPathIntervalOptions;
 using CaseRelationsParams = CaseRelationsOptions;
+using RandomTreeParams = RandomTreeOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -274,6 +276,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] CaseRelationsParams parse_case_relations_params(
     const FieldLookup& field);
 [[nodiscard]] CaseRelationsParams parse_case_relations_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] RandomTreeParams parse_random_tree_params(
+    const FieldLookup& field);
+[[nodiscard]] RandomTreeParams parse_random_tree_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

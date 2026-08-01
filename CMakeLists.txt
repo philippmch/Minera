@@ -62,6 +62,7 @@ add_library(minera_core
   src/petri_usage_comparison.cpp
   src/playout.cpp
   src/process_tree_alignment.cpp
+  src/random_tree.cpp
   src/process_tree_playout.cpp
   src/process_tree_reduction.cpp
   src/powl.cpp
@@ -405,4 +406,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_case_relations_tests PRIVATE cxx_std_20)
   target_compile_options(minera_case_relations_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_case_relations_tests COMMAND minera_case_relations_tests)
+
+  add_executable(minera_random_tree_tests
+    tests/test_random_tree.cpp
+  )
+  target_link_libraries(minera_random_tree_tests PRIVATE minera::core)
+  target_compile_features(minera_random_tree_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_random_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_random_tree_tests COMMAND minera_random_tree_tests)
 endif()

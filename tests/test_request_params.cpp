@@ -205,6 +205,27 @@ void case_relations_params_contract() {
   assert(threw);
 }
 
+void random_tree_params_contract() {
+  const auto p = minera::parse_random_tree_params(fields({
+      {"random_tree_min_rec_depth", "2"},
+      {"random_tree_max_rec_depth", "4"},
+      {"random_tree_prob_leaf", "0.75"},
+      {"random_tree_seed", "17"},
+      {"random_tree_activities", R"(Review\, senior,A\\B)"},
+  }));
+  assert(p.min_rec_depth == 2 && p.max_rec_depth == 4);
+  assert(p.prob_leaf == 0.75 && p.seed == 17);
+  assert((p.activities == std::vector<std::string>{"Review, senior", "A\\B"}));
+  bool threw = false;
+  try {
+    (void)minera::parse_random_tree_params(
+        fields({{"random_tree_prob_leaf", "2"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1511,5 +1532,6 @@ int main() {
   trie_params_contract();
   interval_tree_params_contract();
   case_relations_params_contract();
+  random_tree_params_contract();
   return 0;
 }

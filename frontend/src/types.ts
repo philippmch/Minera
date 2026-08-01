@@ -136,6 +136,43 @@ export function isCaseRelationsResult(value: unknown): value is CaseRelationsRes
   });
 }
 
+export interface RandomTreeNode {
+  operator: "activity" | "tau" | "sequence" | "exclusive" | "parallel" | "loop";
+  activity?: string;
+  children: RandomTreeNode[];
+}
+export interface RandomTreeResult {
+  family: "RANDOM_TREE";
+  variant: "BASIC";
+  activities: string[];
+  tree: RandomTreeNode;
+}
+function isRandomTreeNode(value: unknown, activities: string[], root = false): value is RandomTreeNode {
+  if (!value || typeof value !== "object") return false;
+  const node = value as Partial<RandomTreeNode>;
+  if (!["activity", "tau", "sequence", "exclusive", "parallel", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
+  if (node.operator === "activity") return node.children.length === 0 && typeof node.activity === "string" && activities.includes(node.activity);
+  if (node.activity !== undefined) return false;
+  if (node.operator === "tau") return node.children.length === 0;
+  if (node.operator === "loop") {
+    return node.children.length === 3 && isRandomTreeNode(node.children[0], activities)
+      && isRandomTreeNode(node.children[1], activities)
+      && isRandomTreeNode(node.children[2], activities)
+      && node.children[2].operator === "tau";
+  }
+  const minimumChildren = 2;
+  if (node.children.length < minimumChildren || (root && (node.operator !== "sequence" || node.children.length !== 3))) return false;
+  if (!node.children.every((child) => isRandomTreeNode(child, activities))) return false;
+  return !root || (node.children[0].operator === "activity" && node.children[2].operator === "activity");
+}
+export function isRandomTreeResult(value: unknown): value is RandomTreeResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<RandomTreeResult>;
+  if (candidate.family !== "RANDOM_TREE" || candidate.variant !== "BASIC" || !Array.isArray(candidate.activities)) return false;
+  if (candidate.activities.length === 0 || candidate.activities.some((activity) => typeof activity !== "string" || activity.length === 0) || new Set(candidate.activities).size !== candidate.activities.length) return false;
+  return isRandomTreeNode(candidate.tree, candidate.activities, true);
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

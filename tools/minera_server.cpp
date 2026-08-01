@@ -44,6 +44,7 @@
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
+#include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -723,6 +724,36 @@ void handle_case_relations(const httplib::Request& request,
     response.set_content(
         minera::case_relations_json(minera::merge_case_relations(
             base, incoming, relations, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_random_tree(const httplib::Request& request,
+                        httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "random_tree_rec_depth",     "random_tree_min_rec_depth",
+        "random_tree_max_rec_depth", "random_tree_prob_leaf",
+        "random_tree_seed",          "random_tree_activities"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown random-tree parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto params = minera::parse_random_tree_params(lookup, present);
+    response.set_content(
+        minera::random_tree_json(minera::generate_random_process_tree(params)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -1583,6 +1614,7 @@ int main(int argc, char** argv) {
   server.Options("/api/trie", preflight);
   server.Options("/api/interval-tree", preflight);
   server.Options("/api/merge-case-relations", preflight);
+  server.Options("/api/random-tree", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -1604,6 +1636,7 @@ int main(int argc, char** argv) {
   server.Get("/api/trie", handle_trie);
   server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/merge-case-relations", handle_case_relations);
+  server.Get("/api/random-tree", handle_random_tree);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);
