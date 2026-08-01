@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes concept drift controls", () => {
@@ -34,6 +34,20 @@ describe("native alignment adapters", () => {
     try {
       await expect(requestLogToTarget()).rejects.toThrow(/invalid target transformation/);
       expect(fetchMock).toHaveBeenCalledWith("/api/transform-target", { method: "POST" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("serializes trie controls and validates recursive responses", async () => {
+    expect(trieQuery({ trie_activity_key: "concept:name", trie_max_path_length: 3 })).toBe("trie_activity_key=concept%3Aname&trie_max_path_length=3");
+    const valid = { family: "LOG_TO_TRIE", root: { label: "", depth: 0, final: false, children: [{ label: "A", depth: 1, final: true, children: [] }] } };
+    expect(isTrieResult(valid)).toBe(true);
+    expect(isTrieResult({ ...valid, root: { ...valid.root, depth: -1 } })).toBe(false);
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => valid }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(requestTrie()).resolves.toEqual(valid);
+      expect(fetchMock).toHaveBeenCalledWith("/api/trie");
     } finally {
       vi.unstubAllGlobals();
     }

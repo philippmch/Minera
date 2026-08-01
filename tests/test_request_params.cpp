@@ -141,6 +141,21 @@ void log_to_target_params_contract() {
   assert(threw);
 }
 
+void trie_params_contract() {
+  const auto p = minera::parse_trie_params(fields({
+      {"trie_activity_key", "phase"}, {"trie_max_path_length", "4"}}));
+  assert(p.activity_key == "phase");
+  assert(p.max_path_length && *p.max_path_length == 4);
+  bool threw = false;
+  try {
+    (void)minera::parse_trie_params(
+        fields({{"trie_max_path_length", "0"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1444,5 +1459,6 @@ int main() {
   native_json_contracts();
   concept_drift_params_contract();
   log_to_target_params_contract();
+  trie_params_contract();
   return 0;
 }

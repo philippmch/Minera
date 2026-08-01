@@ -39,6 +39,7 @@
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
+#include "minera/trie.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -430,6 +431,9 @@ int usage(const char* program) {
                "  --target-enable-padding <bool> Pad rows to target size\n"
                "  --target-pad-size <n>    Padded row count\n"
                "  --target-activities <a,b,c> Explicit classes (\\, escapes commas)\n"
+               "  --trie                   Emit standalone log-trie JSON\n"
+               "  --trie-activity-key <name> Event activity attribute\n"
+               "  --trie-max-path-length <n> Positive variant path limit\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -808,6 +812,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> concept_drift_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
+  bool trie_requested = false;
+  std::map<std::string, std::string> trie_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -910,6 +916,19 @@ int main(int argc, char** argv) {
       if (!target_option_names.contains(key)) return usage(argv[0]);
       target_fields.insert_or_assign(std::move(key), value);
       target_requested = true;
+      continue;
+    }
+    if (arg == "--trie") { trie_requested = true; continue; }
+    if (arg.rfind("--trie-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> trie_option_names = {
+          "trie_activity_key", "trie_max_path_length"};
+      if (!trie_option_names.contains(key)) return usage(argv[0]);
+      trie_fields.insert_or_assign(std::move(key), value);
+      trie_requested = true;
       continue;
     }
 
@@ -2250,6 +2269,19 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_log_to_target_params(lookup, present);
       std::cout << minera::log_to_target_json(
           minera::log_to_target(log, params)) << '\n';
+      return 0;
+    }
+    if (trie_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = trie_fields.find(std::string(name));
+        return it == trie_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return trie_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_trie_params(lookup, present);
+      std::cout << minera::trie_json(minera::discover_trie(log, params))
+                << '\n';
       return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);
