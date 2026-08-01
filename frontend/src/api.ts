@@ -22,9 +22,11 @@ import {
   type LogToTargetResult,
   type TrieResult,
   type IntervalTreeResult,
+  type CaseRelationsResult,
   isLogToTargetResult,
   isTrieResult,
   isIntervalTreeResult,
+  isCaseRelationsResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1571,5 +1573,37 @@ export async function requestIntervalTree(options: IntervalTreeOptions = {}): Pr
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isIntervalTreeResult(payload)) throw new Error("the Minera backend returned an invalid interval tree");
+  return payload;
+}
+
+export interface CaseRelationsOptions {
+  merge_timestamp_key?: string;
+  merge_left_column?: string;
+  merge_right_column?: string;
+}
+
+export function caseRelationsQuery(options: CaseRelationsOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.merge_timestamp_key !== undefined) query.set("merge_timestamp_key", options.merge_timestamp_key);
+  if (options.merge_left_column !== undefined) query.set("merge_left_column", options.merge_left_column);
+  if (options.merge_right_column !== undefined) query.set("merge_right_column", options.merge_right_column);
+  return query.toString();
+}
+
+export async function requestCaseRelations(
+  base: File,
+  incoming: File,
+  relations: File,
+  options: CaseRelationsOptions = {},
+): Promise<CaseRelationsResult> {
+  const form = new FormData();
+  form.append("base_log", base, base.name);
+  form.append("incoming_log", incoming, incoming.name);
+  form.append("case_relations", relations, relations.name);
+  const query = caseRelationsQuery(options);
+  const response = await fetch(`/api/merge-case-relations${query ? `?${query}` : ""}`, { method: "POST", body: form });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isCaseRelationsResult(payload)) throw new Error("the Minera backend returned an invalid case-relations merge");
   return payload;
 }

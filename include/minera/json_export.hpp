@@ -40,6 +40,7 @@
 #include "minera/log_to_target.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
+#include "minera/case_relations.hpp"
 
 namespace minera {
 
@@ -242,5 +243,6 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string trie_json(const TrieModel& result);
 [[nodiscard]] std::string interval_tree_json(
     const std::vector<OpenPathInterval>& result);
+[[nodiscard]] std::string case_relations_json(const EventLog& result);
 
 }  // namespace minera

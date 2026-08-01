@@ -43,6 +43,7 @@
 #include "minera/log_to_target.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
+#include "minera/case_relations.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -670,6 +671,59 @@ void handle_interval_tree(const httplib::Request& request,
                              minera::discover_open_path_intervals(session->log,
                                                                    options)),
                          "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_case_relations(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    if (!request.is_multipart_form_data() ||
+        !request.has_file("base_log") ||
+        !request.has_file("incoming_log") ||
+        !request.has_file("case_relations")) {
+      throw std::invalid_argument(
+          "required multipart fields: base_log, incoming_log, case_relations");
+    }
+    static const std::set<std::string> allowed = {
+        "merge_timestamp_key", "merge_left_column", "merge_right_column"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown merge parameter: " + key);
+    }
+    const auto& base_file = request.get_file_value("base_log");
+    const auto& incoming_file = request.get_file_value("incoming_log");
+    const auto& relation_file = request.get_file_value("case_relations");
+    std::istringstream base_input(base_file.content);
+    std::istringstream incoming_input(incoming_file.content);
+    std::istringstream relation_input(relation_file.content);
+    const auto base = looks_like_xes(base_file.filename, base_file.content)
+                          ? minera::import_xes_event_log(base_input)
+                          : minera::import_csv_event_log(base_input);
+    const auto incoming =
+        looks_like_xes(incoming_file.filename, incoming_file.content)
+            ? minera::import_xes_event_log(incoming_input)
+            : minera::import_csv_event_log(incoming_input);
+    const auto value = [&](std::string_view key,
+                           std::string fallback) {
+      return request.has_param(std::string(key))
+                 ? request.get_param_value(std::string(key))
+                 : std::move(fallback);
+    };
+    const auto timestamp_key = value("merge_timestamp_key", "time:timestamp");
+    const auto left_column = value("merge_left_column", "case_id_LEFT");
+    const auto right_column = value("merge_right_column", "case_id_RIGHT");
+    minera::CaseRelationsOptions options;
+    options.timestamp_key = timestamp_key;
+    const auto relations = minera::parse_case_relations_csv(
+        relation_input, left_column, right_column);
+    response.set_content(
+        minera::case_relations_json(minera::merge_case_relations(
+            base, incoming, relations, options)),
+        "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -1528,6 +1582,7 @@ int main(int argc, char** argv) {
   server.Options("/api/transform-target", preflight);
   server.Options("/api/trie", preflight);
   server.Options("/api/interval-tree", preflight);
+  server.Options("/api/merge-case-relations", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -1548,6 +1603,7 @@ int main(int argc, char** argv) {
   server.Post("/api/transform-target", handle_log_to_target);
   server.Get("/api/trie", handle_trie);
   server.Get("/api/interval-tree", handle_interval_tree);
+  server.Post("/api/merge-case-relations", handle_case_relations);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);

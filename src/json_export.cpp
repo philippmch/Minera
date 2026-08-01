@@ -3528,4 +3528,12 @@ std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
   return out.str();
 }
 
+std::string case_relations_json(const EventLog& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"MERGE_CASE_RELATIONS\",\"log\":";
+  write_projected_log(out, result);
+  out << '}';
+  return out.str();
+}
+
 }  // namespace minera
