@@ -74,6 +74,35 @@ export function isTrieResult(value: unknown): value is TrieResult {
     && isTrieNode((value as Partial<TrieResult>).root);
 }
 
+export interface OpenPathInterval {
+  start: number;
+  end: number;
+  case_id: string;
+  source_activity: string;
+  target_activity: string;
+  trace_index: number;
+  source_event_index: number;
+  target_event_index: number;
+}
+export interface IntervalTreeResult {
+  family: "LOG_TO_INTERVAL_TREE";
+  intervals: OpenPathInterval[];
+}
+export function isIntervalTreeResult(value: unknown): value is IntervalTreeResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<IntervalTreeResult>;
+  return candidate.family === "LOG_TO_INTERVAL_TREE" && Array.isArray(candidate.intervals)
+    && candidate.intervals.every((interval) => !!interval && typeof interval === "object"
+      && Number.isFinite((interval as OpenPathInterval).start)
+      && Number.isFinite((interval as OpenPathInterval).end)
+      && typeof (interval as OpenPathInterval).case_id === "string"
+      && typeof (interval as OpenPathInterval).source_activity === "string"
+      && typeof (interval as OpenPathInterval).target_activity === "string"
+      && Number.isInteger((interval as OpenPathInterval).trace_index)
+      && Number.isInteger((interval as OpenPathInterval).source_event_index)
+      && Number.isInteger((interval as OpenPathInterval).target_event_index));
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

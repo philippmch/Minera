@@ -21,8 +21,10 @@ import {
   type ConceptDriftResult,
   type LogToTargetResult,
   type TrieResult,
+  type IntervalTreeResult,
   isLogToTargetResult,
   isTrieResult,
+  isIntervalTreeResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1539,5 +1541,35 @@ export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isTrieResult(payload)) throw new Error("the Minera backend returned an invalid trie");
+  return payload;
+}
+
+export interface IntervalTreeOptions {
+  interval_activity_key?: string;
+  interval_start_timestamp_key?: string;
+  interval_timestamp_key?: string;
+  interval_epsilon?: number;
+  interval_filter_activity_couple?: [string, string];
+}
+
+export function intervalTreeQuery(options: IntervalTreeOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.interval_activity_key !== undefined) query.set("interval_activity_key", options.interval_activity_key);
+  if (options.interval_start_timestamp_key !== undefined) query.set("interval_start_timestamp_key", options.interval_start_timestamp_key);
+  if (options.interval_timestamp_key !== undefined) query.set("interval_timestamp_key", options.interval_timestamp_key);
+  if (options.interval_epsilon !== undefined) query.set("interval_epsilon", String(options.interval_epsilon));
+  if (options.interval_filter_activity_couple !== undefined) {
+    const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+    query.set("interval_filter_activity_couple", options.interval_filter_activity_couple.map(escape).join(","));
+  }
+  return query.toString();
+}
+
+export async function requestIntervalTree(options: IntervalTreeOptions = {}): Promise<IntervalTreeResult> {
+  const query = intervalTreeQuery(options);
+  const response = await fetch(`/api/interval-tree${query ? `?${query}` : ""}`);
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isIntervalTreeResult(payload)) throw new Error("the Minera backend returned an invalid interval tree");
   return payload;
 }

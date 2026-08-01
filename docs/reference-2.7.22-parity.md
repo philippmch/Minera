@@ -78,7 +78,7 @@ are reconciled.
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; object-centric playout, Monte Carlo, and random-model generators remain |
-| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — all three target variants and the traditional trie are native and adapter-wired; feature tables, interval tree, embeddings, and OCEL transformations remain |
+| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — all three target variants, open-path interval extraction, and the traditional trie are native and adapter-wired; feature tables, embeddings, and OCEL transformations remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
@@ -213,6 +213,19 @@ Truncation marks the retained endpoint terminal, matching the language of the
 bounded variants. Recursive JSON, strict request fields, standalone CLI JSON
 (`--trie`), cached-session `GET /api/trie`, and frontend recursive response
 validation are covered by focused native and adapter tests.
+
+## Interval-tree transformation evidence
+
+Open-path interval extraction selects the first later event whose start instant
+is at or after the source completion instant, applies the configured epsilon
+boundary, and retains deterministic source/target/case identity. It supports
+custom activity and timestamp attributes and an exact activity-pair filter;
+invalid timestamps, malformed filters, negative epsilon, and timezone offsets
+are rejected or normalized explicitly.
+
+The interval result is exposed through recursive JSON, strict request fields,
+standalone CLI JSON (`--interval-tree`), cached-session `GET
+/api/interval-tree`, and frontend query/response validation.
 
 ## POWL parity evidence
 

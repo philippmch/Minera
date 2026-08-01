@@ -156,6 +156,40 @@ void trie_params_contract() {
   assert(threw);
 }
 
+void interval_tree_params_contract() {
+  const auto p = minera::parse_interval_tree_params(fields({
+      {"interval_activity_key", "phase"},
+      {"interval_start_timestamp_key", "started_at"},
+      {"interval_timestamp_key", "completed_at"},
+      {"interval_epsilon", "0.25"},
+      {"interval_filter_activity_couple", R"(Review\, senior,A\\B)"},
+  }));
+  assert(p.activity_key == "phase");
+  assert(p.start_timestamp_key == "started_at");
+  assert(p.timestamp_key == "completed_at");
+  assert(p.epsilon == 0.25);
+  assert(p.filter_activity_couple);
+  assert(p.filter_activity_couple->first == "Review, senior");
+  assert(p.filter_activity_couple->second == "A\\B");
+
+  bool threw = false;
+  try {
+    (void)minera::parse_interval_tree_params(
+        fields({{"interval_filter_activity_couple", "A"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_interval_tree_params(
+        fields({{"interval_epsilon", "-0.1"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1460,5 +1494,6 @@ int main() {
   concept_drift_params_contract();
   log_to_target_params_contract();
   trie_params_contract();
+  interval_tree_params_contract();
   return 0;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes concept drift controls", () => {
@@ -48,6 +48,20 @@ describe("native alignment adapters", () => {
     try {
       await expect(requestTrie()).resolves.toEqual(valid);
       expect(fetchMock).toHaveBeenCalledWith("/api/trie");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("serializes interval-tree controls and validates interval responses", async () => {
+    expect(intervalTreeQuery({ interval_activity_key: "phase", interval_epsilon: 0.5, interval_filter_activity_couple: ["Review, senior", "A\\B"] })).toBe("interval_activity_key=phase&interval_epsilon=0.5&interval_filter_activity_couple=Review%5C%2C+senior%2CA%5C%5CB");
+    const valid = { family: "LOG_TO_INTERVAL_TREE", intervals: [{ start: 1, end: 2, case_id: "c", source_activity: "A", target_activity: "B", trace_index: 0, source_event_index: 0, target_event_index: 1 }] };
+    expect(isIntervalTreeResult(valid)).toBe(true);
+    expect(isIntervalTreeResult({ ...valid, intervals: [{ ...valid.intervals[0], end: Number.NaN }] })).toBe(false);
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => valid }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(requestIntervalTree()).resolves.toEqual(valid);
+      expect(fetchMock).toHaveBeenCalledWith("/api/interval-tree");
     } finally {
       vi.unstubAllGlobals();
     }

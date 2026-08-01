@@ -42,6 +42,7 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/trie.hpp"
+#include "minera/interval_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -627,6 +628,47 @@ void handle_trie(const httplib::Request& request,
     const auto options = minera::parse_trie_params(lookup, present);
     response.set_content(minera::trie_json(
                              minera::discover_trie(session->log, options)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_interval_tree(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "interval_activity_key", "interval_start_timestamp_key",
+        "interval_timestamp_key", "interval_epsilon",
+        "interval_filter_activity_couple"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown interval parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_interval_tree_params(lookup, present);
+    response.set_content(minera::interval_tree_json(
+                             minera::discover_open_path_intervals(session->log,
+                                                                   options)),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -1485,6 +1527,7 @@ int main(int argc, char** argv) {
   server.Options("/api/concept-drift", preflight);
   server.Options("/api/transform-target", preflight);
   server.Options("/api/trie", preflight);
+  server.Options("/api/interval-tree", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -1504,6 +1547,7 @@ int main(int argc, char** argv) {
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Get("/api/trie", handle_trie);
+  server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);

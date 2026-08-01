@@ -3506,4 +3506,26 @@ std::string trie_json(const TrieModel& result) {
   return out.str();
 }
 
+std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"intervals\":[";
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    if (i) out << ',';
+    const auto& interval = result[i];
+    out << "{\"start\":" << interval.start << ",\"end\":"
+        << interval.end << ",\"case_id\":";
+    write_json_string(out, interval.case_id);
+    out << ",\"source_activity\":";
+    write_json_string(out, interval.source_activity);
+    out << ",\"target_activity\":";
+    write_json_string(out, interval.target_activity);
+    out << ",\"trace_index\":" << interval.trace_index
+        << ",\"source_event_index\":" << interval.source_event_index
+        << ",\"target_event_index\":" << interval.target_event_index
+        << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 }  // namespace minera
