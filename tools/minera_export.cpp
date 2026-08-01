@@ -51,6 +51,7 @@
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
+#include "minera/petri_usage_comparison.hpp"
 #include "minera/petri_analysis_json.hpp"
 #include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
@@ -463,6 +464,8 @@ int usage(const char* program) {
                "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
+               "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
+               "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
                "                            DYNAMIC_PROGRAMMING, MILP, or\n"
@@ -725,6 +728,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> petri_analysis_fields;
   bool petri_analysis_requested = false;
   std::filesystem::path emd_reference;
+  std::filesystem::path compare_petri_reference;
+  std::string compare_petri_miner = "inductive";
   minera::EmdOptions emd_options;
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
@@ -892,6 +897,23 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       emd_reference = value;
+      continue;
+    }
+    if (arg == "--compare-petri-reference") {
+      const auto* value = next();
+      if (!value || *value == '\0') return usage(argv[0]);
+      compare_petri_reference = value;
+      continue;
+    }
+    if (arg == "--compare-petri-miner") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      compare_petri_miner = value;
+      if (compare_petri_miner != "inductive" && compare_petri_miner != "alpha" &&
+          compare_petri_miner != "heuristic" && compare_petri_miner != "powl") {
+        std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, or powl\n";
+        return 2;
+      }
       continue;
     }
     if (arg == "--emd-normalize-masses" ||
@@ -2021,6 +2043,10 @@ int main(int argc, char** argv) {
     std::cerr << "error: EMD options require --emd-reference <file>\n";
     return 2;
   }
+  if (compare_petri_reference.empty() && compare_petri_miner != "inductive") {
+    std::cerr << "error: --compare-petri-miner requires --compare-petri-reference <file>\n";
+    return 2;
+  }
   if (evaluation_requested) {
     const auto lookup = [&](std::string_view name) {
       const auto it = evaluation_fields.find(std::string(name));
@@ -2299,6 +2325,38 @@ int main(int argc, char** argv) {
       }
       conformance.push_back(model("imported", *imported_net));
       available_models.emplace_back("imported", &*imported_net);
+    }
+    if (!compare_petri_reference.empty()) {
+      if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&
+          !ends_with_ci(compare_petri_reference.string(), ".xes")) {
+        std::cerr << "error: --compare-petri-reference expects a .csv or .xes file\n";
+        return 2;
+      }
+      const auto model_it = std::find_if(
+          available_models.begin(), available_models.end(),
+          [&](const auto& item) { return item.first == compare_petri_miner; });
+      if (model_it == available_models.end()) {
+        std::cerr << "error: unknown --compare-petri-miner '"
+                  << compare_petri_miner << "'\n";
+        return 2;
+      }
+      const auto reference = ends_with_ci(compare_petri_reference.string(), ".xes")
+          ? minera::import_xes_event_log(compare_petri_reference)
+          : minera::import_csv_event_log(compare_petri_reference, options);
+      const auto comparison = minera::compare_petri_usage(
+          *model_it->second, log, reference);
+      const auto body = minera::petri_usage_comparison_json(comparison);
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
     }
     if (petri_analysis_params) {
       const auto& request = *petri_analysis_params;

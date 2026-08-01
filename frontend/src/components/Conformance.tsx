@@ -35,9 +35,10 @@ import {
   type ProcessTreePlayoutOptions,
   type StochasticPlayoutOptions,
   type DfgPlayoutOptions,
+  type PetriUsageComparison,
   numberFormat,
 } from "../types";
-import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
+import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -336,8 +337,37 @@ export function Conformance({
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
       <StochasticPetriPlayoutPanel dataset={data.dataset} available={Boolean(data.petri_net || data.inductive_petri_net || data.heuristic_petri_net || data.powl_petri_net)} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
+      <PetriUsageComparisonPanel />
     </div>
   );
+}
+
+function PetriUsageComparisonPanel() {
+  const [reference, setReference] = useState<File | null>(null);
+  const [miner, setMiner] = useState("inductive");
+  const [result, setResult] = useState<PetriUsageComparison | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    if (!reference) return;
+    setBusy(true); setError(null); setResult(null);
+    try { setResult(await comparePetriUsage(reference, miner)); }
+    catch (cause) { setResult(null); setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const rows = result?.transitions
+    .map((row) => ({ ...row, delta: row.log2_occurrences - row.log1_occurrences }))
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 8) ?? [];
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Petri element usage comparison</h2><span className="panel-meta">Compare replay counts with a reference log</span></div>
+    <div className="align-settings-grid">
+      <label>Reference log<input type="file" accept=".csv,.xes" onChange={e => { setReference(e.target.files?.[0] ?? null); setResult(null); setError(null); }} /></label>
+      <label>Miner<select value={miner} onChange={e => { setMiner(e.target.value); setResult(null); setError(null); }}><option value="inductive">Inductive</option><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option><option value="powl">POWL</option></select></label>
+    </div>
+    <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
+    {error && <p className="conf-inline-note">{error}</p>}
+    {rows.length > 0 && <table className="activity-table deviation-table"><thead><tr><th>Transition</th><th className="num">Log 1</th><th className="num">Log 2</th><th className="num">Δ</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{row.id}</td><td className="num">{numberFormat.format(row.log1_occurrences)}</td><td className="num">{numberFormat.format(row.log2_occurrences)}</td><td className="num">{row.delta > 0 ? "+" : ""}{numberFormat.format(row.delta)}</td></tr>)}</tbody></table>}
+  </section>;
 }
 
 function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {

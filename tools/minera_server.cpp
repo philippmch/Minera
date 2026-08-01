@@ -522,6 +522,83 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+// Compares Petri-net element usage between the cached session log and an
+// uploaded reference log. The multipart field `reference_log` is required;
+// `miner` is optional and defaults to inductive.
+void handle_compare_petri(const httplib::Request& request,
+                          httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    if (!request.has_file("reference_log")) {
+      response.status = 400;
+      response.set_content(error_json("missing form field: reference_log"),
+                           "application/json");
+      return;
+    }
+    const auto& reference_file = request.get_file_value("reference_log");
+    std::string miner = request.has_param("miner") ? request.get_param_value("miner") : "";
+    if (miner.empty() && request.has_file("miner")) miner = request.get_file_value("miner").content;
+    if (miner.empty()) miner = "inductive";
+    const auto it = session->nets.find(miner);
+    if (it == session->nets.end()) {
+      response.status = 400;
+      response.set_content(error_json("unknown miner: " + miner),
+                           "application/json");
+      return;
+    }
+    constexpr std::size_t kMaxComparisonTraces = 10'000;
+    constexpr std::size_t kMaxComparisonEvents = 1'000'000;
+    constexpr std::size_t kMaxComparisonPlaces = 50'000;
+    constexpr std::size_t kMaxComparisonTransitions = 10'000;
+    constexpr std::size_t kMaxComparisonWork = 500'000'000;
+    constexpr std::size_t kSilentRoutingStateCap = 4'096;
+    minera::EventLog reference;
+    if (minera::looks_like_xes(reference_file.filename, reference_file.content)) {
+      std::istringstream input(reference_file.content);
+      reference = minera::import_xes_event_log(input);
+    } else {
+      std::istringstream input(reference_file.content);
+      reference = minera::import_csv_event_log(input);
+    }
+    if (session->log.trace_count() > kMaxComparisonTraces ||
+        session->log.event_count() > kMaxComparisonEvents ||
+        reference.trace_count() > kMaxComparisonTraces ||
+        reference.event_count() > kMaxComparisonEvents ||
+        it->second.place_count() > kMaxComparisonPlaces ||
+        it->second.transitions().size() > kMaxComparisonTransitions) {
+      throw std::invalid_argument(
+          "Petri usage comparison log exceeds the server safety limits");
+    }
+    const auto replay_units = session->log.event_count() +
+                              reference.event_count() +
+                              session->log.trace_count() + reference.trace_count();
+    const auto worst_case_scan = replay_units * kSilentRoutingStateCap;
+    if (worst_case_scan != 0 &&
+        it->second.transitions().size() > kMaxComparisonWork / worst_case_scan) {
+      throw std::invalid_argument(
+          "Petri usage comparison exceeds the server work budget");
+    }
+    const auto comparison = minera::compare_petri_usage(it->second,
+                                                         session->log,
+                                                         reference);
+    response.set_content(minera::petri_usage_comparison_json(comparison),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_evaluate(const httplib::Request& request,
                      httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -1281,6 +1358,8 @@ int main(int argc, char** argv) {
   }
 
   httplib::Server server;
+  // Bound multipart bodies before the HTTP library buffers or parses them.
+  server.set_payload_max_length(32u * 1024u * 1024u);
 
   // The app is local-first; permissive CORS keeps the Vite dev server (a
   // different port) working against this backend.
@@ -1291,6 +1370,7 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
   server.Options("/api/petri-analysis", preflight);
@@ -1306,6 +1386,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);
   server.Post("/api/petri-analysis", handle_petri_analysis);
