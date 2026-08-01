@@ -6,14 +6,21 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include "minera/bpmn.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/dfg_playout.hpp"
+#include "minera/dfg_variants.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/ptml.hpp"
+#include "minera/request_params.hpp"
+#include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 
 namespace {
@@ -31,7 +38,9 @@ int usage(const char* program) {
                "                     allows (shortest first) instead of\n"
                "                     sampling randomly\n"
                "  --max-length <n>   Extensive: longest visible trace to\n"
-               "                     enumerate (default: 10)\n";
+               "                     enumerate (default: 10)\n"
+               "  --dfg              Treat input CSV/XES as a log and play out its DFG\n"
+               "  --variant <name>   DFG variant: classic or performance\n";
   return 2;
 }
 
@@ -43,6 +52,8 @@ int main(int argc, char** argv) {
   minera::PlayoutOptions options;
   minera::ExtensivePlayoutOptions extensive_options;
   bool extensive = false;
+  bool dfg = false;
+  std::map<std::string, std::string> dfg_fields;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -54,7 +65,7 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       output = value;
-    } else if (arg == "--traces") {
+    } else if (arg == "--traces" && !dfg) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       options.traces = static_cast<std::size_t>(std::atoll(value));
@@ -62,12 +73,33 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       options.max_steps = static_cast<std::size_t>(std::atoll(value));
-    } else if (arg == "--seed") {
+    } else if (arg == "--seed" && !dfg) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       options.seed = static_cast<std::uint64_t>(std::atoll(value));
     } else if (arg == "--extensive") {
       extensive = true;
+    } else if (arg == "--dfg") {
+      dfg = true;
+    } else if (arg == "--variant") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      dfg_fields["dfg_playout_variant"] = value;
+    } else if (arg == "--dfg-traces" || arg == "--max-variants" ||
+               arg == "--min-weighted-probability" ||
+               arg == "--max-occurrences-per-activity" ||
+               arg == "--max-execution-time-ms" || arg == "--case-arrival-rate" ||
+               arg == "--max-events-per-trace" || arg == "--start-time" ||
+               arg == "--dfg-seed") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      const std::string key = arg == "--dfg-traces" ? "dfg_playout_traces" :
+          arg == "--max-variants" ? "dfg_playout_max_variants" :
+          arg == "--min-weighted-probability" ? "dfg_playout_min_weighted_probability" :
+          arg == "--max-occurrences-per-activity" ? "dfg_playout_max_occurrences_per_activity" :
+          arg == "--max-execution-time-ms" ? "dfg_playout_max_execution_time_ms" :
+          arg == "--case-arrival-rate" ? "dfg_playout_case_arrival_rate" :
+          arg == "--max-events-per-trace" ? "dfg_playout_max_events_per_trace" :
+          arg == "--dfg-seed" ? "dfg_playout_seed" : "dfg_playout_start_time";
+      dfg_fields[key] = value;
     } else if (arg == "--max-length") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -87,6 +119,41 @@ int main(int argc, char** argv) {
   extensive_options.max_traces = options.traces;
 
   try {
+    if (dfg) {
+      std::ifstream input_file(input);
+      if (!input_file) throw std::runtime_error("cannot open input log");
+      const auto source = input.extension() == ".xes"
+                              ? minera::import_xes_event_log(input_file)
+                              : minera::import_csv_event_log(input_file);
+      const auto frequency = minera::discover_frequency_dfg(source);
+      minera::DfgActivityCounts starts, ends;
+      for (const auto& trace : source.traces) {
+        if (!trace.events.empty()) {
+          ++starts[trace.events.front().activity];
+          ++ends[trace.events.back().activity];
+        }
+      }
+      const auto lookup = [&dfg_fields](std::string_view name) {
+        const auto it = dfg_fields.find(std::string(name));
+        return it == dfg_fields.end() ? std::string{} : it->second;
+      };
+      const auto dfg_options = minera::parse_dfg_playout_params(lookup);
+      std::optional<minera::DfgPerformance> performance;
+      if (dfg_options.variant == minera::DfgPlayoutVariant::kPerformance)
+        performance = minera::discover_performance_dfg(source);
+      const auto generated = minera::dfg_playout(
+          frequency, starts, ends, dfg_options,
+          performance ? &*performance : nullptr);
+      const auto name = input.stem().string() + " dfg playout";
+      if (output.empty()) {
+        minera::write_xes(std::cout, generated, name);
+      } else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("cannot open output file");
+        minera::write_xes(file, generated, name);
+      }
+      return 0;
+    }
     const auto net =
         input.extension() == ".bpmn" ? minera::import_bpmn(input)
         : input.extension() == ".ptml"

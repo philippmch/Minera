@@ -33,6 +33,7 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type ProcessTreePlayoutOptions,
+  type DfgPlayoutOptions,
   numberFormat,
 } from "../types";
 import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
@@ -332,6 +333,7 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
+      <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
     </div>
   );
 }
@@ -366,6 +368,59 @@ function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; avai
         <label>Max trace cap<input type="number" min={1} value={options.max_trace_cap ?? ""} onChange={e => number("max_trace_cap", e.target.value)} /></label>
       </div>
       <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      {error && <p className="conf-inline-note">{error}</p>}
+    </>}
+  </section>;
+}
+
+function DfgPlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+  const [options, setOptions] = useState<DfgPlayoutOptions>({ variant: "classic" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setError(null);
+    try {
+      const xes = await fetchPlayout("dfg", options);
+      const blob = new Blob([xes], { type: "application/xml" });
+      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-dfg-playout.xes`; anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const number = (name: keyof DfgPlayoutOptions, value: string) =>
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  const flag = (name: keyof DfgPlayoutOptions, value: boolean) =>
+    setOptions((current) => ({ ...current, [name]: value }));
+  const selectVariant = (variant: DfgPlayoutOptions["variant"]) =>
+    setOptions((current) => variant === "classic"
+      ? { variant, max_variants: current.max_variants, min_weighted_probability: current.min_weighted_probability, max_occurrences_per_activity: current.max_occurrences_per_activity, max_execution_time_ms: current.max_execution_time_ms, interrupt_when_dfg_complete: current.interrupt_when_dfg_complete, add_trace_if_takes_new_edges: current.add_trace_if_takes_new_edges, return_variants: current.return_variants, return_only_if_complete: current.return_only_if_complete, min_variant_occurrences: current.min_variant_occurrences }
+      : { variant, traces: current.traces, case_arrival_rate: current.case_arrival_rate, seed: current.seed, max_events_per_trace: current.max_events_per_trace, start_time: current.start_time });
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>DFG playout</h2><span className="panel-meta">Synthetic XES from the directly-follows graph</span></div>
+    {!available ? <p className="conf-inline-note">No directly-follows graph is present in this analysis.</p> : <>
+      <div className="align-settings-grid">
+        <label>Variant<select value={options.variant} onChange={e => selectVariant(e.target.value as DfgPlayoutOptions["variant"])}><option value="classic">Classic</option><option value="performance">Performance</option></select></label>
+        {options.variant === "classic" ? <>
+          <label>Max variants<input type="number" min={1} value={options.max_variants ?? ""} onChange={e => number("max_variants", e.target.value)} /></label>
+          <label>Probability floor<input type="number" min={0} max={1} step={0.01} value={options.min_weighted_probability ?? ""} onChange={e => number("min_weighted_probability", e.target.value)} /></label>
+          <label>Max activity occurrences<input type="number" min={1} value={options.max_occurrences_per_activity ?? ""} onChange={e => number("max_occurrences_per_activity", e.target.value)} /></label>
+          <label>Max execution (ms)<input type="number" min={0} value={options.max_execution_time_ms ?? ""} onChange={e => number("max_execution_time_ms", e.target.value)} /></label>
+        </> : <>
+          <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
+          <label>Case arrival rate<input type="number" min={0} step={0.01} value={options.case_arrival_rate ?? ""} onChange={e => number("case_arrival_rate", e.target.value)} /></label>
+          <label>Max events / trace<input type="number" min={1} value={options.max_events_per_trace ?? ""} onChange={e => number("max_events_per_trace", e.target.value)} /></label>
+          <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
+          <label>Start time<input type="text" value={options.start_time ?? ""} onChange={e => setOptions({ ...options, start_time: e.target.value || undefined })} placeholder="ISO-8601 (optional)" /></label>
+        </>}
+      </div>
+      {options.variant === "classic" && <div className="align-settings-grid">
+        <label><input type="checkbox" checked={Boolean(options.interrupt_when_dfg_complete)} onChange={e => flag("interrupt_when_dfg_complete", e.target.checked)} /> Stop when graph is complete</label>
+        <label><input type="checkbox" checked={Boolean(options.add_trace_if_takes_new_edges)} onChange={e => flag("add_trace_if_takes_new_edges", e.target.checked)} /> Keep traces adding new edges</label>
+        <label><input type="checkbox" checked={Boolean(options.return_variants)} onChange={e => flag("return_variants", e.target.checked)} /> Return discovered variants</label>
+        <label><input type="checkbox" checked={Boolean(options.return_only_if_complete)} onChange={e => flag("return_only_if_complete", e.target.checked)} /> Complete variants only</label>
+      </div>}
+      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download DFG playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -168,6 +168,24 @@ describe("process-tree playout contract", () => {
     expect(() => processTreePlayoutQuery({ traces: 0 })).toThrow(/positive/);
     expect(() => processTreePlayoutQuery({ min_length: 4, max_length: 2 })).toThrow(/must not exceed/);
     expect(() => processTreePlayoutQuery({ max_loop_occurrences: -1 })).toThrow(/non-negative/);
+  });
+});
+
+describe("DFG playout contract", () => {
+  it("serializes variant and safety controls", () => {
+    const params = new URLSearchParams(dfgPlayoutQuery({
+      variant: "performance", traces: 12, max_variants: 8,
+      min_weighted_probability: 0.25, max_events_per_trace: 99,
+      interrupt_when_dfg_complete: true, return_variants: true,
+    }));
+    expect(params.get("dfg_playout_variant")).toBe("performance");
+    expect(params.get("dfg_playout_max_events_per_trace")).toBe("99");
+    expect(params.get("dfg_playout_interrupt_when_dfg_complete")).toBe("true");
+  });
+  it("rejects invalid bounds", () => {
+    expect(() => dfgPlayoutQuery({ traces: 0 })).toThrow(/positive/);
+    expect(() => dfgPlayoutQuery({ min_weighted_probability: 2 })).toThrow(/between/);
+    expect(() => dfgPlayoutQuery({ case_arrival_rate: -1 })).toThrow(/non-negative/);
   });
 });
 import {

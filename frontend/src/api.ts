@@ -30,6 +30,7 @@ import {
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
+  type DfgPlayoutOptions,
   isDfgAlignmentResult,
   isEditDistanceResult,
   isModelEvaluation,
@@ -1283,10 +1284,70 @@ export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {})
   return params.toString();
 }
 
-export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions = {}): Promise<string> {
+function validatePlayoutNumber(name: string, value: number, positive = false): void {
+  if (!Number.isFinite(value) || !Number.isSafeInteger(value) || value < 0 || (positive && value === 0)) {
+    throw new Error(`${name} must be a ${positive ? "positive" : "non-negative"} integer`);
+  }
+}
+
+export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.variant !== undefined) {
+    if (options.variant !== "classic" && options.variant !== "performance") {
+      throw new Error("variant must be classic or performance");
+    }
+    params.set("dfg_playout_variant", options.variant);
+  }
+  const positiveIntegers: Array<keyof DfgPlayoutOptions> = [
+    "max_variants", "max_occurrences_per_activity",
+    "min_variant_occurrences", "traces", "max_events_per_trace",
+  ];
+  for (const name of positiveIntegers) {
+    const value = options[name];
+    if (value !== undefined) {
+      validatePlayoutNumber(name, value as number, true);
+      params.set(`dfg_playout_${name}`, String(value));
+    }
+  }
+  if (options.max_execution_time_ms !== undefined) {
+    validatePlayoutNumber("max_execution_time_ms", options.max_execution_time_ms);
+    params.set("dfg_playout_max_execution_time_ms", String(options.max_execution_time_ms));
+  }
+  if (options.max_steps !== undefined) {
+    validatePlayoutNumber("max_steps", options.max_steps, true);
+    params.set("dfg_playout_max_steps", String(options.max_steps));
+  }
+  if (options.min_weighted_probability !== undefined) {
+    if (!Number.isFinite(options.min_weighted_probability) || options.min_weighted_probability < 0 || options.min_weighted_probability > 1) {
+      throw new Error("min_weighted_probability must be between 0 and 1");
+    }
+    params.set("dfg_playout_min_weighted_probability", String(options.min_weighted_probability));
+  }
+  if (options.case_arrival_rate !== undefined) {
+    if (!Number.isFinite(options.case_arrival_rate) || options.case_arrival_rate < 0) {
+      throw new Error("case_arrival_rate must be non-negative");
+    }
+    params.set("dfg_playout_case_arrival_rate", String(options.case_arrival_rate));
+  }
+  if (options.seed !== undefined) {
+    validatePlayoutNumber("seed", options.seed);
+    params.set("dfg_playout_seed", String(options.seed));
+  }
+  for (const name of ["interrupt_when_dfg_complete", "add_trace_if_takes_new_edges", "return_variants", "return_only_if_complete"] as const) {
+    const value = options[name];
+    if (value !== undefined) params.set(`dfg_playout_${name}`, value ? "true" : "false");
+  }
+  if (options.start_time !== undefined) {
+    if (!options.start_time.trim()) throw new Error("start_time must not be empty");
+    params.set("dfg_playout_start_time", options.start_time);
+  }
+  return params.toString();
+}
+
+export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | DfgPlayoutOptions = {}): Promise<string> {
+  const query = miner === "dfg" ? dfgPlayoutQuery(options as DfgPlayoutOptions) : processTreePlayoutQuery(options as ProcessTreePlayoutOptions);
   let response: Response;
   try {
-    const query = processTreePlayoutQuery(options);
     response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
   } catch {
     throw new Error(

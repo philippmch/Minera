@@ -26,6 +26,7 @@
 #include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/dfg_playout.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -576,6 +577,7 @@ int usage(const char* program) {
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
                "                            or declare/process_tree\n"
+               "                            or dfg\n"
                "  --playout-variant <id>   Process-tree variant: BASIC_PLAYOUT,\n"
                "                            EXTENSIVE, or TOPBOTTOM\n"
                "  --playout-traces <n>     Process-tree sampled cases\n"
@@ -586,6 +588,16 @@ int usage(const char* program) {
                "  --playout-max-loop-occurrences <n> Loop re-do limit\n"
                "  --playout-max-traces <n> Extensive trace cap\n"
                "  --playout-max-trace-cap <n> Alias for max-traces\n"
+               "  --dfg-playout-variant <name> classic or performance\n"
+               "  --dfg-playout-traces <n> DFG generated cases\n"
+               "  --dfg-playout-max-events-per-trace <n> Event cap\n"
+               "  --dfg-playout-max-variants <n> Variant cap\n"
+               "  --dfg-playout-min-weighted-probability <f> Probability floor\n"
+               "  --dfg-playout-max-occurrences-per-activity <n> Activity cap\n"
+               "  --dfg-playout-max-execution-time-ms <n> Time cap\n"
+               "  --dfg-playout-case-arrival-rate <f> Performance arrival rate\n"
+               "  --dfg-playout-seed <u64> DFG random seed\n"
+               "  --dfg-playout-start-time <iso8601> DFG start timestamp\n"
                "  --declare-playout-traces <n> Declare cases (default: 1000)\n"
                "  --declare-playout-min-length <n> Minimum events (default: 3)\n"
                "  --declare-playout-max-length <n> Maximum events (default: 15)\n"
@@ -654,6 +666,23 @@ int usage(const char* program) {
                "                            that together cover this share of\n"
                "                            cases, f in (0,1]\n";
   return 2;
+}
+
+minera::EventLog generate_dfg_playout(const minera::EventLog& log,
+                                      const minera::DfgPlayoutOptions& options) {
+  const auto frequency = minera::discover_frequency_dfg(log);
+  minera::DfgActivityCounts starts, ends;
+  for (const auto& trace : log.traces) {
+    if (!trace.events.empty()) {
+      ++starts[trace.events.front().activity];
+      ++ends[trace.events.back().activity];
+    }
+  }
+  std::optional<minera::DfgPerformance> performance;
+  if (options.variant == minera::DfgPlayoutVariant::kPerformance)
+    performance = minera::discover_performance_dfg(log);
+  return minera::dfg_playout(frequency, starts, ends, options,
+                             performance ? &*performance : nullptr);
 }
 
 }  // namespace
@@ -735,6 +764,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> process_tree_playout_fields;
   bool process_tree_playout_options_used = false;
   minera::ProcessTreePlayoutOptions process_tree_playout_options;
+  std::map<std::string, std::string> dfg_playout_fields;
+  bool dfg_playout_options_used = false;
+  minera::DfgPlayoutOptions dfg_playout_options;
   minera::FootprintsOptions footprints_options;
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
@@ -870,6 +902,31 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
+      continue;
+    }
+
+    // Keep the DFG playout option family outside the legacy parser chain;
+    // that chain is already close to MSVC's block-nesting limit.
+    if (arg == "--dfg-playout-variant" || arg == "--dfg-playout-traces" ||
+        arg == "--dfg-playout-max-events-per-trace" ||
+        arg == "--dfg-playout-max-steps" ||
+        arg == "--dfg-playout-max-variants" ||
+        arg == "--dfg-playout-min-weighted-probability" ||
+        arg == "--dfg-playout-max-occurrences-per-activity" ||
+        arg == "--dfg-playout-max-execution-time-ms" ||
+        arg == "--dfg-playout-case-arrival-rate" ||
+        arg == "--dfg-playout-seed" || arg == "--dfg-playout-start-time" ||
+        arg == "--dfg-playout-min-variant-occurrences" ||
+        arg == "--dfg-playout-interrupt-when-dfg-complete" ||
+        arg == "--dfg-playout-add-trace-if-takes-new-edges" ||
+        arg == "--dfg-playout-return-variants" ||
+        arg == "--dfg-playout-return-only-if-complete") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      dfg_playout_fields.insert_or_assign(std::move(key), value);
+      dfg_playout_options_used = true;
       continue;
     }
 
@@ -2014,11 +2071,25 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (dfg_playout_options_used && playout_miner != "dfg") {
+    std::cerr << "error: --dfg-playout-* options require --playout-miner dfg\n";
+    return 2;
+  }
   if (input.empty()) {
     return usage(argv[0]);
   }
 
   try {
+    if (dfg_playout_options_used) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = dfg_playout_fields.find(std::string(name));
+        return it == dfg_playout_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return dfg_playout_fields.contains(std::string(name));
+      };
+      dfg_playout_options = minera::parse_dfg_playout_params(lookup, present);
+    }
     // A .xes file is read as XES; everything else is treated as CSV.
     auto log = ends_with_ci(input.string(), ".xes")
                    ? minera::import_xes_event_log(input)
@@ -2493,10 +2564,12 @@ int main(int argc, char** argv) {
       else if (playout_miner == "process_tree")
         generated = minera::process_tree_playout(tree,
                                                  process_tree_playout_options);
+      else if (playout_miner == "dfg")
+        generated = generate_dfg_playout(log, dfg_playout_options);
       else {
         std::cerr << "error: unknown --playout-miner '" << playout_miner
                   << "' (expected inductive, alpha, heuristic, powl, or "
-                     "declare, or process_tree)\n";
+                     "declare, process_tree, or dfg)\n";
         return 1;
       }
       if (!generated) generated = minera::playout(*selected);

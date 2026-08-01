@@ -1562,4 +1562,97 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
   return params;
 }
 
+DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field) {
+  return parse_dfg_playout_params(field, {});
+}
+
+DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field,
+                                           const FieldPresence& present) {
+  DfgPlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    }
+    return value;
+  };
+  const auto nonnegative = [&](std::string_view name) {
+    return parse_nonnegative_size(require(name), name);
+  };
+  const auto positive = [&](std::string_view name) {
+    return parse_positive_size(require(name), name);
+  };
+  const auto number = [&](std::string_view name) {
+    return parse_finite_double(require(name), name);
+  };
+
+  if (supplied("dfg_playout_variant")) {
+    const auto value = require("dfg_playout_variant");
+    if (value == "classic" || value == "CLASSIC") {
+      params.variant = DfgPlayoutVariant::kClassic;
+    } else if (value == "performance" || value == "PERFORMANCE") {
+      params.variant = DfgPlayoutVariant::kPerformance;
+    } else {
+      throw std::invalid_argument(
+          "dfg_playout_variant: expected classic or performance");
+    }
+  }
+  if (supplied("dfg_playout_max_variants"))
+    params.max_variants = positive("dfg_playout_max_variants");
+  if (supplied("dfg_playout_min_weighted_probability")) {
+    params.min_weighted_probability =
+        number("dfg_playout_min_weighted_probability");
+    if (params.min_weighted_probability < 0.0 ||
+        params.min_weighted_probability > 1.0)
+      throw std::invalid_argument(
+          "dfg_playout_min_weighted_probability must be between 0 and 1");
+  }
+  if (supplied("dfg_playout_max_occurrences_per_activity"))
+    params.max_occurrences_per_activity =
+        positive("dfg_playout_max_occurrences_per_activity");
+  if (supplied("dfg_playout_interrupt_when_dfg_complete"))
+    params.interrupt_when_dfg_complete = parse_boolean(
+        require("dfg_playout_interrupt_when_dfg_complete"),
+        "dfg_playout_interrupt_when_dfg_complete");
+  if (supplied("dfg_playout_add_trace_if_takes_new_edges"))
+    params.add_trace_if_takes_new_edges = parse_boolean(
+        require("dfg_playout_add_trace_if_takes_new_edges"),
+        "dfg_playout_add_trace_if_takes_new_edges");
+  if (supplied("dfg_playout_max_execution_time_ms"))
+    params.max_execution_time_ms =
+        nonnegative("dfg_playout_max_execution_time_ms");
+  if (supplied("dfg_playout_return_variants"))
+    params.return_variants = parse_boolean(require("dfg_playout_return_variants"),
+                                           "dfg_playout_return_variants");
+  if (supplied("dfg_playout_return_only_if_complete"))
+    params.return_only_if_complete = parse_boolean(
+        require("dfg_playout_return_only_if_complete"),
+        "dfg_playout_return_only_if_complete");
+  if (supplied("dfg_playout_min_variant_occurrences"))
+    params.min_variant_occurrences =
+        positive("dfg_playout_min_variant_occurrences");
+  if (supplied("dfg_playout_traces"))
+    params.traces = positive("dfg_playout_traces");
+  if (supplied("dfg_playout_case_arrival_rate")) {
+    params.case_arrival_rate = number("dfg_playout_case_arrival_rate");
+    if (params.case_arrival_rate < 0.0)
+      throw std::invalid_argument(
+          "dfg_playout_case_arrival_rate must be non-negative");
+  }
+  if (supplied("dfg_playout_seed"))
+    params.seed = parse_nonnegative_u64(require("dfg_playout_seed"),
+                                        "dfg_playout_seed");
+  if (supplied("dfg_playout_max_events_per_trace"))
+    params.max_events_per_trace =
+        positive("dfg_playout_max_events_per_trace");
+  if (supplied("dfg_playout_max_steps"))
+    params.max_events_per_trace = positive("dfg_playout_max_steps");
+  if (supplied("dfg_playout_start_time"))
+    params.start_time = require("dfg_playout_start_time");
+  return params;
+}
+
 }  // namespace minera
