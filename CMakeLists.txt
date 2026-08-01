@@ -56,6 +56,7 @@ add_library(minera_core
   src/petri_net.cpp
   src/playout.cpp
   src/process_tree_alignment.cpp
+  src/process_tree_playout.cpp
   src/process_tree_reduction.cpp
   src/powl.cpp
   src/powl_conversion.cpp
@@ -129,6 +130,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_process_tree_playout_tests
+    tests/test_process_tree_playout.cpp
+  )
+  target_link_libraries(minera_process_tree_playout_tests PRIVATE minera::core)
+  target_compile_features(minera_process_tree_playout_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_tree_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_tree_playout_tests COMMAND minera_process_tree_playout_tests)
 
   add_executable(minera_correlation_miner_tests
     tests/test_correlation_miner.cpp

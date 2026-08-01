@@ -49,6 +49,7 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/process_tree_playout.hpp"
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
 #include "minera/decomposed_alignment.hpp"
@@ -947,8 +948,9 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
 // ("inductive" | "alpha" | "heuristic" | "powl" | "imported", default
 // inductive) or the classic Declare model ("declare"). `traces` defaults to
 // 100 for Petri models and 1000 for Declare, capped at 10000. Declare also
-// accepts min_length, max_length, and seed; Petri models retain their existing
-// mode=extensive/max_length behavior.
+// accepts min_length, max_length, and seed; process_tree accepts variant,
+// traces, max_steps, seed, min_length, max_length, max_loop_occurrences and
+// max_trace_cap.
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -967,6 +969,53 @@ void handle_playout(const httplib::Request& request,
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
   const bool is_declare = miner == "declare";
+  if (miner == "process_tree") {
+    const auto lookup = [&](std::string_view name) {
+      const std::string key(name.substr(std::string_view("playout_").size()));
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const std::string key(name.substr(std::string_view("playout_").size()));
+      return request.has_param(key);
+    };
+    const auto reject = [&](std::string message) {
+      response.status = 400;
+      response.set_content(error_json(message), "application/json");
+    };
+    try {
+      auto options = minera::parse_process_tree_playout_params(lookup, present);
+      if (options.traces > 10000 || options.max_steps > 10000 ||
+          options.max_loop_occurrences > 100 ||
+          (request.has_param("max_length") && options.max_length > 64)) {
+        reject("process-tree playout bounds exceed the server safety limits");
+        return;
+      }
+      // The native extensive default is intentionally generous for local
+      // callers. The server uses a bounded default when the client did not
+      // provide a cap, so an ordinary default request remains usable.
+      if (!request.has_param("max_length")) options.max_length = 64;
+      if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
+          options.max_traces > 10000) {
+        if (request.has_param("max_trace_cap") ||
+            request.has_param("max_traces")) {
+          reject("max_trace_cap must not exceed 10000");
+          return;
+        }
+        options.max_traces = 10000;
+      }
+      if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
+          options.max_length > 64) {
+        reject("max_length must not exceed 64");
+        return;
+      }
+      const auto log = minera::process_tree_playout(session->tree, options);
+      response.set_content(minera::to_xes(log, "process_tree playout"),
+                           "application/xml");
+    } catch (const std::exception& error) {
+      reject(error.what());
+    }
+    return;
+  }
   const auto it = session->nets.find(miner);
   if (!is_declare && it == session->nets.end()) {
     response.status = 400;

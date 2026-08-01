@@ -142,6 +142,17 @@ std::uint64_t parse_positive_u64(std::string_view value, std::string_view name) 
   return parsed;
 }
 
+std::uint64_t parse_nonnegative_u64(std::string_view value,
+                                    std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  std::uint64_t parsed = 0;
+  const auto r = std::from_chars(value.data(), value.data() + value.size(), parsed);
+  if (r.ec != std::errc{} || r.ptr != value.data() + value.size())
+    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  return parsed;
+}
+
 std::vector<std::size_t> parse_marking(std::string_view value,
                                        std::string_view name) {
   if (value.empty())
@@ -1498,6 +1509,56 @@ PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field,
   if (supplied("petri_analysis_diagnostics"))
     params.diagnostics = parse_boolean(require("petri_analysis_diagnostics"),
                                        "petri_analysis_diagnostics");
+  return params;
+}
+
+ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field) {
+  return parse_process_tree_playout_params(field, {});
+}
+
+ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  ProcessTreePlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("playout_variant")) {
+    const auto value = require("playout_variant");
+    if (value == "BASIC_PLAYOUT" || value == "basic" || value == "basic_playout")
+      params.variant = ProcessTreePlayoutVariant::kBasicPlayout;
+    else if (value == "EXTENSIVE" || value == "extensive")
+      params.variant = ProcessTreePlayoutVariant::kExtensive;
+    else if (value == "TOPBOTTOM" || value == "TOP_BOTTOM" || value == "topbottom" || value == "top_bottom")
+      params.variant = ProcessTreePlayoutVariant::kTopBottom;
+    else
+      throw std::invalid_argument(
+          "playout_variant: expected BASIC_PLAYOUT, EXTENSIVE, or TOPBOTTOM");
+  }
+  if (supplied("playout_traces"))
+    params.traces = parse_positive_size(require("playout_traces"), "playout_traces");
+  if (supplied("playout_max_steps"))
+    params.max_steps = parse_nonnegative_size(require("playout_max_steps"), "playout_max_steps");
+  if (supplied("playout_seed"))
+    params.seed = parse_nonnegative_u64(require("playout_seed"), "playout_seed");
+  if (supplied("playout_min_length"))
+    params.min_length = parse_nonnegative_size(require("playout_min_length"), "playout_min_length");
+  if (supplied("playout_max_length"))
+    params.max_length = parse_nonnegative_size(require("playout_max_length"), "playout_max_length");
+  if (supplied("playout_max_loop_occurrences"))
+    params.max_loop_occurrences = parse_nonnegative_size(require("playout_max_loop_occurrences"), "playout_max_loop_occurrences");
+  if (supplied("playout_max_traces"))
+    params.max_traces = parse_positive_size(require("playout_max_traces"), "playout_max_traces");
+  if (supplied("playout_max_trace_cap"))
+    params.max_traces = parse_positive_size(require("playout_max_trace_cap"), "playout_max_trace_cap");
+  if (params.min_length > params.max_length)
+    throw std::invalid_argument("playout_min_length must not exceed playout_max_length");
   return params;
 }
 
