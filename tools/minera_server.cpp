@@ -28,6 +28,7 @@
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/dfg_alignment.hpp"
+#include "minera/dfg_playout.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
@@ -1017,6 +1018,65 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   const auto it = session->nets.find(miner);
+  if (miner == "dfg") {
+    const auto reject = [&](std::string message) {
+      response.status = 400;
+      response.set_content(error_json(message), "application/json");
+    };
+    try {
+      const auto lookup = [&](std::string_view name) {
+        const auto key = std::string(name);
+        return request.has_param(key) ? request.get_param_value(key)
+                                      : std::string{};
+      };
+      const auto present = [&](std::string_view name) {
+        return request.has_param(std::string(name));
+      };
+      auto options = minera::parse_dfg_playout_params(lookup, present);
+      if (options.traces > 10000 || options.max_events_per_trace > 10000 ||
+          options.max_variants > 100000 ||
+          options.max_occurrences_per_activity > 100 ||
+          options.max_execution_time_ms > 600000) {
+        reject("DFG playout bounds exceed the server safety limits");
+        return;
+      }
+      constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
+      if (options.variant == minera::DfgPlayoutVariant::kPerformance &&
+          options.traces != 0 && options.max_events_per_trace != 0 &&
+          options.traces > kMaxGeneratedEvents /
+                              options.max_events_per_trace) {
+        reject("DFG performance playout event budget exceeds the server "
+               "safety limit");
+        return;
+      }
+      // A caller may omit the native wall-clock bound. Keep the local
+      // endpoint responsive on highly cyclic graphs while preserving an
+      // explicit zero/unbounded setting for direct native callers.
+      if (options.max_execution_time_ms == 0)
+        options.max_execution_time_ms = 5000;
+      minera::DfgStatisticalOptions dfg_options;
+      const auto frequency = minera::discover_frequency_dfg(session->log, dfg_options);
+      minera::DfgActivityCounts starts, ends;
+      for (const auto& trace : session->log.traces) {
+        if (!trace.events.empty()) {
+          ++starts[trace.events.front().activity];
+          ++ends[trace.events.back().activity];
+        }
+      }
+      std::optional<minera::DfgPerformance> performance;
+      if (options.variant == minera::DfgPlayoutVariant::kPerformance) {
+        performance = minera::discover_performance_dfg(session->log, dfg_options);
+      }
+      const auto log = minera::dfg_playout(
+          frequency, starts, ends, options,
+          performance ? &*performance : nullptr);
+      response.set_content(minera::to_xes(log, "dfg playout"),
+                           "application/xml");
+    } catch (const std::exception& error) {
+      reject(error.what());
+    }
+    return;
+  }
   if (!is_declare && it == session->nets.end()) {
     response.status = 400;
     response.set_content(error_json("unknown miner: " + miner),

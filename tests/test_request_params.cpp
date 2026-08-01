@@ -1255,6 +1255,52 @@ void parse_process_tree_playout_params_rejects_bad_values() {
   assert(threw);
 }
 
+void parse_dfg_playout_params_maps_controls_and_aliases() {
+  const auto parsed = minera::parse_dfg_playout_params(fields({
+      {"dfg_playout_variant", "performance"},
+      {"dfg_playout_max_variants", "12"},
+      {"dfg_playout_min_weighted_probability", "0.25"},
+      {"dfg_playout_max_occurrences_per_activity", "4"},
+      {"dfg_playout_interrupt_when_dfg_complete", "true"},
+      {"dfg_playout_add_trace_if_takes_new_edges", "1"},
+      {"dfg_playout_max_execution_time_ms", "500"},
+      {"dfg_playout_return_variants", "true"},
+      {"dfg_playout_return_only_if_complete", "false"},
+      {"dfg_playout_min_variant_occurrences", "2"},
+      {"dfg_playout_traces", "20"},
+      {"dfg_playout_case_arrival_rate", "1.5"},
+      {"dfg_playout_seed", "7"},
+      {"dfg_playout_max_steps", "99"},
+      {"dfg_playout_start_time", "2026-01-01T00:00:00Z"}}));
+  assert(parsed.variant == minera::DfgPlayoutVariant::kPerformance);
+  assert(parsed.max_variants == 12 && parsed.min_weighted_probability == 0.25);
+  assert(parsed.max_occurrences_per_activity == 4 &&
+         parsed.interrupt_when_dfg_complete &&
+         parsed.add_trace_if_takes_new_edges);
+  assert(parsed.max_execution_time_ms == 500 && parsed.return_variants &&
+         !parsed.return_only_if_complete && parsed.min_variant_occurrences == 2);
+  assert(parsed.traces == 20 && parsed.case_arrival_rate == 1.5 &&
+         parsed.seed == 7 && parsed.max_events_per_trace == 99);
+  assert(parsed.start_time == "2026-01-01T00:00:00Z");
+}
+
+void parse_dfg_playout_params_rejects_invalid_bounds() {
+  for (const auto& item : {std::pair{"dfg_playout_variant", "other"},
+                           std::pair{"dfg_playout_traces", "0"},
+                           std::pair{"dfg_playout_max_variants", "0"},
+                           std::pair{"dfg_playout_min_weighted_probability", "2"},
+                           std::pair{"dfg_playout_case_arrival_rate", "-1"},
+                           std::pair{"dfg_playout_return_variants", "maybe"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_dfg_playout_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1281,6 +1327,8 @@ int main() {
   parse_petri_analysis_params_rejects_bad_values();
   parse_process_tree_playout_params_maps_variants_and_limits();
   parse_process_tree_playout_params_rejects_bad_values();
+  parse_dfg_playout_params_maps_controls_and_aliases();
+  parse_dfg_playout_params_rejects_invalid_bounds();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

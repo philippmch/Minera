@@ -1095,6 +1095,26 @@ export interface ProcessTreePlayoutOptions {
   max_trace_cap?: number;
 }
 
+export type DfgPlayoutVariant = "classic" | "performance";
+export interface DfgPlayoutOptions {
+  variant?: DfgPlayoutVariant;
+  max_variants?: number;
+  min_weighted_probability?: number;
+  max_occurrences_per_activity?: number;
+  interrupt_when_dfg_complete?: boolean;
+  add_trace_if_takes_new_edges?: boolean;
+  max_execution_time_ms?: number;
+  return_variants?: boolean;
+  return_only_if_complete?: boolean;
+  min_variant_occurrences?: number;
+  traces?: number;
+  case_arrival_rate?: number;
+  seed?: number;
+  max_steps?: number;
+  max_events_per_trace?: number;
+  start_time?: string;
+}
+
 /** Response from the standalone Petri-analysis endpoint. */
 export interface PetriAnalysisResult {
   family: PetriAnalysisFamily;

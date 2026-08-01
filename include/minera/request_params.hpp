@@ -30,6 +30,7 @@
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
 #include "minera/process_tree_playout.hpp"
+#include "minera/dfg_playout.hpp"
 #include "minera/petri_analysis.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
@@ -129,6 +130,7 @@ struct PetriAnalysisParams {
 // Strict wire contract for process-tree simulation. Fields use the
 // `playout_` prefix when parsed from request/CLI adapters.
 using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
+using DfgPlayoutParams = DfgPlayoutOptions;
 
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
@@ -218,6 +220,14 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
     const FieldLookup& field);
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parses DFG playout settings. Wire fields use the `dfg_playout_` prefix;
+// every supplied value is validated and unsafe/unbounded values are rejected
+// by the adapters rather than silently falling back to native defaults.
+[[nodiscard]] DfgPlayoutParams parse_dfg_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] DfgPlayoutParams parse_dfg_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

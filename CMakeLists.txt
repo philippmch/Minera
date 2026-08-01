@@ -30,6 +30,7 @@ add_library(minera_core
   src/declare_playout.cpp
   src/declare_streaming.cpp
   src/decision_mining.cpp
+  src/dfg_playout.cpp
   src/dfg_alignment.cpp
   src/decomposed_alignment.cpp
   src/dfg_variants.cpp
@@ -254,6 +255,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dfg_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_dfg_variants_tests COMMAND minera_dfg_variants_tests)
+
+  add_executable(minera_dfg_playout_tests
+    tests/test_dfg_playout.cpp
+  )
+  target_link_libraries(minera_dfg_playout_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_playout_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_playout_tests COMMAND minera_dfg_playout_tests)
 
   add_executable(minera_temporal_behavioral_tests
     tests/test_temporal_behavioral.cpp

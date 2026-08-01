@@ -77,7 +77,7 @@ are reconciled.
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — workflow-net sampled/extensive and Declare classic playout remain; all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; Petri stochastic, object-centric playout, Monte Carlo, and random-model generators remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -85,6 +85,17 @@ Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 (`--playout-miner process_tree`), local-server `/api/playout`, cached-tree XES,
 and frontend controls. This closes only the process-tree variants; the broader
 simulation row remains partial because other simulation families are pending.
+
+DFG simulation evidence: `CLASSIC` performs deterministic best-first expansion
+of a frequency DFG with start/end boundaries, probability ordering, occurrence
+limits, graph-completeness interruption, and safety bounds. `PERFORMANCE`
+samples frequency-weighted paths and exponential edge delays from the native
+performance DFG using a reproducible seed and case-arrival schedule. Both
+variants are exposed by `minera_playout --dfg`, `minera_export
+--playout-miner dfg`, local-server `/api/playout?miner=dfg`, and frontend XES
+controls. The native API preserves probability and estimated-occurrence trace
+attributes; map-shaped variant return remains represented through those
+attributes while the transport remains XES.
 
 ## Data, object, conversion, and integration checklist
 
