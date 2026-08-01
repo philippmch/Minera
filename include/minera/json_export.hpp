@@ -41,6 +41,7 @@
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
+#include "minera/random_tree.hpp"
 
 namespace minera {
 
@@ -244,5 +245,6 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string interval_tree_json(
     const std::vector<OpenPathInterval>& result);
 [[nodiscard]] std::string case_relations_json(const EventLog& result);
+[[nodiscard]] std::string random_tree_json(const ProcessTree& result);
 
 }  // namespace minera

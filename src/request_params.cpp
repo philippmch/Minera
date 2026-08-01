@@ -1937,4 +1937,48 @@ CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
   return params;
 }
 
+RandomTreeParams parse_random_tree_params(const FieldLookup& field) {
+  return parse_random_tree_params(field, {});
+}
+
+RandomTreeParams parse_random_tree_params(const FieldLookup& field,
+                                          const FieldPresence& present) {
+  RandomTreeParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("random_tree_rec_depth"))
+    params.rec_depth = parse_nonnegative_size(require("random_tree_rec_depth"),
+                                              "random_tree_rec_depth");
+  if (supplied("random_tree_min_rec_depth"))
+    params.min_rec_depth = parse_nonnegative_size(
+        require("random_tree_min_rec_depth"), "random_tree_min_rec_depth");
+  if (supplied("random_tree_max_rec_depth"))
+    params.max_rec_depth = parse_nonnegative_size(
+        require("random_tree_max_rec_depth"), "random_tree_max_rec_depth");
+  if (supplied("random_tree_prob_leaf")) {
+    params.prob_leaf = parse_finite_double(require("random_tree_prob_leaf"),
+                                           "random_tree_prob_leaf");
+    if (params.prob_leaf < 0.0 || params.prob_leaf > 1.0)
+      throw std::invalid_argument("random_tree_prob_leaf must be in [0,1]");
+  }
+  if (supplied("random_tree_seed"))
+    params.seed = static_cast<std::uint64_t>(
+        parse_nonnegative_size(require("random_tree_seed"),
+                               "random_tree_seed"));
+  if (supplied("random_tree_activities")) {
+    params.activities = split_target_activities(
+        require("random_tree_activities"));
+    if (params.activities.empty())
+      throw std::invalid_argument("random_tree_activities: expected labels");
+  }
+  return params;
+}
+
 }  // namespace minera

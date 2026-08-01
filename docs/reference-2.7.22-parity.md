@@ -77,7 +77,7 @@ are reconciled.
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; object-centric playout, Monte Carlo, and random-model generators remain |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and the BASIC random-tree generator are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout, Monte Carlo, and tree+log generation remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — all three target variants, open-path interval extraction, and the traditional trie are native and adapter-wired; feature tables, embeddings, and OCEL transformations remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -237,6 +237,16 @@ Malformed relation headers/rows, empty identifiers, missing timestamps, and
 invalid timestamps are rejected. The result is exposed as recursive JSON,
 strict CLI flags, a multipart local-server endpoint, and a frontend upload
 adapter with runtime response validation.
+
+## Basic random-tree generation evidence
+
+The BASIC random-tree generator uses the seeded recursive-depth process-tree
+contract: the root sequence has entry and exit activities, recursive operators
+are uniformly selected among sequence, loop, XOR, and parallel, operator
+child-count ranges are bounded, and loop exits are silent. Leaf probability,
+minimum/maximum depth, seed, and deterministic activity labels are validated
+and exposed through recursive JSON, standalone CLI output, cached-session-free
+server GET, and frontend response validation.
 
 ## POWL parity evidence
 

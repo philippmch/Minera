@@ -3536,4 +3536,36 @@ std::string case_relations_json(const EventLog& result) {
   return out.str();
 }
 
+namespace {
+void write_random_tree_node_json(std::ostream& out,
+                                 const ProcessTreeNode& node,
+                                 const ProcessTree& tree) {
+  out << "{\"operator\":";
+  write_json_string(out, operator_name(node.op));
+  if (node.op == ProcessTreeOperator::kActivity) {
+    out << ",\"activity\":";
+    write_json_string(out, tree.activities().at(node.activity));
+  }
+  out << ",\"children\":[";
+  for (std::size_t i = 0; i < node.children.size(); ++i) {
+    if (i) out << ',';
+    write_random_tree_node_json(out, node.children[i], tree);
+  }
+  out << "]}";
+}
+}  // namespace
+
+std::string random_tree_json(const ProcessTree& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"RANDOM_TREE\",\"variant\":\"BASIC\",\"activities\":[";
+  for (std::size_t i = 0; i < result.activities().size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.activities()[i]);
+  }
+  out << "],\"tree\":";
+  write_random_tree_node_json(out, result.root(), result);
+  out << '}';
+  return out.str();
+}
+
 }  // namespace minera

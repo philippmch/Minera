@@ -42,6 +42,7 @@
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
+#include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -447,6 +448,13 @@ int usage(const char* program) {
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
                "  --merge-left-column <name>    Relation left-case column\n"
                "  --merge-right-column <name>   Relation right-case column\n"
+               "  --random-tree               Emit a seeded random process tree\n"
+               "  --random-tree-rec-depth <n> Starting recursion depth\n"
+               "  --random-tree-min-rec-depth <n> Minimum recursion depth\n"
+               "  --random-tree-max-rec-depth <n> Maximum recursion depth\n"
+               "  --random-tree-prob-leaf <f> Leaf probability\n"
+               "  --random-tree-seed <n>      Random seed\n"
+               "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -833,6 +841,8 @@ int main(int argc, char** argv) {
   std::filesystem::path merge_incoming_path;
   std::filesystem::path merge_relations_path;
   std::map<std::string, std::string> merge_fields;
+  bool random_tree_requested = false;
+  std::map<std::string, std::string> random_tree_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -987,6 +997,24 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       merge_fields.insert_or_assign(std::move(key), value);
       merge_requested = true;
+      continue;
+    }
+    if (arg == "--random-tree") {
+      random_tree_requested = true;
+      continue;
+    }
+    if (arg.rfind("--random-tree-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> random_tree_option_names = {
+          "random_tree_rec_depth",       "random_tree_min_rec_depth",
+          "random_tree_max_rec_depth",   "random_tree_prob_leaf",
+          "random_tree_seed",            "random_tree_activities"};
+      if (!random_tree_option_names.contains(key)) return usage(argv[0]);
+      random_tree_fields.insert_or_assign(std::move(key), value);
+      random_tree_requested = true;
       continue;
     }
 
@@ -2281,7 +2309,7 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
-  if (input.empty()) {
+  if (input.empty() && !random_tree_requested) {
     return usage(argv[0]);
   }
   if (merge_requested && (merge_incoming_path.empty() ||
@@ -2292,6 +2320,20 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (random_tree_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = random_tree_fields.find(std::string(name));
+        return it == random_tree_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return random_tree_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_random_tree_params(lookup, present);
+      std::cout << minera::random_tree_json(
+          minera::generate_random_process_tree(params))
+                << '\n';
+      return 0;
+    }
     if (dfg_playout_options_used) {
       const auto lookup = [&](std::string_view name) {
         const auto it = dfg_playout_fields.find(std::string(name));

@@ -23,10 +23,12 @@ import {
   type TrieResult,
   type IntervalTreeResult,
   type CaseRelationsResult,
+  type RandomTreeResult,
   isLogToTargetResult,
   isTrieResult,
   isIntervalTreeResult,
   isCaseRelationsResult,
+  isRandomTreeResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1605,5 +1607,37 @@ export async function requestCaseRelations(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isCaseRelationsResult(payload)) throw new Error("the Minera backend returned an invalid case-relations merge");
+  return payload;
+}
+
+export interface RandomTreeOptions {
+  random_tree_rec_depth?: number;
+  random_tree_min_rec_depth?: number;
+  random_tree_max_rec_depth?: number;
+  random_tree_prob_leaf?: number;
+  random_tree_seed?: number;
+  random_tree_activities?: string[];
+}
+
+export function randomTreeQuery(options: RandomTreeOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.random_tree_rec_depth !== undefined) query.set("random_tree_rec_depth", String(options.random_tree_rec_depth));
+  if (options.random_tree_min_rec_depth !== undefined) query.set("random_tree_min_rec_depth", String(options.random_tree_min_rec_depth));
+  if (options.random_tree_max_rec_depth !== undefined) query.set("random_tree_max_rec_depth", String(options.random_tree_max_rec_depth));
+  if (options.random_tree_prob_leaf !== undefined) query.set("random_tree_prob_leaf", String(options.random_tree_prob_leaf));
+  if (options.random_tree_seed !== undefined) query.set("random_tree_seed", String(options.random_tree_seed));
+  if (options.random_tree_activities !== undefined) {
+    const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+    query.set("random_tree_activities", options.random_tree_activities.map(escape).join(","));
+  }
+  return query.toString();
+}
+
+export async function requestRandomTree(options: RandomTreeOptions = {}): Promise<RandomTreeResult> {
+  const query = randomTreeQuery(options);
+  const response = await fetch(`/api/random-tree${query ? `?${query}` : ""}`);
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isRandomTreeResult(payload)) throw new Error("the Minera backend returned an invalid random tree");
   return payload;
 }
