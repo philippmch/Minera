@@ -1157,6 +1157,64 @@ void parse_mine_params_rejects_dependent_options_without_opt_in() {
   assert(threw);
 }
 
+void parse_petri_analysis_params_maps_all_families_and_settings() {
+  const auto parsed = minera::parse_petri_analysis_params(fields({
+      {"petri_analysis_family", "extended_marking_equation"},
+      {"petri_analysis_miner", "powl"},
+      {"petri_analysis_trace_index", "3"},
+      {"petri_analysis_initial_marking", "1, 0"},
+      {"petri_analysis_final_marking", "0, 1"},
+      {"petri_analysis_model_costs", "4,5"},
+      {"petri_analysis_sync_costs", "0,1"},
+      {"petri_analysis_log_costs", "9,10"},
+      {"petri_analysis_split_indices", "1, 3"},
+      {"petri_analysis_max_k", "2"},
+      {"petri_analysis_max_states", "42"},
+      {"petri_analysis_full_bootstrap", "false"},
+      {"petri_analysis_diagnostics", "true"}}));
+  assert(parsed.family == minera::PetriAnalysisFamily::kExtendedMarkingEquation);
+  assert(parsed.miner == "powl" && parsed.trace_index == 3);
+  assert(parsed.initial_marking == minera::Marking({1, 0}));
+  assert(parsed.final_marking == minera::Marking({0, 1}));
+  assert(parsed.model_transition_costs == std::vector<double>({4, 5}));
+  assert(parsed.synchronous_transition_costs == std::vector<double>({0, 1}));
+  assert(parsed.log_move_costs == std::vector<double>({9, 10}));
+  assert(parsed.split_indices == std::vector<std::size_t>({1, 3}));
+  assert(parsed.max_k_value == 2 && parsed.max_states == 42);
+  assert(!parsed.full_bootstrap_required && parsed.diagnostics);
+}
+
+void parse_petri_analysis_params_rejects_bad_values() {
+  for (const auto& item : {
+           std::pair{"petri_analysis_family", "bad"},
+           std::pair{"petri_analysis_max_states", "0"},
+           std::pair{"petri_analysis_model_costs", "1,-1"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_petri_analysis_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> empty_split = {
+      {"petri_analysis_split_indices", ""}};
+  bool threw = false;
+  try {
+    const auto lookup = [&empty_split](std::string_view key) {
+      const auto it = empty_split.find(std::string(key));
+      return it == empty_split.end() ? std::string{} : it->second;
+    };
+    const auto present = [&empty_split](std::string_view key) {
+      return empty_split.contains(std::string(key));
+    };
+    (void)minera::parse_petri_analysis_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -1179,6 +1237,8 @@ int main() {
   parse_mine_params_maps_spectrum_and_batch_options();
   parse_mine_params_rejects_invalid_spectrum_and_batch_options();
   parse_mine_params_rejects_dependent_options_without_opt_in();
+  parse_petri_analysis_params_maps_all_families_and_settings();
+  parse_petri_analysis_params_rejects_bad_values();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

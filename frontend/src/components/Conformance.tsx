@@ -30,6 +30,8 @@ import {
   type PetriMultiAlignmentResult,
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
+  type PetriAnalysisOptions,
+  type PetriAnalysisResult,
   numberFormat,
 } from "../types";
 import { parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
@@ -40,6 +42,7 @@ import {
 } from "../conformance";
 import { MINER_GROUPS } from "../miners";
 import { evaluationModelIds } from "../app-logic";
+import { PetriAnalysis } from "./PetriAnalysis";
 
 type Step = "miner" | "method" | "result";
 
@@ -71,6 +74,7 @@ export function Conformance({
   onRequestPetriMulti,
   onRequestReduction,
   onRequestEvaluation,
+  onRequestPetriAnalysis,
   onRequestEmd,
 }: {
   data: MineraExport;
@@ -85,6 +89,7 @@ export function Conformance({
   onRequestPetriMulti?: (miner: string, options?: PetriMultiAlignmentOptions) => Promise<PetriMultiAlignmentResult>;
   onRequestReduction?: (traceIndex: number, options?: ProcessTreeReductionOptions) => Promise<ProcessTreeReductionResult>;
   onRequestEvaluation?: (miner: string, options?: EvaluationOptions) => Promise<ModelEvaluation>;
+  onRequestPetriAnalysis?: (options?: PetriAnalysisOptions) => Promise<PetriAnalysisResult>;
   onRequestEmd?: (reference: File, options?: EmdOptions) => Promise<EmdResult>;
 }) {
   const analysisIdentity = useRef({ data, id: 0 });
@@ -323,6 +328,7 @@ export function Conformance({
           </section>
         ))}
       <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} />
+      <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
     </div>
   );

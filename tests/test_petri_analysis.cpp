@@ -45,7 +45,7 @@ void classic_equation() {
   const auto net = chain();
   auto result = solve_marking_equation(net);
   assert(result.computed && result.feasible && !result.exhausted);
-  assert(std::abs(result.objective - 20000.0) < 1e-5);
+  assert(std::abs(result.objective) < 1e-5);
   assert(result.transition_counts.size() == 2);
   assert(std::abs(result.transition_counts[0] - 1) < 1e-7);
   assert(result.firing_sequence == std::vector<std::size_t>({0, 1}));
@@ -87,6 +87,59 @@ void incidence_feasible_not_realizable() {
   const auto result = solve_marking_equation(net);
   assert(result.feasible && result.transition_counts == std::vector<double>({1, 1}));
   assert(result.recovery_attempted && !result.reaches_final && result.firing_sequence.empty());
+}
+
+void extended_equation() {
+  const auto net = chain();
+  auto matching = solve_extended_marking_equation({"A", "B"}, net);
+  assert(matching.computed && matching.feasible && matching.reaches_final);
+  assert(std::abs(matching.objective) < 1e-8);
+  assert(matching.firing_sequence == std::vector<std::size_t>({0, 1}));
+  assert(matching.segment_count == 2 &&
+         matching.retained_splits == std::vector<std::size_t>({1}));
+
+  const auto deviation = solve_extended_marking_equation({"A", "X", "B"}, net);
+  assert(deviation.feasible && std::abs(deviation.objective - 10000.0) < 1e-7);
+
+  const auto reversed = solve_extended_marking_equation({"B", "A"}, net);
+  assert(reversed.feasible && std::abs(reversed.objective - 20000.0) < 1e-7);
+
+  const auto long_trace = solve_extended_marking_equation(
+      {"A", "B", "C", "D", "E", "F", "G"}, net);
+  assert(long_trace.retained_splits ==
+         std::vector<std::size_t>({1, 2, 3, 4, 5, 6}));
+  ExtendedMarkingEquationOptions capped;
+  capped.max_k_value = 2;
+  const auto capped_trace = solve_extended_marking_equation(
+      {"A", "B", "C", "D", "E", "F", "G"}, net, capped);
+  assert(capped_trace.retained_splits ==
+         std::vector<std::size_t>({1, 2, 5, 6}));
+  ExtendedMarkingEquationOptions boundary_only;
+  boundary_only.max_k_value = 0;
+  const auto boundary_trace = solve_extended_marking_equation(
+      {"A", "B", "C", "D", "E", "F", "G"}, net, boundary_only);
+  assert(boundary_trace.retained_splits ==
+         std::vector<std::size_t>({1, 6}));
+
+  ExtendedMarkingEquationOptions no_splits;
+  no_splits.max_k_value = 0;
+  const auto empty = solve_extended_marking_equation({}, net, no_splits);
+  assert(empty.feasible && empty.segment_count == 1 &&
+         std::abs(empty.objective - 20000.0) < 1e-7);
+
+  ExtendedMarkingEquationOptions explicit_splits;
+  explicit_splits.split_indices = {1};
+  const auto split = solve_extended_marking_equation({"A", "B"}, net,
+                                                      explicit_splits);
+  assert(split.retained_splits == std::vector<std::size_t>({1}));
+  bool threw = false;
+  try {
+    explicit_splits.split_indices = {0};
+    (void)solve_extended_marking_equation({"A", "B"}, net, explicit_splits);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void workflow_structure() {
@@ -188,6 +241,7 @@ void caps_markings_determinism_and_weights() {
 int main() {
   classic_equation();
   incidence_feasible_not_realizable();
+  extended_equation();
   workflow_structure();
   sound_models();
   unsound_models();

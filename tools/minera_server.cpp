@@ -42,6 +42,7 @@
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/petri_analysis_json.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/powl_conversion.hpp"
@@ -582,6 +583,93 @@ void handle_evaluate(const httplib::Request& request,
   }
 }
 
+void handle_petri_analysis(const httplib::Request& request,
+                           httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto params = minera::parse_petri_analysis_params(lookup, present);
+    const auto it = session->nets.find(params.miner);
+    if (it == session->nets.end())
+      throw std::invalid_argument("petri_analysis_miner: unknown model '" +
+                                  params.miner + "'");
+    const auto& net = it->second;
+    switch (params.family) {
+      case minera::PetriAnalysisFamily::kMarkingEquation: {
+        minera::MarkingEquationOptions options;
+        options.initial_marking = params.initial_marking;
+        options.final_marking = params.final_marking;
+        options.transition_costs = params.transition_costs;
+        options.realizability_limit = params.max_states;
+        response.set_content(minera::petri_analysis_json(
+                                 minera::solve_marking_equation(net, options)),
+                             "application/json");
+        return;
+      }
+      case minera::PetriAnalysisFamily::kExtendedMarkingEquation: {
+        if (params.trace_index >= session->log.traces.size())
+          throw std::invalid_argument(
+              "petri_analysis_trace_index: out of range");
+        minera::ExtendedMarkingEquationOptions options;
+        options.initial_marking = params.initial_marking;
+        options.final_marking = params.final_marking;
+        options.model_transition_costs = params.model_transition_costs;
+        options.synchronous_transition_costs =
+            params.synchronous_transition_costs;
+        options.log_move_costs = params.log_move_costs;
+        options.split_indices = params.split_indices;
+        options.max_k_value = params.max_k_value;
+        options.full_bootstrap_required = params.full_bootstrap_required;
+        options.realizability_limit = params.max_states;
+        std::vector<std::string> trace;
+        for (const auto& event : session->log.traces[params.trace_index].events)
+          trace.push_back(event.activity);
+        response.set_content(minera::petri_analysis_json(
+                                 minera::solve_extended_marking_equation(
+                                     trace, net, options)),
+                             "application/json");
+        return;
+      }
+      case minera::PetriAnalysisFamily::kWorkflowNet:
+        response.set_content(
+            minera::petri_analysis_json(minera::check_workflow_net(net)),
+            "application/json");
+        return;
+      case minera::PetriAnalysisFamily::kSoundness: {
+        minera::SoundnessOptions options;
+        options.initial_marking = params.initial_marking;
+        options.final_marking = params.final_marking;
+        options.max_states = params.max_states;
+        options.diagnostics = params.diagnostics;
+        response.set_content(
+            minera::petri_analysis_json(minera::analyze_soundness(net, options)),
+            "application/json");
+        return;
+      }
+    }
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_evaluate_emd(const httplib::Request& request,
                          httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -1052,6 +1140,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
+  server.Options("/api/petri-analysis", preflight);
   server.Options("/api/evaluate-emd", preflight);
   server.Options("/api/align-process-tree", preflight);
   server.Options("/api/align-decomposed", preflight);
@@ -1066,6 +1155,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);
+  server.Post("/api/petri-analysis", handle_petri_analysis);
   server.Post("/api/evaluate-emd", handle_evaluate_emd);
   server.Post("/api/align-process-tree", handle_align_process_tree);
   server.Post("/api/align-decomposed", handle_align_decomposed);

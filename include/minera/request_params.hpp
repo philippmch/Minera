@@ -29,6 +29,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/petri_analysis.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -98,6 +99,30 @@ struct EvaluationParams {
       GeneralizationVariant::GENERALIZATION_TOKEN;
   SimplicityVariant simplicity_variant = SimplicityVariant::ARC_DEGREE;
   SimplicityOptions simplicity_options;
+};
+
+enum class PetriAnalysisFamily {
+  kMarkingEquation,
+  kExtendedMarkingEquation,
+  kWorkflowNet,
+  kSoundness,
+};
+
+struct PetriAnalysisParams {
+  PetriAnalysisFamily family = PetriAnalysisFamily::kMarkingEquation;
+  std::string miner = "alpha";
+  std::size_t trace_index = 0;
+  Marking initial_marking;
+  Marking final_marking;
+  std::vector<double> transition_costs;
+  std::vector<double> model_transition_costs;
+  std::vector<double> synchronous_transition_costs;
+  std::vector<double> log_move_costs;
+  std::vector<std::size_t> split_indices;
+  std::size_t max_k_value = 5;
+  bool full_bootstrap_required = true;
+  std::size_t max_states = 200000;
+  bool diagnostics = false;
 };
 
 // A lookup returning a form field's value, or "" when the field is absent.
@@ -178,6 +203,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] EvaluationParams parse_evaluation_params(
     const FieldLookup& field);
 [[nodiscard]] EvaluationParams parse_evaluation_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
+    const FieldLookup& field);
+[[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera
