@@ -1981,4 +1981,113 @@ RandomTreeParams parse_random_tree_params(const FieldLookup& field,
   return params;
 }
 
+LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field) {
+  return parse_log_to_features_params(field, {});
+}
+
+LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
+                                                 const FieldPresence& present) {
+  LogToFeaturesParams params;
+  const auto key_for = [&](std::string_view suffix) {
+    const std::string plural = "features_" + std::string(suffix);
+    const std::string singular = "feature_" + std::string(suffix);
+    if (present) {
+      if (present(plural)) return plural;
+      if (present(singular)) return singular;
+    } else {
+      if (!field(plural).empty()) return plural;
+      if (!field(singular).empty()) return singular;
+    }
+    return plural;
+  };
+  const auto supplied = [&](std::string_view suffix) {
+    const auto k = key_for(suffix);
+    return present ? present(k) : !field(k).empty();
+  };
+  const auto require = [&](std::string_view suffix) {
+    const auto k = key_for(suffix);
+    const auto v = field(k);
+    if (v.empty()) throw std::invalid_argument(k + ": expected a value");
+    return v;
+  };
+  if (supplied("variant")) {
+    const auto v = require("variant");
+    if (v == "event" || v == "event_based") params.variant = LogToFeaturesVariant::EVENT_BASED;
+    else if (v == "trace" || v == "trace_based") params.variant = LogToFeaturesVariant::TRACE_BASED;
+    else if (v == "temporal") params.variant = LogToFeaturesVariant::TEMPORAL;
+    else throw std::invalid_argument("features_variant: unknown variant '" + v + "'");
+  }
+  auto assign_string = [&](std::string_view suffix, std::string& out) {
+    if (supplied(suffix)) out = require(suffix);
+  };
+  assign_string("activity_key", params.activity_key);
+  assign_string("timestamp_key", params.timestamp_key);
+  assign_string("start_timestamp_key", params.start_timestamp_key);
+  assign_string("resource_key", params.resource_key);
+  if (supplied("window_seconds")) {
+    params.window_seconds = parse_finite_double(require("window_seconds"), key_for("window_seconds"));
+    if (params.window_seconds <= 0.0) throw std::invalid_argument("features_window_seconds must be positive");
+  }
+  if (supplied("default_not_present"))
+    params.default_not_present = parse_finite_double(require("default_not_present"), key_for("default_not_present"));
+  const auto parse_list = [&](std::string_view suffix, std::vector<std::string>& out) {
+    if (!supplied(suffix)) return;
+    const auto k = key_for(suffix);
+    try { out = split_target_activities(require(suffix)); }
+    catch (const std::invalid_argument& e) {
+      throw std::invalid_argument(k + ": " + e.what());
+    }
+    if (out.empty()) throw std::invalid_argument(k + ": expected a non-empty list");
+  };
+  parse_list("event_string_attributes", params.event_string_attributes);
+  parse_list("event_numeric_attributes", params.event_numeric_attributes);
+  parse_list("case_string_attributes", params.case_string_attributes);
+  parse_list("case_numeric_attributes", params.case_numeric_attributes);
+  parse_list("event_attributes", params.event_attributes);
+  parse_list("case_attributes", params.case_attributes);
+  parse_list("feature_names", params.feature_names);
+  return params;
+}
+
+LabelSplittingParams parse_label_splitting_params(const FieldLookup& field) {
+  return parse_label_splitting_params(field, {});
+}
+
+LabelSplittingParams parse_label_splitting_params(const FieldLookup& field,
+                                                  const FieldPresence& present) {
+  LabelSplittingParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("label_splitting_variant")) {
+    const auto value = require("label_splitting_variant");
+    if (value != "contextual") throw std::invalid_argument("label_splitting_variant: unknown variant '" + value + "'");
+    params.variant = LabelSplittingVariant::CONTEXTUAL;
+  }
+  const auto assign_string = [&](std::string_view name, std::string& out) {
+    if (supplied(name)) out = require(name);
+  };
+  assign_string("label_splitting_activity_key", params.activity_key);
+  assign_string("label_splitting_target_key", params.target_key);
+  assign_string("label_splitting_activities_suffix", params.activities_suffix);
+  if (supplied("label_splitting_prefix_length"))
+    params.prefix_length = parse_nonnegative_size(require("label_splitting_prefix_length"), "label_splitting_prefix_length");
+  if (supplied("label_splitting_suffix_length"))
+    params.suffix_length = parse_nonnegative_size(require("label_splitting_suffix_length"), "label_splitting_suffix_length");
+  if (supplied("label_splitting_min_edge_weight"))
+    params.min_edge_weight = parse_finite_double(require("label_splitting_min_edge_weight"), "label_splitting_min_edge_weight");
+  if (supplied("label_splitting_target_activities")) {
+    params.target_activities = split_target_activities(require("label_splitting_target_activities"));
+    if (params.target_activities.empty()) throw std::invalid_argument("label_splitting_target_activities: expected a non-empty list");
+    const std::set<std::string> unique(params.target_activities.begin(), params.target_activities.end());
+    if (unique.size() != params.target_activities.size()) throw std::invalid_argument("label_splitting_target_activities: duplicate activity");
+  }
+  return params;
+}
+
 }  // namespace minera

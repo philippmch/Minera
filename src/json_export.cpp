@@ -3484,6 +3484,79 @@ std::string log_to_target_json(const LogToTargetResult& result) {
   return out.str();
 }
 
+std::string log_to_features_json(const LogToFeaturesResult& result) {
+  const auto variant_name = [&]() -> std::string_view {
+    switch (result.variant) {
+      case LogToFeaturesVariant::EVENT_BASED: return "event_based";
+      case LogToFeaturesVariant::TRACE_BASED: return "trace_based";
+      case LogToFeaturesVariant::TEMPORAL: return "temporal";
+    }
+    return "event_based";
+  };
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_TO_FEATURES\",\"variant\":";
+  write_json_string(out, variant_name());
+  out << ",\"feature_names\":[";
+  for (std::size_t i = 0; i < result.feature_names.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.feature_names[i]);
+  }
+  out << "]";
+  if (result.variant == LogToFeaturesVariant::EVENT_BASED) {
+    out << ",\"event_rows\":[";
+    for (std::size_t i = 0; i < result.event_rows.size(); ++i) {
+      if (i) out << ',';
+      out << '[';
+      for (std::size_t j = 0; j < result.event_rows[i].size(); ++j) {
+        if (j) out << ',';
+        out << '[';
+        for (std::size_t k = 0; k < result.event_rows[i][j].size(); ++k) {
+          if (k) out << ',';
+          out << result.event_rows[i][j][k];
+        }
+        out << ']';
+      }
+      out << ']';
+    }
+    out << ']';
+  } else if (result.variant == LogToFeaturesVariant::TRACE_BASED) {
+    out << ",\"trace_rows\":[";
+    for (std::size_t i = 0; i < result.trace_rows.size(); ++i) {
+      if (i) out << ',';
+      out << '[';
+      for (std::size_t j = 0; j < result.trace_rows[i].size(); ++j) {
+        if (j) out << ',';
+        out << result.trace_rows[i][j];
+      }
+      out << ']';
+    }
+    out << ']';
+  } else {
+    out << ",\"temporal_rows\":[";
+    for (std::size_t i = 0; i < result.temporal_rows.size(); ++i) {
+      if (i) out << ',';
+      const auto& row = result.temporal_rows[i];
+      out << "{\"timestamp\":" << row.timestamp << ",\"values\":[";
+      for (std::size_t j = 0; j < row.values.size(); ++j) {
+        if (j) out << ',';
+        out << row.values[j];
+      }
+      out << "]}";
+    }
+    out << ']';
+  }
+  out << '}';
+  return out.str();
+}
+
+std::string label_splitting_json(const LabelSplittingResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"LABEL_SPLITTING\",\"variant\":\"contextual\",\"log\":";
+  write_projected_log(out, result.log);
+  out << '}';
+  return out.str();
+}
+
 namespace {
 void write_trie_node_json(std::ostream& out, const TrieNode& node) {
   out << "{\"label\":";

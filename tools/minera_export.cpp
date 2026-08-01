@@ -39,6 +39,8 @@
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
+#include "minera/log_to_features.hpp"
+#include "minera/label_splitting.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
@@ -434,6 +436,20 @@ int usage(const char* program) {
                "  --target-enable-padding <bool> Pad rows to target size\n"
                "  --target-pad-size <n>    Padded row count\n"
                "  --target-activities <a,b,c> Explicit classes (\\, escapes commas)\n"
+               "  --log-to-features         Emit standalone feature-table JSON\n"
+               "  --features-variant <id>  event_based (default), trace_based, temporal\n"
+               "  --features-activity-key <name> Activity attribute\n"
+               "  --features-timestamp-key <name> Timestamp attribute\n"
+               "  --features-window-seconds <f> Temporal bucket width\n"
+               "  --label-splitting         Emit contextual label-splitting JSON\n"
+               "  --label-splitting-variant <id> contextual\n"
+               "  --label-splitting-activity-key <name> Source activity attribute\n"
+               "  --label-splitting-target-key <name> Destination activity attribute\n"
+               "  --label-splitting-prefix-length <n> Prefix context length\n"
+               "  --label-splitting-suffix-length <n> Suffix context length\n"
+               "  --label-splitting-min-edge-weight <f> Similarity edge threshold\n"
+               "  --label-splitting-activities-suffix <text> Replacement suffix\n"
+               "  --label-splitting-target-activities <a,b> Optional target labels\n"
                "  --trie                   Emit standalone log-trie JSON\n"
                "  --trie-activity-key <name> Event activity attribute\n"
                "  --trie-max-path-length <n> Positive variant path limit\n"
@@ -833,6 +849,10 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> concept_drift_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
+  bool features_requested = false;
+  std::map<std::string, std::string> features_fields;
+  bool label_splitting_requested = false;
+  std::map<std::string, std::string> label_splitting_fields;
   bool trie_requested = false;
   std::map<std::string, std::string> trie_fields;
   bool interval_requested = false;
@@ -945,6 +965,46 @@ int main(int argc, char** argv) {
       if (!target_option_names.contains(key)) return usage(argv[0]);
       target_fields.insert_or_assign(std::move(key), value);
       target_requested = true;
+      continue;
+    }
+    if (arg == "--log-to-features" || arg == "--features") { features_requested = true; continue; }
+    if (arg.rfind("--features-", 0) == 0 || arg.rfind("--feature-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> feature_option_names = {
+          "features_variant", "features_activity_key", "features_timestamp_key",
+          "features_start_timestamp_key", "features_resource_key",
+          "features_window_seconds", "features_default_not_present",
+          "features_event_string_attributes", "features_event_numeric_attributes",
+          "features_case_string_attributes", "features_case_numeric_attributes",
+          "features_event_attributes", "features_case_attributes", "features_feature_names",
+          "feature_variant", "feature_activity_key", "feature_timestamp_key",
+          "feature_start_timestamp_key", "feature_resource_key", "feature_window_seconds",
+          "feature_default_not_present", "feature_event_string_attributes",
+          "feature_event_numeric_attributes", "feature_case_string_attributes",
+          "feature_case_numeric_attributes", "feature_event_attributes",
+          "feature_case_attributes", "feature_feature_names"};
+      if (!feature_option_names.contains(key)) return usage(argv[0]);
+      features_fields.insert_or_assign(std::move(key), value);
+      features_requested = true;
+      continue;
+    }
+    if (arg == "--label-splitting") { label_splitting_requested = true; continue; }
+    if (arg.rfind("--label-splitting-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "label_splitting_variant", "label_splitting_activity_key",
+          "label_splitting_target_key", "label_splitting_prefix_length",
+          "label_splitting_suffix_length", "label_splitting_min_edge_weight",
+          "label_splitting_activities_suffix", "label_splitting_target_activities"};
+      if (!names.contains(key)) return usage(argv[0]);
+      label_splitting_fields.insert_or_assign(std::move(key), value);
+      label_splitting_requested = true;
       continue;
     }
     if (arg == "--trie") { trie_requested = true; continue; }
@@ -2404,6 +2464,31 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_log_to_target_params(lookup, present);
       std::cout << minera::log_to_target_json(
           minera::log_to_target(log, params)) << '\n';
+      return 0;
+    }
+    if (features_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = features_fields.find(std::string(name));
+        return it == features_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return features_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_log_to_features_params(lookup, present);
+      std::cout << minera::log_to_features_json(minera::log_to_features(log, params)) << '\n';
+      return 0;
+    }
+    if (label_splitting_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = label_splitting_fields.find(std::string(name));
+        return it == label_splitting_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return label_splitting_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_label_splitting_params(lookup, present);
+      std::cout << minera::label_splitting_json(
+          minera::split_activity_labels(log, params)) << '\n';
       return 0;
     }
     if (trie_requested) {

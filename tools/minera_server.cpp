@@ -41,6 +41,8 @@
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
+#include "minera/log_to_features.hpp"
+#include "minera/label_splitting.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
@@ -597,6 +599,55 @@ void handle_log_to_target(const httplib::Request& request,
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
+}
+
+void handle_log_to_features(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
+    static const std::set<std::string> allowed = {
+        "features_variant", "features_activity_key", "features_timestamp_key",
+        "features_start_timestamp_key", "features_resource_key", "features_window_seconds",
+        "features_default_not_present", "features_event_string_attributes",
+        "features_event_numeric_attributes", "features_case_string_attributes",
+        "features_case_numeric_attributes", "features_event_attributes",
+        "features_case_attributes", "features_feature_names",
+        "feature_variant", "feature_activity_key", "feature_timestamp_key",
+        "feature_start_timestamp_key", "feature_resource_key", "feature_window_seconds",
+        "feature_default_not_present", "feature_event_string_attributes",
+        "feature_event_numeric_attributes", "feature_case_string_attributes",
+        "feature_case_numeric_attributes", "feature_event_attributes",
+        "feature_case_attributes", "feature_feature_names"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown features parameter: " + key); }
+    const auto lookup = [&](std::string_view name) { const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{}; };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto options = minera::parse_log_to_features_params(lookup, present);
+    response.set_content(minera::log_to_features_json(minera::log_to_features(session->log, options)), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+// On-demand transformation of the cached session. This route is intentionally
+// not advertised by the frontend navigation, but remains available to clients
+// that need deterministic contextual label splitting.
+void handle_label_splitting(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
+    static const std::set<std::string> allowed = {
+        "label_splitting_variant", "label_splitting_activity_key",
+        "label_splitting_target_key", "label_splitting_prefix_length",
+        "label_splitting_suffix_length", "label_splitting_min_edge_weight",
+        "label_splitting_activities_suffix", "label_splitting_target_activities"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown label_splitting parameter: " + key); }
+    const auto lookup = [&](std::string_view name) { const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{}; };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto options = minera::parse_label_splitting_params(lookup, present);
+    response.set_content(minera::label_splitting_json(minera::split_activity_labels(session->log, options)), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
 void handle_trie(const httplib::Request& request,
@@ -1611,6 +1662,11 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/concept-drift", preflight);
   server.Options("/api/transform-target", preflight);
+  server.Options("/api/log-to-features", preflight);
+  server.Options("/api/features", preflight);
+  server.Options("/api/transform-features", preflight);
+  server.Options("/api/label-splitting", preflight);
+  server.Options("/api/transform-label-splitting", preflight);
   server.Options("/api/trie", preflight);
   server.Options("/api/interval-tree", preflight);
   server.Options("/api/merge-case-relations", preflight);
@@ -1633,6 +1689,11 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/transform-target", handle_log_to_target);
+  server.Post("/api/log-to-features", handle_log_to_features);
+  server.Post("/api/features", handle_log_to_features);
+  server.Post("/api/transform-features", handle_log_to_features);
+  server.Post("/api/label-splitting", handle_label_splitting);
+  server.Post("/api/transform-label-splitting", handle_label_splitting);
   server.Get("/api/trie", handle_trie);
   server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/merge-case-relations", handle_case_relations);
