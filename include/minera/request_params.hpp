@@ -39,6 +39,8 @@
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
+#include "minera/log_to_features.hpp"
+#include "minera/label_splitting.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -98,6 +100,8 @@ using TrieParams = TrieOptions;
 using IntervalTreeParams = OpenPathIntervalOptions;
 using CaseRelationsParams = CaseRelationsOptions;
 using RandomTreeParams = RandomTreeOptions;
+using LogToFeaturesParams = LogToFeaturesOptions;
+using LabelSplittingParams = LabelSplittingOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -281,6 +285,20 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] RandomTreeParams parse_random_tree_params(
     const FieldLookup& field);
 [[nodiscard]] RandomTreeParams parse_random_tree_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parses the native log-to-features projection. Wire fields use the
+// `features_` prefix (the singular `feature_` spelling is accepted for
+// compatibility). Lists are comma-separated and explicitly present empty
+// lists are rejected.
+[[nodiscard]] LogToFeaturesParams parse_log_to_features_params(
+    const FieldLookup& field);
+[[nodiscard]] LogToFeaturesParams parse_log_to_features_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] LabelSplittingParams parse_label_splitting_params(
+    const FieldLookup& field);
+[[nodiscard]] LabelSplittingParams parse_label_splitting_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

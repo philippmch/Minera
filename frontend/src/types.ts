@@ -52,6 +52,43 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
     && candidate.rows.every((trace) => Array.isArray(trace) && trace.every((row) => Array.isArray(row) && row.every((entry) => typeof entry === "number" && Number.isFinite(entry))));
 }
 
+export type LogToFeaturesVariant = "event_based" | "trace_based" | "temporal";
+export interface LogToFeaturesTemporalRow { timestamp: number; values: number[]; }
+export interface LogToFeaturesResult {
+  family: "LOG_TO_FEATURES";
+  variant: LogToFeaturesVariant;
+  feature_names: string[];
+  event_rows?: number[][][];
+  trace_rows?: number[][];
+  temporal_rows?: LogToFeaturesTemporalRow[];
+}
+export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<LogToFeaturesResult>;
+  if (c.family !== "LOG_TO_FEATURES" || !(["event_based", "trace_based", "temporal"] as const).includes(c.variant as LogToFeaturesVariant)) return false;
+  if (!Array.isArray(c.feature_names) || !c.feature_names.every((x) => typeof x === "string")) return false;
+  const rows = (r: unknown): r is number[] => Array.isArray(r) && r.every((x) => typeof x === "number" && Number.isFinite(x));
+  if (c.variant === "event_based") return Array.isArray(c.event_rows) && c.event_rows.every((t) => Array.isArray(t) && t.every(rows));
+  if (c.variant === "trace_based") return Array.isArray(c.trace_rows) && c.trace_rows.every(rows);
+  return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
+}
+
+export interface LabelSplittingEvent { activity: string; timestamp: string; resource: string; lifecycle: string; input_order: number; attributes?: Record<string, string>; }
+export interface LabelSplittingTrace { case_id: string; events: LabelSplittingEvent[]; attributes?: Record<string, string>; }
+export interface LabelSplittingResult { family: "LABEL_SPLITTING"; variant: "contextual"; log: { traces: LabelSplittingTrace[]; attributes?: Record<string, string> }; }
+export function isLabelSplittingResult(value: unknown): value is LabelSplittingResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<LabelSplittingResult>;
+  const strings = (item: unknown): item is Record<string, string> => !!item && typeof item === "object" && !Array.isArray(item)
+    && Object.values(item).every((value) => typeof value === "string");
+  if (c.family !== "LABEL_SPLITTING" || c.variant !== "contextual" || !c.log || typeof c.log !== "object" || !Array.isArray(c.log.traces)) return false;
+  if (c.log.attributes !== undefined && !strings(c.log.attributes)) return false;
+  return c.log.traces.every((trace) => !!trace && typeof trace === "object" && typeof trace.case_id === "string" && Array.isArray(trace.events)
+    && (trace.attributes === undefined || strings(trace.attributes))
+    && trace.events.every((event) => !!event && typeof event === "object" && typeof event.activity === "string" && typeof event.timestamp === "string" && typeof event.resource === "string" && typeof event.lifecycle === "string" && Number.isInteger(event.input_order)
+      && (event.attributes === undefined || strings(event.attributes))));
+}
+
 export interface TrieNode {
   label: string;
   depth: number;

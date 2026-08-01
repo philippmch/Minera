@@ -46,6 +46,7 @@ add_library(minera_core
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
   src/interval_tree.cpp
+  src/label_splitting.cpp
   src/json_export.cpp
   src/log_filter.cpp
   src/log_to_features.cpp
@@ -233,6 +234,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_to_features_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_to_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_to_features_tests COMMAND minera_log_to_features_tests)
+
+  add_executable(minera_label_splitting_tests
+    tests/test_label_splitting.cpp
+  )
+  target_link_libraries(minera_label_splitting_tests PRIVATE minera::core)
+  target_compile_features(minera_label_splitting_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_label_splitting_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_label_splitting_tests COMMAND minera_label_splitting_tests)
 
   add_executable(minera_footprints_tests
     tests/test_footprints.cpp

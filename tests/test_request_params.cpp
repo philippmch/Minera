@@ -1127,6 +1127,13 @@ void native_json_contracts() {
   const auto rj = minera::process_tree_reduction_json(tree, graph, 3);
   assert(rj.find("process_tree_reduction") != std::string::npos);
   assert(rj.find("\"trace_index\":3") != std::string::npos && rj.find("\"process_tree\"") != std::string::npos);
+  minera::EventLog log;
+  log.traces.push_back({"case-1", {{"case-1", "A", "", "", 0, {}, ""}}, {}});
+  minera::LabelSplittingResult split;
+  split.log = log;
+  const auto sj = minera::label_splitting_json(split);
+  assert(sj.find("\"family\":\"LABEL_SPLITTING\"") != std::string::npos &&
+         sj.find("\"log\":") != std::string::npos);
 }
 
 void parse_dfg_and_edit_alignment_params_contract() {
@@ -1471,6 +1478,55 @@ void parse_stochastic_playout_params_rejects_bad_values() {
   }
 }
 
+void log_to_features_params_contract() {
+  const auto parsed = minera::parse_log_to_features_params(fields({
+      {"features_variant", "temporal"},
+      {"features_activity_key", "concept:name"},
+      {"features_window_seconds", "60"},
+      {"features_event_numeric_attributes", "cost,amount"},
+      {"features_feature_names", "arrivals,finishes"}}));
+  assert(parsed.variant == minera::LogToFeaturesVariant::TEMPORAL);
+  assert(parsed.activity_key == "concept:name" && parsed.window_seconds == 60.0);
+  assert(parsed.event_numeric_attributes.size() == 2 && parsed.feature_names.size() == 2);
+  bool threw = false;
+  try { (void)minera::parse_log_to_features_params(fields({{"features_variant", "bogus"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_log_to_features_params(fields({{"features_window_seconds", "0"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
+void label_splitting_params_contract() {
+  const auto parsed = minera::parse_label_splitting_params(fields({
+      {"label_splitting_variant", "contextual"},
+      {"label_splitting_activity_key", "concept:name"},
+      {"label_splitting_target_key", "split"},
+      {"label_splitting_prefix_length", "3"},
+      {"label_splitting_suffix_length", "4"},
+      {"label_splitting_min_edge_weight", "0.25"},
+      {"label_splitting_activities_suffix", "#"},
+      {"label_splitting_target_activities", "A,B"}}));
+  assert(parsed.variant == minera::LabelSplittingVariant::CONTEXTUAL);
+  assert(parsed.activity_key == "concept:name" && parsed.target_key == "split");
+  assert(parsed.prefix_length == 3 && parsed.suffix_length == 4);
+  assert(parsed.min_edge_weight == 0.25 && parsed.activities_suffix == "#");
+  assert((parsed.target_activities == std::vector<std::string>{"A", "B"}));
+  bool threw = false;
+  try { (void)minera::parse_label_splitting_params(fields({{"label_splitting_variant", "other"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_label_splitting_params(fields({{"label_splitting_prefix_length", "-1"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_label_splitting_params(fields({{"label_splitting_target_activities", "A,A"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -1533,5 +1589,7 @@ int main() {
   interval_tree_params_contract();
   case_relations_params_contract();
   random_tree_params_contract();
+  log_to_features_params_contract();
+  label_splitting_params_contract();
   return 0;
 }

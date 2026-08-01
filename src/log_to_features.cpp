@@ -249,9 +249,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   if (options.variant != LogToFeaturesVariant::TEMPORAL) throw std::invalid_argument("log_to_features: unknown variant");
   std::vector<TimedEvent> events; double origin = std::numeric_limits<double>::infinity();
   for (std::size_t ti=0; ti<log.traces.size(); ++ti) for (std::size_t i=0;i<log.traces[ti].events.size();++i) { const auto& e=log.traces[ti].events[i]; double f=instant(e,options.timestamp_key,true); double s=f; if (!options.start_timestamp_key.empty()) s=instant(e,options.start_timestamp_key,true); if (s>f) throw std::invalid_argument("log_to_features: start timestamp after finish"); origin=std::min(origin,s); events.push_back({&e,f,s,ti,i}); }
-  if (events.empty()) return out;
   out.feature_names = options.feature_names;
   if (out.feature_names.empty()) out.feature_names = {"arrivals", "finishes", "service_seconds", "waiting_seconds", "sojourn_seconds", "rework", "cases", "resource_workload"}; else validate_names(out.feature_names,"feature_names");
+  if (events.empty()) return out;
   std::map<long long,std::vector<const TimedEvent*>> buckets;
   for (const auto& e:events) buckets[static_cast<long long>(std::floor((e.start-origin)/options.window_seconds))].push_back(&e);
   std::unordered_map<std::string,std::size_t> index; for (std::size_t i=0;i<out.feature_names.size();++i) index[out.feature_names[i]]=i;

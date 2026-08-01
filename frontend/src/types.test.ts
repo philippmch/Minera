@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, type MineraExport } from "./types";
+
+describe("isLogToFeaturesResult", () => {
+  it("guards variant-specific rows", () => {
+    expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["wip"], trace_rows: [[1]] })).toBe(true);
+    expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["arrivals"], temporal_rows: [{ timestamp: 1, values: [2] }] })).toBe(true);
+    expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: [], event_rows: [[[{ value: 1 }]]] })).toBe(false);
+  });
+});
+
+describe("isLabelSplittingResult", () => {
+  it("guards the transformed event-log contract", () => {
+    const event = { activity: "A_0", timestamp: "", resource: "", lifecycle: "", input_order: 0 };
+    expect(isLabelSplittingResult({ family: "LABEL_SPLITTING", variant: "contextual", log: { traces: [{ case_id: "c", events: [event] }] } })).toBe(true);
+    expect(isLabelSplittingResult({ family: "LABEL_SPLITTING", variant: "contextual", log: { traces: [{ case_id: "c", events: [{ activity: "A" }] }] } })).toBe(false);
+  });
+});
 
 describe("formatDuration", () => {
   it("renders a dash for non-positive or non-finite input", () => {

@@ -20,11 +20,15 @@ import {
   type EmdOptions,
   type ConceptDriftResult,
   type LogToTargetResult,
+  type LogToFeaturesResult,
+  type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
   type CaseRelationsResult,
   type RandomTreeResult,
   isLogToTargetResult,
+  isLogToFeaturesResult,
+  isLabelSplittingResult,
   isTrieResult,
   isIntervalTreeResult,
   isCaseRelationsResult,
@@ -1524,6 +1528,76 @@ export async function requestLogToTarget(options: LogToTargetOptions = {}): Prom
   if (!isLogToTargetResult(payload)) {
     throw new Error("the Minera backend returned an invalid target transformation");
   }
+  return payload;
+}
+
+export interface LogToFeaturesOptions {
+  features_variant?: "event_based" | "trace_based" | "temporal";
+  features_activity_key?: string;
+  features_timestamp_key?: string;
+  features_start_timestamp_key?: string;
+  features_resource_key?: string;
+  features_window_seconds?: number;
+  features_default_not_present?: number;
+  features_event_string_attributes?: string[];
+  features_event_numeric_attributes?: string[];
+  features_case_string_attributes?: string[];
+  features_case_numeric_attributes?: string[];
+  features_event_attributes?: string[];
+  features_case_attributes?: string[];
+  features_feature_names?: string[];
+}
+export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
+  const query = new URLSearchParams();
+  const encode = (s: string) => s.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
+    if (value === undefined) continue;
+    query.set(key, Array.isArray(value) ? value.map(encode).join(",") : String(value));
+  }
+  return query.toString();
+}
+export async function requestLogToFeatures(options: LogToFeaturesOptions = {}): Promise<LogToFeaturesResult> {
+  const query = logToFeaturesQuery(options);
+  const response = await fetch(`/api/log-to-features${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isLogToFeaturesResult(payload)) throw new Error("the Minera backend returned an invalid feature extraction");
+  return payload;
+}
+
+export interface LabelSplittingOptions {
+  label_splitting_variant?: "contextual";
+  label_splitting_activity_key?: string;
+  label_splitting_target_key?: string;
+  label_splitting_prefix_length?: number;
+  label_splitting_suffix_length?: number;
+  label_splitting_min_edge_weight?: number;
+  label_splitting_activities_suffix?: string;
+  label_splitting_target_activities?: string[];
+}
+export function labelSplittingQuery(options: LabelSplittingOptions = {}): string {
+  const query = new URLSearchParams();
+  const encode = (s: string) => s.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
+    if (value === undefined) continue;
+    query.set(key, Array.isArray(value) ? value.map(encode).join(",") : String(value));
+  }
+  return query.toString();
+}
+export async function requestLabelSplitting(options: LabelSplittingOptions = {}): Promise<LabelSplittingResult> {
+  const query = labelSplittingQuery(options);
+  const response = await fetch(`/api/label-splitting${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isLabelSplittingResult(payload)) throw new Error("the Minera backend returned an invalid label splitting result");
   return payload;
 }
 
