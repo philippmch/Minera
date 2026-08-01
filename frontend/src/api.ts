@@ -15,6 +15,8 @@ import {
   type EditDistanceResult,
   type EvaluationOptions,
   type ModelEvaluation,
+  type PetriAnalysisOptions,
+  type PetriAnalysisResult,
   type EmdOptions,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
@@ -30,6 +32,7 @@ import {
   isDfgAlignmentResult,
   isEditDistanceResult,
   isModelEvaluation,
+  isPetriAnalysisResult,
   isEmdResult,
   isProcessTreeAlignmentResult,
   isDecomposedAlignmentResult,
@@ -838,6 +841,58 @@ export async function evaluateModel(miner: string, options: EvaluationOptions = 
   const query = new URLSearchParams(evaluationQuery(options));
   query.set("miner", miner);
   return postChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
+}
+
+/** Stable query serialization for the four native Petri-analysis families. */
+export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
+  const family = options.family ?? "marking_equation";
+  if (!["marking_equation", "extended_marking_equation", "workflow_net", "soundness"].includes(family)) {
+    throw new Error("petri analysis family is invalid");
+  }
+  if (options.miner !== undefined && options.miner.trim() === "") throw new Error("petri analysis miner must not be empty");
+  for (const [name, value] of [
+    ["trace_index", options.trace_index], ["max_k", options.max_k], ["max_states", options.max_states],
+  ] as const) {
+    if (value !== undefined && (!Number.isInteger(value) || value < (name === "max_states" ? 1 : 0))) {
+      throw new Error(`${name} must be a valid non-negative integer`);
+    }
+  }
+  for (const [name, value] of [
+    ["initial_marking", options.initial_marking], ["final_marking", options.final_marking],
+    ["split_indices", options.split_indices],
+  ] as const) {
+    if (value !== undefined && (value.length === 0 || value.some((item) => !Number.isFinite(item) || !Number.isInteger(item) || item < 0))) {
+      throw new Error(`${name} must contain non-negative finite integers`);
+    }
+  }
+  for (const [name, value] of [["transition_costs", options.transition_costs], ["model_costs", options.model_costs], ["sync_costs", options.sync_costs], ["log_costs", options.log_costs]] as const) {
+    if (value !== undefined && value.some((item) => !Number.isFinite(item) || item < 0)) throw new Error(`${name} must contain non-negative finite costs`);
+  }
+  if (options.full_bootstrap !== undefined && typeof options.full_bootstrap !== "boolean") throw new Error("full_bootstrap must be boolean");
+  if (options.diagnostics !== undefined && typeof options.diagnostics !== "boolean") throw new Error("diagnostics must be boolean");
+  const query = new URLSearchParams();
+  const add = (name: string, value: unknown) => { if (value !== undefined) query.set(`petri_analysis_${name}`, Array.isArray(value) ? value.join(",") : String(value)); };
+  add("family", family);
+  add("miner", options.miner);
+  add("trace_index", options.trace_index);
+  add("initial_marking", options.initial_marking);
+  add("final_marking", options.final_marking);
+  add("transition_costs", options.transition_costs);
+  add("model_costs", options.model_costs);
+  add("sync_costs", options.sync_costs);
+  add("log_costs", options.log_costs);
+  add("split_indices", options.split_indices);
+  add("max_k", options.max_k);
+  add("max_states", options.max_states);
+  add("full_bootstrap", options.full_bootstrap);
+  add("diagnostics", options.diagnostics);
+  return query.toString();
+}
+
+/** Runs one selected Petri-analysis family against a cached model. */
+export async function analyzePetriModel(options: PetriAnalysisOptions = {}): Promise<PetriAnalysisResult> {
+  const query = petriAnalysisQuery(options);
+  return postChecked(`/api/petri-analysis?${query}`, isPetriAnalysisResult, "Petri analysis");
 }
 
 /** Stable query serialization for stochastic-language distance controls. */

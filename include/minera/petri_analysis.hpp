@@ -47,6 +47,39 @@ struct MarkingEquationResult {
 [[nodiscard]] MarkingEquationResult solve_marking_equation(
     const PetriNet& net, const MarkingEquationOptions& options = {});
 
+enum class ExtendedMarkingEquationVariant { CLASSIC };
+
+struct ExtendedMarkingEquationOptions {
+  Marking initial_marking;
+  Marking final_marking;
+  std::vector<double> model_transition_costs;
+  std::vector<double> synchronous_transition_costs;
+  std::vector<double> log_move_costs;
+  std::vector<std::size_t> split_indices;
+  std::size_t max_k_value = 5;
+  bool full_bootstrap_required = true;
+  std::size_t realizability_limit = 200000;
+};
+
+struct ExtendedMarkingEquationResult {
+  ExtendedMarkingEquationVariant variant = ExtendedMarkingEquationVariant::CLASSIC;
+  bool computed = false;
+  bool feasible = false;
+  bool exhausted = false;
+  double objective = 0.0;
+  double lower_bound = 0.0;
+  std::vector<std::size_t> retained_splits;
+  std::size_t segment_count = 0;
+  std::vector<double> transition_counts;
+  std::vector<std::size_t> firing_sequence;
+  bool reaches_final = false;
+  std::string error;
+};
+
+[[nodiscard]] ExtendedMarkingEquationResult solve_extended_marking_equation(
+    const std::vector<std::string>& trace, const PetriNet& net,
+    const ExtendedMarkingEquationOptions& options = {});
+
 enum class WorkflowNetVariant { PETRI_NET };
 
 struct WorkflowNetResult {

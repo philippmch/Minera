@@ -1060,6 +1060,51 @@ export interface EvaluationOptions {
   simplicity_final_marking?: number[];
 }
 
+export type PetriAnalysisFamily =
+  | "marking_equation"
+  | "extended_marking_equation"
+  | "workflow_net"
+  | "soundness";
+
+export interface PetriAnalysisOptions {
+  family?: PetriAnalysisFamily;
+  miner?: string;
+  trace_index?: number;
+  initial_marking?: number[];
+  final_marking?: number[];
+  transition_costs?: number[];
+  model_costs?: number[];
+  sync_costs?: number[];
+  log_costs?: number[];
+  split_indices?: number[];
+  max_k?: number;
+  max_states?: number;
+  full_bootstrap?: boolean;
+  diagnostics?: boolean;
+}
+
+/** Response from the standalone Petri-analysis endpoint. */
+export interface PetriAnalysisResult {
+  family: PetriAnalysisFamily;
+  variant?: string;
+  result?: Record<string, unknown>;
+  computed?: boolean;
+  feasible?: boolean;
+  exhausted?: boolean;
+  objective?: number;
+  lower_bound?: number;
+  status?: "sound" | "unsound" | "unknown";
+  error?: string;
+  [key: string]: unknown;
+}
+
+export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisResult {
+  if (!value || typeof value !== "object") return false;
+  const family = (value as { family?: unknown }).family;
+  return family === "marking_equation" || family === "extended_marking_equation" ||
+    family === "workflow_net" || family === "soundness";
+}
+
 type EvaluationMetric = number | null;
 export interface ReplayFitnessEvaluation {
   variant: Exclude<ReplayFitnessVariant, "auto">;

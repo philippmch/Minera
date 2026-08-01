@@ -1402,4 +1402,103 @@ MineParams parse_mine_params(const FieldLookup& field,
   return params;
 }
 
+PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field) {
+  return parse_petri_analysis_params(field, {});
+}
+
+PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field,
+                                                const FieldPresence& present) {
+  PetriAnalysisParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("petri_analysis_family")) {
+    const auto value = require("petri_analysis_family");
+    if (value == "marking_equation")
+      params.family = PetriAnalysisFamily::kMarkingEquation;
+    else if (value == "extended_marking_equation")
+      params.family = PetriAnalysisFamily::kExtendedMarkingEquation;
+    else if (value == "workflow_net")
+      params.family = PetriAnalysisFamily::kWorkflowNet;
+    else if (value == "soundness")
+      params.family = PetriAnalysisFamily::kSoundness;
+    else
+      throw std::invalid_argument(
+          "petri_analysis_family: expected marking_equation, "
+          "extended_marking_equation, workflow_net, or soundness");
+  }
+  if (supplied("petri_analysis_miner"))
+    params.miner = require("petri_analysis_miner");
+  if (supplied("petri_analysis_trace_index"))
+    params.trace_index = parse_nonnegative_size(
+        require("petri_analysis_trace_index"), "petri_analysis_trace_index");
+  const auto parse_marking_field = [&](std::string_view name, Marking& target) {
+    if (!supplied(name)) return;
+    const auto parsed = parse_marking(require(name), name);
+    target.clear();
+    target.reserve(parsed.size());
+    for (const auto value : parsed) {
+      if (value > static_cast<std::size_t>(
+                      std::numeric_limits<std::int64_t>::max()))
+        throw std::invalid_argument(std::string(name) +
+                                    ": token count is too large");
+      target.push_back(static_cast<std::int64_t>(value));
+    }
+  };
+  parse_marking_field("petri_analysis_initial_marking", params.initial_marking);
+  parse_marking_field("petri_analysis_final_marking", params.final_marking);
+  const auto parse_doubles = [&](std::string_view name,
+                                 std::vector<double>& target) {
+    if (!supplied(name)) return;
+    const auto value = require(name);
+    target.clear();
+    const auto parts = split_csv(value);
+    if (parts.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a non-empty list");
+    target.reserve(parts.size());
+    for (const auto& part : parts) {
+      const auto cost = parse_finite_double(part, name);
+      if (cost < 0.0)
+        throw std::invalid_argument(std::string(name) +
+                                    ": costs must be non-negative");
+      target.push_back(cost);
+    }
+  };
+  parse_doubles("petri_analysis_transition_costs", params.transition_costs);
+  parse_doubles("petri_analysis_model_costs", params.model_transition_costs);
+  parse_doubles("petri_analysis_sync_costs",
+                params.synchronous_transition_costs);
+  parse_doubles("petri_analysis_log_costs", params.log_move_costs);
+  if (supplied("petri_analysis_split_indices")) {
+    const auto value = require("petri_analysis_split_indices");
+    const auto parts = split_csv(value);
+    if (parts.empty())
+      throw std::invalid_argument(
+          "petri_analysis_split_indices: expected a non-empty list");
+    for (const auto& part : parts)
+      params.split_indices.push_back(parse_nonnegative_size(
+          part, "petri_analysis_split_indices"));
+  }
+  if (supplied("petri_analysis_max_k"))
+    params.max_k_value = parse_nonnegative_size(
+        require("petri_analysis_max_k"), "petri_analysis_max_k");
+  if (supplied("petri_analysis_max_states"))
+    params.max_states = parse_positive_size(
+        require("petri_analysis_max_states"), "petri_analysis_max_states");
+  if (supplied("petri_analysis_full_bootstrap"))
+    params.full_bootstrap_required = parse_boolean(
+        require("petri_analysis_full_bootstrap"),
+        "petri_analysis_full_bootstrap");
+  if (supplied("petri_analysis_diagnostics"))
+    params.diagnostics = parse_boolean(require("petri_analysis_diagnostics"),
+                                       "petri_analysis_diagnostics");
+  return params;
+}
+
 }  // namespace minera

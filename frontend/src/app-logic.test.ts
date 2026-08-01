@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes advanced options deterministically", () => {
@@ -65,6 +65,23 @@ describe("evaluation adapters", () => {
       simplicity_final_marking: [0, 1],
     })).toBe("evaluation_family=simplicity&fitness_variant=alignment_based&precision_variant=automaton_after_align&precision_use_task_ids=true&precision_max_states=200&generalization_variant=generalization_token&simplicity_variant=extended_cyclomatic&simplicity_arc_degree_k=2.5&simplicity_max_states=300&simplicity_initial_marking=1%2C0&simplicity_final_marking=0%2C1");
     expect(evaluationQuery()).toBe("evaluation_family=replay_fitness");
+  });
+
+  it("serializes and validates every Petri-analysis setting", () => {
+    const query = new URLSearchParams(petriAnalysisQuery({
+      family: "extended_marking_equation", miner: "powl", trace_index: 2,
+      initial_marking: [1, 0], final_marking: [0, 1], transition_costs: [3.5, 4],
+      model_costs: [5, 6], sync_costs: [0, 1], log_costs: [9], split_indices: [1, 3],
+      max_k: 2, max_states: 100, full_bootstrap: false, diagnostics: true,
+    }));
+    expect(query.get("petri_analysis_family")).toBe("extended_marking_equation");
+    expect(query.get("petri_analysis_model_costs")).toBe("5,6");
+    expect(query.get("petri_analysis_split_indices")).toBe("1,3");
+    expect(query.get("petri_analysis_full_bootstrap")).toBe("false");
+    expect(() => petriAnalysisQuery({ max_states: 0 })).toThrow(/valid/);
+    expect(() => petriAnalysisQuery({ model_costs: [-1] })).toThrow(/costs/);
+    expect(isPetriAnalysisResult({ family: "soundness", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "unknown" })).toBe(false);
   });
 
   it("validates supplied settings even when another family is selected", () => {

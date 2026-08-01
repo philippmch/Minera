@@ -1667,6 +1667,18 @@ input[type="range"]::-moz-range-thumb {
   font: inherit;
 }
 .align-settings-grid label.disabled { opacity: 0.45; }
+
+.analysis-json {
+  margin: 1rem 0 0;
+  max-height: 28rem;
+  overflow: auto;
+  padding: .85rem;
+  border: 1px solid var(--line, #d7d5ce);
+  border-radius: 8px;
+  background: var(--paper-muted, #f7f7f4);
+  font-size: .76rem;
+  white-space: pre-wrap;
+}
 .checkbox-label { flex-direction: row !important; align-items: center; padding-top: 22px; }
 .align-costs { border-top: 1px solid var(--line-soft); }
 .align-settings-caption { grid-column: 1 / -1; font-size: 11px; color: var(--ink-45); }

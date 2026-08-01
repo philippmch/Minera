@@ -50,6 +50,7 @@ add_library(minera_core
   src/performance.cpp
   src/performance_spectrum.cpp
   src/petri_anti_alignment.cpp
+  src/petri_analysis_json.cpp
   src/petri_multi_alignment.cpp
   src/petri_analysis.cpp
   src/petri_net.cpp

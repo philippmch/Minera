@@ -6,6 +6,8 @@ import {
   type EditDistanceOptions,
   type EvaluationOptions,
   type ModelEvaluation,
+  type PetriAnalysisOptions,
+  type PetriAnalysisResult,
   type EmdOptions,
   type ProcessTreeAlignmentOptions,
   type DecomposedAlignmentOptions,
@@ -46,6 +48,8 @@ import {
   alignDfg,
   alignEditDistance,
   evaluateModel,
+  analyzePetriModel,
+  petriAnalysisQuery,
   evaluationQuery,
   evaluateEmd,
   emdQuery,
@@ -110,6 +114,7 @@ export default function App() {
   const petriMultiCache = useRef<Record<string, import("./types").PetriMultiAlignmentResult>>({});
   const reductionCache = useRef<Record<string, import("./types").ProcessTreeReductionResult>>({});
   const evaluationCache = useRef<Record<string, ModelEvaluation>>({});
+  const petriAnalysisCache = useRef<Record<string, PetriAnalysisResult>>({});
   const emdCache = useRef<Record<string, import("./types").EmdResult>>({});
   // Any result started under an older backend session may still resolve, but
   // must never repopulate caches cleared for the new session.
@@ -176,6 +181,15 @@ export default function App() {
     if (generation === cacheGeneration.current) evaluationCache.current = { ...evaluationCache.current, [key]: result };
     return result;
   }, []);
+  const requestPetriAnalysis = useCallback(async (options: PetriAnalysisOptions = {}): Promise<PetriAnalysisResult> => {
+    const key = petriAnalysisQuery(options);
+    const cached = petriAnalysisCache.current[key];
+    if (cached) return cached;
+    const generation = cacheGeneration.current;
+    const result = await analyzePetriModel(options);
+    if (generation === cacheGeneration.current) petriAnalysisCache.current = { ...petriAnalysisCache.current, [key]: result };
+    return result;
+  }, []);
   const requestEmd = useCallback(async (reference: File, options: EmdOptions = {}) => {
     const key = `${reference.name}|${reference.size}|${reference.lastModified}|${emdQuery(options)}`;
     const cached = emdCache.current[key];
@@ -233,6 +247,7 @@ export default function App() {
     petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.startsWith("imported|")));
     petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.startsWith("imported|")));
     evaluationCache.current = Object.fromEntries(Object.entries(evaluationCache.current).filter(([key]) => !key.startsWith("imported|")));
+    petriAnalysisCache.current = {};
     return result;
   }, []);
 
@@ -249,6 +264,7 @@ export default function App() {
     petriMultiCache.current = {};
     reductionCache.current = {};
     evaluationCache.current = {};
+    petriAnalysisCache.current = {};
     emdCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
@@ -321,6 +337,7 @@ export default function App() {
         petriMultiCache.current = {};
         reductionCache.current = {};
         evaluationCache.current = {};
+        petriAnalysisCache.current = {};
         emdCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
@@ -560,6 +577,7 @@ export default function App() {
             onRequestPetriMulti={requestPetriMulti}
             onRequestReduction={requestReduction}
             onRequestEvaluation={requestEvaluation}
+            onRequestPetriAnalysis={requestPetriAnalysis}
             onRequestEmd={requestEmd}
           />
         </main>

@@ -49,6 +49,7 @@
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
+#include "minera/petri_analysis_json.hpp"
 #include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
@@ -441,6 +442,22 @@ int usage(const char* program) {
                "  --simplicity-max-states <n> Positive simplicity search limit\n"
                "  --simplicity-initial-marking <n,...> Initial place marking\n"
                "  --simplicity-final-marking <n,...> Final place marking\n"
+               "  --petri-analysis-family <id> marking_equation,\n"
+               "                            extended_marking_equation,\n"
+               "                            workflow_net, or soundness\n"
+               "  --petri-analysis-miner <id> Model id (default: alpha)\n"
+               "  --petri-analysis-trace-index <n> Extended-equation trace\n"
+               "  --petri-analysis-initial-marking <n,...> Initial marking\n"
+               "  --petri-analysis-final-marking <n,...> Final marking\n"
+               "  --petri-analysis-transition-costs <n,...> Classic costs\n"
+               "  --petri-analysis-model-costs <n,...> Model-move costs\n"
+               "  --petri-analysis-sync-costs <n,...> Sync costs\n"
+               "  --petri-analysis-log-costs <n,...> Log-move costs\n"
+               "  --petri-analysis-split-indices <n,...> Extended splits\n"
+               "  --petri-analysis-max-k <n> Default split count\n"
+               "  --petri-analysis-max-states <n> Solver state bound\n"
+               "  --petri-analysis-full-bootstrap <bool> Require bootstrap\n"
+               "  --petri-analysis-diagnostics <bool> Include diagnostics\n"
                "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
@@ -660,6 +677,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> evaluation_fields;
   bool evaluation_requested = false;
   std::optional<minera::EvaluationParams> evaluation_params;
+  std::map<std::string, std::string> petri_analysis_fields;
+  bool petri_analysis_requested = false;
   std::filesystem::path emd_reference;
   minera::EmdOptions emd_options;
   bool emd_option_used = false;
@@ -804,6 +823,15 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       evaluation_fields.insert_or_assign(std::move(key), value);
       evaluation_requested = true;
+      continue;
+    }
+    if (arg.rfind("--petri-analysis-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      petri_analysis_fields.insert_or_assign(std::move(key), value);
+      petri_analysis_requested = true;
       continue;
     }
     if (arg == "--emd-reference") {
@@ -1890,6 +1918,23 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
+  std::optional<minera::PetriAnalysisParams> petri_analysis_params;
+  if (petri_analysis_requested) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = petri_analysis_fields.find(std::string(name));
+      return it == petri_analysis_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return petri_analysis_fields.contains(std::string(name));
+    };
+    try {
+      petri_analysis_params =
+          minera::parse_petri_analysis_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
   if (align_process_tree) {
     const auto lookup = [&](std::string_view name) {
       const auto it = pt_alignment_fields.find(std::string(name));
@@ -2079,6 +2124,79 @@ int main(int argc, char** argv) {
       }
       conformance.push_back(model("imported", *imported_net));
       available_models.emplace_back("imported", &*imported_net);
+    }
+    if (petri_analysis_params) {
+      const auto& request = *petri_analysis_params;
+      const auto model_it = std::find_if(
+          available_models.begin(), available_models.end(),
+          [&](const auto& item) { return item.first == request.miner; });
+      if (model_it == available_models.end()) {
+        std::cerr << "error: unknown --petri-analysis-miner '"
+                  << request.miner << "'\n";
+        return 2;
+      }
+      std::string result_json;
+      switch (request.family) {
+        case minera::PetriAnalysisFamily::kMarkingEquation: {
+          minera::MarkingEquationOptions options;
+          options.initial_marking = request.initial_marking;
+          options.final_marking = request.final_marking;
+          options.transition_costs = request.transition_costs;
+          options.realizability_limit = request.max_states;
+          result_json = minera::petri_analysis_json(
+              minera::solve_marking_equation(*model_it->second, options));
+          break;
+        }
+        case minera::PetriAnalysisFamily::kExtendedMarkingEquation: {
+          if (request.trace_index >= log.traces.size()) {
+            std::cerr << "error: --petri-analysis-trace-index out of range\n";
+            return 2;
+          }
+          minera::ExtendedMarkingEquationOptions options;
+          options.initial_marking = request.initial_marking;
+          options.final_marking = request.final_marking;
+          options.model_transition_costs = request.model_transition_costs;
+          options.synchronous_transition_costs =
+              request.synchronous_transition_costs;
+          options.log_move_costs = request.log_move_costs;
+          options.split_indices = request.split_indices;
+          options.max_k_value = request.max_k_value;
+          options.full_bootstrap_required = request.full_bootstrap_required;
+          options.realizability_limit = request.max_states;
+          std::vector<std::string> trace;
+          for (const auto& event : log.traces[request.trace_index].events)
+            trace.push_back(event.activity);
+          result_json = minera::petri_analysis_json(
+              minera::solve_extended_marking_equation(
+                  trace, *model_it->second, options));
+          break;
+        }
+        case minera::PetriAnalysisFamily::kWorkflowNet:
+          result_json = minera::petri_analysis_json(
+              minera::check_workflow_net(*model_it->second));
+          break;
+        case minera::PetriAnalysisFamily::kSoundness: {
+          minera::SoundnessOptions options;
+          options.initial_marking = request.initial_marking;
+          options.final_marking = request.final_marking;
+          options.max_states = request.max_states;
+          options.diagnostics = request.diagnostics;
+          result_json = minera::petri_analysis_json(
+              minera::analyze_soundness(*model_it->second, options));
+          break;
+        }
+      }
+      if (output.empty()) {
+        std::cout << result_json << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << result_json << '\n';
+      }
+      return 0;
     }
     std::optional<std::vector<minera::ModelEvaluation>> evaluation;
     if (evaluation_params) {

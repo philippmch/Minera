@@ -50,7 +50,7 @@ are reconciled.
 
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
-| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — final-marking reachability only |
+| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; coverability/invariant diagnostics and full differential edge-contract review remain |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Missing** |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Missing** |
@@ -114,6 +114,27 @@ non-unique models compare canonical behavior (language, footprints, fitness,
 or replay) rather than generated node identifiers. Floating metrics use an
 explicit tolerance. Performance claims require representative logs and may
 not replace semantic tests.
+
+## Petri-analysis parity evidence
+
+The native analysis surface now exposes the classic integer marking equation,
+the split-aware extended marking equation, structural workflow-net validation,
+and bounded soundness diagnostics. The extended equation keeps trace events in
+ordered segments, assigns each event to a synchronous or log move, constrains
+segment-boundary markings, and solves the resulting integer state equation with
+caller-controlled costs and deterministic node limits. Recovery separately
+attempts a concrete firing sequence, so an incidence-feasible result that is
+not realizable is reported rather than silently presented as a replay.
+
+Strict request parsing covers family, miner, trace index, markings, transition
+cost vectors, split indices, split limits, solver limits, bootstrap, and
+diagnostic settings. The CLI emits a focused JSON document for any discovered
+or imported Petri model, the local server exposes `POST /api/petri-analysis`,
+and the frontend conformance tab provides the same controls with generation-safe
+on-demand caching. Native, request, frontend, CLI, and hidden-server smoke
+tests cover the current vertical. Coverability-tree evidence, positive
+invariant/S-component diagnostics, and a complete black-box edge matrix remain
+open before this row can claim full parity.
 
 ## POWL parity evidence
 
