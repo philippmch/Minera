@@ -41,6 +41,7 @@
 #include "minera/log_to_target.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
+#include "minera/case_relations.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -441,6 +442,11 @@ int usage(const char* program) {
                "  --interval-timestamp-key <name> Completion-time attribute\n"
                "  --interval-epsilon <f>   Non-negative boundary epsilon\n"
                "  --interval-filter-activity-couple <a,b> Optional pair filter\n"
+               "  --merge-case-relations <file> Merge incoming CSV/XES log\n"
+               "  --case-relations <file>       Relation CSV for merge\n"
+               "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
+               "  --merge-left-column <name>    Relation left-case column\n"
+               "  --merge-right-column <name>   Relation right-case column\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
@@ -823,6 +829,10 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> trie_fields;
   bool interval_requested = false;
   std::map<std::string, std::string> interval_fields;
+  bool merge_requested = false;
+  std::filesystem::path merge_incoming_path;
+  std::filesystem::path merge_relations_path;
+  std::map<std::string, std::string> merge_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -953,6 +963,30 @@ int main(int argc, char** argv) {
       if (!interval_option_names.contains(key)) return usage(argv[0]);
       interval_fields.insert_or_assign(std::move(key), value);
       interval_requested = true;
+      continue;
+    }
+    if (arg == "--merge-case-relations") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      merge_incoming_path = value;
+      merge_requested = true;
+      continue;
+    }
+    if (arg == "--case-relations") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      merge_relations_path = value;
+      merge_requested = true;
+      continue;
+    }
+    if (arg == "--merge-timestamp-key" || arg == "--merge-left-column" ||
+        arg == "--merge-right-column") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      merge_fields.insert_or_assign(std::move(key), value);
+      merge_requested = true;
       continue;
     }
 
@@ -2250,6 +2284,12 @@ int main(int argc, char** argv) {
   if (input.empty()) {
     return usage(argv[0]);
   }
+  if (merge_requested && (merge_incoming_path.empty() ||
+                          merge_relations_path.empty())) {
+    std::cerr << "error: case-relation merge requires --merge-case-relations "
+                 "and --case-relations\n";
+    return 2;
+  }
 
   try {
     if (dfg_playout_options_used) {
@@ -2266,6 +2306,35 @@ int main(int argc, char** argv) {
     auto log = ends_with_ci(input.string(), ".xes")
                    ? minera::import_xes_event_log(input)
                    : minera::import_csv_event_log(input, options);
+    if (merge_requested) {
+      const auto incoming = ends_with_ci(merge_incoming_path.string(), ".xes")
+                                ? minera::import_xes_event_log(merge_incoming_path)
+                                : minera::import_csv_event_log(merge_incoming_path,
+                                                               options);
+      std::ifstream relation_input(merge_relations_path);
+      if (!relation_input)
+        throw std::invalid_argument("cannot open case relations file");
+      const auto lookup = [&](std::string_view name) {
+        const auto it = merge_fields.find(std::string(name));
+        return it == merge_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return merge_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_case_relations_params(lookup, present);
+      const auto left = merge_fields.contains("merge_left_column")
+                            ? merge_fields.at("merge_left_column")
+                            : std::string("case_id_LEFT");
+      const auto right = merge_fields.contains("merge_right_column")
+                             ? merge_fields.at("merge_right_column")
+                             : std::string("case_id_RIGHT");
+      const auto relations = minera::parse_case_relations_csv(
+          relation_input, left, right);
+      std::cout << minera::case_relations_json(
+          minera::merge_case_relations(log, incoming, relations, params))
+                << '\n';
+      return 0;
+    }
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
     }

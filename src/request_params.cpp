@@ -1916,4 +1916,25 @@ IntervalTreeParams parse_interval_tree_params(const FieldLookup& field,
   return params;
 }
 
+CaseRelationsParams parse_case_relations_params(const FieldLookup& field) {
+  return parse_case_relations_params(field, {});
+}
+
+CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
+                                                const FieldPresence& present) {
+  CaseRelationsParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("merge_timestamp_key"))
+    params.timestamp_key = require("merge_timestamp_key");
+  return params;
+}
+
 }  // namespace minera

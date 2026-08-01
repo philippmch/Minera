@@ -23,6 +23,7 @@ add_library(minera_core
   src/alpha_miner.cpp
   src/bpmn.cpp
   src/batches.cpp
+  src/case_relations.cpp
   src/conformance.cpp
   src/concept_drift.cpp
   src/correlation_miner.cpp
@@ -396,4 +397,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_interval_tree_tests PRIVATE cxx_std_20)
   target_compile_options(minera_interval_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_interval_tree_tests COMMAND minera_interval_tree_tests)
+
+  add_executable(minera_case_relations_tests
+    tests/test_case_relations.cpp
+  )
+  target_link_libraries(minera_case_relations_tests PRIVATE minera::core)
+  target_compile_features(minera_case_relations_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_relations_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_case_relations_tests COMMAND minera_case_relations_tests)
 endif()

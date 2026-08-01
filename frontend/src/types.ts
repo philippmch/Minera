@@ -103,6 +103,39 @@ export function isIntervalTreeResult(value: unknown): value is IntervalTreeResul
       && Number.isInteger((interval as OpenPathInterval).target_event_index));
 }
 
+export interface CaseRelationsEvent {
+  activity: string;
+  timestamp: string;
+  resource: string;
+  lifecycle: string;
+  input_order: number;
+  attributes?: Record<string, string>;
+}
+export interface CaseRelationsTrace {
+  case_id: string;
+  events: CaseRelationsEvent[];
+  attributes?: Record<string, string>;
+}
+export interface CaseRelationsResult {
+  family: "MERGE_CASE_RELATIONS";
+  log: { traces: CaseRelationsTrace[]; attributes?: Record<string, string> };
+}
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+    && Object.values(value).every((item) => typeof item === "string");
+}
+export function isCaseRelationsResult(value: unknown): value is CaseRelationsResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<CaseRelationsResult>;
+  if (candidate.family !== "MERGE_CASE_RELATIONS" || !candidate.log || typeof candidate.log !== "object" || !Array.isArray(candidate.log.traces)) return false;
+  if (candidate.log.attributes !== undefined && !isStringRecord(candidate.log.attributes)) return false;
+  return candidate.log.traces.every((trace) => {
+    if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" || !Array.isArray(trace.events)) return false;
+    if (trace.attributes !== undefined && !isStringRecord(trace.attributes)) return false;
+    return trace.events.every((event) => event && typeof event === "object" && typeof event.activity === "string" && typeof event.timestamp === "string" && typeof event.resource === "string" && typeof event.lifecycle === "string" && Number.isInteger(event.input_order) && (event.attributes === undefined || isStringRecord(event.attributes)));
+  });
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

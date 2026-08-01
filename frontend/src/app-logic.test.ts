@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes concept drift controls", () => {
@@ -62,6 +62,22 @@ describe("native alignment adapters", () => {
     try {
       await expect(requestIntervalTree()).resolves.toEqual(valid);
       expect(fetchMock).toHaveBeenCalledWith("/api/interval-tree");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("serializes case-relation merge controls and validates merged logs", async () => {
+    expect(caseRelationsQuery({ merge_timestamp_key: "completed", merge_left_column: "left", merge_right_column: "right" })).toBe("merge_timestamp_key=completed&merge_left_column=left&merge_right_column=right");
+    const valid = { family: "MERGE_CASE_RELATIONS", log: { traces: [{ case_id: "L1", events: [{ activity: "A", timestamp: "2024-01-01T00:00:00Z", resource: "", lifecycle: "", input_order: 0 }] }] } };
+    expect(isCaseRelationsResult(valid)).toBe(true);
+    expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], events: [{ ...valid.log.traces[0].events[0], input_order: 0.5 }] }] } })).toBe(false);
+    expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], attributes: [] }] } })).toBe(false);
+    expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], events: [{ ...valid.log.traces[0].events[0], attributes: { bad: 1 } }] }] } })).toBe(false);
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => valid }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(requestCaseRelations(new File(["a"], "base.csv"), new File(["b"], "incoming.csv"), new File(["case_id_LEFT,case_id_RIGHT\nL1,R1\n"], "relations.csv"))).resolves.toEqual(valid);
+      expect(fetchMock).toHaveBeenCalledWith("/api/merge-case-relations", expect.objectContaining({ method: "POST", body: expect.any(FormData) }));
     } finally {
       vi.unstubAllGlobals();
     }

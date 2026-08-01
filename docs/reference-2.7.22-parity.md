@@ -74,7 +74,7 @@ are reconciled.
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Missing** |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Missing** |
-| Merging | case relations | **Missing** |
+| Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, and all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls; object-centric playout, Monte Carlo, and random-model generators remain |
@@ -226,6 +226,17 @@ are rejected or normalized explicitly.
 The interval result is exposed through recursive JSON, strict request fields,
 standalone CLI JSON (`--interval-tree`), cached-session `GET
 /api/interval-tree`, and frontend query/response validation.
+
+## Case-relations merging evidence
+
+The case-relations variation preserves the base log, inserts only incoming
+events with a declared right-case relation, rewrites those events to the left
+case, preserves duplicate relation rows, supports new left cases, and sorts
+each resulting case deterministically by a configured timestamp attribute.
+Malformed relation headers/rows, empty identifiers, missing timestamps, and
+invalid timestamps are rejected. The result is exposed as recursive JSON,
+strict CLI flags, a multipart local-server endpoint, and a frontend upload
+adapter with runtime response validation.
 
 ## POWL parity evidence
 

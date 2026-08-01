@@ -190,6 +190,21 @@ void interval_tree_params_contract() {
   assert(threw);
 }
 
+void case_relations_params_contract() {
+  const auto p = minera::parse_case_relations_params(
+      fields({{"merge_timestamp_key", "completed_at"}}));
+  assert(p.timestamp_key == "completed_at");
+  bool threw = false;
+  try {
+    (void)minera::parse_case_relations_params(
+        fields({{"merge_timestamp_key", ""}}),
+        [](std::string_view name) { return name == "merge_timestamp_key"; });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_mine_params_maps_correlation_options() {
   const auto params = minera::parse_mine_params(fields({
       {"correlation_variants", "trace_based, classic, classic,classic_split"},
@@ -1495,5 +1510,6 @@ int main() {
   log_to_target_params_contract();
   trie_params_contract();
   interval_tree_params_contract();
+  case_relations_params_contract();
   return 0;
 }
