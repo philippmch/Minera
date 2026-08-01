@@ -117,6 +117,27 @@ int main() {
                     tree);
   assert(incomplete_start.kind() != PowlNodeKind::kLoop);
 
+  // The dual end-side completeness repair rejects a component that is
+  // reached from one possible end but not from every possible end.
+  const auto incomplete_end =
+      discover_powl(log({{"A", "C"}, {"B", "C", "X", "D"}}), tree);
+  assert(incomplete_end.kind() != PowlNodeKind::kLoop);
+
+  // Separate return components must not be merged into a false common loop
+  // when each one returns only to its own boundary activity.
+  const auto split_returns =
+      discover_powl(log({{"A", "X", "A"}, {"B", "Y", "B"}}), tree);
+  assert(split_returns.kind() != PowlNodeKind::kLoop);
+
+  // Multiple redo slices retain their multiplicity and order in the merged
+  // redo projection rather than collapsing to a single activity choice.
+  const auto multiple_redo =
+      discover_powl(log({{"A", "X", "A", "Y", "A"}}), tree);
+  assert(multiple_redo.kind() == PowlNodeKind::kLoop);
+  assert(multiple_redo.children()[0].label() == "A");
+  assert(multiple_redo.children()[1].kind() == PowlNodeKind::kXor);
+  assert(multiple_redo.children()[1].children().size() == 2);
+
   // A single closed variant is a normal LOOP(do, redo), not a tau-loop
   // fall-through with a different language.
   const auto single_closed = discover_powl(log({{"A", "B", "A"}}), tree);

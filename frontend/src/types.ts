@@ -1083,7 +1083,7 @@ export interface ModelConformance {
   alignments?: Alignments;
 }
 
-/** Per-miner conformance, keyed by miner id ("inductive", "alpha", "heuristic"). */
+/** Per-miner conformance, keyed by discovered or imported model id. */
 export type ConformanceModels = Record<string, ModelConformance>;
 
 /** Model-quality evaluator families and their complete native variant set. */
