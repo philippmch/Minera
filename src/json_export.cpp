@@ -3364,4 +3364,39 @@ std::string imported_model_json(const ModelConformance& model,
   return out.str();
 }
 
+std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PETRI_USAGE_COMPARISON\",\"places\":[";
+  for (std::size_t i = 0; i < result.places.size(); ++i) {
+    if (i) out << ',';
+    const auto& r = result.places[i];
+    out << "{\"id\":" << r.id << ",\"log1_occurrences\":"
+        << r.log1_occurrences << ",\"log2_occurrences\":"
+        << r.log2_occurrences << ",\"total_occurrences\":"
+        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+  }
+  out << "],\"transitions\":[";
+  for (std::size_t i = 0; i < result.transitions.size(); ++i) {
+    if (i) out << ',';
+    const auto& r = result.transitions[i];
+    out << "{\"id\":" << r.id << ",\"log1_occurrences\":"
+        << r.log1_occurrences << ",\"log2_occurrences\":"
+        << r.log2_occurrences << ",\"total_occurrences\":"
+        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+  }
+  out << "],\"arcs\":[";
+  for (std::size_t i = 0; i < result.arcs.size(); ++i) {
+    if (i) out << ',';
+    const auto& r = result.arcs[i];
+    out << "{\"id\":" << r.id << ",\"transition\":" << r.transition
+        << ",\"place\":" << r.place << ",\"input\":"
+        << (r.input ? "true" : "false") << ",\"log1_occurrences\":"
+        << r.log1_occurrences << ",\"log2_occurrences\":"
+        << r.log2_occurrences << ",\"total_occurrences\":"
+        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 }  // namespace minera

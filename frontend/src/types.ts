@@ -107,6 +107,25 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+export interface PetriUsageRecord {
+  id: number;
+  log1_occurrences: number;
+  log2_occurrences: number;
+  total_occurrences: number;
+  direction: number;
+}
+export interface PetriArcUsageRecord extends PetriUsageRecord {
+  transition: number;
+  place: number;
+  input: boolean;
+}
+export interface PetriUsageComparison {
+  family: "PETRI_USAGE_COMPARISON";
+  places: PetriUsageRecord[];
+  transitions: PetriUsageRecord[];
+  arcs: PetriArcUsageRecord[];
+}
+
 /** Recursive POWL model emitted by the POWL discovery miner. */
 export type PowlNode =
   | { kind: "transition"; activity: number; frequency: { minimum: number; maximum: number | null } }
@@ -701,6 +720,27 @@ export interface ProcessTreeReductionResult {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const isPetriUsageRecord = (value: unknown): value is PetriUsageRecord => {
+  if (!isRecord(value)) return false;
+  const rec = value as Record<string, unknown>;
+  return Number.isInteger(rec.id) && (rec.id as number) >= 0 &&
+    Number.isInteger(rec.log1_occurrences) && (rec.log1_occurrences as number) >= 0 &&
+    Number.isInteger(rec.log2_occurrences) && (rec.log2_occurrences as number) >= 0 &&
+    Number.isInteger(rec.total_occurrences) && (rec.total_occurrences as number) >= 0 &&
+    finite(rec.direction);
+};
+export function isPetriUsageComparison(value: unknown): value is PetriUsageComparison {
+  if (!isRecord(value) || value.family !== "PETRI_USAGE_COMPARISON" ||
+      !Array.isArray(value.places) || !Array.isArray(value.transitions) || !Array.isArray(value.arcs)) return false;
+  return value.places.every(isPetriUsageRecord) && value.transitions.every(isPetriUsageRecord) &&
+    value.arcs.every((arc) => {
+      if (!isPetriUsageRecord(arc) || !isRecord(arc)) return false;
+      const rec = arc as Record<string, unknown>;
+      return Number.isInteger(rec.transition) && (rec.transition as number) >= 0 &&
+        Number.isInteger(rec.place) && (rec.place as number) >= 0 &&
+        typeof rec.input === "boolean";
+    });
+}
 export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResult {
   if (!isRecord(value) || value.family !== "DFG" || value.variant !== "CLASSIC" ||
       !Number.isInteger(value.unique_variants) || !Array.isArray(value.alignments)) return false;

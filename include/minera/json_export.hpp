@@ -35,6 +35,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/petri_usage_comparison.hpp"
 
 namespace minera {
 
@@ -228,5 +229,8 @@ void write_analysis_json(std::ostream& out,
 // so the frontend needs the extended registry to label them.
 [[nodiscard]] std::string imported_model_json(const ModelConformance& model,
                                               const DirectlyFollowsGraph& graph);
+
+[[nodiscard]] std::string petri_usage_comparison_json(
+    const PetriUsageComparison& result);
 
 }  // namespace minera

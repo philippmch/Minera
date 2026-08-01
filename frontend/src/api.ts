@@ -32,6 +32,7 @@ import {
   type ProcessTreePlayoutOptions,
   type StochasticPlayoutOptions,
   type DfgPlayoutOptions,
+  type PetriUsageComparison,
   isDfgAlignmentResult,
   isEditDistanceResult,
   isModelEvaluation,
@@ -43,6 +44,7 @@ import {
   isPetriMultiAlignmentResult,
   isProcessTreeReductionResult,
   isMineraExport,
+  isPetriUsageComparison,
 } from "./types";
 
 export interface CsvOptions {
@@ -1262,6 +1264,28 @@ function validatePlayoutInteger(name: string, value: number, positive = false): 
   if (!Number.isSafeInteger(value) || value < 0 || (positive && value === 0)) {
     throw new Error(`${name} must be a ${positive ? "positive" : "non-negative"} integer`);
   }
+}
+
+export async function comparePetriUsage(
+  reference: File,
+  miner = "inductive",
+): Promise<PetriUsageComparison> {
+  const form = new FormData();
+  form.append("reference_log", reference, reference.name);
+  form.append("miner", miner);
+  let response: Response;
+  try {
+    response = await fetch("/api/compare-petri", { method: "POST", body: form });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed) {
+    throw new Error(String((parsed as { error: unknown }).error));
+  }
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isPetriUsageComparison(parsed)) throw new Error("the Minera backend returned an invalid Petri usage comparison");
+  return parsed;
 }
 
 export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {}): string {

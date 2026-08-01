@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes advanced options deterministically", () => {
@@ -35,6 +35,12 @@ describe("native alignment adapters", () => {
     expect(isDecomposedAlignmentResult({ ...decomposed, traces: [{ ...decomposed.traces[0], alignment: [{ log: 1 }] }] })).toBe(false);
     const reduced = { algorithm: "process_tree_reduction", variant: "tree_tr_based", trace_index: 0, process_tree: { operator: "activity", activity: 0 } };
     expect(isProcessTreeReductionResult(reduced)).toBe(true);
+  });
+  it("validates deterministic Petri usage comparison responses", () => {
+    const result = { family: "PETRI_USAGE_COMPARISON", places: [{ id: 0, log1_occurrences: 1, log2_occurrences: 2, total_occurrences: 3, direction: 1 / 3 }], transitions: [], arcs: [] };
+    expect(isPetriUsageComparison(result)).toBe(true);
+    expect(isPetriUsageComparison({ ...result, family: "DFG" })).toBe(false);
+    expect(isPetriUsageComparison({ ...result, places: [{ ...result.places[0], direction: Number.NaN }] })).toBe(false);
   });
 });
 
