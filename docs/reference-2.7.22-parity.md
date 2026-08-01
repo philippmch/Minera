@@ -50,7 +50,7 @@ are reconciled.
 
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
-| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; coverability/invariant diagnostics and full differential edge-contract review remain |
+| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Missing** |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Missing** |
@@ -77,8 +77,14 @@ are reconciled.
 | Merging | case relations | **Missing** |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — workload and handover network |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — workflow-net sampled/extensive playout and Declare classic playout are present |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — workflow-net sampled/extensive and Declare classic playout remain; all three native process-tree variants are wired through strict request parsing, CLI, local server, cached-session XES, and frontend controls |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Missing** |
+
+Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
+`TOPBOTTOM` are available through strict request parsing, the CLI
+(`--playout-miner process_tree`), local-server `/api/playout`, cached-tree XES,
+and frontend controls. This closes only the process-tree variants; the broader
+simulation row remains partial because other simulation families are pending.
 
 ## Data, object, conversion, and integration checklist
 
@@ -132,9 +138,10 @@ diagnostic settings. The CLI emits a focused JSON document for any discovered
 or imported Petri model, the local server exposes `POST /api/petri-analysis`,
 and the frontend conformance tab provides the same controls with generation-safe
 on-demand caching. Native, request, frontend, CLI, and hidden-server smoke
-tests cover the current vertical. Coverability-tree evidence, positive
-invariant/S-component diagnostics, and a complete black-box edge matrix remain
-open before this row can claim full parity.
+tests cover the current vertical. Karp–Miller-style coverability witnesses,
+positive normalized invariant/S-component diagnostics, and their JSON fields are
+included; a complete black-box edge matrix remains open before this row can
+claim full parity.
 
 ## POWL parity evidence
 

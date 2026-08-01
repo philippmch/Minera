@@ -46,6 +46,7 @@
 #include "minera/powl_discovery.hpp"
 #include "minera/ptml.hpp"
 #include "minera/process_tree_alignment.hpp"
+#include "minera/process_tree_playout.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
@@ -574,7 +575,17 @@ int usage(const char* program) {
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
-               "                            or declare\n"
+               "                            or declare/process_tree\n"
+               "  --playout-variant <id>   Process-tree variant: BASIC_PLAYOUT,\n"
+               "                            EXTENSIVE, or TOPBOTTOM\n"
+               "  --playout-traces <n>     Process-tree sampled cases\n"
+               "  --playout-max-steps <n> Visible sampling step cap\n"
+               "  --playout-seed <u64>     Process-tree random seed\n"
+               "  --playout-min-length <n> Minimum extensive trace length\n"
+               "  --playout-max-length <n> Maximum extensive trace length\n"
+               "  --playout-max-loop-occurrences <n> Loop re-do limit\n"
+               "  --playout-max-traces <n> Extensive trace cap\n"
+               "  --playout-max-trace-cap <n> Alias for max-traces\n"
                "  --declare-playout-traces <n> Declare cases (default: 1000)\n"
                "  --declare-playout-min-length <n> Minimum events (default: 3)\n"
                "  --declare-playout-max-length <n> Maximum events (default: 15)\n"
@@ -721,6 +732,9 @@ int main(int argc, char** argv) {
   minera::DeclareDiscoveryOptions declare_options;
   minera::DeclarePlayoutOptions declare_playout_options;
   bool declare_playout_options_used = false;
+  std::map<std::string, std::string> process_tree_playout_fields;
+  bool process_tree_playout_options_used = false;
+  minera::ProcessTreePlayoutOptions process_tree_playout_options;
   minera::FootprintsOptions footprints_options;
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
@@ -1024,6 +1038,19 @@ int main(int argc, char** argv) {
         return 2;
       }
       declare_playout_options_used = true;
+    } else if (arg == "--playout-variant" || arg == "--playout-traces" ||
+               arg == "--playout-max-steps" ||
+               arg == "--playout-seed" || arg == "--playout-min-length" ||
+               arg == "--playout-max-length" ||
+               arg == "--playout-max-loop-occurrences" ||
+               arg == "--playout-max-traces" ||
+               arg == "--playout-max-trace-cap") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      process_tree_playout_fields.insert_or_assign(std::move(key), value);
+      process_tree_playout_options_used = true;
     } else if (arg == "--decisions") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -1965,6 +1992,27 @@ int main(int argc, char** argv) {
                  "--playout-miner declare\n";
     return 2;
   }
+  if (process_tree_playout_options_used && playout_miner != "process_tree") {
+    std::cerr << "error: --playout-* process-tree options require "
+                 "--playout-miner process_tree\n";
+    return 2;
+  }
+  if (process_tree_playout_options_used) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = process_tree_playout_fields.find(std::string(name));
+      return it == process_tree_playout_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return process_tree_playout_fields.contains(std::string(name));
+    };
+    try {
+      process_tree_playout_options =
+          minera::parse_process_tree_playout_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
 
   if (input.empty()) {
     return usage(argv[0]);
@@ -2442,10 +2490,13 @@ int main(int argc, char** argv) {
       else if (playout_miner == "declare")
         generated =
             minera::declare_playout(declare, declare_playout_options);
+      else if (playout_miner == "process_tree")
+        generated = minera::process_tree_playout(tree,
+                                                 process_tree_playout_options);
       else {
         std::cerr << "error: unknown --playout-miner '" << playout_miner
                   << "' (expected inductive, alpha, heuristic, powl, or "
-                     "declare)\n";
+                     "declare, or process_tree)\n";
         return 1;
       }
       if (!generated) generated = minera::playout(*selected);

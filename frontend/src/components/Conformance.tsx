@@ -32,9 +32,10 @@ import {
   type ProcessTreeReductionResult,
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
+  type ProcessTreePlayoutOptions,
   numberFormat,
 } from "../types";
-import { parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
+import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, type ImportedModelCheck } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -330,8 +331,44 @@ export function Conformance({
       <ModelEvaluationPanel key={`evaluation-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestEvaluation={onRequestEvaluation} />
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
+      <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
     </div>
   );
+}
+
+function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
+  const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "BASIC_PLAYOUT", traces: 100, max_trace_cap: 1000 });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setError(null);
+    try {
+      const xes = await fetchPlayout("process_tree", options);
+      const blob = new Blob([xes], { type: "application/xml" });
+      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-process_tree-playout.xes`; anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const number = (name: keyof ProcessTreePlayoutOptions, value: string) => setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Process-tree playout</h2><span className="panel-meta">Synthetic XES from the cached process tree</span></div>
+    {!available ? <p className="conf-inline-note">No inductive process tree is present in this analysis.</p> : <>
+      <div className="align-settings-grid">
+        <label>Variant<select value={options.variant} onChange={e => setOptions({ ...options, variant: e.target.value as ProcessTreePlayoutOptions["variant"] })}><option value="BASIC_PLAYOUT">Basic playout</option><option value="EXTENSIVE">Extensive</option><option value="TOPBOTTOM">Top-bottom</option></select></label>
+        <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
+        <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
+        <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
+        <label>Min length<input type="number" min={0} value={options.min_length ?? ""} onChange={e => number("min_length", e.target.value)} /></label>
+        <label>Max length<input type="number" min={0} value={options.max_length ?? ""} onChange={e => number("max_length", e.target.value)} /></label>
+        <label>Max loop occurrences<input type="number" min={0} value={options.max_loop_occurrences ?? ""} onChange={e => number("max_loop_occurrences", e.target.value)} /></label>
+        <label>Max trace cap<input type="number" min={1} value={options.max_trace_cap ?? ""} onChange={e => number("max_trace_cap", e.target.value)} /></label>
+      </div>
+      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      {error && <p className="conf-inline-note">{error}</p>}
+    </>}
+  </section>;
 }
 
 function embeddedEvaluation(data: MineraExport, miner: string, family: EvaluationFamily): ModelEvaluation | null {

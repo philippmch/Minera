@@ -1,10 +1,12 @@
 #include "minera/petri_analysis.hpp"
+#include "minera/petri_analysis_json.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 using namespace minera;
 
@@ -180,6 +182,38 @@ void sound_models() {
   }
 }
 
+void positive_invariant_diagnostics() {
+  const auto sequential = analyze_soundness(chain(), {.diagnostics = true});
+  assert(sequential.s_components.has_value());
+  assert(sequential.s_components->size() == 1);
+  assert(sequential.s_components->front() == std::vector<std::size_t>({0, 1, 2}));
+  assert(sequential.uncovered_places.empty());
+  for (const auto& invariant : sequential.place_invariant_basis) {
+    assert(std::all_of(invariant.begin(), invariant.end(),
+                       [](double value) { return value >= -1e-8; }));
+    assert(std::abs(invariant[0] - invariant[1]) < 1e-7);
+    assert(std::abs(invariant[1] - invariant[2]) < 1e-7);
+  }
+  const auto serialized = petri_analysis_json(sequential);
+  assert(serialized.find("\"s_components\"") != std::string::npos);
+  assert(serialized.find("\"handled_pairs\"") != std::string::npos);
+
+  const auto parallel = analyze_soundness(parallel_net());
+  assert(parallel.s_components.has_value());
+  assert(parallel.uncovered_places.empty());
+  for (const auto& invariant : parallel.place_invariant_basis) {
+    assert(std::all_of(invariant.begin(), invariant.end(),
+                       [](double value) { return value >= -1e-8; }));
+    for (const auto& transition : parallel_net().transitions()) {
+      double consumed = 0.0;
+      double produced = 0.0;
+      for (const auto p : transition.inputs) consumed += invariant[p];
+      for (const auto p : transition.outputs) produced += invariant[p];
+      assert(std::abs(consumed - produced) < 1e-7);
+    }
+  }
+}
+
 void unsound_models() {
   PetriNet improper; improper.set_activities({"A"});
   const auto s = improper.add_place(), extra = improper.add_place(), sink = improper.add_place();
@@ -209,9 +243,33 @@ void unsound_models() {
   growing.add_transition(0, {gs}, {gp});
   growing.add_transition(1, {gp}, {gp, gp});
   growing.add_transition(2, {gp}, {gk});
-  result = analyze_soundness(growing);
+  result = analyze_soundness(growing, {.diagnostics = true});
   assert(result.status == SoundnessStatus::UNSOUND && !result.bounded);
   assert(result.unbounded_witness == std::vector<std::size_t>({0, 1}));
+  assert(result.coverability_node_count >= 2);
+  assert(std::any_of(result.diagnostic_messages.begin(),
+                     result.diagnostic_messages.end(), [](const auto& message) {
+                       return message.find("coverability") != std::string::npos;
+                     }));
+
+  // A smaller reachable marking from one branch must not subsume the larger
+  // branch that contains the unbounded growth.
+  PetriNet cross_branch;
+  cross_branch.set_activities({"small", "large", "grow", "finish"});
+  const auto cb_source = cross_branch.add_place();
+  const auto cb_mid = cross_branch.add_place();
+  const auto cb_growth = cross_branch.add_place();
+  const auto cb_sink = cross_branch.add_place();
+  cross_branch.set_source(cb_source);
+  cross_branch.set_sink(cb_sink);
+  cross_branch.add_transition(0, {cb_source}, {cb_mid});
+  cross_branch.add_transition(1, {cb_source}, {cb_mid, cb_growth});
+  cross_branch.add_transition(2, {cb_mid, cb_growth},
+                               {cb_mid, cb_growth, cb_growth});
+  cross_branch.add_transition(3, {cb_growth}, {cb_sink});
+  result = analyze_soundness(cross_branch, {.diagnostics = true});
+  assert(result.status == SoundnessStatus::UNSOUND && !result.bounded);
+  assert(result.unbounded_witness == std::vector<std::size_t>({1, 2}));
 }
 
 void caps_markings_determinism_and_weights() {
@@ -234,6 +292,15 @@ void caps_markings_determinism_and_weights() {
   const auto sound = analyze_soundness(weighted, options);
   assert(sound.status == SoundnessStatus::SOUND && sound.reachable_marking_count == 3);
   assert(sound.improper_markings.empty());
+
+  PetriNet malformed;
+  malformed.set_activities({"A"});
+  const auto mp = malformed.add_place();
+  malformed.set_source(mp);
+  malformed.set_sink(mp);
+  malformed.add_transition(0, {mp}, {mp + 1});
+  const auto malformed_result = analyze_soundness(malformed);
+  assert(malformed_result.status == SoundnessStatus::UNSOUND);
 }
 
 }  // namespace
@@ -244,6 +311,7 @@ int main() {
   extended_equation();
   workflow_structure();
   sound_models();
+  positive_invariant_diagnostics();
   unsound_models();
   caps_markings_determinism_and_weights();
 }

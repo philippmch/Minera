@@ -1083,6 +1083,18 @@ export interface PetriAnalysisOptions {
   diagnostics?: boolean;
 }
 
+export type ProcessTreePlayoutVariant = "BASIC_PLAYOUT" | "EXTENSIVE" | "TOPBOTTOM";
+export interface ProcessTreePlayoutOptions {
+  variant?: ProcessTreePlayoutVariant;
+  traces?: number;
+  max_steps?: number;
+  seed?: number;
+  min_length?: number;
+  max_length?: number;
+  max_loop_occurrences?: number;
+  max_trace_cap?: number;
+}
+
 /** Response from the standalone Petri-analysis endpoint. */
 export interface PetriAnalysisResult {
   family: PetriAnalysisFamily;

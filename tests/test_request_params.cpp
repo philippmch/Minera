@@ -1215,6 +1215,46 @@ void parse_petri_analysis_params_rejects_bad_values() {
   assert(threw);
 }
 
+void parse_process_tree_playout_params_maps_variants_and_limits() {
+  const auto parsed = minera::parse_process_tree_playout_params(fields({
+      {"playout_variant", "TOPBOTTOM"},
+      {"playout_traces", "12"},
+      {"playout_max_steps", "99"},
+      {"playout_seed", "7"},
+      {"playout_min_length", "2"},
+      {"playout_max_length", "8"},
+      {"playout_max_loop_occurrences", "4"},
+      {"playout_max_trace_cap", "50"}}));
+  assert(parsed.variant == minera::ProcessTreePlayoutVariant::kTopBottom);
+  assert(parsed.traces == 12 && parsed.max_steps == 99 && parsed.seed == 7);
+  assert(parsed.min_length == 2 && parsed.max_length == 8);
+  assert(parsed.max_loop_occurrences == 4 && parsed.max_traces == 50);
+}
+
+void parse_process_tree_playout_params_rejects_bad_values() {
+  for (const auto& item : {
+           std::pair{"playout_variant", "not-a-variant"},
+           std::pair{"playout_traces", "0"},
+           std::pair{"playout_max_steps", "-1"},
+           std::pair{"playout_max_trace_cap", "0"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_process_tree_playout_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_process_tree_playout_params(fields({
+        {"playout_min_length", "4"}, {"playout_max_length", "2"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -1239,6 +1279,8 @@ int main() {
   parse_mine_params_rejects_dependent_options_without_opt_in();
   parse_petri_analysis_params_maps_all_families_and_settings();
   parse_petri_analysis_params_rejects_bad_values();
+  parse_process_tree_playout_params_maps_variants_and_limits();
+  parse_process_tree_playout_params_rejects_bad_values();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

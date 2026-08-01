@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -151,6 +151,23 @@ describe("process-tree alignment contract", () => {
     expect(isProcessTreeAlignmentResult(result)).toBe(true);
     expect(isProcessTreeAlignmentResult({ ...result, family: "DFG" })).toBe(false);
     expect(isProcessTreeAlignmentResult({ ...result, diagnostics: { ...result.diagnostics, lp_solved: -1 } })).toBe(false);
+  });
+});
+
+describe("process-tree playout contract", () => {
+  it("serializes all native variants and controls", () => {
+    const query = new URLSearchParams(processTreePlayoutQuery({
+      variant: "TOPBOTTOM", traces: 12, max_steps: 99, seed: 7,
+      min_length: 2, max_length: 8, max_loop_occurrences: 4, max_trace_cap: 50,
+    }));
+    expect(query.get("variant")).toBe("TOPBOTTOM");
+    expect(query.get("max_trace_cap")).toBe("50");
+    expect(query.get("max_steps")).toBe("99");
+  });
+  it("rejects invalid bounds and inverted lengths", () => {
+    expect(() => processTreePlayoutQuery({ traces: 0 })).toThrow(/positive/);
+    expect(() => processTreePlayoutQuery({ min_length: 4, max_length: 2 })).toThrow(/must not exceed/);
+    expect(() => processTreePlayoutQuery({ max_loop_occurrences: -1 })).toThrow(/non-negative/);
   });
 });
 import {

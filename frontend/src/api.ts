@@ -29,6 +29,7 @@ import {
   type PetriMultiAlignmentResult,
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
+  type ProcessTreePlayoutOptions,
   isDfgAlignmentResult,
   isEditDistanceResult,
   isModelEvaluation,
@@ -1255,10 +1256,38 @@ export async function fetchXes(): Promise<string> {
  * end with pending obligations rather than being a complete fitting execution.
  * Like the other model endpoints this only works for a log mined this session.
  */
-export async function fetchPlayout(miner: string): Promise<string> {
+function validatePlayoutInteger(name: string, value: number, positive = false): void {
+  if (!Number.isSafeInteger(value) || value < 0 || (positive && value === 0)) {
+    throw new Error(`${name} must be a ${positive ? "positive" : "non-negative"} integer`);
+  }
+}
+
+export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.variant !== undefined) {
+    if (options.variant !== "BASIC_PLAYOUT" && options.variant !== "EXTENSIVE" && options.variant !== "TOPBOTTOM") {
+      throw new Error("variant must be BASIC_PLAYOUT, EXTENSIVE, or TOPBOTTOM");
+    }
+    params.set("variant", options.variant);
+  }
+  if (options.traces !== undefined) { validatePlayoutInteger("traces", options.traces, true); params.set("traces", String(options.traces)); }
+  if (options.max_steps !== undefined) { validatePlayoutInteger("max_steps", options.max_steps); params.set("max_steps", String(options.max_steps)); }
+  if (options.seed !== undefined) { validatePlayoutInteger("seed", options.seed); params.set("seed", String(options.seed)); }
+  if (options.min_length !== undefined) { validatePlayoutInteger("min_length", options.min_length); params.set("min_length", String(options.min_length)); }
+  if (options.max_length !== undefined) { validatePlayoutInteger("max_length", options.max_length); params.set("max_length", String(options.max_length)); }
+  if (options.max_loop_occurrences !== undefined) { validatePlayoutInteger("max_loop_occurrences", options.max_loop_occurrences); params.set("max_loop_occurrences", String(options.max_loop_occurrences)); }
+  if (options.max_trace_cap !== undefined) { validatePlayoutInteger("max_trace_cap", options.max_trace_cap, true); params.set("max_trace_cap", String(options.max_trace_cap)); }
+  if (options.min_length !== undefined && options.max_length !== undefined && options.min_length > options.max_length) {
+    throw new Error("min_length must not exceed max_length");
+  }
+  return params.toString();
+}
+
+export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions = {}): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}`);
+    const query = processTreePlayoutQuery(options);
+    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",

@@ -52,6 +52,19 @@ std::string markings(const std::vector<Marking>& values) {
   return out.str();
 }
 
+std::string optional_index_vectors(
+    const std::optional<std::vector<std::vector<std::size_t>>>& values) {
+  if (!values) return "null";
+  std::ostringstream out;
+  out << '[';
+  for (std::size_t i = 0; i < values->size(); ++i) {
+    if (i != 0) out << ',';
+    out << numbers((*values)[i]);
+  }
+  out << ']';
+  return out.str();
+}
+
 std::string doubles(const std::vector<double>& values) {
   std::ostringstream out;
   out << std::setprecision(17) << '[';
@@ -168,6 +181,8 @@ std::string petri_analysis_json(const SoundnessResult& result) {
     out << doubles(result.place_invariant_basis[i]);
   }
   out << "]"
+      << ",\"s_components\":" << optional_index_vectors(result.s_components)
+      << ",\"handled_pairs\":" << optional_index_vectors(result.handled_pairs)
       << ",\"error\":" << quote(result.error) << '}';
   return out.str();
 }

@@ -29,6 +29,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/process_tree_playout.hpp"
 #include "minera/petri_analysis.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
@@ -125,6 +126,10 @@ struct PetriAnalysisParams {
   bool diagnostics = false;
 };
 
+// Strict wire contract for process-tree simulation. Fields use the
+// `playout_` prefix when parsed from request/CLI adapters.
+using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
+
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
 // Optional companion lookup that distinguishes an omitted field from a
@@ -208,6 +213,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
     const FieldLookup& field);
 [[nodiscard]] PetriAnalysisParams parse_petri_analysis_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

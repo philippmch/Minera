@@ -123,8 +123,15 @@ struct SoundnessResult {
   std::size_t reachable_marking_count = 0;
   std::size_t coverability_node_count = 0;
   std::vector<std::string> diagnostic_messages;
+  // Deterministic non-negative P-invariants, normalized so their largest
+  // coefficient is one.  A place is covered when it has a positive
+  // coefficient in at least one vector.
   std::vector<std::vector<double>> place_invariant_basis;
   std::vector<std::size_t> uncovered_places;
+  // For workflow nets, supports of the positive P-invariants above.  The
+  // optional is disengaged when the input is not a structurally valid
+  // workflow net; an engaged empty value means no positive S-component was
+  // found.
   std::optional<std::vector<std::vector<std::size_t>>> s_components;
   std::optional<std::vector<std::vector<std::size_t>>> handled_pairs;
   std::string error;
