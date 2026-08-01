@@ -2090,4 +2090,38 @@ LabelSplittingParams parse_label_splitting_params(const FieldLookup& field,
   return params;
 }
 
+ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field) {
+  return parse_ilp_miner_params(field, {});
+}
+
+ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field,
+                                       const FieldPresence& present) {
+  ILPMinerOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    }
+    return value;
+  };
+  if (supplied("ilp_activity_key")) {
+    options.activity_key = require("ilp_activity_key");
+  }
+  if (supplied("ilp_noise_threshold")) {
+    const auto value = require("ilp_noise_threshold");
+    options.noise_threshold = parse_finite_double(value, "ilp_noise_threshold");
+    if (options.noise_threshold < 0.0 || options.noise_threshold > 1.0) {
+      throw std::invalid_argument("ilp_noise_threshold must be in [0,1]");
+    }
+  }
+  if (supplied("ilp_max_nodes")) {
+    options.max_nodes = parse_positive_size(require("ilp_max_nodes"),
+                                             "ilp_max_nodes");
+  }
+  return options;
+}
+
 }  // namespace minera

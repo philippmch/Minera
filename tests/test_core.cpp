@@ -15,6 +15,7 @@
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
+#include "minera/ilp_miner.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -4898,7 +4899,21 @@ void json_export_carries_evaluation_contract() {
   assert(rejected_unnamed);
 }
 
+void ilp_json_is_standalone_and_deterministic() {
+  std::istringstream input("case_id,activity\nc1,A\nc1,B\nc2,A\nc2,B\n");
+  const auto log = minera::import_csv_event_log(input);
+  const auto result = minera::mine_ilp(log);
+  const auto first = minera::ilp_miner_json(result);
+  const auto second = minera::ilp_miner_json(result);
+  assert(first == second);
+  assert(first.find("\"family\":\"ILP\"") != std::string::npos);
+  assert(first.find("\"net\":") != std::string::npos);
+  assert(first.find("\"markings\":") != std::string::npos);
+  assert(first.find("\"diagnostics\":") != std::string::npos);
+}
+
 int main() {
+  ilp_json_is_standalone_and_deterministic();
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();

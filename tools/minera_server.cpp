@@ -95,6 +95,7 @@ struct MinedSession {
 };
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
+constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
@@ -432,6 +433,51 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 // the cached session under the id "imported", so POST /api/align?miner=imported
 // can align against it on demand like any discovered model; the session's
 // registry is extended with the net's activities so ids stay resolvable.
+// Hidden cached-session adapter for the bounded classic ILP miner. The log is
+// intentionally taken from the latest /api/mine session so this endpoint does
+// not accept uploads or perform any implicit re-importing.
+void handle_ilp_mine(const httplib::Request& request,
+                     httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "ilp_activity_key", "ilp_noise_threshold", "ilp_max_nodes"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) {
+        throw std::invalid_argument("unknown ILP parameter: " + key);
+      }
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_ilp_miner_params(lookup, present);
+    if (options.max_nodes > kServerIlpMaxNodes) {
+      throw std::invalid_argument("ilp_max_nodes exceeds the server safety cap");
+    }
+    const auto result = minera::mine_ilp(session->log, options);
+    response.set_content(minera::ilp_miner_json(result), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_check_model(const httplib::Request& request,
                         httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -1660,6 +1706,8 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/ilp-mine", preflight);
+  server.Options("/api/mine-ilp", preflight);
   server.Options("/api/concept-drift", preflight);
   server.Options("/api/transform-target", preflight);
   server.Options("/api/log-to-features", preflight);
@@ -1687,6 +1735,8 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/ilp-mine", handle_ilp_mine);
+  server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);

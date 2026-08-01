@@ -65,7 +65,7 @@ are reconciled.
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
-| Discovery: optimization | ILP classic and Genetic classic | **Missing** |
+| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP classic is available through JSON, CLI, local server, and frontend adapters; Genetic classic remains missing |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |

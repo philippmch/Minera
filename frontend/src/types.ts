@@ -35,6 +35,66 @@ export interface ConceptDriftResult {
   change_timestamps: number[];
 }
 
+export interface ILPMinerTransition {
+  activity: string | null;
+  inputs: number[];
+  outputs: number[];
+}
+export interface ILPMinerNet {
+  place_count: number;
+  source: number;
+  sink: number;
+  activities: string[];
+  transitions: ILPMinerTransition[];
+}
+export interface ILPMinerMarkings { initial: number[]; final: number[]; }
+export interface ILPMinerDiagnostics {
+  computed: boolean;
+  exhausted: boolean;
+  visited_nodes: number;
+  lp_solved: number;
+  branch_and_bound_nodes: number;
+  message: string;
+}
+export interface ILPMinerResult {
+  family: "ILP";
+  net: ILPMinerNet;
+  markings: ILPMinerMarkings;
+  diagnostics: ILPMinerDiagnostics;
+}
+export interface ILPMinerOptions {
+  activity_key?: string;
+  noise_threshold?: number;
+  max_nodes?: number;
+}
+// Compatibility spellings for consumers that use title-case ILP names.
+export type IlpMinerResult = ILPMinerResult;
+export type IlpMinerOptions = ILPMinerOptions;
+function isFiniteIntegerArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "number" && Number.isInteger(item) && item >= 0);
+}
+export function isILPMinerResult(value: unknown): value is ILPMinerResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<ILPMinerResult>;
+  if (c.family !== "ILP" || !c.net || typeof c.net !== "object" || !c.markings || typeof c.markings !== "object" || !c.diagnostics || typeof c.diagnostics !== "object") return false;
+  const n = c.net as Partial<ILPMinerNet>;
+  const placeCount = n.place_count;
+  if (!Number.isInteger(placeCount) || (placeCount as number) <= 0 || !Number.isInteger(n.source) || !Number.isInteger(n.sink) || (n.source as number) < 0 || (n.sink as number) < 0 || (n.source as number) >= (placeCount as number) || (n.sink as number) >= (placeCount as number) || !Array.isArray(n.activities) || !n.activities.every((x) => typeof x === "string") || !Array.isArray(n.transitions)) return false;
+  const activities = n.activities as string[];
+  if (!n.transitions.every((t) => {
+    if (!t || typeof t !== "object" || !(t.activity === null || (typeof t.activity === "string" && activities.includes(t.activity))) || !isFiniteIntegerArray(t.inputs) || !isFiniteIntegerArray(t.outputs)) return false;
+    return t.inputs.every((place) => place < (placeCount as number)) && t.outputs.every((place) => place < (placeCount as number));
+  })) return false;
+  const m = c.markings as Partial<ILPMinerMarkings>;
+  if (!isFiniteIntegerArray(m.initial) || !isFiniteIntegerArray(m.final) || m.initial.length !== placeCount || m.final.length !== placeCount) return false;
+  const d = c.diagnostics as Partial<ILPMinerDiagnostics>;
+  const visited = d.visited_nodes;
+  const solved = d.lp_solved;
+  const branchNodes = d.branch_and_bound_nodes;
+  return typeof d.computed === "boolean" && typeof d.exhausted === "boolean" && Number.isInteger(visited) && (visited as number) >= 0 && Number.isInteger(solved) && (solved as number) >= 0 && Number.isInteger(branchNodes) && (branchNodes as number) >= 0 && typeof d.message === "string";
+}
+export const isIlpMinerResult = isILPMinerResult;
+
 export type LogToTargetVariant = "next_activity" | "next_time" | "remaining_time";
 export interface LogToTargetResult {
   family: "LOG_TO_TARGET";
