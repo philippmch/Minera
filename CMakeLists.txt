@@ -24,6 +24,7 @@ add_library(minera_core
   src/bpmn.cpp
   src/batches.cpp
   src/conformance.cpp
+  src/concept_drift.cpp
   src/correlation_miner.cpp
   src/csv_event_log_importer.cpp
   src/declare.cpp
@@ -280,6 +281,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_temporal_behavioral_tests PRIVATE cxx_std_20)
   target_compile_options(minera_temporal_behavioral_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_temporal_behavioral_tests COMMAND minera_temporal_behavioral_tests)
+
+  add_executable(minera_concept_drift_tests
+    tests/test_concept_drift.cpp
+  )
+  target_link_libraries(minera_concept_drift_tests PRIVATE minera::core)
+  target_compile_features(minera_concept_drift_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_concept_drift_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_concept_drift_tests COMMAND minera_concept_drift_tests)
 
   add_executable(minera_alignment_variants_tests
     tests/test_alignment_variants.cpp

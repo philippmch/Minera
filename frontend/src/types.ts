@@ -16,6 +16,25 @@ export interface EdgeStat {
   count: number;
 }
 
+export interface ConceptDriftSublogSummary {
+  trace_count: number;
+  event_count: number;
+}
+export interface ConceptDriftChangePoint {
+  sublog_index: number;
+  p_value: number;
+}
+export interface ConceptDriftResult {
+  family: "CONCEPT_DRIFT";
+  activities: string[];
+  feature_vectors: number[][];
+  sublogs: ConceptDriftSublogSummary[];
+  cumulative_sublogs: ConceptDriftSublogSummary[];
+  sublog_start_timestamps: number[];
+  change_points: ConceptDriftChangePoint[];
+  change_timestamps: number[];
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

@@ -54,7 +54,7 @@ are reconciled.
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Missing** |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
-| Concept drift | Bose feature extraction and drift detection | **Missing** |
+| Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
@@ -175,6 +175,17 @@ the same reference as multipart `reference_log` against its cached session;
 the frontend provides a compact upload-and-delta panel. Native replay,
 standalone JSON, CLI, server, and frontend response guards are covered; richer
 differential semantics remain outside this adapter.
+
+## Concept-drift evidence
+
+The native concept-drift surface extracts deterministic relation-type count
+vectors from ordered trace sub-logs and evaluates adjacent windows with a
+seeded permutation test. It supports configurable sub-log/window sizes,
+permutation counts, p-value threshold, result cap, and optional case-start
+timestamps. Strict request parsing, standalone JSON, CLI, cached-session
+server, frontend request/response types, and focused native/request tests are
+included. The current row remains partial pending differential edge-contract
+fixtures and the reference implementation's dataframe/lazyframe adapters.
 
 ## POWL parity evidence
 
@@ -651,3 +662,10 @@ source time, omits source-only moves, and marks each projected event's
 `@@is_conforming` value. Scalar EventLog log attributes (including these
 projection markers) and their XES scalar types round-trip through the XES
 importer/exporter.
+
+Concept-drift adapters expose deterministic `CONCEPT_DRIFT` JSON from the CLI
+(`--concept-drift`, `--drift-*`) and cached-log server endpoint
+`POST /api/concept-drift`. Strict controls cover sub-log/window sizes,
+permutation count, threshold, change-point cap, seed, and optional timestamps;
+the result includes activity features, raw and cumulative sub-log summaries,
+change points, and timestamp arrays.

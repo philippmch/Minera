@@ -22,6 +22,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
+#include "minera/concept_drift.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/declare.hpp"
@@ -516,6 +517,36 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     const auto alignment = minera::check_alignment(session->log, it->second, options);
     response.set_content(minera::alignment_json(alignment, session->graph),
                          "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_concept_drift(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_concept_drift_params(lookup, present);
+    const auto result = minera::detect_concept_drift(session->log, options);
+    response.set_content(minera::concept_drift_json(result), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -1370,6 +1401,7 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/concept-drift", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
   server.Options("/api/evaluate", preflight);
@@ -1386,6 +1418,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
   server.Post("/api/evaluate", handle_evaluate);

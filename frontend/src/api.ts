@@ -18,6 +18,7 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type EmdOptions,
+  type ConceptDriftResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1454,4 +1455,29 @@ export async function fetchBpmn(miner: string): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+export interface ConceptDriftOptions {
+  drift_sub_log_size?: number;
+  drift_window_size?: number;
+  drift_num_permutations?: number;
+  drift_threshold?: number;
+  drift_max_no_change_points?: number;
+  drift_seed?: number;
+  drift_include_timestamps?: boolean;
+}
+
+export function conceptDriftQuery(options: ConceptDriftOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  return query.toString();
+}
+
+export async function requestConceptDrift(options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> {
+  const query = conceptDriftQuery(options);
+  const response = await fetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  return (await response.json()) as ConceptDriftResult;
 }

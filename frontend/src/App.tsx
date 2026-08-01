@@ -9,6 +9,7 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type EmdOptions,
+  type ConceptDriftResult,
   type ProcessTreeAlignmentOptions,
   type DecomposedAlignmentOptions,
   type PetriAntiAlignmentOptions,
@@ -63,6 +64,9 @@ import {
   petriAntiAlignmentQuery,
   petriMultiAlignmentQuery,
   processTreeReductionQuery,
+  conceptDriftQuery,
+  requestConceptDrift,
+  type ConceptDriftOptions,
   checkModel,
   decideModel,
   mineCsv,
@@ -116,6 +120,7 @@ export default function App() {
   const evaluationCache = useRef<Record<string, ModelEvaluation>>({});
   const petriAnalysisCache = useRef<Record<string, PetriAnalysisResult>>({});
   const emdCache = useRef<Record<string, import("./types").EmdResult>>({});
+  const conceptDriftCache = useRef<Record<string, ConceptDriftResult>>({});
   // Any result started under an older backend session may still resolve, but
   // must never repopulate caches cleared for the new session.
   const cacheGeneration = useRef(0);
@@ -199,6 +204,16 @@ export default function App() {
     if (generation === cacheGeneration.current) emdCache.current = { ...emdCache.current, [key]: result };
     return result;
   }, []);
+  const requestConceptDriftCached = useCallback(async (options: ConceptDriftOptions = {}): Promise<ConceptDriftResult> => {
+    const key = conceptDriftQuery(options);
+    const cached = conceptDriftCache.current[key];
+    if (cached) return cached;
+    const generation = cacheGeneration.current;
+    const result = await requestConceptDrift(options);
+    if (generation !== cacheGeneration.current) throw new Error("analysis changed while concept-drift request was pending");
+    conceptDriftCache.current = { ...conceptDriftCache.current, [key]: result };
+    return result;
+  }, []);
   const requestProcessTree = useCallback(async (options: ProcessTreeAlignmentOptions = {}) => {
     const key = processTreeAlignmentQuery(options);
     if (processTreeCache.current[key]) return processTreeCache.current[key];
@@ -266,6 +281,7 @@ export default function App() {
     evaluationCache.current = {};
     petriAnalysisCache.current = {};
     emdCache.current = {};
+    conceptDriftCache.current = {};
     setSelectedVariant(null);
     setThreshold(1);
     setError(null);
@@ -339,6 +355,7 @@ export default function App() {
         evaluationCache.current = {};
         petriAnalysisCache.current = {};
         emdCache.current = {};
+        conceptDriftCache.current = {};
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
@@ -474,6 +491,7 @@ export default function App() {
           setError(null);
           setSource(null);
           setFiltersActive(false);
+          conceptDriftCache.current = {};
         }}
       />
       {error && <div className="error-banner">{error}</div>}
@@ -579,6 +597,7 @@ export default function App() {
             onRequestEvaluation={requestEvaluation}
             onRequestPetriAnalysis={requestPetriAnalysis}
             onRequestEmd={requestEmd}
+            onRequestConceptDrift={requestConceptDriftCached}
           />
         </main>
       )}

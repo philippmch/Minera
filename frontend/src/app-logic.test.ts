@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, type FilterOptions } from "./api";
+import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -13,6 +13,9 @@ import {
 import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
+  it("serializes concept drift controls", () => {
+    expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true })).toBe("drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_window_size=2");
+  });
   it("serializes advanced options deterministically", () => {
     expect(decomposedAlignmentQuery({ max_states: 10, final_marking: [2, 1], initial_marking: [0], tau_model_cost: 1, sync_cost: 0 })).toBe("final_marking=2%2C1&initial_marking=0&max_states=10&sync_cost=0&tau_model_cost=1&variant=recompos_maximal");
     expect(new URLSearchParams(decomposedAlignmentQuery({ activity_log_costs: { "A,B\\C": 2 } })).get("activity_log_costs")).toBe("A\\,B\\\\C=2");
