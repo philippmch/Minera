@@ -39,6 +39,7 @@ add_library(minera_core
   src/decomposed_alignment.cpp
   src/dfg_variants.cpp
   src/directly_follows_graph.cpp
+  src/embeddings.cpp
   src/edit_distance_alignment.cpp
   src/evaluation.cpp
   src/event_ordering.cpp
@@ -174,6 +175,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_tests COMMAND minera_ocel_tests)
+
+  add_executable(minera_embeddings_tests
+    tests/test_embeddings.cpp
+  )
+  target_link_libraries(minera_embeddings_tests PRIVATE minera::core)
+  target_compile_features(minera_embeddings_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_embeddings_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_embeddings_tests COMMAND minera_embeddings_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp
