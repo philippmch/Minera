@@ -1,6 +1,7 @@
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "minera/ocel.hpp"
+#include "minera/ocel_csv.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
@@ -19,15 +21,14 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv [--csv] [--csv-objects OBJECTS.csv] [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
-    std::ifstream input(argv[1], std::ios::binary);
-    if (!input) throw std::runtime_error("cannot open input");
-    std::ostringstream text; text << input.rdbuf();
-    minera::Ocel log = minera::parse_ocel_json(text.str());
     std::string format = "classic", describe, features, discover, split, conformance,
-                        split_object_type, normative_path;
+                        split_object_type, normative_path, csv_objects_path,
+                        normative_csv_objects_path;
+    bool csv_input = false;
+    minera::Ocel log;
     bool ocpn_playout = false;
     bool oc_causal_net_playout = false;
     bool ocpn_unique_objects = false;
@@ -65,7 +66,14 @@ int main(int argc, char** argv) {
     };
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
-      if ((option == "--format" || option == "--features" ||
+      if (option == "--csv") {
+        csv_input = true;
+      } else if (option == "--csv-objects" && i + 1 < argc) {
+        csv_objects_path = argv[++i];
+        csv_input = true;
+      } else if (option == "--normative-csv-objects" && i + 1 < argc) {
+        normative_csv_objects_path = argv[++i];
+      } else if ((option == "--format" || option == "--features" ||
            option == "--discover" ||
            option == "--split") && i + 1 < argc) {
         auto& target = option == "--format" ? format
@@ -258,6 +266,40 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("--normative is required with --conformance");
     if (conformance.empty() && !normative_path.empty())
       throw std::invalid_argument("--normative requires --conformance");
+    const std::filesystem::path input_path(argv[1]);
+    const auto lower_extension = [](const std::filesystem::path& path) {
+      std::string extension = path.extension().string();
+      for (auto& ch : extension) {
+        if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+      }
+      return extension;
+    };
+    csv_input = csv_input || lower_extension(input_path) == ".csv";
+    if (!csv_input && !csv_objects_path.empty()) {
+      throw std::invalid_argument("--csv-objects requires a CSV input");
+    }
+    if (!normative_csv_objects_path.empty() && normative_path.empty()) {
+      throw std::invalid_argument(
+          "--normative-csv-objects requires --normative");
+    }
+    {
+      minera::OcelCsvImportOptions csv_options;
+      if (csv_input) {
+        if (!csv_objects_path.empty()) {
+          log = minera::import_ocel_csv(input_path,
+                                        std::filesystem::path(csv_objects_path),
+                                        csv_options);
+        } else {
+          log = minera::import_ocel_csv(input_path, csv_options);
+        }
+      } else {
+        std::ifstream input(input_path, std::ios::binary);
+        if (!input) throw std::runtime_error("cannot open input");
+        std::ostringstream text;
+        text << input.rdbuf();
+        log = minera::parse_ocel_json(text.str());
+      }
+    }
     if (!features.empty() &&
         (!discover.empty() || !split.empty() || !conformance.empty() ||
          ocpn_playout || oc_causal_net_playout))
@@ -318,11 +360,23 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (!conformance.empty()) {
-      std::ifstream normative_input(normative_path, std::ios::binary);
-      if (!normative_input) throw std::runtime_error("cannot open normative input");
-      std::ostringstream normative_text;
-      normative_text << normative_input.rdbuf();
-      const auto normative = minera::parse_ocel_json(normative_text.str());
+      const std::filesystem::path normative_file(normative_path);
+      minera::Ocel normative;
+      if (lower_extension(normative_file) == ".csv") {
+        if (!normative_csv_objects_path.empty()) {
+          normative = minera::import_ocel_csv(
+              normative_file,
+              std::filesystem::path(normative_csv_objects_path));
+        } else {
+          normative = minera::import_ocel_csv(normative_file);
+        }
+      } else {
+        std::ifstream normative_input(normative_file, std::ios::binary);
+        if (!normative_input) throw std::runtime_error("cannot open normative input");
+        std::ostringstream normative_text;
+        normative_text << normative_input.rdbuf();
+        normative = minera::parse_ocel_json(normative_text.str());
+      }
       if (conformance == "etot") {
         minera::EtotConformanceOptions options;
         options.alpha = alpha;
