@@ -192,10 +192,10 @@ describe("OCEL API", () => {
     expect(ocelSplitQuery({ variant: "ancestors_descendants", object_type: "order", max_objects: 2, max_degree_centrality: 0.5 }))
       .toBe("variant=ancestors_descendants&object_type=order&max_objects=2&max_degree_centrality=0.5");
     expect(ocelPlayoutQuery({
-      variant: "extensive", max_bindings_per_activity: 2, max_traces: 3,
+      model: "causal_net", variant: "extensive", max_bindings_per_activity: 2, max_traces: 3,
       max_states: 40, objects: { item: ["i,1"], order: ["o1", "o2"] },
       objects_unique_per_trace: true, ocpn_variant: "dfg", event_interval: 1.5,
-    })).toBe("variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg");
+    })).toBe("model=causal_net&variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg");
     expect(ocelFeaturesQuery({
       variant: "objects", max_features: 12,
       include_lifecycle_features: false,
@@ -235,6 +235,16 @@ describe("OCEL API", () => {
     await expect(requestOcelPlayout(new File(["{}"], "log.json"), {
       max_traces: 1,
     })).resolves.toMatchObject({ family: "OCEL_PLAYOUT", variant: "EXTENSIVE" });
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts the causal-net playout family", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({
+      family: "OC_CAUSAL_NET_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} },
+    }) })));
+    await expect(requestOcelPlayout(new File(["{}"], "log.json"), {
+      model: "causal_net", variant: "extensive",
+    })).resolves.toMatchObject({ family: "OC_CAUSAL_NET_PLAYOUT" });
     vi.unstubAllGlobals();
   });
 

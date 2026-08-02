@@ -728,11 +728,17 @@ export interface OcelSplitResult {
   logs: Array<Record<string, unknown>>;
 }
 export type OcelPlayoutVariant = "EXTENSIVE";
-export interface OcelPlayoutResult {
+export interface OcelPetriPlayoutResult {
   family: "OCEL_PLAYOUT";
   variant: OcelPlayoutVariant;
   log: Record<string, unknown>;
 }
+export interface OcelCausalNetPlayoutResult {
+  family: "OC_CAUSAL_NET_PLAYOUT";
+  variant: OcelPlayoutVariant;
+  log: Record<string, unknown>;
+}
+export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutResult;
 function isOcelRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -753,7 +759,8 @@ export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
   return value.logs.every((log) => isOcelRecord(log));
 }
 export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult {
-  if (!isOcelRecord(value) || value.family !== "OCEL_PLAYOUT" ||
+  if (!isOcelRecord(value) ||
+      (value.family !== "OCEL_PLAYOUT" && value.family !== "OC_CAUSAL_NET_PLAYOUT") ||
       value.variant !== "EXTENSIVE") return false;
   return isOcelRecord(value.log);
 }

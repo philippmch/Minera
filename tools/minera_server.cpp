@@ -60,6 +60,7 @@
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
+#include "minera/oc_causal_net.hpp"
 #include "minera/ocel.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
@@ -700,7 +701,7 @@ void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "max_bindings_per_activity", "max_traces", "max_states",
+        "model", "variant", "max_bindings_per_activity", "max_traces", "max_states",
         "objects", "objects_unique_per_trace", "start", "case_interval",
         "event_interval", "ocpn_variant", "double_arc_threshold",
         "noise_threshold"};
@@ -714,6 +715,11 @@ void handle_ocel_playout(const httplib::Request& request,
                              : std::string("extensive");
     if (variant != "extensive" && variant != "EXTENSIVE")
       throw std::invalid_argument("variant expects extensive");
+    const auto model = request.has_param("model")
+                           ? request.get_param_value("model")
+                           : std::string("ocpn");
+    if (model != "ocpn" && model != "causal_net")
+      throw std::invalid_argument("model expects ocpn or causal_net");
 
     minera::OcpnPlayoutOptions options;
     options.max_bindings_per_activity = ocel_query_size(
@@ -758,11 +764,19 @@ void handle_ocel_playout(const httplib::Request& request,
         request, "double_arc_threshold", discovery.double_arc_threshold);
     discovery.noise_threshold =
         ocel_query_number(request, "noise_threshold", discovery.noise_threshold);
-    const auto graph = minera::discover_ocpn(
-        minera::parse_ocel_json(body), discovery);
-    response.set_content(minera::serialize_ocpn_playout_json(
-                             minera::ocpn_extensive_playout(graph, options)),
-                         "application/json");
+    const auto log = minera::parse_ocel_json(body);
+    if (model == "causal_net") {
+      const auto causal = minera::discover_oc_causal_net(log, discovery);
+      response.set_content(minera::serialize_oc_causal_net_playout_json(
+                               minera::oc_causal_net_extensive_playout(causal,
+                                                                       options)),
+                           "application/json");
+    } else {
+      const auto graph = minera::discover_ocpn(log, discovery);
+      response.set_content(minera::serialize_ocpn_playout_json(
+                               minera::ocpn_extensive_playout(graph, options)),
+                           "application/json");
+    }
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
