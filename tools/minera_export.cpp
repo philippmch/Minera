@@ -40,6 +40,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/network_analysis.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/local_diagnostics.hpp"
 #include "minera/role_discovery.hpp"
@@ -364,6 +365,8 @@ int usage(const char* program) {
                "  --sna-metric-normalization <bool> Normalize edge weights\n"
                "  --sna-max-resources <n> Resource safety bound\n"
                "  --sna-max-edges <n>    Edge safety bound\n"
+               "  --network-analysis     Emit organizational network analysis JSON\n"
+               "  --network-analysis-* <v> Network selectors, performance, hours, and bounds\n"
                "  --roles                Emit deterministic role discovery JSON\n"
                "  --roles-threshold <f>  Merge threshold in [0,1]\n"
                "  --roles-max-resources <n> Resource safety bound\n"
@@ -921,6 +924,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> genetic_fields;
   bool organizational_sna_requested = false;
   std::map<std::string, std::string> organizational_sna_fields;
+  bool network_analysis_requested = false;
+  std::map<std::string, std::string> network_analysis_fields;
   bool roles_requested = false;
   std::map<std::string, std::string> roles_fields;
   bool resource_profiles_requested = false;
@@ -1050,6 +1055,22 @@ int main(int argc, char** argv) {
     if (arg == "--organizational-sna" || arg == "--sna") {
       organizational_sna_requested = true;
       continue;
+    }
+    if (arg == "--network-analysis") { network_analysis_requested = true; continue; }
+    if (arg.rfind("--network-analysis-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
+          "network_analysis_source_node_attribute", "network_analysis_target_node_attribute",
+          "network_analysis_edge_attribute", "network_analysis_edge_reference",
+          "network_analysis_out_relation_attribute", "network_analysis_in_relation_attribute",
+          "network_analysis_include_performance", "network_analysis_business_hours",
+          "network_analysis_business_hour_slots", "network_analysis_max_rows",
+          "network_analysis_max_values"};
+      if (!names.contains(key)) return usage(argv[0]);
+      network_analysis_fields.insert_or_assign(std::move(key), value);
+      network_analysis_requested = true; continue;
     }
     if (arg == "--roles") { roles_requested = true; continue; }
     if (arg == "--resource-profiles") { resource_profiles_requested = true; continue; }
@@ -2685,6 +2706,15 @@ int main(int argc, char** argv) {
         if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; }
         file << body << '\n';
       }
+      return 0;
+    }
+    if (network_analysis_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = network_analysis_fields.find(std::string(name)); return it == network_analysis_fields.end() ? std::string{} : it->second; };
+      const auto present = [&](std::string_view name) { return network_analysis_fields.contains(std::string(name)); };
+      const auto params = minera::parse_network_analysis_params(lookup, present);
+      const auto body = minera::network_analysis_json(minera::discover_network_analysis(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;
     }
     if (roles_requested) {

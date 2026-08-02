@@ -46,6 +46,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/network_analysis.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/local_diagnostics.hpp"
@@ -208,6 +209,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(
     const FieldLookup& field);
 [[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(
+    const FieldLookup& field);
+[[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -70,6 +70,18 @@ describe("organizational SNA API", () => {
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "bad" }), { status: 200 })));
     await expect(requestOrganizationalSna()).rejects.toThrow(/invalid organizational SNA/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("network analysis API", () => {
+  it("serializes selectors and bounded options", () => {
+    expect(networkAnalysisQuery({ network_analysis_edge_reference: "_in", network_analysis_include_performance: true, network_analysis_max_rows: 3 }))
+      .toBe("network_analysis_edge_reference=_in&network_analysis_include_performance=true&network_analysis_max_rows=3");
+  });
+  it("rejects malformed responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "NETWORK_ANALYSIS", edges: [] }), { status: 200 })));
+    await expect(requestNetworkAnalysis()).rejects.toThrow(/invalid network analysis/);
     vi.unstubAllGlobals();
   });
 });

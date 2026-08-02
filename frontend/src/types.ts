@@ -194,6 +194,26 @@ export interface OrganizationalSnaOptions {
   sna_variant?: OrganizationalSnaVariant; sna_beta?: number; sna_n?: number;
   sna_metric_normalization?: boolean; sna_max_resources?: number; sna_max_edges?: number;
 }
+
+export interface NetworkAnalysisEdge { source: string; target: string; activity: string; count: number; performance: number[]; }
+export interface NetworkAnalysisDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; link_count: number; row_count: number; performance_value_count: number; message: string; }
+export interface NetworkAnalysisResult { family: "NETWORK_ANALYSIS"; edges: NetworkAnalysisEdge[]; diagnostics: NetworkAnalysisDiagnostics; }
+export interface NetworkAnalysisOptions {
+  network_analysis_sorting_attribute?: string; network_analysis_timestamp_attribute?: string;
+  network_analysis_source_node_attribute?: string; network_analysis_target_node_attribute?: string;
+  network_analysis_edge_attribute?: string; network_analysis_edge_reference?: "_out" | "_in";
+  network_analysis_out_relation_attribute?: string; network_analysis_in_relation_attribute?: string;
+  network_analysis_include_performance?: boolean; network_analysis_business_hours?: boolean;
+  network_analysis_business_hour_slots?: string; network_analysis_max_rows?: number; network_analysis_max_values?: number;
+}
+export function isNetworkAnalysisResult(value: unknown): value is NetworkAnalysisResult {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<NetworkAnalysisResult>;
+  if (v.family !== "NETWORK_ANALYSIS" || !Array.isArray(v.edges) || !v.diagnostics) return false;
+  if (!v.edges.every((e) => !!e && typeof e.source === "string" && typeof e.target === "string" && typeof e.activity === "string" && Number.isInteger(e.count) && e.count >= 0 && Array.isArray(e.performance) && e.performance.every((x) => typeof x === "number" && Number.isFinite(x)))) return false;
+  const d = v.diagnostics as Partial<NetworkAnalysisDiagnostics>;
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && typeof d.message === "string";
+}
 export function isOrganizationalSnaResult(value: unknown): value is OrganizationalSnaResult {
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<OrganizationalSnaResult>;

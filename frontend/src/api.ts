@@ -48,6 +48,9 @@ import {
   isTraceVariantQueryResult,
   isPripelResult,
   isOrganizationalSnaResult,
+  type NetworkAnalysisOptions,
+  type NetworkAnalysisResult,
+  isNetworkAnalysisResult,
   type RoleDiscoveryOptions,
   type RoleDiscoveryResult,
   isRoleDiscoveryResult,
@@ -1175,6 +1178,31 @@ export function requestOrganizationalSna(options: OrganizationalSnaOptions = {})
 }
 export const requestSna = requestOrganizationalSna;
 export const discoverOrganizationalSna = requestOrganizationalSna;
+export function networkAnalysisQuery(options: NetworkAnalysisOptions = {}): string {
+  const query = new URLSearchParams();
+  const entries: Array<[string, unknown]> = [
+    ["network_analysis_sorting_attribute", options.network_analysis_sorting_attribute],
+    ["network_analysis_timestamp_attribute", options.network_analysis_timestamp_attribute],
+    ["network_analysis_source_node_attribute", options.network_analysis_source_node_attribute],
+    ["network_analysis_target_node_attribute", options.network_analysis_target_node_attribute],
+    ["network_analysis_edge_attribute", options.network_analysis_edge_attribute],
+    ["network_analysis_edge_reference", options.network_analysis_edge_reference],
+    ["network_analysis_out_relation_attribute", options.network_analysis_out_relation_attribute],
+    ["network_analysis_in_relation_attribute", options.network_analysis_in_relation_attribute],
+    ["network_analysis_include_performance", options.network_analysis_include_performance],
+    ["network_analysis_business_hours", options.network_analysis_business_hours],
+    ["network_analysis_business_hour_slots", options.network_analysis_business_hour_slots],
+    ["network_analysis_max_rows", options.network_analysis_max_rows],
+    ["network_analysis_max_values", options.network_analysis_max_values],
+  ];
+  for (const [key, value] of entries) if (value !== undefined) query.set(key, String(value));
+  return query.toString();
+}
+export function requestNetworkAnalysis(options: NetworkAnalysisOptions = {}): Promise<NetworkAnalysisResult> {
+  const query = networkAnalysisQuery(options);
+  return postChecked(`/api/network-analysis${query ? `?${query}` : ""}`, isNetworkAnalysisResult, "network analysis");
+}
+export const discoverNetworkAnalysis = requestNetworkAnalysis;
 export function roleDiscoveryQuery(options: RoleDiscoveryOptions = {}): string {
   const query = new URLSearchParams();
   if (options.roles_threshold !== undefined) query.set("roles_threshold", String(options.roles_threshold));
