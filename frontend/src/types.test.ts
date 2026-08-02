@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, type MineraExport } from "./types";
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
@@ -127,6 +127,17 @@ describe("isLogToFeaturesResult", () => {
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["wip"], trace_rows: [[1]] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["arrivals"], temporal_rows: [{ timestamp: 1, values: [2] }] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: [], event_rows: [[[{ value: 1 }]]] })).toBe(false);
+  });
+});
+
+describe("embedding result guards", () => {
+  it("accepts fixed-length vectors and similarity rows", () => {
+    expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0, 1] }] })).toBe(true);
+    expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", top_k: 1, items: [{ id: "0", score: 0.5 }] })).toBe(true);
+  });
+  it("rejects ragged vectors and non-finite scores", () => {
+    expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0] }] })).toBe(false);
+    expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", top_k: 1, items: [{ id: "0", score: Number.NaN }] })).toBe(false);
   });
 });
 

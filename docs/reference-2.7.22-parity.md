@@ -78,7 +78,7 @@ are reconciled.
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN and causal-net extensive playout projections are now available through native, CLI, multipart local-server, and frontend adapters; richer marker-binding semantics and interval-tree diagnostics remain |
-| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic OCEL text/tuple descriptions, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; embeddings and broader OCEL feature parameters remain |
+| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, deterministic OCEL text/tuple descriptions, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
@@ -152,6 +152,15 @@ indicators, lifecycle length/duration/endpoints, activity/path counts, custom
 attributes, work-in-progress, and interaction degree. Strict feature-count and
 relation-id validation is shared by `minera_ocel --features`, multipart local
 `POST /api/ocel/features`, and the typed frontend query/response adapter.
+
+Embedding evidence: `to_embeddings` exposes both case-level and event-level
+variants through a deterministic bounded token-hash encoder. The native API
+returns fixed-length normalized vectors and deterministic cosine top-k matches;
+`minera_export --embeddings`, cached-session `POST /api/embeddings`, and the
+typed frontend request/response guards share the same JSON contract. Event
+filtering can retain only selected events or complete cases. Model-backed
+embedding loading remains outside the native core; the encoder label and
+vector dimension are explicit request settings.
 
 Timestamp-interleavings evidence: the native discovery joins related left/right
 event logs through `CaseRelation` rows, adds deterministic extreme trace

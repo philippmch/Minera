@@ -504,6 +504,16 @@ int usage(const char* program) {
                "  --features-activity-key <name> Activity attribute\n"
                "  --features-timestamp-key <name> Timestamp attribute\n"
                "  --features-window-seconds <f> Temporal bucket width\n"
+               "  --embeddings              Emit case/event embeddings JSON\n"
+               "  --embedding-variant <id>  cases (default) or events\n"
+               "  --embedding-model <name>  Deterministic encoder label\n"
+               "  --embedding-attribute-key <name> Text attribute\n"
+               "  --embedding-event-id-key <name> Optional event id attribute\n"
+               "  --embedding-dimensions <n> Vector dimension\n"
+               "  --embedding-max-items <n> Safety bound\n"
+               "  --embedding-target <text> Emit cosine top-k matches\n"
+               "  --embedding-top-k <n>    Match count (zero means all)\n"
+               "  --embedding-keep-cases   Keep complete cases for event matches\n"
                "  --label-splitting         Emit contextual label-splitting JSON\n"
                "  --label-splitting-variant <id> contextual\n"
                "  --label-splitting-activity-key <name> Source activity attribute\n"
@@ -943,6 +953,11 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
   std::map<std::string, std::string> features_fields;
+  bool embeddings_requested = false;
+  std::map<std::string, std::string> embedding_fields;
+  bool embedding_target_requested = false;
+  std::string embedding_target;
+  std::size_t embedding_top_k = 0;
   bool label_splitting_requested = false;
   std::map<std::string, std::string> label_splitting_fields;
   bool trie_requested = false;
@@ -1260,6 +1275,49 @@ int main(int argc, char** argv) {
       if (!feature_option_names.contains(key)) return usage(argv[0]);
       features_fields.insert_or_assign(std::move(key), value);
       features_requested = true;
+      continue;
+    }
+    if (arg == "--embeddings" || arg == "--to-embeddings") {
+      embeddings_requested = true;
+      continue;
+    }
+    if (arg == "--embedding-target") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      embedding_target = value;
+      embedding_target_requested = true;
+      embeddings_requested = true;
+      continue;
+    }
+    if (arg == "--embedding-top-k") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        embedding_top_k = parse_nonnegative_size(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      embeddings_requested = true;
+      continue;
+    }
+    if (arg == "--embedding-keep-cases") {
+      embedding_fields.insert_or_assign("embedding_keep_cases", "true");
+      embeddings_requested = true;
+      continue;
+    }
+    if (arg.rfind("--embedding-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "embedding_variant", "embedding_model", "embedding_attribute_key",
+          "embedding_event_id_key", "embedding_dimensions",
+          "embedding_max_items", "embedding_keep_cases"};
+      if (!names.contains(key)) return usage(argv[0]);
+      embedding_fields.insert_or_assign(std::move(key), value);
+      embeddings_requested = true;
       continue;
     }
     if (arg == "--label-splitting") { label_splitting_requested = true; continue; }
@@ -3069,6 +3127,29 @@ int main(int argc, char** argv) {
       };
       const auto params = minera::parse_log_to_features_params(lookup, present);
       std::cout << minera::log_to_features_json(minera::log_to_features(log, params)) << '\n';
+      return 0;
+    }
+    if (embeddings_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = embedding_fields.find(std::string(name));
+        return it == embedding_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return embedding_fields.contains(std::string(name));
+      };
+      const auto options = minera::parse_embedding_params(lookup, present);
+      const auto result = minera::to_embeddings(log, options);
+      if (embedding_target_requested) {
+        if (embedding_target.empty())
+          throw std::invalid_argument("--embedding-target expects non-empty text");
+        const auto matches = minera::embedding_similarity(
+            embedding_target, result, options, embedding_top_k);
+        std::cout << minera::serialize_embedding_similarity_json(
+            embedding_target, result, matches, embedding_top_k)
+                  << '\n';
+      } else {
+        std::cout << minera::serialize_embeddings_json(result) << '\n';
+      }
       return 0;
     }
     if (label_splitting_requested) {

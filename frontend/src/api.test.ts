@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult } from "./api";
 
 describe("Monte Carlo API", () => {
   it("serializes bounded virtual-time controls", () => {
@@ -44,6 +44,22 @@ describe("log-to-features API", () => {
   it("rejects malformed backend payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: [], trace_rows: [["bad"]] }) })));
     await expect(requestLogToFeatures()).rejects.toThrow(/invalid feature extraction/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("embedding API", () => {
+  it("serializes deterministic embedding settings", () => {
+    expect(embeddingsQuery({
+      embedding_variant: "events_transformers", embedding_dimensions: 32,
+      embedding_target: "Approve Ship", embedding_top_k: 2,
+      embedding_keep_cases: true,
+    })).toBe("embedding_dimensions=32&embedding_keep_cases=true&embedding_target=Approve+Ship&embedding_top_k=2&embedding_variant=events_transformers");
+  });
+
+  it("rejects malformed embedding responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "TO_EMBEDDINGS", variant: "cases_transformers", dimensions: 2, items: [{ id: "c", embedding: [1] }] }) })));
+    await expect(requestEmbeddings()).rejects.toThrow(/invalid embedding result/);
     vi.unstubAllGlobals();
   });
 });

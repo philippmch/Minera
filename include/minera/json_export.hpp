@@ -43,6 +43,7 @@
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/embeddings.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/genetic_miner.hpp"
@@ -253,6 +254,11 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string concept_drift_json(const ConceptDriftResult& result);
 [[nodiscard]] std::string log_to_target_json(const LogToTargetResult& result);
 [[nodiscard]] std::string log_to_features_json(const LogToFeaturesResult& result);
+[[nodiscard]] std::string serialize_embeddings_json(
+    const EmbeddingResult& result);
+[[nodiscard]] std::string serialize_embedding_similarity_json(
+    std::string_view target_text, const EmbeddingResult& result,
+    const std::vector<EmbeddingSimilarity>& matches, std::size_t top_k);
 [[nodiscard]] std::string label_splitting_json(const LabelSplittingResult& result);
 [[nodiscard]] std::string trie_json(const TrieModel& result);
 [[nodiscard]] std::string interval_tree_json(
