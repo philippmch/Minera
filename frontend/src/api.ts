@@ -51,6 +51,9 @@ import {
   type RoleDiscoveryOptions,
   type RoleDiscoveryResult,
   isRoleDiscoveryResult,
+  type ResourceProfilesOptions,
+  type ResourceProfilesResult,
+  isResourceProfilesResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1181,6 +1184,15 @@ export function requestRoleDiscovery(options: RoleDiscoveryOptions = {}): Promis
   return postChecked(`/api/roles${query ? `?${query}` : ""}`, isRoleDiscoveryResult, "role discovery");
 }
 export const discoverRoles = requestRoleDiscovery;
+export function resourceProfilesQuery(options: ResourceProfilesOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [k,v] of Object.entries(options)) if (v !== undefined) query.set(k, String(v));
+  return query.toString();
+}
+export function requestResourceProfiles(options: ResourceProfilesOptions = {}): Promise<ResourceProfilesResult> {
+  const query = resourceProfilesQuery(options);
+  return postChecked(`/api/resource-profiles${query ? `?${query}` : ""}`, isResourceProfilesResult, "resource profiles");
+}
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();

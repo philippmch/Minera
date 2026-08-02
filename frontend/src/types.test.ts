@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -41,6 +41,13 @@ describe("isRoleDiscoveryResult", () => {
     const value = { family: "ROLE_DISCOVERY", roles: [{ activities: ["A"], resources: [{ name: "r", count: 2 }] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 1, activity_count: 1, resource_count: 1, role_count: 1, message: "ok" } };
     expect(isRoleDiscoveryResult(value)).toBe(true);
     expect(isRoleDiscoveryResult({ ...value, roles: [{ ...value.roles[0], resources: [{ name: "r", count: 0 }] }] })).toBe(false);
+  });
+});
+
+describe("isResourceProfilesResult", () => {
+  it("rejects unknown metric names", () => {
+    const value = { family: "RESOURCE_PROFILES", metric: "not-a-metric", rows: [], diagnostics: { computed: true, output_truncated: false, trace_count: 0, event_count: 0, resource_count: 0, message: "ok" } };
+    expect(isResourceProfilesResult(value)).toBe(false);
   });
 });
 

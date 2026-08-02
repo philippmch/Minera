@@ -2344,4 +2344,28 @@ RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field,
   return options;
 }
 
+ResourceProfilesOptions parse_resource_profiles_params(const FieldLookup& field) {
+  return parse_resource_profiles_params(field, {});
+}
+
+ResourceProfilesOptions parse_resource_profiles_params(const FieldLookup& field,
+                                                       const FieldPresence& present) {
+  ResourceProfilesOptions options;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("resource_profiles_metric")) options.metric = resource_profile_metric_from_string(require("resource_profiles_metric"));
+  if (supplied("resource_profiles_t1")) options.t1 = require("resource_profiles_t1");
+  if (supplied("resource_profiles_t2")) options.t2 = require("resource_profiles_t2");
+  if (supplied("resource_profiles_resource")) options.resource = require("resource_profiles_resource");
+  if (supplied("resource_profiles_activity")) options.activity = require("resource_profiles_activity");
+  if (supplied("resource_profiles_resource2")) options.resource2 = require("resource_profiles_resource2");
+  if (supplied("resource_profiles_max_resources")) options.max_resources = parse_positive_size(require("resource_profiles_max_resources"), "resource_profiles_max_resources");
+  if (supplied("resource_profiles_max_rows")) options.max_rows = parse_positive_size(require("resource_profiles_max_rows"), "resource_profiles_max_rows");
+  if (options.metric == ResourceProfileMetric::kAverageWorkload && options.t2.empty()) throw std::invalid_argument("resource_profiles_t2: required for average_workload");
+  if (options.metric == ResourceProfileMetric::kMultitasking && (options.t1.empty() || options.t2.empty())) throw std::invalid_argument("resource_profiles_t1/t2: required for multitasking");
+  if (options.metric == ResourceProfileMetric::kInteractionTwoResources && (options.resource.empty() || options.resource2.empty())) throw std::invalid_argument("resource_profiles_resource/resource2: required for interaction_two_resources");
+  if ((options.metric == ResourceProfileMetric::kActivityFrequency || options.metric == ResourceProfileMetric::kAverageDurationActivity) && options.activity.empty()) throw std::invalid_argument("resource_profiles_activity: required for selected metric");
+  return options;
+}
+
 }  // namespace minera

@@ -90,6 +90,18 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.batch_options.min_batch_size == 2);
 }
 
+void resource_profiles_params_contract() {
+  const auto p = minera::parse_resource_profiles_params(fields({
+      {"resource_profiles_metric", "social_position"},
+      {"resource_profiles_t1", "2024-01-01"},
+      {"resource_profiles_t2", "2024-01-02"},
+      {"resource_profiles_resource", "alice"},
+      {"resource_profiles_max_rows", "12"}}));
+  assert(p.metric == minera::ResourceProfileMetric::kSocialPosition && p.resource == "alice" && p.max_rows == 12);
+  try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "bogus"}})); assert(false); } catch (const std::invalid_argument&) {}
+  try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "interaction_two_resources"}, {"resource_profiles_resource", "a"}})); assert(false); } catch (const std::invalid_argument&) {}
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -1750,5 +1762,6 @@ int main() {
   role_discovery_params_contract();
   trace_variant_query_params_contract();
   pripel_params_contract();
+  resource_profiles_params_contract();
   return 0;
 }
