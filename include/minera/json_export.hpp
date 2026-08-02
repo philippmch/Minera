@@ -45,6 +45,7 @@
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 
@@ -256,6 +257,9 @@ void write_analysis_json(std::ostream& out,
 
 // Standalone deterministic JSON for the classic bounded ILP miner.
 [[nodiscard]] std::string ilp_miner_json(const ILPMinerResult& result);
+
+// Standalone deterministic JSON for the bounded classic genetic miner.
+[[nodiscard]] std::string genetic_miner_json(const GeneticMinerResult& result);
 
 // Standalone deterministic JSON for trace-variant query anonymization.
 [[nodiscard]] std::string trace_variant_query_json(

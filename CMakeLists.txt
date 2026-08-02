@@ -42,6 +42,7 @@ add_library(minera_core
   src/event_ordering.cpp
   src/eventually_follows.cpp
   src/footprints.cpp
+  src/genetic_miner.cpp
   src/footprints_models.cpp
   src/heuristic_miner.cpp
   src/inductive_miner.cpp
@@ -167,6 +168,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_pripel_tests PRIVATE cxx_std_20)
   target_compile_options(minera_pripel_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_pripel_tests COMMAND minera_pripel_tests)
+
+  add_executable(minera_genetic_miner_tests
+    tests/test_genetic_miner.cpp
+  )
+  target_link_libraries(minera_genetic_miner_tests PRIVATE minera::core)
+  target_compile_features(minera_genetic_miner_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_genetic_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_genetic_miner_tests COMMAND minera_genetic_miner_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

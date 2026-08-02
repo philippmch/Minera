@@ -36,6 +36,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
@@ -341,6 +342,17 @@ int usage(const char* program) {
                "  --ilp-activity-key <name> Event attribute used as activity\n"
                "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
                "  --ilp-max-nodes <n>       Positive ILP search bound\n"
+               "  --genetic-mine            Emit standalone classic genetic JSON\n"
+               "  --genetic-activity-key <name> Event attribute used as activity\n"
+               "  --genetic-seed <n>        Deterministic search seed\n"
+               "  --genetic-population-size <n> Population bound (>=2)\n"
+               "  --genetic-generations <n> Generation bound\n"
+               "  --genetic-elitism-rate <f> Elitism rate in [0,1]\n"
+               "  --genetic-crossover-rate <f> Crossover rate in [0,1]\n"
+               "  --genetic-mutation-rate <f> Mutation rate in [0,1]\n"
+               "  --genetic-elitism-min-sample <n> Tournament sample\n"
+               "  --genetic-max-activities <n> Activity safety bound\n"
+               "  --genetic-max-states <n> Candidate safety bound\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -886,6 +898,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> random_tree_fields;
   bool ilp_mine_requested = false;
   std::map<std::string, std::string> ilp_fields;
+  bool genetic_mine_requested = false;
+  std::map<std::string, std::string> genetic_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -984,6 +998,26 @@ int main(int argc, char** argv) {
       if (!ilp_option_names.contains(key)) return usage(argv[0]);
       ilp_fields.insert_or_assign(std::move(key), value);
       ilp_mine_requested = true;
+      continue;
+    }
+    if (arg == "--genetic-mine") {
+      genetic_mine_requested = true;
+      continue;
+    }
+    if (arg.rfind("--genetic-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> genetic_option_names = {
+          "genetic_activity_key", "genetic_seed", "genetic_population_size",
+          "genetic_generations", "genetic_elitism_rate",
+          "genetic_crossover_rate", "genetic_mutation_rate",
+          "genetic_elitism_min_sample", "genetic_max_activities",
+          "genetic_max_states"};
+      if (!genetic_option_names.contains(key)) return usage(argv[0]);
+      genetic_fields.insert_or_assign(std::move(key), value);
+      genetic_mine_requested = true;
       continue;
     }
     if (arg == "--trace-variant-query") {
@@ -2531,6 +2565,29 @@ int main(int argc, char** argv) {
       };
       const auto options = minera::parse_ilp_miner_params(lookup, present);
       const auto body = minera::ilp_miner_json(minera::mine_ilp(log, options));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (genetic_mine_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = genetic_fields.find(std::string(name));
+        return it == genetic_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return genetic_fields.contains(std::string(name));
+      };
+      const auto options = minera::parse_genetic_miner_params(lookup, present);
+      const auto body = minera::genetic_miner_json(
+          minera::mine_genetic(log, options));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

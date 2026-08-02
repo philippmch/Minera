@@ -16,6 +16,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
@@ -4914,6 +4915,24 @@ void ilp_json_is_standalone_and_deterministic() {
   assert(first.find("\"diagnostics\":") != std::string::npos);
 }
 
+void genetic_json_is_standalone_and_deterministic() {
+  std::istringstream input("case_id,activity\nc1,A\nc1,B\nc2,A\nc2,B\n");
+  const auto log = minera::import_csv_event_log(input);
+  minera::GeneticMinerOptions options;
+  options.seed = 11;
+  options.population_size = 6;
+  options.generations = 2;
+  options.max_states = 32;
+  const auto result = minera::mine_genetic(log, options);
+  const auto first = minera::genetic_miner_json(result);
+  const auto second = minera::genetic_miner_json(result);
+  assert(first == second);
+  assert(first.find("\"family\":\"GENETIC\"") != std::string::npos);
+  assert(first.find("\"net\":") != std::string::npos);
+  assert(first.find("\"markings\":") != std::string::npos);
+  assert(first.find("\"best_fitness\":") != std::string::npos);
+}
+
 void trace_variant_query_json_is_standalone_and_deterministic() {
   minera::EventLog log;
   log.traces.push_back({"c1", {{"c1", "A", "", "", 0, {}, ""},
@@ -5113,5 +5132,6 @@ int main() {
   json_export_carries_dfg_variants_contract();
   json_export_carries_correlation_mining_contract();
   json_export_carries_evaluation_contract();
+  genetic_json_is_standalone_and_deterministic();
   return 0;
 }

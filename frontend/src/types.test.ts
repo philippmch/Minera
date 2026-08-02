@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isTraceVariantQueryResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -9,6 +9,20 @@ describe("isILPMinerResult", () => {
     expect(isILPMinerResult({ ...valid, net: { ...valid.net, source: 2 } })).toBe(false);
     expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: "A", inputs: [2], outputs: [1] }] } })).toBe(false);
     expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: "missing", inputs: [0], outputs: [1] }] } })).toBe(false);
+  });
+});
+
+describe("isGeneticMinerResult", () => {
+  const valid = {
+    family: "GENETIC",
+    net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: 0, inputs: [0], outputs: [1] }] },
+    markings: { initial: [1, 0], final: [0, 1] },
+    diagnostics: { computed: true, exhausted: false, generations_completed: 2, candidates_evaluated: 8, population_size: 4, activity_count: 1, best_fitness: 1, seed: 7, message: "done" },
+  };
+  it("accepts the standalone contract", () => expect(isGeneticMinerResult(valid)).toBe(true));
+  it("rejects invalid activity and marking references", () => {
+    expect(isGeneticMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: 2, inputs: [0], outputs: [1] }] } })).toBe(false);
+    expect(isGeneticMinerResult({ ...valid, markings: { initial: [1], final: [0, 1] } })).toBe(false);
   });
 });
 
