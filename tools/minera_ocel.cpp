@@ -12,6 +12,7 @@
 
 #include "minera/ocel.hpp"
 #include "minera/ocel_csv.hpp"
+#include "minera/ocel_xml.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
@@ -21,13 +22,13 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv [--csv] [--csv-objects OBJECTS.csv] [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
                         split_object_type, normative_path, csv_objects_path,
                         normative_csv_objects_path;
-    bool csv_input = false;
+    bool csv_input = false, xml_input = false;
     minera::Ocel log;
     bool ocpn_playout = false;
     bool oc_causal_net_playout = false;
@@ -68,6 +69,8 @@ int main(int argc, char** argv) {
       const std::string option = argv[i];
       if (option == "--csv") {
         csv_input = true;
+      } else if (option == "--xml") {
+        xml_input = true;
       } else if (option == "--csv-objects" && i + 1 < argc) {
         csv_objects_path = argv[++i];
         csv_input = true;
@@ -219,8 +222,10 @@ int main(int argc, char** argv) {
         include_description_timestamps = false;
       } else throw std::invalid_argument("unknown option: " + option);
     }
-    if (format != "classic" && format != "standard") {
-      throw std::invalid_argument("format must be classic or standard");
+    if (format != "classic" && format != "standard" && format != "xml" &&
+        format != "xml_standard") {
+      throw std::invalid_argument(
+          "format must be classic, standard, xml, or xml_standard");
     }
     if (!describe.empty() && describe != "text" && describe != "tuples") {
       throw std::invalid_argument("describe must be text or tuples");
@@ -274,13 +279,23 @@ int main(int argc, char** argv) {
       }
       return extension;
     };
-    csv_input = csv_input || lower_extension(input_path) == ".csv";
+    const auto input_extension = lower_extension(input_path);
+    csv_input = csv_input || input_extension == ".csv";
+    xml_input = xml_input || input_extension == ".xml" || input_extension == ".xmlocel";
+    if (csv_input && xml_input) {
+      throw std::invalid_argument("CSV and XML input modes are mutually exclusive");
+    }
     if (!csv_input && !csv_objects_path.empty()) {
       throw std::invalid_argument("--csv-objects requires a CSV input");
     }
     if (!normative_csv_objects_path.empty() && normative_path.empty()) {
       throw std::invalid_argument(
           "--normative-csv-objects requires --normative");
+    }
+    if (!normative_csv_objects_path.empty() &&
+        lower_extension(std::filesystem::path(normative_path)) != ".csv") {
+      throw std::invalid_argument(
+          "--normative-csv-objects requires a CSV normative log");
     }
     {
       minera::OcelCsvImportOptions csv_options;
@@ -292,6 +307,8 @@ int main(int argc, char** argv) {
         } else {
           log = minera::import_ocel_csv(input_path, csv_options);
         }
+      } else if (xml_input) {
+        log = minera::import_ocel_xml(input_path);
       } else {
         std::ifstream input(input_path, std::ios::binary);
         if (!input) throw std::runtime_error("cannot open input");
@@ -362,7 +379,8 @@ int main(int argc, char** argv) {
     if (!conformance.empty()) {
       const std::filesystem::path normative_file(normative_path);
       minera::Ocel normative;
-      if (lower_extension(normative_file) == ".csv") {
+      const auto normative_extension = lower_extension(normative_file);
+      if (normative_extension == ".csv") {
         if (!normative_csv_objects_path.empty()) {
           normative = minera::import_ocel_csv(
               normative_file,
@@ -370,6 +388,8 @@ int main(int argc, char** argv) {
         } else {
           normative = minera::import_ocel_csv(normative_file);
         }
+      } else if (normative_extension == ".xml" || normative_extension == ".xmlocel") {
+        normative = minera::import_ocel_xml(normative_file);
       } else {
         std::ifstream normative_input(normative_file, std::ios::binary);
         if (!normative_input) throw std::runtime_error("cannot open normative input");
@@ -442,8 +462,16 @@ int main(int argc, char** argv) {
                 << '\n';
       return 0;
     }
-    const auto selected = format == "standard" ? minera::OcelJsonFormat::kStandard : minera::OcelJsonFormat::kClassic;
-    std::cout << minera::serialize_ocel_json(log, selected) << '\n';
+    if (format == "xml" || format == "xml_standard") {
+      minera::OcelXmlExportOptions options;
+      options.format = format == "xml_standard"
+                           ? minera::OcelXmlFormat::kStandard
+                           : minera::OcelXmlFormat::kClassic;
+      std::cout << minera::serialize_ocel_xml(log, options);
+    } else {
+      const auto selected = format == "standard" ? minera::OcelJsonFormat::kStandard : minera::OcelJsonFormat::kClassic;
+      std::cout << minera::serialize_ocel_json(log, selected) << '\n';
+    }
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "minera_ocel: " << error.what() << '\n';

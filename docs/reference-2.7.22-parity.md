@@ -153,6 +153,14 @@ attributes, work-in-progress, and interaction degree. Strict feature-count and
 relation-id validation is shared by `minera_ocel --features`, multipart local
 `POST /api/ocel/features`, and the typed frontend query/response adapter.
 
+OCEL interchange evidence: the native core now parses and writes deterministic
+extended-table CSV (with an optional object table) and bounded classic/standard
+XML. CSV import validates headers, object-list cells, timestamps, ids, and
+cross-type references; XML import/export preserves scalar attributes,
+qualifiers, object-to-object links, object changes, globals, and deterministic
+ordering where the selected format carries them. `minera_ocel` detects `.csv`
+and `.xml`/`.xmlocel` inputs and can emit classic or standard XML.
+
 Embedding evidence: `to_embeddings` exposes both case-level and event-level
 variants through a deterministic bounded token-hash encoder. The native API
 returns fixed-length normalized vectors and deterministic cosine top-k matches;
@@ -203,7 +211,7 @@ this traditional-log vertical.
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN; no DFG format |
-| Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON plus deterministic extended-table CSV (with an optional object table) round-trip through the native core/CLI; XML, SQLite, and the remaining schema-specific adapters remain |
+| Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters; LTL/segments/DFG/OCEL gaps |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
