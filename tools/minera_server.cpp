@@ -61,6 +61,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
 #include "minera/performance.hpp"
@@ -522,6 +523,56 @@ std::string ocel_request_body(const httplib::Request& request,
   return request.body;
 }
 
+std::vector<std::string> split_ocel_playout_value(std::string_view value,
+                                                  char delimiter) {
+  std::vector<std::string> parts;
+  std::string current;
+  bool escaped = false;
+  for (const char c : value) {
+    if (escaped) {
+      if (c != '\\' && c != ',' && c != ';' && c != ':')
+        throw std::invalid_argument(
+            "objects: unsupported escape (use \\\\, \\\\; \\\\: or \\\\\\)");
+      current.push_back(c);
+      escaped = false;
+    } else if (c == '\\') {
+      escaped = true;
+    } else if (c == delimiter) {
+      parts.push_back(std::move(current));
+      current.clear();
+    } else {
+      current.push_back(c);
+    }
+  }
+  if (escaped) throw std::invalid_argument("objects: dangling escape");
+  parts.push_back(std::move(current));
+  return parts;
+}
+
+std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
+    const httplib::Request& request) {
+  std::map<std::string, std::vector<std::string>> result;
+  if (!request.has_param("objects")) return result;
+  const auto entries = split_ocel_playout_value(
+      request.get_param_value("objects"), ';');
+  for (const auto& entry : entries) {
+    if (entry.empty()) throw std::invalid_argument("objects: empty entry");
+    const auto fields = split_ocel_playout_value(entry, ':');
+    if (fields.size() != 2 || fields.front().empty())
+      throw std::invalid_argument(
+          "objects: expected TYPE:ID1,ID2 entries");
+    std::vector<std::string> ids;
+    for (const auto& id : split_ocel_playout_value(fields[1], ',')) {
+      if (id.empty()) throw std::invalid_argument(
+          "objects: expected non-empty comma-separated ids");
+      ids.push_back(id);
+    }
+    auto& target = result[fields.front()];
+    target.insert(target.end(), ids.begin(), ids.end());
+  }
+  return result;
+}
+
 std::string ocel_discovery_response(std::string_view variant,
                                     std::string payload) {
   return std::string("{\"family\":\"OCEL_DISCOVERY\",\"variant\":\"") +
@@ -616,6 +667,79 @@ void handle_ocel_split(const httplib::Request& request,
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const auto result = minera::split_ocel(minera::parse_ocel_json(body), options);
     response.set_content(minera::serialize_ocel_split_json(result),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_playout(const httplib::Request& request,
+                         httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "max_bindings_per_activity", "max_traces", "max_states",
+        "objects", "objects_unique_per_trace", "start", "case_interval",
+        "event_interval", "ocpn_variant", "double_arc_threshold",
+        "noise_threshold"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL playout parameter: " + key);
+    }
+    const auto variant = request.has_param("variant")
+                             ? request.get_param_value("variant")
+                             : std::string("extensive");
+    if (variant != "extensive" && variant != "EXTENSIVE")
+      throw std::invalid_argument("variant expects extensive");
+
+    minera::OcpnPlayoutOptions options;
+    options.max_bindings_per_activity = ocel_query_size(
+        request, "max_bindings_per_activity", options.max_bindings_per_activity);
+    options.max_traces = ocel_query_size(request, "max_traces", options.max_traces);
+    options.max_states = ocel_query_size(request, "max_states", options.max_states);
+    options.objects = parse_ocel_playout_objects(request);
+    options.objects_unique_per_trace = ocel_query_bool(
+        request, "objects_unique_per_trace", options.objects_unique_per_trace);
+    options.start = ocel_query_number(request, "start", options.start);
+    options.case_interval =
+        ocel_query_number(request, "case_interval", options.case_interval);
+    options.event_interval =
+        ocel_query_number(request, "event_interval", options.event_interval);
+    if (options.max_bindings_per_activity == 0 ||
+        options.max_bindings_per_activity > 100 || options.max_traces > 10000 ||
+        options.max_states > 1'000'000) {
+      throw std::invalid_argument(
+          "OCEL playout bounds exceed the server safety limits");
+    }
+    constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
+    if (options.max_traces != 0 && options.max_bindings_per_activity != 0 &&
+        options.max_traces > kMaxGeneratedEvents /
+                                  options.max_bindings_per_activity) {
+      throw std::invalid_argument(
+          "OCEL playout event budget exceeds the server safety limit");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    minera::OcpnDiscoveryOptions discovery;
+    if (request.has_param("ocpn_variant")) {
+      const auto value = request.get_param_value("ocpn_variant");
+      if (value == "log" || value == "im") {
+        discovery.variant = minera::OcpnInductiveVariant::kLog;
+      } else if (value == "dfg" || value == "imd") {
+        discovery.variant = minera::OcpnInductiveVariant::kDfg;
+      } else {
+        throw std::invalid_argument("ocpn_variant expects log or dfg");
+      }
+    }
+    discovery.double_arc_threshold = ocel_query_number(
+        request, "double_arc_threshold", discovery.double_arc_threshold);
+    discovery.noise_threshold =
+        ocel_query_number(request, "noise_threshold", discovery.noise_threshold);
+    const auto graph = minera::discover_ocpn(
+        minera::parse_ocel_json(body), discovery);
+    response.set_content(minera::serialize_ocpn_playout_json(
+                             minera::ocpn_extensive_playout(graph, options)),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -2471,6 +2595,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/ocel/discover", preflight);
   server.Options("/api/ocel/split", preflight);
+  server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -2519,6 +2644,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
   server.Post("/api/ocel/split", handle_ocel_split);
+  server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

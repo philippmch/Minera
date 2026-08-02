@@ -727,6 +727,12 @@ export interface OcelSplitResult {
   variant: OcelSplitVariant;
   logs: Array<Record<string, unknown>>;
 }
+export type OcelPlayoutVariant = "EXTENSIVE";
+export interface OcelPlayoutResult {
+  family: "OCEL_PLAYOUT";
+  variant: OcelPlayoutVariant;
+  log: Record<string, unknown>;
+}
 function isOcelRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -745,6 +751,11 @@ export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
       !["CONNECTED_COMPONENTS", "ANCESTORS_DESCENDANTS"].includes(String(value.variant)) ||
       !Array.isArray(value.logs)) return false;
   return value.logs.every((log) => isOcelRecord(log));
+}
+export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_PLAYOUT" ||
+      value.variant !== "EXTENSIVE") return false;
+  return isOcelRecord(value.log);
 }
 
 export type TransitionSystemView = "sequence" | "set" | "multiset";

@@ -33,6 +33,7 @@ import {
   type OcelDiscoveryResult,
   type OcelConformanceResult,
   type OcelSplitResult,
+  type OcelPlayoutResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -55,6 +56,7 @@ import {
   isOcelDiscoveryResult,
   isOcelConformanceResult,
   isOcelSplitResult,
+  isOcelPlayoutResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2211,6 +2213,80 @@ export async function requestOcelSplit(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelSplitResult(payload)) throw new Error("the Minera backend returned an invalid OCEL split");
+  return payload;
+}
+
+export interface OcelPlayoutOptions {
+  variant?: "extensive";
+  max_bindings_per_activity?: number;
+  max_traces?: number;
+  max_states?: number;
+  objects?: Record<string, string[]>;
+  objects_unique_per_trace?: boolean;
+  start?: number;
+  case_interval?: number;
+  event_interval?: number;
+  ocpn_variant?: "log" | "dfg";
+  double_arc_threshold?: number;
+  noise_threshold?: number;
+}
+
+function escapeOcelPlayoutPart(value: string): string {
+  return value.replaceAll("\\", "\\\\")
+    .replaceAll(":", "\\:")
+    .replaceAll(",", "\\,")
+    .replaceAll(";", "\\;");
+}
+
+export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  const addInteger = (name: string, value: number | undefined) => {
+    if (value !== undefined && Number.isInteger(value) && value >= 0)
+      query.set(name, String(value));
+  };
+  addInteger("max_bindings_per_activity", options.max_bindings_per_activity);
+  addInteger("max_traces", options.max_traces);
+  addInteger("max_states", options.max_states);
+  if (options.objects !== undefined) {
+    const entries = Object.entries(options.objects)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([type, ids]) => {
+        if (!type || !Array.isArray(ids) || ids.some((id) => !id))
+          throw new Error("OCEL playout objects require non-empty types and ids");
+        return `${escapeOcelPlayoutPart(type)}:${ids.map(escapeOcelPlayoutPart).join(",")}`;
+      });
+    if (entries.length) query.set("objects", entries.join(";"));
+  }
+  if (options.objects_unique_per_trace !== undefined)
+    query.set("objects_unique_per_trace", options.objects_unique_per_trace ? "true" : "false");
+  const addNumber = (name: string, value: number | undefined) => {
+    if (value !== undefined && Number.isFinite(value)) query.set(name, String(value));
+  };
+  addNumber("start", options.start);
+  addNumber("case_interval", options.case_interval);
+  addNumber("event_interval", options.event_interval);
+  if (options.ocpn_variant !== undefined) query.set("ocpn_variant", options.ocpn_variant);
+  addNumber("double_arc_threshold", options.double_arc_threshold);
+  addNumber("noise_threshold", options.noise_threshold);
+  return query.toString();
+}
+
+export async function requestOcelPlayout(
+  log: Blob,
+  options: OcelPlayoutOptions = {},
+): Promise<OcelPlayoutResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelPlayoutQuery(options);
+  const response = await fetch(`/api/ocel/playout${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelPlayoutResult(payload)) throw new Error("the Minera backend returned an invalid OCEL playout");
   return payload;
 }
 
