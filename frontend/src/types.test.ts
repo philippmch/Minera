@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -48,6 +48,21 @@ describe("isResourceProfilesResult", () => {
   it("rejects unknown metric names", () => {
     const value = { family: "RESOURCE_PROFILES", metric: "not-a-metric", rows: [], diagnostics: { computed: true, output_truncated: false, trace_count: 0, event_count: 0, resource_count: 0, message: "ok" } };
     expect(isResourceProfilesResult(value)).toBe(false);
+  });
+});
+
+describe("isLocalDiagnosticsResult", () => {
+  const valid = {
+    family: "LOCAL_DIAGNOSTICS",
+    group_relative_focus: { g: { A: 1 } }, group_relative_stake: { g: { A: 1 } },
+    group_coverage: { g: { r: 1 } }, group_member_contribution: { g: { r: { A: 2 } } },
+    diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 1, group_count: 1, resource_count: 1, row_count: 1, skipped_events: 0, message: "ok" },
+  };
+  it("accepts nested diagnostics maps", () => expect(isLocalDiagnosticsResult(valid)).toBe(true));
+  it("rejects negative member counts", () => expect(isLocalDiagnosticsResult({ ...valid, group_member_contribution: { g: { r: { A: -1 } } } })).toBe(false));
+  it("rejects array maps and out-of-range ratios", () => {
+    expect(isLocalDiagnosticsResult({ ...valid, group_relative_focus: [] })).toBe(false);
+    expect(isLocalDiagnosticsResult({ ...valid, group_relative_focus: { g: { A: 1.1 } } })).toBe(false);
   });
 });
 

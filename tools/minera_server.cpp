@@ -42,6 +42,7 @@
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
 #include "minera/resource_profiles.hpp"
+#include "minera/local_diagnostics.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -603,6 +604,20 @@ void handle_resource_profiles(const httplib::Request& request, httplib::Response
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_resource_profiles_params(lookup, present);
     response.set_content(minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+void handle_local_diagnostics(const httplib::Request& request, httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
+    static const std::set<std::string> allowed = {"local_diagnostics_group_attribute", "local_diagnostics_resource_attribute", "local_diagnostics_activity_attribute", "local_diagnostics_groups", "local_diagnostics_max_groups", "local_diagnostics_max_resources", "local_diagnostics_max_rows"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown local diagnostics parameter: " + key); }
+    const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
+    const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
+    const auto options = minera::parse_local_diagnostics_params(lookup, present);
+    response.set_content(minera::local_diagnostics_json(minera::discover_local_diagnostics(session->log, options)), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -1953,6 +1968,7 @@ int main(int argc, char** argv) {
   server.Options("/api/sna", preflight);
   server.Options("/api/roles", preflight);
   server.Options("/api/resource-profiles", preflight);
+  server.Options("/api/local-diagnostics", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -1992,6 +2008,7 @@ int main(int argc, char** argv) {
   server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
+  server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

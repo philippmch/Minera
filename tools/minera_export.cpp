@@ -41,6 +41,7 @@
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
 #include "minera/resource_profiles.hpp"
+#include "minera/local_diagnostics.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -369,6 +370,8 @@ int usage(const char* program) {
                "  --roles-max-activities <n> Activity safety bound\n"
                "  --resource-profiles      Emit resource profile JSON\n"
                "  --resource-profile-* <v> Resource profile metric, slots, selectors, and bounds\n"
+               "  --local-diagnostics      Emit bounded local diagnostics JSON\n"
+               "  --local-diagnostics-* <v> Group attributes, explicit groups, and bounds\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -922,6 +925,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> roles_fields;
   bool resource_profiles_requested = false;
   std::map<std::string, std::string> resource_profiles_fields;
+  bool local_diagnostics_requested = false;
+  std::map<std::string, std::string> local_diagnostics_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1048,6 +1053,14 @@ int main(int argc, char** argv) {
     }
     if (arg == "--roles") { roles_requested = true; continue; }
     if (arg == "--resource-profiles") { resource_profiles_requested = true; continue; }
+    if (arg == "--local-diagnostics") { local_diagnostics_requested = true; continue; }
+    if (arg.rfind("--local-diagnostics-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {"local_diagnostics_group_attribute", "local_diagnostics_resource_attribute", "local_diagnostics_activity_attribute", "local_diagnostics_groups", "local_diagnostics_max_groups", "local_diagnostics_max_resources", "local_diagnostics_max_rows"};
+      if (!names.contains(key)) return usage(argv[0]);
+      local_diagnostics_fields.insert_or_assign(std::move(key), value); local_diagnostics_requested = true; continue;
+    }
     if (arg.rfind("--resource-profile-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key("resource_profiles_"); key += std::string(arg.substr(19));
@@ -2688,6 +2701,15 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) { return resource_profiles_fields.contains(std::string(name)); };
       const auto params = minera::parse_resource_profiles_params(lookup, present);
       const auto body = minera::resource_profiles_json(minera::discover_resource_profiles(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
+      return 0;
+    }
+    if (local_diagnostics_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = local_diagnostics_fields.find(std::string(name)); return it == local_diagnostics_fields.end() ? std::string{} : it->second; };
+      const auto present = [&](std::string_view name) { return local_diagnostics_fields.contains(std::string(name)); };
+      const auto params = minera::parse_local_diagnostics_params(lookup, present);
+      const auto body = minera::local_diagnostics_json(minera::discover_local_diagnostics(log, params));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;

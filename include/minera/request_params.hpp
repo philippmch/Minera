@@ -48,6 +48,7 @@
 #include "minera/organizational_mining.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
+#include "minera/local_diagnostics.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -203,6 +204,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ResourceProfilesOptions parse_resource_profiles_params(
     const FieldLookup& field);
 [[nodiscard]] ResourceProfilesOptions parse_resource_profiles_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(
+    const FieldLookup& field);
+[[nodiscard]] LocalDiagnosticsOptions parse_local_diagnostics_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

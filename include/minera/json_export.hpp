@@ -51,6 +51,7 @@
 #include "minera/organizational_mining.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
+#include "minera/local_diagnostics.hpp"
 
 namespace minera {
 
@@ -275,5 +276,6 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string resource_profiles_json(
     const ResourceProfilesResult& result);
 [[nodiscard]] std::string role_discovery_json(const RoleDiscoveryResult& result);
+[[nodiscard]] std::string local_diagnostics_json(const LocalDiagnosticsResult& result);
 
 }  // namespace minera
