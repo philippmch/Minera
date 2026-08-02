@@ -213,6 +213,21 @@ export function isOrganizationalSnaResult(value: unknown): value is Organization
 }
 export const isOrganizationalSna = isOrganizationalSnaResult;
 
+export interface RoleDiscoveryResource { name: string; count: number; }
+export interface DiscoveredRole { activities: string[]; resources: RoleDiscoveryResource[]; }
+export interface RoleDiscoveryDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; activity_count: number; resource_count: number; role_count: number; message: string; }
+export interface RoleDiscoveryResult { family: "ROLE_DISCOVERY"; roles: DiscoveredRole[]; diagnostics: RoleDiscoveryDiagnostics; }
+export interface RoleDiscoveryOptions { roles_threshold?: number; roles_max_resources?: number; roles_max_activities?: number; }
+export function isRoleDiscoveryResult(value: unknown): value is RoleDiscoveryResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<RoleDiscoveryResult>;
+  if (c.family !== "ROLE_DISCOVERY" || !Array.isArray(c.roles) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
+  if (!c.roles.every((r) => !!r && typeof r === "object" && Array.isArray(r.activities) && r.activities.every((a) => typeof a === "string") && Array.isArray(r.resources) && r.resources.every((x) => !!x && typeof x === "object" && typeof x.name === "string" && Number.isInteger(x.count) && (x.count as number) > 0))) return false;
+  const d = c.diagnostics as Partial<RoleDiscoveryDiagnostics>;
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count, d.event_count, d.activity_count, d.resource_count, d.role_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+}
+export const isRoleDiscovery = isRoleDiscoveryResult;
+
 export type TraceVariantQueryVariant = "laplace" | "sacofa";
 export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
 export interface TraceVariantQueryEvent {

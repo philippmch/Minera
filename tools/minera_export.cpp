@@ -40,6 +40,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -361,6 +362,10 @@ int usage(const char* program) {
                "  --sna-metric-normalization <bool> Normalize edge weights\n"
                "  --sna-max-resources <n> Resource safety bound\n"
                "  --sna-max-edges <n>    Edge safety bound\n"
+               "  --roles                Emit deterministic role discovery JSON\n"
+               "  --roles-threshold <f>  Merge threshold in [0,1]\n"
+               "  --roles-max-resources <n> Resource safety bound\n"
+               "  --roles-max-activities <n> Activity safety bound\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -910,6 +915,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> genetic_fields;
   bool organizational_sna_requested = false;
   std::map<std::string, std::string> organizational_sna_fields;
+  bool roles_requested = false;
+  std::map<std::string, std::string> roles_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1033,6 +1040,14 @@ int main(int argc, char** argv) {
     if (arg == "--organizational-sna" || arg == "--sna") {
       organizational_sna_requested = true;
       continue;
+    }
+    if (arg == "--roles") { roles_requested = true; continue; }
+    if (arg.rfind("--roles-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {"roles_threshold", "roles_max_resources", "roles_max_activities"};
+      if (!names.contains(key)) return usage(argv[0]);
+      roles_fields.insert_or_assign(std::move(key), value); roles_requested = true; continue;
     }
     if (arg.rfind("--sna-", 0) == 0) {
       const auto* value = next();
@@ -2644,6 +2659,15 @@ int main(int argc, char** argv) {
         if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; }
         file << body << '\n';
       }
+      return 0;
+    }
+    if (roles_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = roles_fields.find(std::string(name)); return it == roles_fields.end() ? std::string{} : it->second; };
+      const auto present = [&](std::string_view name) { return roles_fields.contains(std::string(name)); };
+      const auto params = minera::parse_role_discovery_params(lookup, present);
+      const auto body = minera::role_discovery_json(minera::discover_roles(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;
     }
     if (trace_variant_query_requested) {

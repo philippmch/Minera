@@ -1616,6 +1616,24 @@ void organizational_sna_params_contract() {
   }
 }
 
+void role_discovery_params_contract() {
+  const auto parsed = minera::parse_role_discovery_params(fields({
+      {"roles_threshold", "0.4"},
+      {"roles_max_resources", "8"},
+      {"roles_max_activities", "12"}}));
+  assert(parsed.threshold == 0.4 && parsed.max_resources == 8 &&
+         parsed.max_activities == 12);
+  for (const auto& item : {std::pair{"roles_threshold", "1.1"},
+                           std::pair{"roles_threshold", "nan"},
+                           std::pair{"roles_max_resources", "0"},
+                           std::pair{"roles_max_activities", "0"}}) {
+    bool threw = false;
+    try { (void)minera::parse_role_discovery_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 void trace_variant_query_params_contract() {
   const auto parsed = minera::parse_trace_variant_query_params(fields({
       {"tvq_variant", "sacofa"},
@@ -1729,6 +1747,7 @@ int main() {
   ilp_params_contract();
   genetic_params_contract();
   organizational_sna_params_contract();
+  role_discovery_params_contract();
   trace_variant_query_params_contract();
   pripel_params_contract();
   return 0;

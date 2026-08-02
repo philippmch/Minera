@@ -75,7 +75,7 @@ are reconciled.
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
-| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — four deterministic SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; resource profiles, roles, local diagnostics, network-analysis performance metrics, and differential review remain |
+| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic role discovery and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; resource profiles, local diagnostics, network-analysis performance metrics, and differential review remain |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and the BASIC random-tree generator are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout, Monte Carlo, and tree+log generation remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, and contextual label splitting are adapter-wired (`minera_export --label-splitting`, hidden cached-session `POST /api/label-splitting`); embeddings and OCEL transformations remain |
@@ -325,8 +325,10 @@ are strictly validated.
 Native tests cover repeated resources, normalized boundaries, symmetric output,
 degenerate correlations, truncation, and parser rejection. Standalone JSON,
 CLI flags, cached-session server routes, and frontend query/result guards cover
-all four selectable variants. Resource profiles, roles, local diagnostics, and
-network-analysis performance metrics remain future organizational slices.
+all four selectable variants. Deterministic role discovery is also exposed via
+the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; resource
+profiles, local diagnostics, and network-analysis performance metrics remain
+future organizational slices.
 
 ## Evaluation parity evidence
 
@@ -788,3 +790,19 @@ Concept-drift adapters expose deterministic `CONCEPT_DRIFT` JSON from the CLI
 permutation count, threshold, change-point cap, seed, and optional timestamps;
 the result includes activity features, raw and cumulative sub-log summaries,
 change points, and timestamp arrays.
+
+## Organizational role discovery parity
+
+The bounded role endpoint (`--roles` and `POST /api/roles`) starts with one
+role per activity and counts only events having both a non-empty activity and
+resource. Role similarity is the overlap of normalized resource-count vectors
+(sum of component-wise minima divided by sum of maxima). The highest-scoring
+pair is merged only when its score is strictly greater than
+`roles_threshold` (default `0.65`); ties and final role ordering are lexical
+and deterministic. Final roles are sorted by descending activity/resource
+cardinality before the activity-name tie break. `roles_max_resources` and
+`roles_max_activities` are strict safety bounds. Empty activities and
+blank-resource events are excluded, while
+their traces remain represented by aggregate diagnostics. The standalone JSON
+family is `ROLE_DISCOVERY` with `roles[].activities` and
+`roles[].resources[{name,count}]`.

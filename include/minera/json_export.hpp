@@ -49,6 +49,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/role_discovery.hpp"
 
 namespace minera {
 
@@ -270,5 +271,6 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string pripel_json(const PripelResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
+[[nodiscard]] std::string role_discovery_json(const RoleDiscoveryResult& result);
 
 }  // namespace minera

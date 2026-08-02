@@ -46,6 +46,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/role_discovery.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -193,6 +194,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] OrganizationalSnaOptions parse_organizational_sna_params(
     const FieldLookup& field);
 [[nodiscard]] OrganizationalSnaOptions parse_organizational_sna_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] RoleDiscoveryOptions parse_role_discovery_params(
+    const FieldLookup& field);
+[[nodiscard]] RoleDiscoveryOptions parse_role_discovery_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI
