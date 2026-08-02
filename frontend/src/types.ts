@@ -170,6 +170,55 @@ export function isTraceVariantQueryResult(value: unknown): value is TraceVariant
 }
 export const isTraceVariantQuery = isTraceVariantQueryResult;
 
+export interface PripelDiagnostics {
+  epsilon: number;
+  seed: number;
+  query_trace_count: number;
+  released_trace_count: number;
+  exact_matches: number;
+  nearest_matches: number;
+  synthesized_traces: number;
+  synthesized_events: number;
+  output_truncated: boolean;
+  message: string;
+}
+export interface PripelResult {
+  family: "PRIPEL";
+  diagnostics: PripelDiagnostics;
+  log: { traces: TraceVariantQueryTrace[]; attributes?: Record<string, string> };
+}
+export interface PripelOptions {
+  pripel_epsilon?: number;
+  pripel_blocklist?: string[];
+  pripel_seed?: number;
+  pripel_max_output_traces?: number;
+  pripel_max_distance?: number;
+}
+export function isPripelResult(value: unknown): value is PripelResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<PripelResult>;
+  if (c.family !== "PRIPEL" || !c.diagnostics || typeof c.diagnostics !== "object"
+      || !c.log || typeof c.log !== "object") return false;
+  const d = c.diagnostics as Partial<PripelDiagnostics>;
+  const nonnegative = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
+  if (typeof d.epsilon !== "number" || !Number.isFinite(d.epsilon) || d.epsilon <= 0
+      || !nonnegative(d.seed) || !nonnegative(d.query_trace_count)
+      || !nonnegative(d.released_trace_count) || !nonnegative(d.exact_matches)
+      || !nonnegative(d.nearest_matches) || !nonnegative(d.synthesized_traces)
+      || !nonnegative(d.synthesized_events) || typeof d.output_truncated !== "boolean"
+      || typeof d.message !== "string") return false;
+  const l = c.log as Partial<PripelResult["log"]>;
+  if (!Array.isArray(l.traces) || (l.attributes !== undefined && !isStringMap(l.attributes))) return false;
+  return l.traces.every((trace) => !!trace && typeof trace === "object"
+    && typeof trace.case_id === "string" && Array.isArray(trace.events)
+    && (trace.attributes === undefined || isStringMap(trace.attributes))
+    && trace.events.every((event) => !!event && typeof event === "object"
+      && typeof event.activity === "string" && typeof event.timestamp === "string"
+      && typeof event.resource === "string" && typeof event.lifecycle === "string"
+      && Number.isInteger(event.input_order)
+      && (event.attributes === undefined || isStringMap(event.attributes))));
+}
+
 export type LogToTargetVariant = "next_activity" | "next_time" | "remaining_time";
 export interface LogToTargetResult {
   family: "LOG_TO_TARGET";

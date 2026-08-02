@@ -64,6 +64,7 @@ add_library(minera_core
   src/petri_net.cpp
   src/petri_usage_comparison.cpp
   src/playout.cpp
+  src/pripel.cpp
   src/process_tree_alignment.cpp
   src/random_tree.cpp
   src/process_tree_playout.cpp
@@ -158,6 +159,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_trace_variant_query_tests PRIVATE cxx_std_20)
   target_compile_options(minera_trace_variant_query_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_trace_variant_query_tests COMMAND minera_trace_variant_query_tests)
+
+  add_executable(minera_pripel_tests
+    tests/test_pripel.cpp
+  )
+  target_link_libraries(minera_pripel_tests PRIVATE minera::core)
+  target_compile_features(minera_pripel_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_pripel_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_pripel_tests COMMAND minera_pripel_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

@@ -51,7 +51,7 @@ are reconciled.
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
-| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded deterministic trace-variant query supports Laplace and SaCoFa through native, JSON, CLI, local-server, and frontend adapters; PRIPEL and production-grade privacy RNG remain missing |
+| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded deterministic PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; secure production privacy RNG and differential edge-contract review remain |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
 | Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
@@ -202,8 +202,11 @@ Strict `tvq_*` request parsing, standalone JSON, CLI
 (`--trace-variant-query`), cached-session server endpoints, frontend query
 serialization, response guards, output caps, and focused Release tests cover
 both variants, empty prefix bounds, malformed privacy settings, pruning,
-reproducibility, and non-negative release counts. PRIPEL and secure production
-privacy plumbing remain outside this vertical.
+reproducibility, and non-negative release counts. The PRIPEL-style adapter
+matches exact and bounded nearest variants, removes identity/blocklisted
+attributes, preserves monotonic event time, and applies deterministic bounded
+categorical/numeric release noise. A cryptographically secure production RNG
+and full differential edge-contract review remain open.
 
 ## Target-transformation evidence
 

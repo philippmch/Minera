@@ -1574,6 +1574,28 @@ void trace_variant_query_params_contract() {
   }
 }
 
+void pripel_params_contract() {
+  const auto parsed = minera::parse_pripel_params(fields({
+      {"pripel_epsilon", "0.5"},
+      {"pripel_blocklist", "case_id,resource"},
+      {"pripel_seed", "8"},
+      {"pripel_max_output_traces", "20"},
+      {"pripel_max_distance", "2"}}));
+  assert(parsed.epsilon == 0.5);
+  assert((parsed.blocklist == std::vector<std::string>{"case_id", "resource"}));
+  assert(parsed.seed == 8 && parsed.max_output_traces == 20 &&
+         parsed.max_distance == 2);
+  for (const auto& item : {std::pair{"pripel_epsilon", "0"},
+                           std::pair{"pripel_blocklist", "a,a"},
+                           std::pair{"pripel_seed", "-1"},
+                           std::pair{"pripel_max_distance", "-1"}}) {
+    bool threw = false;
+    try { (void)minera::parse_pripel_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1640,5 +1662,6 @@ int main() {
   label_splitting_params_contract();
   ilp_params_contract();
   trace_variant_query_params_contract();
+  pripel_params_contract();
   return 0;
 }

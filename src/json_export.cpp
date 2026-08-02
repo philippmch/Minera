@@ -3728,4 +3728,13 @@ std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
   return out.str();
 }
 
+std::string pripel_json(const PripelResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PRIPEL\",\"diagnostics\":"
+      << result.diagnostics.to_json() << ",\"log\":";
+  write_projected_log(out, result.log);
+  out << '}';
+  return out.str();
+}
+
 }  // namespace minera

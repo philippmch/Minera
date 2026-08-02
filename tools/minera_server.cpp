@@ -38,6 +38,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/trace_variant_query.hpp"
+#include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -99,6 +100,7 @@ std::mutex g_session_mutex;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 constexpr std::size_t kServerTvqMaxOutputTraces = 100'000;
 constexpr std::size_t kServerTvqMaxOutputVariants = 100'000;
+constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
 
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
@@ -522,6 +524,69 @@ void handle_trace_variant_query(const httplib::Request& request,
     response.set_content(
         minera::trace_variant_query_json(
             minera::anonymize_trace_variant_query(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+// Cached-session PRIPEL adapter. The released trace-variant query is supplied
+// as a multipart `trace_variant_query` file or as the raw request body.
+void handle_pripel(const httplib::Request& request,
+                   httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "pripel_epsilon", "pripel_blocklist", "pripel_seed",
+        "pripel_max_output_traces", "pripel_max_distance"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown PRIPEL parameter: " + key);
+    }
+    std::string query_content;
+    std::string query_name;
+    if (request.has_file("trace_variant_query")) {
+      const auto file = request.get_file_value("trace_variant_query");
+      query_content = file.content;
+      query_name = file.filename;
+    } else if (request.has_file("query_log")) {
+      const auto file = request.get_file_value("query_log");
+      query_content = file.content;
+      query_name = file.filename;
+    } else {
+      query_content = request.body;
+    }
+    if (query_content.empty())
+      throw std::invalid_argument("PRIPEL requires a non-empty trace-variant query log");
+    std::istringstream input(query_content);
+    const auto query = looks_like_xes(query_name, query_content)
+                           ? minera::import_xes_event_log(input)
+                           : minera::import_csv_event_log(input);
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_pripel_params(lookup, present);
+    if (options.max_output_traces > kServerPripelMaxOutputTraces)
+      throw std::invalid_argument("pripel_max_output_traces exceeds the server safety cap");
+    response.set_content(
+        minera::pripel_json(minera::anonymize_pripel(session->log, query, options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -1761,6 +1826,8 @@ int main(int argc, char** argv) {
   server.Options("/api/mine-ilp", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
+  server.Options("/api/pripel", preflight);
+  server.Options("/api/anonymize-pripel", preflight);
   server.Options("/api/concept-drift", preflight);
   server.Options("/api/transform-target", preflight);
   server.Options("/api/log-to-features", preflight);
@@ -1792,6 +1859,8 @@ int main(int argc, char** argv) {
   server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
+  server.Post("/api/pripel", handle_pripel);
+  server.Post("/api/anonymize-pripel", handle_pripel);
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);

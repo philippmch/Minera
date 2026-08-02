@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, traceVariantQuery, requestTraceVariantQuery } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -47,6 +47,21 @@ describe("trace-variant query API", () => {
   it("rejects malformed backend payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "TRACE_VARIANT_QUERY", variant: "sacofa" }) })));
     await expect(requestTraceVariantQuery()).rejects.toThrow(/invalid trace-variant query/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("PRIPEL API", () => {
+  it("encodes privacy, blocklist, and matching bounds", () => {
+    expect(pripelQuery({ pripel_epsilon: 0.5, pripel_blocklist: ["case,id", "resource"], pripel_seed: 4, pripel_max_distance: 2 }))
+      .toBe("pripel_epsilon=0.5&pripel_blocklist=case%5C%2Cid%2Cresource&pripel_seed=4&pripel_max_distance=2");
+  });
+  it("posts a query log and rejects malformed responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
+      expect(init.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => ({ family: "PRIPEL" }) };
+    }));
+    await expect(requestPripel(new File(["case_id,activity\nc,A\n"], "query.csv"))).rejects.toThrow(/invalid PRIPEL/);
     vi.unstubAllGlobals();
   });
 });

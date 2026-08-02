@@ -30,6 +30,8 @@ import {
   type ILPMinerResult,
   type TraceVariantQueryOptions,
   type TraceVariantQueryResult,
+  type PripelOptions,
+  type PripelResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
   isLabelSplittingResult,
@@ -39,6 +41,7 @@ import {
   isRandomTreeResult,
   isILPMinerResult,
   isTraceVariantQueryResult,
+  isPripelResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1132,9 +1135,29 @@ export function requestTraceVariantQuery(options: TraceVariantQueryOptions = {})
   return postChecked(`/api/trace-variant-query${query ? `?${query}` : ""}`, isTraceVariantQueryResult, "trace-variant query");
 }
 export const anonymizeTraceVariants = requestTraceVariantQuery;
-async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
+export function pripelQuery(options: PripelOptions = {}): string {
+  const query = new URLSearchParams();
+  const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+  const entries: Array<[string, string | undefined]> = [
+    ["pripel_epsilon", options.pripel_epsilon === undefined ? undefined : String(options.pripel_epsilon)],
+    ["pripel_blocklist", options.pripel_blocklist === undefined ? undefined : options.pripel_blocklist.map(escape).join(",")],
+    ["pripel_seed", options.pripel_seed === undefined ? undefined : String(options.pripel_seed)],
+    ["pripel_max_output_traces", options.pripel_max_output_traces === undefined ? undefined : String(options.pripel_max_output_traces)],
+    ["pripel_max_distance", options.pripel_max_distance === undefined ? undefined : String(options.pripel_max_distance)],
+  ];
+  for (const [key, value] of entries) if (value !== undefined) query.set(key, value);
+  return query.toString();
+}
+export async function requestPripel(queryLog: File, options: PripelOptions = {}): Promise<PripelResult> {
+  const query = pripelQuery(options);
+  const form = new FormData();
+  form.append("trace_variant_query", queryLog, queryLog.name);
+  return postChecked(`/api/pripel${query ? `?${query}` : ""}`, isPripelResult, "PRIPEL anonymization", form);
+}
+export const anonymizePripel = requestPripel;
+async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string, body?: BodyInit): Promise<T> {
   let response: Response;
-  try { response = await fetch(path, { method: "POST" }); }
+  try { response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }) }); }
   catch { throw new Error("could not reach the Minera backend — is minera_server running?"); }
   const parsed: unknown = await response.json().catch(() => null);
   if (parsed && typeof parsed === "object" && "error" in parsed) throw new Error(String((parsed as { error: unknown }).error));
