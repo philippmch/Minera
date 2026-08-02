@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isTraceVariantQueryResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -17,6 +17,22 @@ describe("isLogToFeaturesResult", () => {
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: ["wip"], trace_rows: [[1]] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "temporal", feature_names: ["arrivals"], temporal_rows: [{ timestamp: 1, values: [2] }] })).toBe(true);
     expect(isLogToFeaturesResult({ family: "LOG_TO_FEATURES", variant: "event_based", feature_names: [], event_rows: [[[{ value: 1 }]]] })).toBe(false);
+  });
+});
+
+describe("isTraceVariantQueryResult", () => {
+  const event = { activity: "A", timestamp: "1970-01-01T00:00:00Z", resource: "", lifecycle: "", input_order: 0 };
+  const valid = {
+    family: "TRACE_VARIANT_QUERY", variant: "sacofa", epsilon: 1, k: 1, p: 1, seed: 2,
+    frequencies: [{ activities: ["A"], count: 1 }],
+    diagnostics: { candidate_count: 1, retained_variant_count: 1, released_trace_count: 1, output_truncated: false, message: "ok" },
+    log: { traces: [{ case_id: "tvq-1", events: [event] }] },
+  };
+  it("accepts a released trace distribution", () => expect(isTraceVariantQueryResult(valid)).toBe(true));
+  it("rejects invalid privacy and event contracts", () => {
+    expect(isTraceVariantQueryResult({ ...valid, epsilon: 0 })).toBe(false);
+    expect(isTraceVariantQueryResult({ ...valid, frequencies: [{ activities: ["A"], count: 0 }] })).toBe(false);
+    expect(isTraceVariantQueryResult({ ...valid, log: { traces: [{ case_id: "x", events: [{ activity: "A" }] }] } })).toBe(false);
   });
 });
 

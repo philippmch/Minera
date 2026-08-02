@@ -78,6 +78,7 @@ add_library(minera_core
   src/timestamp.cpp
   src/temporal_profile.cpp
   src/transition_system.cpp
+  src/trace_variant_query.cpp
   src/trie.cpp
   src/xes_event_log_importer.cpp
   src/xes_export.cpp
@@ -149,6 +150,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ilp_miner_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ilp_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ilp_miner_tests COMMAND minera_ilp_miner_tests)
+
+  add_executable(minera_trace_variant_query_tests
+    tests/test_trace_variant_query.cpp
+  )
+  target_link_libraries(minera_trace_variant_query_tests PRIVATE minera::core)
+  target_compile_features(minera_trace_variant_query_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_trace_variant_query_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_trace_variant_query_tests COMMAND minera_trace_variant_query_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

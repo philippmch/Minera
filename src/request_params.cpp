@@ -2124,4 +2124,54 @@ ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field,
   return options;
 }
 
+TraceVariantQueryOptions parse_trace_variant_query_params(
+    const FieldLookup& field) {
+  return parse_trace_variant_query_params(field, {});
+}
+
+TraceVariantQueryOptions parse_trace_variant_query_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  TraceVariantQueryOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("tvq_variant")) {
+    const auto value = require("tvq_variant");
+    if (value == "laplace")
+      options.variant = TraceVariantQueryVariant::kLaplace;
+    else if (value == "sacofa")
+      options.variant = TraceVariantQueryVariant::kSacofa;
+    else
+      throw std::invalid_argument("tvq_variant: expected laplace or sacofa");
+  }
+  if (supplied("tvq_epsilon")) {
+    options.epsilon = parse_finite_double(require("tvq_epsilon"),
+                                          "tvq_epsilon");
+    if (options.epsilon <= 0.0)
+      throw std::invalid_argument("tvq_epsilon must be positive");
+  }
+  if (supplied("tvq_k"))
+    options.max_prefix_length = parse_nonnegative_size(
+        require("tvq_k"), "tvq_k");
+  if (supplied("tvq_p"))
+    options.prune_threshold = static_cast<std::uint64_t>(
+        parse_positive_size(require("tvq_p"), "tvq_p"));
+  if (supplied("tvq_seed"))
+    options.seed = static_cast<std::uint64_t>(
+        parse_nonnegative_size(require("tvq_seed"), "tvq_seed"));
+  if (supplied("tvq_max_output_traces"))
+    options.max_output_traces = parse_nonnegative_size(
+        require("tvq_max_output_traces"), "tvq_max_output_traces");
+  if (supplied("tvq_max_output_variants"))
+    options.max_output_variants = parse_nonnegative_size(
+        require("tvq_max_output_variants"), "tvq_max_output_variants");
+  return options;
+}
+
 }  // namespace minera

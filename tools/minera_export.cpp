@@ -36,6 +36,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/trace_variant_query.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -339,6 +340,14 @@ int usage(const char* program) {
                "  --ilp-activity-key <name> Event attribute used as activity\n"
                "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
                "  --ilp-max-nodes <n>       Positive ILP search bound\n"
+               "  --trace-variant-query    Emit trace-variant query JSON\n"
+               "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
+               "  --tvq-epsilon <f>        Positive privacy parameter\n"
+               "  --tvq-k <n>              Maximum prefix length (0 = empty)\n"
+               "  --tvq-p <n>              Minimum released frequency\n"
+               "  --tvq-seed <n>           Deterministic noise seed\n"
+               "  --tvq-max-output-traces <n> Safety trace cap\n"
+               "  --tvq-max-output-variants <n> Candidate cap\n"
                "                            recurse) or dfg (IMd: recurse on\n"
                "                            the directly-follows graph alone,\n"
                "                            scaling to huge logs)\n"
@@ -870,6 +879,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> random_tree_fields;
   bool ilp_mine_requested = false;
   std::map<std::string, std::string> ilp_fields;
+  bool trace_variant_query_requested = false;
+  std::map<std::string, std::string> trace_variant_query_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -963,6 +974,23 @@ int main(int argc, char** argv) {
       if (!ilp_option_names.contains(key)) return usage(argv[0]);
       ilp_fields.insert_or_assign(std::move(key), value);
       ilp_mine_requested = true;
+      continue;
+    }
+    if (arg == "--trace-variant-query") {
+      trace_variant_query_requested = true;
+      continue;
+    }
+    if (arg.rfind("--tvq-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "tvq_variant", "tvq_epsilon", "tvq_k", "tvq_p", "tvq_seed",
+          "tvq_max_output_traces", "tvq_max_output_variants"};
+      if (!names.contains(key)) return usage(argv[0]);
+      trace_variant_query_fields.insert_or_assign(std::move(key), value);
+      trace_variant_query_requested = true;
       continue;
     }
     if (arg == "--concept-drift") { concept_drift_requested = true; continue; }
@@ -2473,6 +2501,29 @@ int main(int argc, char** argv) {
       };
       const auto options = minera::parse_ilp_miner_params(lookup, present);
       const auto body = minera::ilp_miner_json(minera::mine_ilp(log, options));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (trace_variant_query_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = trace_variant_query_fields.find(std::string(name));
+        return it == trace_variant_query_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return trace_variant_query_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_trace_variant_query_params(lookup, present);
+      const auto body = minera::trace_variant_query_json(
+          minera::anonymize_trace_variant_query(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

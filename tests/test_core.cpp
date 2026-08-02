@@ -16,6 +16,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/trace_variant_query.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -4912,8 +4913,29 @@ void ilp_json_is_standalone_and_deterministic() {
   assert(first.find("\"diagnostics\":") != std::string::npos);
 }
 
+void trace_variant_query_json_is_standalone_and_deterministic() {
+  minera::EventLog log;
+  log.traces.push_back({"c1", {{"c1", "A", "", "", 0, {}, ""},
+                              {"c1", "B", "", "", 1, {}, ""}}});
+  minera::TraceVariantQueryOptions options;
+  options.variant = minera::TraceVariantQueryVariant::kLaplace;
+  options.max_prefix_length = 2;
+  options.epsilon = 2.0;
+  options.seed = 4;
+  options.max_output_traces = 20;
+  const auto result = minera::anonymize_trace_variant_query(log, options);
+  const auto first = minera::trace_variant_query_json(result);
+  const auto second = minera::trace_variant_query_json(result);
+  assert(first == second);
+  assert(first.find("\"family\":\"TRACE_VARIANT_QUERY\"") != std::string::npos);
+  assert(first.find("\"variant\":\"laplace\"") != std::string::npos);
+  assert(first.find("\"frequencies\":") != std::string::npos);
+  assert(first.find("\"log\":") != std::string::npos);
+}
+
 int main() {
   ilp_json_is_standalone_and_deterministic();
+  trace_variant_query_json_is_standalone_and_deterministic();
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();

@@ -42,6 +42,7 @@
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/trace_variant_query.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -163,6 +164,13 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // are `ilp_activity_key`, `ilp_noise_threshold`, and `ilp_max_nodes`.
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field);
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict wire parser for trace-variant query anonymization. Fields use the
+// `tvq_` prefix: variant, epsilon, k, p, seed, and output safety bounds.
+[[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
+    const FieldLookup& field);
+[[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

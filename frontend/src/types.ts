@@ -95,6 +95,81 @@ export function isILPMinerResult(value: unknown): value is ILPMinerResult {
 }
 export const isIlpMinerResult = isILPMinerResult;
 
+export type TraceVariantQueryVariant = "laplace" | "sacofa";
+export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
+export interface TraceVariantQueryEvent {
+  activity: string;
+  timestamp: string;
+  resource: string;
+  lifecycle: string;
+  input_order: number;
+  attributes?: Record<string, string>;
+}
+export interface TraceVariantQueryTrace {
+  case_id: string;
+  events: TraceVariantQueryEvent[];
+  attributes?: Record<string, string>;
+}
+export interface TraceVariantQueryDiagnostics {
+  candidate_count: number;
+  retained_variant_count: number;
+  released_trace_count: number;
+  output_truncated: boolean;
+  message: string;
+}
+export interface TraceVariantQueryResult {
+  family: "TRACE_VARIANT_QUERY";
+  variant: TraceVariantQueryVariant;
+  epsilon: number;
+  k: number;
+  p: number;
+  seed: number;
+  frequencies: TraceVariantQueryFrequency[];
+  diagnostics: TraceVariantQueryDiagnostics;
+  log: { traces: TraceVariantQueryTrace[]; attributes?: Record<string, string> };
+}
+export interface TraceVariantQueryOptions {
+  tvq_variant?: TraceVariantQueryVariant;
+  tvq_epsilon?: number;
+  tvq_k?: number;
+  tvq_p?: number;
+  tvq_seed?: number;
+  tvq_max_output_traces?: number;
+  tvq_max_output_variants?: number;
+}
+function isStringMap(value: unknown): value is Record<string, string> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+    && Object.values(value).every((item) => typeof item === "string");
+}
+export function isTraceVariantQueryResult(value: unknown): value is TraceVariantQueryResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<TraceVariantQueryResult>;
+  if (c.family !== "TRACE_VARIANT_QUERY" || (c.variant !== "laplace" && c.variant !== "sacofa")
+      || typeof c.epsilon !== "number" || !Number.isFinite(c.epsilon) || c.epsilon <= 0
+      || !Number.isInteger(c.k) || (c.k as number) < 0 || !Number.isInteger(c.p) || (c.p as number) < 1
+      || !Number.isInteger(c.seed) || (c.seed as number) < 0 || !Array.isArray(c.frequencies)
+      || !c.diagnostics || typeof c.diagnostics !== "object" || !c.log || typeof c.log !== "object") return false;
+  if (!c.frequencies.every((entry) => !!entry && typeof entry === "object"
+      && Array.isArray(entry.activities) && entry.activities.every((item) => typeof item === "string")
+      && Number.isInteger(entry.count) && (entry.count as number) >= 1)) return false;
+  const d = c.diagnostics as Partial<TraceVariantQueryDiagnostics>;
+  if (!Number.isInteger(d.candidate_count) || (d.candidate_count as number) < 0
+      || !Number.isInteger(d.retained_variant_count) || (d.retained_variant_count as number) < 0
+      || !Number.isInteger(d.released_trace_count) || (d.released_trace_count as number) < 0
+      || typeof d.output_truncated !== "boolean" || typeof d.message !== "string") return false;
+  const l = c.log as Partial<TraceVariantQueryResult["log"]>;
+  if (!Array.isArray(l.traces) || (l.attributes !== undefined && !isStringMap(l.attributes))) return false;
+  return l.traces.every((trace) => !!trace && typeof trace === "object"
+    && typeof trace.case_id === "string" && Array.isArray(trace.events)
+    && (trace.attributes === undefined || isStringMap(trace.attributes))
+    && trace.events.every((event) => !!event && typeof event === "object"
+      && typeof event.activity === "string" && typeof event.timestamp === "string"
+      && typeof event.resource === "string" && typeof event.lifecycle === "string"
+      && Number.isInteger(event.input_order)
+      && (event.attributes === undefined || isStringMap(event.attributes))));
+}
+export const isTraceVariantQuery = isTraceVariantQueryResult;
+
 export type LogToTargetVariant = "next_activity" | "next_time" | "remaining_time";
 export interface LogToTargetResult {
   family: "LOG_TO_TARGET";

@@ -51,7 +51,7 @@ are reconciled.
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
-| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Missing** |
+| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded deterministic trace-variant query supports Laplace and SaCoFa through native, JSON, CLI, local-server, and frontend adapters; PRIPEL and production-grade privacy RNG remain missing |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Missing** |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
 | Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
@@ -186,6 +186,24 @@ timestamps. Strict request parsing, standalone JSON, CLI, cached-session
 server, frontend request/response types, and focused native/request tests are
 included. The current row remains partial pending differential edge-contract
 fixtures and the reference implementation's dataframe/lazyframe adapters.
+
+## Trace-variant query anonymization evidence
+
+The native trace-variant query surface supports both Laplace and SaCoFa
+variants. It builds bounded prefix distributions, applies deterministic
+seeded non-negative integer noise, prunes by the configured minimum frequency,
+and expands released frequencies into timestamp-neutral event traces with
+stable case identifiers. SaCoFa additionally filters prefixes by observed
+first-event and all-order predecessor/follower relations. The deterministic
+seed is an explicit testing/reproducibility extension; it is not a claim of a
+cryptographically secure privacy source.
+
+Strict `tvq_*` request parsing, standalone JSON, CLI
+(`--trace-variant-query`), cached-session server endpoints, frontend query
+serialization, response guards, output caps, and focused Release tests cover
+both variants, empty prefix bounds, malformed privacy settings, pruning,
+reproducibility, and non-negative release counts. PRIPEL and secure production
+privacy plumbing remain outside this vertical.
 
 ## Target-transformation evidence
 
