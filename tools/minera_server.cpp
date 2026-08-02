@@ -614,8 +614,8 @@ std::string ocel_conformance_response(std::string_view variant,
 void handle_ocel_discovery(const httplib::Request& request,
                            httplib::Response& response) {
   try {
-    static const std::set<std::string> allowed = {"variant",
-                                                  "compute_edges_performance"};
+    static const std::set<std::string> allowed = {
+        "variant", "compute_edges_performance", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -638,7 +638,21 @@ void handle_ocel_discovery(const httplib::Request& request,
     } else if (variant == "otg") {
       payload = minera::otg_json(minera::discover_otg_classic(log));
     } else if (variant == "ocpn") {
-      payload = minera::serialize_ocpn_json(minera::discover_ocpn(log));
+      minera::OcpnDiscoveryOptions discovery;
+      if (request.has_param("ocpn_annotation")) {
+        const auto value = request.get_param_value("ocpn_annotation");
+        if (value == "annotated" || value == "classic") {
+          discovery.annotated = true;
+        } else if (value == "none" || value == "wo_annotation" ||
+                   value == "without") {
+          discovery.annotated = false;
+        } else {
+          throw std::invalid_argument(
+              "ocpn_annotation expects annotated or none");
+        }
+      }
+      payload = minera::serialize_ocpn_json(
+          minera::discover_ocpn(log, discovery));
     } else if (variant == "saw") {
       payload = minera::saw_nets_json(minera::discover_saw_nets(log));
     } else {
@@ -705,7 +719,7 @@ void handle_ocel_playout(const httplib::Request& request,
         "model", "variant", "max_bindings_per_activity", "max_traces", "max_states",
         "objects", "objects_unique_per_trace", "start", "case_interval",
         "event_interval", "ocpn_variant", "double_arc_threshold",
-        "noise_threshold"};
+        "noise_threshold", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -759,6 +773,18 @@ void handle_ocel_playout(const httplib::Request& request,
         discovery.variant = minera::OcpnInductiveVariant::kDfg;
       } else {
         throw std::invalid_argument("ocpn_variant expects log or dfg");
+      }
+    }
+    if (request.has_param("ocpn_annotation")) {
+      const auto value = request.get_param_value("ocpn_annotation");
+      if (value == "annotated" || value == "classic") {
+        discovery.annotated = true;
+      } else if (value == "none" || value == "wo_annotation" ||
+                 value == "without") {
+        discovery.annotated = false;
+      } else {
+        throw std::invalid_argument(
+            "ocpn_annotation expects annotated or none");
       }
     }
     discovery.double_arc_threshold = ocel_query_number(

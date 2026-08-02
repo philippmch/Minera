@@ -207,6 +207,11 @@ int main() {
   ocpn_options.variant = minera::OcpnInductiveVariant::kDfg;
   const auto ocpn_dfg = minera::discover_ocpn(log, ocpn_options);
   assert(ocpn_dfg.petri_nets.size() == 2);
+  ocpn_options.annotated = false;
+  const auto ocpn_plain = minera::discover_ocpn(log, ocpn_options);
+  assert(!ocpn_plain.annotated && ocpn_plain.annotations.activities.empty());
+  assert(minera::serialize_ocpn_json(ocpn_plain).find("\"annotations\":null") !=
+         std::string::npos);
 
   const auto tuple_description = minera::describe_ocel_tuples(log);
   assert(tuple_description.includes_timestamps);

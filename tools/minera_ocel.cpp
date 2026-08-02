@@ -19,7 +19,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
@@ -188,6 +188,17 @@ int main(int argc, char** argv) {
           ocpn_options.variant = minera::OcpnInductiveVariant::kDfg;
         } else {
           throw std::invalid_argument("--ocpn-variant expects im or imd");
+        }
+      } else if (option == "--ocpn-annotation" && i + 1 < argc) {
+        const std::string annotation = argv[++i];
+        if (annotation == "annotated" || annotation == "classic") {
+          ocpn_options.annotated = true;
+        } else if (annotation == "none" || annotation == "wo_annotation" ||
+                   annotation == "without") {
+          ocpn_options.annotated = false;
+        } else {
+          throw std::invalid_argument(
+              "--ocpn-annotation expects annotated or none");
         }
       } else if (option == "--ocpn-double-arc-threshold" && i + 1 < argc) {
         ocpn_options.double_arc_threshold =

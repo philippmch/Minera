@@ -2187,6 +2187,7 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
 export interface OcelDiscoveryOptions {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
+  ocpn_annotation?: "annotated" | "none";
 }
 
 export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
@@ -2195,6 +2196,7 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   if (options.compute_edges_performance !== undefined) {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
   }
+  if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
   return query.toString();
 }
 
@@ -2264,6 +2266,7 @@ export interface OcelPlayoutOptions {
   case_interval?: number;
   event_interval?: number;
   ocpn_variant?: "log" | "dfg";
+  ocpn_annotation?: "annotated" | "none";
   double_arc_threshold?: number;
   noise_threshold?: number;
 }
@@ -2305,6 +2308,7 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   addNumber("case_interval", options.case_interval);
   addNumber("event_interval", options.event_interval);
   if (options.ocpn_variant !== undefined) query.set("ocpn_variant", options.ocpn_variant);
+  if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
   addNumber("double_arc_threshold", options.double_arc_threshold);
   addNumber("noise_threshold", options.noise_threshold);
   return query.toString();
