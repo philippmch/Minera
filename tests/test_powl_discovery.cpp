@@ -139,6 +139,24 @@ int main() {
   assert(common_boundary_redo.children()[0].kind() == PowlNodeKind::kXor);
   assert(common_boundary_redo.children()[1].label() == "X");
 
+  // A shared multi-activity redo segment must remain ordered while all
+  // start/end boundary alternatives stay in the do part.
+  const auto shared_ordered_redo = discover_powl(
+      log({{"A", "X", "Y", "A"}, {"B", "X", "Y", "B"},
+           {"A", "X", "Y", "B"}, {"B", "X", "Y", "A"}}),
+      tree);
+  assert(shared_ordered_redo.kind() == PowlNodeKind::kLoop);
+  assert(shared_ordered_redo.children()[0].kind() == PowlNodeKind::kXor);
+  assert(shared_ordered_redo.children()[1].kind() ==
+         PowlNodeKind::kStrictPartialOrder);
+  assert(shared_ordered_redo.children()[1].has_edge(0, 1));
+
+  // A connected middle component that returns to only one boundary is not a
+  // common loop; accepting it would create a false-positive redo cut.
+  const auto partial_shared_return = discover_powl(
+      log({{"A", "X", "Y", "A"}, {"B", "X", "B"}}), tree);
+  assert(partial_shared_return.kind() != PowlNodeKind::kLoop);
+
   // Multiple redo slices retain their multiplicity and order in the merged
   // redo projection rather than collapsing to a single activity choice.
   const auto multiple_redo =
