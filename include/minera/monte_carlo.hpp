@@ -105,11 +105,18 @@ struct MonteCarloResult {
   MonteCarloDiagnostics diagnostics;
 };
 
+// Fits the optional transition weights and deterministic service means from a
+// source log.  Visible transitions use activity frequencies; when timestamps
+// are available, the elapsed time to the next event estimates the current
+// activity's service interval. Explicit options always take precedence.
+[[nodiscard]] MonteCarloOptions fit_monte_carlo_options(
+    const EventLog& input_log, const PetriNet& net,
+    const MonteCarloOptions& options = {});
+
 // Runs a bounded, seeded virtual-time simulation of a workflow net.  Cases
 // share output-place resource pools, but each case owns its marking.  The
-// overload taking an input log is source-compatible with callers that keep a
-// source log beside the model; the current native contract uses explicit
-// weights and durations from MonteCarloOptions.
+// overload taking an input log fits missing transition weights and durations
+// before running the same scheduler.
 [[nodiscard]] MonteCarloResult monte_carlo(
     const PetriNet& net, const MonteCarloOptions& options = {});
 

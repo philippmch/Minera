@@ -31,6 +31,19 @@ minera::PetriNet choice_net() {
   return net;
 }
 
+minera::PetriNet sequential_net() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {middle});
+  net.add_transition(1, {middle}, {sink});
+  return net;
+}
+
 minera::PetriNet deadlock_net() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -113,6 +126,36 @@ void weighted_choices_and_exponential_replay() {
     assert(trace.events.size() == 1);
     assert(!trace.events.front().timestamp.empty());
   }
+}
+
+void source_log_fits_missing_weights_and_durations() {
+  const auto net = sequential_net();
+  minera::EventLog input;
+  for (int i = 0; i < 2; ++i) {
+    minera::Trace trace;
+    trace.case_id = "source_" + std::to_string(i);
+    trace.events = {
+        minera::Event{trace.case_id, "A", "2026-01-01T00:00:00Z"},
+        minera::Event{trace.case_id, "B", "2026-01-01T00:00:04Z"}};
+    input.traces.push_back(std::move(trace));
+  }
+  const auto fitted = minera::fit_monte_carlo_options(input, net);
+  assert(fitted.transition_weights.size() == 2);
+  assert(fitted.transition_weights[0] == 2.0 &&
+         fitted.transition_weights[1] == 2.0);
+  assert(fitted.transition_durations.size() == 2);
+  assert(fitted.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kDeterministic);
+  assert(fitted.transition_durations[0].value_seconds == 4.0);
+  assert(fitted.transition_durations[1].value_seconds == 1.0);
+
+  minera::MonteCarloOptions options;
+  options.simulations = 1;
+  options.resources_per_place[net.sink()] = 1;
+  const auto result = minera::monte_carlo(input, net, options);
+  assert(result.diagnostics.completed_cases == 1);
+  assert(result.diagnostics.case_execution_seconds.size() == 1);
+  assert(result.diagnostics.case_execution_seconds.front() == 5.0);
 }
 
 void scalar_duration_distributions_are_seeded_and_nonnegative() {
@@ -315,6 +358,7 @@ void json_contract_is_stable() {
 int main() {
   deterministic_seed_and_diagnostics();
   weighted_choices_and_exponential_replay();
+  source_log_fits_missing_weights_and_durations();
   scalar_duration_distributions_are_seeded_and_nonnegative();
   resources_create_virtual_fifo_wait();
   deadlocks_and_step_limits_are_reported();
