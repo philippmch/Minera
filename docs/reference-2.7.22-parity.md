@@ -71,7 +71,7 @@ are reconciled.
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
-| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, OCDFG metrics, unannotated OCPN per-object-type nets (IM/IMd), and OTG discovery are available through the native OCEL core and headless CLI; timestamp interleavings, link analysis, annotated OCPN, and SAW variants remain |
+| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), and OTG discovery are available through native/headless adapters; timestamp interleavings and SAW variants remain |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
@@ -92,6 +92,22 @@ The latter validates triangular activity-count bounds, supported operator
 weights, silent/duplicate probabilities, and its single-tree contract; strict request
 parsing, standalone CLI JSON, local `/api/random-tree`, frontend query
 serialization, and recursive response guards preserve the selected variant.
+
+Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
+deterministic OCDFG activity, start/end, and directly-followed-event metrics
+alongside each per-object-type workflow net. The serialized `annotations`
+section includes event/object tuples, event-pair aliases, object-type maps,
+performance-disabled diagnostics, and double-arc decisions; the existing
+`minera_ocel --discover ocpn`, local OCEL discovery route, and frontend result
+guard continue to select the same `ocpn` variant.
+
+Link-analysis evidence: the classic relation join is available as
+`discover_link_analysis` over event logs and supports first-class or generic
+event/trace columns, timestamp-aware stable ordering, forward-only filtering,
+first-occurrence reduction, deterministic transitive propagation, and a strict
+link bound. Its standalone JSON, `minera_export --link-analysis`, cached local
+`POST /api/link-analysis`, and frontend API/query guard all expose the same
+options and canonical event references.
 
 DFG simulation evidence: `CLASSIC` performs deterministic best-first expansion
 of a frequency DFG with start/end boundaries, probability ordering, occurrence

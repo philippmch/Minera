@@ -582,6 +582,52 @@ export function isCaseRelationsResult(value: unknown): value is CaseRelationsRes
   });
 }
 
+export interface LinkAnalysisEvent {
+  index: number;
+  trace_index: number;
+  event_index: number;
+  case_id: string;
+  activity: string;
+  timestamp: string;
+  value: string;
+}
+export interface LinkAnalysisLink {
+  source: LinkAnalysisEvent;
+  target: LinkAnalysisEvent;
+}
+export interface LinkAnalysisResult {
+  family: "LINK_ANALYSIS";
+  variant: "CLASSIC";
+  out_column: string;
+  in_column: string;
+  sorting_column: string;
+  look_forward: boolean;
+  keep_first_occurrence: boolean;
+  propagate: boolean;
+  event_count: number;
+  links: LinkAnalysisLink[];
+}
+function isLinkAnalysisEvent(value: unknown): value is LinkAnalysisEvent {
+  if (!value || typeof value !== "object") return false;
+  const event = value as Partial<LinkAnalysisEvent>;
+  return Number.isInteger(event.index) && Number.isInteger(event.trace_index) &&
+    Number.isInteger(event.event_index) && typeof event.case_id === "string" &&
+    typeof event.activity === "string" && typeof event.timestamp === "string" &&
+    typeof event.value === "string";
+}
+export function isLinkAnalysisResult(value: unknown): value is LinkAnalysisResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<LinkAnalysisResult>;
+  return result.family === "LINK_ANALYSIS" && result.variant === "CLASSIC" &&
+    typeof result.out_column === "string" && typeof result.in_column === "string" &&
+    typeof result.sorting_column === "string" && typeof result.look_forward === "boolean" &&
+    typeof result.keep_first_occurrence === "boolean" && typeof result.propagate === "boolean" &&
+    typeof result.event_count === "number" && Number.isInteger(result.event_count) && result.event_count >= 0 &&
+    Array.isArray(result.links) && result.links.every((link) => !!link &&
+      typeof link === "object" && isLinkAnalysisEvent(link.source) &&
+      isLinkAnalysisEvent(link.target));
+}
+
 export interface RandomTreeNode {
   operator: "activity" | "tau" | "sequence" | "exclusive" | "parallel" | "loop";
   activity?: string;

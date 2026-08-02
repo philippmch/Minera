@@ -190,8 +190,20 @@ int main() {
   assert(ocpn.object_types.size() == 2 && ocpn.petri_nets.size() == 2);
   assert(ocpn.petri_nets.at("order").activities().size() >= 1);
   assert(ocpn.double_arcs_on_activity.at("order").at("Create") == false);
-  assert(minera::serialize_ocpn_json(ocpn).find("double_arcs_on_activity") !=
-         std::string::npos);
+  assert(ocpn.annotations.activities_indep.at("Create").events.size() == 1);
+  assert(ocpn.annotations.activities_ot.at("order").at("Ship")
+             .unique_objects.size() == 1);
+  assert(ocpn.annotations.start_activities.at("order").at("Create")
+             .events.size() == 1);
+  assert(ocpn.annotations.end_activities.at("order").at("Ship")
+             .events.size() == 1);
+  assert(ocpn.annotations.edges.at("order").at({"Create", "Ship"})
+             .event_couples.size() == 1);
+  const auto ocpn_json = minera::serialize_ocpn_json(ocpn);
+  assert(ocpn_json.find("double_arcs_on_activity") != std::string::npos);
+  assert(ocpn_json.find("\"annotations\"") != std::string::npos);
+  assert(ocpn_json.find("\"event_pairs\"") != std::string::npos);
+  assert(ocpn_json.find("\"total_objects\":[[") != std::string::npos);
   ocpn_options.variant = minera::OcpnInductiveVariant::kDfg;
   const auto ocpn_dfg = minera::discover_ocpn(log, ocpn_options);
   assert(ocpn_dfg.petri_nets.size() == 2);

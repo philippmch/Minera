@@ -51,6 +51,7 @@
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
+#include "minera/link_analysis.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
@@ -368,6 +369,8 @@ int usage(const char* program) {
                "  --sna-max-edges <n>    Edge safety bound\n"
                "  --network-analysis     Emit organizational network analysis JSON\n"
                "  --network-analysis-* <v> Network selectors, performance, hours, and bounds\n"
+               "  --link-analysis       Emit classic link-analysis JSON\n"
+               "  --link-analysis-* <v> Relation columns, ordering, propagation, and bounds\n"
                "  --roles                Emit deterministic role discovery JSON\n"
                "  --roles-threshold <f>  Merge threshold in [0,1]\n"
                "  --roles-max-resources <n> Resource safety bound\n"
@@ -941,6 +944,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> organizational_sna_fields;
   bool network_analysis_requested = false;
   std::map<std::string, std::string> network_analysis_fields;
+  bool link_analysis_requested = false;
+  std::map<std::string, std::string> link_analysis_fields;
   bool roles_requested = false;
   std::map<std::string, std::string> roles_fields;
   bool resource_profiles_requested = false;
@@ -1088,6 +1093,22 @@ int main(int argc, char** argv) {
       if (!names.contains(key)) return usage(argv[0]);
       network_analysis_fields.insert_or_assign(std::move(key), value);
       network_analysis_requested = true; continue;
+    }
+    if (arg == "--link-analysis") { link_analysis_requested = true; continue; }
+    if (arg.rfind("--link-analysis-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "link_analysis_out_column", "link_analysis_in_column",
+          "link_analysis_sorting_column", "link_analysis_look_forward",
+          "link_analysis_keep_first_occurrence", "link_analysis_propagate",
+          "link_analysis_max_links"};
+      if (!names.contains(key)) return usage(argv[0]);
+      link_analysis_fields.insert_or_assign(std::move(key), value);
+      link_analysis_requested = true;
+      continue;
     }
     if (arg == "--roles") { roles_requested = true; continue; }
     if (arg == "--resource-profiles") { resource_profiles_requested = true; continue; }
@@ -2746,6 +2767,28 @@ int main(int argc, char** argv) {
       const auto body = minera::network_analysis_json(minera::discover_network_analysis(log, params));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
+      return 0;
+    }
+    if (link_analysis_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = link_analysis_fields.find(std::string(name));
+        return it == link_analysis_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return link_analysis_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_link_analysis_params(lookup, present);
+      const auto body = minera::link_analysis_json(
+          minera::discover_link_analysis(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
       return 0;
     }
     if (roles_requested) {

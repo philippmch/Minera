@@ -1937,6 +1937,44 @@ CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
   return params;
 }
 
+LinkAnalysisParams parse_link_analysis_params(const FieldLookup& field) {
+  return parse_link_analysis_params(field, {});
+}
+
+LinkAnalysisParams parse_link_analysis_params(const FieldLookup& field,
+                                              const FieldPresence& present) {
+  LinkAnalysisParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  const auto assign_string = [&](std::string_view name, std::string& target) {
+    if (supplied(name)) target = require(name);
+  };
+  assign_string("link_analysis_out_column", params.out_column);
+  assign_string("link_analysis_in_column", params.in_column);
+  assign_string("link_analysis_sorting_column", params.sorting_column);
+  if (supplied("link_analysis_look_forward"))
+    params.look_forward = parse_boolean(
+        require("link_analysis_look_forward"), "link_analysis_look_forward");
+  if (supplied("link_analysis_keep_first_occurrence"))
+    params.keep_first_occurrence = parse_boolean(
+        require("link_analysis_keep_first_occurrence"),
+        "link_analysis_keep_first_occurrence");
+  if (supplied("link_analysis_propagate"))
+    params.propagate = parse_boolean(require("link_analysis_propagate"),
+                                     "link_analysis_propagate");
+  if (supplied("link_analysis_max_links"))
+    params.max_links = parse_positive_size(require("link_analysis_max_links"),
+                                           "link_analysis_max_links");
+  return params;
+}
+
 RandomTreeParams parse_random_tree_params(const FieldLookup& field) {
   return parse_random_tree_params(field, {});
 }

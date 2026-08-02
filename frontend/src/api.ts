@@ -25,6 +25,7 @@ import {
   type TrieResult,
   type IntervalTreeResult,
   type CaseRelationsResult,
+  type LinkAnalysisResult,
   type RandomTreeResult,
   type OcelDiscoveryVariant,
   type OcelConformanceVariant,
@@ -46,6 +47,7 @@ import {
   isTrieResult,
   isIntervalTreeResult,
   isCaseRelationsResult,
+  isLinkAnalysisResult,
   isRandomTreeResult,
   isOcelDiscoveryResult,
   isOcelConformanceResult,
@@ -1889,6 +1891,44 @@ export async function requestCaseRelations(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isCaseRelationsResult(payload)) throw new Error("the Minera backend returned an invalid case-relations merge");
+  return payload;
+}
+
+export interface LinkAnalysisOptions {
+  link_analysis_out_column?: string;
+  link_analysis_in_column?: string;
+  link_analysis_sorting_column?: string;
+  link_analysis_look_forward?: boolean;
+  link_analysis_keep_first_occurrence?: boolean;
+  link_analysis_propagate?: boolean;
+  link_analysis_max_links?: number;
+}
+
+export function linkAnalysisQuery(options: LinkAnalysisOptions = {}): string {
+  const query = new URLSearchParams();
+  const add = (name: string, value: string | number | boolean | undefined) => {
+    if (value !== undefined) query.set(name, String(value));
+  };
+  add("link_analysis_out_column", options.link_analysis_out_column);
+  add("link_analysis_in_column", options.link_analysis_in_column);
+  add("link_analysis_sorting_column", options.link_analysis_sorting_column);
+  add("link_analysis_look_forward", options.link_analysis_look_forward);
+  add("link_analysis_keep_first_occurrence", options.link_analysis_keep_first_occurrence);
+  add("link_analysis_propagate", options.link_analysis_propagate);
+  add("link_analysis_max_links", options.link_analysis_max_links);
+  return query.toString();
+}
+
+export async function requestLinkAnalysis(
+  options: LinkAnalysisOptions = {},
+): Promise<LinkAnalysisResult> {
+  const query = linkAnalysisQuery(options);
+  const response = await fetch(`/api/link-analysis${query ? `?${query}` : ""}`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isLinkAnalysisResult(payload)) throw new Error("the Minera backend returned an invalid link analysis");
   return payload;
 }
 

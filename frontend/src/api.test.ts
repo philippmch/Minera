@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -170,6 +170,32 @@ describe("OCEL API", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "OCEL_CONFORMANCE", variant: "otg" }) })));
     await expect(requestOcelConformance(new File(["{}"], "log.json"), new File(["{}"], "normative.json")))
       .rejects.toThrow(/invalid OCEL conformance/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("link-analysis API", () => {
+  it("serializes relation, ordering, propagation, and bound options", () => {
+    expect(linkAnalysisQuery({
+      link_analysis_out_column: "source_id",
+      link_analysis_in_column: "target_id",
+      link_analysis_sorting_column: "started_at",
+      link_analysis_look_forward: false,
+      link_analysis_keep_first_occurrence: true,
+      link_analysis_propagate: true,
+      link_analysis_max_links: 12,
+    })).toBe("link_analysis_out_column=source_id&link_analysis_in_column=target_id&link_analysis_sorting_column=started_at&link_analysis_look_forward=false&link_analysis_keep_first_occurrence=true&link_analysis_propagate=true&link_analysis_max_links=12");
+  });
+
+  it("validates the cached-session response shape", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LINK_ANALYSIS", variant: "CLASSIC", out_column: "case_id", in_column: "case_id", sorting_column: "timestamp", look_forward: true, keep_first_occurrence: false, propagate: false, event_count: 1, links: [] }) })));
+    await expect(requestLinkAnalysis()).resolves.toMatchObject({ family: "LINK_ANALYSIS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects malformed link payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LINK_ANALYSIS", variant: "CLASSIC", links: [] }) })));
+    await expect(requestLinkAnalysis()).rejects.toThrow(/invalid link analysis/);
     vi.unstubAllGlobals();
   });
 });

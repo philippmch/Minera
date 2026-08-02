@@ -41,6 +41,7 @@
 #include "minera/random_tree.hpp"
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
+#include "minera/link_analysis.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
@@ -109,6 +110,7 @@ using LogToTargetParams = LogToTargetOptions;
 using TrieParams = TrieOptions;
 using IntervalTreeParams = OpenPathIntervalOptions;
 using CaseRelationsParams = CaseRelationsOptions;
+using LinkAnalysisParams = LinkAnalysisOptions;
 using RandomTreeParams = RandomTreeOptions;
 using LogToFeaturesParams = LogToFeaturesOptions;
 using LabelSplittingParams = LabelSplittingOptions;
@@ -343,6 +345,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] CaseRelationsParams parse_case_relations_params(
     const FieldLookup& field);
 [[nodiscard]] CaseRelationsParams parse_case_relations_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] LinkAnalysisParams parse_link_analysis_params(
+    const FieldLookup& field);
+[[nodiscard]] LinkAnalysisParams parse_link_analysis_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] RandomTreeParams parse_random_tree_params(
