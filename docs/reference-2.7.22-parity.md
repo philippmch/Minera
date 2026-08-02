@@ -215,7 +215,7 @@ this traditional-log vertical.
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN; no DFG format |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters; LTL/segments/DFG/OCEL gaps |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters plus deterministic connected DFG activity/path/dependency/boundary filters; LTL/segments/OCEL gaps |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
@@ -550,6 +550,17 @@ request fields, CLI, and local server. Deterministic JSON resolves all
 activities against the shared registry and preserves alias names; the frontend
 exposes all settings and renders frequency, triple, performance,
 case-attribute, clean-time, and causal artifacts.
+
+## Connected DFG filtering evidence
+
+The native DFG filtering API now exposes deterministic activity-percentage,
+path-percentage, dependency-threshold, to-activity, from-activity, and
+contain-activity variations. Each filter works on explicit activity, boundary,
+and edge frequencies, removes only the requested low-support nodes or paths,
+and repairs the graph so retained activities remain reachable from a start and
+can reach an end. Focused tests cover boundary preservation, branch pruning,
+dependency ties, unknown activities, invalid thresholds, and deterministic
+output ordering.
 
 ## Correlation-mining parity evidence
 
