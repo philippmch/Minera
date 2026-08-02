@@ -9,13 +9,14 @@
 #include <string>
 
 #include "minera/ocel.hpp"
+#include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
 
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
@@ -24,6 +25,9 @@ int main(int argc, char** argv) {
     minera::Ocel log = minera::parse_ocel_json(text.str());
     std::string format = "classic", describe, discover, split, conformance,
                         split_object_type, normative_path;
+    bool ocpn_playout = false;
+    bool ocpn_unique_objects = false;
+    minera::OcpnPlayoutOptions ocpn_playout_options;
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
     std::optional<double> split_max_degree_centrality;
     bool compute_edges_performance = true;
@@ -62,6 +66,45 @@ int main(int argc, char** argv) {
       } else if (option == "--split-max-degree-centrality" && i + 1 < argc) {
         split_max_degree_centrality =
             number(argv[++i], "--split-max-degree-centrality");
+      } else if (option == "--ocpn-playout") {
+        ocpn_playout = true;
+      } else if (option == "--ocpn-unique-objects") {
+        ocpn_unique_objects = true;
+      } else if ((option == "--ocpn-max-bindings" ||
+                  option == "--ocpn-max-traces" ||
+                  option == "--ocpn-max-states") && i + 1 < argc) {
+        const auto parsed = number(argv[++i], option.c_str());
+        if (parsed > static_cast<double>(std::numeric_limits<std::size_t>::max()) ||
+            std::floor(parsed) != parsed)
+          throw std::invalid_argument(option + " expects a non-negative integer");
+        const auto value = static_cast<std::size_t>(parsed);
+        if (option == "--ocpn-max-bindings")
+          ocpn_playout_options.max_bindings_per_activity = value;
+        else if (option == "--ocpn-max-traces")
+          ocpn_playout_options.max_traces = value;
+        else
+          ocpn_playout_options.max_states = value;
+      } else if (option == "--ocpn-objects" && i + 1 < argc) {
+        const std::string spec = argv[++i];
+        const auto separator = spec.find(':');
+        if (separator == std::string::npos || separator == 0 ||
+            separator + 1 >= spec.size())
+          throw std::invalid_argument(
+              "--ocpn-objects expects TYPE:ID1,ID2");
+        const auto type = spec.substr(0, separator);
+        const auto ids = spec.substr(separator + 1);
+        std::size_t begin = 0;
+        while (begin <= ids.size()) {
+          const auto end = ids.find(',', begin);
+          const auto id = ids.substr(begin, end == std::string::npos
+                                              ? std::string::npos
+                                              : end - begin);
+          if (id.empty())
+            throw std::invalid_argument("--ocpn-objects contains an empty id");
+          ocpn_playout_options.objects[type].push_back(id);
+          if (end == std::string::npos) break;
+          begin = end + 1;
+        }
       } else if ((option == "--conformance" || option == "--normative") &&
                  i + 1 < argc) {
         (option == "--conformance" ? conformance : normative_path) = argv[++i];
@@ -120,19 +163,32 @@ int main(int argc, char** argv) {
         conformance != "otg") {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
-    if (!conformance.empty() && (!discover.empty() || !split.empty()))
+    if (!conformance.empty() &&
+        (!discover.empty() || !split.empty() || ocpn_playout))
       throw std::invalid_argument(
           "--conformance cannot be combined with discovery or split");
     if (!discover.empty() && !split.empty())
       throw std::invalid_argument("--discover and --split are mutually exclusive");
+    if (ocpn_playout && (!discover.empty() || !split.empty()))
+      throw std::invalid_argument(
+          "--ocpn-playout cannot be combined with discovery or split");
     if (!describe.empty() &&
-        (!discover.empty() || !split.empty() || !conformance.empty()))
+        (!discover.empty() || !split.empty() || !conformance.empty() ||
+         ocpn_playout))
       throw std::invalid_argument(
           "--describe cannot be combined with discovery, split, or conformance");
     if (!conformance.empty() && normative_path.empty())
       throw std::invalid_argument("--normative is required with --conformance");
     if (conformance.empty() && !normative_path.empty())
       throw std::invalid_argument("--normative requires --conformance");
+    if (ocpn_playout) {
+      ocpn_playout_options.objects_unique_per_trace = ocpn_unique_objects;
+      std::cout << minera::serialize_ocpn_playout_json(
+                       minera::ocpn_extensive_playout(
+                           minera::discover_ocpn(log), ocpn_playout_options))
+                << '\n';
+      return 0;
+    }
     if (!split.empty()) {
       minera::OcelSplitOptions options;
       options.variant = split == "connected_components"
