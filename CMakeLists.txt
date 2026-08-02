@@ -60,6 +60,7 @@ add_library(minera_core
   src/local_diagnostics.cpp
   src/log_skeleton.cpp
   src/model_decoration.cpp
+  src/monte_carlo.cpp
   src/minimum_self_distance.cpp
   src/ocel.cpp
   src/performance.cpp
@@ -260,6 +261,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_playout_tests PRIVATE cxx_std_20)
   target_compile_options(minera_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_playout_tests COMMAND minera_playout_tests)
+
+  add_executable(minera_monte_carlo_tests
+    tests/test_monte_carlo.cpp
+  )
+  target_link_libraries(minera_monte_carlo_tests PRIVATE minera::core)
+  target_compile_features(minera_monte_carlo_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_monte_carlo_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_monte_carlo_tests COMMAND minera_monte_carlo_tests)
 
   add_executable(minera_correlation_miner_tests
     tests/test_correlation_miner.cpp
