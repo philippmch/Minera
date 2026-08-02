@@ -1545,7 +1545,9 @@ void parse_monte_carlo_params_maps_controls() {
       {"monte_carlo_default_duration_seconds", "3"},
       {"monte_carlo_default_resources_per_place", "2"},
       {"monte_carlo_transition_weights", "0.25, 2, 0"},
-      {"monte_carlo_transition_durations", "deterministic:1, EXPONENTIAL=2"},
+      {"monte_carlo_transition_durations",
+       "deterministic:1, EXPONENTIAL=2, normal:3;1, uniform:0;2, "
+       "lognormal:0.5;0;1, gamma:2;0;1, immediate:0"},
       {"monte_carlo_resources_per_place", "0=2, 3=4"},
       {"monte_carlo_enable_diagnostics", "false"},
       {"monte_carlo_stop_at_final", "false"}}));
@@ -1555,12 +1557,25 @@ void parse_monte_carlo_params_maps_controls() {
          parsed.default_duration_seconds == 3.0);
   assert(parsed.default_resources_per_place == 2 &&
          parsed.transition_weights == std::vector<double>({0.25, 2, 0}));
-  assert(parsed.transition_durations.size() == 2);
+  assert(parsed.transition_durations.size() == 7);
   assert(parsed.transition_durations[0].distribution ==
          minera::MonteCarloDurationDistribution::kDeterministic);
   assert(parsed.transition_durations[1].distribution ==
          minera::MonteCarloDurationDistribution::kExponential);
   assert(parsed.transition_durations[1].value_seconds == 2.0);
+  assert(parsed.transition_durations[2].distribution ==
+         minera::MonteCarloDurationDistribution::kNormal);
+  assert(parsed.transition_durations[2].secondary_seconds == 1.0);
+  assert(parsed.transition_durations[3].distribution ==
+         minera::MonteCarloDurationDistribution::kUniform);
+  assert(parsed.transition_durations[3].secondary_seconds == 2.0);
+  assert(parsed.transition_durations[4].distribution ==
+         minera::MonteCarloDurationDistribution::kLogNormal);
+  assert(parsed.transition_durations[4].tertiary_seconds == 1.0);
+  assert(parsed.transition_durations[5].distribution ==
+         minera::MonteCarloDurationDistribution::kGamma);
+  assert(parsed.transition_durations[6].distribution ==
+         minera::MonteCarloDurationDistribution::kImmediate);
   assert(parsed.resources_per_place.at(0) == 2 &&
          parsed.resources_per_place.at(3) == 4);
   assert(!parsed.enable_diagnostics && !parsed.stop_at_final);
@@ -1572,6 +1587,8 @@ void parse_monte_carlo_params_rejects_bad_values() {
            std::pair{"monte_carlo_case_arrival_seconds", "-1"},
            std::pair{"monte_carlo_transition_weights", "1,"},
            std::pair{"monte_carlo_transition_durations", "normal:1"},
+           std::pair{"monte_carlo_transition_durations", "lognormal:1;0;0"},
+           std::pair{"monte_carlo_transition_durations", "unknown:1"},
            std::pair{"monte_carlo_resources_per_place", "1=0"},
            std::pair{"monte_carlo_enable_diagnostics", "maybe"}}) {
     bool threw = false;

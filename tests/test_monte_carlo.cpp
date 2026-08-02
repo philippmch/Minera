@@ -115,6 +115,56 @@ void weighted_choices_and_exponential_replay() {
   }
 }
 
+void scalar_duration_distributions_are_seeded_and_nonnegative() {
+  const auto net = linear_net();
+  const auto options_for = [&](minera::MonteCarloDuration duration) {
+    minera::MonteCarloOptions options;
+    options.simulations = 8;
+    options.case_arrival_seconds = 0.0;
+    options.seed = 901;
+    options.resources_per_place[net.sink()] = options.simulations;
+    options.transition_durations = {duration};
+    return options;
+  };
+  const auto assert_replay = [&](const minera::MonteCarloOptions& options) {
+    const auto first = minera::monte_carlo(net, options);
+    const auto second = minera::monte_carlo(net, options);
+    assert_same_logs(first.log, second.log);
+    assert(first.diagnostics.case_execution_seconds.size() ==
+           options.simulations);
+    for (const double seconds : first.diagnostics.case_execution_seconds) {
+      assert(std::isfinite(seconds));
+      assert(seconds >= 0.0);
+    }
+  };
+
+  auto constant0 = options_for(
+      {minera::MonteCarloDurationDistribution::kConstant0, 99.0});
+  assert_replay(constant0);
+  assert(constant0.transition_durations.front().value_seconds == 99.0);
+  const auto zero_result = minera::monte_carlo(net, constant0);
+  for (const double seconds : zero_result.diagnostics.case_execution_seconds)
+    assert(seconds == 0.0);
+
+  assert_replay(options_for(
+      {minera::MonteCarloDurationDistribution::kImmediate, 4.0}));
+  const auto normal = options_for(
+      {minera::MonteCarloDurationDistribution::kNormal, 3.0, 0.0});
+  const auto normal_result = minera::monte_carlo(net, normal);
+  for (const double seconds : normal_result.diagnostics.case_execution_seconds)
+    assert(seconds == 3.0);
+  const auto uniform = options_for(
+      {minera::MonteCarloDurationDistribution::kUniform, 2.0, 0.0});
+  const auto uniform_result = minera::monte_carlo(net, uniform);
+  for (const double seconds : uniform_result.diagnostics.case_execution_seconds)
+    assert(seconds == 2.0);
+
+  assert_replay(options_for(
+      {minera::MonteCarloDurationDistribution::kLogNormal, 1.0, 0.0, 1.0}));
+  assert_replay(options_for(
+      {minera::MonteCarloDurationDistribution::kGamma, 1.0, 0.0, 1.0}));
+}
+
 void resources_create_virtual_fifo_wait() {
   const auto net = linear_net();
   minera::MonteCarloOptions options;
@@ -213,6 +263,28 @@ void invalid_options_are_rejected() {
     rejected = true;
   }
   assert(rejected);
+
+  for (const auto duration : {
+           minera::MonteCarloDuration{
+               minera::MonteCarloDurationDistribution::kNormal, 1.0, -1.0},
+           minera::MonteCarloDuration{
+               minera::MonteCarloDurationDistribution::kUniform, 1.0, -1.0},
+           minera::MonteCarloDuration{
+               minera::MonteCarloDurationDistribution::kLogNormal, 0.0, 0.0,
+               1.0},
+           minera::MonteCarloDuration{
+               minera::MonteCarloDurationDistribution::kGamma, 1.0, 0.0,
+               0.0}}) {
+    rejected = false;
+    try {
+      minera::MonteCarloOptions options;
+      options.transition_durations = {duration};
+      (void)minera::monte_carlo(net, options);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
 }
 
 void diagnostics_can_be_disabled() {
@@ -243,6 +315,7 @@ void json_contract_is_stable() {
 int main() {
   deterministic_seed_and_diagnostics();
   weighted_choices_and_exponential_replay();
+  scalar_duration_distributions_are_seeded_and_nonnegative();
   resources_create_virtual_fifo_wait();
   deadlocks_and_step_limits_are_reported();
   invalid_options_are_rejected();

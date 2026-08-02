@@ -1609,13 +1609,34 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   }
   if (options.transition_durations !== undefined) {
     if (!Array.isArray(options.transition_durations) || options.transition_durations.length === 0 ||
-        options.transition_durations.some((duration) =>
-          !duration || (duration.distribution !== "deterministic" && duration.distribution !== "exponential") ||
-          !Number.isFinite(duration.value_seconds) || duration.value_seconds < 0)) {
-      throw new Error("transition_durations must contain valid distribution/value entries");
+        options.transition_durations.some((duration) => {
+          if (!duration || !Number.isFinite(duration.value_seconds) || duration.value_seconds < 0) return true;
+          const distribution = duration.distribution;
+          if (!["deterministic", "exponential", "constant0", "immediate", "normal", "uniform", "lognormal", "gamma"]
+            .includes(distribution)) return true;
+          const secondary = duration.secondary_seconds;
+          const tertiary = duration.tertiary_seconds;
+          if (secondary !== undefined && (!Number.isFinite(secondary) || secondary < 0)) return true;
+          if (tertiary !== undefined && (!Number.isFinite(tertiary) || tertiary <= 0)) return true;
+          if ((distribution === "normal" || distribution === "uniform") && secondary === undefined) return true;
+          if ((distribution === "lognormal" || distribution === "gamma") &&
+              (duration.value_seconds <= 0 || (tertiary !== undefined && tertiary <= 0))) return true;
+          return false;
+        })) {
+      throw new Error("transition_durations must contain valid distribution parameters");
     }
     params.set("monte_carlo_transition_durations", options.transition_durations
-      .map((duration) => `${duration.distribution}:${duration.value_seconds}`).join(","));
+      .map((duration) => {
+        const distribution = duration.distribution;
+        if (distribution === "constant0" || distribution === "immediate") return `${distribution}:0`;
+        if (distribution === "normal" || distribution === "uniform") {
+          return `${distribution}:${duration.value_seconds};${duration.secondary_seconds}`;
+        }
+        if (distribution === "lognormal" || distribution === "gamma") {
+          return `${distribution}:${duration.value_seconds};${duration.secondary_seconds ?? 0};${duration.tertiary_seconds ?? 1}`;
+        }
+        return `${distribution}:${duration.value_seconds}`;
+      }).join(","));
   }
   if (options.resources_per_place !== undefined) {
     if (!options.resources_per_place || typeof options.resources_per_place !== "object" ||
