@@ -24,6 +24,7 @@ add_library(minera_core
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
+  src/oc_causal_net.cpp
   src/conformance.cpp
   src/concept_drift.cpp
   src/correlation_miner.cpp
@@ -582,6 +583,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_features_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_features_tests COMMAND minera_ocel_features_tests)
+
+  add_executable(minera_oc_causal_net_tests
+    tests/test_oc_causal_net.cpp
+  )
+  target_link_libraries(minera_oc_causal_net_tests PRIVATE minera::core)
+  target_compile_features(minera_oc_causal_net_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_oc_causal_net_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_oc_causal_net_tests COMMAND minera_oc_causal_net_tests)
 
   add_executable(minera_link_analysis_tests
     tests/test_link_analysis.cpp

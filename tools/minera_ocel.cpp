@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "minera/ocel.hpp"
+#include "minera/oc_causal_net.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
@@ -18,7 +19,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
@@ -28,6 +29,7 @@ int main(int argc, char** argv) {
     std::string format = "classic", describe, features, discover, split, conformance,
                         split_object_type, normative_path;
     bool ocpn_playout = false;
+    bool oc_causal_net_playout = false;
     bool ocpn_unique_objects = false;
     minera::OcpnPlayoutOptions ocpn_playout_options;
     minera::OcelFeatureOptions feature_options;
@@ -120,6 +122,8 @@ int main(int argc, char** argv) {
             number(argv[++i], "--split-max-degree-centrality");
       } else if (option == "--ocpn-playout") {
         ocpn_playout = true;
+      } else if (option == "--oc-causal-net") {
+        oc_causal_net_playout = true;
       } else if (option == "--ocpn-unique-objects") {
         ocpn_unique_objects = true;
       } else if ((option == "--ocpn-max-bindings" ||
@@ -221,17 +225,22 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
     if (!conformance.empty() &&
-        (!discover.empty() || !split.empty() || !features.empty() || ocpn_playout))
+        (!discover.empty() || !split.empty() || !features.empty() ||
+         ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
           "--conformance cannot be combined with discovery or split");
     if (!discover.empty() && !split.empty())
       throw std::invalid_argument("--discover and --split are mutually exclusive");
-    if (ocpn_playout && (!discover.empty() || !split.empty()))
+    if ((ocpn_playout || oc_causal_net_playout) &&
+        (!discover.empty() || !split.empty()))
       throw std::invalid_argument(
-          "--ocpn-playout cannot be combined with discovery or split");
+          "object-centric playout cannot be combined with discovery or split");
+    if (ocpn_playout && oc_causal_net_playout)
+      throw std::invalid_argument(
+          "--ocpn-playout and --oc-causal-net are mutually exclusive");
     if (!describe.empty() &&
         (!discover.empty() || !split.empty() || !features.empty() || !conformance.empty() ||
-         ocpn_playout))
+         ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
           "--describe cannot be combined with discovery, split, or conformance");
     if (!conformance.empty() && normative_path.empty())
@@ -240,7 +249,7 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("--normative requires --conformance");
     if (!features.empty() &&
         (!discover.empty() || !split.empty() || !conformance.empty() ||
-         ocpn_playout))
+         ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
           "--features cannot be combined with discovery, split, conformance, or playout");
     if (!features.empty()) {
@@ -260,6 +269,15 @@ int main(int argc, char** argv) {
       std::cout << minera::serialize_ocpn_playout_json(
                        minera::ocpn_extensive_playout(
                            minera::discover_ocpn(log), ocpn_playout_options))
+                << '\n';
+      return 0;
+    }
+    if (oc_causal_net_playout) {
+      ocpn_playout_options.objects_unique_per_trace = ocpn_unique_objects;
+      const auto model = minera::discover_oc_causal_net(log, ocpn_options);
+      std::cout << minera::serialize_oc_causal_net_playout_json(
+                       minera::oc_causal_net_extensive_playout(
+                           model, ocpn_playout_options))
                 << '\n';
       return 0;
     }

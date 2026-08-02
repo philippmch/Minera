@@ -2219,6 +2219,7 @@ export async function requestOcelSplit(
 }
 
 export interface OcelPlayoutOptions {
+  model?: "ocpn" | "causal_net";
   variant?: "extensive";
   max_bindings_per_activity?: number;
   max_traces?: number;
@@ -2242,6 +2243,7 @@ function escapeOcelPlayoutPart(value: string): string {
 
 export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   const query = new URLSearchParams();
+  if (options.model !== undefined) query.set("model", options.model);
   if (options.variant !== undefined) query.set("variant", options.variant);
   const addInteger = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isInteger(value) && value >= 0)
