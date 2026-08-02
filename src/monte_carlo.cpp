@@ -509,6 +509,79 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
 
 }  // namespace
 
+MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
+                                          const PetriNet& net,
+                                          const MonteCarloOptions& options) {
+  MonteCarloOptions fitted = options;
+  if (input_log.traces.empty()) return fitted;
+
+  std::map<std::string, std::uint64_t> activity_counts;
+  std::map<std::string, double> elapsed_seconds;
+  std::map<std::string, std::size_t> elapsed_samples;
+  for (const auto& trace : input_log.traces) {
+    for (std::size_t index = 0; index < trace.events.size(); ++index) {
+      const auto& event = trace.events[index];
+      ++activity_counts[event.activity];
+      if (index + 1 >= trace.events.size()) continue;
+      const auto current = parse_timestamp(event.timestamp);
+      const auto next = parse_timestamp(trace.events[index + 1].timestamp);
+      if (!current || !next || !std::isfinite(*current) ||
+          !std::isfinite(*next) || *next < *current) {
+        continue;
+      }
+      const double elapsed = *next - *current;
+      if (!std::isfinite(elapsed)) continue;
+      elapsed_seconds[event.activity] += elapsed;
+      ++elapsed_samples[event.activity];
+    }
+  }
+
+  if (fitted.transition_weights.empty()) {
+    bool observed_transition = false;
+    std::vector<double> weights(net.transitions().size(), 0.0);
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      const auto& transition = net.transitions()[index];
+      if (!transition.activity ||
+          *transition.activity >= net.activities().size()) {
+        weights[index] = 1.0;
+        continue;
+      }
+      const auto it = activity_counts.find(net.activities()[*transition.activity]);
+      if (it != activity_counts.end() && it->second != 0) {
+        weights[index] = static_cast<double>(it->second);
+        observed_transition = true;
+      }
+    }
+    if (observed_transition) fitted.transition_weights = std::move(weights);
+  }
+
+  if (fitted.transition_durations.empty()) {
+    std::vector<MonteCarloDuration> durations(
+        net.transitions().size(),
+        MonteCarloDuration{MonteCarloDurationDistribution::kDeterministic,
+                           fitted.default_duration_seconds});
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      const auto& transition = net.transitions()[index];
+      if (!transition.activity ||
+          *transition.activity >= net.activities().size()) {
+        continue;
+      }
+      const auto activity = net.activities()[*transition.activity];
+      const auto samples = elapsed_samples.find(activity);
+      const auto total = elapsed_seconds.find(activity);
+      if (samples == elapsed_samples.end() || total == elapsed_seconds.end() ||
+          samples->second == 0) {
+        continue;
+      }
+      const double mean = total->second /
+                          static_cast<double>(samples->second);
+      if (std::isfinite(mean) && mean >= 0.0) durations[index].value_seconds = mean;
+    }
+    fitted.transition_durations = std::move(durations);
+  }
+  return fitted;
+}
+
 MonteCarloResult monte_carlo(const PetriNet& net,
                              const MonteCarloOptions& options) {
   return run_monte_carlo(net, options);
@@ -516,8 +589,7 @@ MonteCarloResult monte_carlo(const PetriNet& net,
 
 MonteCarloResult monte_carlo(const EventLog& input_log, const PetriNet& net,
                              const MonteCarloOptions& options) {
-  (void)input_log;
-  return run_monte_carlo(net, options);
+  return run_monte_carlo(net, fit_monte_carlo_options(input_log, net, options));
 }
 
 }  // namespace minera
