@@ -141,41 +141,139 @@ void append_values(const Node& n, std::vector<OcelAttribute>& out, bool reject_l
   }
 }
 
+bool is_value_node_name(std::string_view name) {
+  return name == "string" || name == "int" || name == "integer" ||
+         name == "long" || name == "float" || name == "double" ||
+         name == "number" || name == "boolean" || name == "bool" ||
+         name == "null" || name == "date" || name == "timestamp" ||
+         name == "id" || name == "list" || name == "array" ||
+         name == "attribute";
+}
+
+std::string keyed_value(const Node& n, std::string_view wanted) {
+  for (const auto& c : n.children) {
+    if (!is_value_node_name(local(c.name))) continue;
+    const auto key = attr_or(c, "key", attr_or(c, "name"));
+    if (key == wanted) return attr_or(c, "value", c.text);
+  }
+  return {};
+}
+
+void append_values_filtered(const Node& n, std::vector<OcelAttribute>& out,
+                            bool reject_lists,
+                            const std::unordered_set<std::string>& excluded) {
+  for (const auto& c : n.children) {
+    const auto name = local(c.name);
+    const auto key = attr_or(c, "key", attr_or(c, "name"));
+    if (name == "omap" ||
+        ((name == "list" || name == "array") && key == "omap")) {
+      continue;
+    }
+    if (name == "attributes" || name == "vmap" || name == "ovmap" ||
+        ((name == "list" || name == "array") &&
+         (key == "vmap" || key == "ovmap"))) {
+      append_values_filtered(c, out, reject_lists,
+                             std::unordered_set<std::string>{});
+      continue;
+    }
+    if (!is_value_node_name(name)) continue;
+    if (key.empty() || excluded.count(key)) continue;
+    out.push_back({key, value_node(c, reject_lists)});
+  }
+}
+
+void append_classic_relations(const Node& omap, std::string_view event_id,
+                              const std::unordered_map<std::string, std::string>& types,
+                              Ocel& log) {
+  for (const auto& rel : omap.children) {
+    const auto name = local(rel.name);
+    const std::string key = attr_or(rel, "key", attr_or(rel, "name"));
+    if (name != "object" && name != "relationship" &&
+        !(is_value_node_name(name) && key == "object-id")) {
+      continue;
+    }
+    const std::string oid = attr_or(rel, "object-id",
+                                    attr_or(rel, "objectId",
+                                            attr_or(rel, "id",
+                                                    key == "object-id"
+                                                        ? attr_or(rel, "value", rel.text)
+                                                        : std::string{})));
+    if (oid.empty()) throw std::invalid_argument("invalid OCEL XML event relation");
+    if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
+    log.relations.push_back({std::string(event_id), oid, attr_or(rel, "qualifier")});
+  }
+}
+
 void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
   std::unordered_map<std::string, std::string> types;
-  if (const auto* objects = child(root, "objects")) {
+  for (const auto* objects : children(root, "objects")) {
     for (const auto* on : children(*objects, "object")) {
-      const std::string id = attr_or(*on, "id", attr_or(*on, "object-id"));
-      const std::string type = attr_or(*on, "type", attr_or(*on, "object-type"));
+      const std::string id = attr_or(*on, "id", attr_or(*on, "object-id")).empty()
+                                 ? keyed_value(*on, "id")
+                                 : attr_or(*on, "id", attr_or(*on, "object-id"));
+      const std::string type = attr_or(*on, "type", attr_or(*on, "object-type")).empty()
+                                   ? (keyed_value(*on, "type").empty()
+                                          ? keyed_value(*on, "object-type")
+                                          : keyed_value(*on, "type"))
+                                   : attr_or(*on, "type", attr_or(*on, "object-type"));
       if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
-      OcelObject o{id, type, {}}; append_values(*on, o.attributes, reject_lists); log.objects.push_back(std::move(o));
-      if (const auto* links = child(*on, "o2o")) for (const auto* rel : children(*links, "relation")) {
-        log.o2o.push_back({id, attr_or(*rel, "target-id", attr_or(*rel, "object-id", attr_or(*rel, "target"))), attr_or(*rel, "qualifier")});
-      }
+      OcelObject o{id, type, {}};
+      append_values_filtered(*on, o.attributes, reject_lists,
+                             {"id", "object-id", "type", "object-type"});
+      log.objects.push_back(std::move(o));
+      for (const auto* links : children(*on, "o2o"))
+        for (const auto* rel : children(*links, "relation")) {
+          log.o2o.push_back({id, attr_or(*rel, "target-id",
+                                        attr_or(*rel, "object-id",
+                                                attr_or(*rel, "target"))),
+                            attr_or(*rel, "qualifier")});
+        }
     }
   }
-  if (const auto* events = child(root, "events")) {
+  for (const auto* events : children(root, "events")) {
     for (const auto* en : children(*events, "event")) {
-      OcelEvent e{attr_or(*en, "id", attr_or(*en, "event-id")), attr_or(*en, "activity", attr_or(*en, "type")), attr_or(*en, "timestamp", attr_or(*en, "time")), {}};
+      const std::string id = attr_or(*en, "id", attr_or(*en, "event-id")).empty()
+                                 ? keyed_value(*en, "id")
+                                 : attr_or(*en, "id", attr_or(*en, "event-id"));
+      const std::string activity =
+          attr_or(*en, "activity", attr_or(*en, "type")).empty()
+              ? (keyed_value(*en, "activity").empty()
+                     ? keyed_value(*en, "type")
+                     : keyed_value(*en, "activity"))
+              : attr_or(*en, "activity", attr_or(*en, "type"));
+      const std::string timestamp =
+          attr_or(*en, "timestamp", attr_or(*en, "time")).empty()
+              ? (keyed_value(*en, "timestamp").empty()
+                     ? keyed_value(*en, "time")
+                     : keyed_value(*en, "timestamp"))
+              : attr_or(*en, "timestamp", attr_or(*en, "time"));
+      OcelEvent e{id, activity, timestamp, {}};
       if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
-      append_values(*en, e.attributes, reject_lists); log.events.push_back(std::move(e));
-      if (const auto* omap = child(*en, "omap")) for (const auto* rel : children(*omap, "object")) {
-        const std::string oid = attr_or(*rel, "object-id", attr_or(*rel, "id"));
-        if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
-        log.relations.push_back({log.events.back().id, oid, attr_or(*rel, "qualifier")});
+      append_values_filtered(*en, e.attributes, reject_lists,
+                             {"id", "event-id", "activity", "type", "timestamp", "time"});
+      log.events.push_back(std::move(e));
+      for (const auto& child_node : en->children) {
+        const auto name = local(child_node.name);
+        const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
+        if (name == "omap" || (name == "list" && key == "omap"))
+          append_classic_relations(child_node, log.events.back().id, types, log);
       }
     }
   }
-  if (const auto* links = child(root, "o2o")) for (const auto* rel : children(*links, "relation")) {
-    log.o2o.push_back({attr_or(*rel, "source-id", attr_or(*rel, "source")), attr_or(*rel, "target-id", attr_or(*rel, "target")), attr_or(*rel, "qualifier")});
-  }
-  if (const auto* changes = child(root, "objectChanges")) for (const auto* cn : children(*changes, "change")) {
+  for (const auto* links : children(root, "o2o"))
+    for (const auto* rel : children(*links, "relation")) {
+      log.o2o.push_back({attr_or(*rel, "source-id", attr_or(*rel, "source")),
+                        attr_or(*rel, "target-id", attr_or(*rel, "target")),
+                        attr_or(*rel, "qualifier")});
+    }
+  for (const auto* changes : children(root, "objectChanges"))
+    for (const auto* cn : children(*changes, "change")) {
     OcelObjectChange c{attr_or(*cn, "object-id", attr_or(*cn, "objectId")), attr_or(*cn, "object-type", attr_or(*cn, "type")), attr_or(*cn, "timestamp", attr_or(*cn, "time")), attr_or(*cn, "field"), nullptr};
     if (c.object_type.empty() && types.count(c.object_id)) c.object_type = types[c.object_id];
     for (const auto& v : cn->children) if (local(v.name) != "field") { c.value = value_node(v, reject_lists); break; }
     if (c.object_id.empty() || c.field.empty()) throw std::invalid_argument("invalid OCEL XML object change");
     log.object_changes.push_back(std::move(c));
-  }
+    }
   for (const auto& g : root.children) if (local(g.name) == "global") {
     const std::string scope = attr_or(g, "scope"); std::vector<OcelAttribute> vals; append_values(g, vals, reject_lists);
     for (auto& a : vals) log.globals[(scope.empty() ? std::string("global") : "ocel:global-" + scope) + "." + a.key] = std::move(a.value);
@@ -184,29 +282,66 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
 
 void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   std::unordered_map<std::string, std::string> types;
-  if (const auto* objects = child(root, "objects")) for (const auto* on : children(*objects, "object")) {
-    const std::string id = attr_or(*on, "id"), type = attr_or(*on, "type");
-    if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
-    OcelObject o{id, type, {}};
-    if (const auto* a = child(*on, "attributes")) {
-      for (const auto& av : a->children) if (local(av.name) == "attribute") {
-        const std::string key = attr_or(av, "name", attr_or(av, "key"));
-        if (key.empty()) continue;
-        const auto value = value_node(av, reject_lists);
-        if (const auto* when = attr(av, "time")) log.object_changes.push_back({id, type, *when, key, value});
-        else o.attributes.push_back({key, value});
-      }
-    } else append_values(*on, o.attributes, reject_lists);
-    log.objects.push_back(std::move(o));
-    if (const auto* rs = child(*on, "relationships")) for (const auto* r : children(*rs, "relationship")) log.o2o.push_back({id, attr_or(*r, "object-id", attr_or(*r, "objectId")), attr_or(*r, "qualifier")});
-  }
-  if (const auto* events = child(root, "events")) for (const auto* en : children(*events, "event")) {
-    OcelEvent e{attr_or(*en, "id"), attr_or(*en, "type", attr_or(*en, "activity")), attr_or(*en, "time", attr_or(*en, "timestamp")), {}};
-    if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
-    if (const auto* a = child(*en, "attributes")) append_values(*a, e.attributes, reject_lists); log.events.push_back(std::move(e));
-    if (const auto* rs = child(*en, "objects")) for (const auto* r : children(*rs, "relationship")) { const std::string oid = attr_or(*r, "object-id", attr_or(*r, "objectId")); if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object"); log.relations.push_back({log.events.back().id, oid, attr_or(*r, "qualifier")}); }
-  }
+  for (const auto* objects : children(root, "objects"))
+    for (const auto* on : children(*objects, "object")) {
+      const std::string id = attr_or(*on, "id"), type = attr_or(*on, "type");
+      if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
+      OcelObject o{id, type, {}};
+      if (const auto* a = child(*on, "attributes")) {
+        for (const auto& av : a->children) if (local(av.name) == "attribute") {
+          const std::string key = attr_or(av, "name", attr_or(av, "key"));
+          if (key.empty()) continue;
+          const auto value = value_node(av, reject_lists);
+          if (const auto* when = attr(av, "time")) log.object_changes.push_back({id, type, *when, key, value});
+          else o.attributes.push_back({key, value});
+        }
+      } else append_values(*on, o.attributes, reject_lists);
+      log.objects.push_back(std::move(o));
+      for (const auto* rs : children(*on, "relationships"))
+        for (const auto* r : children(*rs, "relationship"))
+          log.o2o.push_back({id, attr_or(*r, "object-id", attr_or(*r, "objectId")), attr_or(*r, "qualifier")});
+      for (const auto* rs : children(*on, "objects"))
+        for (const auto* r : children(*rs, "relationship"))
+          log.o2o.push_back({id, attr_or(*r, "object-id", attr_or(*r, "objectId")), attr_or(*r, "qualifier")});
+    }
+  for (const auto* events : children(root, "events"))
+    for (const auto* en : children(*events, "event")) {
+      OcelEvent e{attr_or(*en, "id"), attr_or(*en, "type", attr_or(*en, "activity")), attr_or(*en, "time", attr_or(*en, "timestamp")), {}};
+      if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
+      if (const auto* a = child(*en, "attributes")) append_values(*a, e.attributes, reject_lists);
+      log.events.push_back(std::move(e));
+      for (const auto* rs : children(*en, "objects"))
+        for (const auto* r : children(*rs, "relationship")) {
+          const std::string oid = attr_or(*r, "object-id", attr_or(*r, "objectId"));
+          if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
+          log.relations.push_back({log.events.back().id, oid, attr_or(*r, "qualifier")});
+        }
+    }
   if (const auto* globals = child(root, "globals")) { std::vector<OcelAttribute> vals; append_values(*globals, vals, reject_lists); for (auto& a : vals) log.globals[a.key] = std::move(a.value); }
+}
+
+void validate_references(const Ocel& log) {
+  std::unordered_set<std::string> object_ids;
+  std::unordered_set<std::string> event_ids;
+  for (const auto& object : log.objects) object_ids.insert(object.id);
+  for (const auto& event : log.events) event_ids.insert(event.id);
+  for (const auto& relation : log.relations) {
+    if (!event_ids.count(relation.event_id) ||
+        !object_ids.count(relation.object_id)) {
+      throw std::invalid_argument("OCEL XML relation references unknown id");
+    }
+  }
+  for (const auto& relation : log.o2o) {
+    if (!object_ids.count(relation.source_id) ||
+        !object_ids.count(relation.target_id)) {
+      throw std::invalid_argument("OCEL XML O2O relation references unknown id");
+    }
+  }
+  for (const auto& change : log.object_changes) {
+    if (!object_ids.count(change.object_id)) {
+      throw std::invalid_argument("OCEL XML object change references unknown id");
+    }
+  }
 }
 
 std::string esc(std::string_view s) { std::string o; for (char c : s) { if (c == '&') o += "&amp;"; else if (c == '<') o += "&lt;"; else if (c == '"') o += "&quot;"; else if (c == '\'') o += "&apos;"; else o += c; } return o; }
@@ -222,6 +357,7 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   const Node root = parse_tree(xml); Ocel log;
   const bool standard = child(root, "object-types") != nullptr || child(root, "event-types") != nullptr || attr(root, "ocelVersion") != nullptr;
   if (standard) parse_standard(root, log, options.reject_unsupported); else parse_classic(root, log, options.reject_unsupported);
+  validate_references(log);
   return log;
 }
 
