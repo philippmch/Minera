@@ -274,8 +274,10 @@ server GET, and frontend response validation.
 The POWL review is pinned to commit
 `0715c31f3f1d85924107d6aa5329806db69df899`. Minera independently implements
 the five selectable discovery behaviors, both filtering policies, filtering
-threshold, frequency-order ratio, and a caller-controlled brute-force activity
-limit. The common loop cut follows the reference behavior for:
+threshold (including strict decreasing-factor boundaries and dynamic filtering
+when its threshold is zero), frequency-order ratio, and a caller-controlled
+brute-force activity limit. The common loop cut follows the reference behavior
+for:
 
 - start/end boundary union and removal of boundary nodes and incident edges;
 - weak redo-component discovery;
@@ -285,8 +287,9 @@ limit. The common loop cut follows the reference behavior for:
 
 Focused regressions cover ordered multi-activity redo behavior, different
 start/end boundary activities, prefix/suffix false positives, incomplete
-start- and end-side boundary reachability, split return components, and single
-closed variants. Recursive POWL JSON, request
+start- and end-side boundary reachability, split return components, single
+closed variants, strict filtering boundaries, and dynamic zero-threshold
+filtering. Recursive POWL JSON, request
 validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
