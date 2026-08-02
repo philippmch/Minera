@@ -45,6 +45,7 @@
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
+#include "minera/organizational_mining.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -186,6 +187,12 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // Strict PRIPEL-style anonymization parser. Fields use the `pripel_` prefix.
 [[nodiscard]] PripelOptions parse_pripel_params(const FieldLookup& field);
 [[nodiscard]] PripelOptions parse_pripel_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict organizational SNA parser. Fields use the `sna_` prefix.
+[[nodiscard]] OrganizationalSnaOptions parse_organizational_sna_params(
+    const FieldLookup& field);
+[[nodiscard]] OrganizationalSnaOptions parse_organizational_sna_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

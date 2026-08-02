@@ -17,6 +17,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/genetic_miner.hpp"
+#include "minera/organizational_mining.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
@@ -4933,6 +4934,26 @@ void genetic_json_is_standalone_and_deterministic() {
   assert(first.find("\"best_fitness\":") != std::string::npos);
 }
 
+void organizational_sna_json_is_standalone_and_deterministic() {
+  std::istringstream input(
+      "case_id,activity,resource\n"
+      "c1,A,alice\n"
+      "c1,B,bob\n"
+      "c2,A,alice\n"
+      "c2,B,bob\n");
+  const auto log = minera::import_csv_event_log(input);
+  minera::OrganizationalSnaOptions options;
+  options.variant = minera::OrganizationalSnaVariant::kWorkingTogether;
+  const auto result = minera::discover_organizational_sna(log, options);
+  const auto first = minera::organizational_sna_json(result);
+  const auto second = minera::organizational_sna_json(result);
+  assert(first == second);
+  assert(first.find("\"family\":\"ORGANIZATIONAL_SNA\"") != std::string::npos);
+  assert(first.find("\"directed\":false") != std::string::npos);
+  assert(first.find("\"resources\":[\"alice\",\"bob\"]") != std::string::npos);
+  assert(first.find("\"edges\":") != std::string::npos);
+}
+
 void trace_variant_query_json_is_standalone_and_deterministic() {
   minera::EventLog log;
   log.traces.push_back({"c1", {{"c1", "A", "", "", 0, {}, ""},
@@ -5133,5 +5154,6 @@ int main() {
   json_export_carries_correlation_mining_contract();
   json_export_carries_evaluation_contract();
   genetic_json_is_standalone_and_deterministic();
+  organizational_sna_json_is_standalone_and_deterministic();
   return 0;
 }

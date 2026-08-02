@@ -40,6 +40,7 @@
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
+#include "minera/organizational_mining.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -531,6 +532,43 @@ void handle_genetic_mine(const httplib::Request& request,
     }
     const auto result = minera::mine_genetic(session->log, options);
     response.set_content(minera::genetic_miner_json(result),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+// Hidden cached-session adapter for bounded organizational SNA metrics.
+void handle_organizational_sna(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "sna_variant", "sna_beta", "sna_n", "sna_metric_normalization",
+        "sna_max_resources", "sna_max_edges"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown organizational SNA parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_organizational_sna_params(lookup, present);
+    const auto result = minera::discover_organizational_sna(session->log, options);
+    response.set_content(minera::organizational_sna_json(result),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -1881,6 +1919,8 @@ int main(int argc, char** argv) {
   server.Options("/api/mine-ilp", preflight);
   server.Options("/api/genetic-mine", preflight);
   server.Options("/api/mine-genetic", preflight);
+  server.Options("/api/organizational-sna", preflight);
+  server.Options("/api/sna", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -1916,6 +1956,8 @@ int main(int argc, char** argv) {
   server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/genetic-mine", handle_genetic_mine);
   server.Post("/api/mine-genetic", handle_genetic_mine);
+  server.Post("/api/organizational-sna", handle_organizational_sna);
+  server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

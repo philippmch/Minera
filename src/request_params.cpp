@@ -2276,4 +2276,55 @@ PripelOptions parse_pripel_params(const FieldLookup& field,
   return options;
 }
 
+OrganizationalSnaOptions parse_organizational_sna_params(
+    const FieldLookup& field) {
+  return parse_organizational_sna_params(field, {});
+}
+
+OrganizationalSnaOptions parse_organizational_sna_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  OrganizationalSnaOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("sna_variant")) {
+    const auto value = require("sna_variant");
+    if (value == "handover") options.variant = OrganizationalSnaVariant::kHandover;
+    else if (value == "working_together" || value == "working-together")
+      options.variant = OrganizationalSnaVariant::kWorkingTogether;
+    else if (value == "subcontracting")
+      options.variant = OrganizationalSnaVariant::kSubcontracting;
+    else if (value == "jointactivities" || value == "joint_activities" ||
+             value == "joint-activities")
+      options.variant = OrganizationalSnaVariant::kJointActivities;
+    else
+      throw std::invalid_argument(
+          "sna_variant: expected handover, working_together, subcontracting, or jointactivities");
+  }
+  if (supplied("sna_beta")) {
+    options.beta = parse_finite_double(require("sna_beta"), "sna_beta");
+    if (options.beta < 0.0 || options.beta > 1.0)
+      throw std::invalid_argument("sna_beta must be in [0,1]");
+  }
+  if (supplied("sna_n"))
+    options.n = parse_positive_size(require("sna_n"), "sna_n");
+  if (supplied("sna_metric_normalization"))
+    options.metric_normalization =
+        parse_boolean(require("sna_metric_normalization"),
+                      "sna_metric_normalization");
+  if (supplied("sna_max_resources"))
+    options.max_resources =
+        parse_positive_size(require("sna_max_resources"), "sna_max_resources");
+  if (supplied("sna_max_edges"))
+    options.max_edges = parse_positive_size(require("sna_max_edges"),
+                                             "sna_max_edges");
+  return options;
+}
+
 }  // namespace minera

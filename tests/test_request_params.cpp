@@ -1588,6 +1588,34 @@ void genetic_params_contract() {
   }
 }
 
+void organizational_sna_params_contract() {
+  const auto parsed = minera::parse_organizational_sna_params(fields({
+      {"sna_variant", "working_together"},
+      {"sna_beta", "0.25"},
+      {"sna_n", "4"},
+      {"sna_metric_normalization", "true"},
+      {"sna_max_resources", "20"},
+      {"sna_max_edges", "80"}}));
+  assert(parsed.variant == minera::OrganizationalSnaVariant::kWorkingTogether);
+  assert(parsed.beta == 0.25 && parsed.n == 4 && parsed.metric_normalization);
+  assert(parsed.max_resources == 20 && parsed.max_edges == 80);
+  for (const auto& item : {std::pair{"sna_variant", "bad"},
+                           std::pair{"sna_beta", "1.1"},
+                           std::pair{"sna_beta", "nan"},
+                           std::pair{"sna_n", "0"},
+                           std::pair{"sna_metric_normalization", "maybe"},
+                           std::pair{"sna_max_edges", "0"}}) {
+    bool threw = false;
+    const auto lookup = fields({item});
+    const auto present = [name = item.first](std::string_view key) {
+      return key == name;
+    };
+    try { (void)minera::parse_organizational_sna_params(lookup, present); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 void trace_variant_query_params_contract() {
   const auto parsed = minera::parse_trace_variant_query_params(fields({
       {"tvq_variant", "sacofa"},
@@ -1700,6 +1728,7 @@ int main() {
   label_splitting_params_contract();
   ilp_params_contract();
   genetic_params_contract();
+  organizational_sna_params_contract();
   trace_variant_query_params_contract();
   pripel_params_contract();
   return 0;

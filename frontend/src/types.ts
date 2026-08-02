@@ -178,6 +178,41 @@ export function isGeneticMinerResult(value: unknown): value is GeneticMinerResul
 }
 export const isGeneticMiner = isGeneticMinerResult;
 
+export type OrganizationalSnaVariant = "handover" | "working_together" | "subcontracting" | "jointactivities";
+export interface OrganizationalSnaEdge { source: number; target: number; weight: number; }
+export interface OrganizationalSnaDiagnostics {
+  computed: boolean; output_truncated: boolean; trace_count: number;
+  event_count: number; resource_count: number; edge_count: number; message: string;
+}
+export interface OrganizationalSnaResult {
+  family: "ORGANIZATIONAL_SNA"; variant: OrganizationalSnaVariant;
+  directed: boolean;
+  resources: string[]; edges: OrganizationalSnaEdge[];
+  diagnostics: OrganizationalSnaDiagnostics;
+}
+export interface OrganizationalSnaOptions {
+  sna_variant?: OrganizationalSnaVariant; sna_beta?: number; sna_n?: number;
+  sna_metric_normalization?: boolean; sna_max_resources?: number; sna_max_edges?: number;
+}
+export function isOrganizationalSnaResult(value: unknown): value is OrganizationalSnaResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<OrganizationalSnaResult>;
+  if (c.family !== "ORGANIZATIONAL_SNA" || typeof c.directed !== "boolean" ||
+      !(["handover", "working_together", "subcontracting", "jointactivities"] as unknown[]).includes(c.variant) ||
+      !Array.isArray(c.resources) || !c.resources.every((x) => typeof x === "string") ||
+      !Array.isArray(c.edges) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
+  const resourceCount = (c.resources as string[]).length;
+  if (!c.edges.every((e) => !!e && typeof e === "object" && Number.isInteger(e.source) &&
+      Number.isInteger(e.target) && typeof e.weight === "number" && Number.isFinite(e.weight) &&
+      (e.source as number) >= 0 && (e.target as number) >= 0 &&
+       (e.source as number) < resourceCount && (e.target as number) < resourceCount)) return false;
+  const d = c.diagnostics as Partial<OrganizationalSnaDiagnostics>;
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" &&
+    [d.trace_count, d.event_count, d.resource_count, d.edge_count].every((x) => Number.isInteger(x) && (x as number) >= 0) &&
+    typeof d.message === "string";
+}
+export const isOrganizationalSna = isOrganizationalSnaResult;
+
 export type TraceVariantQueryVariant = "laplace" | "sacofa";
 export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
 export interface TraceVariantQueryEvent {

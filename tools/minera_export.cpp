@@ -39,6 +39,7 @@
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
+#include "minera/organizational_mining.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -353,6 +354,13 @@ int usage(const char* program) {
                "  --genetic-elitism-min-sample <n> Tournament sample\n"
                "  --genetic-max-activities <n> Activity safety bound\n"
                "  --genetic-max-states <n> Candidate safety bound\n"
+               "  --organizational-sna   Emit organizational SNA JSON\n"
+               "  --sna-variant <id>     handover, working_together, subcontracting, or jointactivities\n"
+               "  --sna-beta <f>         Handover beta in [0,1]\n"
+               "  --sna-n <n>            Subcontracting distance\n"
+               "  --sna-metric-normalization <bool> Normalize edge weights\n"
+               "  --sna-max-resources <n> Resource safety bound\n"
+               "  --sna-max-edges <n>    Edge safety bound\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -900,6 +908,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> ilp_fields;
   bool genetic_mine_requested = false;
   std::map<std::string, std::string> genetic_fields;
+  bool organizational_sna_requested = false;
+  std::map<std::string, std::string> organizational_sna_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1018,6 +1028,23 @@ int main(int argc, char** argv) {
       if (!genetic_option_names.contains(key)) return usage(argv[0]);
       genetic_fields.insert_or_assign(std::move(key), value);
       genetic_mine_requested = true;
+      continue;
+    }
+    if (arg == "--organizational-sna" || arg == "--sna") {
+      organizational_sna_requested = true;
+      continue;
+    }
+    if (arg.rfind("--sna-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "sna_variant", "sna_beta", "sna_n", "sna_metric_normalization",
+          "sna_max_resources", "sna_max_edges"};
+      if (!names.contains(key)) return usage(argv[0]);
+      organizational_sna_fields.insert_or_assign(std::move(key), value);
+      organizational_sna_requested = true;
       continue;
     }
     if (arg == "--trace-variant-query") {
@@ -2596,6 +2623,25 @@ int main(int argc, char** argv) {
           std::cerr << "error: cannot open output file " << output << '\n';
           return 1;
         }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (organizational_sna_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = organizational_sna_fields.find(std::string(name));
+        return it == organizational_sna_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return organizational_sna_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_organizational_sna_params(lookup, present);
+      const auto body = minera::organizational_sna_json(
+          minera::discover_organizational_sna(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; }
         file << body << '\n';
       }
       return 0;

@@ -3792,4 +3792,42 @@ std::string pripel_json(const PripelResult& result) {
   return out.str();
 }
 
+std::string organizational_sna_json(const OrganizationalSnaResult& result) {
+  const char* variant = "handover";
+  switch (result.variant) {
+    case OrganizationalSnaVariant::kWorkingTogether: variant = "working_together"; break;
+    case OrganizationalSnaVariant::kSubcontracting: variant = "subcontracting"; break;
+    case OrganizationalSnaVariant::kJointActivities: variant = "jointactivities"; break;
+    case OrganizationalSnaVariant::kHandover: break;
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"ORGANIZATIONAL_SNA\",\"variant\":";
+  write_json_string(out, variant);
+  out << ",\"directed\":" << (result.directed ? "true" : "false")
+      << ",\"resources\":[";
+  for (std::size_t i = 0; i < result.resources.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.resources[i]);
+  }
+  out << "],\"edges\":[";
+  for (std::size_t i = 0; i < result.edges.size(); ++i) {
+    if (i) out << ',';
+    const auto& edge = result.edges[i];
+    out << "{\"source\":" << edge.source << ",\"target\":"
+        << edge.target << ",\"weight\":" << std::setprecision(17)
+        << edge.weight << '}';
+  }
+  const auto& d = result.diagnostics;
+  out << "],\"diagnostics\":{\"computed\":"
+      << (d.computed ? "true" : "false") << ",\"output_truncated\":"
+      << (d.output_truncated ? "true" : "false")
+      << ",\"trace_count\":" << d.trace_count
+      << ",\"event_count\":" << d.event_count
+      << ",\"resource_count\":" << d.resource_count
+      << ",\"edge_count\":" << d.edge_count << ",\"message\":";
+  write_json_string(out, d.message);
+  out << "}}";
+  return out.str();
+}
+
 }  // namespace minera

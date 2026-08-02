@@ -45,6 +45,7 @@ add_library(minera_core
   src/genetic_miner.cpp
   src/footprints_models.cpp
   src/heuristic_miner.cpp
+  src/organizational_mining.cpp
   src/inductive_miner.cpp
   src/ilp_miner.cpp
   src/interval_tree.cpp
@@ -176,6 +177,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_genetic_miner_tests PRIVATE cxx_std_20)
   target_compile_options(minera_genetic_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_genetic_miner_tests COMMAND minera_genetic_miner_tests)
+
+  add_executable(minera_organizational_mining_tests
+    tests/test_organizational_mining.cpp
+  )
+  target_link_libraries(minera_organizational_mining_tests PRIVATE minera::core)
+  target_compile_features(minera_organizational_mining_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_organizational_mining_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_organizational_mining_tests COMMAND minera_organizational_mining_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
