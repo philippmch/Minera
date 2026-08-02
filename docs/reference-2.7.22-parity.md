@@ -75,7 +75,7 @@ are reconciled.
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
-| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic role discovery and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; resource profiles, local diagnostics, network-analysis performance metrics, and differential review remain |
+| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; local diagnostics, network-analysis performance metrics, and differential review remain |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and the BASIC random-tree generator are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout, Monte Carlo, and tree+log generation remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, and contextual label splitting are adapter-wired (`minera_export --label-splitting`, hidden cached-session `POST /api/label-splitting`); embeddings and OCEL transformations remain |
@@ -326,9 +326,18 @@ Native tests cover repeated resources, normalized boundaries, symmetric output,
 degenerate correlations, truncation, and parser rejection. Standalone JSON,
 CLI flags, cached-session server routes, and frontend query/result guards cover
 all four selectable variants. Deterministic role discovery is also exposed via
-the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; resource
-profiles, local diagnostics, and network-analysis performance metrics remain
+the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; local
+diagnostics and network-analysis performance metrics remain
 future organizational slices.
+
+The resource-profile vertical exposes the eleven scalar metrics through the
+`RESOURCE_PROFILES` JSON family, `--resource-profiles` CLI mode, cached
+`POST /api/resource-profiles`, and typed frontend query/response helpers.
+Metrics use deterministic resource/activity rows, half-open timestamp slots,
+FIFO lifecycle pairing with atomic-event fallback, and explicit zero-safe
+diagnostics for empty denominators. Workload and multitasking preserve the
+reference interval policies; safety limits reject unbounded resource or row
+output.
 
 ## Evaluation parity evidence
 

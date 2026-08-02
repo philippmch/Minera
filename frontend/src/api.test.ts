@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -10,6 +10,17 @@ describe("log-to-features API", () => {
   it("rejects malformed backend payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: [], trace_rows: [["bad"]] }) })));
     await expect(requestLogToFeatures()).rejects.toThrow(/invalid feature extraction/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("resource profiles API", () => {
+  it("encodes strict fields", () => {
+    expect(resourceProfilesQuery({ resource_profiles_metric: "social_position", resource_profiles_t1: "2024-01-01", resource_profiles_max_rows: 4 })).toBe("resource_profiles_metric=social_position&resource_profiles_t1=2024-01-01&resource_profiles_max_rows=4");
+  });
+  it("rejects malformed responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "RESOURCE_PROFILES", rows: [] }) })));
+    await expect(requestResourceProfiles()).rejects.toThrow(/invalid resource profiles/);
     vi.unstubAllGlobals();
   });
 });

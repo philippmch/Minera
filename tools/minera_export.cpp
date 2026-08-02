@@ -40,6 +40,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -366,6 +367,8 @@ int usage(const char* program) {
                "  --roles-threshold <f>  Merge threshold in [0,1]\n"
                "  --roles-max-resources <n> Resource safety bound\n"
                "  --roles-max-activities <n> Activity safety bound\n"
+               "  --resource-profiles      Emit resource profile JSON\n"
+               "  --resource-profile-* <v> Resource profile metric, slots, selectors, and bounds\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -917,6 +920,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> organizational_sna_fields;
   bool roles_requested = false;
   std::map<std::string, std::string> roles_fields;
+  bool resource_profiles_requested = false;
+  std::map<std::string, std::string> resource_profiles_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1042,6 +1047,14 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--roles") { roles_requested = true; continue; }
+    if (arg == "--resource-profiles") { resource_profiles_requested = true; continue; }
+    if (arg.rfind("--resource-profile-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key("resource_profiles_"); key += std::string(arg.substr(19));
+      static const std::set<std::string> names = {"resource_profiles_metric", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows"};
+      if (!names.contains(key)) throw std::invalid_argument("unknown resource profile option: " + key);
+      resource_profiles_fields.insert_or_assign(key, value); resource_profiles_requested = true; continue;
+    }
     if (arg.rfind("--roles-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
@@ -2666,6 +2679,15 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) { return roles_fields.contains(std::string(name)); };
       const auto params = minera::parse_role_discovery_params(lookup, present);
       const auto body = minera::role_discovery_json(minera::discover_roles(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
+      return 0;
+    }
+    if (resource_profiles_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = resource_profiles_fields.find(std::string(name)); return it == resource_profiles_fields.end() ? std::string{} : it->second; };
+      const auto present = [&](std::string_view name) { return resource_profiles_fields.contains(std::string(name)); };
+      const auto params = minera::parse_resource_profiles_params(lookup, present);
+      const auto body = minera::resource_profiles_json(minera::discover_resource_profiles(log, params));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;

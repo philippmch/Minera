@@ -46,6 +46,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
@@ -198,6 +199,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] RoleDiscoveryOptions parse_role_discovery_params(
     const FieldLookup& field);
 [[nodiscard]] RoleDiscoveryOptions parse_role_discovery_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] ResourceProfilesOptions parse_resource_profiles_params(
+    const FieldLookup& field);
+[[nodiscard]] ResourceProfilesOptions parse_resource_profiles_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

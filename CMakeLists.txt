@@ -78,6 +78,7 @@ add_library(minera_core
   src/ptml.cpp
   src/request_params.cpp
   src/resource_analysis.cpp
+  src/resource_profiles.cpp
   src/role_discovery.cpp
   src/timestamp.cpp
   src/temporal_profile.cpp
@@ -194,6 +195,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_organizational_mining_tests PRIVATE cxx_std_20)
   target_compile_options(minera_organizational_mining_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_organizational_mining_tests COMMAND minera_organizational_mining_tests)
+
+  add_executable(minera_resource_profiles_tests
+    tests/test_resource_profiles.cpp
+  )
+  target_link_libraries(minera_resource_profiles_tests PRIVATE minera::core)
+  target_compile_features(minera_resource_profiles_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_resource_profiles_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_resource_profiles_tests COMMAND minera_resource_profiles_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

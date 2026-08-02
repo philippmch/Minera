@@ -41,6 +41,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -588,6 +589,20 @@ void handle_roles(const httplib::Request& request, httplib::Response& response) 
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
     const auto options = minera::parse_role_discovery_params(lookup, present);
     response.set_content(minera::role_discovery_json(minera::discover_roles(session->log, options)), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+void handle_resource_profiles(const httplib::Request& request, httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
+    static const std::set<std::string> allowed = {"resource_profiles_metric", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown resource profile parameter: " + key); }
+    const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
+    const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
+    const auto options = minera::parse_resource_profiles_params(lookup, present);
+    response.set_content(minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
@@ -1937,6 +1952,7 @@ int main(int argc, char** argv) {
   server.Options("/api/organizational-sna", preflight);
   server.Options("/api/sna", preflight);
   server.Options("/api/roles", preflight);
+  server.Options("/api/resource-profiles", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -1975,6 +1991,7 @@ int main(int argc, char** argv) {
   server.Post("/api/organizational-sna", handle_organizational_sna);
   server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/roles", handle_roles);
+  server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

@@ -228,6 +228,16 @@ export function isRoleDiscoveryResult(value: unknown): value is RoleDiscoveryRes
 }
 export const isRoleDiscovery = isRoleDiscoveryResult;
 
+export type ResourceProfilesMetric = "distinct_activities" | "activity_frequency" | "activity_completions" | "case_completions" | "fraction_case_completions" | "average_workload" | "multitasking" | "average_duration_activity" | "average_case_duration" | "interaction_two_resources" | "social_position";
+export interface ResourceProfilesRow { resource: string; activity: string; resource2: string; value: number; count: number; }
+export interface ResourceProfilesResult { family: "RESOURCE_PROFILES"; metric: ResourceProfilesMetric; rows: ResourceProfilesRow[]; diagnostics: { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; resource_count: number; message: string }; }
+export interface ResourceProfilesOptions { resource_profiles_metric?: ResourceProfilesMetric; resource_profiles_t1?: string; resource_profiles_t2?: string; resource_profiles_resource?: string; resource_profiles_activity?: string; resource_profiles_resource2?: string; resource_profiles_max_resources?: number; resource_profiles_max_rows?: number; }
+export function isResourceProfilesResult(value: unknown): value is ResourceProfilesResult {
+  if (!value || typeof value !== "object") return false; const c = value as Partial<ResourceProfilesResult>; const d = c.diagnostics;
+  const metrics = new Set<ResourceProfilesMetric>(["distinct_activities", "activity_frequency", "activity_completions", "case_completions", "fraction_case_completions", "average_workload", "multitasking", "average_duration_activity", "average_case_duration", "interaction_two_resources", "social_position"]);
+  return c.family === "RESOURCE_PROFILES" && typeof c.metric === "string" && metrics.has(c.metric as ResourceProfilesMetric) && Array.isArray(c.rows) && c.rows.every((r) => !!r && typeof r.resource === "string" && typeof r.activity === "string" && typeof r.resource2 === "string" && typeof r.value === "number" && Number.isFinite(r.value) && Number.isInteger(r.count) && r.count >= 0) && !!d && typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count,d.event_count,d.resource_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+}
+
 export type TraceVariantQueryVariant = "laplace" | "sacofa";
 export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
 export interface TraceVariantQueryEvent {
