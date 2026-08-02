@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -196,6 +196,34 @@ describe("link-analysis API", () => {
   it("rejects malformed link payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LINK_ANALYSIS", variant: "CLASSIC", links: [] }) })));
     await expect(requestLinkAnalysis()).rejects.toThrow(/invalid link analysis/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("timestamp interleavings API", () => {
+  it("serializes timestamp, relation-column, and result-bound options", () => {
+    expect(timestampInterleavingsQuery({
+      interleavings_timestamp_key: "started_at",
+      interleavings_max_results: 12,
+      interleavings_left_column: "left_case",
+      interleavings_right_column: "right_case",
+    })).toBe("interleavings_timestamp_key=started_at&interleavings_max_results=12&interleavings_left_column=left_case&interleavings_right_column=right_case");
+  });
+
+  it("uploads both logs and validates the response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({
+      family: "TIMESTAMP_INTERLEAVINGS", variant: "TIMESTAMP", timestamp_key: "timestamp",
+      max_interleavings: 10, interleavings: [],
+    }) })));
+    await expect(requestTimestampInterleavings(new File([""], "left.csv"), new File([""], "right.csv"), new File([""], "relations.csv")))
+      .resolves.toMatchObject({ family: "TIMESTAMP_INTERLEAVINGS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects malformed timestamp interleavings payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "TIMESTAMP_INTERLEAVINGS", variant: "TIMESTAMP", interleavings: [] }) })));
+    await expect(requestTimestampInterleavings(new File([""], "left.csv"), new File([""], "right.csv"), new File([""], "relations.csv")))
+      .rejects.toThrow(/invalid timestamp interleavings/);
     vi.unstubAllGlobals();
   });
 });

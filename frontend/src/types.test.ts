@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -201,6 +201,37 @@ describe("isMineraExport", () => {
           occurrences: [{ trace_index: 0, event_index: 0 }] }],
       },
     })).toBe(true);
+  });
+
+  it("validates recursive POWL nodes and activity references", () => {
+    const powl = {
+      kind: "strict_partial_order",
+      children: [
+        { kind: "transition", activity: 0, frequency: { minimum: 1, maximum: 2 } },
+        { kind: "loop", children: [{ kind: "xor", children: [{ kind: "silent" }, { kind: "transition", activity: 0, frequency: { minimum: 0, maximum: null } }] }] },
+      ],
+      order: [{ source: 0, target: 1 }],
+    };
+    expect(isPowlNode(powl, 1)).toBe(true);
+    expect(isMineraExport({ ...valid, activities: [{}], powl })).toBe(true);
+  });
+
+  it("rejects malformed recursive POWL payloads before rendering", () => {
+    const base = { ...valid, activities: [{}] };
+    expect(isMineraExport({ ...base, powl: { kind: "transition", activity: 1, frequency: { minimum: 1, maximum: 1 } } })).toBe(false);
+    expect(isMineraExport({ ...base, powl: { kind: "transition", activity: 0, frequency: { minimum: 2, maximum: 1 } } })).toBe(false);
+    expect(isMineraExport({ ...base, powl: { kind: "strict_partial_order", children: [{ kind: "silent" }], order: [{ source: 0, target: 1 }] } })).toBe(false);
+    expect(isMineraExport({ ...base, powl: { kind: "xor", children: [{ kind: "unknown" }] } })).toBe(false);
+  });
+
+  it("guards timestamp interleavings results", () => {
+    const result = {
+      family: "TIMESTAMP_INTERLEAVINGS", variant: "TIMESTAMP", timestamp_key: "timestamp",
+      max_interleavings: 4,
+      interleavings: [{ source_activity: "A", target_activity: "B", source_timestamp: "1", target_timestamp: "2", left_index: 0, right_index: 1, direction: "LR", timestamp_diff: 1 }],
+    };
+    expect(isTimestampInterleavingsResult(result)).toBe(true);
+    expect(isTimestampInterleavingsResult({ ...result, interleavings: [{ ...result.interleavings[0], timestamp_diff: NaN }] })).toBe(false);
   });
 
   it("rejects non-objects", () => {

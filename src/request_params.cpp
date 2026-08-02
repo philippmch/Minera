@@ -1975,6 +1975,31 @@ LinkAnalysisParams parse_link_analysis_params(const FieldLookup& field,
   return params;
 }
 
+TimestampInterleavingsParams parse_timestamp_interleavings_params(
+    const FieldLookup& field) {
+  return parse_timestamp_interleavings_params(field, {});
+}
+
+TimestampInterleavingsParams parse_timestamp_interleavings_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  TimestampInterleavingsParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("interleavings_timestamp_key"))
+    params.timestamp_key = require("interleavings_timestamp_key");
+  if (supplied("interleavings_max_results"))
+    params.max_interleavings = parse_positive_size(
+        require("interleavings_max_results"), "interleavings_max_results");
+  return params;
+}
+
 RandomTreeParams parse_random_tree_params(const FieldLookup& field) {
   return parse_random_tree_params(field, {});
 }

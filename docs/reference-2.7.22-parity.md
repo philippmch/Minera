@@ -71,7 +71,7 @@ are reconciled.
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
-| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), and OTG discovery are available through native/headless adapters; timestamp interleavings and SAW variants remain |
+| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), and OTG discovery are available through native/headless adapters; SAW variants remain |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
@@ -108,6 +108,16 @@ first-occurrence reduction, deterministic transitive propagation, and a strict
 link bound. Its standalone JSON, `minera_export --link-analysis`, cached local
 `POST /api/link-analysis`, and frontend API/query guard all expose the same
 options and canonical event references.
+
+Timestamp-interleavings evidence: the native discovery joins related left/right
+event logs through `CaseRelation` rows, adds deterministic extreme trace
+boundaries, and emits only strict four-timestamp LR/RL crossings with source /
+target activities, original event indices, timestamps, and finite elapsed
+seconds. Missing or invalid timestamps, malformed relations, and result-bound
+overruns are rejected during discovery. The standalone
+`minera_export --timestamp-interleavings` path, multipart local
+`POST /api/timestamp-interleavings`, strict request parser, frontend upload
+adapter, and focused Release tests share the same canonical JSON contract.
 
 DFG simulation evidence: `CLASSIC` performs deterministic best-first expansion
 of a frequency DFG with start/end boundaries, probability ordering, occurrence

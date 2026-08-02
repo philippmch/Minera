@@ -87,6 +87,7 @@ add_library(minera_core
   src/role_discovery.cpp
   src/timestamp.cpp
   src/temporal_profile.cpp
+  src/timestamp_interleavings.cpp
   src/transition_system.cpp
   src/trace_variant_query.cpp
   src/trie.cpp
@@ -543,4 +544,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_link_analysis_tests PRIVATE cxx_std_20)
   target_compile_options(minera_link_analysis_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_link_analysis_tests COMMAND minera_link_analysis_tests)
+
+  add_executable(minera_timestamp_interleavings_tests
+    tests/test_timestamp_interleavings.cpp
+  )
+  target_link_libraries(minera_timestamp_interleavings_tests PRIVATE minera::core)
+  target_compile_features(minera_timestamp_interleavings_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_timestamp_interleavings_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_timestamp_interleavings_tests COMMAND minera_timestamp_interleavings_tests)
 endif()

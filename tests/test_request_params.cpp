@@ -1760,6 +1760,22 @@ void link_analysis_params_contract() {
   }
 }
 
+void timestamp_interleavings_params_contract() {
+  const auto parsed = minera::parse_timestamp_interleavings_params(fields({
+      {"interleavings_timestamp_key", "started_at"},
+      {"interleavings_max_results", "23"}}));
+  assert(parsed.timestamp_key == "started_at" &&
+         parsed.max_interleavings == 23);
+  for (const auto& item : {
+           std::pair{"interleavings_max_results", "0"},
+           std::pair{"interleavings_max_results", "nope"}}) {
+    bool threw = false;
+    try { (void)minera::parse_timestamp_interleavings_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1831,6 +1847,7 @@ int main() {
   trace_variant_query_params_contract();
   pripel_params_contract();
   link_analysis_params_contract();
+  timestamp_interleavings_params_contract();
   resource_profiles_params_contract();
   clustering_params_contract();
   return 0;
