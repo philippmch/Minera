@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelSplitQuery, requestOcelSplit, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult } from "./api";
 
 describe("Monte Carlo API", () => {
   it("serializes bounded virtual-time controls", () => {
@@ -191,6 +191,11 @@ describe("OCEL API", () => {
       .toBe("variant=saw");
     expect(ocelSplitQuery({ variant: "ancestors_descendants", object_type: "order", max_objects: 2, max_degree_centrality: 0.5 }))
       .toBe("variant=ancestors_descendants&object_type=order&max_objects=2&max_degree_centrality=0.5");
+    expect(ocelPlayoutQuery({
+      variant: "extensive", max_bindings_per_activity: 2, max_traces: 3,
+      max_states: 40, objects: { item: ["i,1"], order: ["o1", "o2"] },
+      objects_unique_per_trace: true, ocpn_variant: "dfg", event_interval: 1.5,
+    })).toBe("variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg");
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
   });
@@ -211,6 +216,19 @@ describe("OCEL API", () => {
     })));
     await expect(requestOcelSplit(new File(["{}"], "log.json"), { variant: "connected_components" }))
       .resolves.toMatchObject({ family: "OCEL_SPLIT", variant: "CONNECTED_COMPONENTS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("posts an OCEL playout request and validates the response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
+      expect(init.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => ({
+        family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} },
+      }) };
+    }));
+    await expect(requestOcelPlayout(new File(["{}"], "log.json"), {
+      max_traces: 1,
+    })).resolves.toMatchObject({ family: "OCEL_PLAYOUT", variant: "EXTENSIVE" });
     vi.unstubAllGlobals();
   });
 
