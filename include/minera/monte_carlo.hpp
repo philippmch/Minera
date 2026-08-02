@@ -11,20 +11,50 @@
 
 namespace minera {
 
-// The duration model is intentionally small and deterministic: a fixed
-// duration is useful for fixtures, while an exponential duration gives the
-// usual memoryless service-time model with a seeded generator.
+// Duration families use a common, compact parameter record.  The first value
+// is the fixed value/mean for deterministic and exponential durations, the
+// mean for normal durations, the lower bound for uniform durations, and the
+// shape for lognormal/gamma durations.  Secondary and tertiary values carry
+// the remaining parameters described on MonteCarloDuration below.
 enum class MonteCarloDurationDistribution {
   kDeterministic,
   kExponential,
+  kConstant0,
+  kImmediate,
+  kNormal,
+  kUniform,
+  kLogNormal,
+  kGamma,
+
+  // Spelling aliases retained for callers that use the conventional camel
+  // case form of the lognormal family name.
+  kLognormal = kLogNormal,
+  kConstantZero = kConstant0,
+
+  // Readable aliases for callers that mirror wire-level names.
+  DETERMINISTIC = kDeterministic,
+  EXPONENTIAL = kExponential,
+  CONSTANT0 = kConstant0,
+  IMMEDIATE = kImmediate,
+  NORMAL = kNormal,
+  UNIFORM = kUniform,
+  LOGNORMAL = kLogNormal,
+  GAMMA = kGamma,
 };
 
 struct MonteCarloDuration {
   MonteCarloDurationDistribution distribution =
       MonteCarloDurationDistribution::kDeterministic;
-  // Seconds for a deterministic value, or the mean (scale) for an
-  // exponential value.  Zero is valid and produces an immediate firing.
+  // Seconds for a deterministic value, mean for an exponential value, mean
+  // for a normal value, lower bound for a uniform value, or shape for a
+  // lognormal/gamma value. Constant-zero and immediate durations ignore it.
   double value_seconds = 1.0;
+  // Normal: standard deviation (must be non-negative).
+  // Uniform: interval width/scale (must be non-negative).
+  // Lognormal/gamma: location (must be non-negative).
+  double secondary_seconds = 0.0;
+  // Lognormal/gamma: positive scale. Unused by the other distributions.
+  double tertiary_seconds = 0.0;
 };
 
 struct MonteCarloOptions {

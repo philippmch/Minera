@@ -1912,8 +1912,11 @@ export interface MonteCarloOptions {
   default_duration_seconds?: number;
   transition_weights?: number[];
   transition_durations?: Array<{
-    distribution: "deterministic" | "exponential";
+    distribution: "deterministic" | "exponential" | "constant0" | "immediate" |
+      "normal" | "uniform" | "lognormal" | "gamma";
     value_seconds: number;
+    secondary_seconds?: number;
+    tertiary_seconds?: number;
   }>;
   resources_per_place?: Record<number, number>;
   default_resources_per_place?: number;

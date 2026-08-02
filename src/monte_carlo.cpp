@@ -123,15 +123,53 @@ PreparedOptions prepare_options(const PetriNet& net,
   }
   for (const auto& duration : options.transition_durations) {
     if (!std::isfinite(duration.value_seconds) ||
-        duration.value_seconds < 0.0) {
+        !std::isfinite(duration.secondary_seconds) ||
+        !std::isfinite(duration.tertiary_seconds)) {
       throw std::invalid_argument(
-          "Monte Carlo transition durations must be finite and non-negative");
+          "Monte Carlo transition duration parameters must be finite");
     }
-    if (duration.distribution !=
-            MonteCarloDurationDistribution::kDeterministic &&
-        duration.distribution !=
-            MonteCarloDurationDistribution::kExponential) {
-      throw std::invalid_argument("Monte Carlo duration distribution is invalid");
+    switch (duration.distribution) {
+      case MonteCarloDurationDistribution::kDeterministic:
+      case MonteCarloDurationDistribution::kExponential:
+        if (duration.value_seconds < 0.0) {
+          throw std::invalid_argument(
+              "Monte Carlo transition duration must be non-negative");
+        }
+        break;
+      case MonteCarloDurationDistribution::kConstant0:
+      case MonteCarloDurationDistribution::kImmediate:
+        // These distributions have no numeric parameter and always return 0.
+        break;
+      case MonteCarloDurationDistribution::kNormal:
+        if (duration.value_seconds < 0.0 ||
+            duration.secondary_seconds < 0.0) {
+          throw std::invalid_argument(
+              "Monte Carlo normal mean and standard deviation must be non-negative");
+        }
+        break;
+      case MonteCarloDurationDistribution::kUniform:
+        if (duration.value_seconds < 0.0 ||
+            duration.secondary_seconds < 0.0) {
+          throw std::invalid_argument(
+              "Monte Carlo uniform lower bound and width must be non-negative");
+        }
+        if (!std::isfinite(duration.value_seconds +
+                           duration.secondary_seconds)) {
+          throw std::invalid_argument(
+              "Monte Carlo uniform upper bound must be finite");
+        }
+        break;
+      case MonteCarloDurationDistribution::kLogNormal:
+      case MonteCarloDurationDistribution::kGamma:
+        if (duration.value_seconds <= 0.0 ||
+            duration.secondary_seconds < 0.0 ||
+            duration.tertiary_seconds <= 0.0) {
+          throw std::invalid_argument(
+              "Monte Carlo lognormal/gamma shape and scale must be positive, with a non-negative location");
+        }
+        break;
+      default:
+        throw std::invalid_argument("Monte Carlo duration distribution is invalid");
     }
   }
 
@@ -215,13 +253,41 @@ PreparedOptions prepare_options(const PetriNet& net,
 
 [[nodiscard]] double sample_duration(const MonteCarloDuration& duration,
                                      std::mt19937_64& rng) {
-  if (duration.distribution ==
-      MonteCarloDurationDistribution::kDeterministic) {
-    return duration.value_seconds;
+  switch (duration.distribution) {
+    case MonteCarloDurationDistribution::kDeterministic:
+      return duration.value_seconds;
+    case MonteCarloDurationDistribution::kExponential:
+      if (duration.value_seconds == 0.0) return 0.0;
+      return std::exponential_distribution<double>(
+          1.0 / duration.value_seconds)(rng);
+    case MonteCarloDurationDistribution::kConstant0:
+    case MonteCarloDurationDistribution::kImmediate:
+      return 0.0;
+    case MonteCarloDurationDistribution::kNormal: {
+      if (duration.secondary_seconds == 0.0) return duration.value_seconds;
+      const double draw = std::normal_distribution<double>(
+          duration.value_seconds, duration.secondary_seconds)(rng);
+      // Service times cannot be negative; clamp the lower tail while
+      // retaining the seeded draw sequence.
+      return std::max(0.0, draw);
+    }
+    case MonteCarloDurationDistribution::kUniform:
+      if (duration.secondary_seconds == 0.0) return duration.value_seconds;
+      return std::uniform_real_distribution<double>(
+          duration.value_seconds,
+          duration.value_seconds + duration.secondary_seconds)(rng);
+    case MonteCarloDurationDistribution::kLogNormal: {
+      const double draw = std::lognormal_distribution<double>(
+          0.0, duration.value_seconds)(rng);
+      return duration.secondary_seconds + duration.tertiary_seconds * draw;
+    }
+    case MonteCarloDurationDistribution::kGamma:
+      return duration.secondary_seconds +
+             std::gamma_distribution<double>(duration.value_seconds,
+                                             duration.tertiary_seconds)(rng);
+    default:
+      throw std::invalid_argument("Monte Carlo duration distribution is invalid");
   }
-  if (duration.value_seconds == 0.0) return 0.0;
-  return std::exponential_distribution<double>(1.0 / duration.value_seconds)(
-      rng);
 }
 
 // Reserve output-place resources for one firing.  Every output arc reserves a

@@ -1864,9 +1864,9 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
       std::size_t separator = token.find(':');
       if (separator == std::string_view::npos) separator = token.find('=');
       if (separator == std::string_view::npos || separator == 0 ||
-          separator + 1 >= token.size())
+          separator + 1 > token.size())
         throw std::invalid_argument(
-            "monte_carlo_transition_durations: expected distribution:value entries");
+            "monte_carlo_transition_durations: expected distribution:param entries");
       std::string distribution(trim(token.substr(0, separator)));
       std::transform(distribution.begin(), distribution.end(), distribution.begin(),
                      [](unsigned char c) {
@@ -1877,18 +1877,73 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
         kind = MonteCarloDurationDistribution::kDeterministic;
       } else if (distribution == "exponential") {
         kind = MonteCarloDurationDistribution::kExponential;
+      } else if (distribution == "constant0") {
+        kind = MonteCarloDurationDistribution::kConstant0;
+      } else if (distribution == "immediate") {
+        kind = MonteCarloDurationDistribution::kImmediate;
+      } else if (distribution == "normal") {
+        kind = MonteCarloDurationDistribution::kNormal;
+      } else if (distribution == "uniform") {
+        kind = MonteCarloDurationDistribution::kUniform;
+      } else if (distribution == "lognormal") {
+        kind = MonteCarloDurationDistribution::kLogNormal;
+      } else if (distribution == "gamma") {
+        kind = MonteCarloDurationDistribution::kGamma;
       } else {
         throw std::invalid_argument(
             "monte_carlo_transition_durations: unknown distribution '" +
             distribution + "'");
       }
-      const double duration = parse_finite_double(
-          trim(token.substr(separator + 1)),
-          "monte_carlo_transition_durations");
-      if (duration < 0.0)
+      std::vector<double> values;
+      const auto parameter_text = token.substr(separator + 1);
+      if (!parameter_text.empty()) {
+        std::size_t parameter_begin = 0;
+        for (std::size_t parameter_index = 0;
+             parameter_index <= parameter_text.size(); ++parameter_index) {
+          if (parameter_index < parameter_text.size() &&
+              parameter_text[parameter_index] != ';')
+            continue;
+          const auto parameter = trim(parameter_text.substr(
+              parameter_begin, parameter_index - parameter_begin));
+          if (parameter.empty())
+            throw std::invalid_argument(
+                "monte_carlo_transition_durations: expected finite parameters");
+          values.push_back(parse_finite_double(
+              parameter, "monte_carlo_transition_durations"));
+          parameter_begin = parameter_index + 1;
+        }
+      }
+      const bool zero_arity =
+          kind == MonteCarloDurationDistribution::kConstant0 ||
+          kind == MonteCarloDurationDistribution::kImmediate;
+      const std::size_t expected_arity =
+          kind == MonteCarloDurationDistribution::kNormal ||
+                  kind == MonteCarloDurationDistribution::kUniform
+              ? 2
+              : kind == MonteCarloDurationDistribution::kLogNormal ||
+                        kind == MonteCarloDurationDistribution::kGamma
+                    ? 3
+                    : 1;
+      if ((!zero_arity && values.size() != expected_arity) ||
+          (zero_arity && values.size() > 1))
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: wrong parameter count for '" +
+            distribution + "'");
+      MonteCarloDuration duration;
+      duration.distribution = kind;
+      if (!values.empty()) duration.value_seconds = values[0];
+      if (values.size() > 1) duration.secondary_seconds = values[1];
+      if (values.size() > 2) duration.tertiary_seconds = values[2];
+      if (duration.value_seconds < 0.0 || duration.secondary_seconds < 0.0 ||
+          duration.tertiary_seconds < 0.0)
         throw std::invalid_argument(
             "monte_carlo_transition_durations must be non-negative");
-      params.transition_durations.push_back({kind, duration});
+      if ((kind == MonteCarloDurationDistribution::kLogNormal ||
+           kind == MonteCarloDurationDistribution::kGamma) &&
+          (duration.value_seconds <= 0.0 || duration.tertiary_seconds <= 0.0))
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations lognormal/gamma shape and scale must be positive");
+      params.transition_durations.push_back(duration);
       begin = i + 1;
     }
     if (params.transition_durations.empty())

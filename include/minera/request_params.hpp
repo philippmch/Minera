@@ -329,8 +329,9 @@ using FieldPresence = std::function<bool(std::string_view)>;
 
 // Parses bounded virtual-time Monte Carlo settings. Wire fields use the
 // `monte_carlo_` prefix. Transition durations are comma-separated
-// `deterministic:value` or `exponential:value` entries; resource capacities
-// use `place=count` pairs.
+// `distribution:param[;param...]` entries for deterministic, exponential,
+// constant0, immediate, normal, uniform, lognormal, and gamma families;
+// resource capacities use `place=count` pairs.
 [[nodiscard]] MonteCarloParams parse_monte_carlo_params(
     const FieldLookup& field);
 [[nodiscard]] MonteCarloParams parse_monte_carlo_params(
