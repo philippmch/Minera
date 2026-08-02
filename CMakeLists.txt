@@ -64,6 +64,7 @@ add_library(minera_core
   src/monte_carlo_json.cpp
   src/minimum_self_distance.cpp
   src/ocel.cpp
+  src/ocel_features.cpp
   src/ocel_playout.cpp
   src/ocel_transform.cpp
   src/performance.cpp
@@ -573,6 +574,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_playout_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_playout_tests COMMAND minera_ocel_playout_tests)
+
+  add_executable(minera_ocel_features_tests
+    tests/test_ocel_features.cpp
+  )
+  target_link_libraries(minera_ocel_features_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_features_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_features_tests COMMAND minera_ocel_features_tests)
 
   add_executable(minera_link_analysis_tests
     tests/test_link_analysis.cpp

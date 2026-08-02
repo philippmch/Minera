@@ -757,6 +757,34 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
       value.variant !== "EXTENSIVE") return false;
   return isOcelRecord(value.log);
 }
+export type OcelFeatureVariant = "EVENTS" | "OBJECTS" | "EVENTS_OBJECTS";
+export interface OcelFeatureResult {
+  family: "OCEL_FEATURES";
+  variant: OcelFeatureVariant;
+  row_ids: string[];
+  row_types?: string[];
+  feature_names: string[];
+  values: number[][];
+}
+export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_FEATURES" ||
+      !["EVENTS", "OBJECTS", "EVENTS_OBJECTS"].includes(String(value.variant)) ||
+      !Array.isArray(value.row_ids) || !value.row_ids.every((id) => typeof id === "string") ||
+      !Array.isArray(value.feature_names) ||
+      !value.feature_names.every((name) => typeof name === "string") ||
+      !Array.isArray(value.values)) return false;
+  const rowIds = value.row_ids;
+  const featureNames = value.feature_names;
+  const values = value.values;
+  if (value.row_types !== undefined &&
+      (!Array.isArray(value.row_types) ||
+       !value.row_types.every((type) => typeof type === "string") ||
+       value.row_types.length !== rowIds.length)) return false;
+  return values.length === rowIds.length &&
+    values.every((row) => Array.isArray(row) &&
+      row.length === featureNames.length &&
+      row.every((entry) => typeof entry === "number" && Number.isFinite(entry)));
+}
 
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";

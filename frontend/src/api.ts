@@ -34,6 +34,7 @@ import {
   type OcelConformanceResult,
   type OcelSplitResult,
   type OcelPlayoutResult,
+  type OcelFeatureResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -57,6 +58,7 @@ import {
   isOcelConformanceResult,
   isOcelSplitResult,
   isOcelPlayoutResult,
+  isOcelFeatureResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2287,6 +2289,68 @@ export async function requestOcelPlayout(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelPlayoutResult(payload)) throw new Error("the Minera backend returned an invalid OCEL playout");
+  return payload;
+}
+
+export interface OcelFeatureOptions {
+  variant?: "events" | "objects" | "events_objects";
+  max_features?: number;
+  include_activity_features?: boolean;
+  include_timestamp_features?: boolean;
+  include_relation_features?: boolean;
+  include_endpoint_features?: boolean;
+  include_attribute_counts?: boolean;
+  include_interaction_features?: boolean;
+  include_lifecycle_features?: boolean;
+  numeric_event_attributes?: string[];
+  string_event_attributes?: string[];
+  numeric_object_attributes?: string[];
+  string_object_attributes?: string[];
+}
+
+export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  const addInteger = (name: string, value: number | undefined) => {
+    if (value !== undefined && Number.isInteger(value) && value > 0)
+      query.set(name, String(value));
+  };
+  addInteger("max_features", options.max_features);
+  const addBoolean = (name: string, value: boolean | undefined) => {
+    if (value !== undefined) query.set(name, value ? "true" : "false");
+  };
+  addBoolean("include_activity_features", options.include_activity_features);
+  addBoolean("include_timestamp_features", options.include_timestamp_features);
+  addBoolean("include_relation_features", options.include_relation_features);
+  addBoolean("include_endpoint_features", options.include_endpoint_features);
+  addBoolean("include_attribute_counts", options.include_attribute_counts);
+  addBoolean("include_interaction_features", options.include_interaction_features);
+  addBoolean("include_lifecycle_features", options.include_lifecycle_features);
+  const addList = (name: string, values: string[] | undefined) => {
+    if (values?.length) query.set(name, [...values].sort().join(","));
+  };
+  addList("numeric_event_attributes", options.numeric_event_attributes);
+  addList("string_event_attributes", options.string_event_attributes);
+  addList("numeric_object_attributes", options.numeric_object_attributes);
+  addList("string_object_attributes", options.string_object_attributes);
+  return query.toString();
+}
+
+export async function requestOcelFeatures(
+  log: Blob,
+  options: OcelFeatureOptions = {},
+): Promise<OcelFeatureResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelFeaturesQuery(options);
+  const response = await fetch(`/api/ocel/features${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelFeatureResult(payload)) throw new Error("the Minera backend returned an invalid OCEL feature table");
   return payload;
 }
 

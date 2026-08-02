@@ -7,8 +7,10 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "minera/ocel.hpp"
+#include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
@@ -16,18 +18,19 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
     if (!input) throw std::runtime_error("cannot open input");
     std::ostringstream text; text << input.rdbuf();
     minera::Ocel log = minera::parse_ocel_json(text.str());
-    std::string format = "classic", describe, discover, split, conformance,
+    std::string format = "classic", describe, features, discover, split, conformance,
                         split_object_type, normative_path;
     bool ocpn_playout = false;
     bool ocpn_unique_objects = false;
     minera::OcpnPlayoutOptions ocpn_playout_options;
+    minera::OcelFeatureOptions feature_options;
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
     std::optional<double> split_max_degree_centrality;
     bool compute_edges_performance = true;
@@ -44,14 +47,63 @@ int main(int argc, char** argv) {
         throw std::invalid_argument(std::string(option) + " expects a finite non-negative number");
       return result;
     };
+    const auto list = [](const std::string& value) {
+      std::vector<std::string> result;
+      std::size_t begin = 0;
+      while (begin <= value.size()) {
+        const auto end = value.find(',', begin);
+        const auto item = value.substr(begin, end == std::string::npos
+                                                ? std::string::npos
+                                                : end - begin);
+        if (!item.empty()) result.push_back(item);
+        if (end == std::string::npos) break;
+        begin = end + 1;
+      }
+      return result;
+    };
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
-      if ((option == "--format" || option == "--discover" ||
+      if ((option == "--format" || option == "--features" ||
+           option == "--discover" ||
            option == "--split") && i + 1 < argc) {
         auto& target = option == "--format" ? format
+                      : option == "--features" ? features
                       : option == "--discover" ? discover
                                                  : split;
         target = argv[++i];
+      } else if (option == "--features-max" && i + 1 < argc) {
+        const auto parsed = number(argv[++i], "--features-max");
+        if (parsed > static_cast<double>(std::numeric_limits<std::size_t>::max()) ||
+            std::floor(parsed) != parsed || parsed == 0.0)
+          throw std::invalid_argument("--features-max expects a positive integer");
+        feature_options.max_features = static_cast<std::size_t>(parsed);
+      } else if ((option == "--features-numeric-events" ||
+                  option == "--features-string-events" ||
+                  option == "--features-numeric-objects" ||
+                  option == "--features-string-objects") && i + 1 < argc) {
+        const auto values = list(argv[++i]);
+        if (option == "--features-numeric-events")
+          feature_options.numeric_event_attributes = values;
+        else if (option == "--features-string-events")
+          feature_options.string_event_attributes = values;
+        else if (option == "--features-numeric-objects")
+          feature_options.numeric_object_attributes = values;
+        else
+          feature_options.string_object_attributes = values;
+      } else if (option == "--features-no-activity") {
+        feature_options.include_activity_features = false;
+      } else if (option == "--features-no-timestamps") {
+        feature_options.include_timestamp_features = false;
+      } else if (option == "--features-no-relations") {
+        feature_options.include_relation_features = false;
+      } else if (option == "--features-no-endpoints") {
+        feature_options.include_endpoint_features = false;
+      } else if (option == "--features-no-attribute-counts") {
+        feature_options.include_attribute_counts = false;
+      } else if (option == "--features-no-interactions") {
+        feature_options.include_interaction_features = false;
+      } else if (option == "--features-no-lifecycle") {
+        feature_options.include_lifecycle_features = false;
       } else if (option == "--describe" && i + 1 < argc) {
         describe = argv[++i];
       } else if (option == "--split-object-type" && i + 1 < argc) {
@@ -150,6 +202,11 @@ int main(int argc, char** argv) {
     if (!describe.empty() && describe != "text" && describe != "tuples") {
       throw std::invalid_argument("describe must be text or tuples");
     }
+    if (!features.empty() && features != "events" && features != "objects" &&
+        features != "events_objects") {
+      throw std::invalid_argument(
+          "features must be events, objects, or events_objects");
+    }
     if (!discover.empty() && discover != "etot" && discover != "ocdfg" &&
         discover != "ocpn" && discover != "otg" && discover != "saw") {
       throw std::invalid_argument("discover must be etot, ocdfg, ocpn, otg, or saw");
@@ -164,7 +221,7 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
     if (!conformance.empty() &&
-        (!discover.empty() || !split.empty() || ocpn_playout))
+        (!discover.empty() || !split.empty() || !features.empty() || ocpn_playout))
       throw std::invalid_argument(
           "--conformance cannot be combined with discovery or split");
     if (!discover.empty() && !split.empty())
@@ -173,7 +230,7 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "--ocpn-playout cannot be combined with discovery or split");
     if (!describe.empty() &&
-        (!discover.empty() || !split.empty() || !conformance.empty() ||
+        (!discover.empty() || !split.empty() || !features.empty() || !conformance.empty() ||
          ocpn_playout))
       throw std::invalid_argument(
           "--describe cannot be combined with discovery, split, or conformance");
@@ -181,6 +238,23 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("--normative is required with --conformance");
     if (conformance.empty() && !normative_path.empty())
       throw std::invalid_argument("--normative requires --conformance");
+    if (!features.empty() &&
+        (!discover.empty() || !split.empty() || !conformance.empty() ||
+         ocpn_playout))
+      throw std::invalid_argument(
+          "--features cannot be combined with discovery, split, conformance, or playout");
+    if (!features.empty()) {
+      const auto variant = features == "events"
+                               ? minera::OcelFeatureVariant::kEvents
+                               : features == "objects"
+                                     ? minera::OcelFeatureVariant::kObjects
+                                     : minera::OcelFeatureVariant::kEventsObjects;
+      std::cout << minera::serialize_ocel_features_json(
+                       minera::extract_ocel_features(log, variant,
+                                                     feature_options))
+                << '\n';
+      return 0;
+    }
     if (ocpn_playout) {
       ocpn_playout_options.objects_unique_per_trace = ocpn_unique_objects;
       std::cout << minera::serialize_ocpn_playout_json(

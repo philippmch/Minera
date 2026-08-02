@@ -61,6 +61,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_features.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
@@ -573,6 +574,27 @@ std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
   return result;
 }
 
+std::vector<std::string> ocel_query_list(const httplib::Request& request,
+                                         std::string_view name) {
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return {};
+  std::vector<std::string> result;
+  std::size_t begin = 0;
+  const auto value = request.get_param_value(key);
+  while (begin <= value.size()) {
+    const auto end = value.find(',', begin);
+    const auto item = value.substr(begin, end == std::string::npos
+                                            ? std::string::npos
+                                            : end - begin);
+    if (item.empty())
+      throw std::invalid_argument(key + ": expected non-empty comma-separated names");
+    result.push_back(item);
+    if (end == std::string::npos) break;
+    begin = end + 1;
+  }
+  return result;
+}
+
 std::string ocel_discovery_response(std::string_view variant,
                                     std::string payload) {
   return std::string("{\"family\":\"OCEL_DISCOVERY\",\"variant\":\"") +
@@ -740,6 +762,74 @@ void handle_ocel_playout(const httplib::Request& request,
         minera::parse_ocel_json(body), discovery);
     response.set_content(minera::serialize_ocpn_playout_json(
                              minera::ocpn_extensive_playout(graph, options)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_features(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "max_features", "include_activity_features",
+        "include_timestamp_features", "include_relation_features",
+        "include_endpoint_features", "include_attribute_counts",
+        "include_interaction_features", "include_lifecycle_features",
+        "numeric_event_attributes", "string_event_attributes",
+        "numeric_object_attributes", "string_object_attributes"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL feature parameter: " + key);
+    }
+    const auto value = request.has_param("variant")
+                           ? request.get_param_value("variant")
+                           : std::string("events");
+    minera::OcelFeatureVariant variant;
+    if (value == "events" || value == "EVENTS") {
+      variant = minera::OcelFeatureVariant::kEvents;
+    } else if (value == "objects" || value == "OBJECTS") {
+      variant = minera::OcelFeatureVariant::kObjects;
+    } else if (value == "events_objects" || value == "EVENTS_OBJECTS") {
+      variant = minera::OcelFeatureVariant::kEventsObjects;
+    } else {
+      throw std::invalid_argument(
+          "variant expects events, objects, or events_objects");
+    }
+    minera::OcelFeatureOptions options;
+    options.max_features =
+        ocel_query_size(request, "max_features", options.max_features);
+    if (options.max_features == 0 || options.max_features > 10000)
+      throw std::invalid_argument("max_features exceeds the server safety limit");
+    options.include_activity_features = ocel_query_bool(
+        request, "include_activity_features", options.include_activity_features);
+    options.include_timestamp_features = ocel_query_bool(
+        request, "include_timestamp_features", options.include_timestamp_features);
+    options.include_relation_features = ocel_query_bool(
+        request, "include_relation_features", options.include_relation_features);
+    options.include_endpoint_features = ocel_query_bool(
+        request, "include_endpoint_features", options.include_endpoint_features);
+    options.include_attribute_counts = ocel_query_bool(
+        request, "include_attribute_counts", options.include_attribute_counts);
+    options.include_interaction_features = ocel_query_bool(
+        request, "include_interaction_features", options.include_interaction_features);
+    options.include_lifecycle_features = ocel_query_bool(
+        request, "include_lifecycle_features", options.include_lifecycle_features);
+    options.numeric_event_attributes =
+        ocel_query_list(request, "numeric_event_attributes");
+    options.string_event_attributes =
+        ocel_query_list(request, "string_event_attributes");
+    options.numeric_object_attributes =
+        ocel_query_list(request, "numeric_object_attributes");
+    options.string_object_attributes =
+        ocel_query_list(request, "string_object_attributes");
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    response.set_content(minera::serialize_ocel_features_json(
+                             minera::extract_ocel_features(
+                                 minera::parse_ocel_json(body), variant, options)),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -2596,6 +2686,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/discover", preflight);
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/playout", preflight);
+  server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -2645,6 +2736,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/discover", handle_ocel_discovery);
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/playout", handle_ocel_playout);
+  server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

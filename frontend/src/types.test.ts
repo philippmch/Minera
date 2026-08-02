@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, type MineraExport } from "./types";
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
   it("accepts the recursive OCEL log envelope", () => expect(isOcelPlayoutResult(valid)).toBe(true));
   it("rejects an incomplete envelope", () => expect(isOcelPlayoutResult({ ...valid, log: [] })).toBe(false));
+});
+
+describe("isOcelFeatureResult", () => {
+  const valid = {
+    family: "OCEL_FEATURES", variant: "OBJECTS", row_ids: ["o1"],
+    row_types: ["order"], feature_names: ["@@object_lifecycle_length"], values: [[2]],
+  };
+  it("accepts rectangular numeric feature tables", () => expect(isOcelFeatureResult(valid)).toBe(true));
+  it("rejects ragged and non-finite tables", () => {
+    expect(isOcelFeatureResult({ ...valid, values: [[]] })).toBe(false);
+    expect(isOcelFeatureResult({ ...valid, values: [[Number.NaN]] })).toBe(false);
+  });
 });
 
 describe("isMonteCarloResult", () => {
