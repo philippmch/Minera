@@ -61,6 +61,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -488,6 +489,21 @@ double ocel_query_number(const httplib::Request& request,
   return parsed;
 }
 
+std::size_t ocel_query_size(const httplib::Request& request,
+                            std::string_view name, std::size_t fallback) {
+  if (!request.has_param(std::string(name))) return fallback;
+  const auto value = request.get_param_value(std::string(name));
+  if (value.empty() || value.front() == '-')
+    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  char* end = nullptr;
+  const auto parsed = std::strtoull(value.c_str(), &end, 10);
+  if (end != value.c_str() + value.size() ||
+      parsed > std::numeric_limits<std::size_t>::max()) {
+    throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  }
+  return static_cast<std::size_t>(parsed);
+}
+
 bool ocel_query_bool(const httplib::Request& request, std::string_view name,
                      bool fallback) {
   const auto key = std::string(name);
@@ -557,6 +573,49 @@ void handle_ocel_discovery(const httplib::Request& request,
           minera::discover_ocdfg_classic(log, performance));
     }
     response.set_content(ocel_discovery_response(variant, std::move(payload)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_split(const httplib::Request& request,
+                       httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "object_type", "max_objects", "max_degree_centrality"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL split parameter: " + key);
+    }
+    const auto variant = request.has_param("variant")
+                             ? request.get_param_value("variant")
+                             : std::string("connected_components");
+    minera::OcelSplitOptions options;
+    if (variant == "connected_components" || variant == "CONNECTED_COMPONENTS") {
+      options.variant = minera::OcelSplitVariant::kConnectedComponents;
+    } else if (variant == "ancestors_descendants" ||
+               variant == "ANCESTORS_DESCENDANTS") {
+      options.variant = minera::OcelSplitVariant::kAncestorsDescendants;
+    } else {
+      throw std::invalid_argument(
+          "variant expects connected_components or ancestors_descendants");
+    }
+    options.object_type = request.has_param("object_type")
+                              ? request.get_param_value("object_type")
+                              : std::string{};
+    options.max_objects = ocel_query_size(
+        request, "max_objects", std::numeric_limits<std::size_t>::max());
+    if (request.has_param("max_degree_centrality")) {
+      options.max_degree_centrality =
+          ocel_query_number(request, "max_degree_centrality", 1.0);
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto result = minera::split_ocel(minera::parse_ocel_json(body), options);
+    response.set_content(minera::serialize_ocel_split_json(result),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -2411,6 +2470,7 @@ int main(int argc, char** argv) {
   };
   server.Options("/api/mine", preflight);
   server.Options("/api/ocel/discover", preflight);
+  server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -2458,6 +2518,7 @@ int main(int argc, char** argv) {
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
+  server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

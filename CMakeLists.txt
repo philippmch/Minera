@@ -64,6 +64,7 @@ add_library(minera_core
   src/monte_carlo_json.cpp
   src/minimum_self_distance.cpp
   src/ocel.cpp
+  src/ocel_transform.cpp
   src/performance.cpp
   src/performance_spectrum.cpp
   src/petri_anti_alignment.cpp
@@ -555,6 +556,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_saw_nets_tests PRIVATE cxx_std_20)
   target_compile_options(minera_saw_nets_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_saw_nets_tests COMMAND minera_saw_nets_tests)
+
+  add_executable(minera_ocel_transform_tests
+    tests/test_ocel_transform.cpp
+  )
+  target_link_libraries(minera_ocel_transform_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_transform_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_transform_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_transform_tests COMMAND minera_ocel_transform_tests)
 
   add_executable(minera_link_analysis_tests
     tests/test_link_analysis.cpp

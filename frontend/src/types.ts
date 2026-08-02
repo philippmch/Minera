@@ -711,6 +711,7 @@ export function isRandomTreeResult(value: unknown): value is RandomTreeResult {
 
 export type OcelDiscoveryVariant = "etot" | "ocdfg" | "ocpn" | "otg" | "saw";
 export type OcelConformanceVariant = "etot" | "ocdfg" | "otg";
+export type OcelSplitVariant = "CONNECTED_COMPONENTS" | "ANCESTORS_DESCENDANTS";
 export interface OcelDiscoveryResult {
   family: "OCEL_DISCOVERY";
   variant: OcelDiscoveryVariant;
@@ -720,6 +721,11 @@ export interface OcelConformanceResult {
   family: "OCEL_CONFORMANCE";
   variant: OcelConformanceVariant;
   result: Record<string, unknown>;
+}
+export interface OcelSplitResult {
+  family: "OCEL_SPLIT";
+  variant: OcelSplitVariant;
+  logs: Array<Record<string, unknown>>;
 }
 function isOcelRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -733,6 +739,12 @@ export function isOcelConformanceResult(value: unknown): value is OcelConformanc
   if (!isOcelRecord(value) || value.family !== "OCEL_CONFORMANCE") return false;
   return ["etot", "ocdfg", "otg"].includes(String(value.variant))
     && isOcelRecord(value.result);
+}
+export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_SPLIT" ||
+      !["CONNECTED_COMPONENTS", "ANCESTORS_DESCENDANTS"].includes(String(value.variant)) ||
+      !Array.isArray(value.logs)) return false;
+  return value.logs.every((log) => isOcelRecord(log));
 }
 
 export type TransitionSystemView = "sequence" | "set" | "multiset";
