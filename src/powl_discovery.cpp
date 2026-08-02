@@ -347,22 +347,21 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
   }
 
-  // A redo component that returns to one start/end boundary must return to
-  // every boundary of that kind. Otherwise absorb it into do.
+  // A redo component is complete only when every activity that returns to a
+  // possible start returns to every possible start. Components with partial
+  // return evidence are merged into the do group.
   for (std::size_t index = 1; index < groups.size();) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
-      for (const auto& [edge, count] : relations.dfg) {
-        (void)count;
-        if (edge.first != activity || starts.count(edge.second) == 0)
-          continue;
-        for (const auto& start : starts) {
-          if (!has(relations.dfg, activity, start)) {
-            merge = true;
-            break;
-          }
+      bool reaches_start = false;
+      for (const auto& start : starts)
+        reaches_start = reaches_start || has(relations.dfg, activity, start);
+      if (!reaches_start) continue;
+      for (const auto& start : starts) {
+        if (!has(relations.dfg, activity, start)) {
+          merge = true;
+          break;
         }
-        if (merge) break;
       }
       if (merge) break;
     }
@@ -373,20 +372,20 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
       ++index;
     }
   }
+
+  // Apply the dual completeness rule at the end boundary.
   for (std::size_t index = 1; index < groups.size();) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
-      for (const auto& [edge, count] : relations.dfg) {
-        (void)count;
-        if (edge.second != activity || ends.count(edge.first) == 0)
-          continue;
-        for (const auto& end : ends) {
-          if (!has(relations.dfg, end, activity)) {
-            merge = true;
-            break;
-          }
+      bool reached_from_end = false;
+      for (const auto& end : ends)
+        reached_from_end = reached_from_end || has(relations.dfg, end, activity);
+      if (!reached_from_end) continue;
+      for (const auto& end : ends) {
+        if (!has(relations.dfg, end, activity)) {
+          merge = true;
+          break;
         }
-        if (merge) break;
       }
       if (merge) break;
     }
