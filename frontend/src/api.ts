@@ -26,6 +26,10 @@ import {
   type IntervalTreeResult,
   type CaseRelationsResult,
   type RandomTreeResult,
+  type OcelDiscoveryVariant,
+  type OcelConformanceVariant,
+  type OcelDiscoveryResult,
+  type OcelConformanceResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -43,6 +47,8 @@ import {
   isIntervalTreeResult,
   isCaseRelationsResult,
   isRandomTreeResult,
+  isOcelDiscoveryResult,
+  isOcelConformanceResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -1887,20 +1893,44 @@ export async function requestCaseRelations(
 }
 
 export interface RandomTreeOptions {
+  random_tree_variant?: "basic" | "ptandloggenerator";
   random_tree_rec_depth?: number;
   random_tree_min_rec_depth?: number;
   random_tree_max_rec_depth?: number;
   random_tree_prob_leaf?: number;
+  random_tree_mode?: number;
+  random_tree_min?: number;
+  random_tree_max?: number;
+  random_tree_sequence?: number;
+  random_tree_choice?: number;
+  random_tree_parallel?: number;
+  random_tree_loop?: number;
+  random_tree_or?: number;
+  random_tree_silent?: number;
+  random_tree_duplicate?: number;
+  random_tree_no_models?: number;
   random_tree_seed?: number;
   random_tree_activities?: string[];
 }
 
 export function randomTreeQuery(options: RandomTreeOptions = {}): string {
   const query = new URLSearchParams();
+  if (options.random_tree_variant !== undefined) query.set("random_tree_variant", options.random_tree_variant);
   if (options.random_tree_rec_depth !== undefined) query.set("random_tree_rec_depth", String(options.random_tree_rec_depth));
   if (options.random_tree_min_rec_depth !== undefined) query.set("random_tree_min_rec_depth", String(options.random_tree_min_rec_depth));
   if (options.random_tree_max_rec_depth !== undefined) query.set("random_tree_max_rec_depth", String(options.random_tree_max_rec_depth));
   if (options.random_tree_prob_leaf !== undefined) query.set("random_tree_prob_leaf", String(options.random_tree_prob_leaf));
+  if (options.random_tree_mode !== undefined) query.set("random_tree_mode", String(options.random_tree_mode));
+  if (options.random_tree_min !== undefined) query.set("random_tree_min", String(options.random_tree_min));
+  if (options.random_tree_max !== undefined) query.set("random_tree_max", String(options.random_tree_max));
+  if (options.random_tree_sequence !== undefined) query.set("random_tree_sequence", String(options.random_tree_sequence));
+  if (options.random_tree_choice !== undefined) query.set("random_tree_choice", String(options.random_tree_choice));
+  if (options.random_tree_parallel !== undefined) query.set("random_tree_parallel", String(options.random_tree_parallel));
+  if (options.random_tree_loop !== undefined) query.set("random_tree_loop", String(options.random_tree_loop));
+  if (options.random_tree_or !== undefined) query.set("random_tree_or", String(options.random_tree_or));
+  if (options.random_tree_silent !== undefined) query.set("random_tree_silent", String(options.random_tree_silent));
+  if (options.random_tree_duplicate !== undefined) query.set("random_tree_duplicate", String(options.random_tree_duplicate));
+  if (options.random_tree_no_models !== undefined) query.set("random_tree_no_models", String(options.random_tree_no_models));
   if (options.random_tree_seed !== undefined) query.set("random_tree_seed", String(options.random_tree_seed));
   if (options.random_tree_activities !== undefined) {
     const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
@@ -1915,5 +1945,87 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isRandomTreeResult(payload)) throw new Error("the Minera backend returned an invalid random tree");
+  return payload;
+}
+
+export interface OcelDiscoveryOptions {
+  variant?: OcelDiscoveryVariant;
+  compute_edges_performance?: boolean;
+}
+
+export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.compute_edges_performance !== undefined) {
+    query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
+  }
+  return query.toString();
+}
+
+export async function requestOcelDiscovery(
+  log: Blob,
+  options: OcelDiscoveryOptions = {},
+): Promise<OcelDiscoveryResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelDiscoveryQuery(options);
+  const response = await fetch(`/api/ocel/discover${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelDiscoveryResult(payload)) throw new Error("the Minera backend returned an invalid OCEL discovery");
+  return payload;
+}
+
+export interface OcelConformanceOptions {
+  variant?: OcelConformanceVariant;
+  alpha?: number;
+  beta?: number;
+  gamma?: number;
+  delta?: number;
+  etot_theta?: number;
+  otg_theta?: number;
+  ocdfg_theta_activity?: number;
+  ocdfg_theta_flow?: number;
+}
+
+export function ocelConformanceQuery(options: OcelConformanceOptions = {}): string {
+  const query = new URLSearchParams();
+  const add = (name: string, value: number | string | undefined) => {
+    if (value !== undefined) query.set(name, String(value));
+  };
+  add("variant", options.variant);
+  add("alpha", options.alpha);
+  add("beta", options.beta);
+  add("gamma", options.gamma);
+  add("delta", options.delta);
+  add("etot_theta", options.etot_theta);
+  add("otg_theta", options.otg_theta);
+  add("ocdfg_theta_activity", options.ocdfg_theta_activity);
+  add("ocdfg_theta_flow", options.ocdfg_theta_flow);
+  return query.toString();
+}
+
+export async function requestOcelConformance(
+  log: Blob,
+  normative: Blob,
+  options: OcelConformanceOptions = {},
+): Promise<OcelConformanceResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  const normativeName = typeof File !== "undefined" && normative instanceof File ? normative.name : "normative.json";
+  form.append("log", log, logName);
+  form.append("normative", normative, normativeName);
+  const query = ocelConformanceQuery(options);
+  const response = await fetch(`/api/ocel/conformance${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelConformanceResult(payload)) throw new Error("the Minera backend returned an invalid OCEL conformance result");
   return payload;
 }

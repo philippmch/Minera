@@ -248,15 +248,31 @@ void case_relations_params_contract() {
 
 void random_tree_params_contract() {
   const auto p = minera::parse_random_tree_params(fields({
+      {"random_tree_variant", "ptandloggenerator"},
       {"random_tree_min_rec_depth", "2"},
       {"random_tree_max_rec_depth", "4"},
       {"random_tree_prob_leaf", "0.75"},
       {"random_tree_seed", "17"},
       {"random_tree_activities", R"(Review\, senior,A\\B)"},
+      {"random_tree_mode", "5"},
+      {"random_tree_min", "3"},
+      {"random_tree_max", "7"},
+      {"random_tree_sequence", "0.2"},
+      {"random_tree_choice", "0.3"},
+      {"random_tree_parallel", "0.1"},
+      {"random_tree_loop", "0.4"},
+      {"random_tree_or", "0"},
+      {"random_tree_silent", "0.2"},
+      {"random_tree_duplicate", "0.1"},
+      {"random_tree_no_models", "1"},
   }));
+  assert(p.variant == minera::RandomTreeVariant::kPtAndLogGenerator);
   assert(p.min_rec_depth == 2 && p.max_rec_depth == 4);
   assert(p.prob_leaf == 0.75 && p.seed == 17);
   assert((p.activities == std::vector<std::string>{"Review, senior", "A\\B"}));
+  assert(p.mode == 5 && p.min == 3 && p.max == 7 && p.sequence == 0.2 &&
+         p.choice == 0.3 && p.parallel == 0.1 && p.loop == 0.4 &&
+         p.silent == 0.2 && p.duplicate == 0.1 && p.no_models == 1);
   bool threw = false;
   try {
     (void)minera::parse_random_tree_params(

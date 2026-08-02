@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -146,5 +146,30 @@ describe("local diagnostics API", () => {
   it("encodes deterministic group and safety options", () => {
     expect(localDiagnosticsQuery({ local_diagnostics_groups: "g1:r1,r2", local_diagnostics_max_rows: 4 }))
       .toBe("local_diagnostics_groups=g1%3Ar1%2Cr2&local_diagnostics_max_rows=4");
+  });
+});
+
+describe("OCEL API", () => {
+  it("serializes discovery and conformance options", () => {
+    expect(ocelDiscoveryQuery({ variant: "ocdfg", compute_edges_performance: false }))
+      .toBe("variant=ocdfg&compute_edges_performance=false");
+    expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
+      .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
+  });
+
+  it("posts OCEL JSON as multipart data and validates the response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
+      expect(init.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => ({ family: "OCEL_DISCOVERY", variant: "etot", result: { activities: [] } }) };
+    }));
+    await expect(requestOcelDiscovery(new File(["{}"], "log.json"), { variant: "etot" })).resolves.toMatchObject({ family: "OCEL_DISCOVERY" });
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects malformed OCEL conformance payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "OCEL_CONFORMANCE", variant: "otg" }) })));
+    await expect(requestOcelConformance(new File(["{}"], "log.json"), new File(["{}"], "normative.json")))
+      .rejects.toThrow(/invalid OCEL conformance/);
+    vi.unstubAllGlobals();
   });
 });

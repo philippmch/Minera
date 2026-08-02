@@ -523,10 +523,22 @@ int usage(const char* program) {
                "  --merge-left-column <name>    Relation left-case column\n"
                "  --merge-right-column <name>   Relation right-case column\n"
                "  --random-tree               Emit a seeded random process tree\n"
+               "  --random-tree-variant <id> basic or ptandloggenerator\n"
                "  --random-tree-rec-depth <n> Starting recursion depth\n"
                "  --random-tree-min-rec-depth <n> Minimum recursion depth\n"
                "  --random-tree-max-rec-depth <n> Maximum recursion depth\n"
                "  --random-tree-prob-leaf <f> Leaf probability\n"
+               "  --random-tree-mode <n>    PT-and-log activity-count mode\n"
+               "  --random-tree-min <n>     PT-and-log minimum activity count\n"
+               "  --random-tree-max <n>     PT-and-log maximum activity count\n"
+               "  --random-tree-sequence <f> PT-and-log sequence probability\n"
+               "  --random-tree-choice <f>  PT-and-log choice probability\n"
+               "  --random-tree-parallel <f> PT-and-log parallel probability\n"
+               "  --random-tree-loop <f>    PT-and-log loop probability\n"
+               "  --random-tree-or <f>      PT-and-log OR probability\n"
+               "  --random-tree-silent <f>  PT-and-log silent probability\n"
+               "  --random-tree-duplicate <f> PT-and-log duplicate probability\n"
+               "  --random-tree-no-models <n> PT-and-log model count\n"
                "  --random-tree-seed <n>      Random seed\n"
                "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
@@ -1285,9 +1297,16 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> random_tree_option_names = {
-          "random_tree_rec_depth",       "random_tree_min_rec_depth",
+          "random_tree_variant",        "random_tree_rec_depth",
+          "random_tree_min_rec_depth",
           "random_tree_max_rec_depth",   "random_tree_prob_leaf",
-          "random_tree_seed",            "random_tree_activities"};
+          "random_tree_mode",            "random_tree_min",
+          "random_tree_max",             "random_tree_sequence",
+          "random_tree_choice",          "random_tree_parallel",
+          "random_tree_loop",            "random_tree_or",
+          "random_tree_silent",           "random_tree_duplicate",
+          "random_tree_no_models",        "random_tree_seed",
+          "random_tree_activities"};
       if (!random_tree_option_names.contains(key)) return usage(argv[0]);
       random_tree_fields.insert_or_assign(std::move(key), value);
       random_tree_requested = true;
@@ -2606,7 +2625,7 @@ int main(int argc, char** argv) {
       };
       const auto params = minera::parse_random_tree_params(lookup, present);
       std::cout << minera::random_tree_json(
-          minera::generate_random_process_tree(params))
+          minera::generate_random_process_tree(params), params.variant)
                 << '\n';
       return 0;
     }

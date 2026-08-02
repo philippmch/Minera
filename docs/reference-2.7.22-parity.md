@@ -61,7 +61,7 @@ are reconciled.
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
-| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, native APIs, and headless OCEL CLI output; server/frontend adapters and broader OCEL schema coverage remain |
+| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, native APIs, headless OCEL CLI output, and multipart local-server/frontend API adapters; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
@@ -77,7 +77,7 @@ are reconciled.
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and the BASIC random-tree generator are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout, Monte Carlo, and tree+log generation remain |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and both seeded random-tree strategies (BASIC and bounded PT-and-log generation) are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout and Monte Carlo remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, and deterministic OCEL text/tuple descriptions are native or headless CLI-wired (`minera_export --label-splitting`, hidden cached-session `POST /api/label-splitting`, `minera_ocel --describe`); embeddings and broader OCEL transformations remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -85,6 +85,13 @@ Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 (`--playout-miner process_tree`), local-server `/api/playout`, cached-tree XES,
 and frontend controls. This closes only the process-tree variants; the broader
 simulation row remains partial because other simulation families are pending.
+
+Random-tree generation evidence: the native generator now exposes both the
+legacy `BASIC` strategy and a seeded, bounded `PTANDLOGGENERATOR` strategy.
+The latter validates triangular activity-count bounds, supported operator
+weights, silent/duplicate probabilities, and its single-tree contract; strict request
+parsing, standalone CLI JSON, local `/api/random-tree`, frontend query
+serialization, and recursive response guards preserve the selected variant.
 
 DFG simulation evidence: `CLASSIC` performs deterministic best-first expansion
 of a frequency DFG with start/end boundaries, probability ordering, occurrence

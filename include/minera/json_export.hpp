@@ -259,6 +259,8 @@ void write_analysis_json(std::ostream& out,
     const std::vector<OpenPathInterval>& result);
 [[nodiscard]] std::string case_relations_json(const EventLog& result);
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result);
+[[nodiscard]] std::string random_tree_json(const ProcessTree& result,
+                                            RandomTreeVariant variant);
 
 // Standalone deterministic JSON for the classic bounded ILP miner.
 [[nodiscard]] std::string ilp_miner_json(const ILPMinerResult& result);
