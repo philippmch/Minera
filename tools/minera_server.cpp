@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -57,6 +58,7 @@
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
+#include "minera/ocel.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
@@ -307,6 +309,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           });
     } else {
       csv = request.body;
+      params = minera::parse_mine_params(
+          [&](std::string_view name) {
+            const auto key = std::string(name);
+            return request.has_param(key) ? request.get_param_value(key)
+                                          : std::string{};
+          },
+          [&](std::string_view name) {
+            return request.has_param(std::string(name));
+          });
     }
 
     std::istringstream input(csv);
@@ -436,6 +447,169 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
 
     response.set_content(body, "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+double ocel_query_number(const httplib::Request& request,
+                         std::string_view name, double fallback) {
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return fallback;
+  const auto value = request.get_param_value(key);
+  char* end = nullptr;
+  const auto parsed = std::strtod(value.c_str(), &end);
+  if (end != value.c_str() + value.size() || !std::isfinite(parsed)) {
+    throw std::invalid_argument(key + ": expected a finite number");
+  }
+  return parsed;
+}
+
+bool ocel_query_bool(const httplib::Request& request, std::string_view name,
+                     bool fallback) {
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return fallback;
+  const auto value = request.get_param_value(key);
+  if (value == "true" || value == "1") return true;
+  if (value == "false" || value == "0") return false;
+  throw std::invalid_argument(key + ": expected true, false, 1, or 0");
+}
+
+std::string ocel_request_body(const httplib::Request& request,
+                              std::string_view field) {
+  if (request.is_multipart_form_data()) {
+    return form_field(request, std::string(field));
+  }
+  return request.body;
+}
+
+std::string ocel_discovery_response(std::string_view variant,
+                                    std::string payload) {
+  return std::string("{\"family\":\"OCEL_DISCOVERY\",\"variant\":\"") +
+         std::string(variant) + "\",\"result\":" + std::move(payload) +
+         "}";
+}
+
+std::string ocel_conformance_response(std::string_view variant,
+                                      std::string payload) {
+  return std::string("{\"family\":\"OCEL_CONFORMANCE\",\"variant\":\"") +
+         std::string(variant) + "\",\"result\":" + std::move(payload) +
+         "}";
+}
+
+void handle_ocel_discovery(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"variant",
+                                                  "compute_edges_performance"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL discovery parameter: " + key);
+    }
+    const auto variant = request.has_param("variant")
+                             ? request.get_param_value("variant")
+                             : std::string("ocdfg");
+    if (variant != "etot" && variant != "ocdfg" && variant != "ocpn" &&
+        variant != "otg") {
+      throw std::invalid_argument(
+          "variant expects etot, ocdfg, ocpn, or otg");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto log = minera::parse_ocel_json(body);
+    std::string payload;
+    if (variant == "etot") {
+      payload = minera::etot_json(minera::discover_etot_classic(log));
+    } else if (variant == "otg") {
+      payload = minera::otg_json(minera::discover_otg_classic(log));
+    } else if (variant == "ocpn") {
+      payload = minera::serialize_ocpn_json(minera::discover_ocpn(log));
+    } else {
+      const bool performance =
+          ocel_query_bool(request, "compute_edges_performance", true);
+      payload = minera::serialize_ocdfg_json(
+          minera::discover_ocdfg_classic(log, performance));
+    }
+    response.set_content(ocel_discovery_response(variant, std::move(payload)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_conformance(const httplib::Request& request,
+                             httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "alpha", "beta", "gamma", "delta", "etot_theta",
+        "otg_theta", "ocdfg_theta_activity", "ocdfg_theta_flow"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown OCEL conformance parameter: " + key);
+    }
+    const auto variant = request.has_param("variant")
+                             ? request.get_param_value("variant")
+                             : std::string("ocdfg");
+    if (variant != "etot" && variant != "ocdfg" && variant != "otg") {
+      throw std::invalid_argument("variant expects etot, ocdfg, or otg");
+    }
+    if (!request.is_multipart_form_data()) {
+      throw std::invalid_argument(
+          "OCEL conformance requires multipart fields log and normative");
+    }
+    const auto real_body = form_field(request, "log");
+    const auto normative_body = form_field(request, "normative");
+    if (real_body.empty() || normative_body.empty()) {
+      throw std::invalid_argument(
+          "OCEL conformance requires multipart fields log and normative");
+    }
+    const auto real = minera::parse_ocel_json(real_body);
+    const auto normative = minera::parse_ocel_json(normative_body);
+    const auto alpha = ocel_query_number(request, "alpha", 1.0);
+    const auto beta = ocel_query_number(request, "beta", 1.0);
+    const auto gamma = ocel_query_number(request, "gamma", 1.0);
+    std::string payload;
+    if (variant == "etot") {
+      minera::EtotConformanceOptions options;
+      options.alpha = alpha;
+      options.beta = beta;
+      options.gamma = gamma;
+      options.theta_relative =
+          ocel_query_number(request, "etot_theta", options.theta_relative);
+      payload = minera::etot_conformance_json(minera::compare_etot(
+          minera::discover_etot_classic(real),
+          minera::discover_etot_classic(normative), options));
+    } else if (variant == "otg") {
+      minera::OtgConformanceOptions options;
+      options.alpha = alpha;
+      options.beta = beta;
+      options.gamma = gamma;
+      options.theta =
+          ocel_query_number(request, "otg_theta", options.theta);
+      payload = minera::otg_conformance_json(minera::compare_otg(
+          minera::discover_otg_classic(real),
+          minera::discover_otg_classic(normative), options));
+    } else {
+      minera::OcdfgConformanceOptions options;
+      options.alpha = alpha;
+      options.beta = beta;
+      options.gamma = gamma;
+      options.delta = ocel_query_number(request, "delta", options.delta);
+      options.theta_activity = ocel_query_number(
+          request, "ocdfg_theta_activity", options.theta_activity);
+      options.theta_flow =
+          ocel_query_number(request, "ocdfg_theta_flow", options.theta_flow);
+      payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
+          minera::discover_ocdfg_classic(real, false),
+          minera::discover_ocdfg_classic(normative, false), options));
+    }
+    response.set_content(ocel_conformance_response(variant, std::move(payload)),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -1122,9 +1296,15 @@ void handle_random_tree(const httplib::Request& request,
                         httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "random_tree_rec_depth",     "random_tree_min_rec_depth",
-        "random_tree_max_rec_depth", "random_tree_prob_leaf",
-        "random_tree_seed",          "random_tree_activities"};
+        "random_tree_variant",       "random_tree_rec_depth",
+        "random_tree_min_rec_depth", "random_tree_max_rec_depth",
+        "random_tree_prob_leaf",     "random_tree_mode",
+        "random_tree_min",           "random_tree_max",
+        "random_tree_sequence",      "random_tree_choice",
+        "random_tree_parallel",      "random_tree_loop",
+        "random_tree_or",             "random_tree_silent",
+        "random_tree_duplicate",      "random_tree_no_models",
+        "random_tree_seed",           "random_tree_activities"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1140,7 +1320,8 @@ void handle_random_tree(const httplib::Request& request,
     };
     const auto params = minera::parse_random_tree_params(lookup, present);
     response.set_content(
-        minera::random_tree_json(minera::generate_random_process_tree(params)),
+        minera::random_tree_json(minera::generate_random_process_tree(params),
+                                 params.variant),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -1996,6 +2177,8 @@ int main(int argc, char** argv) {
     response.status = 204;
   };
   server.Options("/api/mine", preflight);
+  server.Options("/api/ocel/discover", preflight);
+  server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
   server.Options("/api/genetic-mine", preflight);
@@ -2038,6 +2221,8 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
 
   server.Post("/api/mine", handle_mine);
+  server.Post("/api/ocel/discover", handle_ocel_discovery);
+  server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/genetic-mine", handle_genetic_mine);

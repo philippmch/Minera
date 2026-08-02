@@ -589,11 +589,12 @@ export interface RandomTreeNode {
 }
 export interface RandomTreeResult {
   family: "RANDOM_TREE";
-  variant: "BASIC";
+  variant: "BASIC" | "PTANDLOGGENERATOR";
   activities: string[];
   tree: RandomTreeNode;
 }
-function isRandomTreeNode(value: unknown, activities: string[], root = false): value is RandomTreeNode {
+function isRandomTreeNode(value: unknown, activities: string[], root = false,
+                          basicRoot = false): value is RandomTreeNode {
   if (!value || typeof value !== "object") return false;
   const node = value as Partial<RandomTreeNode>;
   if (!["activity", "tau", "sequence", "exclusive", "parallel", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
@@ -601,22 +602,55 @@ function isRandomTreeNode(value: unknown, activities: string[], root = false): v
   if (node.activity !== undefined) return false;
   if (node.operator === "tau") return node.children.length === 0;
   if (node.operator === "loop") {
-    return node.children.length === 3 && isRandomTreeNode(node.children[0], activities)
-      && isRandomTreeNode(node.children[1], activities)
-      && isRandomTreeNode(node.children[2], activities)
-      && node.children[2].operator === "tau";
+    if (basicRoot && (node.children.length !== 3 ||
+        node.children[2]?.operator !== "tau")) return false;
+    return node.children.length >= 2 &&
+      node.children.every((child) => isRandomTreeNode(child, activities, false,
+                                                       basicRoot));
   }
   const minimumChildren = 2;
-  if (node.children.length < minimumChildren || (root && (node.operator !== "sequence" || node.children.length !== 3))) return false;
-  if (!node.children.every((child) => isRandomTreeNode(child, activities))) return false;
-  return !root || (node.children[0].operator === "activity" && node.children[2].operator === "activity");
+  if (node.children.length < minimumChildren ||
+      (root && basicRoot && (node.operator !== "sequence" || node.children.length !== 3))) return false;
+  if (!node.children.every((child) => isRandomTreeNode(child, activities, false,
+                                                       basicRoot))) return false;
+  return !root || !basicRoot ||
+    (node.children[0].operator === "activity" && node.children[2].operator === "activity");
 }
 export function isRandomTreeResult(value: unknown): value is RandomTreeResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<RandomTreeResult>;
-  if (candidate.family !== "RANDOM_TREE" || candidate.variant !== "BASIC" || !Array.isArray(candidate.activities)) return false;
+  if (candidate.family !== "RANDOM_TREE" ||
+      !["BASIC", "PTANDLOGGENERATOR"].includes(String(candidate.variant)) ||
+      !Array.isArray(candidate.activities)) return false;
   if (candidate.activities.length === 0 || candidate.activities.some((activity) => typeof activity !== "string" || activity.length === 0) || new Set(candidate.activities).size !== candidate.activities.length) return false;
-  return isRandomTreeNode(candidate.tree, candidate.activities, true);
+  return isRandomTreeNode(candidate.tree, candidate.activities, true,
+                         candidate.variant === "BASIC");
+}
+
+export type OcelDiscoveryVariant = "etot" | "ocdfg" | "ocpn" | "otg";
+export type OcelConformanceVariant = "etot" | "ocdfg" | "otg";
+export interface OcelDiscoveryResult {
+  family: "OCEL_DISCOVERY";
+  variant: OcelDiscoveryVariant;
+  result: Record<string, unknown>;
+}
+export interface OcelConformanceResult {
+  family: "OCEL_CONFORMANCE";
+  variant: OcelConformanceVariant;
+  result: Record<string, unknown>;
+}
+function isOcelRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+export function isOcelDiscoveryResult(value: unknown): value is OcelDiscoveryResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_DISCOVERY") return false;
+  return ["etot", "ocdfg", "ocpn", "otg"].includes(String(value.variant))
+    && isOcelRecord(value.result);
+}
+export function isOcelConformanceResult(value: unknown): value is OcelConformanceResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_CONFORMANCE") return false;
+  return ["etot", "ocdfg", "otg"].includes(String(value.variant))
+    && isOcelRecord(value.result);
 }
 
 export type TransitionSystemView = "sequence" | "set" | "multiset";

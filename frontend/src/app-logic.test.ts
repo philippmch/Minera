@@ -84,8 +84,10 @@ describe("native alignment adapters", () => {
   });
   it("serializes random-tree controls and validates recursive trees", async () => {
     expect(randomTreeQuery({ random_tree_seed: 7, random_tree_prob_leaf: 1, random_tree_activities: ["A,B", "C\\D"] })).toBe("random_tree_prob_leaf=1&random_tree_seed=7&random_tree_activities=A%5C%2CB%2CC%5C%5CD");
+    expect(randomTreeQuery({ random_tree_variant: "ptandloggenerator", random_tree_mode: 5, random_tree_min: 3, random_tree_max: 7, random_tree_sequence: 1 })).toBe("random_tree_variant=ptandloggenerator&random_tree_mode=5&random_tree_min=3&random_tree_max=7&random_tree_sequence=1");
     const valid = { family: "RANDOM_TREE", variant: "BASIC", activities: ["A"], tree: { operator: "sequence", children: [{ operator: "activity", activity: "A", children: [] }, { operator: "tau", children: [] }, { operator: "activity", activity: "A", children: [] }] } };
     expect(isRandomTreeResult(valid)).toBe(true);
+    expect(isRandomTreeResult({ ...valid, variant: "PTANDLOGGENERATOR", tree: { operator: "sequence", children: [{ operator: "activity", activity: "A", children: [] }, { operator: "activity", activity: "A", children: [] }] } })).toBe(true);
     expect(isRandomTreeResult({ ...valid, tree: { operator: "activity", children: [] } })).toBe(false);
     expect(isRandomTreeResult({ ...valid, activities: ["A", "A"] })).toBe(false);
     expect(isRandomTreeResult({ ...valid, tree: { operator: "sequence", children: [] } })).toBe(false);

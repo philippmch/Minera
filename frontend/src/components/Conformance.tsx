@@ -342,8 +342,8 @@ export function Conformance({
         key={`stochastic-playout-${analysisId}`}
         dataset={data.dataset}
         miners={[
-          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
           data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
+          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
           data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
           data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
         ].filter((miner): miner is { id: string; label: string } => miner !== null)}

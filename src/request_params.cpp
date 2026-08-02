@@ -1953,6 +1953,18 @@ RandomTreeParams parse_random_tree_params(const FieldLookup& field,
       throw std::invalid_argument(std::string(name) + ": expected a value");
     return value;
   };
+  if (supplied("random_tree_variant")) {
+    const auto value = require("random_tree_variant");
+    if (value == "basic") {
+      params.variant = RandomTreeVariant::kBasic;
+    } else if (value == "ptandloggenerator" || value == "pt_and_log_generator" ||
+               value == "ptandlog") {
+      params.variant = RandomTreeVariant::kPtAndLogGenerator;
+    } else {
+      throw std::invalid_argument(
+          "random_tree_variant: expected basic or ptandloggenerator");
+    }
+  }
   if (supplied("random_tree_rec_depth"))
     params.rec_depth = parse_nonnegative_size(require("random_tree_rec_depth"),
                                               "random_tree_rec_depth");
@@ -1978,6 +1990,32 @@ RandomTreeParams parse_random_tree_params(const FieldLookup& field,
     if (params.activities.empty())
       throw std::invalid_argument("random_tree_activities: expected labels");
   }
+  if (supplied("random_tree_mode"))
+    params.mode = parse_nonnegative_size(require("random_tree_mode"),
+                                         "random_tree_mode");
+  if (supplied("random_tree_min"))
+    params.min = parse_nonnegative_size(require("random_tree_min"),
+                                        "random_tree_min");
+  if (supplied("random_tree_max"))
+    params.max = parse_nonnegative_size(require("random_tree_max"),
+                                        "random_tree_max");
+  const auto parse_probability = [&](std::string_view field,
+                                     double& destination) {
+    if (!supplied(field)) return;
+    destination = parse_finite_double(require(field), field);
+    if (destination < 0.0 || destination > 1.0)
+      throw std::invalid_argument(std::string(field) + " must be in [0,1]");
+  };
+  parse_probability("random_tree_sequence", params.sequence);
+  parse_probability("random_tree_choice", params.choice);
+  parse_probability("random_tree_parallel", params.parallel);
+  parse_probability("random_tree_loop", params.loop);
+  parse_probability("random_tree_or", params.or_probability);
+  parse_probability("random_tree_silent", params.silent);
+  parse_probability("random_tree_duplicate", params.duplicate);
+  if (supplied("random_tree_no_models"))
+    params.no_models = parse_nonnegative_size(require("random_tree_no_models"),
+                                              "random_tree_no_models");
   return params;
 }
 

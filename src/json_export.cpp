@@ -3630,8 +3630,17 @@ void write_random_tree_node_json(std::ostream& out,
 }  // namespace
 
 std::string random_tree_json(const ProcessTree& result) {
+  return random_tree_json(result, RandomTreeVariant::kBasic);
+}
+
+std::string random_tree_json(const ProcessTree& result,
+                             RandomTreeVariant variant) {
   std::ostringstream out;
-  out << "{\"family\":\"RANDOM_TREE\",\"variant\":\"BASIC\",\"activities\":[";
+  const auto variant_name = variant == RandomTreeVariant::kBasic
+                                ? "BASIC"
+                                : "PTANDLOGGENERATOR";
+  out << "{\"family\":\"RANDOM_TREE\",\"variant\":\""
+      << variant_name << "\",\"activities\":[";
   for (std::size_t i = 0; i < result.activities().size(); ++i) {
     if (i) out << ',';
     write_json_string(out, result.activities()[i]);
