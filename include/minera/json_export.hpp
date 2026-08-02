@@ -48,6 +48,7 @@
 #include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
+#include "minera/organizational_mining.hpp"
 
 namespace minera {
 
@@ -267,5 +268,7 @@ void write_analysis_json(std::ostream& out,
 
 // Standalone deterministic JSON for PRIPEL-style contextual anonymization.
 [[nodiscard]] std::string pripel_json(const PripelResult& result);
+[[nodiscard]] std::string organizational_sna_json(
+    const OrganizationalSnaResult& result);
 
 }  // namespace minera

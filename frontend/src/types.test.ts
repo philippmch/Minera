@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -24,6 +24,17 @@ describe("isGeneticMinerResult", () => {
     expect(isGeneticMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: 2, inputs: [0], outputs: [1] }] } })).toBe(false);
     expect(isGeneticMinerResult({ ...valid, markings: { initial: [1], final: [0, 1] } })).toBe(false);
   });
+});
+
+describe("isOrganizationalSnaResult", () => {
+  const valid = {
+    family: "ORGANIZATIONAL_SNA", variant: "handover", directed: true, resources: ["alice", "bob"],
+    edges: [{ source: 0, target: 1, weight: 0.5 }],
+    diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 2, resource_count: 2, edge_count: 1, message: "ok" },
+  };
+  it("accepts a bounded SNA result", () => expect(isOrganizationalSnaResult(valid)).toBe(true));
+  it("rejects out-of-range edges", () => expect(isOrganizationalSnaResult({ ...valid, edges: [{ source: 2, target: 0, weight: 1 }] })).toBe(false));
+  it("requires the directedness contract", () => expect(isOrganizationalSnaResult({ ...valid, directed: undefined })).toBe(false));
 });
 
 describe("isLogToFeaturesResult", () => {

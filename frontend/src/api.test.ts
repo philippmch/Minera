@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -48,6 +48,17 @@ describe("genetic miner API", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "GENETIC" }) })));
     await expect(requestGeneticMine()).rejects.toThrow(/invalid genetic miner/);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("organizational SNA API", () => {
+  it("serializes bounded metric options", () => {
+    expect(organizationalSnaQuery({ sna_variant: "working_together", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
+      .toBe("sna_variant=working_together&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
+  });
+  it("rejects malformed responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "bad" }), { status: 200 })));
+    await expect(requestOrganizationalSna()).rejects.toThrow(/invalid organizational SNA/);
   });
 });
 

@@ -34,6 +34,8 @@ import {
   type TraceVariantQueryResult,
   type PripelOptions,
   type PripelResult,
+  type OrganizationalSnaOptions,
+  type OrganizationalSnaResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
   isLabelSplittingResult,
@@ -45,6 +47,7 @@ import {
   isGeneticMinerResult,
   isTraceVariantQueryResult,
   isPripelResult,
+  isOrganizationalSnaResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1142,6 +1145,27 @@ export function requestGeneticMine(options: GeneticMinerOptions = {}): Promise<G
 }
 export const mineGenetic = requestGeneticMine;
 export const requestGeneticMiner = requestGeneticMine;
+/** Query string for the cached-session organizational SNA endpoint. */
+export function organizationalSnaQuery(options: OrganizationalSnaOptions = {}): string {
+  const query = new URLSearchParams();
+  const entries: Array<[string, string | undefined]> = [
+    ["sna_variant", options.sna_variant],
+    ["sna_beta", options.sna_beta === undefined ? undefined : String(options.sna_beta)],
+    ["sna_n", options.sna_n === undefined ? undefined : String(options.sna_n)],
+    ["sna_metric_normalization", options.sna_metric_normalization === undefined ? undefined : String(options.sna_metric_normalization)],
+    ["sna_max_resources", options.sna_max_resources === undefined ? undefined : String(options.sna_max_resources)],
+    ["sna_max_edges", options.sna_max_edges === undefined ? undefined : String(options.sna_max_edges)],
+  ];
+  for (const [key, value] of entries) if (value !== undefined) query.set(key, value);
+  return query.toString();
+}
+export const snaQuery = organizationalSnaQuery;
+export function requestOrganizationalSna(options: OrganizationalSnaOptions = {}): Promise<OrganizationalSnaResult> {
+  const query = organizationalSnaQuery(options);
+  return postChecked(`/api/organizational-sna${query ? `?${query}` : ""}`, isOrganizationalSnaResult, "organizational SNA");
+}
+export const requestSna = requestOrganizationalSna;
+export const discoverOrganizationalSna = requestOrganizationalSna;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();
