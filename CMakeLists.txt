@@ -76,6 +76,7 @@ add_library(minera_core
   src/pripel.cpp
   src/process_tree_alignment.cpp
   src/random_tree.cpp
+  src/saw_nets.cpp
   src/process_tree_playout.cpp
   src/process_tree_reduction.cpp
   src/powl.cpp
@@ -546,6 +547,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_random_tree_tests PRIVATE cxx_std_20)
   target_compile_options(minera_random_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_random_tree_tests COMMAND minera_random_tree_tests)
+
+  add_executable(minera_saw_nets_tests
+    tests/test_saw_nets.cpp
+  )
+  target_link_libraries(minera_saw_nets_tests PRIVATE minera::core)
+  target_compile_features(minera_saw_nets_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_saw_nets_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_saw_nets_tests COMMAND minera_saw_nets_tests)
 
   add_executable(minera_link_analysis_tests
     tests/test_link_analysis.cpp

@@ -7,11 +7,12 @@
 #include <string>
 
 #include "minera/ocel.hpp"
+#include "minera/saw_nets.hpp"
 
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
@@ -85,8 +86,8 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("describe must be text or tuples");
     }
     if (!discover.empty() && discover != "etot" && discover != "ocdfg" &&
-        discover != "ocpn" && discover != "otg") {
-      throw std::invalid_argument("discover must be etot, ocdfg, ocpn, or otg");
+        discover != "ocpn" && discover != "otg" && discover != "saw") {
+      throw std::invalid_argument("discover must be etot, ocdfg, ocpn, otg, or saw");
     }
     if (!conformance.empty() && conformance != "etot" && conformance != "ocdfg" &&
         conformance != "otg") {
@@ -175,6 +176,11 @@ int main(int argc, char** argv) {
     if (discover == "ocpn") {
       std::cout << minera::serialize_ocpn_json(
                        minera::discover_ocpn(log, ocpn_options))
+                << '\n';
+      return 0;
+    }
+    if (discover == "saw") {
+      std::cout << minera::saw_nets_json(minera::discover_saw_nets(log))
                 << '\n';
       return 0;
     }

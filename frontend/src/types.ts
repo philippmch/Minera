@@ -709,7 +709,7 @@ export function isRandomTreeResult(value: unknown): value is RandomTreeResult {
                          candidate.variant === "BASIC");
 }
 
-export type OcelDiscoveryVariant = "etot" | "ocdfg" | "ocpn" | "otg";
+export type OcelDiscoveryVariant = "etot" | "ocdfg" | "ocpn" | "otg" | "saw";
 export type OcelConformanceVariant = "etot" | "ocdfg" | "otg";
 export interface OcelDiscoveryResult {
   family: "OCEL_DISCOVERY";
@@ -726,7 +726,7 @@ function isOcelRecord(value: unknown): value is Record<string, unknown> {
 }
 export function isOcelDiscoveryResult(value: unknown): value is OcelDiscoveryResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_DISCOVERY") return false;
-  return ["etot", "ocdfg", "ocpn", "otg"].includes(String(value.variant))
+  return ["etot", "ocdfg", "ocpn", "otg", "saw"].includes(String(value.variant))
     && isOcelRecord(value.result);
 }
 export function isOcelConformanceResult(value: unknown): value is OcelConformanceResult {

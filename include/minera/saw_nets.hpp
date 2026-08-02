@@ -1,0 +1,44 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <string>
+
+#include "minera/ocel.hpp"
+
+namespace minera {
+
+// A stochastic arc-weight distribution records how often a transition used a
+// given positive token multiplicity while replaying one object-centric log.
+// The key is the observed multiplicity and the value is its trace frequency.
+using SawWeightDistribution = std::map<std::size_t, std::uint64_t>;
+
+struct SawNet {
+  std::string object_type;
+  PetriNet net;
+  // One distribution is shared by all input/output arcs of a transition,
+  // matching the stochastic-arc convention while keeping the workflow net
+  // representation compact.
+  std::map<std::size_t, SawWeightDistribution> transition_weights;
+};
+
+struct SawNetDiscoveryResult {
+  std::map<std::string, SawNet> ot_saw_nets;
+  SawNet multi_saw_net;
+  // Decorations for the merged net: every place retains its source object
+  // type. Visible transitions are merged by activity label; silent
+  // transitions remain object-type-specific.
+  std::map<std::size_t, std::string> multi_place_object_types;
+  std::map<std::size_t, std::string> multi_silent_transition_object_types;
+};
+
+// Discovers a classic stochastic-arc-weight net for every object type and a
+// merged net in which visible transitions with the same activity are shared.
+// Each per-type model is induced from that type's flattened object cases and
+// weighted by clean token-replay firing multiplicities.
+[[nodiscard]] SawNetDiscoveryResult discover_saw_nets(const Ocel& log);
+
+[[nodiscard]] std::string saw_nets_json(const SawNetDiscoveryResult& result);
+
+}  // namespace minera
