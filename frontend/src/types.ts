@@ -1902,6 +1902,62 @@ export interface StochasticPlayoutOptions {
   event_interval?: number;
 }
 
+/** Controls bounded virtual-time Petri-net Monte Carlo simulation. */
+export interface MonteCarloOptions {
+  simulations?: number;
+  case_arrival_seconds?: number;
+  max_steps?: number;
+  seed?: number;
+  start?: number;
+  default_duration_seconds?: number;
+  transition_weights?: number[];
+  transition_durations?: Array<{
+    distribution: "deterministic" | "exponential";
+    value_seconds: number;
+  }>;
+  resources_per_place?: Record<number, number>;
+  default_resources_per_place?: number;
+  enable_diagnostics?: boolean;
+  stop_at_final?: boolean;
+}
+
+export interface MonteCarloDiagnostics {
+  simulated_cases: number;
+  completed_cases: number;
+  deadlocked_cases: number;
+  step_limited_cases: number;
+  case_arrival_seconds: number;
+  total_cases_seconds: number;
+  median_case_execution_seconds: number;
+  case_execution_seconds: number[];
+}
+
+export interface MonteCarloResult {
+  family: "MONTE_CARLO";
+  variant: "PETRI_SEMAPH_FIFO";
+  log: { trace_count: number; event_count: number };
+  diagnostics: MonteCarloDiagnostics;
+}
+
+export function isMonteCarloResult(value: unknown): value is MonteCarloResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<MonteCarloResult>;
+  if (result.family !== "MONTE_CARLO" || result.variant !== "PETRI_SEMAPH_FIFO") return false;
+  if (!result.log || typeof result.log !== "object" ||
+      !Number.isSafeInteger(result.log.trace_count) || result.log.trace_count < 0 ||
+      !Number.isSafeInteger(result.log.event_count) || result.log.event_count < 0) return false;
+  const d = result.diagnostics;
+  if (!d || typeof d !== "object") return false;
+  for (const name of ["simulated_cases", "completed_cases", "deadlocked_cases", "step_limited_cases"] as const) {
+    if (!Number.isSafeInteger(d[name]) || d[name] < 0) return false;
+  }
+  if (![d.case_arrival_seconds, d.total_cases_seconds,
+        d.median_case_execution_seconds].every(Number.isFinite) ||
+      !Array.isArray(d.case_execution_seconds) ||
+      d.case_execution_seconds.some((item) => !Number.isFinite(item) || item < 0)) return false;
+  return true;
+}
+
 export type DfgPlayoutVariant = "classic" | "performance";
 export interface DfgPlayoutOptions {
   variant?: DfgPlayoutVariant;

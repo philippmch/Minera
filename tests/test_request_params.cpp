@@ -1535,6 +1535,55 @@ void parse_stochastic_playout_params_rejects_bad_values() {
   }
 }
 
+void parse_monte_carlo_params_maps_controls() {
+  const auto parsed = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_simulations", "12"},
+      {"monte_carlo_case_arrival_seconds", "2.5"},
+      {"monte_carlo_max_steps", "99"},
+      {"monte_carlo_seed", "7"},
+      {"monte_carlo_start", "1767225600"},
+      {"monte_carlo_default_duration_seconds", "3"},
+      {"monte_carlo_default_resources_per_place", "2"},
+      {"monte_carlo_transition_weights", "0.25, 2, 0"},
+      {"monte_carlo_transition_durations", "deterministic:1, EXPONENTIAL=2"},
+      {"monte_carlo_resources_per_place", "0=2, 3=4"},
+      {"monte_carlo_enable_diagnostics", "false"},
+      {"monte_carlo_stop_at_final", "false"}}));
+  assert(parsed.simulations == 12 && parsed.case_arrival_seconds == 2.5 &&
+         parsed.max_steps == 99 && parsed.seed == 7);
+  assert(parsed.start == 1767225600.0 &&
+         parsed.default_duration_seconds == 3.0);
+  assert(parsed.default_resources_per_place == 2 &&
+         parsed.transition_weights == std::vector<double>({0.25, 2, 0}));
+  assert(parsed.transition_durations.size() == 2);
+  assert(parsed.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kDeterministic);
+  assert(parsed.transition_durations[1].distribution ==
+         minera::MonteCarloDurationDistribution::kExponential);
+  assert(parsed.transition_durations[1].value_seconds == 2.0);
+  assert(parsed.resources_per_place.at(0) == 2 &&
+         parsed.resources_per_place.at(3) == 4);
+  assert(!parsed.enable_diagnostics && !parsed.stop_at_final);
+}
+
+void parse_monte_carlo_params_rejects_bad_values() {
+  for (const auto& item : {
+           std::pair{"monte_carlo_simulations", "0"},
+           std::pair{"monte_carlo_case_arrival_seconds", "-1"},
+           std::pair{"monte_carlo_transition_weights", "1,"},
+           std::pair{"monte_carlo_transition_durations", "normal:1"},
+           std::pair{"monte_carlo_resources_per_place", "1=0"},
+           std::pair{"monte_carlo_enable_diagnostics", "maybe"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_monte_carlo_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 void log_to_features_params_contract() {
   const auto parsed = minera::parse_log_to_features_params(fields({
       {"features_variant", "temporal"},
@@ -1806,6 +1855,8 @@ int main() {
   parse_dfg_playout_params_rejects_invalid_bounds();
   parse_stochastic_playout_params_maps_controls();
   parse_stochastic_playout_params_rejects_bad_values();
+  parse_monte_carlo_params_maps_controls();
+  parse_monte_carlo_params_rejects_bad_values();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

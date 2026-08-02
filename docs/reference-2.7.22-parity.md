@@ -77,7 +77,7 @@ are reconciled.
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, and both seeded random-tree strategies (BASIC and bounded PT-and-log generation) are wired through strict request parsing, CLI, local server, and frontend controls; object-centric playout and Monte Carlo remain |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant are wired through strict request parsing, CLI, local server, JSON, and frontend controls; object-centric playout, fitted stochastic maps, richer duration distributions, and interval-tree diagnostics remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, and deterministic OCEL text/tuple descriptions are native or headless CLI-wired (`minera_export --label-splitting`, hidden cached-session `POST /api/label-splitting`, `minera_ocel --describe`); embeddings and broader OCEL transformations remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -92,6 +92,17 @@ The latter validates triangular activity-count bounds, supported operator
 weights, silent/duplicate probabilities, and its single-tree contract; strict request
 parsing, standalone CLI JSON, local `/api/random-tree`, frontend query
 serialization, and recursive response guards preserve the selected variant.
+
+Monte Carlo simulation evidence: the native `monte_carlo` core implements the
+`PETRI_SEMAPH_FIFO` virtual-time scheduler over workflow nets, seeded transition
+selection, deterministic and exponential service times, bounded case/step
+budgets, shared output-place resource pools, completion/deadlock diagnostics,
+and deterministic EventLog output. `monte_carlo_*` request fields are strictly
+validated, the export CLI can select `--playout-miner monte_carlo`, the local
+server exposes both `/api/playout?mode=monte_carlo` (XES) and `/api/monte-carlo`
+(JSON), and the frontend offers typed query/result guards and controls. Fitted
+maps from a source log, the remaining duration families, object-centric
+simulation, and interval-tree diagnostics are intentionally still open.
 
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics

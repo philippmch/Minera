@@ -86,6 +86,8 @@ import {
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
   type StochasticPlayoutOptions,
+  type MonteCarloOptions,
+  type MonteCarloResult,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -100,6 +102,7 @@ import {
   isProcessTreeReductionResult,
   isMineraExport,
   isPetriUsageComparison,
+  isMonteCarloResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1571,6 +1574,69 @@ export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): 
   return params.toString();
 }
 
+export function monteCarloQuery(options: MonteCarloOptions = {}): string {
+  const params = new URLSearchParams();
+  const positiveIntegers: Array<keyof MonteCarloOptions> = ["simulations"];
+  for (const name of positiveIntegers) {
+    const value = options[name];
+    if (value !== undefined) {
+      validatePlayoutNumber(name, value as number, true);
+      params.set(`monte_carlo_${name}`, String(value));
+    }
+  }
+  for (const name of ["max_steps", "seed", "default_resources_per_place"] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      validatePlayoutNumber(name, value as number, name === "default_resources_per_place");
+      params.set(`monte_carlo_${name}`, String(value));
+    }
+  }
+  for (const name of ["case_arrival_seconds", "start", "default_duration_seconds"] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!Number.isFinite(value) || (name !== "start" && value < 0)) {
+        throw new Error(`${name} must be a finite ${name === "start" ? "number" : "non-negative number"}`);
+      }
+      params.set(`monte_carlo_${name}`, String(value));
+    }
+  }
+  if (options.transition_weights !== undefined) {
+    if (!Array.isArray(options.transition_weights) || options.transition_weights.length === 0 ||
+        options.transition_weights.some((value) => !Number.isFinite(value) || value < 0)) {
+      throw new Error("transition_weights must be a non-empty list of finite non-negative numbers");
+    }
+    params.set("monte_carlo_transition_weights", options.transition_weights.join(","));
+  }
+  if (options.transition_durations !== undefined) {
+    if (!Array.isArray(options.transition_durations) || options.transition_durations.length === 0 ||
+        options.transition_durations.some((duration) =>
+          !duration || (duration.distribution !== "deterministic" && duration.distribution !== "exponential") ||
+          !Number.isFinite(duration.value_seconds) || duration.value_seconds < 0)) {
+      throw new Error("transition_durations must contain valid distribution/value entries");
+    }
+    params.set("monte_carlo_transition_durations", options.transition_durations
+      .map((duration) => `${duration.distribution}:${duration.value_seconds}`).join(","));
+  }
+  if (options.resources_per_place !== undefined) {
+    if (!options.resources_per_place || typeof options.resources_per_place !== "object" ||
+        Object.entries(options.resources_per_place).some(([place, count]) =>
+          !/^\d+$/.test(place) || !Number.isSafeInteger(count) || count <= 0)) {
+      throw new Error("resources_per_place must map non-negative places to positive integers");
+    }
+    const entries = Object.entries(options.resources_per_place)
+      .sort(([left], [right]) => Number(left) - Number(right));
+    params.set("monte_carlo_resources_per_place", entries.map(([place, count]) => `${place}=${count}`).join(","));
+  }
+  for (const name of ["enable_diagnostics", "stop_at_final"] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
+      params.set(`monte_carlo_${name}`, value ? "true" : "false");
+    }
+  }
+  return params.toString();
+}
+
 function validatePlayoutNumber(name: string, value: number, positive = false): void {
   if (!Number.isFinite(value) || !Number.isSafeInteger(value) || value < 0 || (positive && value === 0)) {
     throw new Error(`${name} must be a ${positive ? "positive" : "non-negative"} integer`);
@@ -1631,10 +1697,16 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
   return params.toString();
 }
 
-export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions = {}): Promise<string> {
+export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | StochasticPlayoutOptions | MonteCarloOptions | DfgPlayoutOptions = {}): Promise<string> {
+  const monteCarlo = miner === "monte_carlo" || "simulations" in options ||
+    "default_duration_seconds" in options || "transition_durations" in options ||
+    "resources_per_place" in options;
   const stochastic = miner === "stochastic" || "transition_weights" in options || "stop_at_final" in options || "case_interval" in options || "event_interval" in options || "start" in options;
   let query: string;
-  if (stochastic) {
+  if (monteCarlo) {
+    const controls = monteCarloQuery(options as MonteCarloOptions);
+    query = `mode=monte_carlo${controls ? `&${controls}` : ""}`;
+  } else if (stochastic) {
     const controls = stochasticPlayoutQuery(options as StochasticPlayoutOptions);
     query = `mode=stochastic${controls ? `&${controls}` : ""}`;
   } else {
@@ -1656,6 +1728,27 @@ export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOpt
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+export async function fetchMonteCarloResult(
+  miner = "inductive", options: MonteCarloOptions = {},
+): Promise<MonteCarloResult> {
+  const controls = monteCarloQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/monte-carlo?miner=${encodeURIComponent(miner)}${controls ? `&${controls}` : ""}`);
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (parsed && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isMonteCarloResult(parsed)) throw new Error("the Minera backend returned an invalid Monte Carlo result");
+  return parsed;
 }
 
 /**

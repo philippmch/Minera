@@ -57,6 +57,7 @@
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
+#include "minera/monte_carlo.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
@@ -715,8 +716,8 @@ int usage(const char* program) {
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
-               "                            declare, process_tree, dfg, or\n"
-               "                            stochastic\n"
+               "                            declare, process_tree, dfg,\n"
+               "                            stochastic, or monte_carlo\n"
                "  --playout-variant <id>   Process-tree variant: BASIC_PLAYOUT,\n"
                "                            EXTENSIVE, TOPBOTTOM, or stochastic\n"
                "  --playout-traces <n>     Process-tree sampled cases\n"
@@ -732,6 +733,16 @@ int usage(const char* program) {
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
                "  --stochastic-transition-weights <w,...> Transition weights\n"
                "  --stochastic-stop-at-final <bool> Stop at final marking\n"
+               "  --monte-carlo-simulations <n> Virtual-time cases\n"
+               "  --monte-carlo-max-steps <n> Firing cap per case\n"
+               "  --monte-carlo-seed <u64> RNG seed\n"
+               "  --monte-carlo-case-arrival-seconds <f> Case arrival interval\n"
+               "  --monte-carlo-default-duration-seconds <f> Default duration\n"
+               "  --monte-carlo-transition-weights <w,...> Transition weights\n"
+               "  --monte-carlo-transition-durations <d:v,...> Durations\n"
+               "  --monte-carlo-resources-per-place <p=n,...> Resource pools\n"
+               "  --monte-carlo-default-resources-per-place <n> Default pool size\n"
+               "  --monte-carlo-json        Emit Monte Carlo diagnostics as JSON\n"
                "  --dfg-playout-variant <name> classic or performance\n"
                "  --dfg-playout-traces <n> DFG generated cases\n"
                "  --dfg-playout-max-events-per-trace <n> Event cap\n"
@@ -916,6 +927,10 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> stochastic_playout_fields;
   bool stochastic_playout_requested = false;
   minera::StochasticPlayoutOptions stochastic_playout_options;
+  std::map<std::string, std::string> monte_carlo_fields;
+  bool monte_carlo_requested = false;
+  bool monte_carlo_json_requested = false;
+  minera::MonteCarloOptions monte_carlo_options;
   minera::FootprintsOptions footprints_options;
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
@@ -1466,11 +1481,43 @@ int main(int argc, char** argv) {
       stochastic_playout_requested = true;
       continue;
     }
+    if (arg == "--monte-carlo") {
+      monte_carlo_requested = true;
+      playout_miner = "monte_carlo";
+      continue;
+    }
+    if (arg == "--monte-carlo-json") {
+      monte_carlo_requested = true;
+      monte_carlo_json_requested = true;
+      continue;
+    }
+    if (arg == "--monte-carlo-simulations" ||
+        arg == "--monte-carlo-case-arrival-seconds" ||
+        arg == "--monte-carlo-max-steps" || arg == "--monte-carlo-seed" ||
+        arg == "--monte-carlo-start" ||
+        arg == "--monte-carlo-default-duration-seconds" ||
+        arg == "--monte-carlo-transition-weights" ||
+        arg == "--monte-carlo-transition-durations" ||
+        arg == "--monte-carlo-resources-per-place" ||
+        arg == "--monte-carlo-default-resources-per-place" ||
+        arg == "--monte-carlo-enable-diagnostics" ||
+        arg == "--monte-carlo-stop-at-final") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      monte_carlo_fields.insert_or_assign(std::move(key), value);
+      monte_carlo_requested = true;
+      continue;
+    }
     if (arg == "--playout-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       if (std::string_view(value) == "stochastic") {
         stochastic_playout_requested = true;
+      } else if (std::string_view(value) == "monte_carlo") {
+        monte_carlo_requested = true;
+        playout_miner = "monte_carlo";
       } else {
         process_tree_playout_fields.insert_or_assign("playout_variant", value);
         process_tree_playout_options_used = true;
@@ -1613,6 +1660,7 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       playout_miner = value;
+      if (playout_miner == "monte_carlo") monte_carlo_requested = true;
     } else if (arg == "--declare-playout-traces" ||
                arg == "--declare-playout-min-length" ||
                arg == "--declare-playout-max-length") {
@@ -2633,6 +2681,16 @@ int main(int argc, char** argv) {
     std::cerr << "error: stochastic playout requires a Petri --playout-miner\n";
     return 2;
   }
+  if (monte_carlo_requested && stochastic_playout_requested) {
+    std::cerr << "error: Monte Carlo and stochastic playout options cannot be combined\n";
+    return 2;
+  }
+  if (monte_carlo_requested &&
+      (playout_miner == "declare" || playout_miner == "process_tree" ||
+       playout_miner == "dfg")) {
+    std::cerr << "error: Monte Carlo playout requires a Petri --playout-miner\n";
+    return 2;
+  }
   if (stochastic_playout_requested) {
     const auto lookup = [&](std::string_view name) {
       const auto it = stochastic_playout_fields.find(std::string(name));
@@ -2644,6 +2702,22 @@ int main(int argc, char** argv) {
     try {
       stochastic_playout_options =
           minera::parse_stochastic_playout_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
+  if (monte_carlo_requested) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = monte_carlo_fields.find(std::string(name));
+      return it == monte_carlo_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return monte_carlo_fields.contains(std::string(name));
+    };
+    try {
+      monte_carlo_options =
+          minera::parse_monte_carlo_params(lookup, present);
     } catch (const std::invalid_argument& error) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;
@@ -3383,6 +3457,33 @@ int main(int argc, char** argv) {
       reduced_tree_result = minera::reduce_process_tree(tree, log.traces[*reduce_trace_index], ro);
     }
 
+    if (monte_carlo_json_requested) {
+      const minera::PetriNet* selected = &inductive_net;
+      if (playout_miner == "alpha") selected = &net;
+      else if (playout_miner == "heuristic") selected = &heuristic_net;
+      else if (playout_miner == "powl") selected = &powl_net;
+      else if (playout_miner != "inductive" &&
+               playout_miner != "monte_carlo") {
+        std::cerr << "error: unknown Monte Carlo model '" << playout_miner
+                  << "' (expected inductive, alpha, heuristic, or powl)\n";
+        return 2;
+      }
+      const auto body =
+          minera::monte_carlo_json(minera::monte_carlo(log, *selected,
+                                                       monte_carlo_options));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+
     if (output.empty()) {
       minera::write_analysis_json(
           std::cout, dataset, log, graph, &tree, &net, &heuristics,
@@ -3522,7 +3623,12 @@ int main(int argc, char** argv) {
       std::optional<minera::EventLog> generated;
       const minera::PetriNet* selected = nullptr;
       const bool stochastic = stochastic_playout_requested || playout_miner == "stochastic";
-      const std::string model_miner = playout_miner == "stochastic" ? "inductive" : playout_miner;
+      const bool monte_carlo_mode =
+          monte_carlo_requested || playout_miner == "monte_carlo";
+      const std::string model_miner =
+          (playout_miner == "stochastic" || monte_carlo_mode)
+              ? "inductive"
+              : playout_miner;
       if (model_miner == "inductive")
         selected = &inductive_net;
       else if (model_miner == "alpha")
@@ -3545,7 +3651,14 @@ int main(int argc, char** argv) {
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
-      if (stochastic) {
+      if (monte_carlo_mode) {
+        if (selected == nullptr) {
+          std::cerr << "error: Monte Carlo playout requires a Petri model\n";
+          return 2;
+        }
+        generated =
+            minera::monte_carlo(log, *selected, monte_carlo_options).log;
+      } else if (stochastic) {
         if (selected == nullptr) {
           std::cerr << "error: stochastic playout requires a Petri model\n";
           return 2;
@@ -3561,7 +3674,8 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_xes(playout_file, *generated,
-                        (stochastic ? model_miner + " stochastic playout"
+                        (monte_carlo_mode ? model_miner + " Monte Carlo playout"
+                         : stochastic ? model_miner + " stochastic playout"
                                     : playout_miner + " playout"));
     }
   } catch (const std::exception& error) {

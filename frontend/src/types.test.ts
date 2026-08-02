@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, type MineraExport } from "./types";
+
+describe("isMonteCarloResult", () => {
+  const valid = {
+    family: "MONTE_CARLO", variant: "PETRI_SEMAPH_FIFO",
+    log: { trace_count: 1, event_count: 2 },
+    diagnostics: { simulated_cases: 1, completed_cases: 1, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 2, median_case_execution_seconds: 2, case_execution_seconds: [2] },
+  };
+  it("accepts bounded diagnostics", () => expect(isMonteCarloResult(valid)).toBe(true));
+  it("rejects negative and malformed counts", () => {
+    expect(isMonteCarloResult({ ...valid, log: { trace_count: -1, event_count: 2 } })).toBe(false);
+    expect(isMonteCarloResult({ ...valid, diagnostics: { ...valid.diagnostics, case_execution_seconds: ["bad"] } })).toBe(false);
+  });
+});
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };

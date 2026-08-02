@@ -2,6 +2,7 @@
 // discovered or drawn anywhere — a PNML net or a BPMN 2.0 process — then feed
 // the log back into Minera (or any other tool) to study or check it.
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -16,6 +17,7 @@
 #include "minera/dfg_playout.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/monte_carlo.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/ptml.hpp"
@@ -40,7 +42,14 @@ int usage(const char* program) {
                "  --max-length <n>   Extensive: longest visible trace to\n"
                "                     enumerate (default: 10)\n"
                "  --dfg              Treat input CSV/XES as a log and play out its DFG\n"
-               "  --variant <name>   DFG variant: classic or performance\n";
+               "  --variant <name>   DFG variant: classic or performance\n"
+               "  --monte-carlo      Use bounded virtual-time Monte Carlo\n"
+               "  --monte-carlo-simulations <n> Case count\n"
+               "  --monte-carlo-max-steps <n> Firing cap\n"
+               "  --monte-carlo-seed <u64> RNG seed\n"
+               "  --monte-carlo-case-arrival-seconds <f> Arrival interval\n"
+               "  --monte-carlo-default-duration-seconds <f> Default duration\n"
+               "  --monte-carlo-transition-durations <d:v,...> Durations\n";
   return 2;
 }
 
@@ -53,7 +62,9 @@ int main(int argc, char** argv) {
   minera::ExtensivePlayoutOptions extensive_options;
   bool extensive = false;
   bool dfg = false;
+  bool monte_carlo = false;
   std::map<std::string, std::string> dfg_fields;
+  std::map<std::string, std::string> monte_carlo_fields;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -81,6 +92,15 @@ int main(int argc, char** argv) {
       extensive = true;
     } else if (arg == "--dfg") {
       dfg = true;
+    } else if (arg == "--monte-carlo") {
+      monte_carlo = true;
+    } else if (arg.rfind("--monte-carlo-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      monte_carlo_fields.insert_or_assign(std::move(key), value);
+      monte_carlo = true;
     } else if (arg == "--variant") {
       const auto* value = next(); if (!value) return usage(argv[0]);
       dfg_fields["dfg_playout_variant"] = value;
@@ -159,8 +179,31 @@ int main(int argc, char** argv) {
         : input.extension() == ".ptml"
             ? minera::to_petri_net(minera::import_ptml(input))
             : minera::import_pnml(input);
-    const auto log = extensive ? minera::extensive_playout(net, extensive_options)
-                               : minera::playout(net, options);
+    minera::EventLog log;
+    if (monte_carlo) {
+      if (!monte_carlo_fields.contains("monte_carlo_simulations"))
+        monte_carlo_fields["monte_carlo_simulations"] =
+            std::to_string(options.traces);
+      if (!monte_carlo_fields.contains("monte_carlo_max_steps"))
+        monte_carlo_fields["monte_carlo_max_steps"] =
+            std::to_string(options.max_steps);
+      if (!monte_carlo_fields.contains("monte_carlo_seed"))
+        monte_carlo_fields["monte_carlo_seed"] =
+            std::to_string(options.seed);
+      const auto lookup = [&monte_carlo_fields](std::string_view name) {
+        const auto it = monte_carlo_fields.find(std::string(name));
+        return it == monte_carlo_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&monte_carlo_fields](std::string_view name) {
+        return monte_carlo_fields.contains(std::string(name));
+      };
+      const auto mc_options =
+          minera::parse_monte_carlo_params(lookup, present);
+      log = minera::monte_carlo(net, mc_options).log;
+    } else {
+      log = extensive ? minera::extensive_playout(net, extensive_options)
+                       : minera::playout(net, options);
+    }
     const auto name = input.stem().string() + " playout";
 
     if (output.empty()) {

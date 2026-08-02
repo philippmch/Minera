@@ -59,6 +59,7 @@
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/model_decoration.hpp"
+#include "minera/monte_carlo.hpp"
 #include "minera/ocel.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
@@ -115,6 +116,24 @@ constexpr std::size_t kServerGeneticMaxStates = 1'000'000;
 constexpr std::size_t kServerTvqMaxOutputTraces = 100'000;
 constexpr std::size_t kServerTvqMaxOutputVariants = 100'000;
 constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
+
+void reject_unknown_monte_carlo_params(const httplib::Request& request) {
+  static const std::set<std::string> allowed = {
+      "miner", "mode", "monte_carlo_simulations",
+      "monte_carlo_case_arrival_seconds", "monte_carlo_max_steps",
+      "monte_carlo_seed", "monte_carlo_start",
+      "monte_carlo_default_duration_seconds",
+      "monte_carlo_transition_weights",
+      "monte_carlo_transition_durations",
+      "monte_carlo_resources_per_place",
+      "monte_carlo_default_resources_per_place",
+      "monte_carlo_enable_diagnostics", "monte_carlo_stop_at_final"};
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (!allowed.contains(key))
+      throw std::invalid_argument("unknown Monte Carlo parameter: " + key);
+  }
+}
 
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
@@ -1931,6 +1950,65 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
                        "application/xml");
 }
 
+void handle_monte_carlo_json(const httplib::Request& request,
+                             httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  const std::string miner = request.has_param("miner")
+                                ? request.get_param_value("miner")
+                                : std::string("inductive");
+  const std::string selected_miner =
+      miner == "monte_carlo" ? "inductive" : miner;
+  const auto it = session->nets.find(selected_miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + selected_miner),
+                         "application/json");
+    return;
+  }
+  const auto reject = [&](std::string message) {
+    response.status = 400;
+    response.set_content(error_json(message), "application/json");
+  };
+  try {
+    reject_unknown_monte_carlo_params(request);
+    const auto lookup = [&](std::string_view name) {
+      const std::string key(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_monte_carlo_params(lookup, present);
+    if (options.simulations > 10000 || options.max_steps > 10000 ||
+        options.default_resources_per_place > 1000) {
+      reject("Monte Carlo bounds exceed the server safety limits");
+      return;
+    }
+    constexpr std::size_t kMaxSimulationSteps = 1'000'000;
+    if (options.simulations != 0 && options.max_steps != 0 &&
+        options.simulations > kMaxSimulationSteps / options.max_steps) {
+      reject("Monte Carlo simulation budget exceeds the server safety limit");
+      return;
+    }
+    const auto result =
+        minera::monte_carlo(session->log, it->second, options);
+    response.set_content(minera::monte_carlo_json(result), "application/json");
+  } catch (const std::exception& error) {
+    reject(error.what());
+  }
+}
+
 // Simulates one model from the most recent mine into a synthetic event log,
 // served as XES. The `miner` query parameter picks a Petri model
 // ("inductive" | "alpha" | "heuristic" | "powl" | "imported", default
@@ -1940,7 +2018,8 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
 // traces, max_steps, seed, min_length, max_length, max_loop_occurrences and
 // max_trace_cap; mode=stochastic selects weighted Petri playout and accepts
 // stochastic_traces, stochastic_max_steps, stochastic_seed,
-// stochastic_transition_weights, and timing controls.
+// stochastic_transition_weights, and timing controls; mode=monte_carlo selects
+// the bounded virtual-time simulator and accepts monte_carlo_* controls.
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -1963,6 +2042,54 @@ void handle_playout(const httplib::Request& request,
                                ? request.get_param_value("mode")
                                : std::string{};
   const bool is_stochastic = mode == "stochastic" || miner == "stochastic";
+  const bool is_monte_carlo =
+      mode == "monte_carlo" || miner == "monte_carlo";
+  if (is_monte_carlo) {
+    const std::string selected_miner =
+        miner == "monte_carlo" ? "inductive" : miner;
+    const auto it = session->nets.find(selected_miner);
+    if (it == session->nets.end()) {
+      response.status = 400;
+      response.set_content(error_json("unknown miner: " + selected_miner),
+                           "application/json");
+      return;
+    }
+    const auto reject = [&](std::string message) {
+      response.status = 400;
+      response.set_content(error_json(message), "application/json");
+    };
+    try {
+      reject_unknown_monte_carlo_params(request);
+      const auto lookup = [&](std::string_view name) {
+        const std::string key(name);
+        return request.has_param(key) ? request.get_param_value(key)
+                                      : std::string{};
+      };
+      const auto present = [&](std::string_view name) {
+        return request.has_param(std::string(name));
+      };
+      const auto options = minera::parse_monte_carlo_params(lookup, present);
+      if (options.simulations > 10000 || options.max_steps > 10000 ||
+          options.default_resources_per_place > 1000) {
+        reject("Monte Carlo bounds exceed the server safety limits");
+        return;
+      }
+      constexpr std::size_t kMaxSimulationSteps = 1'000'000;
+      if (options.simulations != 0 && options.max_steps != 0 &&
+          options.simulations > kMaxSimulationSteps / options.max_steps) {
+        reject("Monte Carlo simulation budget exceeds the server safety limit");
+        return;
+      }
+      const auto result =
+          minera::monte_carlo(session->log, it->second, options);
+      response.set_content(
+          minera::to_xes(result.log, selected_miner + " Monte Carlo playout"),
+          "application/xml");
+    } catch (const std::exception& error) {
+      reject(error.what());
+    }
+    return;
+  }
   if (is_stochastic) {
     const std::string selected_miner = miner == "stochastic" ? "inductive" : miner;
     const auto it = session->nets.find(selected_miner);
@@ -2324,6 +2451,7 @@ int main(int argc, char** argv) {
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
   server.Options("/api/check-model", preflight);
+  server.Options("/api/monte-carlo", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -2375,6 +2503,7 @@ int main(int argc, char** argv) {
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
   server.Get("/api/playout", handle_playout);
+  server.Get("/api/monte-carlo", handle_monte_carlo_json);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;

@@ -202,6 +202,17 @@ void invalid_options_are_rejected() {
     rejected = true;
   }
   assert(rejected);
+
+  rejected = false;
+  try {
+    minera::MonteCarloOptions options;
+    options.transition_durations = {{
+        static_cast<minera::MonteCarloDurationDistribution>(99), 1.0}};
+    (void)minera::monte_carlo(net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
 }
 
 void diagnostics_can_be_disabled() {
@@ -216,6 +227,17 @@ void diagnostics_can_be_disabled() {
   assert(result.diagnostics.median_case_execution_seconds == 0.0);
 }
 
+void json_contract_is_stable() {
+  const auto result = minera::monte_carlo(linear_net(), minera::MonteCarloOptions{});
+  const auto json = minera::monte_carlo_json(result);
+  assert(json.find("\"family\":\"MONTE_CARLO\"") != std::string::npos);
+  assert(json.find("\"variant\":\"PETRI_SEMAPH_FIFO\"") !=
+         std::string::npos);
+  assert(json.find("\"trace_count\":100") != std::string::npos);
+  assert(json.find("\"simulated_cases\":100") != std::string::npos);
+  assert(json.find("case_execution_seconds") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -225,4 +247,5 @@ int main() {
   deadlocks_and_step_limits_are_reported();
   invalid_options_are_rejected();
   diagnostics_can_be_disabled();
+  json_contract_is_stable();
 }

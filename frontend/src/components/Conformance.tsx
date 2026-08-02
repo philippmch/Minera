@@ -34,12 +34,13 @@ import {
   type PetriAnalysisResult,
   type ProcessTreePlayoutOptions,
   type StochasticPlayoutOptions,
+  type MonteCarloOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchPlayout, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions } from "../api";
+import { fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -348,6 +349,16 @@ export function Conformance({
           data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
         ].filter((miner): miner is { id: string; label: string } => miner !== null)}
       />
+      <MonteCarloPlayoutPanel
+        key={`monte-carlo-playout-${analysisId}`}
+        dataset={data.dataset}
+        miners={[
+          data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
+          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
+          data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
+          data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
+        ].filter((miner): miner is { id: string; label: string } => miner !== null)}
+      />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
@@ -472,6 +483,54 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
         <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
       </div>
       <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download stochastic playout"}</button>
+      {error && <p className="conf-inline-note">{error}</p>}
+    </>}
+  </section>;
+}
+
+function MonteCarloPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
+  const [options, setOptions] = useState<MonteCarloOptions>({ simulations: 100, max_steps: 1000, stop_at_final: true });
+  const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
+  const [result, setResult] = useState<{ completed_cases: number; deadlocked_cases: number; median_case_execution_seconds: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setError(null); setResult(null);
+    try {
+      const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
+      const [summary, xes] = await Promise.all([
+        fetchMonteCarloResult(selectedMiner, options),
+        fetchPlayout(selectedMiner, options),
+      ]);
+      setResult({
+        completed_cases: summary.diagnostics.completed_cases,
+        deadlocked_cases: summary.diagnostics.deadlocked_cases,
+        median_case_execution_seconds: summary.diagnostics.median_case_execution_seconds,
+      });
+      const blob = new Blob([xes], { type: "application/xml" });
+      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-monte-carlo.xes`; anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const number = (name: keyof MonteCarloOptions, value: string) =>
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Monte Carlo Petri-net simulation</h2><span className="panel-meta">Bounded virtual-time XES with resource pools and diagnostics</span></div>
+    {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
+      <div className="align-settings-grid">
+        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
+        <label>Simulations<input type="number" min={1} value={options.simulations ?? ""} onChange={e => number("simulations", e.target.value)} /></label>
+        <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
+        <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
+        <label>Case arrival (s)<input type="number" min={0} step={0.1} value={options.case_arrival_seconds ?? ""} onChange={e => number("case_arrival_seconds", e.target.value)} /></label>
+        <label>Default duration (s)<input type="number" min={0} step={0.1} value={options.default_duration_seconds ?? ""} onChange={e => number("default_duration_seconds", e.target.value)} /></label>
+        <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
+        <label><input type="checkbox" checked={options.enable_diagnostics !== false} onChange={e => setOptions({ ...options, enable_diagnostics: e.target.checked })} /> Collect diagnostics</label>
+      </div>
+      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Simulatingâ€¦" : "Download Monte Carlo playout"}</button>
+      {result && <p className="conf-inline-note">Completed {numberFormat.format(result.completed_cases)} Â· deadlocked {numberFormat.format(result.deadlocked_cases)} Â· median execution {result.median_case_execution_seconds.toFixed(2)} s</p>}
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;
