@@ -61,6 +61,7 @@
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/ocel.hpp"
+#include "minera/saw_nets.hpp"
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
@@ -533,9 +534,9 @@ void handle_ocel_discovery(const httplib::Request& request,
                              ? request.get_param_value("variant")
                              : std::string("ocdfg");
     if (variant != "etot" && variant != "ocdfg" && variant != "ocpn" &&
-        variant != "otg") {
+        variant != "otg" && variant != "saw") {
       throw std::invalid_argument(
-          "variant expects etot, ocdfg, ocpn, or otg");
+          "variant expects etot, ocdfg, ocpn, otg, or saw");
     }
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
@@ -547,6 +548,8 @@ void handle_ocel_discovery(const httplib::Request& request,
       payload = minera::otg_json(minera::discover_otg_classic(log));
     } else if (variant == "ocpn") {
       payload = minera::serialize_ocpn_json(minera::discover_ocpn(log));
+    } else if (variant == "saw") {
+      payload = minera::saw_nets_json(minera::discover_saw_nets(log));
     } else {
       const bool performance =
           ocel_query_bool(request, "compute_edges_performance", true);

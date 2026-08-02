@@ -187,6 +187,8 @@ describe("OCEL API", () => {
   it("serializes discovery and conformance options", () => {
     expect(ocelDiscoveryQuery({ variant: "ocdfg", compute_edges_performance: false }))
       .toBe("variant=ocdfg&compute_edges_performance=false");
+    expect(ocelDiscoveryQuery({ variant: "saw" }))
+      .toBe("variant=saw");
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
   });

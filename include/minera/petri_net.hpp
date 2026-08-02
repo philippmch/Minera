@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,6 +35,19 @@ class PetriNet {
     transitions_.push_back(
         PetriTransition{activity, std::move(inputs), std::move(outputs)});
     return transitions_.size() - 1;
+  }
+
+  // Extends an existing transition while assembling composite model views
+  // (for example a merged object-centric net). The public read-only view of
+  // transitions remains stable for callers that only inspect a net.
+  void append_transition_arcs(std::size_t transition,
+                              std::vector<std::size_t> inputs,
+                              std::vector<std::size_t> outputs) {
+    if (transition >= transitions_.size())
+      throw std::out_of_range("Petri transition index is invalid");
+    auto& target = transitions_[transition];
+    target.inputs.insert(target.inputs.end(), inputs.begin(), inputs.end());
+    target.outputs.insert(target.outputs.end(), outputs.begin(), outputs.end());
   }
 
   void set_source(std::size_t place) noexcept { source_ = place; }
