@@ -2451,4 +2451,25 @@ LocalDiagnosticsOptions parse_local_diagnostics_params(const FieldLookup& field,
   return options;
 }
 
+TraceAttributeClusteringOptions parse_clustering_params(const FieldLookup& field) { return parse_clustering_params(field, {}); }
+TraceAttributeClusteringOptions parse_clustering_params(const FieldLookup& field, const FieldPresence& present) {
+  TraceAttributeClusteringOptions o;
+  const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();};
+  const auto req=[&](std::string_view n){auto v=field(n); if(v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v;};
+  if(supplied("clustering_trace_attribute")) o.trace_attribute=req("clustering_trace_attribute");
+  if(supplied("clustering_variant")) { const auto v=req("clustering_variant");
+    if(v=="DMM_LEVEN"||v=="dmm_leven") o.variant=TraceAttributeClusteringVariant::kDmmLeven;
+    else if(v=="AVG_LEVEN"||v=="avg_leven") o.variant=TraceAttributeClusteringVariant::kAvgLeven;
+    else if(v=="DMM_VEC"||v=="dmm_vec") o.variant=TraceAttributeClusteringVariant::kDmmVec;
+    else if(v=="AVG_VEC"||v=="avg_vec") o.variant=TraceAttributeClusteringVariant::kAvgVec;
+    else if(v=="DFG"||v=="dfg") o.variant=TraceAttributeClusteringVariant::kDfg;
+    else throw std::invalid_argument("clustering_variant: unknown variant"); }
+  if(supplied("clustering_alpha")) {o.alpha=parse_finite_double(req("clustering_alpha"),"clustering_alpha"); if(o.alpha<0||o.alpha>1) throw std::invalid_argument("clustering_alpha must be in [0,1]");}
+  if(supplied("clustering_percent")) {o.percent=parse_finite_double(req("clustering_percent"),"clustering_percent"); if(o.percent<=0||o.percent>1) throw std::invalid_argument("clustering_percent must be in (0,1]");}
+  if(supplied("clustering_max_groups")) o.max_groups=parse_positive_size(req("clustering_max_groups"),"clustering_max_groups");
+  if(supplied("clustering_max_output_nodes")) o.max_output_nodes=parse_positive_size(req("clustering_max_output_nodes"),"clustering_max_output_nodes");
+  if(o.trace_attribute.empty()) throw std::invalid_argument("clustering_trace_attribute: required");
+  return o;
+}
+
 }  // namespace minera

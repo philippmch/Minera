@@ -260,6 +260,57 @@ export function isResourceProfilesResult(value: unknown): value is ResourceProfi
 
 export interface LocalDiagnosticsOptions { local_diagnostics_group_attribute?: string; local_diagnostics_resource_attribute?: string; local_diagnostics_activity_attribute?: string; local_diagnostics_groups?: string; local_diagnostics_max_groups?: number; local_diagnostics_max_resources?: number; local_diagnostics_max_rows?: number; }
 export interface LocalDiagnosticsResult { family: "LOCAL_DIAGNOSTICS"; group_relative_focus: Record<string, Record<string, number>>; group_relative_stake: Record<string, Record<string, number>>; group_coverage: Record<string, Record<string, number>>; group_member_contribution: Record<string, Record<string, Record<string, number>>>; diagnostics: { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; group_count: number; resource_count: number; row_count: number; skipped_events: number; message: string }; }
+export type ClusteringVariant = "DMM_LEVEN" | "AVG_LEVEN" | "DMM_VEC" | "AVG_VEC" | "DFG";
+export interface ClusteringOptions {
+  clustering_trace_attribute?: string;
+  clustering_variant?: ClusteringVariant;
+  clustering_alpha?: number;
+  clustering_percent?: number;
+  clustering_max_groups?: number;
+  clustering_max_output_nodes?: number;
+}
+export interface ClusteringNode {
+  name: string;
+  distance: number;
+  size: number;
+  leaf: boolean;
+  children: ClusteringNode[];
+}
+export interface ClusteringResult {
+  family: "TRACE_ATTRIBUTE_CLUSTERING";
+  tree: ClusteringNode;
+  leaf_names: string[];
+  diagnostics: {
+    computed: boolean;
+    output_truncated: boolean;
+    trace_count: number;
+    group_count: number;
+    node_count: number;
+    message: string;
+  };
+}
+function isClusteringNode(value: unknown): value is ClusteringNode {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const n = value as Partial<ClusteringNode>;
+  const children = n.children;
+  const size = n.size;
+  const leaf = n.leaf;
+  return typeof n.name === "string" && typeof n.distance === "number" && Number.isFinite(n.distance) &&
+    typeof size === "number" && Number.isInteger(size) && size >= 0 && typeof leaf === "boolean" &&
+    Array.isArray(children) && children.every(isClusteringNode) &&
+    (leaf ? children.length === 0 : children.length >= 2);
+}
+export const isClusteringResult = (value: unknown): value is ClusteringResult => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const x = value as Partial<ClusteringResult>;
+  const d = x.diagnostics;
+  if (x.family !== "TRACE_ATTRIBUTE_CLUSTERING" || !isClusteringNode(x.tree) ||
+      !Array.isArray(x.leaf_names) || !x.leaf_names.every((name) => typeof name === "string") ||
+      !d || typeof d !== "object") return false;
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" &&
+    [d.trace_count, d.group_count, d.node_count].every((n) => Number.isInteger(n) && (n as number) >= 0) &&
+    typeof d.message === "string";
+};
 export function isLocalDiagnosticsResult(value: unknown): value is LocalDiagnosticsResult {
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<LocalDiagnosticsResult>; const d = c.diagnostics;

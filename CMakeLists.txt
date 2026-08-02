@@ -27,6 +27,7 @@ add_library(minera_core
   src/conformance.cpp
   src/concept_drift.cpp
   src/correlation_miner.cpp
+  src/clustering.cpp
   src/csv_event_log_importer.cpp
   src/declare.cpp
   src/declare_playout.cpp
@@ -220,6 +221,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_local_diagnostics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_local_diagnostics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_local_diagnostics_tests COMMAND minera_local_diagnostics_tests)
+
+  add_executable(minera_clustering_tests tests/test_clustering.cpp)
+  target_link_libraries(minera_clustering_tests PRIVATE minera::core)
+  target_compile_features(minera_clustering_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_clustering_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_clustering_tests COMMAND minera_clustering_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

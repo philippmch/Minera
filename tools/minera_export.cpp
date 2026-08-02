@@ -43,6 +43,7 @@
 #include "minera/network_analysis.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/local_diagnostics.hpp"
+#include "minera/clustering.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
@@ -375,6 +376,8 @@ int usage(const char* program) {
                "  --resource-profile-* <v> Resource profile metric, slots, selectors, and bounds\n"
                "  --local-diagnostics      Emit bounded local diagnostics JSON\n"
                "  --local-diagnostics-* <v> Group attributes, explicit groups, and bounds\n"
+               "  --clustering             Emit trace-attribute clustering JSON\n"
+               "  --clustering-* <v>       Attribute, variant, alpha, percent, and bounds\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -932,6 +935,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> resource_profiles_fields;
   bool local_diagnostics_requested = false;
   std::map<std::string, std::string> local_diagnostics_fields;
+  bool clustering_requested = false;
+  std::map<std::string, std::string> clustering_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1075,6 +1080,13 @@ int main(int argc, char** argv) {
     if (arg == "--roles") { roles_requested = true; continue; }
     if (arg == "--resource-profiles") { resource_profiles_requested = true; continue; }
     if (arg == "--local-diagnostics") { local_diagnostics_requested = true; continue; }
+    if (arg == "--clustering") { clustering_requested = true; continue; }
+    if (arg.rfind("--clustering-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {"clustering_trace_attribute", "clustering_variant", "clustering_alpha", "clustering_percent", "clustering_max_groups", "clustering_max_output_nodes"};
+      if (!names.contains(key)) return usage(argv[0]); clustering_fields.insert_or_assign(std::move(key), value); clustering_requested = true; continue;
+    }
     if (arg.rfind("--local-diagnostics-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
@@ -2740,6 +2752,15 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) { return local_diagnostics_fields.contains(std::string(name)); };
       const auto params = minera::parse_local_diagnostics_params(lookup, present);
       const auto body = minera::local_diagnostics_json(minera::discover_local_diagnostics(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
+      return 0;
+    }
+    if (clustering_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = clustering_fields.find(std::string(name)); return it == clustering_fields.end() ? std::string{} : it->second; };
+      const auto present = [&](std::string_view name) { return clustering_fields.contains(std::string(name)); };
+      const auto params = minera::parse_clustering_params(lookup, present);
+      const auto body = minera::trace_attribute_clustering_json(minera::discover_trace_attribute_clustering(log, params));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;

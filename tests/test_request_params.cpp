@@ -102,6 +102,35 @@ void resource_profiles_params_contract() {
   try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "interaction_two_resources"}, {"resource_profiles_resource", "a"}})); assert(false); } catch (const std::invalid_argument&) {}
 }
 
+void clustering_params_contract() {
+  const auto parsed = minera::parse_clustering_params(fields({
+      {"clustering_trace_attribute", "segment"},
+      {"clustering_variant", "DMM_VEC"},
+      {"clustering_alpha", "0.25"},
+      {"clustering_percent", "0.8"},
+      {"clustering_max_groups", "12"},
+      {"clustering_max_output_nodes", "24"}}));
+  assert(parsed.trace_attribute == "segment");
+  assert(parsed.variant == minera::TraceAttributeClusteringVariant::kDmmVec);
+  assert(parsed.alpha == 0.25 && parsed.percent == 0.8);
+  assert(parsed.max_groups == 12 && parsed.max_output_nodes == 24);
+  for (const auto& item : {std::pair{"clustering_variant", "bad"},
+                           std::pair{"clustering_alpha", "nan"},
+                           std::pair{"clustering_alpha", "1.1"},
+                           std::pair{"clustering_percent", "0"},
+                           std::pair{"clustering_max_groups", "0"},
+                           std::pair{"clustering_max_output_nodes", "0"}}) {
+    bool threw = false;
+    try { (void)minera::parse_clustering_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  bool missing = false;
+  try { (void)minera::parse_clustering_params(fields({})); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -1763,5 +1792,6 @@ int main() {
   trace_variant_query_params_contract();
   pripel_params_contract();
   resource_profiles_params_contract();
+  clustering_params_contract();
   return 0;
 }

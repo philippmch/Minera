@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -82,6 +82,23 @@ describe("network analysis API", () => {
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "NETWORK_ANALYSIS", edges: [] }), { status: 200 })));
     await expect(requestNetworkAnalysis()).rejects.toThrow(/invalid network analysis/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("trace clustering API", () => {
+  it("serializes variant, distance, and safety options", () => {
+    expect(clusteringQuery({ clustering_trace_attribute: "segment", clustering_variant: "DMM_VEC", clustering_alpha: 0.25, clustering_percent: 0.8, clustering_max_groups: 4, clustering_max_output_nodes: 9 }))
+      .toBe("clustering_trace_attribute=segment&clustering_variant=DMM_VEC&clustering_alpha=0.25&clustering_percent=0.8&clustering_max_groups=4&clustering_max_output_nodes=9");
+  });
+  it("rejects malformed recursive results", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      family: "TRACE_ATTRIBUTE_CLUSTERING",
+      tree: { name: "root", distance: 0, size: 2, leaf: false, children: [] },
+      leaf_names: ["a", "b"],
+      diagnostics: { computed: true, output_truncated: false, trace_count: 2, group_count: 2, node_count: 3, message: "ok" },
+    }), { status: 200 })));
+    await expect(requestClustering()).rejects.toThrow(/invalid trace clustering/);
     vi.unstubAllGlobals();
   });
 });
