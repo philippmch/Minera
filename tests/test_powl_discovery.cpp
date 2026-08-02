@@ -129,6 +129,16 @@ int main() {
       discover_powl(log({{"A", "X", "A"}, {"B", "Y", "B"}}), tree);
   assert(split_returns.kind() != PowlNodeKind::kLoop);
 
+  // A redo component is valid when it returns to every possible boundary;
+  // the common loop cut keeps the boundary alternatives in do.
+  const auto common_boundary_redo = discover_powl(
+      log({{"A", "X", "A"}, {"B", "X", "B"}, {"A", "X", "B"},
+           {"B", "X", "A"}}),
+      tree);
+  assert(common_boundary_redo.kind() == PowlNodeKind::kLoop);
+  assert(common_boundary_redo.children()[0].kind() == PowlNodeKind::kXor);
+  assert(common_boundary_redo.children()[1].label() == "X");
+
   // Multiple redo slices retain their multiplicity and order in the merged
   // redo projection rather than collapsing to a single activity choice.
   const auto multiple_redo =

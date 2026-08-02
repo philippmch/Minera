@@ -300,9 +300,8 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
   std::set<std::string> boundary = starts;
   boundary.insert(ends.begin(), ends.end());
 
-  // The do group starts with every trace boundary. Redo candidates are the
-  // weakly connected components left after removing all boundary nodes and
-  // every edge incident to them.
+  // Remove boundary nodes and all incident edges before computing weak
+  // components. The remaining components are the candidate redo groups.
   std::vector<std::set<std::string>> groups{boundary};
   std::set<std::string> seen = boundary;
   for (const auto& root : relations.acts) {
@@ -311,10 +310,8 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     seen.insert(root);
     for (std::size_t position = 0; position < component.size(); ++position) {
       for (const auto& candidate : relations.acts) {
-        if (seen.count(candidate) != 0 ||
-            boundary.count(candidate) != 0) {
+        if (seen.count(candidate) != 0 || boundary.count(candidate) != 0)
           continue;
-        }
         if (has(relations.dfg, component[position], candidate) ||
             has(relations.dfg, candidate, component[position])) {
           seen.insert(candidate);
@@ -334,8 +331,7 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
   };
 
-  // A start that cannot also end must lead directly into the do part; dually,
-  // an end that cannot also start must be reached directly from the do part.
+  // A boundary-only start/end exposes a component that must be part of do.
   for (const auto& start : starts) {
     if (ends.count(start) != 0) continue;
     for (const auto& [edge, count] : relations.dfg) {
@@ -351,25 +347,26 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
   }
 
-  // A redo component that returns to one possible start must return to every
-  // start. Likewise, if one possible end enters it, every end must enter it.
-  // Incomplete components belong to the do group instead.
+  // A redo component that returns to one start/end boundary must return to
+  // every boundary of that kind. Otherwise absorb it into do.
   for (std::size_t index = 1; index < groups.size();) {
-    bool complete = true;
+    bool merge = false;
     for (const auto& activity : groups[index]) {
-      const bool reaches_a_start =
-          std::any_of(starts.begin(), starts.end(), [&](const auto& start) {
-            return has(relations.dfg, activity, start);
-          });
-      if (reaches_a_start &&
-          std::any_of(starts.begin(), starts.end(), [&](const auto& start) {
-            return !has(relations.dfg, activity, start);
-          })) {
-        complete = false;
-        break;
+      for (const auto& [edge, count] : relations.dfg) {
+        (void)count;
+        if (edge.first != activity || starts.count(edge.second) == 0)
+          continue;
+        for (const auto& start : starts) {
+          if (!has(relations.dfg, activity, start)) {
+            merge = true;
+            break;
+          }
+        }
+        if (merge) break;
       }
+      if (merge) break;
     }
-    if (!complete) {
+    if (merge) {
       groups.front().insert(groups[index].begin(), groups[index].end());
       groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
     } else {
@@ -377,34 +374,42 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
   }
   for (std::size_t index = 1; index < groups.size();) {
-    bool complete = true;
+    bool merge = false;
     for (const auto& activity : groups[index]) {
-      const bool reached_from_an_end =
-          std::any_of(ends.begin(), ends.end(), [&](const auto& end) {
-            return has(relations.dfg, end, activity);
-          });
-      if (reached_from_an_end &&
-          std::any_of(ends.begin(), ends.end(), [&](const auto& end) {
-            return !has(relations.dfg, end, activity);
-          })) {
-        complete = false;
-        break;
+      for (const auto& [edge, count] : relations.dfg) {
+        (void)count;
+        if (edge.second != activity || ends.count(edge.first) == 0)
+          continue;
+        for (const auto& end : ends) {
+          if (!has(relations.dfg, end, activity)) {
+            merge = true;
+            break;
+          }
+        }
+        if (merge) break;
       }
+      if (merge) break;
     }
-    if (!complete) {
+    if (merge) {
       groups.front().insert(groups[index].begin(), groups[index].end());
       groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
     } else {
       ++index;
     }
   }
+
+  std::vector<std::set<std::string>> nonempty_groups;
+  for (auto& group : groups) {
+    if (!group.empty()) nonempty_groups.push_back(std::move(group));
+  }
+  groups = std::move(nonempty_groups);
   if (groups.size() <= 1) return std::nullopt;
 
   std::set<std::string> redo;
   for (std::size_t index = 1; index < groups.size(); ++index)
     redo.insert(groups[index].begin(), groups[index].end());
   if (redo.empty()) return std::nullopt;
-  const auto& do_activities = groups.front();
+  const std::set<std::string> do_activities = groups.front();
 
   // Project by alternating maximal do/redo slices. Whole-trace projection
   // loses repeated do executions and can turn ordered redo behavior into a

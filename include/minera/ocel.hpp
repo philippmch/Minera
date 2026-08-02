@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -106,5 +107,33 @@ OtgGraph discover_otg_classic(const Ocel& log);
 
 [[nodiscard]] std::string etot_json(const EtotGraph& graph);
 [[nodiscard]] std::string otg_json(const OtgGraph& graph);
+
+struct OcdfgActivityMetric {
+  std::vector<std::string> events;
+  std::vector<std::string> unique_objects;
+  std::vector<std::pair<std::string, std::string>> event_objects;
+};
+
+struct OcdfgEdgeMetric {
+  std::vector<std::pair<std::string, std::string>> event_couples;
+  std::vector<std::string> unique_objects;
+  std::vector<std::tuple<std::string, std::string, std::string>> event_objects;
+  std::vector<double> performance;
+};
+
+struct OcdfgGraph {
+  std::vector<std::string> activities;
+  std::vector<std::string> object_types;
+  std::map<std::string, OcdfgActivityMetric> activities_indep;
+  std::map<std::string, std::map<std::string, OcdfgActivityMetric>> activities_ot;
+  std::map<std::string, std::map<std::string, OcdfgActivityMetric>> start_activities;
+  std::map<std::string, std::map<std::string, OcdfgActivityMetric>> end_activities;
+  std::map<std::string, std::map<std::pair<std::string, std::string>, OcdfgEdgeMetric>> edges;
+  bool performance_computed = true;
+};
+
+OcdfgGraph discover_ocdfg_classic(const Ocel& log,
+                                  bool compute_edges_performance = true);
+std::string serialize_ocdfg_json(const OcdfgGraph& graph);
 
 }  // namespace minera

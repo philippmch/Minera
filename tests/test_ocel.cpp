@@ -102,5 +102,20 @@ int main() {
          std::string::npos);
   assert(minera::otg_json(otg).find("\"object_interaction\"") !=
          std::string::npos);
+  const auto ocdfg = minera::discover_ocdfg_classic(log, true);
+  assert(ocdfg.activities.size() == 2 && ocdfg.object_types.size() == 2);
+  assert(ocdfg.activities_indep.at("Create").events.size() == 1);
+  assert(ocdfg.activities_ot.at("order").at("Ship").unique_objects.size() == 1);
+  assert(ocdfg.start_activities.at("order").at("Create").events.size() == 1);
+  assert(ocdfg.end_activities.at("order").at("Ship").events.size() == 1);
+  assert(ocdfg.edges.at("order").at({"Create", "Ship"}).event_couples.size() == 1);
+  const auto ocdfg_json = minera::serialize_ocdfg_json(ocdfg);
+  assert(ocdfg_json.find("activities_indep") != std::string::npos);
+  assert(ocdfg_json.find("activities_ot") != std::string::npos);
+  assert(ocdfg_json.find("start_activities") != std::string::npos);
+  assert(ocdfg_json.find("end_activities") != std::string::npos);
+  assert(ocdfg_json.find("event_objects") != std::string::npos);
+  assert(ocdfg_json.find("performance_computed") != std::string::npos);
+  assert(!minera::discover_ocdfg_classic(log, false).performance_computed);
   return 0;
 }
