@@ -60,6 +60,7 @@ add_library(minera_core
   src/log_skeleton.cpp
   src/model_decoration.cpp
   src/minimum_self_distance.cpp
+  src/ocel.cpp
   src/performance.cpp
   src/performance_spectrum.cpp
   src/petri_anti_alignment.cpp
@@ -113,6 +114,12 @@ add_executable(minera_export
 target_link_libraries(minera_export PRIVATE minera::core)
 target_compile_features(minera_export PRIVATE cxx_std_20)
 
+add_executable(minera_ocel
+  tools/minera_ocel.cpp
+)
+target_link_libraries(minera_ocel PRIVATE minera::core)
+target_compile_features(minera_ocel PRIVATE cxx_std_20)
+
 add_executable(minera_playout
   tools/minera_playout.cpp
 )
@@ -150,6 +157,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_ocel_tests
+    tests/test_ocel.cpp
+  )
+  target_link_libraries(minera_ocel_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_tests COMMAND minera_ocel_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp
