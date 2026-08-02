@@ -53,6 +53,7 @@
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
+#include "minera/link_analysis.hpp"
 #include "minera/trie.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
@@ -773,6 +774,46 @@ void handle_network_analysis(const httplib::Request& request, httplib::Response&
     const auto options = minera::parse_network_analysis_params(lookup, present);
     response.set_content(minera::network_analysis_json(minera::discover_network_analysis(session->log, options)), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+void handle_link_analysis(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "link_analysis_out_column", "link_analysis_in_column",
+        "link_analysis_sorting_column", "link_analysis_look_forward",
+        "link_analysis_keep_first_occurrence", "link_analysis_propagate",
+        "link_analysis_max_links"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown link analysis parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_link_analysis_params(lookup, present);
+    response.set_content(
+        minera::link_analysis_json(
+            minera::discover_link_analysis(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_roles(const httplib::Request& request, httplib::Response& response) {
@@ -2186,6 +2227,7 @@ int main(int argc, char** argv) {
   server.Options("/api/organizational-sna", preflight);
   server.Options("/api/sna", preflight);
   server.Options("/api/network-analysis", preflight);
+  server.Options("/api/link-analysis", preflight);
   server.Options("/api/roles", preflight);
   server.Options("/api/resource-profiles", preflight);
   server.Options("/api/local-diagnostics", preflight);
@@ -2230,6 +2272,7 @@ int main(int argc, char** argv) {
   server.Post("/api/organizational-sna", handle_organizational_sna);
   server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/network-analysis", handle_network_analysis);
+  server.Post("/api/link-analysis", handle_link_analysis);
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);

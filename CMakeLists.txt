@@ -52,6 +52,7 @@ add_library(minera_core
   src/ilp_miner.cpp
   src/interval_tree.cpp
   src/label_splitting.cpp
+  src/link_analysis.cpp
   src/json_export.cpp
   src/log_filter.cpp
   src/log_to_features.cpp
@@ -534,4 +535,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_random_tree_tests PRIVATE cxx_std_20)
   target_compile_options(minera_random_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_random_tree_tests COMMAND minera_random_tree_tests)
+
+  add_executable(minera_link_analysis_tests
+    tests/test_link_analysis.cpp
+  )
+  target_link_libraries(minera_link_analysis_tests PRIVATE minera::core)
+  target_compile_features(minera_link_analysis_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_link_analysis_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_link_analysis_tests COMMAND minera_link_analysis_tests)
 endif()

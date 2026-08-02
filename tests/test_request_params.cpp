@@ -1737,6 +1737,29 @@ void pripel_params_contract() {
   }
 }
 
+void link_analysis_params_contract() {
+  const auto parsed = minera::parse_link_analysis_params(fields({
+      {"link_analysis_out_column", "source_id"},
+      {"link_analysis_in_column", "target_id"},
+      {"link_analysis_sorting_column", "started_at"},
+      {"link_analysis_look_forward", "false"},
+      {"link_analysis_keep_first_occurrence", "true"},
+      {"link_analysis_propagate", "true"},
+      {"link_analysis_max_links", "17"}}));
+  assert(parsed.out_column == "source_id" && parsed.in_column == "target_id" &&
+         parsed.sorting_column == "started_at");
+  assert(!parsed.look_forward && parsed.keep_first_occurrence &&
+         parsed.propagate && parsed.max_links == 17);
+  for (const auto& item : {
+           std::pair{"link_analysis_look_forward", "maybe"},
+           std::pair{"link_analysis_max_links", "0"}}) {
+    bool threw = false;
+    try { (void)minera::parse_link_analysis_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1807,6 +1830,7 @@ int main() {
   role_discovery_params_contract();
   trace_variant_query_params_contract();
   pripel_params_contract();
+  link_analysis_params_contract();
   resource_profiles_params_contract();
   clustering_params_contract();
   return 0;
