@@ -46,6 +46,7 @@ add_library(minera_core
   src/footprints_models.cpp
   src/heuristic_miner.cpp
   src/organizational_mining.cpp
+  src/network_analysis.cpp
   src/inductive_miner.cpp
   src/ilp_miner.cpp
   src/interval_tree.cpp
@@ -196,6 +197,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_organizational_mining_tests PRIVATE cxx_std_20)
   target_compile_options(minera_organizational_mining_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_organizational_mining_tests COMMAND minera_organizational_mining_tests)
+  add_executable(minera_network_analysis_tests
+    tests/test_network_analysis.cpp
+  )
+  target_link_libraries(minera_network_analysis_tests PRIVATE minera::core)
+  target_compile_features(minera_network_analysis_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_network_analysis_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_network_analysis_tests COMMAND minera_network_analysis_tests)
 
   add_executable(minera_resource_profiles_tests
     tests/test_resource_profiles.cpp

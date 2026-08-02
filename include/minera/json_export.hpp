@@ -49,6 +49,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/network_analysis.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/local_diagnostics.hpp"
@@ -273,6 +274,8 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string pripel_json(const PripelResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
+[[nodiscard]] std::string network_analysis_json(
+    const NetworkAnalysisResult& result);
 [[nodiscard]] std::string resource_profiles_json(
     const ResourceProfilesResult& result);
 [[nodiscard]] std::string role_discovery_json(const RoleDiscoveryResult& result);

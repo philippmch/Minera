@@ -41,6 +41,7 @@
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
+#include "minera/network_analysis.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/local_diagnostics.hpp"
 #include "minera/role_discovery.hpp"
@@ -577,6 +578,26 @@ void handle_organizational_sna(const httplib::Request& request,
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
+}
+
+void handle_network_analysis(const httplib::Request& request, httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
+    static const std::set<std::string> allowed = {
+      "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
+      "network_analysis_source_node_attribute", "network_analysis_target_node_attribute",
+      "network_analysis_edge_attribute", "network_analysis_edge_reference",
+      "network_analysis_out_relation_attribute", "network_analysis_in_relation_attribute",
+      "network_analysis_include_performance", "network_analysis_business_hours",
+      "network_analysis_business_hour_slots", "network_analysis_max_rows", "network_analysis_max_values"};
+    for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown network analysis parameter: " + key); }
+    const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
+    const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
+    const auto options = minera::parse_network_analysis_params(lookup, present);
+    response.set_content(minera::network_analysis_json(minera::discover_network_analysis(session->log, options)), "application/json");
+  } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
 void handle_roles(const httplib::Request& request, httplib::Response& response) {
@@ -1966,6 +1987,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine-genetic", preflight);
   server.Options("/api/organizational-sna", preflight);
   server.Options("/api/sna", preflight);
+  server.Options("/api/network-analysis", preflight);
   server.Options("/api/roles", preflight);
   server.Options("/api/resource-profiles", preflight);
   server.Options("/api/local-diagnostics", preflight);
@@ -2006,6 +2028,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine-genetic", handle_genetic_mine);
   server.Post("/api/organizational-sna", handle_organizational_sna);
   server.Post("/api/sna", handle_organizational_sna);
+  server.Post("/api/network-analysis", handle_network_analysis);
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);

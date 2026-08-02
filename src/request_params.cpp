@@ -2327,6 +2327,36 @@ OrganizationalSnaOptions parse_organizational_sna_params(
   return options;
 }
 
+NetworkAnalysisOptions parse_network_analysis_params(const FieldLookup& field) {
+  return parse_network_analysis_params(field, {});
+}
+
+NetworkAnalysisOptions parse_network_analysis_params(const FieldLookup& field,
+                                                     const FieldPresence& present) {
+  NetworkAnalysisOptions options;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("network_analysis_sorting_attribute")) options.sorting_attribute = require("network_analysis_sorting_attribute");
+  if (supplied("network_analysis_timestamp_attribute")) options.timestamp_attribute = require("network_analysis_timestamp_attribute");
+  if (supplied("network_analysis_source_node_attribute")) options.source_node_attribute = require("network_analysis_source_node_attribute");
+  if (supplied("network_analysis_target_node_attribute")) options.target_node_attribute = require("network_analysis_target_node_attribute");
+  if (supplied("network_analysis_edge_attribute")) options.edge_attribute = require("network_analysis_edge_attribute");
+  if (supplied("network_analysis_edge_reference")) {
+    const auto v = require("network_analysis_edge_reference");
+    if (v == "_out") options.edge_reference = NetworkAnalysisEdgeReference::kOut;
+    else if (v == "_in") options.edge_reference = NetworkAnalysisEdgeReference::kIn;
+    else throw std::invalid_argument("network_analysis_edge_reference: expected _out or _in");
+  }
+  if (supplied("network_analysis_out_relation_attribute")) options.out_relation_attribute = require("network_analysis_out_relation_attribute");
+  if (supplied("network_analysis_in_relation_attribute")) options.in_relation_attribute = require("network_analysis_in_relation_attribute");
+  if (supplied("network_analysis_include_performance")) options.include_performance = parse_boolean(require("network_analysis_include_performance"), "network_analysis_include_performance");
+  if (supplied("network_analysis_business_hours")) options.business_hours = parse_boolean(require("network_analysis_business_hours"), "network_analysis_business_hours");
+  if (supplied("network_analysis_business_hour_slots")) options.business_hour_slots = parse_business_hour_slots(require("network_analysis_business_hour_slots"), "network_analysis_business_hour_slots");
+  if (supplied("network_analysis_max_rows")) options.max_rows = parse_positive_size(require("network_analysis_max_rows"), "network_analysis_max_rows");
+  if (supplied("network_analysis_max_values")) options.max_values = parse_positive_size(require("network_analysis_max_values"), "network_analysis_max_values");
+  return options;
+}
+
 RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field) {
   return parse_role_discovery_params(field, {});
 }

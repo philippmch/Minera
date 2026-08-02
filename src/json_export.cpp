@@ -3830,6 +3830,33 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   return out.str();
 }
 
+std::string network_analysis_json(const NetworkAnalysisResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"NETWORK_ANALYSIS\",\"edges\":[";
+  for (std::size_t i = 0; i < result.edges.size(); ++i) {
+    if (i) out << ',';
+    const auto& e = result.edges[i];
+    out << "{\"source\":"; write_json_string(out, e.source);
+    out << ",\"target\":"; write_json_string(out, e.target);
+    out << ",\"activity\":"; write_json_string(out, e.activity);
+    out << ",\"count\":" << e.count << ",\"performance\":[";
+    for (std::size_t j = 0; j < e.performance.size(); ++j) {
+      if (j) out << ',';
+      out << std::setprecision(17) << e.performance[j];
+    }
+    out << "]}";
+  }
+  const auto& d = result.diagnostics;
+  out << "],\"diagnostics\":{\"computed\":" << (d.computed ? "true" : "false")
+      << ",\"output_truncated\":" << (d.output_truncated ? "true" : "false")
+      << ",\"trace_count\":" << d.trace_count << ",\"event_count\":" << d.event_count
+      << ",\"link_count\":" << d.link_count << ",\"row_count\":" << d.row_count
+      << ",\"performance_value_count\":" << d.performance_value_count << ",\"message\":";
+  write_json_string(out, d.message);
+  out << "}}";
+  return out.str();
+}
+
 std::string role_discovery_json(const RoleDiscoveryResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"ROLE_DISCOVERY\",\"roles\":[";
