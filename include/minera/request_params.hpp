@@ -41,6 +41,7 @@
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/embeddings.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/link_analysis.hpp"
 #include "minera/timestamp_interleavings.hpp"
@@ -116,6 +117,7 @@ using LinkAnalysisParams = LinkAnalysisOptions;
 using TimestampInterleavingsParams = TimestampInterleavingOptions;
 using RandomTreeParams = RandomTreeOptions;
 using LogToFeaturesParams = LogToFeaturesOptions;
+using EmbeddingParams = EmbeddingOptions;
 using LabelSplittingParams = LabelSplittingOptions;
 
 enum class EvaluationFamily {
@@ -383,6 +385,13 @@ parse_timestamp_interleavings_params(const FieldLookup& field);
 [[nodiscard]] LogToFeaturesParams parse_log_to_features_params(
     const FieldLookup& field);
 [[nodiscard]] LogToFeaturesParams parse_log_to_features_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict parser for deterministic case/event embedding transformations. Wire
+// fields use the `embedding_` prefix.
+[[nodiscard]] EmbeddingParams parse_embedding_params(
+    const FieldLookup& field);
+[[nodiscard]] EmbeddingParams parse_embedding_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] LabelSplittingParams parse_label_splitting_params(

@@ -1621,6 +1621,31 @@ void log_to_features_params_contract() {
   assert(threw);
 }
 
+void embedding_params_contract() {
+  const auto parsed = minera::parse_embedding_params(fields({
+      {"embedding_variant", "events"},
+      {"embedding_model", "hashing-v1"},
+      {"embedding_attribute_key", "concept:name"},
+      {"embedding_event_id_key", "event_id"},
+      {"embedding_dimensions", "32"},
+      {"embedding_max_items", "17"},
+      {"embedding_keep_cases", "true"}}));
+  assert(parsed.variant == minera::EmbeddingVariant::EVENTS_TRANSFORMERS);
+  assert(parsed.embedding_model == "hashing-v1" &&
+         parsed.attribute_key == "concept:name" &&
+         parsed.event_id_key == "event_id");
+  assert(parsed.dimensions == 32 && parsed.max_items == 17 &&
+         parsed.keep_cases);
+  bool threw = false;
+  try { (void)minera::parse_embedding_params(fields({{"embedding_variant", "bogus"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_embedding_params(fields({{"embedding_dimensions", "0"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void label_splitting_params_contract() {
   const auto parsed = minera::parse_label_splitting_params(fields({
       {"label_splitting_variant", "contextual"},
@@ -1907,6 +1932,7 @@ int main() {
   case_relations_params_contract();
   random_tree_params_contract();
   log_to_features_params_contract();
+  embedding_params_contract();
   label_splitting_params_contract();
   ilp_params_contract();
   genetic_params_contract();

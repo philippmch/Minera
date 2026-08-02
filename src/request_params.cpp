@@ -2372,6 +2372,53 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   return params;
 }
 
+EmbeddingParams parse_embedding_params(const FieldLookup& field) {
+  return parse_embedding_params(field, {});
+}
+
+EmbeddingParams parse_embedding_params(const FieldLookup& field,
+                                       const FieldPresence& present) {
+  EmbeddingParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("embedding_variant")) {
+    const auto value = require("embedding_variant");
+    if (value == "cases" || value == "cases_transformers" ||
+        value == "CASES_TRANSFORMERS") {
+      params.variant = EmbeddingVariant::CASES_TRANSFORMERS;
+    } else if (value == "events" || value == "events_transformers" ||
+               value == "EVENTS_TRANSFORMERS") {
+      params.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
+    } else {
+      throw std::invalid_argument(
+          "embedding_variant: expected cases or events");
+    }
+  }
+  if (supplied("embedding_model"))
+    params.embedding_model = require("embedding_model");
+  if (supplied("embedding_attribute_key"))
+    params.attribute_key = require("embedding_attribute_key");
+  if (supplied("embedding_event_id_key"))
+    params.event_id_key = require("embedding_event_id_key");
+  if (supplied("embedding_dimensions"))
+    params.dimensions = parse_positive_size(require("embedding_dimensions"),
+                                            "embedding_dimensions");
+  if (supplied("embedding_max_items"))
+    params.max_items = parse_positive_size(require("embedding_max_items"),
+                                           "embedding_max_items");
+  if (supplied("embedding_keep_cases"))
+    params.keep_cases = parse_boolean(require("embedding_keep_cases"),
+                                      "embedding_keep_cases");
+  return params;
+}
+
 LabelSplittingParams parse_label_splitting_params(const FieldLookup& field) {
   return parse_label_splitting_params(field, {});
 }

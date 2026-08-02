@@ -21,6 +21,8 @@ import {
   type ConceptDriftResult,
   type LogToTargetResult,
   type LogToFeaturesResult,
+  type EmbeddingVariant,
+  type EmbeddingApiResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -47,6 +49,7 @@ import {
   type OrganizationalSnaResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
+  isEmbeddingApiResult,
   isLabelSplittingResult,
   isTrieResult,
   isIntervalTreeResult,
@@ -1898,6 +1901,37 @@ export async function requestLogToFeatures(options: LogToFeaturesOptions = {}): 
   }
   const payload: unknown = await response.json();
   if (!isLogToFeaturesResult(payload)) throw new Error("the Minera backend returned an invalid feature extraction");
+  return payload;
+}
+
+export interface EmbeddingOptions {
+  embedding_variant?: EmbeddingVariant;
+  embedding_model?: string;
+  embedding_attribute_key?: string;
+  embedding_event_id_key?: string;
+  embedding_dimensions?: number;
+  embedding_max_items?: number;
+  embedding_keep_cases?: boolean;
+  embedding_target?: string;
+  embedding_top_k?: number;
+}
+export function embeddingsQuery(options: EmbeddingOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  return query.toString();
+}
+export async function requestEmbeddings(options: EmbeddingOptions = {}): Promise<EmbeddingApiResult> {
+  const query = embeddingsQuery(options);
+  const response = await fetch(`/api/embeddings${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isEmbeddingApiResult(payload)) throw new Error("the Minera backend returned an invalid embedding result");
   return payload;
 }
 

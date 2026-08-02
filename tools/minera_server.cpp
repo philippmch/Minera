@@ -52,6 +52,7 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/embeddings.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/link_analysis.hpp"
 #include "minera/trie.hpp"
@@ -1489,6 +1490,65 @@ void handle_log_to_features(const httplib::Request& request,
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+void handle_embeddings(const httplib::Request& request,
+                       httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "embedding_variant", "embedding_model", "embedding_attribute_key",
+        "embedding_event_id_key", "embedding_dimensions",
+        "embedding_max_items", "embedding_keep_cases", "embedding_target",
+        "embedding_top_k"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown embedding parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_embedding_params(lookup, present);
+    const auto result = minera::to_embeddings(session->log, options);
+    if (request.has_param("embedding_target")) {
+      const auto target = request.get_param_value("embedding_target");
+      if (target.empty())
+        throw std::invalid_argument("embedding_target: expected a value");
+      const auto top_k = ocel_query_size(request, "embedding_top_k", 0);
+      if (top_k > 10000)
+        throw std::invalid_argument("embedding_top_k exceeds the server safety limit");
+      const auto matches = minera::embedding_similarity(
+          target, result, options, top_k);
+      response.set_content(minera::serialize_embedding_similarity_json(
+                               target, result, matches, top_k),
+                           "application/json");
+    } else {
+      if (request.has_param("embedding_top_k"))
+        throw std::invalid_argument(
+            "embedding_top_k requires embedding_target");
+      response.set_content(minera::serialize_embeddings_json(result),
+                           "application/json");
+    }
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // On-demand transformation of the cached session. This route is intentionally
 // not advertised by the frontend navigation, but remains available to clients
 // that need deterministic contextual label splitting.
@@ -2723,6 +2783,8 @@ int main(int argc, char** argv) {
   server.Options("/api/log-to-features", preflight);
   server.Options("/api/features", preflight);
   server.Options("/api/transform-features", preflight);
+  server.Options("/api/embeddings", preflight);
+  server.Options("/api/to-embeddings", preflight);
   server.Options("/api/label-splitting", preflight);
   server.Options("/api/transform-label-splitting", preflight);
   server.Options("/api/trie", preflight);
@@ -2773,6 +2835,8 @@ int main(int argc, char** argv) {
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);
   server.Post("/api/transform-features", handle_log_to_features);
+  server.Post("/api/embeddings", handle_embeddings);
+  server.Post("/api/to-embeddings", handle_embeddings);
   server.Post("/api/label-splitting", handle_label_splitting);
   server.Post("/api/transform-label-splitting", handle_label_splitting);
   server.Get("/api/trie", handle_trie);

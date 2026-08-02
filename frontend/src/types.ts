@@ -482,6 +482,55 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
 }
 
+export type EmbeddingVariant = "cases_transformers" | "events_transformers";
+export interface EmbeddingItem { id: string; embedding: number[]; }
+export interface EmbeddingResult {
+  family: "TO_EMBEDDINGS";
+  variant: EmbeddingVariant;
+  embedding_model: string;
+  attribute_key: string;
+  dimensions: number;
+  items: EmbeddingItem[];
+}
+export interface EmbeddingSimilarityItem { id: string; score: number; }
+export interface EmbeddingSimilarityResult {
+  family: "TO_EMBEDDINGS_SIMILARITY";
+  variant: EmbeddingVariant;
+  target: string;
+  top_k: number;
+  items: EmbeddingSimilarityItem[];
+}
+export type EmbeddingApiResult = EmbeddingResult | EmbeddingSimilarityResult;
+export function isEmbeddingResult(value: unknown): value is EmbeddingResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<EmbeddingResult>;
+  const dimensions = c.dimensions;
+  return c.family === "TO_EMBEDDINGS"
+    && (c.variant === "cases_transformers" || c.variant === "events_transformers")
+    && typeof c.embedding_model === "string" && typeof c.attribute_key === "string"
+    && typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0
+    && Array.isArray(c.items) && c.items.every((item) => !!item && typeof item === "object"
+      && typeof (item as EmbeddingItem).id === "string"
+      && Array.isArray((item as EmbeddingItem).embedding)
+      && (item as EmbeddingItem).embedding.length === dimensions
+      && (item as EmbeddingItem).embedding.every((entry) => typeof entry === "number" && Number.isFinite(entry)));
+}
+export function isEmbeddingSimilarityResult(value: unknown): value is EmbeddingSimilarityResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<EmbeddingSimilarityResult>;
+  const topK = c.top_k;
+  return c.family === "TO_EMBEDDINGS_SIMILARITY"
+    && (c.variant === "cases_transformers" || c.variant === "events_transformers")
+    && typeof c.target === "string" && typeof topK === "number" && Number.isInteger(topK) && topK >= 0
+    && Array.isArray(c.items) && c.items.every((item) => !!item && typeof item === "object"
+      && typeof (item as EmbeddingSimilarityItem).id === "string"
+      && typeof (item as EmbeddingSimilarityItem).score === "number"
+      && Number.isFinite((item as EmbeddingSimilarityItem).score));
+}
+export function isEmbeddingApiResult(value: unknown): value is EmbeddingApiResult {
+  return isEmbeddingResult(value) || isEmbeddingSimilarityResult(value);
+}
+
 export interface LabelSplittingEvent { activity: string; timestamp: string; resource: string; lifecycle: string; input_order: number; attributes?: Record<string, string>; }
 export interface LabelSplittingTrace { case_id: string; events: LabelSplittingEvent[]; attributes?: Record<string, string>; }
 export interface LabelSplittingResult { family: "LABEL_SPLITTING"; variant: "contextual"; log: { traces: LabelSplittingTrace[]; attributes?: Record<string, string> }; }
