@@ -45,6 +45,7 @@
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/trace_variant_query.hpp"
 
 namespace minera {
 
@@ -254,5 +255,9 @@ void write_analysis_json(std::ostream& out,
 
 // Standalone deterministic JSON for the classic bounded ILP miner.
 [[nodiscard]] std::string ilp_miner_json(const ILPMinerResult& result);
+
+// Standalone deterministic JSON for trace-variant query anonymization.
+[[nodiscard]] std::string trace_variant_query_json(
+    const TraceVariantQueryResult& result);
 
 }  // namespace minera

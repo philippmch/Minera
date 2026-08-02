@@ -3692,4 +3692,40 @@ std::string ilp_miner_json(const ILPMinerResult& result) {
   return out.str();
 }
 
+std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
+  const auto variant_name = result.diagnostics.variant ==
+                                    TraceVariantQueryVariant::kSacofa
+                                ? "sacofa"
+                                : "laplace";
+  std::ostringstream out;
+  out << "{\"family\":\"TRACE_VARIANT_QUERY\",\"variant\":";
+  write_json_string(out, variant_name);
+  out << ",\"epsilon\":" << result.diagnostics.epsilon
+      << ",\"k\":" << result.diagnostics.max_prefix_length
+      << ",\"p\":" << result.diagnostics.prune_threshold
+      << ",\"seed\":" << result.diagnostics.seed
+      << ",\"frequencies\":[";
+  std::size_t index = 0;
+  for (const auto& [prefix, count] : result.frequencies) {
+    if (index++) out << ',';
+    out << "{\"activities\":[";
+    for (std::size_t i = 0; i < prefix.size(); ++i) {
+      if (i) out << ',';
+      write_json_string(out, prefix[i]);
+    }
+    out << "],\"count\":" << count << '}';
+  }
+  const auto& d = result.diagnostics;
+  out << "],\"diagnostics\":{\"candidate_count\":"
+      << d.candidate_count << ",\"retained_variant_count\":"
+      << d.retained_variant_count << ",\"released_trace_count\":"
+      << d.released_trace_count << ",\"output_truncated\":"
+      << (d.output_truncated ? "true" : "false") << ",\"message\":";
+  write_json_string(out, d.message);
+  out << "},\"log\":";
+  write_projected_log(out, result.log);
+  out << '}';
+  return out.str();
+}
+
 }  // namespace minera

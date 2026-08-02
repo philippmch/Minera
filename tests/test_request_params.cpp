@@ -1550,6 +1550,30 @@ void ilp_params_contract() {
   }
 }
 
+void trace_variant_query_params_contract() {
+  const auto parsed = minera::parse_trace_variant_query_params(fields({
+      {"tvq_variant", "sacofa"},
+      {"tvq_epsilon", "0.75"},
+      {"tvq_k", "4"},
+      {"tvq_p", "2"},
+      {"tvq_seed", "19"},
+      {"tvq_max_output_traces", "40"},
+      {"tvq_max_output_variants", "7"}}));
+  assert(parsed.variant == minera::TraceVariantQueryVariant::kSacofa);
+  assert(parsed.epsilon == 0.75 && parsed.max_prefix_length == 4);
+  assert(parsed.prune_threshold == 2 && parsed.seed == 19);
+  assert(parsed.max_output_traces == 40 && parsed.max_output_variants == 7);
+  for (const auto& item : {std::pair{"tvq_variant", "other"},
+                           std::pair{"tvq_epsilon", "0"},
+                           std::pair{"tvq_k", "-1"},
+                           std::pair{"tvq_p", "0"}}) {
+    bool threw = false;
+    try { (void)minera::parse_trace_variant_query_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -1615,5 +1639,6 @@ int main() {
   log_to_features_params_contract();
   label_splitting_params_contract();
   ilp_params_contract();
+  trace_variant_query_params_contract();
   return 0;
 }

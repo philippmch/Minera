@@ -28,6 +28,8 @@ import {
   type RandomTreeResult,
   type ILPMinerOptions,
   type ILPMinerResult,
+  type TraceVariantQueryOptions,
+  type TraceVariantQueryResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
   isLabelSplittingResult,
@@ -36,6 +38,7 @@ import {
   isCaseRelationsResult,
   isRandomTreeResult,
   isILPMinerResult,
+  isTraceVariantQueryResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1107,6 +1110,28 @@ export function requestIlpMine(options: ILPMinerOptions = {}): Promise<ILPMinerR
 }
 export const mineIlp = requestIlpMine;
 export const requestILPMine = requestIlpMine;
+/** Query string for the cached-session trace-variant anonymizer. */
+export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
+  const query = new URLSearchParams();
+  const entries: Array<[string, string | undefined]> = [
+    ["tvq_variant", options.tvq_variant],
+    ["tvq_epsilon", options.tvq_epsilon === undefined ? undefined : String(options.tvq_epsilon)],
+    ["tvq_k", options.tvq_k === undefined ? undefined : String(options.tvq_k)],
+    ["tvq_p", options.tvq_p === undefined ? undefined : String(options.tvq_p)],
+    ["tvq_seed", options.tvq_seed === undefined ? undefined : String(options.tvq_seed)],
+    ["tvq_max_output_traces", options.tvq_max_output_traces === undefined ? undefined : String(options.tvq_max_output_traces)],
+    ["tvq_max_output_variants", options.tvq_max_output_variants === undefined ? undefined : String(options.tvq_max_output_variants)],
+  ];
+  for (const [key, value] of entries) if (value !== undefined) query.set(key, value);
+  return query.toString();
+}
+export const traceVariantQueryOptions = traceVariantQuery;
+/** Requests a trace-variant query from the latest cached session. */
+export function requestTraceVariantQuery(options: TraceVariantQueryOptions = {}): Promise<TraceVariantQueryResult> {
+  const query = traceVariantQuery(options);
+  return postChecked(`/api/trace-variant-query${query ? `?${query}` : ""}`, isTraceVariantQueryResult, "trace-variant query");
+}
+export const anonymizeTraceVariants = requestTraceVariantQuery;
 async function postChecked<T>(path: string, guard: (value: unknown) => value is T, label: string): Promise<T> {
   let response: Response;
   try { response = await fetch(path, { method: "POST" }); }

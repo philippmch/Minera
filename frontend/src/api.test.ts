@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, traceVariantQuery, requestTraceVariantQuery } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -35,6 +35,18 @@ describe("ILP miner API", () => {
   it("rejects malformed ILP responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "ILP" }) })));
     await expect(requestIlpMine()).rejects.toThrow(/invalid ILP miner/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("trace-variant query API", () => {
+  it("encodes deterministic privacy and bound options", () => {
+    expect(traceVariantQuery({ tvq_variant: "laplace", tvq_epsilon: 0.5, tvq_k: 3, tvq_p: 2, tvq_seed: 9, tvq_max_output_traces: 20 }))
+      .toBe("tvq_variant=laplace&tvq_epsilon=0.5&tvq_k=3&tvq_p=2&tvq_seed=9&tvq_max_output_traces=20");
+  });
+  it("rejects malformed backend payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "TRACE_VARIANT_QUERY", variant: "sacofa" }) })));
+    await expect(requestTraceVariantQuery()).rejects.toThrow(/invalid trace-variant query/);
     vi.unstubAllGlobals();
   });
 });
