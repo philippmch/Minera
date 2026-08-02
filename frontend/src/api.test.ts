@@ -203,6 +203,8 @@ describe("OCEL API", () => {
   it("serializes discovery and conformance options", () => {
     expect(ocelDiscoveryQuery({ variant: "ocdfg", compute_edges_performance: false }))
       .toBe("variant=ocdfg&compute_edges_performance=false");
+    expect(ocelDiscoveryQuery({ variant: "ocpn", ocpn_annotation: "none" }))
+      .toBe("variant=ocpn&ocpn_annotation=none");
     expect(ocelDiscoveryQuery({ variant: "saw" }))
       .toBe("variant=saw");
     expect(ocelSplitQuery({ variant: "ancestors_descendants", object_type: "order", max_objects: 2, max_degree_centrality: 0.5 }))
@@ -210,8 +212,8 @@ describe("OCEL API", () => {
     expect(ocelPlayoutQuery({
       model: "causal_net", variant: "extensive", max_bindings_per_activity: 2, max_traces: 3,
       max_states: 40, objects: { item: ["i,1"], order: ["o1", "o2"] },
-      objects_unique_per_trace: true, ocpn_variant: "dfg", event_interval: 1.5,
-    })).toBe("model=causal_net&variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg");
+      objects_unique_per_trace: true, ocpn_variant: "dfg", ocpn_annotation: "none", event_interval: 1.5,
+    })).toBe("model=causal_net&variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg&ocpn_annotation=none");
     expect(ocelFeaturesQuery({
       variant: "objects", max_features: 12,
       include_lifecycle_features: false,

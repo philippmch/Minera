@@ -804,6 +804,7 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     throw std::invalid_argument("OCPN noise_threshold must be in [0,1]");
 
   OcpnGraph result;
+  result.annotated = options.annotated;
   std::map<std::string, const OcelEvent*> event_by_id;
   std::map<std::string, std::size_t> event_order;
   for (std::size_t index = 0; index < log.events.size(); ++index) {
@@ -825,8 +826,9 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       std::unique(result.object_types.begin(), result.object_types.end()),
       result.object_types.end());
 
-  const auto ocdfg = discover_ocdfg_classic(log, false);
-  result.annotations = ocdfg;
+  if (options.annotated) {
+    result.annotations = discover_ocdfg_classic(log, false);
+  }
   for (const auto& type : result.object_types) {
     EventLog flattened;
     std::map<std::string, std::set<std::string>> object_event_ids;
@@ -858,23 +860,25 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     const auto tree = discover_process_tree(flattened, miner_options);
     result.petri_nets[type] = to_petri_net(tree);
 
-    const auto type_it = ocdfg.activities_ot.find(type);
-    if (type_it != ocdfg.activities_ot.end()) {
-      for (const auto& [activity, metric] : type_it->second) {
-        std::map<std::string, std::size_t> event_counts;
-        for (const auto& event_object : metric.event_objects)
-          ++event_counts[event_object.first];
-        std::size_t single_events = 0;
-        for (const auto& [event, count] : event_counts) {
-          (void)event;
-          if (count == 1) ++single_events;
+    if (options.annotated) {
+      const auto type_it = result.annotations.activities_ot.find(type);
+      if (type_it != result.annotations.activities_ot.end()) {
+        for (const auto& [activity, metric] : type_it->second) {
+          std::map<std::string, std::size_t> event_counts;
+          for (const auto& event_object : metric.event_objects)
+            ++event_counts[event_object.first];
+          std::size_t single_events = 0;
+          for (const auto& [event, count] : event_counts) {
+            (void)event;
+            if (count == 1) ++single_events;
+          }
+          const double ratio = event_counts.empty()
+                                   ? 0.0
+                                   : static_cast<double>(single_events) /
+                                         static_cast<double>(event_counts.size());
+          result.double_arcs_on_activity[type][activity] =
+              ratio <= options.double_arc_threshold;
         }
-        const double ratio = event_counts.empty()
-                                 ? 0.0
-                                 : static_cast<double>(single_events) /
-                                       static_cast<double>(event_counts.size());
-        result.double_arcs_on_activity[type][activity] =
-            ratio <= options.double_arc_threshold;
       }
     }
   }
@@ -1089,9 +1093,15 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
     }
     out << '}';
   }
-  out << "},\"annotations\":{";
-  write_ocpn_annotation_fields(out, graph.annotations);
-  out << "}}";
+  out << "},\"annotations\":";
+  if (graph.annotated) {
+    out << '{';
+    write_ocpn_annotation_fields(out, graph.annotations);
+    out << '}';
+  } else {
+    out << "null";
+  }
+  out << '}';
   return out.str();
 }
 

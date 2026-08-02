@@ -218,6 +218,10 @@ struct OcpnDiscoveryOptions {
   double double_arc_threshold = 0.8;
   double noise_threshold = 0.0;
   OcpnInductiveVariant variant = OcpnInductiveVariant::kLog;
+  // The classic form retains OCDFG activity/flow annotations.  The
+  // no-annotation form discovers the same per-object-type nets without that
+  // diagnostic payload.
+  bool annotated = true;
 };
 
 struct OcpnGraph {
@@ -229,6 +233,7 @@ struct OcpnGraph {
   // Keeping them with the OCPN makes the annotation variant useful to native
   // callers without changing the compact Petri-net representation.
   OcdfgGraph annotations;
+  bool annotated = true;
 };
 
 OcpnGraph discover_ocpn(const Ocel& log,
