@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -110,5 +110,12 @@ describe("PRIPEL API", () => {
     }));
     await expect(requestPripel(new File(["case_id,activity\nc,A\n"], "query.csv"))).rejects.toThrow(/invalid PRIPEL/);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("local diagnostics API", () => {
+  it("encodes deterministic group and safety options", () => {
+    expect(localDiagnosticsQuery({ local_diagnostics_groups: "g1:r1,r2", local_diagnostics_max_rows: 4 }))
+      .toBe("local_diagnostics_groups=g1%3Ar1%2Cr2&local_diagnostics_max_rows=4");
   });
 });

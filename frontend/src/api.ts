@@ -54,6 +54,9 @@ import {
   type ResourceProfilesOptions,
   type ResourceProfilesResult,
   isResourceProfilesResult,
+  type LocalDiagnosticsOptions,
+  type LocalDiagnosticsResult,
+  isLocalDiagnosticsResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1193,6 +1196,17 @@ export function requestResourceProfiles(options: ResourceProfilesOptions = {}): 
   const query = resourceProfilesQuery(options);
   return postChecked(`/api/resource-profiles${query ? `?${query}` : ""}`, isResourceProfilesResult, "resource profiles");
 }
+
+export function localDiagnosticsQuery(options: LocalDiagnosticsOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(options)) if (v !== undefined) query.set(k, String(v));
+  return query.toString();
+}
+export function requestLocalDiagnostics(options: LocalDiagnosticsOptions = {}): Promise<LocalDiagnosticsResult> {
+  const query = localDiagnosticsQuery(options);
+  return postChecked(`/api/local-diagnostics${query ? `?${query}` : ""}`, isLocalDiagnosticsResult, "local diagnostics");
+}
+export const discoverLocalDiagnostics = requestLocalDiagnostics;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();

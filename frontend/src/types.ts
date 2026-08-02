@@ -238,6 +238,17 @@ export function isResourceProfilesResult(value: unknown): value is ResourceProfi
   return c.family === "RESOURCE_PROFILES" && typeof c.metric === "string" && metrics.has(c.metric as ResourceProfilesMetric) && Array.isArray(c.rows) && c.rows.every((r) => !!r && typeof r.resource === "string" && typeof r.activity === "string" && typeof r.resource2 === "string" && typeof r.value === "number" && Number.isFinite(r.value) && Number.isInteger(r.count) && r.count >= 0) && !!d && typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count,d.event_count,d.resource_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
 }
 
+export interface LocalDiagnosticsOptions { local_diagnostics_group_attribute?: string; local_diagnostics_resource_attribute?: string; local_diagnostics_activity_attribute?: string; local_diagnostics_groups?: string; local_diagnostics_max_groups?: number; local_diagnostics_max_resources?: number; local_diagnostics_max_rows?: number; }
+export interface LocalDiagnosticsResult { family: "LOCAL_DIAGNOSTICS"; group_relative_focus: Record<string, Record<string, number>>; group_relative_stake: Record<string, Record<string, number>>; group_coverage: Record<string, Record<string, number>>; group_member_contribution: Record<string, Record<string, Record<string, number>>>; diagnostics: { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; group_count: number; resource_count: number; row_count: number; skipped_events: number; message: string }; }
+export function isLocalDiagnosticsResult(value: unknown): value is LocalDiagnosticsResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<LocalDiagnosticsResult>; const d = c.diagnostics;
+  const map = (x: unknown) => !!x && typeof x === "object" && !Array.isArray(x) && Object.values(x as Record<string, unknown>).every((v) => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1));
+  const contribution = (x: unknown) => !!x && typeof x === "object" && !Array.isArray(x) && Object.values(x as Record<string, unknown>).every((resources) => !!resources && typeof resources === "object" && !Array.isArray(resources) && Object.values(resources as Record<string, unknown>).every((activities) => !!activities && typeof activities === "object" && !Array.isArray(activities) && Object.values(activities as Record<string, unknown>).every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0)));
+  return c.family === "LOCAL_DIAGNOSTICS" && map(c.group_relative_focus) && map(c.group_relative_stake) && map(c.group_coverage) && contribution(c.group_member_contribution) && !!d && typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count,d.event_count,d.group_count,d.resource_count,d.row_count,d.skipped_events].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+}
+export const isLocalDiagnostics = isLocalDiagnosticsResult;
+
 export type TraceVariantQueryVariant = "laplace" | "sacofa";
 export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
 export interface TraceVariantQueryEvent {

@@ -2368,4 +2368,57 @@ ResourceProfilesOptions parse_resource_profiles_params(const FieldLookup& field,
   return options;
 }
 
+LocalDiagnosticsOptions parse_local_diagnostics_params(const FieldLookup& field) {
+  return parse_local_diagnostics_params(field, {});
+}
+
+LocalDiagnosticsOptions parse_local_diagnostics_params(const FieldLookup& field,
+                                                       const FieldPresence& present) {
+  LocalDiagnosticsOptions options;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("local_diagnostics_group_attribute")) options.group_attribute = require("local_diagnostics_group_attribute");
+  if (supplied("local_diagnostics_resource_attribute")) options.resource_attribute = require("local_diagnostics_resource_attribute");
+  if (supplied("local_diagnostics_activity_attribute")) options.activity_attribute = require("local_diagnostics_activity_attribute");
+  if (supplied("local_diagnostics_groups")) {
+    const auto encoded = require("local_diagnostics_groups");
+    const auto trim = [](std::string value) {
+      const auto first = value.find_first_not_of(" \t\r\n");
+      if (first == std::string::npos) return std::string{};
+      const auto last = value.find_last_not_of(" \t\r\n");
+      return value.substr(first, last - first + 1);
+    };
+    const auto strict_resources = [&](std::string_view value) {
+      std::vector<std::string> resources;
+      std::size_t start = 0;
+      for (std::size_t i = 0; i <= value.size(); ++i) {
+        if (i != value.size() && value[i] != ',') continue;
+        const auto token = trim(std::string(value.substr(start, i - start)));
+        if (token.empty()) throw std::invalid_argument("local_diagnostics_groups: empty resource");
+        resources.push_back(token);
+        start = i + 1;
+      }
+      return resources;
+    };
+    std::size_t pos = 0;
+    while (pos < encoded.size()) {
+      const auto end = encoded.find(';', pos); const auto part = encoded.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+      if (trim(std::string(part)).empty()) throw std::invalid_argument("local_diagnostics_groups: empty group");
+      const auto colon = part.find(':');
+      if (colon == std::string::npos || colon == 0 || part.find(':', colon + 1) != std::string::npos) throw std::invalid_argument("local_diagnostics_groups: expected group:resource,...");
+      const auto group = trim(part.substr(0, colon));
+      const auto resources = strict_resources(part.substr(colon + 1));
+      if (group.empty() || resources.empty() || options.explicit_groups.contains(group)) throw std::invalid_argument("local_diagnostics_groups: invalid or duplicate group");
+      options.explicit_groups[group] = resources;
+      if (end == std::string::npos) break;
+      pos = end + 1;
+      if (pos == encoded.size()) throw std::invalid_argument("local_diagnostics_groups: trailing separator");
+    }
+  }
+  if (supplied("local_diagnostics_max_groups")) options.max_groups = parse_positive_size(require("local_diagnostics_max_groups"), "local_diagnostics_max_groups");
+  if (supplied("local_diagnostics_max_resources")) options.max_resources = parse_positive_size(require("local_diagnostics_max_resources"), "local_diagnostics_max_resources");
+  if (supplied("local_diagnostics_max_rows")) options.max_rows = parse_positive_size(require("local_diagnostics_max_rows"), "local_diagnostics_max_rows");
+  return options;
+}
+
 }  // namespace minera
