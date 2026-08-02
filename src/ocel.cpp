@@ -1,4 +1,5 @@
 #include "minera/ocel.hpp"
+#include "minera/timestamp.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -586,6 +587,209 @@ std::string otg_json(const OtgGraph& graph) {
     out << ",\"frequency\":" << edge.frequency << '}';
   }
   out << "]}";
+  return out.str();
+}
+
+OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performance) {
+  OcdfgGraph result;
+  result.performance_computed = compute_edges_performance;
+  std::map<std::string, std::string> activity;
+  std::map<std::string, std::string> timestamp;
+  std::map<std::string, std::size_t> event_order;
+  for (std::size_t i = 0; i < log.events.size(); ++i) {
+    activity[log.events[i].id] = log.events[i].activity;
+    timestamp[log.events[i].id] = log.events[i].timestamp;
+    event_order[log.events[i].id] = i;
+    result.activities.push_back(log.events[i].activity);
+  }
+  std::sort(result.activities.begin(), result.activities.end());
+  result.activities.erase(std::unique(result.activities.begin(), result.activities.end()), result.activities.end());
+  std::map<std::string, std::string> object_type;
+  for (const auto& object : log.objects) object_type[object.id] = object.type;
+  for (const auto& object : log.objects) result.object_types.push_back(object.type);
+  std::sort(result.object_types.begin(), result.object_types.end());
+  result.object_types.erase(std::unique(result.object_types.begin(), result.object_types.end()), result.object_types.end());
+
+  struct Rel { std::string event; std::string object; std::size_t order; };
+  std::vector<Rel> rels;
+  for (std::size_t i = 0; i < log.relations.size(); ++i) {
+    const auto& relation = log.relations[i];
+    const auto event_it = event_order.find(relation.event_id);
+    const auto type_it = object_type.find(relation.object_id);
+    if (event_it == event_order.end() || type_it == object_type.end()) continue;
+    rels.push_back({relation.event_id, relation.object_id, event_it->second * (log.relations.size() + 1) + i});
+  }
+  auto add_association = [&](std::map<std::string, OcdfgActivityMetric>& target,
+                             const std::string& act, const std::string& event,
+                             const std::string& object) {
+    auto& metric = target[act];
+    metric.events.push_back(event);
+    metric.unique_objects.push_back(object);
+    metric.event_objects.emplace_back(event, object);
+  };
+  for (const auto& relation : rels) {
+    const auto act = activity[relation.event];
+    const auto type = object_type[relation.object];
+    add_association(result.activities_indep, act, relation.event, relation.object);
+    add_association(result.activities_ot[type], act, relation.event, relation.object);
+  }
+  auto normalize_activity = [](OcdfgActivityMetric& metric) {
+    std::sort(metric.events.begin(), metric.events.end());
+    metric.events.erase(std::unique(metric.events.begin(), metric.events.end()), metric.events.end());
+    std::sort(metric.unique_objects.begin(), metric.unique_objects.end());
+    metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()), metric.unique_objects.end());
+    std::sort(metric.event_objects.begin(), metric.event_objects.end());
+    metric.event_objects.erase(std::unique(metric.event_objects.begin(), metric.event_objects.end()), metric.event_objects.end());
+  };
+  for (auto& [act, metric] : result.activities_indep) normalize_activity(metric);
+  for (auto& [type, metrics] : result.activities_ot) for (auto& [act, metric] : metrics) normalize_activity(metric);
+
+  std::map<std::string, std::vector<Rel>> by_object;
+  for (const auto& relation : rels) by_object[relation.object].push_back(relation);
+  for (auto& [object, sequence] : by_object) {
+    std::sort(sequence.begin(), sequence.end(), [](const Rel& a, const Rel& b) { return a.order < b.order; });
+    if (sequence.empty()) continue;
+    const auto type = object_type[object];
+    add_association(result.start_activities[type], activity[sequence.front().event], sequence.front().event, object);
+    add_association(result.end_activities[type], activity[sequence.back().event], sequence.back().event, object);
+    for (std::size_t i = 1; i < sequence.size(); ++i) {
+      const auto source = activity[sequence[i - 1].event];
+      const auto target = activity[sequence[i].event];
+      auto& edge = result.edges[type][{source, target}];
+      edge.event_couples.emplace_back(sequence[i - 1].event, sequence[i].event);
+      edge.unique_objects.push_back(object);
+      edge.event_objects.emplace_back(sequence[i - 1].event, sequence[i].event, object);
+      if (compute_edges_performance) {
+        const auto from = parse_timestamp(timestamp[sequence[i - 1].event]);
+        const auto to = parse_timestamp(timestamp[sequence[i].event]);
+        if (from && to) edge.performance.push_back(*to - *from);
+      }
+    }
+  }
+  for (auto& [type, metrics] : result.start_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
+  for (auto& [type, metrics] : result.end_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
+  for (auto& [type, metrics] : result.edges) for (auto& [pair, edge] : metrics) {
+    std::sort(edge.event_couples.begin(), edge.event_couples.end()); edge.event_couples.erase(std::unique(edge.event_couples.begin(), edge.event_couples.end()), edge.event_couples.end());
+    std::sort(edge.unique_objects.begin(), edge.unique_objects.end()); edge.unique_objects.erase(std::unique(edge.unique_objects.begin(), edge.unique_objects.end()), edge.unique_objects.end());
+    std::sort(edge.event_objects.begin(), edge.event_objects.end()); edge.event_objects.erase(std::unique(edge.event_objects.begin(), edge.event_objects.end()), edge.event_objects.end());
+    std::sort(edge.performance.begin(), edge.performance.end());
+  }
+  return result;
+}
+
+std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
+  std::ostringstream out;
+  const auto strings = [&](const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      write_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto activity_metric = [&](const OcdfgActivityMetric& metric) {
+    out << "{\"events\":";
+    strings(metric.events);
+    out << ",\"unique_objects\":";
+    strings(metric.unique_objects);
+    out << ",\"event_objects\":[";
+    for (std::size_t i = 0; i < metric.event_objects.size(); ++i) {
+      if (i != 0) out << ',';
+      out << '[';
+      write_string(out, metric.event_objects[i].first);
+      out << ',';
+      write_string(out, metric.event_objects[i].second);
+      out << ']';
+    }
+    out << "]}";
+  };
+  const auto activity_map = [&](const auto& metrics) {
+    out << '{';
+    bool first = true;
+    for (const auto& [activity_name, metric] : metrics) {
+      if (!first) out << ',';
+      first = false;
+      write_string(out, activity_name);
+      out << ':';
+      activity_metric(metric);
+    }
+    out << '}';
+  };
+  const auto nested_activity_map = [&](const auto& metrics) {
+    out << '{';
+    bool first_type = true;
+    for (const auto& [object_type_name, activities_for_type] : metrics) {
+      if (!first_type) out << ',';
+      first_type = false;
+      write_string(out, object_type_name);
+      out << ':';
+      activity_map(activities_for_type);
+    }
+    out << '}';
+  };
+
+  out << "{\"activities\":";
+  strings(graph.activities);
+  out << ",\"object_types\":";
+  strings(graph.object_types);
+  out << ",\"activities_indep\":";
+  activity_map(graph.activities_indep);
+  out << ",\"activities_ot\":";
+  nested_activity_map(graph.activities_ot);
+  out << ",\"start_activities\":";
+  nested_activity_map(graph.start_activities);
+  out << ",\"end_activities\":";
+  nested_activity_map(graph.end_activities);
+  out << ",\"edges\":{";
+  bool first_type = true;
+  for (const auto& [object_type_name, edges_for_type] : graph.edges) {
+    if (!first_type) out << ',';
+    first_type = false;
+    write_string(out, object_type_name);
+    out << ":{";
+    bool first_edge = true;
+    for (const auto& [activity_pair, edge] : edges_for_type) {
+      if (!first_edge) out << ',';
+      first_edge = false;
+      write_string(out, activity_pair.first + "->" + activity_pair.second);
+      out << ":{\"source_activity\":";
+      write_string(out, activity_pair.first);
+      out << ",\"target_activity\":";
+      write_string(out, activity_pair.second);
+      out << ",\"event_couples\":[";
+      for (std::size_t i = 0; i < edge.event_couples.size(); ++i) {
+        if (i != 0) out << ',';
+        out << '[';
+        write_string(out, edge.event_couples[i].first);
+        out << ',';
+        write_string(out, edge.event_couples[i].second);
+        out << ']';
+      }
+      out << "],\"unique_objects\":";
+      strings(edge.unique_objects);
+      out << ",\"event_objects\":[";
+      for (std::size_t i = 0; i < edge.event_objects.size(); ++i) {
+        if (i != 0) out << ',';
+        out << '[';
+        write_string(out, std::get<0>(edge.event_objects[i]));
+        out << ',';
+        write_string(out, std::get<1>(edge.event_objects[i]));
+        out << ',';
+        write_string(out, std::get<2>(edge.event_objects[i]));
+        out << ']';
+      }
+      out << "],\"performance\":[";
+      for (std::size_t i = 0; i < edge.performance.size(); ++i) {
+        if (i != 0) out << ',';
+        out.precision(17);
+        out << edge.performance[i];
+      }
+      out << "]}";
+    }
+    out << '}';
+  }
+  out << "},\"performance_computed\":"
+      << (graph.performance_computed ? "true" : "false") << '}';
   return out.str();
 }
 
