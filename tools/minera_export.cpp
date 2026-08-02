@@ -76,6 +76,7 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
 #include "minera/temporal_profile.hpp"
+#include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/transition_system.hpp"
 #include "minera/xes_export.hpp"
@@ -525,6 +526,9 @@ int usage(const char* program) {
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
                "  --merge-left-column <name>    Relation left-case column\n"
                "  --merge-right-column <name>   Relation right-case column\n"
+               "  --timestamp-interleavings <file> Right CSV/XES log for interleavings\n"
+               "  --interleavings-timestamp-key <name> Timestamp attribute\n"
+               "  --interleavings-max-results <n> Result safety bound\n"
                "  --random-tree               Emit a seeded random process tree\n"
                "  --random-tree-variant <id> basic or ptandloggenerator\n"
                "  --random-tree-rec-depth <n> Starting recursion depth\n"
@@ -934,6 +938,9 @@ int main(int argc, char** argv) {
   std::filesystem::path merge_incoming_path;
   std::filesystem::path merge_relations_path;
   std::map<std::string, std::string> merge_fields;
+  bool timestamp_interleavings_requested = false;
+  std::filesystem::path timestamp_interleavings_right_path;
+  std::map<std::string, std::string> timestamp_interleavings_fields;
   bool random_tree_requested = false;
   std::map<std::string, std::string> random_tree_fields;
   bool ilp_mine_requested = false;
@@ -1289,6 +1296,23 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       merge_incoming_path = value;
       merge_requested = true;
+      continue;
+    }
+    if (arg == "--timestamp-interleavings") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      timestamp_interleavings_right_path = value;
+      timestamp_interleavings_requested = true;
+      continue;
+    }
+    if (arg == "--interleavings-timestamp-key" ||
+        arg == "--interleavings-max-results") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      timestamp_interleavings_fields.insert_or_assign(std::move(key), value);
+      timestamp_interleavings_requested = true;
       continue;
     }
     if (arg == "--case-relations") {
@@ -2628,8 +2652,23 @@ int main(int argc, char** argv) {
   if (input.empty() && !random_tree_requested) {
     return usage(argv[0]);
   }
-  if (merge_requested && (merge_incoming_path.empty() ||
-                          merge_relations_path.empty())) {
+  if (timestamp_interleavings_requested) {
+    if (timestamp_interleavings_right_path.empty() ||
+        merge_relations_path.empty()) {
+      std::cerr << "error: timestamp interleavings require the right log and "
+                   "--case-relations\n";
+      return 2;
+    }
+    if (!merge_incoming_path.empty()) {
+      std::cerr << "error: timestamp interleavings cannot be combined with "
+                   "--merge-case-relations\n";
+      return 2;
+    }
+    // --case-relations and --merge-* column selectors share the historical
+    // parser fields.  They are consumed by the interleavings branch below.
+    merge_requested = false;
+  } else if (merge_requested && (merge_incoming_path.empty() ||
+                                 merge_relations_path.empty())) {
     std::cerr << "error: case-relation merge requires --merge-case-relations "
                  "and --case-relations\n";
     return 2;
@@ -2664,6 +2703,48 @@ int main(int argc, char** argv) {
     auto log = ends_with_ci(input.string(), ".xes")
                    ? minera::import_xes_event_log(input)
                    : minera::import_csv_event_log(input, options);
+    if (timestamp_interleavings_requested) {
+      const auto right = ends_with_ci(
+                             timestamp_interleavings_right_path.string(), ".xes")
+                             ? minera::import_xes_event_log(
+                                   timestamp_interleavings_right_path)
+                             : minera::import_csv_event_log(
+                                   timestamp_interleavings_right_path, options);
+      std::ifstream relation_input(merge_relations_path);
+      if (!relation_input)
+        throw std::invalid_argument("cannot open case relations file");
+      const auto left_column = merge_fields.contains("merge_left_column")
+                                   ? merge_fields.at("merge_left_column")
+                                   : std::string("case_id_LEFT");
+      const auto right_column = merge_fields.contains("merge_right_column")
+                                    ? merge_fields.at("merge_right_column")
+                                    : std::string("case_id_RIGHT");
+      const auto relations = minera::parse_case_relations_csv(
+          relation_input, left_column, right_column);
+      const auto lookup = [&](std::string_view name) {
+        const auto it = timestamp_interleavings_fields.find(std::string(name));
+        return it == timestamp_interleavings_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return timestamp_interleavings_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_timestamp_interleavings_params(
+          lookup, present);
+      const auto body = minera::timestamp_interleavings_json(
+          minera::discover_timestamp_interleavings(log, right, relations,
+                                                   params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
     if (merge_requested) {
       const auto incoming = ends_with_ci(merge_incoming_path.string(), ".xes")
                                 ? minera::import_xes_event_log(merge_incoming_path)

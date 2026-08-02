@@ -1,0 +1,151 @@
+#include "minera/timestamp_interleavings.hpp"
+
+#include <array>
+#include <cassert>
+#include <initializer_list>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+namespace {
+
+minera::Event event(std::string case_id, std::string activity,
+                    std::string timestamp, std::size_t index) {
+  minera::Event value;
+  value.case_id = std::move(case_id);
+  value.activity = std::move(activity);
+  value.timestamp = std::move(timestamp);
+  value.input_order = index;
+  return value;
+}
+
+minera::EventLog log_with(const std::string& case_id,
+                          std::initializer_list<minera::Event> events) {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = case_id;
+  trace.events.assign(events.begin(), events.end());
+  log.traces.push_back(std::move(trace));
+  return log;
+}
+
+void finds_strict_lr_and_rl_crossings() {
+  const auto left = log_with(
+      "L", {event("L", "A", "2024-01-01T00:00:01Z", 0),
+            event("L", "B", "2024-01-01T00:00:04Z", 1),
+            event("L", "C", "2024-01-01T00:00:07Z", 2)});
+  const auto right = log_with(
+      "R", {event("R", "X", "2024-01-01T00:00:02Z", 0),
+            event("R", "Y", "2024-01-01T00:00:05Z", 1),
+            event("R", "Z", "2024-01-01T00:00:08Z", 2)});
+  const auto result = minera::discover_timestamp_interleavings(
+      left, right, {minera::CaseRelation{"L", "R"}});
+  // The artificial boundaries make the opposite crossings at the
+  // beginning/end of the related traces observable as well.
+  assert(result.interleavings.size() == 5);
+  assert(result.interleavings[0].direction ==
+         minera::TimestampInterleavingDirection::kLeftToRight);
+  assert(result.interleavings[0].source_activity == "A" &&
+         result.interleavings[0].target_activity == "X");
+  assert(result.interleavings[0].left_index == 0 &&
+         result.interleavings[0].right_index == 0 &&
+         result.interleavings[0].timestamp_diff_seconds == 1.0);
+  assert(result.interleavings[1].direction ==
+         minera::TimestampInterleavingDirection::kRightToLeft);
+  assert(result.interleavings[1].source_activity == "X" &&
+         result.interleavings[1].target_activity == "B");
+  assert(result.interleavings[1].left_index == 1 &&
+         result.interleavings[1].right_index == 0 &&
+         result.interleavings[1].timestamp_diff_seconds == 2.0);
+  assert(result.interleavings[3].source_activity == "Y" &&
+         result.interleavings[3].target_activity == "C");
+  assert(result.interleavings[3].left_index == 2 &&
+         result.interleavings[3].right_index == 1 &&
+         result.interleavings[3].timestamp_diff_seconds == 2.0);
+  assert(result.interleavings[4].source_activity == "Z" &&
+         result.interleavings[4].target_activity == "■");
+}
+
+void equality_and_unrelated_relations_are_excluded() {
+  const auto left = log_with(
+      "L", {event("L", "A", "2024-01-01T00:00:01Z", 0)});
+  const auto right = log_with(
+      "R", {event("R", "X", "2024-01-01T00:00:01Z", 0)});
+  const auto result = minera::discover_timestamp_interleavings(
+      left, right,
+      {minera::CaseRelation{"L", "R"}, minera::CaseRelation{"missing", "R"}});
+  assert(result.interleavings.empty());
+}
+
+void custom_timestamp_and_bound_are_strict() {
+  auto left = log_with(
+      "L", {event("L", "A", "", 0), event("L", "B", "", 1),
+            event("L", "C", "", 2)});
+  auto right = log_with(
+      "R", {event("R", "X", "", 0), event("R", "Y", "", 1),
+            event("R", "Z", "", 2)});
+  const std::array<std::string, 3> left_times = {
+      "2024-01-01T00:00:01Z", "2024-01-01T00:00:04Z",
+      "2024-01-01T00:00:07Z"};
+  const std::array<std::string, 3> right_times = {
+      "2024-01-01T00:00:02Z", "2024-01-01T00:00:05Z",
+      "2024-01-01T00:00:08Z"};
+  for (auto* log : {&left, &right}) {
+    for (auto& trace : log->traces) {
+      const auto& times = log == &left ? left_times : right_times;
+      for (std::size_t i = 0; i < trace.events.size(); ++i)
+        trace.events[i].attributes.push_back({"started", times[i]});
+    }
+  }
+  minera::TimestampInterleavingOptions options;
+  options.timestamp_key = "started";
+  options.max_interleavings = 5;
+  assert(minera::discover_timestamp_interleavings(
+             left, right, {minera::CaseRelation{"L", "R"}}, options)
+             .interleavings.size() == 5);
+  options.max_interleavings = 1;
+  bool threw = false;
+  try {
+    (void)minera::discover_timestamp_interleavings(
+        left, right, {minera::CaseRelation{"L", "R"}}, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void invalid_timestamps_and_json_contract() {
+  auto left = log_with(
+      "L", {event("L", "A", "not-a-time", 0),
+            event("L", "B", "2024-01-01T00:00:03Z", 1)});
+  const auto right = log_with(
+      "R", {event("R", "X", "2024-01-01T00:00:02Z", 0),
+            event("R", "Y", "2024-01-01T00:00:04Z", 1)});
+  bool threw = false;
+  try {
+    (void)minera::discover_timestamp_interleavings(
+        left, right, {minera::CaseRelation{"L", "R"}});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  left.traces[0].events[0].timestamp = "2024-01-01T00:00:01Z";
+  left.traces[0].events[0].activity = "A\"quoted";
+  const auto json = minera::timestamp_interleavings_json(
+      minera::discover_timestamp_interleavings(
+          left, right, {minera::CaseRelation{"L", "R"}}));
+  assert(json.find("TIMESTAMP_INTERLEAVINGS") != std::string::npos);
+  assert(json.find("A\\\"quoted") != std::string::npos);
+  assert(json.find("timestamp_diff") != std::string::npos);
+}
+
+}  // namespace
+
+int main() {
+  finds_strict_lr_and_rl_crossings();
+  equality_and_unrelated_relations_are_excluded();
+  custom_timestamp_and_bound_are_strict();
+  invalid_timestamps_and_json_contract();
+  return 0;
+}

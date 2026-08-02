@@ -26,6 +26,7 @@ import {
   type IntervalTreeResult,
   type CaseRelationsResult,
   type LinkAnalysisResult,
+  type TimestampInterleavingsResult,
   type RandomTreeResult,
   type OcelDiscoveryVariant,
   type OcelConformanceVariant,
@@ -48,6 +49,7 @@ import {
   isIntervalTreeResult,
   isCaseRelationsResult,
   isLinkAnalysisResult,
+  isTimestampInterleavingsResult,
   isRandomTreeResult,
   isOcelDiscoveryResult,
   isOcelConformanceResult,
@@ -1929,6 +1931,46 @@ export async function requestLinkAnalysis(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isLinkAnalysisResult(payload)) throw new Error("the Minera backend returned an invalid link analysis");
+  return payload;
+}
+
+export interface TimestampInterleavingsOptions {
+  interleavings_timestamp_key?: string;
+  interleavings_max_results?: number;
+  interleavings_left_column?: string;
+  interleavings_right_column?: string;
+}
+
+export function timestampInterleavingsQuery(options: TimestampInterleavingsOptions = {}): string {
+  const query = new URLSearchParams();
+  const add = (name: string, value: string | number | undefined) => {
+    if (value !== undefined) query.set(name, String(value));
+  };
+  add("interleavings_timestamp_key", options.interleavings_timestamp_key);
+  add("interleavings_max_results", options.interleavings_max_results);
+  add("interleavings_left_column", options.interleavings_left_column);
+  add("interleavings_right_column", options.interleavings_right_column);
+  return query.toString();
+}
+
+export async function requestTimestampInterleavings(
+  left: File,
+  right: File,
+  relations: File,
+  options: TimestampInterleavingsOptions = {},
+): Promise<TimestampInterleavingsResult> {
+  const form = new FormData();
+  form.append("left", left, left.name);
+  form.append("right", right, right.name);
+  form.append("relations", relations, relations.name);
+  const query = timestampInterleavingsQuery(options);
+  const response = await fetch(`/api/timestamp-interleavings${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isTimestampInterleavingsResult(payload)) throw new Error("the Minera backend returned an invalid timestamp interleavings result");
   return payload;
 }
 

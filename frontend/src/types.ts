@@ -628,6 +628,42 @@ export function isLinkAnalysisResult(value: unknown): value is LinkAnalysisResul
       isLinkAnalysisEvent(link.target));
 }
 
+export type TimestampInterleavingDirection = "LR" | "RL";
+export interface TimestampInterleaving {
+  source_activity: string;
+  target_activity: string;
+  source_timestamp: string;
+  target_timestamp: string;
+  left_index: number;
+  right_index: number;
+  direction: TimestampInterleavingDirection;
+  timestamp_diff: number;
+}
+export interface TimestampInterleavingsResult {
+  family: "TIMESTAMP_INTERLEAVINGS";
+  variant: "TIMESTAMP";
+  timestamp_key: string;
+  max_interleavings: number;
+  interleavings: TimestampInterleaving[];
+}
+export function isTimestampInterleavingsResult(value: unknown): value is TimestampInterleavingsResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<TimestampInterleavingsResult>;
+  return result.family === "TIMESTAMP_INTERLEAVINGS" && result.variant === "TIMESTAMP" &&
+    typeof result.timestamp_key === "string" &&
+    typeof result.max_interleavings === "number" && Number.isInteger(result.max_interleavings) && result.max_interleavings > 0 &&
+    Array.isArray(result.interleavings) && result.interleavings.every((row) => {
+      if (!row || typeof row !== "object") return false;
+      const item = row as Partial<TimestampInterleaving>;
+      return typeof item.source_activity === "string" && typeof item.target_activity === "string" &&
+        typeof item.source_timestamp === "string" && typeof item.target_timestamp === "string" &&
+        typeof item.left_index === "number" && Number.isInteger(item.left_index) && item.left_index >= 0 &&
+        typeof item.right_index === "number" && Number.isInteger(item.right_index) && item.right_index >= 0 &&
+        (item.direction === "LR" || item.direction === "RL") &&
+        typeof item.timestamp_diff === "number" && Number.isFinite(item.timestamp_diff);
+    });
+}
+
 export interface RandomTreeNode {
   operator: "activity" | "tau" | "sequence" | "exclusive" | "parallel" | "loop";
   activity?: string;
@@ -815,6 +851,42 @@ export type PowlNode =
   | { kind: "silent" }
   | { kind: "xor" | "loop"; children: PowlNode[] }
   | { kind: "strict_partial_order"; children: PowlNode[]; order: Array<{ source: number; target: number }> };
+
+/** Runtime validation for the recursive model used by the POWL renderer. */
+export function isPowlNode(value: unknown, activityCount?: number, depth = 0): value is PowlNode {
+  if (depth > 256 || typeof value !== "object" || value === null) return false;
+  const node = value as Record<string, unknown>;
+  if (node.kind === "silent") return true;
+  if (node.kind === "transition") {
+    const frequency = node.frequency;
+    if (typeof node.activity !== "number" || !Number.isInteger(node.activity) || node.activity < 0) return false;
+    if (activityCount !== undefined && node.activity >= activityCount) return false;
+    if (typeof frequency !== "object" || frequency === null) return false;
+    const range = frequency as Record<string, unknown>;
+    if (typeof range.minimum !== "number" || !Number.isInteger(range.minimum) || range.minimum < 0) return false;
+    if (range.maximum !== null && (typeof range.maximum !== "number" || !Number.isInteger(range.maximum) || range.maximum < range.minimum)) return false;
+    return true;
+  }
+  if (node.kind === "xor" || node.kind === "loop") {
+    const children = node.children;
+    return Array.isArray(children) && children.length > 0 &&
+      children.every((child) => isPowlNode(child, activityCount, depth + 1));
+  }
+  if (node.kind !== "strict_partial_order") return false;
+  const children = node.children;
+  const order = node.order;
+  if (!Array.isArray(children) || !Array.isArray(order) || children.length === 0 ||
+      !children.every((child) => isPowlNode(child, activityCount, depth + 1))) return false;
+  return order.every((edge) => {
+    if (typeof edge !== "object" || edge === null) return false;
+    const pair = edge as Record<string, unknown>;
+    return typeof pair.source === "number" && Number.isInteger(pair.source) &&
+      typeof pair.target === "number" && Number.isInteger(pair.target) &&
+      pair.source >= 0 && pair.target >= 0 &&
+      pair.source < children.length && pair.target < children.length &&
+      pair.source !== pair.target;
+  });
+}
 
 /** One ordered relation in a classic log-skeleton model. */
 export interface LogSkeletonRelation {
@@ -2241,15 +2313,13 @@ export interface MineraExport {
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
+  if (typeof value !== "object" || value === null) return false;
   const data = value as MineraExport;
-  return (
-    typeof data === "object" &&
-    data !== null &&
-    Array.isArray(data.activities) &&
+  return Array.isArray(data.activities) &&
     Array.isArray(data.edges) &&
     Array.isArray(data.variants) &&
-    Number.isFinite(data.trace_count)
-  );
+    Number.isFinite(data.trace_count) &&
+    (data.powl === undefined || isPowlNode(data.powl, data.activities.length));
 }
 
 /** Virtual node ids for the trace entry and exit points. */

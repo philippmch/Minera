@@ -80,6 +80,7 @@
 #include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
+#include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
 #include "minera/transition_system.hpp"
 #include "minera/version.hpp"
@@ -430,7 +431,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         batch_discovery ? &*batch_discovery : nullptr);
 
     // Cache this analysis so alignments can be served on demand for the model
-    // the user actually opens, rather than computed for all three up front.
+    // the user actually opens, rather than computed for all models up front.
     auto session = std::make_shared<MinedSession>();
     session->log = log;
     session->graph = graph;
@@ -1326,6 +1327,67 @@ void handle_case_relations(const httplib::Request& request,
     response.set_content(
         minera::case_relations_json(minera::merge_case_relations(
             base, incoming, relations, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_timestamp_interleavings(const httplib::Request& request,
+                                    httplib::Response& response) {
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("left") ||
+        !request.has_file("right") || !request.has_file("relations")) {
+      throw std::invalid_argument(
+          "required multipart fields: left, right, relations");
+    }
+    static const std::set<std::string> allowed = {
+        "interleavings_timestamp_key", "interleavings_max_results",
+        "interleavings_left_column", "interleavings_right_column"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown timestamp interleavings parameter: " + key);
+    }
+    const auto& left_file = request.get_file_value("left");
+    const auto& right_file = request.get_file_value("right");
+    const auto& relation_file = request.get_file_value("relations");
+    std::istringstream left_input(left_file.content);
+    std::istringstream right_input(right_file.content);
+    std::istringstream relation_input(relation_file.content);
+    const auto left = looks_like_xes(left_file.filename, left_file.content)
+                          ? minera::import_xes_event_log(left_input)
+                          : minera::import_csv_event_log(left_input);
+    const auto right = looks_like_xes(right_file.filename, right_file.content)
+                           ? minera::import_xes_event_log(right_input)
+                           : minera::import_csv_event_log(right_input);
+    const auto value = [&](std::string_view key, std::string fallback) {
+      return request.has_param(std::string(key))
+                 ? request.get_param_value(std::string(key))
+                 : std::move(fallback);
+    };
+    const auto left_column =
+        value("interleavings_left_column", "case_id_LEFT");
+    const auto right_column =
+        value("interleavings_right_column", "case_id_RIGHT");
+    const auto relations = minera::parse_case_relations_csv(
+        relation_input, left_column, right_column);
+    const auto lookup = [&](std::string_view key) {
+      return request.has_param(std::string(key))
+                 ? request.get_param_value(std::string(key))
+                 : std::string{};
+    };
+    const auto present = [&](std::string_view key) {
+      return request.has_param(std::string(key));
+    };
+    const auto options =
+        minera::parse_timestamp_interleavings_params(lookup, present);
+    response.set_content(
+        minera::timestamp_interleavings_json(
+            minera::discover_timestamp_interleavings(left, right, relations,
+                                                     options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -2246,6 +2308,7 @@ int main(int argc, char** argv) {
   server.Options("/api/trie", preflight);
   server.Options("/api/interval-tree", preflight);
   server.Options("/api/merge-case-relations", preflight);
+  server.Options("/api/timestamp-interleavings", preflight);
   server.Options("/api/random-tree", preflight);
   server.Options("/api/compare-petri", preflight);
   server.Options("/api/align", preflight);
@@ -2291,6 +2354,7 @@ int main(int argc, char** argv) {
   server.Get("/api/trie", handle_trie);
   server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/merge-case-relations", handle_case_relations);
+  server.Post("/api/timestamp-interleavings", handle_timestamp_interleavings);
   server.Get("/api/random-tree", handle_random_tree);
   server.Post("/api/compare-petri", handle_compare_petri);
   server.Post("/api/align", handle_align);
