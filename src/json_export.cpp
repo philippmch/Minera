@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iomanip>
 #include <map>
 #include <limits>
 #include <numeric>
@@ -3687,6 +3688,60 @@ std::string ilp_miner_json(const ILPMinerResult& result) {
       << d.visited_nodes << ",\"lp_solved\":" << d.lp_solved
       << ",\"branch_and_bound_nodes\":" << d.branch_and_bound_nodes
       << ",\"message\":";
+  write_json_string(out, d.message);
+  out << "}}";
+  return out.str();
+}
+
+std::string genetic_miner_json(const GeneticMinerResult& result) {
+  const auto& net = result.net;
+  std::ostringstream out;
+  out << "{\"family\":\"GENETIC\",\"net\":{\"place_count\":"
+      << net.place_count() << ",\"source\":" << net.source()
+      << ",\"sink\":" << net.sink() << ",\"activities\":[";
+  for (std::size_t i = 0; i < net.activities().size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, net.activities()[i]);
+  }
+  out << "],\"transitions\":[";
+  for (std::size_t i = 0; i < net.transitions().size(); ++i) {
+    if (i) out << ',';
+    const auto& transition = net.transitions()[i];
+    out << "{\"activity\":";
+    if (transition.silent()) out << "null";
+    else out << *transition.activity;
+    out << ",\"inputs\":[";
+    for (std::size_t j = 0; j < transition.inputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.inputs[j];
+    }
+    out << "],\"outputs\":[";
+    for (std::size_t j = 0; j < transition.outputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.outputs[j];
+    }
+    out << "]}";
+  }
+  out << "]},\"markings\":{\"initial\":[";
+  for (std::size_t i = 0; i < result.markings.initial.size(); ++i) {
+    if (i) out << ',';
+    out << result.markings.initial[i];
+  }
+  out << "],\"final\":[";
+  for (std::size_t i = 0; i < result.markings.final.size(); ++i) {
+    if (i) out << ',';
+    out << result.markings.final[i];
+  }
+  const auto& d = result.diagnostics;
+  out << "]},\"diagnostics\":{\"computed\":"
+      << (d.computed ? "true" : "false") << ",\"exhausted\":"
+      << (d.exhausted ? "true" : "false")
+      << ",\"generations_completed\":" << d.generations_completed
+      << ",\"candidates_evaluated\":" << d.candidates_evaluated
+      << ",\"population_size\":" << d.population_size
+      << ",\"activity_count\":" << d.activity_count
+      << ",\"best_fitness\":" << std::setprecision(17)
+      << d.best_fitness << ",\"seed\":" << d.seed << ",\"message\":";
   write_json_string(out, d.message);
   out << "}}";
   return out.str();

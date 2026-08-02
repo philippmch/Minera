@@ -2124,6 +2124,65 @@ ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field,
   return options;
 }
 
+GeneticMinerOptions parse_genetic_miner_params(const FieldLookup& field) {
+  return parse_genetic_miner_params(field, {});
+}
+
+GeneticMinerOptions parse_genetic_miner_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  GeneticMinerOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("genetic_activity_key"))
+    options.activity_key = require("genetic_activity_key");
+  if (supplied("genetic_seed"))
+    options.seed = parse_nonnegative_u64(require("genetic_seed"),
+                                         "genetic_seed");
+  if (supplied("genetic_population_size")) {
+    options.population_size = parse_positive_size(
+        require("genetic_population_size"), "genetic_population_size");
+    if (options.population_size < 2)
+      throw std::invalid_argument(
+          "genetic_population_size: expected at least 2");
+  }
+  if (supplied("genetic_generations"))
+    options.generations = parse_nonnegative_size(
+        require("genetic_generations"), "genetic_generations");
+  const auto rate = [&](std::string_view name, double& destination) {
+    if (!supplied(name)) return;
+    destination = parse_finite_double(require(name), name);
+    if (destination < 0.0 || destination > 1.0)
+      throw std::invalid_argument(std::string(name) + ": expected 0 <= value <= 1");
+  };
+  rate("genetic_elitism_rate", options.elitism_rate);
+  rate("genetic_crossover_rate", options.crossover_rate);
+  rate("genetic_mutation_rate", options.mutation_rate);
+  if (supplied("genetic_elitism_min_sample")) {
+    options.elitism_min_sample = parse_positive_size(
+        require("genetic_elitism_min_sample"),
+        "genetic_elitism_min_sample");
+  }
+  if (supplied("genetic_max_activities")) {
+    options.max_activities = parse_positive_size(
+        require("genetic_max_activities"), "genetic_max_activities");
+  }
+  if (supplied("genetic_max_states")) {
+    options.max_states = parse_positive_size(require("genetic_max_states"),
+                                             "genetic_max_states");
+  }
+  if (options.elitism_min_sample >= options.population_size)
+    throw std::invalid_argument(
+        "genetic_elitism_min_sample: must be smaller than population size");
+  return options;
+}
+
 TraceVariantQueryOptions parse_trace_variant_query_params(
     const FieldLookup& field) {
   return parse_trace_variant_query_params(field, {});

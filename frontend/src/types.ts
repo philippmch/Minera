@@ -95,6 +95,89 @@ export function isILPMinerResult(value: unknown): value is ILPMinerResult {
 }
 export const isIlpMinerResult = isILPMinerResult;
 
+export interface GeneticMinerTransition {
+  activity: number | null;
+  inputs: number[];
+  outputs: number[];
+}
+export interface GeneticMinerNet {
+  place_count: number;
+  source: number;
+  sink: number;
+  activities: string[];
+  transitions: GeneticMinerTransition[];
+}
+export interface GeneticMinerMarkings { initial: number[]; final: number[]; }
+export interface GeneticMinerDiagnostics {
+  computed: boolean;
+  exhausted: boolean;
+  generations_completed: number;
+  candidates_evaluated: number;
+  population_size: number;
+  activity_count: number;
+  best_fitness: number;
+  seed: number;
+  message: string;
+}
+export interface GeneticMinerResult {
+  family: "GENETIC";
+  net: GeneticMinerNet;
+  markings: GeneticMinerMarkings;
+  diagnostics: GeneticMinerDiagnostics;
+}
+export interface GeneticMinerOptions {
+  activity_key?: string;
+  seed?: number;
+  population_size?: number;
+  generations?: number;
+  elitism_rate?: number;
+  crossover_rate?: number;
+  mutation_rate?: number;
+  elitism_min_sample?: number;
+  max_activities?: number;
+  max_states?: number;
+}
+function isNonnegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+export function isGeneticMinerResult(value: unknown): value is GeneticMinerResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<GeneticMinerResult>;
+  if (c.family !== "GENETIC" || !c.net || typeof c.net !== "object" ||
+      !c.markings || typeof c.markings !== "object" ||
+      !c.diagnostics || typeof c.diagnostics !== "object") return false;
+  const n = c.net as Partial<GeneticMinerNet>;
+  const placeCount = n.place_count;
+  if (!Number.isInteger(placeCount) || (placeCount as number) <= 0 ||
+      !Number.isInteger(n.source) || !Number.isInteger(n.sink) ||
+      (n.source as number) < 0 || (n.sink as number) < 0 ||
+      (n.source as number) >= (placeCount as number) ||
+      (n.sink as number) >= (placeCount as number) ||
+      !Array.isArray(n.activities) || !n.activities.every((x) => typeof x === "string") ||
+      !Array.isArray(n.transitions)) return false;
+  const activities = n.activities as string[];
+  if (!n.transitions.every((t) => {
+    if (!t || typeof t !== "object" ||
+        !(t.activity === null || (Number.isInteger(t.activity) &&
+          (t.activity as number) >= 0 && (t.activity as number) < activities.length)) ||
+        !isFiniteIntegerArray(t.inputs) || !isFiniteIntegerArray(t.outputs)) return false;
+    return t.inputs.every((place) => place < (placeCount as number)) &&
+      t.outputs.every((place) => place < (placeCount as number));
+  })) return false;
+  const m = c.markings as Partial<GeneticMinerMarkings>;
+  if (!isFiniteIntegerArray(m.initial) || !isFiniteIntegerArray(m.final) ||
+      m.initial.length !== placeCount || m.final.length !== placeCount) return false;
+  const d = c.diagnostics as Partial<GeneticMinerDiagnostics>;
+  return typeof d.computed === "boolean" && typeof d.exhausted === "boolean" &&
+    Number.isInteger(d.generations_completed) && (d.generations_completed as number) >= 0 &&
+    Number.isInteger(d.candidates_evaluated) && (d.candidates_evaluated as number) >= 0 &&
+    Number.isInteger(d.population_size) && (d.population_size as number) >= 0 &&
+    Number.isInteger(d.activity_count) && (d.activity_count as number) >= 0 &&
+    isNonnegativeFiniteNumber(d.best_fitness) && isNonnegativeFiniteNumber(d.seed) &&
+    typeof d.message === "string";
+}
+export const isGeneticMiner = isGeneticMinerResult;
+
 export type TraceVariantQueryVariant = "laplace" | "sacofa";
 export interface TraceVariantQueryFrequency { activities: string[]; count: number; }
 export interface TraceVariantQueryEvent {

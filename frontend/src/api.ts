@@ -28,6 +28,8 @@ import {
   type RandomTreeResult,
   type ILPMinerOptions,
   type ILPMinerResult,
+  type GeneticMinerOptions,
+  type GeneticMinerResult,
   type TraceVariantQueryOptions,
   type TraceVariantQueryResult,
   type PripelOptions,
@@ -40,6 +42,7 @@ import {
   isCaseRelationsResult,
   isRandomTreeResult,
   isILPMinerResult,
+  isGeneticMinerResult,
   isTraceVariantQueryResult,
   isPripelResult,
   type EmdResult,
@@ -1113,6 +1116,32 @@ export function requestIlpMine(options: ILPMinerOptions = {}): Promise<ILPMinerR
 }
 export const mineIlp = requestIlpMine;
 export const requestILPMine = requestIlpMine;
+/** Query string for the hidden cached-session classic genetic miner. */
+export function geneticMinerQuery(options: GeneticMinerOptions = {}): string {
+  const query = new URLSearchParams();
+  const entries: Array<[string, string | undefined]> = [
+    ["genetic_activity_key", options.activity_key],
+    ["genetic_seed", options.seed === undefined ? undefined : String(options.seed)],
+    ["genetic_population_size", options.population_size === undefined ? undefined : String(options.population_size)],
+    ["genetic_generations", options.generations === undefined ? undefined : String(options.generations)],
+    ["genetic_elitism_rate", options.elitism_rate === undefined ? undefined : String(options.elitism_rate)],
+    ["genetic_crossover_rate", options.crossover_rate === undefined ? undefined : String(options.crossover_rate)],
+    ["genetic_mutation_rate", options.mutation_rate === undefined ? undefined : String(options.mutation_rate)],
+    ["genetic_elitism_min_sample", options.elitism_min_sample === undefined ? undefined : String(options.elitism_min_sample)],
+    ["genetic_max_activities", options.max_activities === undefined ? undefined : String(options.max_activities)],
+    ["genetic_max_states", options.max_states === undefined ? undefined : String(options.max_states)],
+  ];
+  for (const [name, value] of entries) if (value !== undefined) query.set(name, value);
+  return query.toString();
+}
+export const geneticMineQuery = geneticMinerQuery;
+/** Mines the latest cached log with bounded classic genetic discovery. */
+export function requestGeneticMine(options: GeneticMinerOptions = {}): Promise<GeneticMinerResult> {
+  const query = geneticMinerQuery(options);
+  return postChecked(`/api/genetic-mine${query ? `?${query}` : ""}`, isGeneticMinerResult, "genetic miner");
+}
+export const mineGenetic = requestGeneticMine;
+export const requestGeneticMiner = requestGeneticMine;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();

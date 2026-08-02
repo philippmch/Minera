@@ -37,6 +37,7 @@
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
+#include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
@@ -98,6 +99,9 @@ struct MinedSession {
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
+constexpr std::size_t kServerGeneticMaxPopulation = 10'000;
+constexpr std::size_t kServerGeneticMaxGenerations = 10'000;
+constexpr std::size_t kServerGeneticMaxStates = 1'000'000;
 constexpr std::size_t kServerTvqMaxOutputTraces = 100'000;
 constexpr std::size_t kServerTvqMaxOutputVariants = 100'000;
 constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
@@ -477,6 +481,57 @@ void handle_ilp_mine(const httplib::Request& request,
     }
     const auto result = minera::mine_ilp(session->log, options);
     response.set_content(minera::ilp_miner_json(result), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+// Hidden cached-session adapter for bounded classic genetic discovery. The
+// source log is the latest /api/mine session and all evolutionary limits are
+// checked again at the server boundary.
+void handle_genetic_mine(const httplib::Request& request,
+                         httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "genetic_activity_key", "genetic_seed", "genetic_population_size",
+        "genetic_generations", "genetic_elitism_rate",
+        "genetic_crossover_rate", "genetic_mutation_rate",
+        "genetic_elitism_min_sample", "genetic_max_activities",
+        "genetic_max_states"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown genetic parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_genetic_miner_params(lookup, present);
+    if (options.population_size > kServerGeneticMaxPopulation ||
+        options.generations > kServerGeneticMaxGenerations ||
+        options.max_states > kServerGeneticMaxStates) {
+      throw std::invalid_argument("genetic safety bound exceeded");
+    }
+    const auto result = minera::mine_genetic(session->log, options);
+    response.set_content(minera::genetic_miner_json(result),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -1824,6 +1879,8 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
+  server.Options("/api/genetic-mine", preflight);
+  server.Options("/api/mine-genetic", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -1857,6 +1914,8 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);
+  server.Post("/api/genetic-mine", handle_genetic_mine);
+  server.Post("/api/mine-genetic", handle_genetic_mine);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

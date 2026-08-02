@@ -42,6 +42,7 @@
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
+#include "minera/genetic_miner.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 
@@ -165,6 +166,14 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // are `ilp_activity_key`, `ilp_noise_threshold`, and `ilp_max_nodes`.
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field);
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict request/CLI adapter for the bounded classic genetic miner. Wire
+// names use the `genetic_` prefix and include the reproducibility seed and
+// evolutionary safety bounds.
+[[nodiscard]] GeneticMinerOptions parse_genetic_miner_params(
+    const FieldLookup& field);
+[[nodiscard]] GeneticMinerOptions parse_genetic_miner_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Strict wire parser for trace-variant query anonymization. Fields use the

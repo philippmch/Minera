@@ -65,7 +65,7 @@ are reconciled.
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
-| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP classic is available through JSON, CLI, local server, and frontend adapters; Genetic classic remains missing |
+| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; differential edge-contract review remains |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
@@ -294,6 +294,22 @@ validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
+
+## Genetic discovery parity evidence
+
+The bounded classic genetic miner is implemented as a deterministic causal
+matrix search with explicit population, generation, crossover, mutation,
+elitism, activity, and candidate-state limits. Seeded evolution repairs
+disconnected and inverse matrix projections, preserves partition grouping, and
+converts compatible places plus silent routing hubs into a replayable workflow
+net with canonical initial/final markings. Fitness combines weighted token
+replay and fitting-trace coverage; diagnostics report the search bound and
+best candidate without fabricating an optimum after exhaustion.
+
+The native result has a standalone JSON contract and strict request parsing,
+CLI flags, cached-session server endpoints, and frontend types/query helpers.
+Focused tests cover deterministic output, chain fitness, disconnected repair,
+parameter rejection, candidate caps, and malformed frontend responses.
 
 ## Evaluation parity evidence
 

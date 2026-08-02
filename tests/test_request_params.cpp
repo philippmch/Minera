@@ -1550,6 +1550,44 @@ void ilp_params_contract() {
   }
 }
 
+void genetic_params_contract() {
+  const auto parsed = minera::parse_genetic_miner_params(fields({
+      {"genetic_activity_key", "concept:name"},
+      {"genetic_seed", "19"},
+      {"genetic_population_size", "12"},
+      {"genetic_generations", "7"},
+      {"genetic_elitism_rate", "0.2"},
+      {"genetic_crossover_rate", "0.8"},
+      {"genetic_mutation_rate", "0.05"},
+      {"genetic_elitism_min_sample", "4"},
+      {"genetic_max_activities", "9"},
+      {"genetic_max_states", "77"}}));
+  assert(parsed.activity_key == "concept:name" && parsed.seed == 19);
+  assert(parsed.population_size == 12 && parsed.generations == 7);
+  assert(parsed.elitism_rate == 0.2 && parsed.crossover_rate == 0.8);
+  assert(parsed.mutation_rate == 0.05 && parsed.elitism_min_sample == 4);
+  assert(parsed.max_activities == 9 && parsed.max_states == 77);
+  for (const auto& item : {
+           std::pair{"genetic_population_size", "1"},
+           std::pair{"genetic_generations", "-1"},
+           std::pair{"genetic_elitism_rate", "nan"},
+           std::pair{"genetic_crossover_rate", "1.1"},
+           std::pair{"genetic_mutation_rate", "-0.1"},
+           std::pair{"genetic_elitism_min_sample", "32"},
+           std::pair{"genetic_max_activities", "0"},
+           std::pair{"genetic_max_states", "0"},
+           std::pair{"genetic_seed", "-1"}}) {
+    bool threw = false;
+    const auto lookup = fields({item});
+    const auto present = [name = item.first](std::string_view key) {
+      return key == name;
+    };
+    try { (void)minera::parse_genetic_miner_params(lookup, present); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 void trace_variant_query_params_contract() {
   const auto parsed = minera::parse_trace_variant_query_params(fields({
       {"tvq_variant", "sacofa"},
@@ -1661,6 +1699,7 @@ int main() {
   log_to_features_params_contract();
   label_splitting_params_contract();
   ilp_params_contract();
+  genetic_params_contract();
   trace_variant_query_params_contract();
   pripel_params_contract();
   return 0;

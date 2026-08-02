@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -35,6 +35,18 @@ describe("ILP miner API", () => {
   it("rejects malformed ILP responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "ILP" }) })));
     await expect(requestIlpMine()).rejects.toThrow(/invalid ILP miner/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("genetic miner API", () => {
+  it("encodes deterministic evolutionary bounds", () => {
+    expect(geneticMinerQuery({ activity_key: "concept:name", seed: 7, population_size: 8, generations: 3, elitism_rate: 0.2, crossover_rate: 0.8, mutation_rate: 0.1, elitism_min_sample: 2, max_activities: 9, max_states: 64 }))
+      .toBe("genetic_activity_key=concept%3Aname&genetic_seed=7&genetic_population_size=8&genetic_generations=3&genetic_elitism_rate=0.2&genetic_crossover_rate=0.8&genetic_mutation_rate=0.1&genetic_elitism_min_sample=2&genetic_max_activities=9&genetic_max_states=64");
+  });
+  it("rejects malformed genetic responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "GENETIC" }) })));
+    await expect(requestGeneticMine()).rejects.toThrow(/invalid genetic miner/);
     vi.unstubAllGlobals();
   });
 });
