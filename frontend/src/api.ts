@@ -32,6 +32,7 @@ import {
   type OcelConformanceVariant,
   type OcelDiscoveryResult,
   type OcelConformanceResult,
+  type OcelSplitResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -53,6 +54,7 @@ import {
   isRandomTreeResult,
   isOcelDiscoveryResult,
   isOcelConformanceResult,
+  isOcelSplitResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2173,6 +2175,42 @@ export async function requestOcelDiscovery(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelDiscoveryResult(payload)) throw new Error("the Minera backend returned an invalid OCEL discovery");
+  return payload;
+}
+
+export interface OcelSplitOptions {
+  variant?: "connected_components" | "ancestors_descendants";
+  object_type?: string;
+  max_objects?: number;
+  max_degree_centrality?: number;
+}
+
+export function ocelSplitQuery(options: OcelSplitOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.object_type !== undefined) query.set("object_type", options.object_type);
+  if (options.max_objects !== undefined) query.set("max_objects", String(options.max_objects));
+  if (options.max_degree_centrality !== undefined) {
+    query.set("max_degree_centrality", String(options.max_degree_centrality));
+  }
+  return query.toString();
+}
+
+export async function requestOcelSplit(
+  log: Blob,
+  options: OcelSplitOptions = {},
+): Promise<OcelSplitResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelSplitQuery(options);
+  const response = await fetch(`/api/ocel/split${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelSplitResult(payload)) throw new Error("the Minera backend returned an invalid OCEL split");
   return payload;
 }
 

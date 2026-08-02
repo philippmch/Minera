@@ -2,24 +2,30 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 #include "minera/ocel.hpp"
+#include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
 
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json [--format classic|standard] [--describe text|tuples] [--no-description-timestamps] [--discover etot|ocdfg|ocpn|otg|saw] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::ifstream input(argv[1], std::ios::binary);
     if (!input) throw std::runtime_error("cannot open input");
     std::ostringstream text; text << input.rdbuf();
     minera::Ocel log = minera::parse_ocel_json(text.str());
-    std::string format = "classic", describe, discover, conformance, normative_path;
+    std::string format = "classic", describe, discover, split, conformance,
+                        split_object_type, normative_path;
+    std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
+    std::optional<double> split_max_degree_centrality;
     bool compute_edges_performance = true;
     bool include_description_timestamps = true;
     double alpha = 1.0, beta = 1.0, gamma = 1.0, delta = 1.0;
@@ -36,10 +42,26 @@ int main(int argc, char** argv) {
     };
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
-      if ((option == "--format" || option == "--discover") && i + 1 < argc) {
-        (option == "--format" ? format : discover) = argv[++i];
+      if ((option == "--format" || option == "--discover" ||
+           option == "--split") && i + 1 < argc) {
+        auto& target = option == "--format" ? format
+                      : option == "--discover" ? discover
+                                                 : split;
+        target = argv[++i];
       } else if (option == "--describe" && i + 1 < argc) {
         describe = argv[++i];
+      } else if (option == "--split-object-type" && i + 1 < argc) {
+        split_object_type = argv[++i];
+      } else if (option == "--split-max-objects" && i + 1 < argc) {
+        const auto parsed = number(argv[++i], "--split-max-objects");
+        if (parsed > static_cast<double>(std::numeric_limits<std::size_t>::max()) ||
+            std::floor(parsed) != parsed)
+          throw std::invalid_argument(
+              "--split-max-objects expects a non-negative integer");
+        split_max_objects = static_cast<std::size_t>(parsed);
+      } else if (option == "--split-max-degree-centrality" && i + 1 < argc) {
+        split_max_degree_centrality =
+            number(argv[++i], "--split-max-degree-centrality");
       } else if ((option == "--conformance" || option == "--normative") &&
                  i + 1 < argc) {
         (option == "--conformance" ? conformance : normative_path) = argv[++i];
@@ -89,18 +111,41 @@ int main(int argc, char** argv) {
         discover != "ocpn" && discover != "otg" && discover != "saw") {
       throw std::invalid_argument("discover must be etot, ocdfg, ocpn, otg, or saw");
     }
+    if (!split.empty() && split != "connected_components" &&
+        split != "ancestors_descendants") {
+      throw std::invalid_argument(
+          "split must be connected_components or ancestors_descendants");
+    }
     if (!conformance.empty() && conformance != "etot" && conformance != "ocdfg" &&
         conformance != "otg") {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
-    if (!conformance.empty() && discover != "")
-      throw std::invalid_argument("--discover and --conformance are mutually exclusive");
-    if (!describe.empty() && (!discover.empty() || !conformance.empty()))
-      throw std::invalid_argument("--describe cannot be combined with discovery or conformance");
+    if (!conformance.empty() && (!discover.empty() || !split.empty()))
+      throw std::invalid_argument(
+          "--conformance cannot be combined with discovery or split");
+    if (!discover.empty() && !split.empty())
+      throw std::invalid_argument("--discover and --split are mutually exclusive");
+    if (!describe.empty() &&
+        (!discover.empty() || !split.empty() || !conformance.empty()))
+      throw std::invalid_argument(
+          "--describe cannot be combined with discovery, split, or conformance");
     if (!conformance.empty() && normative_path.empty())
       throw std::invalid_argument("--normative is required with --conformance");
     if (conformance.empty() && !normative_path.empty())
       throw std::invalid_argument("--normative requires --conformance");
+    if (!split.empty()) {
+      minera::OcelSplitOptions options;
+      options.variant = split == "connected_components"
+                            ? minera::OcelSplitVariant::kConnectedComponents
+                            : minera::OcelSplitVariant::kAncestorsDescendants;
+      options.object_type = split_object_type;
+      options.max_objects = split_max_objects;
+      options.max_degree_centrality = split_max_degree_centrality;
+      std::cout << minera::serialize_ocel_split_json(
+                       minera::split_ocel(log, options))
+                << '\n';
+      return 0;
+    }
     if (!describe.empty()) {
       minera::OcelDescriptionOptions options;
       options.include_timestamps = include_description_timestamps;
