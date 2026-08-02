@@ -1,5 +1,34 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult } from "./api";
+
+describe("Monte Carlo API", () => {
+  it("serializes bounded virtual-time controls", () => {
+    expect(monteCarloQuery({
+      simulations: 4,
+      case_arrival_seconds: 2.5,
+      max_steps: 8,
+      seed: 7,
+      default_duration_seconds: 3,
+      transition_weights: [0.25, 1],
+      transition_durations: [{ distribution: "deterministic", value_seconds: 1 }, { distribution: "exponential", value_seconds: 2 }],
+      resources_per_place: { 0: 2, 3: 4 },
+      enable_diagnostics: false,
+    })).toBe("monte_carlo_simulations=4&monte_carlo_max_steps=8&monte_carlo_seed=7&monte_carlo_case_arrival_seconds=2.5&monte_carlo_default_duration_seconds=3&monte_carlo_transition_weights=0.25%2C1&monte_carlo_transition_durations=deterministic%3A1%2Cexponential%3A2&monte_carlo_resources_per_place=0%3D2%2C3%3D4&monte_carlo_enable_diagnostics=false");
+  });
+
+  it("validates simulation results", async () => {
+    const result = {
+      family: "MONTE_CARLO", variant: "PETRI_SEMAPH_FIFO",
+      log: { trace_count: 2, event_count: 3 },
+      diagnostics: { simulated_cases: 2, completed_cases: 2, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 3, median_case_execution_seconds: 1, case_execution_seconds: [1, 1] },
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => result })));
+    await expect(fetchMonteCarloResult("inductive", { simulations: 2 })).resolves.toEqual(result);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ...result, diagnostics: { ...result.diagnostics, case_execution_seconds: ["bad"] } }) })));
+    await expect(fetchMonteCarloResult()).rejects.toThrow(/invalid Monte Carlo/);
+    vi.unstubAllGlobals();
+  });
+});
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {

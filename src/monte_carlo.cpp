@@ -295,7 +295,8 @@ void fire_transition(const PetriTransition& transition,
 }
 
 void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,
-                   const MonteCarloOptions& options) {
+                   const MonteCarloOptions& options,
+                   std::vector<double>* execution_by_case) {
   state.finished = true;
   if (state.completed) {
     ++diagnostics.completed_cases;
@@ -305,8 +306,11 @@ void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,
     ++diagnostics.deadlocked_cases;
   }
   if (options.enable_diagnostics) {
-    diagnostics.case_execution_seconds.push_back(
-        std::max(0.0, state.now - state.arrival));
+    const double execution = std::max(0.0, state.now - state.arrival);
+    if (execution_by_case != nullptr &&
+        state.index < execution_by_case->size()) {
+      (*execution_by_case)[state.index] = execution;
+    }
   }
 }
 
@@ -327,6 +331,9 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   result.diagnostics.simulated_cases = options.simulations;
   result.diagnostics.case_arrival_seconds = options.case_arrival_seconds;
   result.log.traces.reserve(options.simulations);
+  if (options.enable_diagnostics) {
+    result.diagnostics.case_execution_seconds.assign(options.simulations, 0.0);
+  }
   if (options.simulations == 0) return result;
 
   std::vector<CaseState> cases;
@@ -365,19 +372,22 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
 
     if (options.stop_at_final && is_final_marking(net, state.marking)) {
       state.completed = true;
-      finalize_case(state, result.diagnostics, options);
+      finalize_case(state, result.diagnostics, options,
+                    &result.diagnostics.case_execution_seconds);
       continue;
     }
     if (state.steps >= options.max_steps) {
       state.step_limited = true;
-      finalize_case(state, result.diagnostics, options);
+      finalize_case(state, result.diagnostics, options,
+                    &result.diagnostics.case_execution_seconds);
       continue;
     }
 
     const auto enabled = enabled_transitions(net, state.marking);
     if (enabled.empty()) {
       state.deadlocked = true;
-      finalize_case(state, result.diagnostics, options);
+      finalize_case(state, result.diagnostics, options,
+                    &result.diagnostics.case_execution_seconds);
       continue;
     }
 

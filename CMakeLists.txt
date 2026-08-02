@@ -61,6 +61,7 @@ add_library(minera_core
   src/log_skeleton.cpp
   src/model_decoration.cpp
   src/monte_carlo.cpp
+  src/monte_carlo_json.cpp
   src/minimum_self_distance.cpp
   src/ocel.cpp
   src/performance.cpp

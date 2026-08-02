@@ -32,6 +32,7 @@
 #include "minera/process_tree_playout.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
+#include "minera/monte_carlo.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/log_to_target.hpp"
@@ -164,6 +165,7 @@ struct PetriAnalysisParams {
 using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
 using DfgPlayoutParams = DfgPlayoutOptions;
 using StochasticPlayoutParams = StochasticPlayoutOptions;
+using MonteCarloParams = MonteCarloOptions;
 
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
@@ -323,6 +325,15 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
     const FieldLookup& field);
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parses bounded virtual-time Monte Carlo settings. Wire fields use the
+// `monte_carlo_` prefix. Transition durations are comma-separated
+// `deterministic:value` or `exponential:value` entries; resource capacities
+// use `place=count` pairs.
+[[nodiscard]] MonteCarloParams parse_monte_carlo_params(
+    const FieldLookup& field);
+[[nodiscard]] MonteCarloParams parse_monte_carlo_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(

@@ -604,7 +604,6 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     }
     return value;
   };
-
   // Family selection is optional and defaults to replay fitness.  The
   // selected family does not gate parsing of the remaining fields below.
   if (supplied("evaluation_family")) {
@@ -1760,6 +1759,174 @@ StochasticPlayoutParams parse_stochastic_playout_params(
     if (params.event_interval < 0.0)
       throw std::invalid_argument(
           "stochastic_event_interval must be non-negative");
+  }
+  return params;
+}
+
+MonteCarloParams parse_monte_carlo_params(const FieldLookup& field) {
+  return parse_monte_carlo_params(field, {});
+}
+
+MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
+                                          const FieldPresence& present) {
+  MonteCarloParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  const auto trim = [](std::string_view value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos) return std::string_view{};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+  };
+  const auto nonnegative = [&](std::string_view name) {
+    const double value = parse_finite_double(require(name), name);
+    if (value < 0.0)
+      throw std::invalid_argument(std::string(name) +
+                                  " must be non-negative");
+    return value;
+  };
+
+  if (supplied("monte_carlo_simulations"))
+    params.simulations = parse_positive_size(require("monte_carlo_simulations"),
+                                             "monte_carlo_simulations");
+  if (supplied("monte_carlo_case_arrival_seconds"))
+    params.case_arrival_seconds =
+        nonnegative("monte_carlo_case_arrival_seconds");
+  if (supplied("monte_carlo_max_steps"))
+    params.max_steps =
+        parse_nonnegative_size(require("monte_carlo_max_steps"),
+                               "monte_carlo_max_steps");
+  if (supplied("monte_carlo_seed"))
+    params.seed = parse_nonnegative_u64(require("monte_carlo_seed"),
+                                       "monte_carlo_seed");
+  if (supplied("monte_carlo_start"))
+    params.start = parse_finite_double(require("monte_carlo_start"),
+                                       "monte_carlo_start");
+  if (supplied("monte_carlo_default_duration_seconds"))
+    params.default_duration_seconds =
+        nonnegative("monte_carlo_default_duration_seconds");
+  if (supplied("monte_carlo_default_resources_per_place"))
+    params.default_resources_per_place = parse_positive_size(
+        require("monte_carlo_default_resources_per_place"),
+        "monte_carlo_default_resources_per_place");
+  if (supplied("monte_carlo_enable_diagnostics"))
+    params.enable_diagnostics = parse_boolean(
+        require("monte_carlo_enable_diagnostics"),
+        "monte_carlo_enable_diagnostics");
+  if (supplied("monte_carlo_stop_at_final"))
+    params.stop_at_final = parse_boolean(require("monte_carlo_stop_at_final"),
+                                         "monte_carlo_stop_at_final");
+
+  if (supplied("monte_carlo_transition_weights")) {
+    const auto value = require("monte_carlo_transition_weights");
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= value.size(); ++i) {
+      if (i < value.size() && value[i] != ',') continue;
+      const auto token = value.substr(begin, i - begin);
+      const auto first = token.find_first_not_of(" \t\r\n");
+      if (first == std::string_view::npos)
+        throw std::invalid_argument(
+            "monte_carlo_transition_weights: expected non-negative values");
+      const auto last = token.find_last_not_of(" \t\r\n");
+      const double weight = parse_finite_double(
+          token.substr(first, last - first + 1),
+          "monte_carlo_transition_weights");
+      if (weight < 0.0)
+        throw std::invalid_argument(
+            "monte_carlo_transition_weights must be non-negative");
+      params.transition_weights.push_back(weight);
+      begin = i + 1;
+    }
+    if (params.transition_weights.empty())
+      throw std::invalid_argument(
+          "monte_carlo_transition_weights: expected a non-empty list");
+  }
+
+  if (supplied("monte_carlo_transition_durations")) {
+    const auto value = require("monte_carlo_transition_durations");
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= value.size(); ++i) {
+      if (i < value.size() && value[i] != ',') continue;
+      auto token = value.substr(begin, i - begin);
+      const auto first = token.find_first_not_of(" \t\r\n");
+      if (first == std::string_view::npos)
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: expected distribution:value entries");
+      const auto last = token.find_last_not_of(" \t\r\n");
+      token = token.substr(first, last - first + 1);
+      std::size_t separator = token.find(':');
+      if (separator == std::string_view::npos) separator = token.find('=');
+      if (separator == std::string_view::npos || separator == 0 ||
+          separator + 1 >= token.size())
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: expected distribution:value entries");
+      std::string distribution(trim(token.substr(0, separator)));
+      std::transform(distribution.begin(), distribution.end(), distribution.begin(),
+                     [](unsigned char c) {
+                       return static_cast<char>(std::tolower(c));
+                     });
+      MonteCarloDurationDistribution kind;
+      if (distribution == "deterministic") {
+        kind = MonteCarloDurationDistribution::kDeterministic;
+      } else if (distribution == "exponential") {
+        kind = MonteCarloDurationDistribution::kExponential;
+      } else {
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations: unknown distribution '" +
+            distribution + "'");
+      }
+      const double duration = parse_finite_double(
+          trim(token.substr(separator + 1)),
+          "monte_carlo_transition_durations");
+      if (duration < 0.0)
+        throw std::invalid_argument(
+            "monte_carlo_transition_durations must be non-negative");
+      params.transition_durations.push_back({kind, duration});
+      begin = i + 1;
+    }
+    if (params.transition_durations.empty())
+      throw std::invalid_argument(
+          "monte_carlo_transition_durations: expected a non-empty list");
+  }
+
+  if (supplied("monte_carlo_resources_per_place")) {
+    const auto value = require("monte_carlo_resources_per_place");
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= value.size(); ++i) {
+      if (i < value.size() && value[i] != ',') continue;
+      auto token = value.substr(begin, i - begin);
+      const auto first = token.find_first_not_of(" \t\r\n");
+      if (first == std::string_view::npos)
+        throw std::invalid_argument(
+            "monte_carlo_resources_per_place: expected place=count entries");
+      const auto last = token.find_last_not_of(" \t\r\n");
+      token = token.substr(first, last - first + 1);
+      const auto separator = token.find('=');
+      if (separator == std::string_view::npos || separator == 0 ||
+          separator + 1 >= token.size())
+        throw std::invalid_argument(
+            "monte_carlo_resources_per_place: expected place=count entries");
+      const auto place = parse_nonnegative_size(
+          trim(token.substr(0, separator)),
+          "monte_carlo_resources_per_place");
+      const auto capacity = parse_positive_size(
+          trim(token.substr(separator + 1)),
+          "monte_carlo_resources_per_place");
+      if (!params.resources_per_place.emplace(place, capacity).second)
+        throw std::invalid_argument(
+            "monte_carlo_resources_per_place: duplicate place");
+      begin = i + 1;
+    }
+    if (params.resources_per_place.empty())
+      throw std::invalid_argument(
+          "monte_carlo_resources_per_place: expected a non-empty map");
   }
   return params;
 }

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <string>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -85,5 +86,10 @@ struct MonteCarloResult {
 [[nodiscard]] MonteCarloResult monte_carlo(
     const EventLog& input_log, const PetriNet& net,
     const MonteCarloOptions& options = {});
+
+// Serializes the bounded simulation result for JSON adapters. The generated
+// payload contains the selected variant, log counts, and diagnostics; event
+// details remain available through the EventLog returned by monte_carlo().
+[[nodiscard]] std::string monte_carlo_json(const MonteCarloResult& result);
 
 }  // namespace minera
