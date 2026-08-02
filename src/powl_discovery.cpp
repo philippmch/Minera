@@ -812,7 +812,12 @@ std::optional<PowlNode> tau_loop_fall_through(const UVCL& log, State& s,
 
 std::optional<UVCL> filtered_log(const UVCL& log,
                                  const PowlDiscoveryOptions& options) {
-  if (options.filtering_threshold == 0.0 || log.size() < 2)
+  // Dynamic filtering is independent of the decreasing-factor threshold.
+  // A zero threshold disables only the decreasing-factor policy; the dynamic
+  // policy still removes the least frequent variants as in the reference.
+  if ((options.filtering_type == PowlFilteringType::kDecreasingFactor &&
+       options.filtering_threshold == 0.0) ||
+      log.size() < 2)
     return std::nullopt;
   UVCL filtered;
   if (options.filtering_type == PowlFilteringType::kDynamic) {
@@ -836,7 +841,7 @@ std::optional<UVCL> filtered_log(const UVCL& log,
       filtered.emplace(ranked.front());
       auto previous_retained = ranked.front().second;
       for (std::size_t i = 1; i < ranked.size(); ++i) {
-        if (static_cast<long double>(ranked[i].second) >=
+        if (static_cast<long double>(ranked[i].second) >
             static_cast<long double>(previous_retained) *
                 options.filtering_threshold) {
           filtered.emplace(ranked[i]);

@@ -235,6 +235,23 @@ int main() {
   const auto dynamically_filtered =
       discover_powl(filtering_log, filtered).serialize();
   assert(dynamically_filtered.find("T(\"C\")") == std::string::npos);
+  // Dynamic filtering ignores the decreasing-factor threshold, including
+  // its zero default, and removes every least-frequent variant.
+  filtered.filtering_threshold = 0.0;
+  const auto dynamic_default_threshold =
+      discover_powl(filtering_log, filtered).serialize();
+  assert(dynamic_default_threshold.find("T(\"C\")") == std::string::npos);
+
+  // Decreasing-factor retention is strict: a variant exactly equal to the
+  // threshold boundary is not retained.
+  EventLog equality_log;
+  append_trace(equality_log, {"B", "A", "A"}, 100);
+  append_trace(equality_log, {"A", "A", "B"}, 50);
+  append_trace(equality_log, {"A", "A", "C"}, 50);
+  auto strict_filter = tree;
+  strict_filter.filtering_threshold = 0.5;
+  const auto strict_boundary = discover_powl(equality_log, strict_filter).serialize();
+  assert(strict_boundary.find("T(\"C\")") == std::string::npos);
   throws([&] { auto o = filtered; o.filtering_threshold = 1.0; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_threshold = -0.1; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_type = static_cast<PowlFilteringType>(99); discover_powl(log({{"A"}}), o); });
