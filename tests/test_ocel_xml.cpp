@@ -32,5 +32,60 @@ int main() {
   bool malformed = false;
   try { (void)minera::parse_ocel_xml("<log><events>"); } catch (...) { malformed = true; }
   assert(malformed);
+
+  const std::string keyed_classic = R"xml(
+<log>
+  <global scope="log"><string key="version" value="1.0"/></global>
+  <events>
+    <event>
+      <string key="id" value="e1"/>
+      <date key="timestamp" value="2024-01-01T00:00:00Z"/>
+      <string key="activity" value="create"/>
+      <list key="omap"><string key="object-id" value="o1" qualifier="owner"/></list>
+      <list key="vmap"><int key="amount" value="7"/></list>
+    </event>
+  </events>
+  <objects>
+    <object>
+      <string key="id" value="o1"/>
+      <string key="type" value="Order"/>
+      <list key="ovmap"><string key="state" value="new"/></list>
+    </object>
+  </objects>
+</log>
+)xml";
+  const auto keyed = minera::parse_ocel_xml(keyed_classic);
+  assert(keyed.objects.size() == 1 && keyed.objects.front().id == "o1");
+  assert(keyed.objects.front().attributes.size() == 1);
+  assert(keyed.objects.front().attributes.front().key == "state");
+  assert(keyed.events.size() == 1 && keyed.events.front().activity == "create");
+  assert(keyed.relations.size() == 1 && keyed.relations.front().qualifier == "owner");
+  assert(std::get<std::int64_t>(keyed.events.front().attributes.front().value) == 7);
+  assert(std::get<std::string>(keyed.globals.at("ocel:global-log.version")) == "1.0");
+
+  const std::string standard_links = R"xml(
+<log>
+  <object-types><object-type name="Order"/></object-types>
+  <event-types><event-type name="ship"/></event-types>
+  <objects>
+    <object id="o1" type="Order">
+      <attributes><attribute name="state" type="string">new</attribute></attributes>
+      <objects><relationship object-id="o2" qualifier="contains"/></objects>
+    </object>
+    <object id="o2" type="Item"><attributes/></object>
+  </objects>
+  <events>
+    <event id="e1" type="ship" time="2024-01-01T00:00:00Z">
+      <attributes><attribute name="count" type="int">2</attribute></attributes>
+      <objects><relationship object-id="o1" qualifier="ships"/></objects>
+    </event>
+  </events>
+</log>
+)xml";
+  const auto standard_fixture = minera::parse_ocel_xml(standard_links);
+  assert(standard_fixture.o2o.size() == 1);
+  assert(standard_fixture.o2o.front().qualifier == "contains");
+  assert(standard_fixture.relations.size() == 1);
+  assert(std::get<std::int64_t>(standard_fixture.events.front().attributes.front().value) == 2);
   return 0;
 }

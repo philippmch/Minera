@@ -159,7 +159,10 @@ XML. CSV import validates headers, object-list cells, timestamps, ids, and
 cross-type references; XML import/export preserves scalar attributes,
 qualifiers, object-to-object links, object changes, globals, and deterministic
 ordering where the selected format carries them. `minera_ocel` detects `.csv`
-and `.xml`/`.xmlocel` inputs and can emit classic or standard XML.
+Classic XML accepts both attribute-form records and keyed child elements,
+including list-based event object maps; standard XML accepts both relationship
+container spellings. `minera_ocel` detects `.csv` and `.xml`/`.xmlocel`
+inputs and can emit classic or standard XML.
 
 Embedding evidence: `to_embeddings` exposes both case-level and event-level
 variants through a deterministic bounded token-hash encoder. The native API
