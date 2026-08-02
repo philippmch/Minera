@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, roleDiscoveryQuery, requestRoleDiscovery } from "./api";
 
 describe("log-to-features API", () => {
   it("encodes deterministic sorted options and escaped lists", () => {
@@ -59,6 +59,19 @@ describe("organizational SNA API", () => {
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "bad" }), { status: 200 })));
     await expect(requestOrganizationalSna()).rejects.toThrow(/invalid organizational SNA/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("role discovery API", () => {
+  it("serializes strict threshold and safety options", () => {
+    expect(roleDiscoveryQuery({ roles_threshold: 0.4, roles_max_resources: 8, roles_max_activities: 12 }))
+      .toBe("roles_threshold=0.4&roles_max_resources=8&roles_max_activities=12");
+  });
+  it("rejects malformed responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "ROLE_DISCOVERY" }), { status: 200 })));
+    await expect(requestRoleDiscovery()).rejects.toThrow(/invalid role discovery/);
+    vi.unstubAllGlobals();
   });
 });
 

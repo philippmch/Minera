@@ -48,6 +48,9 @@ import {
   isTraceVariantQueryResult,
   isPripelResult,
   isOrganizationalSnaResult,
+  type RoleDiscoveryOptions,
+  type RoleDiscoveryResult,
+  isRoleDiscoveryResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1166,6 +1169,18 @@ export function requestOrganizationalSna(options: OrganizationalSnaOptions = {})
 }
 export const requestSna = requestOrganizationalSna;
 export const discoverOrganizationalSna = requestOrganizationalSna;
+export function roleDiscoveryQuery(options: RoleDiscoveryOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.roles_threshold !== undefined) query.set("roles_threshold", String(options.roles_threshold));
+  if (options.roles_max_resources !== undefined) query.set("roles_max_resources", String(options.roles_max_resources));
+  if (options.roles_max_activities !== undefined) query.set("roles_max_activities", String(options.roles_max_activities));
+  return query.toString();
+}
+export function requestRoleDiscovery(options: RoleDiscoveryOptions = {}): Promise<RoleDiscoveryResult> {
+  const query = roleDiscoveryQuery(options);
+  return postChecked(`/api/roles${query ? `?${query}` : ""}`, isRoleDiscoveryResult, "role discovery");
+}
+export const discoverRoles = requestRoleDiscovery;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();

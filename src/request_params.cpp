@@ -2327,4 +2327,21 @@ OrganizationalSnaOptions parse_organizational_sna_params(
   return options;
 }
 
+RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field) {
+  return parse_role_discovery_params(field, {});
+}
+RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field,
+                                                 const FieldPresence& present) {
+  RoleDiscoveryOptions options;
+  const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
+  const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("roles_threshold")) {
+    options.threshold = parse_finite_double(require("roles_threshold"), "roles_threshold");
+    if (options.threshold < 0 || options.threshold > 1) throw std::invalid_argument("roles_threshold must be in [0,1]");
+  }
+  if (supplied("roles_max_resources")) options.max_resources = parse_positive_size(require("roles_max_resources"), "roles_max_resources");
+  if (supplied("roles_max_activities")) options.max_activities = parse_positive_size(require("roles_max_activities"), "roles_max_activities");
+  return options;
+}
+
 }  // namespace minera

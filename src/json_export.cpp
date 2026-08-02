@@ -3830,4 +3830,33 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   return out.str();
 }
 
+std::string role_discovery_json(const RoleDiscoveryResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"ROLE_DISCOVERY\",\"roles\":[";
+  for (std::size_t i = 0; i < result.roles.size(); ++i) {
+    if (i) out << ',';
+    const auto& role = result.roles[i];
+    out << "{\"activities\":[";
+    for (std::size_t j = 0; j < role.activities.size(); ++j) {
+      if (j) out << ','; write_json_string(out, role.activities[j]);
+    }
+    out << "],\"resources\":[";
+    for (std::size_t j = 0; j < role.resources.size(); ++j) {
+      if (j) out << ',';
+      out << "{\"name\":";
+      write_json_string(out, role.resources[j].name);
+      out << ",\"count\":" << role.resources[j].count << '}';
+    }
+    out << "]}";
+  }
+  const auto& d = result.diagnostics;
+  out << "],\"diagnostics\":{\"computed\":" << (d.computed ? "true" : "false")
+      << ",\"output_truncated\":" << (d.output_truncated ? "true" : "false")
+      << ",\"trace_count\":" << d.trace_count << ",\"event_count\":" << d.event_count
+      << ",\"activity_count\":" << d.activity_count << ",\"resource_count\":" << d.resource_count
+      << ",\"role_count\":" << d.role_count << ",\"message\":";
+  write_json_string(out, d.message); out << "}}";
+  return out.str();
+}
+
 }  // namespace minera
