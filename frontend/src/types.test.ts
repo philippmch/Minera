@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isModelEvaluation, isLogToFeaturesResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, type MineraExport } from "./types";
 
 describe("isILPMinerResult", () => {
   const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
@@ -70,6 +70,24 @@ describe("isNetworkAnalysisResult", () => {
   const valid = { family: "NETWORK_ANALYSIS", edges: [{ source: "alice", target: "bob", activity: "A", count: 1, performance: [2] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 2, link_count: 1, row_count: 1, performance_value_count: 1, message: "ok" } };
   it("accepts deterministic edge rows", () => expect(isNetworkAnalysisResult(valid)).toBe(true));
   it("rejects negative diagnostics", () => expect(isNetworkAnalysisResult({ ...valid, diagnostics: { ...valid.diagnostics, row_count: -1 } })).toBe(false));
+});
+
+describe("isClusteringResult", () => {
+  const valid = {
+    family: "TRACE_ATTRIBUTE_CLUSTERING",
+    tree: {
+      name: "root", distance: 0.5, size: 2, leaf: false,
+      children: [
+        { name: "a", distance: 0, size: 1, leaf: true, children: [] },
+        { name: "b", distance: 0, size: 1, leaf: true, children: [] },
+      ],
+    },
+    leaf_names: ["a", "b"],
+    diagnostics: { computed: true, output_truncated: false, trace_count: 2, group_count: 2, node_count: 3, message: "ok" },
+  };
+  it("accepts recursive trees", () => expect(isClusteringResult(valid)).toBe(true));
+  it("rejects an internal node without children", () => expect(isClusteringResult({ ...valid, tree: { ...valid.tree, children: [] } })).toBe(false));
+  it("rejects non-finite distances", () => expect(isClusteringResult({ ...valid, tree: { ...valid.tree, distance: NaN } })).toBe(false));
 });
 
 describe("isLogToFeaturesResult", () => {

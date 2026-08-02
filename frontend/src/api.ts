@@ -60,6 +60,9 @@ import {
   type LocalDiagnosticsOptions,
   type LocalDiagnosticsResult,
   isLocalDiagnosticsResult,
+  type ClusteringOptions,
+  type ClusteringResult,
+  isClusteringResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1235,6 +1238,16 @@ export function requestLocalDiagnostics(options: LocalDiagnosticsOptions = {}): 
   return postChecked(`/api/local-diagnostics${query ? `?${query}` : ""}`, isLocalDiagnosticsResult, "local diagnostics");
 }
 export const discoverLocalDiagnostics = requestLocalDiagnostics;
+export function clusteringQuery(options: ClusteringOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));
+  return query.toString();
+}
+export function requestClustering(options: ClusteringOptions = {}): Promise<ClusteringResult> {
+  const query = clusteringQuery(options);
+  return postChecked(`/api/clustering${query ? `?${query}` : ""}`, isClusteringResult, "trace clustering");
+}
+export const discoverClustering = requestClustering;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();
