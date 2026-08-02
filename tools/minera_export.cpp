@@ -37,6 +37,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/trace_variant_query.hpp"
+#include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -348,6 +349,12 @@ int usage(const char* program) {
                "  --tvq-seed <n>           Deterministic noise seed\n"
                "  --tvq-max-output-traces <n> Safety trace cap\n"
                "  --tvq-max-output-variants <n> Candidate cap\n"
+               "  --pripel <query.csv|.xes>  Emit PRIPEL JSON using a query log\n"
+               "  --pripel-epsilon <f>      Positive privacy parameter\n"
+               "  --pripel-blocklist <a,b>  Attributes to remove\n"
+               "  --pripel-seed <n>         Deterministic anonymization seed\n"
+               "  --pripel-max-output-traces <n> Output trace cap\n"
+               "  --pripel-max-distance <n>  Nearest-variant distance cap\n"
                "                            recurse) or dfg (IMd: recurse on\n"
                "                            the directly-follows graph alone,\n"
                "                            scaling to huge logs)\n"
@@ -881,6 +888,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> ilp_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
+  bool pripel_requested = false;
+  std::filesystem::path pripel_query_path;
+  std::map<std::string, std::string> pripel_fields;
 
   // Succession pairs are parsed while the try block below is not yet open, so
   // report a malformed value as a clean usage error rather than a terminate.
@@ -991,6 +1001,26 @@ int main(int argc, char** argv) {
       if (!names.contains(key)) return usage(argv[0]);
       trace_variant_query_fields.insert_or_assign(std::move(key), value);
       trace_variant_query_requested = true;
+      continue;
+    }
+    if (arg == "--pripel") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      pripel_query_path = value;
+      pripel_requested = true;
+      continue;
+    }
+    if (arg.rfind("--pripel-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "pripel_epsilon", "pripel_blocklist", "pripel_seed",
+          "pripel_max_output_traces", "pripel_max_distance"};
+      if (!names.contains(key)) return usage(argv[0]);
+      pripel_fields.insert_or_assign(std::move(key), value);
+      pripel_requested = true;
       continue;
     }
     if (arg == "--concept-drift") { concept_drift_requested = true; continue; }
@@ -2524,6 +2554,34 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_trace_variant_query_params(lookup, present);
       const auto body = minera::trace_variant_query_json(
           minera::anonymize_trace_variant_query(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (pripel_requested) {
+      if (pripel_query_path.empty())
+        throw std::invalid_argument("--pripel requires a query log path");
+      const auto query = ends_with_ci(pripel_query_path.string(), ".xes")
+                             ? minera::import_xes_event_log(pripel_query_path)
+                             : minera::import_csv_event_log(pripel_query_path, options);
+      const auto lookup = [&](std::string_view name) {
+        const auto it = pripel_fields.find(std::string(name));
+        return it == pripel_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return pripel_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_pripel_params(lookup, present);
+      const auto body = minera::pripel_json(
+          minera::anonymize_pripel(log, query, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

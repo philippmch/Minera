@@ -43,6 +43,7 @@
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/trace_variant_query.hpp"
+#include "minera/pripel.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -171,6 +172,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
     const FieldLookup& field);
 [[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict PRIPEL-style anonymization parser. Fields use the `pripel_` prefix.
+[[nodiscard]] PripelOptions parse_pripel_params(const FieldLookup& field);
+[[nodiscard]] PripelOptions parse_pripel_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the escaped activity=cost grammar shared by HTTP requests and CLI

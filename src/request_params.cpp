@@ -2174,4 +2174,47 @@ TraceVariantQueryOptions parse_trace_variant_query_params(
   return options;
 }
 
+PripelOptions parse_pripel_params(const FieldLookup& field) {
+  return parse_pripel_params(field, {});
+}
+
+PripelOptions parse_pripel_params(const FieldLookup& field,
+                                  const FieldPresence& present) {
+  PripelOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("pripel_epsilon")) {
+    options.epsilon = parse_finite_double(require("pripel_epsilon"),
+                                          "pripel_epsilon");
+    if (options.epsilon <= 0.0)
+      throw std::invalid_argument("pripel_epsilon must be positive");
+  }
+  if (supplied("pripel_blocklist")) {
+    options.blocklist = split_target_activities(require("pripel_blocklist"));
+    if (options.blocklist.empty())
+      throw std::invalid_argument("pripel_blocklist: expected labels");
+    const std::set<std::string> unique(options.blocklist.begin(),
+                                       options.blocklist.end());
+    if (unique.size() != options.blocklist.size())
+      throw std::invalid_argument("pripel_blocklist: duplicate label");
+  }
+  if (supplied("pripel_seed"))
+    options.seed = static_cast<std::uint64_t>(
+        parse_nonnegative_size(require("pripel_seed"), "pripel_seed"));
+  if (supplied("pripel_max_output_traces"))
+    options.max_output_traces = parse_nonnegative_size(
+        require("pripel_max_output_traces"), "pripel_max_output_traces");
+  if (supplied("pripel_max_distance"))
+    options.max_distance = parse_nonnegative_size(
+        require("pripel_max_distance"), "pripel_max_distance");
+  return options;
+}
+
 }  // namespace minera

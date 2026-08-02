@@ -46,6 +46,7 @@
 #include "minera/label_splitting.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/trace_variant_query.hpp"
+#include "minera/pripel.hpp"
 
 namespace minera {
 
@@ -259,5 +260,8 @@ void write_analysis_json(std::ostream& out,
 // Standalone deterministic JSON for trace-variant query anonymization.
 [[nodiscard]] std::string trace_variant_query_json(
     const TraceVariantQueryResult& result);
+
+// Standalone deterministic JSON for PRIPEL-style contextual anonymization.
+[[nodiscard]] std::string pripel_json(const PripelResult& result);
 
 }  // namespace minera

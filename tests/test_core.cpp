@@ -17,6 +17,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/trace_variant_query.hpp"
+#include "minera/pripel.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
 #include "minera/log_skeleton.hpp"
@@ -4933,9 +4934,20 @@ void trace_variant_query_json_is_standalone_and_deterministic() {
   assert(first.find("\"log\":") != std::string::npos);
 }
 
+void pripel_json_is_standalone_and_escapes_diagnostics() {
+  minera::PripelResult result;
+  result.diagnostics.epsilon = 1.0;
+  result.diagnostics.message = "ok \"quoted\"";
+  const auto json = minera::pripel_json(result);
+  assert(json.find("\"family\":\"PRIPEL\"") != std::string::npos);
+  assert(json.find("ok \\\"quoted\\\"") != std::string::npos);
+  assert(json.find("\"log\":{\"traces\":[]}") != std::string::npos);
+}
+
 int main() {
   ilp_json_is_standalone_and_deterministic();
   trace_variant_query_json_is_standalone_and_deterministic();
+  pripel_json_is_standalone_and_escapes_diagnostics();
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();
