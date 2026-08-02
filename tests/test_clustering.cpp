@@ -1,4 +1,5 @@
 #include "minera/clustering.hpp"
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 
@@ -40,4 +41,42 @@ int main() {
   auto dmm_options=o; dmm_options.trace_attribute="segment"; dmm_options.variant=TraceAttributeClusteringVariant::kDmmLeven;
   const auto dmm_result=discover_trace_attribute_clustering(dmm_log,dmm_options);
   assert(dmm_result.tree.distance > 0.19 && dmm_result.tree.distance < 0.21);
+  ProfileClusteringOptions profile_options;
+  profile_options.cluster_count = 2;
+  const auto profile_result = discover_profile_clustering(l, profile_options);
+  const auto profile_repeat = discover_profile_clustering(l, profile_options);
+  assert(profile_result.diagnostics.computed);
+  assert(profile_result.labels.size() == l.traces.size());
+  assert(profile_result.clusters.size() == 2);
+  assert(!profile_result.feature_names.empty());
+  assert(std::find(profile_result.feature_names.begin(), profile_result.feature_names.end(),
+                   "event:concept:name@A") != profile_result.feature_names.end());
+  assert(std::find(profile_result.feature_names.begin(), profile_result.feature_names.end(),
+                   "succession:concept:name@A#B") != profile_result.feature_names.end());
+  assert(profile_result.labels == profile_repeat.labels);
+  assert(profile_clustering_json(profile_result) == profile_clustering_json(profile_repeat));
+
+  ProfileClusteringOptions numeric_options;
+  numeric_options.cluster_count = 2;
+  numeric_options.event_numeric_attributes = {"cost"};
+  for (auto& trace : l.traces) {
+    for (auto& event : trace.events) {
+      event.attributes.push_back({"cost", "1.5", AttributeKind::kFloat});
+    }
+  }
+  const auto numeric_profile = discover_profile_clustering(l, numeric_options);
+  assert(std::find(numeric_profile.feature_names.begin(), numeric_profile.feature_names.end(),
+                   "event:cost") != numeric_profile.feature_names.end());
+
+  bool profile_threw = false;
+  try {
+    auto bad = profile_options;
+    bad.cluster_count = l.traces.size() + 1;
+    (void)discover_profile_clustering(l, bad);
+  } catch (const std::invalid_argument&) {
+    profile_threw = true;
+  }
+  assert(profile_threw);
+  const auto empty_profile = discover_profile_clustering(EventLog{});
+  assert(empty_profile.diagnostics.computed && empty_profile.labels.empty());
 }

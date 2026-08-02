@@ -1,10 +1,12 @@
 #include "minera/ocel.hpp"
+#include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdlib>
+#include <iomanip>
 #include <limits>
 #include <map>
 #include <set>
@@ -790,6 +792,764 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
   }
   out << "},\"performance_computed\":"
       << (graph.performance_computed ? "true" : "false") << '}';
+  return out.str();
+}
+
+OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
+  if (!std::isfinite(options.double_arc_threshold) ||
+      options.double_arc_threshold < 0.0 || options.double_arc_threshold > 1.0)
+    throw std::invalid_argument("OCPN double_arc_threshold must be in [0,1]");
+  if (!std::isfinite(options.noise_threshold) || options.noise_threshold < 0.0 ||
+      options.noise_threshold > 1.0)
+    throw std::invalid_argument("OCPN noise_threshold must be in [0,1]");
+
+  OcpnGraph result;
+  std::map<std::string, const OcelEvent*> event_by_id;
+  std::map<std::string, std::size_t> event_order;
+  for (std::size_t index = 0; index < log.events.size(); ++index) {
+    event_by_id[log.events[index].id] = &log.events[index];
+    event_order[log.events[index].id] = index;
+    result.activities.push_back(log.events[index].activity);
+  }
+  std::sort(result.activities.begin(), result.activities.end());
+  result.activities.erase(
+      std::unique(result.activities.begin(), result.activities.end()),
+      result.activities.end());
+  std::map<std::string, std::string> object_type;
+  for (const auto& object : log.objects) {
+    object_type[object.id] = object.type;
+    result.object_types.push_back(object.type);
+  }
+  std::sort(result.object_types.begin(), result.object_types.end());
+  result.object_types.erase(
+      std::unique(result.object_types.begin(), result.object_types.end()),
+      result.object_types.end());
+
+  const auto ocdfg = discover_ocdfg_classic(log, false);
+  for (const auto& type : result.object_types) {
+    EventLog flattened;
+    std::map<std::string, std::set<std::string>> object_event_ids;
+    for (const auto& relation : log.relations) {
+      const auto type_it = object_type.find(relation.object_id);
+      if (type_it == object_type.end() || type_it->second != type) continue;
+      if (event_by_id.count(relation.event_id))
+        object_event_ids[relation.object_id].insert(relation.event_id);
+    }
+    for (const auto& [object_id, event_ids] : object_event_ids) {
+      Trace trace;
+      trace.case_id = object_id;
+      for (const auto& event_id : event_ids) {
+        const auto event_it = event_by_id.find(event_id);
+        if (event_it == event_by_id.end()) continue;
+        const auto* event = event_it->second;
+        trace.events.push_back(Event{object_id, event->activity, event->timestamp,
+                                     {}, event_order[event_id], {}, {}});
+      }
+      order_events_by_time(trace.events);
+      if (!trace.events.empty()) flattened.traces.push_back(std::move(trace));
+    }
+
+    InductiveMinerOptions miner_options;
+    miner_options.noise_threshold = options.noise_threshold;
+    miner_options.variant = options.variant == OcpnInductiveVariant::kDfg
+                                ? InductiveMinerVariant::kDfg
+                                : InductiveMinerVariant::kLog;
+    const auto tree = discover_process_tree(flattened, miner_options);
+    result.petri_nets[type] = to_petri_net(tree);
+
+    const auto type_it = ocdfg.activities_ot.find(type);
+    if (type_it != ocdfg.activities_ot.end()) {
+      for (const auto& [activity, metric] : type_it->second) {
+        std::map<std::string, std::size_t> event_counts;
+        for (const auto& event_object : metric.event_objects)
+          ++event_counts[event_object.first];
+        std::size_t single_events = 0;
+        for (const auto& [event, count] : event_counts) {
+          (void)event;
+          if (count == 1) ++single_events;
+        }
+        const double ratio = event_counts.empty()
+                                 ? 0.0
+                                 : static_cast<double>(single_events) /
+                                       static_cast<double>(event_counts.size());
+        result.double_arcs_on_activity[type][activity] =
+            ratio <= options.double_arc_threshold;
+      }
+    }
+  }
+  return result;
+}
+
+std::string serialize_ocpn_json(const OcpnGraph& graph) {
+  std::ostringstream out;
+  const auto strings = [&](const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      write_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto numbers = [&](const std::vector<std::size_t>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      out << values[i];
+    }
+    out << ']';
+  };
+  out << "{\"activities\":";
+  strings(graph.activities);
+  out << ",\"object_types\":";
+  strings(graph.object_types);
+  out << ",\"petri_nets\":{";
+  bool first_type = true;
+  for (const auto& [type, net] : graph.petri_nets) {
+    if (!first_type) out << ',';
+    first_type = false;
+    write_string(out, type);
+    out << ":{\"place_count\":" << net.place_count()
+        << ",\"source\":" << net.source() << ",\"sink\":"
+        << net.sink() << ",\"activities\":";
+    strings(net.activities());
+    out << ",\"transitions\":[";
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      if (index != 0) out << ',';
+      const auto& transition = net.transitions()[index];
+      out << "{\"activity\":";
+      if (transition.activity) out << *transition.activity;
+      else out << "null";
+      out << ",\"inputs\":";
+      numbers(transition.inputs);
+      out << ",\"outputs\":";
+      numbers(transition.outputs);
+      out << '}';
+    }
+    out << "]}";
+  }
+  out << "},\"double_arcs_on_activity\":{";
+  first_type = true;
+  for (const auto& [type, activities] : graph.double_arcs_on_activity) {
+    if (!first_type) out << ',';
+    first_type = false;
+    write_string(out, type);
+    out << ":{";
+    bool first_activity = true;
+    for (const auto& [activity, is_double] : activities) {
+      if (!first_activity) out << ',';
+      first_activity = false;
+      write_string(out, activity);
+      out << ':' << (is_double ? "true" : "false");
+    }
+    out << '}';
+  }
+  out << "}}";
+  return out.str();
+}
+
+OcelTupleDescription describe_ocel_tuples(const Ocel& log,
+                                           const OcelDescriptionOptions& options) {
+  OcelTupleDescription result;
+  result.includes_timestamps = options.include_timestamps;
+  std::map<std::string, const OcelEvent*> events;
+  for (const auto& event : log.events) events[event.id] = &event;
+  std::map<std::string, std::string> object_types;
+  for (const auto& object : log.objects) object_types[object.id] = object.type;
+  std::map<std::string, std::vector<std::string>> related_by_event;
+  std::map<std::string, std::vector<std::string>> events_by_object;
+  for (const auto& relation : log.relations) {
+    if (!events.count(relation.event_id) || !object_types.count(relation.object_id))
+      continue;
+    related_by_event[relation.event_id].push_back(relation.object_id);
+    events_by_object[relation.object_id].push_back(relation.event_id);
+  }
+  for (auto& [event_id, objects] : related_by_event) {
+    std::sort(objects.begin(), objects.end());
+    objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
+  }
+  const auto event_less = [&](const std::string& left_id,
+                              const std::string& right_id) {
+    const auto* left = events.at(left_id);
+    const auto* right = events.at(right_id);
+    const auto left_time = parse_timestamp(left->timestamp);
+    const auto right_time = parse_timestamp(right->timestamp);
+    if (left_time && right_time && *left_time != *right_time)
+      return *left_time < *right_time;
+    if (left->timestamp != right->timestamp)
+      return left->timestamp < right->timestamp;
+    if (left->activity != right->activity)
+      return left->activity < right->activity;
+    return left_id < right_id;
+  };
+  std::vector<std::string> event_ids;
+  for (const auto& [event_id, event] : events) {
+    (void)event;
+    event_ids.push_back(event_id);
+  }
+  std::sort(event_ids.begin(), event_ids.end(), event_less);
+  for (const auto& event_id : event_ids) {
+    const auto* event = events.at(event_id);
+    OcelTupleEventDescription description;
+    description.activity = event->activity;
+    description.related_objects = related_by_event[event_id];
+    if (options.include_timestamps) description.timestamp = event->timestamp;
+    result.events.push_back(std::move(description));
+  }
+
+  for (auto& [object_id, object_events] : events_by_object) {
+    std::sort(object_events.begin(), object_events.end(), event_less);
+    object_events.erase(std::unique(object_events.begin(), object_events.end()),
+                        object_events.end());
+  }
+  for (const auto& object : log.objects) {
+    OcelTupleObjectDescription description;
+    description.id = object.id;
+    description.type = object.type;
+    if (options.include_timestamps) {
+      const auto it = events_by_object.find(object.id);
+      if (it != events_by_object.end() && !it->second.empty()) {
+        const auto* first = events.at(it->second.front());
+        const auto* last = events.at(it->second.back());
+        description.lifecycle_start = first->timestamp;
+        description.lifecycle_end = last->timestamp;
+        const auto start = parse_timestamp(first->timestamp);
+        const auto end = parse_timestamp(last->timestamp);
+        if (!start || !end)
+          throw std::invalid_argument("OCEL description requires valid timestamps");
+        description.lifecycle_seconds = *end - *start;
+        description.has_lifecycle = true;
+      }
+    }
+    result.objects.push_back(std::move(description));
+  }
+  std::sort(result.objects.begin(), result.objects.end(),
+            [](const auto& left, const auto& right) { return left.id < right.id; });
+  return result;
+}
+
+std::string describe_ocel_text(const Ocel& log,
+                               const OcelDescriptionOptions& options) {
+  const auto description = describe_ocel_tuples(log, options);
+  std::ostringstream out;
+  out << "\n\nevents:\n";
+  for (const auto& event : description.events) {
+    out << '\n' << event.activity << " ( related objects: ";
+    for (std::size_t index = 0; index < event.related_objects.size(); ++index) {
+      if (index != 0) out << ", ";
+      out << event.related_objects[index];
+    }
+    out << " ) ";
+    if (description.includes_timestamps)
+      out << " timestamp: " << event.timestamp;
+  }
+  out << "\n\nobjects:\n";
+  for (const auto& object : description.objects) {
+    out << '\n' << object.id << " object type: " << object.type;
+    if (description.includes_timestamps && object.has_lifecycle) {
+      out << " ( lifecycle start: " << object.lifecycle_start
+          << " ; lifecycle end: " << object.lifecycle_end
+          << " ; lifecycle duration: " << std::setprecision(17)
+          << object.lifecycle_seconds << " )";
+    }
+  }
+  return out.str();
+}
+
+std::string serialize_ocel_description_json(
+    const OcelTupleDescription& description) {
+  std::ostringstream out;
+  out << "{\"includes_timestamps\":"
+      << (description.includes_timestamps ? "true" : "false")
+      << ",\"events\":[";
+  for (std::size_t index = 0; index < description.events.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& event = description.events[index];
+    out << "{\"activity\":";
+    write_string(out, event.activity);
+    out << ",\"related_objects\":[";
+    for (std::size_t object_index = 0;
+         object_index < event.related_objects.size(); ++object_index) {
+      if (object_index != 0) out << ',';
+      write_string(out, event.related_objects[object_index]);
+    }
+    out << "]";
+    if (description.includes_timestamps) {
+      out << ",\"timestamp\":";
+      write_string(out, event.timestamp);
+    }
+    out << '}';
+  }
+  out << "],\"objects\":[";
+  for (std::size_t index = 0; index < description.objects.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& object = description.objects[index];
+    out << "{\"id\":";
+    write_string(out, object.id);
+    out << ",\"type\":";
+    write_string(out, object.type);
+    out << ",\"has_lifecycle\":"
+        << (object.has_lifecycle ? "true" : "false");
+    if (description.includes_timestamps) {
+      out << ",\"lifecycle_start\":";
+      write_string(out, object.lifecycle_start);
+      out << ",\"lifecycle_end\":";
+      write_string(out, object.lifecycle_end);
+      out << ",\"lifecycle_seconds\":" << std::setprecision(17)
+          << object.lifecycle_seconds;
+    }
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
+namespace {
+
+void validate_conformance_number(double value, const char* name) {
+  if (!std::isfinite(value) || value < 0.0)
+    throw std::invalid_argument(std::string(name) + " must be finite and non-negative");
+}
+
+void write_conformance_number(std::ostringstream& out, double value) {
+  if (!std::isfinite(value)) {
+    out << "null";
+    return;
+  }
+  out << std::setprecision(17) << value;
+}
+
+template <typename T>
+std::vector<T> sorted_difference(const std::set<T>& left,
+                                 const std::set<T>& right) {
+  std::vector<T> result;
+  std::set_difference(left.begin(), left.end(), right.begin(), right.end(),
+                      std::back_inserter(result));
+  return result;
+}
+
+std::map<std::pair<std::string, std::string>, std::size_t> etot_frequencies(
+    const EtotGraph& graph) {
+  std::map<std::pair<std::string, std::string>, std::size_t> result;
+  for (const auto& edge : graph.edges)
+    result[{edge.activity, edge.object_type}] += edge.frequency;
+  return result;
+}
+
+std::map<std::tuple<std::string, std::string, std::string>, std::size_t>
+otg_frequencies(const OtgGraph& graph) {
+  std::map<std::tuple<std::string, std::string, std::string>, std::size_t>
+      result;
+  for (const auto& edge : graph.edges)
+    result[{edge.source_type, edge.relation, edge.target_type}] += edge.frequency;
+  return result;
+}
+
+std::set<std::pair<std::string, std::string>> ocdfg_flows(
+    const OcdfgGraph& graph) {
+  std::set<std::pair<std::string, std::string>> result;
+  for (const auto& [object_type, edges] : graph.edges)
+    for (const auto& [flow, metric] : edges) {
+      (void)object_type;
+      (void)metric;
+      result.insert(flow);
+    }
+  return result;
+}
+
+std::size_t ocdfg_activity_measure(const OcdfgGraph& graph,
+                                   const std::string& activity) {
+  const auto it = graph.activities_indep.find(activity);
+  return it == graph.activities_indep.end() ? 0u : it->second.events.size();
+}
+
+std::size_t ocdfg_flow_measure(const OcdfgGraph& graph,
+                               const std::pair<std::string, std::string>& flow) {
+  std::size_t result = 0;
+  for (const auto& [object_type, edges] : graph.edges) {
+    (void)object_type;
+    const auto it = edges.find(flow);
+    if (it != edges.end()) result += it->second.event_couples.size();
+  }
+  return result;
+}
+
+}  // namespace
+
+EtotConformanceResult compare_etot(const EtotGraph& real,
+                                   const EtotGraph& normative,
+                                   const EtotConformanceOptions& options) {
+  validate_conformance_number(options.alpha, "ETOT alpha");
+  validate_conformance_number(options.beta, "ETOT beta");
+  validate_conformance_number(options.gamma, "ETOT gamma");
+  validate_conformance_number(options.theta_relative, "ETOT theta_relative");
+  const std::set<std::string> real_activities(real.activities.begin(),
+                                               real.activities.end());
+  const std::set<std::string> normative_activities(normative.activities.begin(),
+                                                    normative.activities.end());
+  const std::set<std::string> real_types(real.object_types.begin(),
+                                         real.object_types.end());
+  const std::set<std::string> normative_types(normative.object_types.begin(),
+                                               normative.object_types.end());
+  const auto real_frequency = etot_frequencies(real);
+  const auto normative_frequency = etot_frequencies(normative);
+  std::set<std::pair<std::string, std::string>> real_edges;
+  std::set<std::pair<std::string, std::string>> normative_edges;
+  for (const auto& [edge, frequency] : real_frequency) {
+    (void)frequency;
+    real_edges.insert(edge);
+  }
+  for (const auto& [edge, frequency] : normative_frequency) {
+    (void)frequency;
+    normative_edges.insert(edge);
+  }
+
+  EtotConformanceResult result;
+  result.missing_activities = sorted_difference(normative_activities, real_activities);
+  result.additional_activities = sorted_difference(real_activities, normative_activities);
+  result.missing_object_types = sorted_difference(normative_types, real_types);
+  result.additional_object_types = sorted_difference(real_types, normative_types);
+  result.missing_edges = sorted_difference(normative_edges, real_edges);
+  result.additional_edges = sorted_difference(real_edges, normative_edges);
+
+  std::size_t relative_mismatches = 0;
+  for (const auto& edge : normative_edges) {
+    if (!real_edges.count(edge)) continue;
+    const auto normative_count = normative_frequency.at(edge);
+    const auto real_count = real_frequency.at(edge);
+    const double delta = normative_count == 0
+                             ? std::numeric_limits<double>::infinity()
+                             : std::abs(static_cast<double>(real_count) -
+                                        static_cast<double>(normative_count)) /
+                                   static_cast<double>(normative_count);
+    result.relative_frequency_delta[edge] = delta;
+    if (delta > options.theta_relative) ++relative_mismatches;
+  }
+
+  const double normalizer =
+      options.alpha * static_cast<double>(normative_activities.size() + normative_types.size()) +
+      options.beta * static_cast<double>(normative_edges.size()) +
+      options.gamma * static_cast<double>(normative_edges.size());
+  if (normalizer == 0.0) {
+    result.fitness = 1.0;
+  } else {
+    const double numerator =
+        options.alpha * static_cast<double>(result.missing_activities.size() +
+                                            result.missing_object_types.size()) +
+        options.beta * static_cast<double>(result.missing_edges.size()) +
+        options.gamma * static_cast<double>(relative_mismatches);
+    result.fitness = 1.0 - numerator / normalizer;
+  }
+  return result;
+}
+
+OtgConformanceResult compare_otg(const OtgGraph& real,
+                                  const OtgGraph& normative,
+                                  const OtgConformanceOptions& options) {
+  validate_conformance_number(options.alpha, "OTG alpha");
+  validate_conformance_number(options.beta, "OTG beta");
+  validate_conformance_number(options.gamma, "OTG gamma");
+  validate_conformance_number(options.theta, "OTG theta");
+  for (const auto& [relation, theta] : options.theta_by_relation) {
+    (void)relation;
+    validate_conformance_number(theta, "OTG relation theta");
+  }
+  const std::set<std::string> real_types(real.object_types.begin(),
+                                         real.object_types.end());
+  const std::set<std::string> normative_types(normative.object_types.begin(),
+                                               normative.object_types.end());
+  const auto real_frequency = otg_frequencies(real);
+  const auto normative_frequency = otg_frequencies(normative);
+  std::set<std::tuple<std::string, std::string, std::string>> real_edges;
+  std::set<std::tuple<std::string, std::string, std::string>> normative_edges;
+  for (const auto& [edge, frequency] : real_frequency) {
+    (void)frequency;
+    real_edges.insert(edge);
+  }
+  for (const auto& [edge, frequency] : normative_frequency) {
+    (void)frequency;
+    normative_edges.insert(edge);
+  }
+
+  OtgConformanceResult result;
+  result.missing_object_types = sorted_difference(normative_types, real_types);
+  result.additional_object_types = sorted_difference(real_types, normative_types);
+  result.missing_edges = sorted_difference(normative_edges, real_edges);
+  result.additional_edges = sorted_difference(real_edges, normative_edges);
+  std::size_t non_conforming = 0;
+  for (const auto& edge : normative_edges) {
+    if (!real_edges.count(edge)) continue;
+    const auto normative_count = normative_frequency.at(edge);
+    const auto real_count = real_frequency.at(edge);
+    const double delta = normative_count == 0
+                             ? std::numeric_limits<double>::infinity()
+                             : std::abs(static_cast<double>(real_count) -
+                                        static_cast<double>(normative_count)) /
+                                   static_cast<double>(normative_count);
+    const auto relation = std::get<1>(edge);
+    const auto theta_it = options.theta_by_relation.find(relation);
+    const double theta = theta_it == options.theta_by_relation.end()
+                             ? options.theta
+                             : theta_it->second;
+    if (delta > theta) {
+      result.non_conforming_edges[edge] = delta;
+      ++non_conforming;
+    }
+  }
+  const double normalizer =
+      options.alpha * static_cast<double>(normative_types.size()) +
+      options.beta * static_cast<double>(normative_edges.size()) +
+      options.gamma * static_cast<double>(normative_edges.size());
+  if (normalizer == 0.0) {
+    result.fitness = 1.0;
+  } else {
+    const double numerator =
+        options.alpha * static_cast<double>(result.missing_object_types.size()) +
+        options.beta * static_cast<double>(result.missing_edges.size()) +
+        options.gamma * static_cast<double>(non_conforming);
+    result.fitness = 1.0 - numerator / normalizer;
+  }
+  return result;
+}
+
+OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
+                                     const OcdfgGraph& normative,
+                                     const OcdfgConformanceOptions& options) {
+  validate_conformance_number(options.theta_activity, "OCDFG theta_activity");
+  validate_conformance_number(options.theta_flow, "OCDFG theta_flow");
+  validate_conformance_number(options.alpha, "OCDFG alpha");
+  validate_conformance_number(options.beta, "OCDFG beta");
+  validate_conformance_number(options.gamma, "OCDFG gamma");
+  validate_conformance_number(options.delta, "OCDFG delta");
+  const std::set<std::string> real_activities(real.activities.begin(),
+                                               real.activities.end());
+  const std::set<std::string> normative_activities(normative.activities.begin(),
+                                                    normative.activities.end());
+  const auto real_flows = ocdfg_flows(real);
+  const auto normative_flows = ocdfg_flows(normative);
+  OcdfgConformanceResult result;
+  result.missing_activities = sorted_difference(normative_activities, real_activities);
+  result.additional_activities = sorted_difference(real_activities, normative_activities);
+  result.missing_flows = sorted_difference(normative_flows, real_flows);
+  result.additional_flows = sorted_difference(real_flows, normative_flows);
+
+  std::set<std::string> all_activities = real_activities;
+  all_activities.insert(normative_activities.begin(), normative_activities.end());
+  std::size_t non_conforming_activities = 0;
+  for (const auto& activity : all_activities) {
+    const auto real_measure = ocdfg_activity_measure(real, activity);
+    const auto normative_measure = ocdfg_activity_measure(normative, activity);
+    const auto difference = static_cast<std::int64_t>(
+        normative_measure >= real_measure ? normative_measure - real_measure
+                                           : real_measure - normative_measure);
+    result.activity_measure_differences[activity] = difference;
+    if (static_cast<double>(difference) > options.theta_activity) {
+      result.non_conforming_activities_in_measure.push_back(activity);
+      ++non_conforming_activities;
+    }
+  }
+
+  std::set<std::pair<std::string, std::string>> all_flows = real_flows;
+  all_flows.insert(normative_flows.begin(), normative_flows.end());
+  std::size_t non_conforming_flows = 0;
+  for (const auto& flow : all_flows) {
+    const auto real_measure = ocdfg_flow_measure(real, flow);
+    const auto normative_measure = ocdfg_flow_measure(normative, flow);
+    const auto difference = static_cast<std::int64_t>(
+        normative_measure >= real_measure ? normative_measure - real_measure
+                                           : real_measure - normative_measure);
+    result.flow_measure_differences[flow] = difference;
+    if (static_cast<double>(difference) > options.theta_flow) {
+      result.non_conforming_flows_in_measure.push_back(flow);
+      ++non_conforming_flows;
+    }
+  }
+
+  const double normalizer =
+      options.alpha * static_cast<double>(all_activities.size()) +
+      options.beta * static_cast<double>(all_flows.size()) +
+      options.gamma * static_cast<double>(all_activities.size()) +
+      options.delta * static_cast<double>(all_flows.size());
+  if (normalizer == 0.0) {
+    result.fitness = 1.0;
+  } else {
+    const double numerator =
+        options.alpha * static_cast<double>(result.missing_activities.size()) +
+        options.beta * static_cast<double>(result.missing_flows.size()) +
+        options.gamma * static_cast<double>(non_conforming_activities) +
+        options.delta * static_cast<double>(non_conforming_flows);
+    result.fitness = std::clamp(1.0 - numerator / normalizer, 0.0, 1.0);
+  }
+  return result;
+}
+
+std::string etot_conformance_json(const EtotConformanceResult& result) {
+  std::ostringstream out;
+  const auto strings = [&](const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      write_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto edges = [&](const auto& values) {
+    out << '[';
+    bool first = true;
+    for (const auto& edge : values) {
+      if (!first) out << ',';
+      first = false;
+      out << '[';
+      write_string(out, edge.first);
+      out << ',';
+      write_string(out, edge.second);
+      out << ']';
+    }
+    out << ']';
+  };
+  out << "{\"fitness\":";
+  write_conformance_number(out, result.fitness);
+  out << ",\"missing_activities\":";
+  strings(result.missing_activities);
+  out << ",\"additional_activities\":";
+  strings(result.additional_activities);
+  out << ",\"missing_object_types\":";
+  strings(result.missing_object_types);
+  out << ",\"additional_object_types\":";
+  strings(result.additional_object_types);
+  out << ",\"missing_edges\":";
+  edges(result.missing_edges);
+  out << ",\"additional_edges\":";
+  edges(result.additional_edges);
+  out << ",\"relative_frequency_delta\":[";
+  bool first = true;
+  for (const auto& [edge, delta] : result.relative_frequency_delta) {
+    if (!first) out << ',';
+    first = false;
+    out << "{\"activity\":";
+    write_string(out, edge.first);
+    out << ",\"object_type\":";
+    write_string(out, edge.second);
+    out << ",\"delta\":";
+    write_conformance_number(out, delta);
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
+std::string otg_conformance_json(const OtgConformanceResult& result) {
+  std::ostringstream out;
+  const auto strings = [&](const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      write_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto edges = [&](const auto& values) {
+    out << '[';
+    bool first = true;
+    for (const auto& edge : values) {
+      if (!first) out << ',';
+      first = false;
+      out << '[';
+      write_string(out, std::get<0>(edge));
+      out << ',';
+      write_string(out, std::get<1>(edge));
+      out << ',';
+      write_string(out, std::get<2>(edge));
+      out << ']';
+    }
+    out << ']';
+  };
+  out << "{\"fitness\":";
+  write_conformance_number(out, result.fitness);
+  out << ",\"missing_object_types\":";
+  strings(result.missing_object_types);
+  out << ",\"additional_object_types\":";
+  strings(result.additional_object_types);
+  out << ",\"missing_edges\":";
+  edges(result.missing_edges);
+  out << ",\"additional_edges\":";
+  edges(result.additional_edges);
+  out << ",\"non_conforming_edges\":[";
+  bool first = true;
+  for (const auto& [edge, delta] : result.non_conforming_edges) {
+    if (!first) out << ',';
+    first = false;
+    out << "{\"source_type\":";
+    write_string(out, std::get<0>(edge));
+    out << ",\"relation\":";
+    write_string(out, std::get<1>(edge));
+    out << ",\"target_type\":";
+    write_string(out, std::get<2>(edge));
+    out << ",\"delta\":";
+    write_conformance_number(out, delta);
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
+std::string ocdfg_conformance_json(const OcdfgConformanceResult& result) {
+  std::ostringstream out;
+  const auto strings = [&](const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (i != 0) out << ',';
+      write_string(out, values[i]);
+    }
+    out << ']';
+  };
+  const auto flows = [&](const auto& values) {
+    out << '[';
+    bool first = true;
+    for (const auto& flow : values) {
+      if (!first) out << ',';
+      first = false;
+      out << '[';
+      write_string(out, flow.first);
+      out << ',';
+      write_string(out, flow.second);
+      out << ']';
+    }
+    out << ']';
+  };
+  out << "{\"fitness\":";
+  write_conformance_number(out, result.fitness);
+  out << ",\"missing_activities\":";
+  strings(result.missing_activities);
+  out << ",\"additional_activities\":";
+  strings(result.additional_activities);
+  out << ",\"missing_flows\":";
+  flows(result.missing_flows);
+  out << ",\"additional_flows\":";
+  flows(result.additional_flows);
+  out << ",\"activity_measure_differences\":{";
+  bool first = true;
+  for (const auto& [activity, difference] : result.activity_measure_differences) {
+    if (!first) out << ',';
+    first = false;
+    write_string(out, activity);
+    out << ':' << difference;
+  }
+  out << "},\"non_conforming_activities_in_measure\":";
+  strings(result.non_conforming_activities_in_measure);
+  out << ",\"flow_measure_differences\":[";
+  first = true;
+  for (const auto& [flow, difference] : result.flow_measure_differences) {
+    if (!first) out << ',';
+    first = false;
+    out << "{\"source_activity\":";
+    write_string(out, flow.first);
+    out << ",\"target_activity\":";
+    write_string(out, flow.second);
+    out << ",\"difference\":" << difference << '}';
+  }
+  out << "],\"non_conforming_flows_in_measure\":";
+  flows(result.non_conforming_flows_in_measure);
+  out << '}';
   return out.str();
 }
 

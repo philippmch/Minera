@@ -117,5 +117,107 @@ int main() {
   assert(ocdfg_json.find("event_objects") != std::string::npos);
   assert(ocdfg_json.find("performance_computed") != std::string::npos);
   assert(!minera::discover_ocdfg_classic(log, false).performance_computed);
+
+  const minera::EtotGraph etot_norm{
+      {"Create", "Ship"}, {"order"}, {{"Create", "order", 10}, {"Ship", "order", 5}}};
+  const minera::EtotGraph etot_equal{
+      {"Create", "Ship"}, {"order"}, {{"Create", "order", 11}, {"Ship", "order", 5}}};
+  const auto etot_at_threshold = minera::compare_etot(etot_equal, etot_norm);
+  assert(etot_at_threshold.missing_edges.empty());
+  assert(etot_at_threshold.relative_frequency_delta.size() == 2);
+  assert(etot_at_threshold.fitness == 1.0);
+  const minera::EtotGraph etot_extra{
+      {"Create", "Ship", "Cancel"}, {"order"},
+      {{"Create", "order", 10}, {"Ship", "order", 5}, {"Cancel", "order", 1}}};
+  assert(minera::compare_etot(etot_extra, etot_norm).fitness == 1.0);
+  const minera::EtotGraph etot_missing{
+      {"Create"}, {"order"}, {{"Create", "order", 10}}};
+  const auto etot_bad = minera::compare_etot(etot_missing, etot_norm);
+  assert(etot_bad.missing_activities.size() == 1 &&
+         etot_bad.missing_edges.size() == 1 && etot_bad.fitness < 1.0);
+  assert(minera::etot_conformance_json(etot_bad).find("relative_frequency_delta") !=
+         std::string::npos);
+
+  const minera::OtgGraph otg_norm{
+      {"order", "item"},
+      {{"order", "object_interaction", "item", 10},
+       {"order", "object_descendants", "item", 5}}};
+  const minera::OtgGraph otg_equal{
+      {"order", "item"},
+      {{"order", "object_interaction", "item", 12},
+       {"order", "object_descendants", "item", 5}}};
+  minera::OtgConformanceOptions otg_options;
+  otg_options.theta_by_relation["object_interaction"] = 0.1;
+  const auto otg_bad = minera::compare_otg(otg_equal, otg_norm, otg_options);
+  assert(otg_bad.non_conforming_edges.size() == 1);
+  assert(std::get<1>(otg_bad.non_conforming_edges.begin()->first) ==
+         "object_interaction");
+  assert(otg_bad.fitness < 1.0);
+  assert(minera::otg_conformance_json(otg_bad).find("non_conforming_edges") !=
+         std::string::npos);
+
+  minera::OcdfgGraph ocdfg_norm;
+  ocdfg_norm.activities = {"Create", "Ship"};
+  ocdfg_norm.object_types = {"order", "item"};
+  ocdfg_norm.activities_indep["Create"].events = {"e1", "e2"};
+  ocdfg_norm.activities_indep["Ship"].events = {"e3"};
+  ocdfg_norm.edges["order"][{"Create", "Ship"}].event_couples = {
+      {"e1", "e3"}};
+  ocdfg_norm.edges["item"][{"Create", "Ship"}].event_couples = {
+      {"e2", "e4"}};
+  minera::OcdfgGraph ocdfg_real = ocdfg_norm;
+  ocdfg_real.edges["item"].clear();
+  ocdfg_real.activities = {"Create"};
+  ocdfg_real.activities_indep["Ship"].events.clear();
+  const auto ocdfg_bad = minera::compare_ocdfg(ocdfg_real, ocdfg_norm);
+  assert(ocdfg_bad.missing_activities.size() == 1 &&
+         ocdfg_bad.missing_flows.size() == 0);
+  assert(ocdfg_bad.flow_measure_differences.at({"Create", "Ship"}) == 1);
+  assert(ocdfg_bad.fitness < 1.0);
+  minera::OcdfgConformanceOptions ocdfg_threshold;
+  ocdfg_threshold.theta_activity = 1.0;
+  ocdfg_threshold.theta_flow = 1.0;
+  const auto ocdfg_at_threshold =
+      minera::compare_ocdfg(ocdfg_real, ocdfg_norm, ocdfg_threshold);
+  assert(ocdfg_at_threshold.non_conforming_activities_in_measure.empty());
+  assert(ocdfg_at_threshold.non_conforming_flows_in_measure.empty());
+  assert(minera::ocdfg_conformance_json(ocdfg_bad).find("activity_measure_differences") !=
+         std::string::npos);
+
+  minera::OcpnDiscoveryOptions ocpn_options;
+  ocpn_options.double_arc_threshold = 0.8;
+  const auto ocpn = minera::discover_ocpn(log, ocpn_options);
+  assert(ocpn.object_types.size() == 2 && ocpn.petri_nets.size() == 2);
+  assert(ocpn.petri_nets.at("order").activities().size() >= 1);
+  assert(ocpn.double_arcs_on_activity.at("order").at("Create") == false);
+  assert(minera::serialize_ocpn_json(ocpn).find("double_arcs_on_activity") !=
+         std::string::npos);
+  ocpn_options.variant = minera::OcpnInductiveVariant::kDfg;
+  const auto ocpn_dfg = minera::discover_ocpn(log, ocpn_options);
+  assert(ocpn_dfg.petri_nets.size() == 2);
+
+  const auto tuple_description = minera::describe_ocel_tuples(log);
+  assert(tuple_description.includes_timestamps);
+  assert(tuple_description.events.size() == 2 && tuple_description.objects.size() == 2);
+  assert(tuple_description.events[0].activity == "Create");
+  assert(tuple_description.events[0].related_objects.size() == 1 &&
+         tuple_description.events[0].related_objects[0] == "o1");
+  assert(tuple_description.events[0].timestamp == "2024-01-01T00:00:00Z");
+  assert(tuple_description.objects[0].id == "o1" &&
+         tuple_description.objects[0].has_lifecycle &&
+         tuple_description.objects[0].lifecycle_start == "2024-01-01T00:00:00Z" &&
+         tuple_description.objects[0].lifecycle_end == "2024-01-02T00:00:00Z" &&
+         tuple_description.objects[0].lifecycle_seconds == 86400.0);
+  assert(minera::describe_ocel_text(log).find("events:") != std::string::npos);
+  const auto tuple_json = minera::serialize_ocel_description_json(tuple_description);
+  assert(tuple_json.find("includes_timestamps") != std::string::npos &&
+         tuple_json.find("lifecycle_seconds") != std::string::npos);
+  minera::OcelDescriptionOptions no_timestamps;
+  no_timestamps.include_timestamps = false;
+  const auto without_timestamps = minera::describe_ocel_tuples(log, no_timestamps);
+  assert(!without_timestamps.includes_timestamps &&
+         without_timestamps.events[0].timestamp.empty());
+  assert(minera::serialize_ocel_description_json(without_timestamps).find(
+             "\"timestamp\"") == std::string::npos);
   return 0;
 }
