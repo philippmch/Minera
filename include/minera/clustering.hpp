@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -58,5 +59,49 @@ struct TraceAttributeClusteringResult {
 
 [[nodiscard]] std::string trace_attribute_clustering_json(
     const TraceAttributeClusteringResult& result);
+
+// Deterministic native equivalent of profile-based trace clustering. The
+// default representation contains activity and adjacent-activity one-hot
+// features; explicit attribute lists add trace/event profile dimensions.
+struct ProfileClusteringOptions {
+  std::size_t cluster_count = 2;
+  std::size_t max_iterations = 100;
+  std::size_t max_traces = 100000;
+  std::size_t max_features = 10000;
+  std::uint64_t seed = 0;
+  double tolerance = 1e-6;
+  bool include_activity_representation = true;
+  bool include_succession_representation = true;
+  std::vector<std::string> trace_string_attributes;
+  std::vector<std::string> event_string_attributes;
+  std::vector<std::string> trace_numeric_attributes;
+  std::vector<std::string> event_numeric_attributes;
+  std::vector<std::string> feature_names;
+};
+
+struct ProfileClusteringDiagnostics {
+  bool computed = false;
+  bool converged = false;
+  std::size_t trace_count = 0;
+  std::size_t feature_count = 0;
+  std::size_t cluster_count = 0;
+  std::size_t iterations = 0;
+  std::string message;
+};
+
+struct ProfileClusteringResult {
+  std::vector<int> labels;
+  std::vector<std::vector<std::size_t>> clusters;
+  std::vector<std::vector<double>> centroids;
+  std::vector<std::string> feature_names;
+  double inertia = 0.0;
+  ProfileClusteringDiagnostics diagnostics;
+};
+
+[[nodiscard]] ProfileClusteringResult discover_profile_clustering(
+    const EventLog& log, const ProfileClusteringOptions& options = {});
+
+[[nodiscard]] std::string profile_clustering_json(
+    const ProfileClusteringResult& result);
 
 }  // namespace minera

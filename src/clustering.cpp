@@ -10,6 +10,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 namespace minera {
@@ -306,6 +307,391 @@ std::string trace_attribute_clustering_json(const TraceAttributeClusteringResult
       << ",\"group_count\":" << r.diagnostics.group_count
       << ",\"node_count\":" << r.diagnostics.node_count
       << ",\"message\":" << json_quote(r.diagnostics.message) << "}}";
+  return out.str();
+}
+
+namespace {
+
+const EventAttribute* profile_event_attribute(const Event& event,
+                                              const std::string& key) {
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == key) return &attribute;
+  return nullptr;
+}
+
+const EventAttribute* profile_trace_attribute(const Trace& trace,
+                                              const std::string& key) {
+  for (const auto& attribute : trace.attributes)
+    if (attribute.key == key) return &attribute;
+  return nullptr;
+}
+
+bool profile_numeric_kind(AttributeKind kind) {
+  return kind == AttributeKind::kInt || kind == AttributeKind::kFloat ||
+         kind == AttributeKind::kBoolean;
+}
+
+double profile_number(const std::string& value, const std::string& key) {
+  try {
+    std::size_t end = 0;
+    const double number = std::stod(value, &end);
+    if (end != value.size() || !std::isfinite(number)) throw std::invalid_argument("bad");
+    return number;
+  } catch (...) {
+    if (value == "true" || value == "TRUE" || value == "True") return 1.0;
+    if (value == "false" || value == "FALSE" || value == "False") return 0.0;
+    throw std::invalid_argument("profile clustering: invalid numeric attribute " + key);
+  }
+}
+
+void validate_profile_names(const std::vector<std::string>& names,
+                            const char* kind) {
+  std::set<std::string> seen;
+  for (const auto& name : names) {
+    if (name.empty() || !seen.insert(name).second)
+      throw std::invalid_argument(std::string("profile clustering: invalid ") + kind);
+  }
+}
+
+struct ProfileRows {
+  std::vector<std::string> names;
+  std::vector<std::vector<double>> rows;
+};
+
+ProfileRows profile_rows(const EventLog& log,
+                         const ProfileClusteringOptions& options) {
+  std::set<std::string> trace_keys, event_keys;
+  std::map<std::string, AttributeKind> trace_kinds, event_kinds;
+  for (const auto& trace : log.traces) {
+    for (const auto& attribute : trace.attributes) {
+      trace_keys.insert(attribute.key);
+      trace_kinds.emplace(attribute.key, attribute.kind);
+    }
+    for (const auto& event : trace.events) {
+      for (const auto& attribute : event.attributes) {
+        event_keys.insert(attribute.key);
+        event_kinds.emplace(attribute.key, attribute.kind);
+      }
+    }
+  }
+  const auto complete_trace = [&](const std::string& key) {
+    return std::all_of(log.traces.begin(), log.traces.end(), [&](const auto& trace) {
+      return profile_trace_attribute(trace, key) != nullptr;
+    });
+  };
+  const auto complete_event = [&](const std::string& key) {
+    return std::all_of(log.traces.begin(), log.traces.end(), [&](const auto& trace) {
+      return std::any_of(trace.events.begin(), trace.events.end(), [&](const auto& event) {
+        return profile_event_attribute(event, key) != nullptr;
+      });
+    });
+  };
+  const auto distinct_trace = [&](const std::string& key) {
+    std::set<std::string> values;
+    for (const auto& trace : log.traces) {
+      const auto* attribute = profile_trace_attribute(trace, key);
+      values.insert(attribute ? attribute->value : "UNDEFINED");
+    }
+    return values;
+  };
+  const auto distinct_event = [&](const std::string& key) {
+    std::set<std::string> values;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        if (const auto* attribute = profile_event_attribute(event, key))
+          values.insert(attribute->value);
+    return values;
+  };
+
+  auto trace_strings = options.trace_string_attributes;
+  auto event_strings = options.event_string_attributes;
+  auto trace_numbers = options.trace_numeric_attributes;
+  auto event_numbers = options.event_numeric_attributes;
+  if (trace_strings.empty() && trace_numbers.empty()) {
+    for (const auto& key : trace_keys) {
+      if (!complete_trace(key)) continue;
+      const auto kind = trace_kinds.at(key);
+      if (!profile_numeric_kind(kind) && distinct_trace(key).size() < 12.5)
+        trace_strings.push_back(key);
+    }
+    for (const auto& key : trace_keys) {
+      if (!complete_trace(key)) continue;
+      if (profile_numeric_kind(trace_kinds.at(key))) trace_numbers.push_back(key);
+    }
+  }
+  if (event_strings.empty() && event_numbers.empty()) {
+    for (const auto& key : event_keys) {
+      if (!complete_event(key)) continue;
+      const auto kind = event_kinds.at(key);
+      if (!profile_numeric_kind(kind) && distinct_event(key).size() < 12.5)
+        event_strings.push_back(key);
+    }
+    for (const auto& key : event_keys) {
+      if (!complete_event(key)) continue;
+      if (profile_numeric_kind(event_kinds.at(key))) event_numbers.push_back(key);
+    }
+  }
+  std::sort(trace_strings.begin(), trace_strings.end());
+  std::sort(event_strings.begin(), event_strings.end());
+  std::sort(trace_numbers.begin(), trace_numbers.end());
+  std::sort(event_numbers.begin(), event_numbers.end());
+  validate_profile_names(trace_strings, "trace string attributes");
+  validate_profile_names(event_strings, "event string attributes");
+  validate_profile_names(trace_numbers, "trace numeric attributes");
+  validate_profile_names(event_numbers, "event numeric attributes");
+
+  std::set<std::string> names;
+  if (options.include_activity_representation) {
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        names.insert("event:concept:name@" + event.activity);
+    if (std::any_of(log.traces.begin(), log.traces.end(),
+                    [](const auto& trace) { return trace.events.empty(); }))
+      names.insert("event:concept:name@UNDEFINED");
+  }
+  for (const auto& key : trace_strings)
+    for (const auto& value : distinct_trace(key))
+      names.insert("trace:" + key + "@" + value);
+  for (const auto& key : event_strings) {
+    for (const auto& value : distinct_event(key))
+      names.insert("event:" + key + "@" + value);
+    if (std::any_of(log.traces.begin(), log.traces.end(), [&](const auto& trace) {
+          return std::none_of(trace.events.begin(), trace.events.end(), [&](const auto& event) {
+            return profile_event_attribute(event, key) != nullptr;
+          });
+        }))
+      names.insert("event:" + key + "@UNDEFINED");
+  }
+  std::vector<std::string> ordered_names;
+  for (const auto& key : trace_strings)
+    for (const auto& value : distinct_trace(key))
+      ordered_names.push_back("trace:" + key + "@" + value);
+  for (const auto& key : event_strings)
+    for (const auto& value : distinct_event(key))
+      ordered_names.push_back("event:" + key + "@" + value);
+  for (const auto& key : trace_numbers) ordered_names.push_back("trace:" + key);
+  for (const auto& key : event_numbers) ordered_names.push_back("event:" + key);
+  if (options.include_activity_representation) {
+    std::set<std::string> activity_names;
+    for (const auto& name : names)
+      if (name.rfind("event:concept:name@", 0) == 0) activity_names.insert(name);
+    const auto numeric_begin = ordered_names.begin() +
+                               static_cast<std::ptrdiff_t>(
+                                   ordered_names.size() - trace_numbers.size() -
+                                   event_numbers.size());
+    ordered_names.insert(numeric_begin, activity_names.begin(), activity_names.end());
+  }
+  if (options.include_succession_representation) {
+    std::set<std::string> successions;
+    for (const auto& trace : log.traces) {
+      if (trace.events.size() < 2) {
+        successions.insert("succession:concept:name@UNDEFINED");
+        continue;
+      }
+      for (std::size_t i = 1; i < trace.events.size(); ++i)
+        successions.insert("succession:concept:name@" + trace.events[i - 1].activity +
+                           "#" + trace.events[i].activity);
+    }
+    ordered_names.insert(ordered_names.end(), successions.begin(), successions.end());
+  }
+  if (!options.feature_names.empty()) {
+    validate_profile_names(options.feature_names, "feature names");
+    ordered_names = options.feature_names;
+  }
+  if (ordered_names.size() > options.max_features)
+    throw std::invalid_argument("profile clustering: feature bound exceeded");
+  std::unordered_map<std::string, std::size_t> index;
+  for (std::size_t i = 0; i < ordered_names.size(); ++i) index[ordered_names[i]] = i;
+  ProfileRows result;
+  result.names = ordered_names;
+  result.rows.reserve(log.traces.size());
+  const auto set = [&](std::vector<double>& row, const std::string& name, double value) {
+    const auto it = index.find(name);
+    if (it != index.end()) row[it->second] = value;
+  };
+  for (const auto& trace : log.traces) {
+    std::vector<double> row(ordered_names.size(), 0.0);
+    for (const auto& key : trace_strings) {
+      const auto* attribute = profile_trace_attribute(trace, key);
+      set(row, "trace:" + key + "@" + (attribute ? attribute->value : "UNDEFINED"), 1.0);
+    }
+    for (const auto& key : event_strings) {
+      bool found = false;
+      for (const auto& event : trace.events)
+        if (const auto* attribute = profile_event_attribute(event, key)) {
+          set(row, "event:" + key + "@" + attribute->value, 1.0);
+          found = true;
+        }
+      if (!found) set(row, "event:" + key + "@UNDEFINED", 1.0);
+    }
+    for (const auto& key : trace_numbers) {
+      const auto* attribute = profile_trace_attribute(trace, key);
+      if (!attribute) throw std::invalid_argument("profile clustering: missing numeric trace attribute " + key);
+      set(row, "trace:" + key, profile_number(attribute->value, key));
+    }
+    for (const auto& key : event_numbers) {
+      const EventAttribute* last = nullptr;
+      for (const auto& event : trace.events)
+        if (const auto* attribute = profile_event_attribute(event, key)) last = attribute;
+      if (!last) throw std::invalid_argument("profile clustering: missing numeric event attribute " + key);
+      set(row, "event:" + key, profile_number(last->value, key));
+    }
+    if (options.include_activity_representation) {
+      if (trace.events.empty()) set(row, "event:concept:name@UNDEFINED", 1.0);
+      for (const auto& event : trace.events)
+        set(row, "event:concept:name@" + event.activity, 1.0);
+    }
+    if (options.include_succession_representation) {
+      if (trace.events.size() < 2) set(row, "succession:concept:name@UNDEFINED", 1.0);
+      for (std::size_t i = 1; i < trace.events.size(); ++i)
+        set(row, "succession:concept:name@" + trace.events[i - 1].activity +
+                     "#" + trace.events[i].activity, 1.0);
+    }
+    result.rows.push_back(std::move(row));
+  }
+  return result;
+}
+
+double profile_squared_distance(const std::vector<double>& left,
+                                const std::vector<double>& right) {
+  double result = 0.0;
+  for (std::size_t i = 0; i < left.size(); ++i) {
+    const double difference = left[i] - right[i];
+    result += difference * difference;
+  }
+  return result;
+}
+
+}  // namespace
+
+ProfileClusteringResult discover_profile_clustering(
+    const EventLog& log, const ProfileClusteringOptions& options) {
+  if (options.cluster_count == 0 || options.max_iterations == 0 ||
+      options.max_traces == 0 || options.max_features == 0)
+    throw std::invalid_argument("profile clustering: bounds must be positive");
+  if (!std::isfinite(options.tolerance) || options.tolerance < 0.0)
+    throw std::invalid_argument("profile clustering: tolerance must be finite and non-negative");
+  if (log.traces.size() > options.max_traces)
+    throw std::invalid_argument("profile clustering: trace bound exceeded");
+  ProfileClusteringResult result;
+  result.diagnostics.trace_count = log.traces.size();
+  if (log.traces.empty()) {
+    result.diagnostics.computed = true;
+    result.diagnostics.message = "empty event log";
+    return result;
+  }
+  if (options.cluster_count > log.traces.size())
+    throw std::invalid_argument("profile clustering: cluster_count exceeds trace count");
+  const auto features = profile_rows(log, options);
+  result.feature_names = features.names;
+  result.diagnostics.feature_count = features.names.size();
+  result.diagnostics.cluster_count = options.cluster_count;
+  if (features.names.empty())
+    throw std::invalid_argument("profile clustering: feature representation is empty");
+  const std::size_t k = options.cluster_count;
+  result.centroids.assign(k, std::vector<double>(features.names.size(), 0.0));
+  const std::size_t first = static_cast<std::size_t>(options.seed % features.rows.size());
+  std::vector<std::size_t> centers(k);
+  centers[0] = first;
+  for (std::size_t c = 1; c < k; ++c) {
+    double best_distance = -1.0;
+    std::size_t best_index = 0;
+    for (std::size_t row = 0; row < features.rows.size(); ++row) {
+      double nearest = std::numeric_limits<double>::infinity();
+      for (std::size_t previous = 0; previous < c; ++previous)
+        nearest = std::min(nearest, profile_squared_distance(features.rows[row], features.rows[centers[previous]]));
+      if (nearest > best_distance + 1e-12 ||
+          (std::abs(nearest - best_distance) <= 1e-12 && row < best_index)) {
+        best_distance = nearest;
+        best_index = row;
+      }
+    }
+    centers[c] = best_index;
+  }
+  for (std::size_t c = 0; c < k; ++c) result.centroids[c] = features.rows[centers[c]];
+  result.labels.assign(features.rows.size(), 0);
+  for (std::size_t iteration = 0; iteration < options.max_iterations; ++iteration) {
+    bool labels_changed = false;
+    for (std::size_t row = 0; row < features.rows.size(); ++row) {
+      int best = 0;
+      double distance = profile_squared_distance(features.rows[row], result.centroids[0]);
+      for (std::size_t c = 1; c < k; ++c) {
+        const double candidate = profile_squared_distance(features.rows[row], result.centroids[c]);
+        if (candidate < distance - 1e-12) {
+          distance = candidate;
+          best = static_cast<int>(c);
+        }
+      }
+      if (result.labels[row] != best) labels_changed = true;
+      result.labels[row] = best;
+    }
+    std::vector<std::vector<double>> sums(k, std::vector<double>(features.names.size(), 0.0));
+    std::vector<std::size_t> counts(k, 0);
+    for (std::size_t row = 0; row < features.rows.size(); ++row) {
+      const std::size_t cluster = static_cast<std::size_t>(result.labels[row]);
+      ++counts[cluster];
+      for (std::size_t feature = 0; feature < features.names.size(); ++feature)
+        sums[cluster][feature] += features.rows[row][feature];
+    }
+    double shift = 0.0;
+    for (std::size_t c = 0; c < k; ++c) {
+      if (counts[c] == 0) continue;
+      for (std::size_t feature = 0; feature < features.names.size(); ++feature)
+        sums[c][feature] /= static_cast<double>(counts[c]);
+      shift = std::max(shift, profile_squared_distance(result.centroids[c], sums[c]));
+    }
+    result.centroids = std::move(sums);
+    result.diagnostics.iterations = iteration + 1;
+    if (!labels_changed || shift <= options.tolerance * options.tolerance) {
+      result.diagnostics.converged = true;
+      break;
+    }
+  }
+  result.clusters.clear();
+  result.clusters.resize(k);
+  for (std::size_t row = 0; row < result.labels.size(); ++row) {
+    result.clusters[static_cast<std::size_t>(result.labels[row])].push_back(row);
+  }
+  result.inertia = 0.0;
+  for (std::size_t row = 0; row < features.rows.size(); ++row)
+    result.inertia += profile_squared_distance(
+        features.rows[row], result.centroids[static_cast<std::size_t>(result.labels[row])]);
+  result.diagnostics.computed = true;
+  result.diagnostics.message = result.diagnostics.converged ? "converged" : "iteration limit";
+  return result;
+}
+
+std::string profile_clustering_json(const ProfileClusteringResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PROFILE_CLUSTERING\",\"labels\":[";
+  for (std::size_t i = 0; i < result.labels.size(); ++i) {
+    if (i != 0) out << ',';
+    out << result.labels[i];
+  }
+  out << "],\"clusters\":[";
+  for (std::size_t cluster = 0; cluster < result.clusters.size(); ++cluster) {
+    if (cluster != 0) out << ',';
+    out << '[';
+    for (std::size_t i = 0; i < result.clusters[cluster].size(); ++i) {
+      if (i != 0) out << ',';
+      out << result.clusters[cluster][i];
+    }
+    out << ']';
+  }
+  out << "],\"feature_names\":[";
+  for (std::size_t i = 0; i < result.feature_names.size(); ++i) {
+    if (i != 0) out << ',';
+    out << json_quote(result.feature_names[i]);
+  }
+  out << "],\"inertia\":" << std::setprecision(17) << result.inertia
+      << ",\"diagnostics\":{\"computed\":"
+      << (result.diagnostics.computed ? "true" : "false")
+      << ",\"converged\":" << (result.diagnostics.converged ? "true" : "false")
+      << ",\"trace_count\":" << result.diagnostics.trace_count
+      << ",\"feature_count\":" << result.diagnostics.feature_count
+      << ",\"cluster_count\":" << result.diagnostics.cluster_count
+      << ",\"iterations\":" << result.diagnostics.iterations
+      << ",\"message\":" << json_quote(result.diagnostics.message) << "}}";
   return out.str();
 }
 } // namespace minera

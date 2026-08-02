@@ -9,6 +9,8 @@
 #include <variant>
 #include <vector>
 
+#include "minera/petri_net.hpp"
+
 namespace minera {
 
 using OcelValue = std::variant<std::nullptr_t, bool, std::int64_t, double,
@@ -135,5 +137,129 @@ struct OcdfgGraph {
 OcdfgGraph discover_ocdfg_classic(const Ocel& log,
                                   bool compute_edges_performance = true);
 std::string serialize_ocdfg_json(const OcdfgGraph& graph);
+
+struct EtotConformanceOptions {
+  double alpha = 1.0;
+  double beta = 1.0;
+  double gamma = 1.0;
+  double theta_relative = 0.1;
+};
+
+struct EtotConformanceResult {
+  double fitness = 1.0;
+  std::vector<std::string> missing_activities;
+  std::vector<std::string> additional_activities;
+  std::vector<std::string> missing_object_types;
+  std::vector<std::string> additional_object_types;
+  std::vector<std::pair<std::string, std::string>> missing_edges;
+  std::vector<std::pair<std::string, std::string>> additional_edges;
+  std::map<std::pair<std::string, std::string>, double> relative_frequency_delta;
+};
+
+EtotConformanceResult compare_etot(const EtotGraph& real,
+                                   const EtotGraph& normative,
+                                   const EtotConformanceOptions& options = {});
+std::string etot_conformance_json(const EtotConformanceResult& result);
+
+struct OtgConformanceOptions {
+  double alpha = 1.0;
+  double beta = 1.0;
+  double gamma = 1.0;
+  double theta = 0.2;
+  std::map<std::string, double> theta_by_relation;
+};
+
+struct OtgConformanceResult {
+  double fitness = 1.0;
+  std::vector<std::string> missing_object_types;
+  std::vector<std::string> additional_object_types;
+  std::vector<std::tuple<std::string, std::string, std::string>> missing_edges;
+  std::vector<std::tuple<std::string, std::string, std::string>> additional_edges;
+  std::map<std::tuple<std::string, std::string, std::string>, double>
+      non_conforming_edges;
+};
+
+OtgConformanceResult compare_otg(const OtgGraph& real,
+                                  const OtgGraph& normative,
+                                  const OtgConformanceOptions& options = {});
+std::string otg_conformance_json(const OtgConformanceResult& result);
+
+struct OcdfgConformanceOptions {
+  double theta_activity = 0.0;
+  double theta_flow = 0.0;
+  double alpha = 1.0;
+  double beta = 1.0;
+  double gamma = 1.0;
+  double delta = 1.0;
+};
+
+struct OcdfgConformanceResult {
+  double fitness = 1.0;
+  std::vector<std::string> missing_activities;
+  std::vector<std::string> additional_activities;
+  std::vector<std::pair<std::string, std::string>> missing_flows;
+  std::vector<std::pair<std::string, std::string>> additional_flows;
+  std::map<std::string, std::int64_t> activity_measure_differences;
+  std::vector<std::string> non_conforming_activities_in_measure;
+  std::map<std::pair<std::string, std::string>, std::int64_t>
+      flow_measure_differences;
+  std::vector<std::pair<std::string, std::string>>
+      non_conforming_flows_in_measure;
+};
+
+OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
+                                     const OcdfgGraph& normative,
+                                     const OcdfgConformanceOptions& options = {});
+std::string ocdfg_conformance_json(const OcdfgConformanceResult& result);
+
+enum class OcpnInductiveVariant { kLog, kDfg };
+
+struct OcpnDiscoveryOptions {
+  double double_arc_threshold = 0.8;
+  double noise_threshold = 0.0;
+  OcpnInductiveVariant variant = OcpnInductiveVariant::kLog;
+};
+
+struct OcpnGraph {
+  std::vector<std::string> activities;
+  std::vector<std::string> object_types;
+  std::map<std::string, PetriNet> petri_nets;
+  std::map<std::string, std::map<std::string, bool>> double_arcs_on_activity;
+};
+
+OcpnGraph discover_ocpn(const Ocel& log,
+                        const OcpnDiscoveryOptions& options = {});
+std::string serialize_ocpn_json(const OcpnGraph& graph);
+
+struct OcelDescriptionOptions {
+  bool include_timestamps = true;
+};
+
+struct OcelTupleEventDescription {
+  std::string activity;
+  std::vector<std::string> related_objects;
+  std::string timestamp;
+};
+
+struct OcelTupleObjectDescription {
+  std::string id;
+  std::string type;
+  std::string lifecycle_start;
+  std::string lifecycle_end;
+  double lifecycle_seconds = 0.0;
+  bool has_lifecycle = false;
+};
+
+struct OcelTupleDescription {
+  std::vector<OcelTupleEventDescription> events;
+  std::vector<OcelTupleObjectDescription> objects;
+  bool includes_timestamps = true;
+};
+
+OcelTupleDescription describe_ocel_tuples(
+    const Ocel& log, const OcelDescriptionOptions& options = {});
+std::string describe_ocel_text(const Ocel& log,
+                               const OcelDescriptionOptions& options = {});
+std::string serialize_ocel_description_json(const OcelTupleDescription& description);
 
 }  // namespace minera
