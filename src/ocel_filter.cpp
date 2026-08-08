@@ -1,8 +1,8 @@
 #include "minera/ocel_filter.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -360,6 +360,95 @@ Ocel filter_ocel_activity_type_matching(
                      event_it->second) != allowed_it->second.end();
   });
   return propagate_relation_filter(std::move(filtered));
+}
+
+std::map<std::string, std::map<std::string, std::size_t>>
+ocel_event_object_type_counts(const Ocel& log) {
+  std::unordered_map<std::string, std::string> object_types;
+  object_types.reserve(log.objects.size());
+  for (const auto& object : log.objects) {
+    object_types.emplace(object.id, object.type);
+  }
+
+  std::map<std::string, std::map<std::string, std::size_t>> result;
+  for (const auto& relation : log.relations) {
+    const auto object_it = object_types.find(relation.object_id);
+    if (object_it == object_types.end()) continue;
+    ++result[relation.event_id][object_it->second];
+  }
+  return result;
+}
+
+Ocel filter_ocel_events_object_type_counts(
+    const Ocel& log,
+    const std::map<std::string, std::size_t>& minimum_counts) {
+  const auto counts = ocel_event_object_type_counts(log);
+  IdSet selected_events;
+  for (const auto& [event_id, by_type] : counts) {
+    bool keep = true;
+    for (const auto& [object_type, minimum] : minimum_counts) {
+      const auto type_it = by_type.find(object_type);
+      if (type_it == by_type.end() || type_it->second < minimum) {
+        keep = false;
+        break;
+      }
+    }
+    if (keep) selected_events.insert(event_id);
+  }
+
+  Ocel filtered = log;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    return selected_events.count(event.id) != 0;
+  });
+  return propagate_event_filter(std::move(filtered));
+}
+
+namespace {
+
+Ocel filter_ocel_lifecycle_events_per_object_type(const Ocel& log,
+                                                   std::string_view object_type,
+                                                   bool first) {
+  std::unordered_map<std::string, std::string> object_types;
+  object_types.reserve(log.objects.size());
+  for (const auto& object : log.objects) {
+    object_types.emplace(object.id, object.type);
+  }
+
+  std::unordered_map<std::string, std::string> selected_by_object;
+  for (const auto& relation : log.relations) {
+    const auto type_it = object_types.find(relation.object_id);
+    if (type_it == object_types.end() || type_it->second != object_type) {
+      continue;
+    }
+    if (first) {
+      selected_by_object.emplace(relation.object_id, relation.event_id);
+    } else {
+      selected_by_object[relation.object_id] = relation.event_id;
+    }
+  }
+
+  IdSet selected_events;
+  for (const auto& [object_id, event_id] : selected_by_object) {
+    (void)object_id;
+    selected_events.insert(event_id);
+  }
+  Ocel filtered = log;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    return selected_events.count(event.id) != 0;
+  });
+  return propagate_event_filter(std::move(filtered));
+}
+
+}  // namespace
+
+Ocel filter_ocel_start_events_per_object_type(const Ocel& log,
+                                              std::string_view object_type) {
+  return filter_ocel_lifecycle_events_per_object_type(log, object_type, true);
+}
+
+Ocel filter_ocel_end_events_per_object_type(const Ocel& log,
+                                            std::string_view object_type) {
+  return filter_ocel_lifecycle_events_per_object_type(log, object_type, false);
 }
 
 }  // namespace minera

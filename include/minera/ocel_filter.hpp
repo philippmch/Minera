@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <string>
 #include <string_view>
@@ -37,5 +38,23 @@ namespace minera {
 [[nodiscard]] Ocel filter_ocel_activity_type_matching(
     const Ocel& log,
     const std::map<std::string, std::vector<std::string>>& allowed);
+
+// Count event-object links by object type. Events with no valid relation are
+// absent from the result; nested maps are deterministic.
+[[nodiscard]] std::map<std::string, std::map<std::string, std::size_t>>
+ocel_event_object_type_counts(const Ocel& log);
+
+// Keep events related to at least the requested number of objects of every
+// listed type, then propagate the selection to objects and relations.
+[[nodiscard]] Ocel filter_ocel_events_object_type_counts(
+    const Ocel& log,
+    const std::map<std::string, std::size_t>& minimum_counts);
+
+// Keep the first/last relation event for each object of the selected type.
+[[nodiscard]] Ocel filter_ocel_start_events_per_object_type(
+    const Ocel& log, std::string_view object_type);
+
+[[nodiscard]] Ocel filter_ocel_end_events_per_object_type(
+    const Ocel& log, std::string_view object_type);
 
 }  // namespace minera
