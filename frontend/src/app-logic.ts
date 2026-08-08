@@ -141,6 +141,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.reworkActivity ||
       filters.attributeKey ||
       filters.caseAttributeKey ||
+      filters.ltlVariant && filters.ltlAttributeValues?.length ||
       (filters.betweenStart && filters.betweenEnd),
   );
 }

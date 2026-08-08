@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,6 +18,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/powl_discovery.hpp"
 #include "minera/transition_system.hpp"
@@ -106,6 +108,9 @@ struct MineParams {
   PerformanceSpectrumOptions spectrum;
   bool batches = false;
   BatchDiscoveryOptions batch_options;
+  // Optional bounded temporal predicate, applied after traditional filters.
+  std::optional<LtlFilterOptions> ltl;
+  bool ltl_enabled = false;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;

@@ -50,6 +50,7 @@
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
@@ -356,6 +357,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                    : minera::import_csv_event_log(input, params.csv);
     if (params.filter.any()) {
       log = minera::filter_event_log(log, params.filter);
+    }
+    if (params.ltl_enabled && params.ltl) {
+      log = minera::filter_ltl_event_log(log, *params.ltl);
     }
     auto graph = minera::discover_directly_follows_graph(log);
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;

@@ -88,6 +88,47 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.batches);
   assert(params.batch_options.merge_distance_seconds == 900.0);
   assert(params.batch_options.min_batch_size == 2);
+  assert(!params.ltl_enabled && !params.ltl);
+}
+
+void ltl_filter_params_contract() {
+  const auto params = minera::parse_mine_params(fields({
+      {"ltl_variant", "eventually_follows"},
+      {"ltl_attribute_key", "phase"},
+      {"ltl_attribute_values", "A, B, C"},
+      {"ltl_positive", "false"},
+      {"ltl_enable_timestamp", "true"},
+      {"ltl_timestamp_diff_boundaries", "0:2,3.5:9"},
+      {"ltl_resource_key", "performer"},
+  }));
+  assert(params.ltl_enabled && params.ltl);
+  assert(params.ltl->variant == minera::LtlFilterVariant::kEventuallyFollows);
+  assert(params.ltl->attribute_key == "phase");
+  assert((params.ltl->attribute_values ==
+          std::vector<std::string>{"A", "B", "C"}));
+  assert(!params.ltl->positive && params.ltl->enable_timestamp);
+  assert(params.ltl->timestamp_diff_boundaries.size() == 2);
+  assert(params.ltl->timestamp_diff_boundaries[1].first == 3.5);
+  assert(params.ltl->resource_key == "performer");
+
+  for (const auto& item : {
+           std::pair{"ltl_variant", "unknown"},
+           std::pair{"ltl_attribute_values", "A,,B"},
+           std::pair{"ltl_timestamp_diff_boundaries", "2:1"},
+           std::pair{"ltl_timestamp_diff_boundaries", "nan:1"},
+       }) {
+    bool threw = false;
+    try { (void)minera::parse_mine_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"ltl_variant", "four_eyes_principle"},
+        {"ltl_attribute_values", "A,B,C"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
 }
 
 void resource_profiles_params_contract() {
@@ -1875,6 +1916,7 @@ int main() {
   split_csv_trims_and_drops_empty_parts();
   error_json_escapes_quotes_and_backslashes();
   parse_mine_params_defaults_when_empty();
+  ltl_filter_params_contract();
   parse_mine_params_maps_correlation_options();
   parse_mine_params_preserves_explicit_empty_correlation_timestamp();
   parse_mine_params_rejects_invalid_correlation_options();

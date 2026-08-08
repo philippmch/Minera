@@ -47,6 +47,7 @@
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
@@ -475,6 +476,14 @@ int usage(const char* program) {
                "                            (conformance id: imported)\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
+               "  --ltl-variant <id>        eventually_follows, a_next_b_next_c,\n"
+               "                            four_eyes_principle, or attr_value_different_persons\n"
+               "  --ltl-attribute-key <name> Event attribute key (default: activity)\n"
+               "  --ltl-attribute-values <a,b,...> Ordered LTL value pattern\n"
+               "  --ltl-positive <bool>     Keep matching traces (default: true)\n"
+               "  --ltl-enable-timestamp <bool> Enable eventually-follows bounds\n"
+               "  --ltl-timestamp-diff-boundaries <min:max,...> Inclusive bounds\n"
+               "  --ltl-resource-key <name> Resource attribute key (default: resource)\n"
                "  --spectrum <a,b,c>        Compute the performance spectrum\n"
                "                            over this activity pattern (2+\n"
                "                            steps): per occurrence, when each\n"
@@ -918,6 +927,7 @@ int main(int argc, char** argv) {
   minera::BatchDiscoveryOptions batch_options;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
+  std::map<std::string, std::string> ltl_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
@@ -1075,6 +1085,24 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--ltl-variant" || arg == "--ltl-attribute-key" ||
+        arg == "--ltl-attribute-values" || arg == "--ltl-positive" ||
+        arg == "--ltl-enable-timestamp" ||
+        arg == "--ltl-timestamp-diff-boundaries" ||
+        arg == "--ltl-resource-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string key =
+          arg == "--ltl-variant" ? "ltl_variant" :
+          arg == "--ltl-attribute-key" ? "ltl_attribute_key" :
+          arg == "--ltl-attribute-values" ? "ltl_attribute_values" :
+          arg == "--ltl-positive" ? "ltl_positive" :
+          arg == "--ltl-enable-timestamp" ? "ltl_enable_timestamp" :
+          arg == "--ltl-timestamp-diff-boundaries"
+              ? "ltl_timestamp_diff_boundaries" : "ltl_resource_key";
+      ltl_fields[key] = value;
+      continue;
+    }
     if (arg == "--ilp-mine") {
       ilp_mine_requested = true;
       continue;
@@ -2908,6 +2936,18 @@ int main(int argc, char** argv) {
     }
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
+    }
+    if (!ltl_fields.empty()) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = ltl_fields.find(std::string(name));
+        return it == ltl_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return ltl_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_mine_params(lookup, present);
+      if (params.ltl_enabled && params.ltl)
+        log = minera::filter_ltl_event_log(log, *params.ltl);
     }
     if (ilp_mine_requested) {
       const auto lookup = [&](std::string_view name) {
