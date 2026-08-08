@@ -116,6 +116,47 @@ int main() {
       minera::filter_ocel_start_events_per_object_type(log, "Missing");
   assert(unknown_endpoint.events.empty() && unknown_endpoint.objects.empty());
 
+  const auto connected_order =
+      minera::filter_ocel_activities_connected_object_type(log, "Order");
+  assert(connected_order.events.size() == 2);
+  assert(connected_order.objects.size() == 2);
+  assert(connected_order.relations.size() == 3);
+
+  const auto level_one = minera::filter_ocel_objects(log, {"o1"});
+  assert(level_one.objects.size() == 1 && level_one.events.size() == 2);
+  const auto level_two = minera::filter_ocel_objects(log, {"o1"}, true, 2);
+  assert(level_two.objects.size() == 2 && level_two.events.size() == 2);
+  assert(level_two.relations.size() == 3);
+  const auto type_level_two =
+      minera::filter_ocel_object_types(log, {"Order"}, true, 2);
+  assert(type_level_two.objects.size() == 2 && type_level_two.relations.size() == 3);
+
+  const auto order_component = minera::filter_ocel_cc_object(log, "o1");
+  assert(order_component.objects.size() == 2);
+  assert(order_component.events.size() == 2);
+  assert(order_component.relations.size() == 3);
+  const auto singleton_component = minera::filter_ocel_cc_object(log, "o3");
+  assert(singleton_component.events.size() == 1 &&
+         singleton_component.objects.size() == 1 &&
+         singleton_component.relations.size() == 1);
+
+  const auto length_two = minera::filter_ocel_cc_length(log, 2, 2);
+  assert(length_two.objects.size() == 2 && length_two.events.size() == 2);
+  const auto length_one = minera::filter_ocel_cc_length(log, 1, 1);
+  assert(length_one.events.empty() && length_one.objects.empty());
+
+  const auto component_order_type =
+      minera::filter_ocel_cc_object_type(log, "Order");
+  assert(component_order_type.objects.size() == 2);
+  const auto component_non_order_type =
+      minera::filter_ocel_cc_object_type(log, "Order", false);
+  assert(component_non_order_type.objects.size() == 2);
+  const auto component_create = minera::filter_ocel_cc_activity(log, "create");
+  assert(component_create.objects.size() == 2);
+  const auto component_inspect =
+      minera::filter_ocel_cc_activity(log, "inspect");
+  assert(component_inspect.events.empty() && component_inspect.objects.empty());
+
   minera::Ocel duplicate = log;
   duplicate.relations.push_back({"e1", "o2", "duplicate"});
   assert(minera::ocel_event_object_type_counts(duplicate).at("e1").at("Item") ==

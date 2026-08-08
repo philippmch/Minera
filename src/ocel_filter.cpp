@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -242,6 +243,91 @@ IdSet string_set(const std::vector<std::string>& values) {
   return {values.begin(), values.end()};
 }
 
+std::map<std::string, std::string> object_types_by_id(const Ocel& log) {
+  std::map<std::string, std::string> result;
+  for (const auto& object : log.objects) result.emplace(object.id, object.type);
+  return result;
+}
+
+std::map<std::string, std::set<std::string>> objects_by_event(
+    const Ocel& log, const std::map<std::string, std::string>& object_types) {
+  std::map<std::string, std::set<std::string>> result;
+  for (const auto& relation : log.relations) {
+    if (object_types.contains(relation.object_id)) {
+      result[relation.event_id].insert(relation.object_id);
+    }
+  }
+  return result;
+}
+
+std::vector<IdSet> object_interaction_components(const Ocel& log) {
+  const auto object_types = object_types_by_id(log);
+  const auto related = objects_by_event(log, object_types);
+  std::map<std::string, std::set<std::string>> adjacency;
+  for (const auto& [event_id, objects] : related) {
+    (void)event_id;
+    for (auto left = objects.begin(); left != objects.end(); ++left) {
+      auto right = left;
+      ++right;
+      for (; right != objects.end(); ++right) {
+        adjacency[*left].insert(*right);
+        adjacency[*right].insert(*left);
+      }
+    }
+  }
+
+  std::vector<IdSet> result;
+  IdSet seen;
+  for (const auto& [start, neighbours] : adjacency) {
+    (void)neighbours;
+    if (seen.count(start)) continue;
+    IdSet component;
+    std::vector<std::string> stack{start};
+    seen.insert(start);
+    while (!stack.empty()) {
+      const auto current = stack.back();
+      stack.pop_back();
+      component.insert(current);
+      const auto adjacency_it = adjacency.find(current);
+      if (adjacency_it == adjacency.end()) continue;
+      for (const auto& next : adjacency_it->second) {
+        if (seen.insert(next).second) stack.push_back(next);
+      }
+    }
+    if (!component.empty()) result.push_back(std::move(component));
+  }
+  return result;
+}
+
+IdSet expand_object_ids(const Ocel& log, IdSet selected, std::size_t level) {
+  if (level <= 1 || selected.empty()) return selected;
+  const auto object_types = object_types_by_id(log);
+  const auto related = objects_by_event(log, object_types);
+  std::map<std::string, std::set<std::string>> adjacency;
+  for (const auto& [event_id, objects] : related) {
+    (void)event_id;
+    for (const auto& left : objects) {
+      auto& neighbours = adjacency[left];
+      neighbours.insert(objects.begin(), objects.end());
+      neighbours.erase(left);
+    }
+  }
+  for (std::size_t depth = 1; depth < level; ++depth) {
+    const IdSet frontier = selected;
+    for (const auto& object_id : frontier) {
+      const auto adjacency_it = adjacency.find(object_id);
+      if (adjacency_it == adjacency.end()) continue;
+      selected.insert(adjacency_it->second.begin(), adjacency_it->second.end());
+    }
+  }
+  return selected;
+}
+
+Ocel filter_object_id_set(const Ocel& log, const IdSet& selected) {
+  return filter_ocel_objects(
+      log, std::vector<std::string>(selected.begin(), selected.end()), true, 1);
+}
+
 }  // namespace
 
 Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key,
@@ -277,8 +363,17 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
 
 Ocel filter_ocel_object_types(const Ocel& log,
                               const std::vector<std::string>& types,
-                              bool positive) {
+                              bool positive, std::size_t level) {
   const auto selected = string_set(types);
+  if (level > 1) {
+    IdSet object_ids;
+    for (const auto& object : log.objects) {
+      if (selected.count(object.type)) object_ids.insert(object.id);
+    }
+    return filter_ocel_objects(
+        log, std::vector<std::string>(object_ids.begin(), object_ids.end()),
+        positive, level);
+  }
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
     const bool matches = selected.count(object.type) != 0;
@@ -289,8 +384,8 @@ Ocel filter_ocel_object_types(const Ocel& log,
 
 Ocel filter_ocel_objects(const Ocel& log,
                          const std::vector<std::string>& object_ids,
-                         bool positive) {
-  const auto selected = string_set(object_ids);
+                         bool positive, std::size_t level) {
+  auto selected = expand_object_ids(log, string_set(object_ids), level);
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
     const bool matches = selected.count(object.id) != 0;
@@ -449,6 +544,111 @@ Ocel filter_ocel_start_events_per_object_type(const Ocel& log,
 Ocel filter_ocel_end_events_per_object_type(const Ocel& log,
                                             std::string_view object_type) {
   return filter_ocel_lifecycle_events_per_object_type(log, object_type, false);
+}
+
+Ocel filter_ocel_activities_connected_object_type(
+    const Ocel& log, std::string_view object_type) {
+  const auto object_types = object_types_by_id(log);
+  std::unordered_map<std::string, std::string> event_activities;
+  event_activities.reserve(log.events.size());
+  for (const auto& event : log.events) {
+    event_activities.emplace(event.id, event.activity);
+  }
+
+  std::unordered_set<std::string> activities;
+  for (const auto& relation : log.relations) {
+    const auto object_it = object_types.find(relation.object_id);
+    const auto event_it = event_activities.find(relation.event_id);
+    if (object_it != object_types.end() && event_it != event_activities.end() &&
+        object_it->second == object_type) {
+      activities.insert(event_it->second);
+    }
+  }
+
+  Ocel filtered = log;
+  filter_records(filtered.relations, [&](const OcelRelation& relation) {
+    const auto event_it = event_activities.find(relation.event_id);
+    return event_it != event_activities.end() &&
+           activities.count(event_it->second) != 0;
+  });
+  return propagate_relation_filter(std::move(filtered));
+}
+
+Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {
+  IdSet selected{std::string(object_id)};
+  for (const auto& component : object_interaction_components(log)) {
+    if (component.count(std::string(object_id)) != 0) {
+      selected = component;
+      break;
+    }
+  }
+  return filter_object_id_set(log, selected);
+}
+
+Ocel filter_ocel_cc_length(const Ocel& log, std::size_t minimum_size,
+                           std::size_t maximum_size) {
+  if (minimum_size > maximum_size) {
+    throw std::invalid_argument(
+        "OCEL connected-component size bounds are reversed");
+  }
+  IdSet selected;
+  for (const auto& component : object_interaction_components(log)) {
+    if (component.size() >= minimum_size && component.size() <= maximum_size) {
+      selected.insert(component.begin(), component.end());
+    }
+  }
+  return filter_object_id_set(log, selected);
+}
+
+Ocel filter_ocel_cc_object_type(const Ocel& log, std::string_view object_type,
+                                bool positive) {
+  const auto object_types = object_types_by_id(log);
+  IdSet seeds;
+  for (const auto& [object_id, type] : object_types) {
+    const bool matches = type == object_type;
+    if (positive ? matches : !matches) seeds.insert(object_id);
+  }
+
+  IdSet selected;
+  for (const auto& component : object_interaction_components(log)) {
+    bool intersects = false;
+    for (const auto& object_id : component) {
+      if (seeds.count(object_id) != 0) {
+        intersects = true;
+        break;
+      }
+    }
+    if (intersects) selected.insert(component.begin(), component.end());
+  }
+  return filter_object_id_set(log, selected);
+}
+
+Ocel filter_ocel_cc_activity(const Ocel& log, std::string_view activity) {
+  std::unordered_map<std::string, std::string> event_activities;
+  event_activities.reserve(log.events.size());
+  for (const auto& event : log.events) {
+    event_activities.emplace(event.id, event.activity);
+  }
+  IdSet seeds;
+  for (const auto& relation : log.relations) {
+    const auto event_it = event_activities.find(relation.event_id);
+    if (event_it != event_activities.end() && event_it->second == activity) {
+      seeds.insert(relation.object_id);
+    }
+  }
+
+  IdSet selected;
+  for (const auto& component : object_interaction_components(log)) {
+    bool intersects = false;
+    for (const auto& object_id : component) {
+      if (seeds.count(object_id) != 0) {
+        intersects = true;
+        break;
+      }
+    }
+    if (intersects) selected.insert(component.begin(), component.end());
+  }
+  return filter_object_id_set(log, selected);
 }
 
 }  // namespace minera
