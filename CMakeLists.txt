@@ -109,6 +109,7 @@ add_library(minera_core
   src/transition_system.cpp
   src/trace_variant_query.cpp
   src/trie.cpp
+  src/process_cube.cpp
   src/xes_event_log_importer.cpp
   src/xes_export.cpp
 )
@@ -139,6 +140,12 @@ add_executable(minera_ocel
 )
 target_link_libraries(minera_ocel PRIVATE minera::core)
 target_compile_features(minera_ocel PRIVATE cxx_std_20)
+
+add_executable(minera_process_cube
+  tools/minera_process_cube.cpp
+)
+target_link_libraries(minera_process_cube PRIVATE minera::core)
+target_compile_features(minera_process_cube PRIVATE cxx_std_20)
 
 add_executable(minera_playout
   tools/minera_playout.cpp
@@ -334,6 +341,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_clustering_tests PRIVATE cxx_std_20)
   target_compile_options(minera_clustering_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_clustering_tests COMMAND minera_clustering_tests)
+
+  add_executable(minera_process_cube_tests tests/test_process_cube.cpp)
+  target_link_libraries(minera_process_cube_tests PRIVATE minera::core)
+  target_compile_features(minera_process_cube_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_cube_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_cube_tests COMMAND minera_process_cube_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
