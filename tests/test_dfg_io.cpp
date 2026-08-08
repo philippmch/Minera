@@ -1,4 +1,5 @@
 #include "minera/dfg_io.hpp"
+#include "minera/directly_follows_graph.hpp"
 
 #include <cassert>
 #include <filesystem>
@@ -46,6 +47,22 @@ void preserves_utf8_labels() {
   assert(minera::to_dfg(dfg).find("Auftrag ✓") != std::string::npos);
 }
 
+void projects_discovered_graph_without_zero_registry_entries() {
+  minera::EventLog log;
+  log.traces = {
+      {"one", {minera::Event{"one", "A", "", "", 0, {}, {}},
+                minera::Event{"one", "B", "", "", 1, {}, {}}}, {}},
+      {"two", {minera::Event{"two", "A", "", "", 0, {}, {}}}, {}},
+  };
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto projected = minera::to_dfg_analysis(graph);
+  assert(projected.graph.at({"A", "B"}) == 1);
+  assert(projected.start_activities.at("A") == 2);
+  assert(projected.end_activities.at("A") == 1);
+  assert(projected.end_activities.at("B") == 1);
+  assert(minera::to_dfg(projected).find("C") == std::string::npos);
+}
+
 void rejects_malformed_and_duplicate_rows() {
   assert(throws("1\nA\n1\n0x1\n"));  // missing end count
   assert(throws("2\nA\nA\n0\n0\n"));  // duplicate label
@@ -76,6 +93,7 @@ void imports_and_exports_files() {
 int main() {
   round_trip_is_deterministic();
   preserves_utf8_labels();
+  projects_discovered_graph_without_zero_registry_entries();
   rejects_malformed_and_duplicate_rows();
   imports_and_exports_files();
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, type Trace, numberFormat } from "../types";
-import { fetchXes } from "../api";
+import { fetchDfg, fetchXes } from "../api";
 
 const PAGE_SIZE = 50;
 
@@ -124,6 +124,38 @@ function XesButton({ dataset }: { dataset: string }) {
   );
 }
 
+function DfgButton({ dataset }: { dataset: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = () => {
+    setBusy(true);
+    setError(null);
+    fetchDfg()
+      .then((text) => {
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const base = dataset.replace(/\.[^.]+$/, "") || "log";
+        anchor.href = url;
+        anchor.download = `${base}.dfg`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <span className="pnml-export">
+      <button className="btn-ghost" onClick={download} disabled={busy}>
+        {busy ? "Exporting…" : "Download DFG"}
+      </button>
+      {error && <span className="pnml-error">{error}</span>}
+    </span>
+  );
+}
+
 export function EventLogView({ data }: { data: MineraExport }) {
   const traces = data.traces ?? [];
   const [query, setQuery] = useState("");
@@ -176,6 +208,7 @@ export function EventLogView({ data }: { data: MineraExport }) {
             ` · ${formatTimestamp(timeSpan.min)} — ${formatTimestamp(timeSpan.max)}`}
         </span>
         <XesButton dataset={data.dataset} />
+        <DfgButton dataset={data.dataset} />
         <input
           className="case-search"
           type="search"

@@ -31,6 +31,7 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/dfg_io.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/edit_distance_alignment.hpp"
@@ -3006,6 +3007,27 @@ void handle_xes(const httplib::Request&, httplib::Response& response) {
                        "application/xml");
 }
 
+void handle_dfg(const httplib::Request&, httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    response.set_content(minera::to_dfg(minera::to_dfg_analysis(session->graph)),
+                         "text/plain");
+  } catch (const std::exception& error) {
+    response.status = 500;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -3105,6 +3127,7 @@ int main(int argc, char** argv) {
   server.Options("/api/decide", preflight);
   server.Options("/api/check-model", preflight);
   server.Options("/api/monte-carlo", preflight);
+  server.Options("/api/dfg", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -3161,6 +3184,7 @@ int main(int argc, char** argv) {
   server.Get("/api/bpmn", handle_bpmn);
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
+  server.Get("/api/dfg", handle_dfg);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 

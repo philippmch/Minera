@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include "minera/directly_follows_graph.hpp"
+
 namespace minera {
 namespace {
 
@@ -147,6 +149,25 @@ std::string to_dfg(const DfgCleanAnalysis& dfg) {
   std::ostringstream out;
   write_dfg(out, dfg);
   return out.str();
+}
+
+DfgCleanAnalysis to_dfg_analysis(const DirectlyFollowsGraph& graph) {
+  DfgCleanAnalysis result;
+  const auto& names = graph.activities();
+  for (const auto& edge : graph.edges()) {
+    if (edge.source >= names.size() || edge.target >= names.size()) {
+      throw std::invalid_argument("DFG: graph edge activity id out of range");
+    }
+    if (edge.count == 0) continue;
+    result.graph[{names[edge.source], names[edge.target]}] = edge.count;
+  }
+  for (const auto& name : names) {
+    const auto start = graph.start_activity_count(name);
+    const auto end = graph.end_activity_count(name);
+    if (start != 0) result.start_activities[name] = start;
+    if (end != 0) result.end_activities[name] = end;
+  }
+  return result;
 }
 
 DfgCleanAnalysis parse_dfg(std::string_view text) {

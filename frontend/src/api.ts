@@ -1523,6 +1523,30 @@ export async function fetchXes(): Promise<string> {
 }
 
 /**
+ * Fetches the most recently mined directly-follows graph in the compact
+ * classic text interchange format. The graph is generated from the cached
+ * post-filter session on the backend.
+ */
+export async function fetchDfg(): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch("/api/dfg");
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  if (!response.ok) {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}
+
+/**
  * Simulates one miner's model into a synthetic event log served as standard
  * XES. The backend defaults to 100 traces for Petri models and 1,000 for
  * Declare. Declare classic playout is prefix-safe, so a generated trace may

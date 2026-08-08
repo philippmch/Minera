@@ -27,6 +27,7 @@
 #include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/dfg_io.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
@@ -476,6 +477,8 @@ int usage(const char* program) {
                "                            (conformance id: imported)\n"
                "  --xes <path>              Also write the event log (after any\n"
                "                            filtering) as XES to <path>\n"
+               "  --dfg <path>              Also write the classic directly-follows\n"
+               "                            graph (after any filtering) to <path>\n"
                "  --ltl-variant <id>        eventually_follows, a_next_b_next_c,\n"
                "                            four_eyes_principle, or attr_value_different_persons\n"
                "  --ltl-attribute-key <name> Event attribute key (default: activity)\n"
@@ -871,6 +874,7 @@ int main(int argc, char** argv) {
   std::filesystem::path ptml_output;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
+  std::filesystem::path dfg_output;
   std::filesystem::path playout_output;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
@@ -1101,6 +1105,12 @@ int main(int argc, char** argv) {
           arg == "--ltl-timestamp-diff-boundaries"
               ? "ltl_timestamp_diff_boundaries" : "ltl_resource_key";
       ltl_fields[key] = value;
+      continue;
+    }
+    if (arg == "--dfg") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      dfg_output = value;
       continue;
     }
     if (arg == "--ilp-mine") {
@@ -3738,6 +3748,10 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_xes(xes_file, log, dataset);
+    }
+
+    if (!dfg_output.empty()) {
+      minera::export_dfg(dfg_output, minera::to_dfg_analysis(graph));
     }
 
     if (!playout_output.empty()) {
