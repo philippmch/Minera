@@ -61,6 +61,17 @@ export function temporalValidationMessage(input: {
   return null;
 }
 
+/** Segment endpoints are a pair: a half-configured extraction is invalid. */
+export function segmentValidationMessage(input: {
+  betweenStart: string;
+  betweenEnd: string;
+}): string | null {
+  if ((input.betweenStart === "") !== (input.betweenEnd === "")) {
+    return "Segment-between filtering needs both a start and an end activity.";
+  }
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -87,6 +98,14 @@ export function Filters({
   const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
   const [prefixActivity, setPrefixActivity] = useState("");
   const [suffixActivity, setSuffixActivity] = useState("");
+  const [segmentPrefixActivity, setSegmentPrefixActivity] = useState("");
+  const [segmentPrefixStrict, setSegmentPrefixStrict] = useState(true);
+  const [segmentPrefixOccurrence, setSegmentPrefixOccurrence] = useState<"first" | "last">("first");
+  const [segmentSuffixActivity, setSegmentSuffixActivity] = useState("");
+  const [segmentSuffixStrict, setSegmentSuffixStrict] = useState(true);
+  const [segmentSuffixOccurrence, setSegmentSuffixOccurrence] = useState<"first" | "last">("first");
+  const [segmentBetweenStart, setSegmentBetweenStart] = useState("");
+  const [segmentBetweenEnd, setSegmentBetweenEnd] = useState("");
   // One succession constraint: keep or drop cases where `from` is directly /
   // eventually followed by `to` (the CLI accepts several pairs; the UI one).
   const [successionAction, setSuccessionAction] = useState<
@@ -420,9 +439,13 @@ export function Filters({
     }
     return null;
   })();
+  const segmentValidationError = segmentValidationMessage({
+    betweenStart: segmentBetweenStart,
+    betweenEnd: segmentBetweenEnd,
+  });
 
   const apply = () => {
-    if (temporalValidationError || ltlValidationError) return;
+    if (temporalValidationError || ltlValidationError || segmentValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -464,6 +487,14 @@ export function Filters({
       removeEventuallyFollows: succession("remove", "eventually"),
       prefixActivity: prefixActivity || undefined,
       suffixActivity: suffixActivity || undefined,
+      segmentPrefixActivity: segmentPrefixActivity || undefined,
+      segmentPrefixStrict: segmentPrefixActivity ? segmentPrefixStrict : undefined,
+      segmentPrefixOccurrence: segmentPrefixActivity ? segmentPrefixOccurrence : undefined,
+      segmentSuffixActivity: segmentSuffixActivity || undefined,
+      segmentSuffixStrict: segmentSuffixActivity ? segmentSuffixStrict : undefined,
+      segmentSuffixOccurrence: segmentSuffixActivity ? segmentSuffixOccurrence : undefined,
+      segmentBetweenStarts: segmentBetweenStart ? [segmentBetweenStart] : undefined,
+      segmentBetweenEnds: segmentBetweenEnd ? [segmentBetweenEnd] : undefined,
       removeActivities: removeList.length > 0 ? removeList : undefined,
       removeResources:
         removeResourceList.length > 0 ? removeResourceList : undefined,
@@ -702,6 +733,14 @@ export function Filters({
     setLtlEnableTimestamp(false);
     setLtlTimestampBounds("");
     setLtlResourceKey("");
+    setSegmentPrefixActivity("");
+    setSegmentPrefixStrict(true);
+    setSegmentPrefixOccurrence("first");
+    setSegmentSuffixActivity("");
+    setSegmentSuffixStrict(true);
+    setSegmentSuffixOccurrence("first");
+    setSegmentBetweenStart("");
+    setSegmentBetweenEnd("");
     onApply({});
   };
 
@@ -716,6 +755,10 @@ export function Filters({
     betweenEnd !== "" ||
     prefixActivity !== "" ||
     suffixActivity !== "" ||
+    segmentPrefixActivity !== "" ||
+    segmentSuffixActivity !== "" ||
+    segmentBetweenStart !== "" ||
+    segmentBetweenEnd !== "" ||
     successionAction !== "off" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
@@ -1287,6 +1330,60 @@ export function Filters({
                     {name}
                   </option>
                 ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Segment head</span>
+              <select value={segmentPrefixActivity} onChange={(e) => setSegmentPrefixActivity(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>occurrence</span>
+              <select value={segmentPrefixOccurrence} onChange={(e) => setSegmentPrefixOccurrence(e.target.value as "first" | "last")} disabled={!segmentPrefixActivity}>
+                <option value="first">first</option><option value="last">last</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>strict</span>
+              <input type="checkbox" checked={segmentPrefixStrict} onChange={(e) => setSegmentPrefixStrict(e.target.checked)} disabled={!segmentPrefixActivity} />
+            </label>
+            <label className="filters-field">
+              <span>Segment tail</span>
+              <select value={segmentSuffixActivity} onChange={(e) => setSegmentSuffixActivity(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>occurrence</span>
+              <select value={segmentSuffixOccurrence} onChange={(e) => setSegmentSuffixOccurrence(e.target.value as "first" | "last")} disabled={!segmentSuffixActivity}>
+                <option value="first">first</option><option value="last">last</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>strict</span>
+              <input type="checkbox" checked={segmentSuffixStrict} onChange={(e) => setSegmentSuffixStrict(e.target.checked)} disabled={!segmentSuffixActivity} />
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Segment between</span>
+              <select value={segmentBetweenStart} onChange={(e) => setSegmentBetweenStart(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>and</span>
+              <select value={segmentBetweenEnd} onChange={(e) => setSegmentBetweenEnd(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
           </div>
@@ -1899,11 +1996,11 @@ export function Filters({
             </label>
           </div>
 
-          {(temporalValidationError || ltlValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError}</p>
+          {(temporalValidationError || ltlValidationError || segmentValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError)}>
               Apply
             </button>
             <button

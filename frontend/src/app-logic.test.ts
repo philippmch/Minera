@@ -980,6 +980,36 @@ describe("mineFormEntries", () => {
     expect(mineFormEntries({ keepEventuallyFollows: [] })).toEqual([]);
   });
 
+  it("maps optional native segment operations independently of legacy filters", () => {
+    expect(mineFormEntries({
+      segmentPrefixActivity: "A",
+      segmentPrefixStrict: false,
+      segmentPrefixOccurrence: "last",
+      segmentSuffixActivity: "Z",
+      segmentSuffixStrict: true,
+      segmentSuffixOccurrence: "first",
+      segmentBetweenStarts: ["A", "B"],
+      segmentBetweenEnds: ["Z"],
+      segmentBetweenSeparator: "@@",
+    })).toEqual([
+      ["segment_prefix_activity", "A"],
+      ["segment_prefix_strict", "false"],
+      ["segment_prefix_occurrence", "last"],
+      ["segment_suffix_activity", "Z"],
+      ["segment_suffix_strict", "true"],
+      ["segment_suffix_occurrence", "first"],
+      ["segment_between_starts", "A,B"],
+      ["segment_between_ends", "Z"],
+      ["segment_between_separator", "@@"],
+    ]);
+    expect(mineFormEntries({ segmentBetweenStarts: ["A"] })).toEqual([]);
+    expect(mineFormEntries({ segmentPrefixStrict: false })).toEqual([]);
+    expect(mineFormEntries({ segmentSuffixOccurrence: "last" })).toEqual([]);
+    expect(hasActiveFilters({ segmentPrefixActivity: "A" })).toBe(true);
+    expect(hasActiveFilters({ segmentBetweenStarts: ["A"] })).toBe(false);
+    expect(hasActiveFilters({ segmentPrefixStrict: false })).toBe(false);
+  });
+
   it("maps the attribute filter and requires its key", () => {
     const entries = mineFormEntries({
       attributeKey: "channel",

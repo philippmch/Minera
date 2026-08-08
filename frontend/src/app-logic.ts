@@ -126,6 +126,15 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.removeEventuallyFollows?.length ||
       filters.prefixActivity ||
       filters.suffixActivity ||
+      filters.segmentPrefixActivity ||
+      filters.segmentSuffixActivity ||
+      (filters.segmentPrefixActivity &&
+        (filters.segmentPrefixStrict === false ||
+          filters.segmentPrefixOccurrence === "last")) ||
+      (filters.segmentSuffixActivity &&
+        (filters.segmentSuffixStrict === false ||
+          filters.segmentSuffixOccurrence === "last")) ||
+      filters.segmentBetweenStarts?.length && filters.segmentBetweenEnds?.length ||
       filters.removeActivities?.length ||
       filters.keepActivities?.length ||
       filters.removeResources?.length ||

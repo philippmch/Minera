@@ -182,6 +182,16 @@ export interface FilterOptions extends LtlFilterOptions {
   /** Cut each case into the subtraces from betweenStart to betweenEnd. */
   betweenStart?: string;
   betweenEnd?: string;
+  /** Optional native segment operations, applied after ordinary filters. */
+  segmentPrefixActivity?: string;
+  segmentPrefixStrict?: boolean;
+  segmentPrefixOccurrence?: "first" | "last";
+  segmentSuffixActivity?: string;
+  segmentSuffixStrict?: boolean;
+  segmentSuffixOccurrence?: "first" | "last";
+  segmentBetweenStarts?: string[];
+  segmentBetweenEnds?: string[];
+  segmentBetweenSeparator?: string;
   minLength?: number;
   maxLength?: number;
   /** ISO-8601 bounds, both inclusive; either side may be open. */
@@ -476,6 +486,26 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     options.logSkeletonNoiseThreshold !== 0
   ) {
     add("log_skeleton_noise_threshold", String(options.logSkeletonNoiseThreshold));
+  }
+  if (options.segmentPrefixActivity) {
+    add("segment_prefix_activity", options.segmentPrefixActivity);
+    if (options.segmentPrefixStrict !== undefined)
+      add("segment_prefix_strict", String(options.segmentPrefixStrict));
+    if (options.segmentPrefixOccurrence)
+      add("segment_prefix_occurrence", options.segmentPrefixOccurrence);
+  }
+  if (options.segmentSuffixActivity) {
+    add("segment_suffix_activity", options.segmentSuffixActivity);
+    if (options.segmentSuffixStrict !== undefined)
+      add("segment_suffix_strict", String(options.segmentSuffixStrict));
+    if (options.segmentSuffixOccurrence)
+      add("segment_suffix_occurrence", options.segmentSuffixOccurrence);
+  }
+  if (options.segmentBetweenStarts?.length && options.segmentBetweenEnds?.length) {
+    add("segment_between_starts", options.segmentBetweenStarts.join(","));
+    add("segment_between_ends", options.segmentBetweenEnds.join(","));
+    if (options.segmentBetweenSeparator)
+      add("segment_between_separator", options.segmentBetweenSeparator);
   }
   if (options.ltlVariant && options.ltlAttributeValues?.length) {
     add("ltl_variant", options.ltlVariant);

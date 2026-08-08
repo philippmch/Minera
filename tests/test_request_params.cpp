@@ -89,6 +89,44 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.batch_options.merge_distance_seconds == 900.0);
   assert(params.batch_options.min_batch_size == 2);
   assert(!params.ltl_enabled && !params.ltl);
+  assert(!params.segment_enabled && !params.segment);
+}
+
+void segment_filter_params_contract() {
+  const auto params = minera::parse_mine_params(fields({
+      {"segment_prefix_activity", "A"},
+      {"segment_prefix_strict", "false"},
+      {"segment_prefix_occurrence", "last"},
+      {"segment_suffix_activity", "Z"},
+      {"segment_suffix_occurrence", "first"},
+      {"segment_between_starts", "A, B"},
+      {"segment_between_ends", "Z"},
+      {"segment_between_separator", "@@"},
+  }));
+  assert(params.segment_enabled && params.segment);
+  assert(params.segment->use_prefix && params.segment->prefix.activity == "A");
+  assert(!params.segment->prefix.strict);
+  assert(params.segment->prefix.occurrence == minera::AnchorOccurrence::last);
+  assert(params.segment->use_suffix && params.segment->suffix.activity == "Z");
+  assert(params.segment->suffix.occurrence == minera::AnchorOccurrence::first);
+  assert(params.segment->use_between);
+  assert((params.segment->between.start_activities == std::vector<std::string>{"A", "B"}));
+  assert(params.segment->between.case_id_separator == "@@");
+  for (const auto& item : {
+           std::pair{"segment_prefix_strict", "maybe"},
+           std::pair{"segment_prefix_occurrence", "middle"},
+           std::pair{"segment_between_starts", "A"},
+           std::pair{"segment_between_separator", "@@"},
+       }) {
+    bool threw = false;
+    try {
+      std::map<std::string, std::string> values{{item.first, item.second}};
+      (void)minera::parse_mine_params(fields(std::move(values)));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void ltl_filter_params_contract() {
@@ -1916,6 +1954,7 @@ int main() {
   split_csv_trims_and_drops_empty_parts();
   error_json_escapes_quotes_and_backslashes();
   parse_mine_params_defaults_when_empty();
+  segment_filter_params_contract();
   ltl_filter_params_contract();
   parse_mine_params_maps_correlation_options();
   parse_mine_params_preserves_explicit_empty_correlation_timestamp();

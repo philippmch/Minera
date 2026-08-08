@@ -85,6 +85,7 @@
 #include "minera/process_tree_playout.hpp"
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
+#include "minera/segment_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
@@ -358,6 +359,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                    : minera::import_csv_event_log(input, params.csv);
     if (params.filter.any()) {
       log = minera::filter_event_log(log, params.filter);
+    }
+    if (params.segment_enabled && params.segment) {
+      log = minera::filter_segments(log, *params.segment);
     }
     if (params.ltl_enabled && params.ltl) {
       log = minera::filter_ltl_event_log(log, *params.ltl);

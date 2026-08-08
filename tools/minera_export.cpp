@@ -78,6 +78,7 @@
 #include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
+#include "minera/segment_filter.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
@@ -487,6 +488,15 @@ int usage(const char* program) {
                "  --ltl-enable-timestamp <bool> Enable eventually-follows bounds\n"
                "  --ltl-timestamp-diff-boundaries <min:max,...> Inclusive bounds\n"
                "  --ltl-resource-key <name> Resource attribute key (default: resource)\n"
+               "  --segment-prefix-activity <name> Native segment head anchor\n"
+               "  --segment-prefix-strict <bool> Exclude the prefix anchor\n"
+               "  --segment-prefix-occurrence <first|last> Anchor occurrence\n"
+               "  --segment-suffix-activity <name> Native segment tail anchor\n"
+               "  --segment-suffix-strict <bool> Include the suffix anchor\n"
+               "  --segment-suffix-occurrence <first|last> Anchor occurrence\n"
+               "  --segment-between-starts <a,b,...> Segment start activities\n"
+               "  --segment-between-ends <a,b,...> Segment end activities\n"
+               "  --segment-between-separator <text> Segment case-id separator\n"
                "  --spectrum <a,b,c>        Compute the performance spectrum\n"
                "                            over this activity pattern (2+\n"
                "                            steps): per occurrence, when each\n"
@@ -932,6 +942,7 @@ int main(int argc, char** argv) {
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
+  std::map<std::string, std::string> segment_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
@@ -1105,6 +1116,22 @@ int main(int argc, char** argv) {
           arg == "--ltl-timestamp-diff-boundaries"
               ? "ltl_timestamp_diff_boundaries" : "ltl_resource_key";
       ltl_fields[key] = value;
+      continue;
+    }
+    if (arg == "--segment-prefix-activity" ||
+        arg == "--segment-prefix-strict" ||
+        arg == "--segment-prefix-occurrence" ||
+        arg == "--segment-suffix-activity" ||
+        arg == "--segment-suffix-strict" ||
+        arg == "--segment-suffix-occurrence" ||
+        arg == "--segment-between-starts" ||
+        arg == "--segment-between-ends" ||
+        arg == "--segment-between-separator") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      segment_fields[key] = value;
       continue;
     }
     if (arg == "--dfg") {
@@ -2946,6 +2973,18 @@ int main(int argc, char** argv) {
     }
     if (filter.any()) {
       log = minera::filter_event_log(log, filter);
+    }
+    if (!segment_fields.empty()) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = segment_fields.find(std::string(name));
+        return it == segment_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return segment_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_mine_params(lookup, present);
+      if (params.segment_enabled && params.segment)
+        log = minera::filter_segments(log, *params.segment);
     }
     if (!ltl_fields.empty()) {
       const auto lookup = [&](std::string_view name) {
