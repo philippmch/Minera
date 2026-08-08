@@ -215,7 +215,7 @@ this traditional-log vertical.
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN; no DFG format |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, connected DFG activity/path/dependency/boundary filters, and native OCEL event/object/type/id/timestamp/activity-type/count/start/end filters; LTL/segments and adapter coverage remain |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; LTL/segments remain |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
@@ -573,8 +573,10 @@ component object/length/type/activity filters. Event, object, and relation
 selections propagate deterministically to the related tables, retaining only
 valid links, object changes, and object-to-object relations; empty selections
 clear the dependent tables according to the selected propagation direction.
-The standalone `minera_ocel` command exposes every OCEL filtering variant with
-strict bounded arguments. Focused tests cover typed scalar attributes,
+The standalone `minera_ocel` command and multipart `POST /api/ocel/filter`
+expose every OCEL filtering variant with strict bounded arguments. The typed
+frontend `requestOcelFilter` adapter serializes the same options and validates
+the recursive OCEL envelope. Focused tests cover typed scalar attributes,
 duplicate relation counts, orphan removal, inclusive boundaries, lifecycle
 endpoints, recursive expansion, singleton components, component predicates,
 empty maps, and malformed bounds.

@@ -34,6 +34,7 @@ import {
   type OcelConformanceVariant,
   type OcelDiscoveryResult,
   type OcelConformanceResult,
+  type OcelFilterResult,
   type OcelSplitResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
@@ -59,6 +60,7 @@ import {
   isRandomTreeResult,
   isOcelDiscoveryResult,
   isOcelConformanceResult,
+  isOcelFilterResult,
   isOcelSplitResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
@@ -2218,6 +2220,110 @@ export async function requestOcelDiscovery(
   return payload;
 }
 
+export type OcelFilterSelector =
+  | "event_attribute" | "object_attribute" | "object_types" | "objects"
+  | "events" | "timestamp" | "activity_type_matching" | "object_count"
+  | "start_events" | "end_events" | "activities_object_type" | "cc_object"
+  | "cc_length" | "cc_object_type" | "cc_activity";
+export interface OcelFilterOptions {
+  variant?: OcelFilterSelector;
+  attribute_key?: string;
+  attribute_values?: Array<string | number | boolean | null>;
+  positive?: boolean;
+  types?: string[];
+  ids?: string[];
+  event_ids?: string[];
+  from?: string;
+  to?: string;
+  object_type?: string;
+  activity?: string;
+  minimum_counts?: Record<string, number>;
+  level?: number;
+  object_id?: string;
+  min_size?: number;
+  max_size?: number;
+  allowed?: Record<string, string[]>;
+}
+
+export function ocelFilterQuery(options: OcelFilterOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.attribute_key !== undefined) query.set("attribute_key", options.attribute_key);
+  const escapePart = (value: string) => value.replaceAll("\\", "\\\\")
+    .replaceAll(",", "\\,").replaceAll(":", "\\:")
+    .replaceAll(";", "\\;").replaceAll("|", "\\|");
+  const addList = (name: string, values: string[] | undefined) => {
+    if (values?.length) query.set(name, values.map(escapePart).join(","));
+  };
+  if (options.attribute_values?.length) {
+    const values = options.attribute_values.map((value) => {
+      if (value === null) return "n:";
+      if (typeof value === "boolean") return `b:${value ? "true" : "false"}`;
+      if (typeof value === "number") {
+        if (!Number.isFinite(value)) throw new Error("OCEL filter attribute values must be finite");
+        if (Number.isInteger(value)) return `i:${value}`;
+        return `d:${value}`;
+      }
+      return `s:${escapePart(value)}`;
+    });
+    query.set("attribute_values", values.join(","));
+  }
+  addList("types", options.types);
+  addList("ids", options.ids);
+  addList("event_ids", options.event_ids);
+  if (options.positive !== undefined) query.set("positive", options.positive ? "true" : "false");
+  if (options.from !== undefined) query.set("from", options.from);
+  if (options.to !== undefined) query.set("to", options.to);
+  if (options.object_type !== undefined) query.set("object_type", options.object_type);
+  if (options.activity !== undefined) query.set("activity", options.activity);
+  if (options.level !== undefined) {
+    if (!Number.isInteger(options.level) || options.level < 0 || options.level > 32) throw new Error("OCEL filter level must be an integer from 0 through 32");
+    query.set("level", String(options.level));
+  }
+  if (options.minimum_counts !== undefined) {
+    const entries = Object.entries(options.minimum_counts).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+    if (entries.some(([type, count]) => !type || !Number.isInteger(count) || count < 0)) {
+      throw new Error("OCEL filter minimum counts must be non-negative integers");
+    }
+    if (entries.length) query.set("minimum_counts", entries.map(([type, count]) => `${escapePart(type)}:${count}`).join(","));
+  }
+  if (options.object_id !== undefined) query.set("object_id", options.object_id);
+  const addSize = (name: string, value: number | undefined) => {
+    if (value !== undefined) {
+      if (!Number.isInteger(value) || value < 0) throw new Error(`OCEL filter ${name} must be a non-negative integer`);
+      query.set(name, String(value));
+    }
+  };
+  addSize("min_size", options.min_size);
+  addSize("max_size", options.max_size);
+  if (options.allowed !== undefined) {
+    const entries = Object.entries(options.allowed).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+    if (entries.some(([type, activities]) => !type || !activities.length || activities.some((activity) => !activity))) {
+      throw new Error("OCEL filter allowed activities require non-empty types and activities");
+    }
+    if (entries.length) query.set("allowed", entries.map(([type, activities]) => `${escapePart(type)}:${activities.map(escapePart).join("|")}`).join(";"));
+  }
+  return query.toString();
+}
+
+export async function requestOcelFilter(
+  log: Blob,
+  options: OcelFilterOptions = {},
+): Promise<OcelFilterResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelFilterQuery(options);
+  const response = await fetch(`/api/ocel/filter${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelFilterResult(payload)) throw new Error("the Minera backend returned an invalid OCEL filter result");
+  return payload;
+}
+
 export interface OcelSplitOptions {
   variant?: "connected_components" | "ancestors_descendants";
   object_type?: string;
@@ -2367,7 +2473,12 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_interaction_features", options.include_interaction_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
   const addList = (name: string, values: string[] | undefined) => {
-    if (values?.length) query.set(name, [...values].sort().join(","));
+    if (values?.length) {
+      const escape = (value: string) => value.replaceAll("\\", "\\\\")
+        .replaceAll(",", "\\,").replaceAll(":", "\\:")
+        .replaceAll(";", "\\;").replaceAll("|", "\\|");
+      query.set(name, [...values].sort().map(escape).join(","));
+    }
   };
   addList("numeric_event_attributes", options.numeric_event_attributes);
   addList("string_event_attributes", options.string_event_attributes);
