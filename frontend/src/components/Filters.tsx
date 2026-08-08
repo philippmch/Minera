@@ -39,6 +39,8 @@ export function temporalValidationMessage(input: {
   batches: boolean;
   batchMergeDistanceSeconds: string;
   batchMinSize: string;
+  overlap?: boolean;
+  overlapEpsilon?: string;
 }): string | null {
   if (input.spectrumActivityCount === 1)
     return "Spectrum needs at least two activities.";
@@ -57,6 +59,12 @@ export function temporalValidationMessage(input: {
     const min = Number(minRaw);
     if (!minRaw || !Number.isFinite(min) || !Number.isInteger(min) || min < 2)
       return "Batch minimum size must be an integer of at least 2.";
+  }
+  if (input.overlap) {
+    const rawEpsilon = input.overlapEpsilon?.trim() ?? "";
+    const epsilon = Number(rawEpsilon);
+    if (!rawEpsilon || !Number.isFinite(epsilon) || epsilon < 0)
+      return "Overlap epsilon must be a finite, non-negative number.";
   }
   return null;
 }
@@ -305,6 +313,12 @@ export function Filters({
   const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
   const [batchMinSize, setBatchMinSize] = useState("2");
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
+  const [overlap, setOverlap] = useState(false);
+  const [overlapActivityAttribute, setOverlapActivityAttribute] = useState("");
+  const [overlapStartAttribute, setOverlapStartAttribute] = useState("");
+  const [overlapCompletionAttribute, setOverlapCompletionAttribute] = useState("");
+  const [overlapEpsilon, setOverlapEpsilon] = useState("0.00001");
+  const [overlapStrict, setOverlapStrict] = useState(false);
 
   const toggle = (setter: typeof setRemoved) => (name: string) => {
     setter((prev) => {
@@ -447,6 +461,8 @@ export function Filters({
     batches,
     batchMergeDistanceSeconds,
     batchMinSize,
+    overlap,
+    overlapEpsilon,
   });
   const ltlNames = ltlAttributeValues.split(",").map((value) => value.trim()).filter(Boolean);
   const ltlTimestampActive = ltlVariant === "eventually_follows" && ltlEnableTimestamp;
@@ -681,6 +697,12 @@ export function Filters({
         ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 2 ? n : undefined; })()
         : undefined,
       batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
+      overlap: overlap || undefined,
+      overlapActivityAttribute: overlap ? overlapActivityAttribute.trim() || undefined : undefined,
+      overlapStartAttribute: overlap ? overlapStartAttribute.trim() || undefined : undefined,
+      overlapCompletionAttribute: overlap ? overlapCompletionAttribute.trim() || undefined : undefined,
+      overlapEpsilon: overlap ? (() => { const n = Number(overlapEpsilon); return Number.isFinite(n) && n >= 0 ? n : undefined; })() : undefined,
+      overlapStrict: overlap && overlapStrict ? true : undefined,
     });
   };
 
@@ -766,6 +788,12 @@ export function Filters({
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
     setBatchStartTimestampAttribute("");
+    setOverlap(false);
+    setOverlapActivityAttribute("");
+    setOverlapStartAttribute("");
+    setOverlapCompletionAttribute("");
+    setOverlapEpsilon("0.00001");
+    setOverlapStrict(false);
     setLtlVariant("");
     setLtlAttributeKey("");
     setLtlAttributeValues("");
@@ -861,7 +889,7 @@ export function Filters({
   const correlationDirty = correlationVariants.size > 0;
   const spectrumActive = spectrumActivities.trim() !== "";
   const temporalDirty =
-    spectrumActive || batches;
+    spectrumActive || batches || overlap;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
     declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
@@ -2076,6 +2104,32 @@ export function Filters({
                 disabled={!batches}
                 onChange={(e) => setBatchStartTimestampAttribute(e.target.value)}
               />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={overlap} onChange={(e) => setOverlap(e.target.checked)} />
+              <span>Compute overlap statistics</span>
+            </label>
+            <label className="filters-field">
+              <span>Overlap activity attribute</span>
+              <input type="text" placeholder="event activity" value={overlapActivityAttribute} disabled={!overlap} onChange={(e) => setOverlapActivityAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Overlap start attribute</span>
+              <input type="text" placeholder="event timestamp" value={overlapStartAttribute} disabled={!overlap} onChange={(e) => setOverlapStartAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Overlap completion attribute</span>
+              <input type="text" placeholder="event timestamp" value={overlapCompletionAttribute} disabled={!overlap} onChange={(e) => setOverlapCompletionAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Overlap epsilon</span>
+              <input type="number" min={0} step="any" value={overlapEpsilon} disabled={!overlap} onChange={(e) => setOverlapEpsilon(e.target.value)} />
+            </label>
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={overlapStrict} disabled={!overlap} onChange={(e) => setOverlapStrict(e.target.checked)} />
+              <span>Strict (exclude touching)</span>
             </label>
           </div>
 

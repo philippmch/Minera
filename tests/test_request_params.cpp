@@ -1405,6 +1405,34 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.batch_options.start_timestamp_attribute == "started_at");
 }
 
+void parse_mine_params_maps_overlap_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"overlap", "true"},
+      {"overlap_activity_attribute", "phase"},
+      {"overlap_start_attribute", "start"},
+      {"overlap_completion_attribute", "complete"},
+      {"overlap_epsilon", "0.25"},
+      {"overlap_strict", "1"},
+  }));
+  assert(params.overlap);
+  assert(params.overlap_options.activity_attribute == "phase");
+  assert(params.overlap_options.start_timestamp_attribute == "start");
+  assert(params.overlap_options.completion_timestamp_attribute == "complete");
+  assert(params.overlap_options.epsilon == 0.25);
+  assert(params.overlap_options.strict);
+}
+
+void parse_mine_params_rejects_invalid_overlap_epsilon() {
+  bool rejected = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"overlap", "true"},
+                                             {"overlap_epsilon", "-1"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
   for (const auto& item : {
            std::pair{"spectrum_variant", "other"},
@@ -2016,6 +2044,8 @@ int main() {
   parse_mine_params_rejects_an_unknown_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_maps_spectrum_and_batch_options();
+  parse_mine_params_maps_overlap_options();
+  parse_mine_params_rejects_invalid_overlap_epsilon();
   parse_mine_params_rejects_invalid_spectrum_and_batch_options();
   parse_mine_params_rejects_dependent_options_without_opt_in();
   parse_petri_analysis_params_maps_all_families_and_settings();

@@ -8,6 +8,8 @@ const valid = {
   batches: true,
   batchMergeDistanceSeconds: "900",
   batchMinSize: "2",
+  overlap: false,
+  overlapEpsilon: "0.00001",
 };
 
 describe("temporal filter validation", () => {
@@ -27,6 +29,12 @@ describe("temporal filter validation", () => {
     expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "Infinity" })).toContain("merge distance");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toContain("minimum size");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "2.1" })).toContain("minimum size");
+  });
+
+  it("validates active overlap epsilon", () => {
+    expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "-1" })).toContain("Overlap epsilon");
+    expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "Infinity" })).toContain("Overlap epsilon");
+    expect(temporalValidationMessage({ ...valid, overlap: true, overlapEpsilon: "0" })).toBeNull();
   });
 });
 

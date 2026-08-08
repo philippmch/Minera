@@ -2304,6 +2304,18 @@ export interface BatchDiscoveryExport {
   groups: BatchGroup[];
 }
 
+/** Optional overlap perspective, emitted only when explicitly requested. */
+export interface ConcurrentActivityOverlapExport {
+  first: string;
+  second: string;
+  count: number;
+}
+export interface OverlapExport {
+  interval_events: number[];
+  cases: number[];
+  concurrent_activities: ConcurrentActivityOverlapExport[];
+}
+
 export interface ResourceStat {
   name: string;
   event_count: number;
@@ -2488,6 +2500,8 @@ export interface MineraExport {
   performance_spectrum?: PerformanceSpectrumExport;
   /** Optional batch discovery analysis. */
   batch_discovery?: BatchDiscoveryExport;
+  /** Optional interval/case/concurrent overlap statistics. */
+  overlap?: OverlapExport;
   /** Organizational perspective (handover-of-work network); absent in older exports. */
   resources?: ResourceNetwork;
   /**
@@ -2522,11 +2536,24 @@ export interface MineraExport {
 export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null) return false;
   const data = value as MineraExport;
+  const overlap = data.overlap;
   return Array.isArray(data.activities) &&
     Array.isArray(data.edges) &&
     Array.isArray(data.variants) &&
     Number.isFinite(data.trace_count) &&
-    (data.powl === undefined || isPowlNode(data.powl, data.activities.length));
+    (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
+    (overlap === undefined || (
+      typeof overlap === "object" && overlap !== null &&
+      Array.isArray(overlap.interval_events) &&
+      overlap.interval_events.every((n) => Number.isInteger(n) && n >= 0) &&
+      Array.isArray(overlap.cases) &&
+      overlap.cases.every((n) => Number.isInteger(n) && n >= 0) &&
+      Array.isArray(overlap.concurrent_activities) &&
+      overlap.concurrent_activities.every((row) => {
+        return typeof row === "object" && row !== null &&
+          typeof row.first === "string" && typeof row.second === "string" &&
+          Number.isInteger(row.count) && row.count >= 0;
+      })));
 }
 
 /** Virtual node ids for the trace entry and exit points. */

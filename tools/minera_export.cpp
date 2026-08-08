@@ -588,6 +588,12 @@ int usage(const char* program) {
                "  --random-tree-seed <n>      Random seed\n"
                "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
+               "  --overlap                 Compute interval/case/concurrent overlap statistics\n"
+               "  --overlap-activity-attribute <name> Optional concurrent activity attribute\n"
+               "  --overlap-start-attribute <name> Optional interval start timestamp attribute\n"
+               "  --overlap-completion-attribute <name> Optional completion timestamp attribute\n"
+               "  --overlap-epsilon <f>     Non-negative overlap boundary epsilon\n"
+               "  --overlap-strict          Exclude endpoint-only overlap\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -945,6 +951,8 @@ int main(int argc, char** argv) {
   bool batches = false;
   bool batch_option_used = false;
   minera::BatchDiscoveryOptions batch_options;
+  bool overlap_requested = false;
+  std::map<std::string, std::string> overlap_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1149,6 +1157,37 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       path_fields[key] = value;
+      continue;
+    }
+    if (arg == "--overlap") {
+      overlap_requested = true;
+      overlap_fields["overlap"] = "true";
+      continue;
+    }
+    if (arg == "--overlap-strict") {
+      overlap_requested = true;
+      overlap_fields["overlap"] = "true";
+      overlap_fields["overlap_strict"] = "true";
+      if (i + 1 < argc) {
+        const std::string_view next_value = argv[i + 1];
+        if (next_value == "true" || next_value == "false" ||
+            next_value == "1" || next_value == "0") {
+          overlap_fields["overlap_strict"] = std::string(next_value);
+          ++i;
+        }
+      }
+      continue;
+    }
+    if (arg == "--overlap-activity-attribute" ||
+        arg == "--overlap-start-attribute" ||
+        arg == "--overlap-completion-attribute" ||
+        arg == "--overlap-epsilon") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      overlap_fields[key] = value;
+      overlap_requested = true;
       continue;
     }
     if (arg == "--dfg") {
@@ -3027,6 +3066,29 @@ int main(int argc, char** argv) {
       if (params.ltl_enabled && params.ltl)
         log = minera::filter_ltl_event_log(log, *params.ltl);
     }
+    std::optional<minera::IntervalEventOverlapCounts> overlap_interval_events;
+    std::optional<minera::CaseOverlapCounts> overlap_cases;
+    std::optional<minera::ConcurrentActivityOverlapResult>
+        overlap_concurrent_activities;
+    if (overlap_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = overlap_fields.find(std::string(name));
+        return it == overlap_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return overlap_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_mine_params(lookup, present);
+      if (params.overlap) {
+        overlap_interval_events =
+            minera::discover_interval_event_overlap_counts(log,
+                                                             params.overlap_options);
+        overlap_cases = minera::discover_case_overlap_counts(log,
+                                                              params.overlap_options);
+        overlap_concurrent_activities = minera::discover_concurrent_activity_overlap(
+            log, params.overlap_options);
+      }
+    }
     if (ilp_mine_requested) {
       const auto lookup = [&](std::string_view name) {
         const auto it = ilp_fields.find(std::string(name));
@@ -3709,7 +3771,11 @@ int main(int argc, char** argv) {
           reduced_tree_result ? &*reduced_tree_result : nullptr,
           reduce_trace_index.value_or(0),
           evaluation ? &*evaluation : nullptr,
-          emd_result ? &*emd_result : nullptr);
+          emd_result ? &*emd_result : nullptr,
+          overlap_interval_events ? &*overlap_interval_events : nullptr,
+          overlap_cases ? &*overlap_cases : nullptr,
+          overlap_concurrent_activities ? &*overlap_concurrent_activities
+                                        : nullptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -3741,7 +3807,11 @@ int main(int argc, char** argv) {
           reduced_tree_result ? &*reduced_tree_result : nullptr,
           reduce_trace_index.value_or(0),
           evaluation ? &*evaluation : nullptr,
-          emd_result ? &*emd_result : nullptr);
+          emd_result ? &*emd_result : nullptr,
+          overlap_interval_events ? &*overlap_interval_events : nullptr,
+          overlap_cases ? &*overlap_cases : nullptr,
+          overlap_concurrent_activities ? &*overlap_concurrent_activities
+                                        : nullptr);
     }
 
     // Optionally emit one discovered model as standard PNML.

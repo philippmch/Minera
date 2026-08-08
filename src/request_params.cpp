@@ -924,6 +924,42 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.ltl_enabled = true;
   }
 
+  // Optional overlap statistics.  The explicit boolean is the opt-in gate;
+  // dependent fields are still parsed when present so malformed requests are
+  // rejected deterministically before mining starts.
+  const bool overlap_supplied = supplied("overlap") ||
+                                supplied("overlap_activity_attribute") ||
+                                supplied("overlap_start_attribute") ||
+                                supplied("overlap_completion_attribute") ||
+                                supplied("overlap_epsilon") ||
+                                supplied("overlap_strict");
+  if (overlap_supplied) {
+    if (supplied("overlap"))
+      params.overlap = parse_boolean(field("overlap"), "overlap");
+    if (supplied("overlap_start_attribute"))
+      params.overlap_options.start_timestamp_attribute =
+          field("overlap_start_attribute");
+    if (supplied("overlap_activity_attribute"))
+      params.overlap_options.activity_attribute =
+          field("overlap_activity_attribute");
+    if (supplied("overlap_completion_attribute"))
+      params.overlap_options.completion_timestamp_attribute =
+          field("overlap_completion_attribute");
+    if (supplied("overlap_epsilon")) {
+      params.overlap_options.epsilon =
+          parse_finite_double(field("overlap_epsilon"), "overlap_epsilon");
+      if (params.overlap_options.epsilon < 0.0)
+        throw std::invalid_argument(
+            "overlap_epsilon: expected a finite non-negative number");
+    }
+    if (supplied("overlap_strict"))
+      params.overlap_options.strict =
+          parse_boolean(field("overlap_strict"), "overlap_strict");
+    // Any dependent overlap field is an explicit request as well, preserving
+    // useful form semantics when clients omit the checkbox value.
+    if (!supplied("overlap")) params.overlap = true;
+  }
+
   if (const auto value = field("case_column"); !value.empty()) {
     params.csv.case_id_column = value;
   }

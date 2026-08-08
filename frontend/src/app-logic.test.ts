@@ -13,6 +13,25 @@ import {
 import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
+  it("serializes opt-in overlap controls and marks them active", () => {
+    expect(mineFormEntries({
+      overlap: true,
+      overlapActivityAttribute: "phase",
+      overlapStartAttribute: "start",
+      overlapCompletionAttribute: "complete",
+      overlapEpsilon: 0.25,
+      overlapStrict: true,
+    })).toEqual([
+      ["overlap", "true"],
+      ["overlap_activity_attribute", "phase"],
+      ["overlap_start_attribute", "start"],
+      ["overlap_completion_attribute", "complete"],
+      ["overlap_epsilon", "0.25"],
+      ["overlap_strict", "true"],
+    ]);
+    expect(hasActiveMinerOptions({ overlap: true })).toBe(true);
+  });
+
   it("serializes bounded LTL trace filters", async () => {
     expect(mineFormEntries({
       ltlVariant: "eventually_follows",

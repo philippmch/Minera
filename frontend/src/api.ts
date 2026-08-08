@@ -316,6 +316,13 @@ export interface MinerOptions {
   batchMergeDistanceSeconds?: number;
   batchMinSize?: number;
   batchStartTimestampAttribute?: string;
+  /** Optional overlap statistics (interval events, cases, concurrent activities). */
+  overlap?: boolean;
+  overlapActivityAttribute?: string;
+  overlapStartAttribute?: string;
+  overlapCompletionAttribute?: string;
+  overlapEpsilon?: number;
+  overlapStrict?: boolean;
 }
 
 export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
@@ -715,6 +722,18 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("batch_min_size", String(options.batchMinSize));
     if (options.batchStartTimestampAttribute?.trim())
       add("batch_start_timestamp_attribute", options.batchStartTimestampAttribute.trim());
+  }
+  if (options.overlap) {
+    add("overlap", "true");
+    if (options.overlapActivityAttribute?.trim())
+      add("overlap_activity_attribute", options.overlapActivityAttribute.trim());
+    if (options.overlapStartAttribute?.trim())
+      add("overlap_start_attribute", options.overlapStartAttribute.trim());
+    if (options.overlapCompletionAttribute?.trim())
+      add("overlap_completion_attribute", options.overlapCompletionAttribute.trim());
+    if (options.overlapEpsilon !== undefined && Number.isFinite(options.overlapEpsilon) && options.overlapEpsilon >= 0)
+      add("overlap_epsilon", String(options.overlapEpsilon));
+    if (options.overlapStrict) add("overlap_strict", "true");
   }
 
   return entries;

@@ -55,6 +55,7 @@ add_library(minera_core
   src/inductive_miner.cpp
   src/ilp_miner.cpp
   src/interval_tree.cpp
+  src/overlap.cpp
   src/label_splitting.cpp
   src/link_analysis.cpp
   src/json_export.cpp
@@ -688,4 +689,20 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_timestamp_interleavings_tests PRIVATE cxx_std_20)
   target_compile_options(minera_timestamp_interleavings_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_timestamp_interleavings_tests COMMAND minera_timestamp_interleavings_tests)
+
+  add_executable(minera_overlap_tests
+    tests/test_overlap.cpp
+  )
+  target_link_libraries(minera_overlap_tests PRIVATE minera::core)
+  target_compile_features(minera_overlap_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_overlap_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_overlap_tests COMMAND minera_overlap_tests)
+
+  add_executable(minera_overlap_json_tests
+    tests/test_overlap_json.cpp
+  )
+  target_link_libraries(minera_overlap_json_tests PRIVATE minera::core)
+  target_compile_features(minera_overlap_json_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_overlap_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_overlap_json_tests COMMAND minera_overlap_json_tests)
 endif()
