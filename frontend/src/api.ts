@@ -132,8 +132,25 @@ export type TimeFilterMode =
 /** How the backend's attribute filter applies: to events or to whole cases. */
 export type AttributeFilterMode = "events" | "traces";
 
+/** Optional bounded temporal predicate applied after ordinary log filters. */
+export type LtlVariant =
+  | "eventually_follows"
+  | "a_next_b_next_c"
+  | "four_eyes_principle"
+  | "attr_value_different_persons";
+
+export interface LtlFilterOptions {
+  ltlVariant?: LtlVariant;
+  ltlAttributeKey?: string;
+  ltlAttributeValues?: string[];
+  ltlPositive?: boolean;
+  ltlEnableTimestamp?: boolean;
+  ltlTimestampDiffBoundaries?: Array<[number, number]>;
+  ltlResourceKey?: string;
+}
+
 /** Log-preprocessing filters applied by the backend before discovery. */
-export interface FilterOptions {
+export interface FilterOptions extends LtlFilterOptions {
   topVariants?: number;
   minVariantFrequency?: number;
   /** Cumulative variant coverage in (0, 1]: keep the most frequent variants
@@ -459,6 +476,17 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     options.logSkeletonNoiseThreshold !== 0
   ) {
     add("log_skeleton_noise_threshold", String(options.logSkeletonNoiseThreshold));
+  }
+  if (options.ltlVariant && options.ltlAttributeValues?.length) {
+    add("ltl_variant", options.ltlVariant);
+    add("ltl_attribute_values", options.ltlAttributeValues.join(","));
+    if (options.ltlAttributeKey) add("ltl_attribute_key", options.ltlAttributeKey);
+    if (options.ltlPositive !== undefined) add("ltl_positive", String(options.ltlPositive));
+    if (options.ltlEnableTimestamp !== undefined)
+      add("ltl_enable_timestamp", String(options.ltlEnableTimestamp));
+    if (options.ltlTimestampDiffBoundaries?.length)
+      add("ltl_timestamp_diff_boundaries", options.ltlTimestampDiffBoundaries.map(([lo, hi]) => `${lo}:${hi}`).join(","));
+    if (options.ltlResourceKey) add("ltl_resource_key", options.ltlResourceKey);
   }
   const allLogSkeletonConstraints = [
     "equivalence",

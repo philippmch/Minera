@@ -13,6 +13,26 @@ import {
 import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
+  it("serializes bounded LTL trace filters", async () => {
+    expect(mineFormEntries({
+      ltlVariant: "eventually_follows",
+      ltlAttributeKey: "phase",
+      ltlAttributeValues: ["A", "B"],
+      ltlPositive: false,
+      ltlEnableTimestamp: true,
+      ltlTimestampDiffBoundaries: [[0, 2], [3.5, 9]],
+      ltlResourceKey: "performer",
+    })).toEqual([
+      ["ltl_variant", "eventually_follows"],
+      ["ltl_attribute_values", "A,B"],
+      ["ltl_attribute_key", "phase"],
+      ["ltl_positive", "false"],
+      ["ltl_enable_timestamp", "true"],
+      ["ltl_timestamp_diff_boundaries", "0:2,3.5:9"],
+      ["ltl_resource_key", "performer"],
+    ]);
+    expect(hasActiveFilters({ ltlVariant: "four_eyes_principle", ltlAttributeValues: ["A", "B"] })).toBe(true);
+  });
   it("serializes concept drift controls", () => {
     expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true })).toBe("drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_window_size=2");
   });

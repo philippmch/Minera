@@ -63,6 +63,61 @@ bool parse_boolean(std::string_view value, std::string_view name) {
                               std::string(value) + "'");
 }
 
+std::vector<std::string> parse_strict_csv(std::string_view value,
+                                          std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) + ": expected a non-empty list");
+  std::vector<std::string> result;
+  std::size_t start = 0;
+  for (std::size_t i = 0; i <= value.size(); ++i) {
+    if (i != value.size() && value[i] != ',') continue;
+    auto token = value.substr(start, i - start);
+    const auto first = token.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos)
+      throw std::invalid_argument(std::string(name) + ": values must not be empty");
+    const auto last = token.find_last_not_of(" \t\r\n");
+    result.emplace_back(token.substr(first, last - first + 1));
+    start = i + 1;
+  }
+  return result;
+}
+
+LtlFilterVariant parse_ltl_variant(std::string_view value) {
+  if (value == "eventually_follows" || value == "eventually-follows")
+    return LtlFilterVariant::kEventuallyFollows;
+  if (value == "a_next_b_next_c" || value == "a-next-b-next-c")
+    return LtlFilterVariant::kANextBNextC;
+  if (value == "four_eyes" || value == "four_eyes_principle" ||
+      value == "four-eyes" || value == "four-eyes-principle")
+    return LtlFilterVariant::kFourEyes;
+  if (value == "attr_value_different_persons" ||
+      value == "attribute_value_different_persons" ||
+      value == "attr-value-different-persons")
+    return LtlFilterVariant::kAttributeValueDifferentPersons;
+  throw std::invalid_argument(
+      "ltl_variant: expected eventually_follows, a_next_b_next_c, four_eyes_principle, or attr_value_different_persons, got '" +
+      std::string(value) + "'");
+}
+
+std::vector<std::pair<double, double>> parse_ltl_boundaries(
+    std::string_view value, std::string_view name) {
+  const auto items = parse_strict_csv(value, name);
+  std::vector<std::pair<double, double>> result;
+  result.reserve(items.size());
+  for (const auto& item : items) {
+    const auto sep = item.find(':');
+    if (sep == std::string::npos || item.find(':', sep + 1) != std::string::npos ||
+        sep == 0 || sep + 1 == item.size())
+      throw std::invalid_argument(std::string(name) + ": expected min:max pairs");
+    const double lower = parse_finite_double(item.substr(0, sep), name);
+    const double upper = parse_finite_double(item.substr(sep + 1), name);
+    if (lower > upper)
+      throw std::invalid_argument(std::string(name) + ": bounds must be ordered");
+    result.emplace_back(lower, upper);
+  }
+  return result;
+}
+
 std::map<std::string, double> parse_cost_map(std::string_view value,
                                              std::string_view name) {
   if (value.empty()) throw std::invalid_argument(std::string(name) + ": expected a value");
@@ -724,6 +779,58 @@ MineParams parse_mine_params(const FieldLookup& field) {
 MineParams parse_mine_params(const FieldLookup& field,
                              const FieldPresence& present) {
   MineParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+
+  // Optional bounded temporal predicate. Presence of any ltl_* field opts in;
+  // all supplied values are then parsed strictly so malformed requests fail
+  // before a potentially surprising discovery run.
+  const bool ltl_supplied = supplied("ltl_variant") ||
+                            supplied("ltl_attribute_key") ||
+                            supplied("ltl_attribute_values") ||
+                            supplied("ltl_positive") ||
+                            supplied("ltl_enable_timestamp") ||
+                            supplied("ltl_timestamp_diff_boundaries") ||
+                            supplied("ltl_resource_key");
+  if (ltl_supplied) {
+    LtlFilterOptions options;
+    if (supplied("ltl_variant"))
+      options.variant = parse_ltl_variant(field("ltl_variant"));
+    if (!supplied("ltl_attribute_values"))
+      throw std::invalid_argument("ltl_attribute_values: field is required when LTL filtering is enabled");
+    options.attribute_values =
+        parse_strict_csv(field("ltl_attribute_values"), "ltl_attribute_values");
+    if (supplied("ltl_attribute_key")) options.attribute_key = field("ltl_attribute_key");
+    if (supplied("ltl_resource_key")) options.resource_key = field("ltl_resource_key");
+    if (supplied("ltl_positive"))
+      options.positive = parse_boolean(field("ltl_positive"), "ltl_positive");
+    if (supplied("ltl_enable_timestamp"))
+      options.enable_timestamp = parse_boolean(field("ltl_enable_timestamp"), "ltl_enable_timestamp");
+    if (supplied("ltl_timestamp_diff_boundaries"))
+      options.timestamp_diff_boundaries = parse_ltl_boundaries(
+          field("ltl_timestamp_diff_boundaries"), "ltl_timestamp_diff_boundaries");
+    if (options.variant != LtlFilterVariant::kEventuallyFollows &&
+        (options.enable_timestamp || !options.timestamp_diff_boundaries.empty()))
+      throw std::invalid_argument(
+          "ltl_timestamp_diff_boundaries: timestamp bounds only apply to eventually_follows");
+    if (options.variant == LtlFilterVariant::kEventuallyFollows &&
+        options.enable_timestamp &&
+        options.timestamp_diff_boundaries.size() != options.attribute_values.size() - 1)
+      throw std::invalid_argument(
+          "ltl_timestamp_diff_boundaries: expected one min:max pair per adjacent value pair");
+    if (!options.enable_timestamp && !options.timestamp_diff_boundaries.empty())
+      throw std::invalid_argument(
+          "ltl_timestamp_diff_boundaries: requires ltl_enable_timestamp=true");
+    const auto expected = options.variant == LtlFilterVariant::kEventuallyFollows ? 0u
+                         : options.variant == LtlFilterVariant::kANextBNextC ? 3u
+                         : options.variant == LtlFilterVariant::kFourEyes ? 2u : 1u;
+    if ((expected == 0 && options.attribute_values.empty()) ||
+        (expected != 0 && options.attribute_values.size() != expected))
+      throw std::invalid_argument("ltl_attribute_values: wrong number of values for selected variant");
+    params.ltl = std::move(options);
+    params.ltl_enabled = true;
+  }
 
   if (const auto value = field("case_column"); !value.empty()) {
     params.csv.case_id_column = value;

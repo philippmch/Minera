@@ -213,9 +213,9 @@ this traditional-log vertical.
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object relations, o2o links, object changes, scalar globals, and classic/standard JSON parsing are present; e2e, richer value types, and full schema coverage remain |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
-| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN; no DFG format |
+| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN, and deterministic classic DFG text read/write are present; DFG adapters remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; LTL/segments remain |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; segments remain |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
@@ -561,6 +561,28 @@ and repairs the graph so retained activities remain reachable from a start and
 can reach an end. Focused tests cover boundary preservation, branch pruning,
 dependency ties, unknown activities, invalid thresholds, and deterministic
 output ordering.
+
+## LTL trace-filter evidence
+
+The native LTL filter exposes eventually-follows, contiguous A-next-B-next-C,
+four-eyes resource separation, and different-person predicates. It supports
+generic event/resource attribute keys, positive and negative selection,
+strict pattern arities, and optional inclusive timestamp-difference bounds for
+eventually-follows. Request parsing, the export CLI, the local mine endpoint,
+and the typed frontend controls all apply the predicate after ordinary log
+filters and preserve event/trace attributes. Focused regressions cover
+timestamp validation, generic attributes, polarity, missing four-eyes sides,
+and malformed request fields.
+
+## Classic DFG text I/O evidence
+
+The deterministic DFG interchange surface reads and writes the compact classic
+text layout: a sorted activity registry, `idxcount` boundary rows, and
+`source>targetxcount` edge rows. Counts are positive 64-bit integers, duplicate
+or out-of-range rows are rejected, unsafe multi-line/trimmed labels are
+rejected, and UTF-8 labels plus stream/path aliases round-trip through the
+native `DfgCleanAnalysis` payload. Trace variants and activity totals are not
+invented into this format; CLI/server/frontend adapters remain open.
 
 ## OCEL filtering evidence
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   type AttributeFilterMode,
   type FilterOptions,
+  type LtlVariant,
   type MinerOptions,
   type TimeFilterMode,
 } from "../api";
@@ -176,6 +177,13 @@ export function Filters({
   const [logSkeletonConstraints, setLogSkeletonConstraints] = useState<Set<string>>(
     () => new Set(logSkeletonFamilies.map(([name]) => name)),
   );
+  const [ltlVariant, setLtlVariant] = useState<LtlVariant | "">("");
+  const [ltlAttributeKey, setLtlAttributeKey] = useState("");
+  const [ltlAttributeValues, setLtlAttributeValues] = useState("");
+  const [ltlPositive, setLtlPositive] = useState(true);
+  const [ltlEnableTimestamp, setLtlEnableTimestamp] = useState(false);
+  const [ltlTimestampBounds, setLtlTimestampBounds] = useState("");
+  const [ltlResourceKey, setLtlResourceKey] = useState("");
   const declareFamilies = [
     ["existence", "Existence"], ["exactly_one", "Exactly-one"], ["init", "Init"],
     ["responded_existence", "Responded existence"], ["response", "Response"],
@@ -369,6 +377,19 @@ export function Filters({
     const names = value.split(",").map((name) => name.trim()).filter(Boolean);
     return names.length ? [...new Set(names)] : undefined;
   };
+  const toLtlValues = (value: string) => {
+    const values = value.split(",").map((item) => item.trim());
+    return values.length && values.every(Boolean) ? values : undefined;
+  };
+  const toLtlBounds = (value: string) => {
+    const result: Array<[number, number]> = [];
+    for (const item of value.split(",").map((part) => part.trim()).filter(Boolean)) {
+      const [lo, hi, ...rest] = item.split(":").map(Number);
+      if (rest.length || !Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) return undefined;
+      result.push([lo, hi]);
+    }
+    return result.length ? result : undefined;
+  };
 
   const spectrumNames = spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean);
   const spectrumConfigured = spectrumNames.length >= 2;
@@ -380,9 +401,28 @@ export function Filters({
     batchMergeDistanceSeconds,
     batchMinSize,
   });
+  const ltlNames = ltlAttributeValues.split(",").map((value) => value.trim()).filter(Boolean);
+  const ltlTimestampActive = ltlVariant === "eventually_follows" && ltlEnableTimestamp;
+  const ltlValidationError = (() => {
+    if (!ltlVariant) return null;
+    const expected = ltlVariant === "eventually_follows" ? 1 :
+      ltlVariant === "a_next_b_next_c" ? 3 : ltlVariant === "four_eyes_principle" ? 2 : 1;
+    if (ltlNames.length !== expected && !(ltlVariant === "eventually_follows" && ltlNames.length >= 1))
+      return `This LTL variant requires ${expected === 1 ? "one" : `exactly ${expected}`} value${expected === 1 ? "" : "s"}.`;
+    if (ltlVariant !== "eventually_follows" && ltlTimestampBounds.trim())
+      return "Timestamp bounds only apply to eventually-follows.";
+    if (ltlTimestampActive) {
+      const bounds = toLtlBounds(ltlTimestampBounds);
+      if (!bounds || bounds.length !== ltlNames.length - 1)
+        return "Timestamp bounds need one ordered finite min:max pair per adjacent value pair.";
+    } else if (ltlTimestampBounds.trim()) {
+      return "Clear timestamp bounds or enable timestamp filtering.";
+    }
+    return null;
+  })();
 
   const apply = () => {
-    if (temporalValidationError) return;
+    if (temporalValidationError || ltlValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -447,6 +487,14 @@ export function Filters({
         removeCaseValueList.length > 0 ? caseAttributeKey : undefined,
       removeCaseAttributeValues:
         removeCaseValueList.length > 0 ? removeCaseValueList : undefined,
+      ltlVariant: ltlVariant || undefined,
+      ltlAttributeKey: ltlVariant ? ltlAttributeKey || undefined : undefined,
+      ltlAttributeValues: ltlVariant ? toLtlValues(ltlAttributeValues) : undefined,
+      ltlPositive: ltlVariant ? ltlPositive : undefined,
+      ltlEnableTimestamp: ltlTimestampActive ? true : undefined,
+      ltlTimestampDiffBoundaries:
+        ltlTimestampActive ? toLtlBounds(ltlTimestampBounds) : undefined,
+      ltlResourceKey: ltlVariant ? ltlResourceKey || undefined : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
       alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
@@ -647,6 +695,13 @@ export function Filters({
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
     setBatchStartTimestampAttribute("");
+    setLtlVariant("");
+    setLtlAttributeKey("");
+    setLtlAttributeValues("");
+    setLtlPositive(true);
+    setLtlEnableTimestamp(false);
+    setLtlTimestampBounds("");
+    setLtlResourceKey("");
     onApply({});
   };
 
@@ -683,6 +738,9 @@ export function Filters({
     heuristicMostCommonPaths.trim() !== "" ||
     heuristicStartTimestampAttribute !== "start_timestamp" ||
     heuristicLifecycleInstanceAttribute !== "concept:instance";
+  const ltlDirty = ltlVariant !== "" || ltlAttributeValues.trim() !== "" ||
+    ltlAttributeKey.trim() !== "" || ltlResourceKey.trim() !== "" ||
+    !ltlPositive || ltlEnableTimestamp || ltlTimestampBounds.trim() !== "";
 
   const powlDirty =
     powlVariant !== "maximal" ||
@@ -712,7 +770,7 @@ export function Filters({
   const temporalDirty =
     spectrumActive || batches;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
-    declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty;
+    declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
   return (
     <section className="filters reveal">
@@ -1709,6 +1767,56 @@ export function Filters({
             </label>
           </div>
 
+          <div className="filters-subhead">LTL trace filter</div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Predicate variant</span>
+              <select value={ltlVariant} onChange={(e) => setLtlVariant(e.target.value as LtlVariant | "")}>
+                <option value="">off</option>
+                <option value="eventually_follows">eventually follows</option>
+                <option value="a_next_b_next_c">A next B next C</option>
+                <option value="four_eyes_principle">four-eyes principle</option>
+                <option value="attr_value_different_persons">different persons</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Attribute key <small>(blank = activity)</small></span>
+              <input type="text" value={ltlAttributeKey} disabled={!ltlVariant}
+                onChange={(e) => setLtlAttributeKey(e.target.value)} />
+            </label>
+            <label className="filters-field filters-field-wide">
+              <span>Ordered values <small>(comma-separated)</small></span>
+              <input type="text" placeholder="A, B" value={ltlAttributeValues} disabled={!ltlVariant}
+                onChange={(e) => setLtlAttributeValues(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Match polarity</span>
+              <select value={ltlPositive ? "positive" : "negative"} disabled={!ltlVariant}
+                onChange={(e) => setLtlPositive(e.target.value === "positive")}>
+                <option value="positive">positive (keep matches)</option>
+                <option value="negative">negative (drop matches)</option>
+              </select>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Resource key <small>(blank = resource)</small></span>
+              <input type="text" value={ltlResourceKey} disabled={!ltlVariant || ltlVariant === "eventually_follows" || ltlVariant === "a_next_b_next_c"}
+                onChange={(e) => setLtlResourceKey(e.target.value)} />
+            </label>
+            <label className="filters-field filters-check">
+              <input type="checkbox" checked={ltlEnableTimestamp}
+                disabled={!ltlVariant || ltlVariant !== "eventually_follows"}
+                onChange={(e) => setLtlEnableTimestamp(e.target.checked)} />
+              <span>Enable timestamp bounds</span>
+            </label>
+            <label className="filters-field filters-field-wide">
+              <span>Timestamp bounds <small>(min:max pairs)</small></span>
+              <input type="text" placeholder="0:10,0:30" value={ltlTimestampBounds}
+                disabled={!ltlEnableTimestamp} onChange={(e) => setLtlTimestampBounds(e.target.value)} />
+            </label>
+          </div>
+
           <div className="filters-subhead">Temporal &amp; behavioral discovery</div>
           <div className="filters-row">
             <label className="filters-field">
@@ -1791,11 +1899,11 @@ export function Filters({
             </label>
           </div>
 
-          {temporalValidationError && (
-            <p className="filters-validation" role="alert">{temporalValidationError}</p>
+          {(temporalValidationError || ltlValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError)}>
               Apply
             </button>
             <button
