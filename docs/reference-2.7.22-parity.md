@@ -222,7 +222,7 @@ this traditional-log vertical.
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG output through CLI/server/frontend adapters are present; DFG input adapters remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
-| Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — interval-event, case-envelope, and concurrent-activity overlap plus OCEL object-type activity sets and per-event object-type counts are available through native/CLI/server/frontend adapters; process-cube and broader OCEL association/edge statistics remain |
+| Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — interval-event, case-envelope, and concurrent-activity overlap plus OCEL object-type summaries, activity/object associations, and edge metrics are available through native/CLI/server/frontend adapters; process-cube and business-calendar/statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
@@ -241,12 +241,15 @@ by `tests/test_request_params.cpp` and the focused overlap/native JSON tests.
 OCEL statistics evidence: `object_type_activities` returns deterministic
 lexical object-type keys with deduplicated related activities, while
 `objects_ot_count` returns deterministic event/object-type maps and counts
-duplicate relation rows independently. The native APIs, `minera_ocel
---statistics`, multipart local `POST /api/ocel/statistics`, and typed frontend
+duplicate relation rows independently. Activity associations support none,
+start, and end relation prefilters; object-type-dependent associations and
+event-edge metrics include event couples, unique objects, event-object triples,
+and sorted elapsed-time samples. The native APIs, `minera_ocel --statistics`,
+multipart local `POST /api/ocel/statistics`, and typed frontend
 request/response guard share the `OCEL_STATISTICS` JSON envelope. Empty logs,
-unreferenced objects, duplicate relations, and invalid relation identifiers are
-covered by focused Release tests; association, edge, and process-cube
-statistics remain open.
+unreferenced objects, duplicate relations, invalid identifiers, prefilters,
+repeated activity labels, and malformed timestamps are covered by focused
+Release tests; process-cube and business-calendar extensions remain open.
 
 ## Delivery order
 

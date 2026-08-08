@@ -2630,12 +2630,16 @@ export async function requestOcelFeatures(
 }
 
 export interface OcelStatisticsOptions {
-  variant?: "object_type_activities" | "objects_ot_count";
+  variant?: "object_type_activities" | "objects_ot_count" |
+    "activity_associations" | "object_type_activity_associations" | "edge_associations";
+  prefilter?: "none" | "start" | "end";
 }
 
 export function ocelStatisticsQuery(options: OcelStatisticsOptions = {}): string {
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.prefilter !== undefined && options.prefilter !== "none")
+    query.set("prefilter", options.prefilter);
   return query.toString();
 }
 

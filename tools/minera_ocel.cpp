@@ -26,11 +26,11 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
-                        statistics,
+                        statistics, statistics_prefilter = "none",
                         split_object_type, normative_path, csv_objects_path,
                         normative_csv_objects_path;
     std::map<std::string, std::size_t> filter_object_counts;
@@ -206,6 +206,10 @@ int main(int argc, char** argv) {
         if (!statistics.empty())
           throw std::invalid_argument("--statistics may be specified once");
         statistics = argv[++i];
+      } else if (option == "--statistics-prefilter" && i + 1 < argc) {
+        if (statistics_prefilter != "none")
+          throw std::invalid_argument("--statistics-prefilter may be specified once");
+        statistics_prefilter = argv[++i];
       } else if ((option == "--format" || option == "--features" ||
            option == "--discover" ||
            option == "--split") && i + 1 < argc) {
@@ -366,10 +370,22 @@ int main(int argc, char** argv) {
           "features must be events, objects, or events_objects");
     }
     if (!statistics.empty() && statistics != "object_type_activities" &&
-        statistics != "objects_ot_count") {
+        statistics != "objects_ot_count" &&
+        statistics != "activity_associations" &&
+        statistics != "object_type_activity_associations" &&
+        statistics != "edge_associations") {
       throw std::invalid_argument(
-          "statistics must be object_type_activities or objects_ot_count");
+          "statistics must be object_type_activities, objects_ot_count, activity_associations, object_type_activity_associations, or edge_associations");
     }
+    if (statistics_prefilter != "none" && statistics_prefilter != "start" &&
+        statistics_prefilter != "end")
+      throw std::invalid_argument(
+          "statistics-prefilter must be none, start, or end");
+    if (statistics_prefilter != "none" &&
+        statistics != "activity_associations" &&
+        statistics != "object_type_activity_associations")
+      throw std::invalid_argument(
+          "statistics-prefilter applies only to association statistics");
     if (!discover.empty() && discover != "etot" && discover != "ocdfg" &&
         discover != "ocpn" && discover != "otg" && discover != "saw") {
       throw std::invalid_argument("discover must be etot, ocdfg, ocpn, otg, or saw");
@@ -517,10 +533,29 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "--features cannot be combined with discovery, split, conformance, or playout");
     if (!statistics.empty()) {
-      const auto variant = statistics == "object_type_activities"
-                               ? minera::OcelStatisticsVariant::kObjectTypeActivities
-                               : minera::OcelStatisticsVariant::kObjectsOtCount;
-      std::cout << minera::serialize_ocel_statistics_json(log, variant) << '\n';
+      const auto prefilter = statistics_prefilter == "start"
+                                 ? minera::OcelAssociationPrefilter::kStart
+                                 : statistics_prefilter == "end"
+                                       ? minera::OcelAssociationPrefilter::kEnd
+                                       : minera::OcelAssociationPrefilter::kNone;
+      if (statistics == "activity_associations") {
+        std::cout << minera::serialize_ocel_statistics_json(
+                         minera::activity_associations(log, prefilter))
+                  << '\n';
+      } else if (statistics == "object_type_activity_associations") {
+        std::cout << minera::serialize_ocel_statistics_json(
+                         minera::object_type_activity_associations(log, prefilter))
+                  << '\n';
+      } else if (statistics == "edge_associations") {
+        std::cout << minera::serialize_ocel_statistics_json(
+                         minera::edge_associations(log))
+                  << '\n';
+      } else {
+        const auto variant = statistics == "object_type_activities"
+                                 ? minera::OcelStatisticsVariant::kObjectTypeActivities
+                                 : minera::OcelStatisticsVariant::kObjectsOtCount;
+        std::cout << minera::serialize_ocel_statistics_json(log, variant) << '\n';
+      }
       return 0;
     }
     if (!features.empty()) {
