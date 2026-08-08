@@ -59,6 +59,7 @@
 #include "minera/clustering.hpp"
 #include "minera/segment_filter.hpp"
 #include "minera/path_filter.hpp"
+#include "minera/overlap.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -121,6 +122,9 @@ struct MineParams {
   // ordinary filters and segment extraction and before LTL.
   std::optional<AdjacentPathFilterOptions> path;
   bool path_enabled = false;
+  // Optional overlap statistics, computed after all log filters.
+  bool overlap = false;
+  OverlapOptions overlap_options;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;

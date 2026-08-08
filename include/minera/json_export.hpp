@@ -51,6 +51,7 @@
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
 #include "minera/network_analysis.hpp"
+#include "minera/overlap.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/local_diagnostics.hpp"
@@ -141,7 +142,12 @@ void write_analysis_json(std::ostream& out,
                          const ProcessTree* reduced_process_tree = nullptr,
                          std::size_t reduced_trace_index = 0,
                          const std::vector<ModelEvaluation>* evaluation = nullptr,
-                         const EmdResult* earth_movers_distance = nullptr);
+                         const EmdResult* earth_movers_distance = nullptr,
+                         const IntervalEventOverlapCounts*
+                             interval_event_overlap_counts = nullptr,
+                         const CaseOverlapCounts* case_overlap_counts = nullptr,
+                         const ConcurrentActivityOverlapResult*
+                             concurrent_activity_overlap = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -190,7 +196,10 @@ void write_analysis_json(std::ostream& out,
     const ProcessTree* reduced_process_tree = nullptr,
     std::size_t reduced_trace_index = 0,
     const std::vector<ModelEvaluation>* evaluation = nullptr,
-    const EmdResult* earth_movers_distance = nullptr);
+    const EmdResult* earth_movers_distance = nullptr,
+    const IntervalEventOverlapCounts* interval_event_overlap_counts = nullptr,
+    const CaseOverlapCounts* case_overlap_counts = nullptr,
+    const ConcurrentActivityOverlapResult* concurrent_activity_overlap = nullptr);
 
 [[nodiscard]] std::string replay_fitness_json(
     const ReplayFitnessResult& result,

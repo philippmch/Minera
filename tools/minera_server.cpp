@@ -435,6 +435,20 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       }
     }
 
+    std::optional<minera::IntervalEventOverlapCounts> overlap_interval_events;
+    std::optional<minera::CaseOverlapCounts> overlap_cases;
+    std::optional<minera::ConcurrentActivityOverlapResult>
+        overlap_concurrent_activities;
+    if (params.overlap) {
+      overlap_interval_events = minera::discover_interval_event_overlap_counts(
+          log, params.overlap_options);
+      overlap_cases = minera::discover_case_overlap_counts(
+          log, params.overlap_options);
+      overlap_concurrent_activities =
+          minera::discover_concurrent_activity_overlap(log,
+                                                       params.overlap_options);
+    }
+
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
@@ -469,7 +483,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         dfg_variants_analysis ? &*dfg_variants_analysis : nullptr,
         correlation_variants_analysis ? &*correlation_variants_analysis
                                       : nullptr,
-        batch_discovery ? &*batch_discovery : nullptr);
+        batch_discovery ? &*batch_discovery : nullptr,
+        /* dfg_alignment */ nullptr, /* edit_distance */ nullptr,
+        /* edit_anti */ false, /* dfg_projection */ nullptr,
+        /* dfg_projected_log */ nullptr, /* edit_projected_log */ nullptr,
+        /* process_tree_alignment */ nullptr, /* decomposed_alignment */ nullptr,
+        /* petri_anti_alignment */ nullptr, /* petri_multi_alignment */ nullptr,
+        /* reduced_process_tree */ nullptr, /* reduced_trace_index */ 0,
+        /* evaluation */ nullptr, /* earth_movers_distance */ nullptr,
+        overlap_interval_events ? &*overlap_interval_events : nullptr,
+        overlap_cases ? &*overlap_cases : nullptr,
+        overlap_concurrent_activities ? &*overlap_concurrent_activities
+                                      : nullptr);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all models up front.

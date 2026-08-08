@@ -204,6 +204,11 @@ describe("isMineraExport", () => {
     expect(isMineraExport(valid)).toBe(true);
   });
 
+  it("rejects null or primitive overlap payloads", () => {
+    expect(isMineraExport({ ...valid, overlap: null })).toBe(false);
+    expect(isMineraExport({ ...valid, overlap: 4 })).toBe(false);
+  });
+
   it("accepts an export with a temporal profile", () => {
     expect(
       isMineraExport({

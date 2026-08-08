@@ -2704,6 +2704,102 @@ void write_correlation_mining(
   out << "]}";
 }
 
+template <typename Counts>
+void validate_overlap_vector(const Counts& counts, const char* name) {
+  using Value = typename Counts::value_type;
+  for (const auto value : counts) {
+    // Native overlap counters are unsigned integers, but retain these checks
+    // so the export contract remains safe if a floating-point counter type is
+    // supplied by a downstream adapter.
+    const auto numeric = static_cast<long double>(value);
+    if (!std::isfinite(numeric) ||
+        (std::is_signed_v<Value> && value < static_cast<Value>(0))) {
+      throw std::invalid_argument(std::string(name) +
+                                  " must contain finite non-negative counts");
+    }
+  }
+}
+
+void validate_overlap_counts(
+    const EventLog& log,
+    const IntervalEventOverlapCounts* interval_event_overlap_counts,
+    const CaseOverlapCounts* case_overlap_counts,
+    const ConcurrentActivityOverlapResult*
+        concurrent_activity_overlap = nullptr) {
+  if (interval_event_overlap_counts != nullptr &&
+      interval_event_overlap_counts->size() != log.event_count()) {
+    throw std::invalid_argument(
+        "interval event overlap counts must match event count");
+  }
+  if (interval_event_overlap_counts != nullptr) {
+    validate_overlap_vector(*interval_event_overlap_counts,
+                            "interval event overlap counts");
+  }
+  if (case_overlap_counts != nullptr &&
+      case_overlap_counts->size() != log.trace_count()) {
+    throw std::invalid_argument("case overlap counts must match trace count");
+  }
+  if (case_overlap_counts != nullptr) {
+    validate_overlap_vector(*case_overlap_counts, "case overlap counts");
+  }
+  if (concurrent_activity_overlap != nullptr) {
+    for (const auto& [pair, count] : *concurrent_activity_overlap) {
+      if (pair.first > pair.second) {
+        throw std::invalid_argument(
+            "concurrent activity overlap pair must be lexicographically ordered");
+      }
+      const auto numeric = static_cast<long double>(count);
+      if (!std::isfinite(numeric) || count < 0) {
+        throw std::invalid_argument(
+            "concurrent activity overlap counts must be finite non-negative counts");
+      }
+    }
+  }
+}
+
+void write_overlap(
+    std::ostream& out,
+    const IntervalEventOverlapCounts* interval_event_overlap_counts,
+    const CaseOverlapCounts* case_overlap_counts,
+    const ConcurrentActivityOverlapResult* concurrent_activity_overlap) {
+  out << '{';
+  bool first = true;
+  if (interval_event_overlap_counts != nullptr) {
+    out << "\"interval_events\": [";
+    for (std::size_t i = 0; i < interval_event_overlap_counts->size(); ++i) {
+      if (i != 0) out << ", ";
+      out << (*interval_event_overlap_counts)[i];
+    }
+    out << ']';
+    first = false;
+  }
+  if (case_overlap_counts != nullptr) {
+    if (!first) out << ", ";
+    out << "\"cases\": [";
+    for (std::size_t i = 0; i < case_overlap_counts->size(); ++i) {
+      if (i != 0) out << ", ";
+      out << (*case_overlap_counts)[i];
+    }
+    out << ']';
+    first = false;
+  }
+  if (concurrent_activity_overlap != nullptr) {
+    if (!first) out << ", ";
+    out << "\"concurrent_activities\": [";
+    std::size_t emitted = 0;
+    for (const auto& [pair, count] : *concurrent_activity_overlap) {
+      if (emitted++ != 0) out << ", ";
+      out << "{\"first\": ";
+      write_json_string(out, pair.first);
+      out << ", \"second\": ";
+      write_json_string(out, pair.second);
+      out << ", \"count\": " << count << '}';
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
 }  // namespace
 
 void write_analysis_json(std::ostream& out,
@@ -2755,7 +2851,12 @@ void write_analysis_json(std::ostream& out,
                          const ProcessTree* reduced_process_tree,
                          std::size_t reduced_trace_index,
                          const std::vector<ModelEvaluation>* evaluation,
-                         const EmdResult* earth_movers_distance) {
+                         const EmdResult* earth_movers_distance,
+                         const IntervalEventOverlapCounts*
+                             interval_event_overlap_counts,
+                         const CaseOverlapCounts* case_overlap_counts,
+                         const ConcurrentActivityOverlapResult*
+                             concurrent_activity_overlap) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2807,6 +2908,8 @@ void write_analysis_json(std::ostream& out,
       }
     }
   }
+  validate_overlap_counts(log, interval_event_overlap_counts,
+                          case_overlap_counts, concurrent_activity_overlap);
   out << "{\n";
   out << "  \"dataset\": ";
   write_json_string(out, dataset);
@@ -3053,6 +3156,12 @@ void write_analysis_json(std::ostream& out,
     out << ",\n  \"earth_movers_distance\": ";
     write_emd(out, *earth_movers_distance);
   }
+  if (interval_event_overlap_counts != nullptr || case_overlap_counts != nullptr ||
+      concurrent_activity_overlap != nullptr) {
+    out << ",\n  \"overlap\": ";
+    write_overlap(out, interval_event_overlap_counts, case_overlap_counts,
+                  concurrent_activity_overlap);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -3105,7 +3214,12 @@ std::string analysis_json(std::string_view dataset,
                           const ProcessTree* reduced_process_tree,
                           std::size_t reduced_trace_index,
                           const std::vector<ModelEvaluation>* evaluation,
-                          const EmdResult* earth_movers_distance) {
+                          const EmdResult* earth_movers_distance,
+                          const IntervalEventOverlapCounts*
+                              interval_event_overlap_counts,
+                          const CaseOverlapCounts* case_overlap_counts,
+                          const ConcurrentActivityOverlapResult*
+                              concurrent_activity_overlap) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -3121,7 +3235,8 @@ std::string analysis_json(std::string_view dataset,
                       process_tree_alignment, decomposed_alignment,
                       petri_anti_alignment, petri_multi_alignment,
                       reduced_process_tree, reduced_trace_index, evaluation,
-                      earth_movers_distance);
+                      earth_movers_distance, interval_event_overlap_counts,
+                      case_overlap_counts, concurrent_activity_overlap);
   return out.str();
 }
 
