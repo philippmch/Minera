@@ -59,6 +59,7 @@ add_library(minera_core
   src/link_analysis.cpp
   src/json_export.cpp
   src/log_filter.cpp
+  src/segment_filter.cpp
   src/ltl_filter.cpp
   src/log_to_features.cpp
   src/log_to_target.cpp
@@ -221,6 +222,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ltl_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ltl_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ltl_filter_tests COMMAND minera_ltl_filter_tests)
+
+  add_executable(minera_segment_filter_tests
+    tests/test_segment_filter.cpp
+  )
+  target_link_libraries(minera_segment_filter_tests PRIVATE minera::core)
+  target_compile_features(minera_segment_filter_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_segment_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_segment_filter_tests COMMAND minera_segment_filter_tests)
 
   add_executable(minera_embeddings_tests
     tests/test_embeddings.cpp

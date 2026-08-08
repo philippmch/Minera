@@ -215,7 +215,7 @@ this traditional-log vertical.
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, BPMN, and deterministic classic DFG text read/write are present; DFG adapters remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; segments remain |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; segment adapters remain |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
@@ -583,6 +583,19 @@ or out-of-range rows are rejected, unsafe multi-line/trimmed labels are
 rejected, and UTF-8 labels plus stream/path aliases round-trip through the
 native `DfgCleanAnalysis` payload. Trace variants and activity totals are not
 invented into this format; CLI/server/frontend adapters remain open.
+
+## Segment-filter evidence
+
+The native segment surface exposes prefix and suffix cuts with first/last
+anchor selection and strict/non-strict boundary behavior, plus between
+extraction over activity sets. Complete subtraces retain event and trace
+attributes, reuse a shared boundary for repeated equal endpoints, and receive
+deterministic subcase identifiers with a configurable separator. Empty cuts
+are preserved when a strict boundary is at the edge; incomplete between
+segments are discarded. Focused tests cover missing anchors, first/last
+selection, strict boundaries, repeated endpoints, activity lists, attributes,
+custom identifiers, and malformed options. CLI/server/frontend adapters remain
+open.
 
 ## OCEL filtering evidence
 
