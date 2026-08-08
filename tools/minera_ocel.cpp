@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -15,6 +16,7 @@
 #include "minera/ocel_xml.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel_features.hpp"
+#include "minera/ocel_filter.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
@@ -22,12 +24,14 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-start-events TYPE] [--filter-end-events TYPE] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
                         split_object_type, normative_path, csv_objects_path,
                         normative_csv_objects_path;
+    std::map<std::string, std::size_t> filter_object_counts;
+    std::string filter_start_events_type, filter_end_events_type;
     bool csv_input = false, xml_input = false;
     minera::Ocel log;
     bool ocpn_playout = false;
@@ -76,6 +80,42 @@ int main(int argc, char** argv) {
         csv_input = true;
       } else if (option == "--normative-csv-objects" && i + 1 < argc) {
         normative_csv_objects_path = argv[++i];
+      } else if (option == "--filter-object-count" && i + 1 < argc) {
+        const std::string spec = argv[++i];
+        const auto separator = spec.find(':');
+        if (separator == std::string::npos || separator == 0 ||
+            separator + 1 >= spec.size()) {
+          throw std::invalid_argument(
+              "--filter-object-count expects TYPE:N");
+        }
+        const auto type = spec.substr(0, separator);
+        const auto count_text = spec.substr(separator + 1);
+        const auto parsed = number(count_text, "--filter-object-count");
+        if (parsed < 0.0 || std::floor(parsed) != parsed ||
+            parsed > static_cast<double>(std::numeric_limits<std::size_t>::max())) {
+          throw std::invalid_argument(
+              "--filter-object-count expects a non-negative integer count");
+        }
+        if (!filter_object_counts.emplace(type, static_cast<std::size_t>(parsed)).second) {
+          throw std::invalid_argument(
+              "--filter-object-count repeats an object type");
+        }
+      } else if (option == "--filter-start-events" && i + 1 < argc) {
+        if (!filter_start_events_type.empty()) {
+          throw std::invalid_argument("--filter-start-events may be specified once");
+        }
+        filter_start_events_type = argv[++i];
+        if (filter_start_events_type.empty()) {
+          throw std::invalid_argument("--filter-start-events expects a type");
+        }
+      } else if (option == "--filter-end-events" && i + 1 < argc) {
+        if (!filter_end_events_type.empty()) {
+          throw std::invalid_argument("--filter-end-events may be specified once");
+        }
+        filter_end_events_type = argv[++i];
+        if (filter_end_events_type.empty()) {
+          throw std::invalid_argument("--filter-end-events expects a type");
+        }
       } else if ((option == "--format" || option == "--features" ||
            option == "--discover" ||
            option == "--split") && i + 1 < argc) {
@@ -314,8 +354,20 @@ int main(int argc, char** argv) {
         if (!input) throw std::runtime_error("cannot open input");
         std::ostringstream text;
         text << input.rdbuf();
-        log = minera::parse_ocel_json(text.str());
+      log = minera::parse_ocel_json(text.str());
       }
+    }
+    if (!filter_object_counts.empty()) {
+      log = minera::filter_ocel_events_object_type_counts(
+          log, filter_object_counts);
+    }
+    if (!filter_start_events_type.empty()) {
+      log = minera::filter_ocel_start_events_per_object_type(
+          log, filter_start_events_type);
+    }
+    if (!filter_end_events_type.empty()) {
+      log = minera::filter_ocel_end_events_per_object_type(
+          log, filter_end_events_type);
     }
     if (!features.empty() &&
         (!discover.empty() || !split.empty() || !conformance.empty() ||

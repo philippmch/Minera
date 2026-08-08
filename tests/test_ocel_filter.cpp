@@ -79,6 +79,48 @@ int main() {
   const auto none = minera::filter_ocel_activity_type_matching(log, {});
   assert(none.events.empty() && none.objects.empty() && none.relations.empty());
 
+  const auto counts = minera::ocel_event_object_type_counts(log);
+  assert(counts.at("e1").at("Order") == 1);
+  assert(counts.at("e1").at("Item") == 1);
+  assert(counts.at("e2").at("Order") == 1);
+  assert(counts.at("e3").at("Item") == 1);
+
+  const auto at_least_order_and_item =
+      minera::filter_ocel_events_object_type_counts(
+          log, {{"Order", 1}, {"Item", 1}});
+  assert(at_least_order_and_item.events.size() == 1);
+  assert(at_least_order_and_item.events.front().id == "e1");
+  assert(at_least_order_and_item.objects.size() == 2);
+  assert(at_least_order_and_item.relations.size() == 2);
+
+  const auto starts =
+      minera::filter_ocel_start_events_per_object_type(log, "Item");
+  assert(starts.events.size() == 2);
+  assert(starts.events[0].id == "e1" && starts.events[1].id == "e3");
+  assert(starts.objects.size() == 3 && starts.relations.size() == 3);
+
+  const auto ends =
+      minera::filter_ocel_end_events_per_object_type(log, "Item");
+  assert(ends.events.size() == 2);
+  assert(ends.events[0].id == "e1" && ends.events[1].id == "e3");
+  assert(ends.objects.size() == 3 && ends.relations.size() == 3);
+
+  const auto empty_requirements =
+      minera::filter_ocel_events_object_type_counts(log, {});
+  assert(empty_requirements.events.size() == 3);
+  const auto missing_type = minera::filter_ocel_events_object_type_counts(
+      log, {{"Missing", 0}});
+  assert(missing_type.events.empty() && missing_type.objects.empty());
+
+  const auto unknown_endpoint =
+      minera::filter_ocel_start_events_per_object_type(log, "Missing");
+  assert(unknown_endpoint.events.empty() && unknown_endpoint.objects.empty());
+
+  minera::Ocel duplicate = log;
+  duplicate.relations.push_back({"e1", "o2", "duplicate"});
+  assert(minera::ocel_event_object_type_counts(duplicate).at("e1").at("Item") ==
+         2);
+
   bool rejected = false;
   try {
     (void)minera::filter_ocel_event_attribute(log, "", {});
