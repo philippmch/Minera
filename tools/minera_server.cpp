@@ -68,6 +68,7 @@
 #include "minera/ocel.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_filter.hpp"
+#include "minera/ocel_statistics.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
@@ -1177,6 +1178,39 @@ void handle_ocel_features(const httplib::Request& request,
                              minera::extract_ocel_features(
                                  minera::parse_ocel_json(body), variant, options)),
                          "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_statistics(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"variant"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL statistics parameter: " + key);
+    }
+    const auto value = request.has_param("variant")
+                           ? request.get_param_value("variant")
+                           : std::string("object_type_activities");
+    minera::OcelStatisticsVariant variant;
+    if (value == "object_type_activities" || value == "OBJECT_TYPE_ACTIVITIES") {
+      variant = minera::OcelStatisticsVariant::kObjectTypeActivities;
+    } else if (value == "objects_ot_count" || value == "OBJECTS_OT_COUNT") {
+      variant = minera::OcelStatisticsVariant::kObjectsOtCount;
+    } else {
+      throw std::invalid_argument(
+          "variant expects object_type_activities or objects_ot_count");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    response.set_content(
+        minera::serialize_ocel_statistics_json(minera::parse_ocel_json(body),
+                                               variant),
+        "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -3113,6 +3147,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
+  server.Options("/api/ocel/statistics", preflight);
   server.Options("/api/ocel/filter", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
@@ -3167,6 +3202,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
+  server.Post("/api/ocel/statistics", handle_ocel_statistics);
   server.Post("/api/ocel/filter", handle_ocel_filter);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);

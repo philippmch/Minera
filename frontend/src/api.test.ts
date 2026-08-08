@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -243,6 +243,8 @@ describe("OCEL API", () => {
       numeric_event_attributes: ["z", "a"],
       string_object_attributes: ["color"],
     })).toBe("variant=objects&max_features=12&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color");
+    expect(ocelStatisticsQuery({ variant: "objects_ot_count" }))
+      .toBe("variant=objects_ot_count");
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
     expect(ocelFilterQuery({
@@ -323,6 +325,20 @@ describe("OCEL API", () => {
     await expect(requestOcelFeatures(new File(["{}"], "log.json"), {
       variant: "events", include_lifecycle_features: false,
     })).resolves.toMatchObject({ family: "OCEL_FEATURES", variant: "EVENTS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("posts an OCEL statistics request and validates the summary", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
+      expect(init.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => ({
+        family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
+        objects_ot_count: { e1: { item: 2 } },
+      }) };
+    }));
+    await expect(requestOcelStatistics(new File(["{}"], "log.json"), {
+      variant: "objects_ot_count",
+    })).resolves.toMatchObject({ family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT" });
     vi.unstubAllGlobals();
   });
 
