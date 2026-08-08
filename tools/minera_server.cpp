@@ -1187,7 +1187,7 @@ void handle_ocel_features(const httplib::Request& request,
 void handle_ocel_statistics(const httplib::Request& request,
                             httplib::Response& response) {
   try {
-    static const std::set<std::string> allowed = {"variant"};
+    static const std::set<std::string> allowed = {"variant", "prefilter"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1197,20 +1197,58 @@ void handle_ocel_statistics(const httplib::Request& request,
                            ? request.get_param_value("variant")
                            : std::string("object_type_activities");
     minera::OcelStatisticsVariant variant;
-    if (value == "object_type_activities" || value == "OBJECT_TYPE_ACTIVITIES") {
-      variant = minera::OcelStatisticsVariant::kObjectTypeActivities;
-    } else if (value == "objects_ot_count" || value == "OBJECTS_OT_COUNT") {
-      variant = minera::OcelStatisticsVariant::kObjectsOtCount;
-    } else {
-      throw std::invalid_argument(
-          "variant expects object_type_activities or objects_ot_count");
-    }
+    const auto prefilter_value = request.has_param("prefilter")
+                                     ? request.get_param_value("prefilter")
+                                     : std::string("none");
+    if (prefilter_value != "none" && prefilter_value != "start" &&
+        prefilter_value != "end")
+      throw std::invalid_argument("prefilter expects none, start, or end");
+    const auto prefilter = prefilter_value == "start"
+                               ? minera::OcelAssociationPrefilter::kStart
+                               : prefilter_value == "end"
+                                     ? minera::OcelAssociationPrefilter::kEnd
+                                     : minera::OcelAssociationPrefilter::kNone;
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
-    response.set_content(
-        minera::serialize_ocel_statistics_json(minera::parse_ocel_json(body),
-                                               variant),
-        "application/json");
+    const auto log = minera::parse_ocel_json(body);
+    if (value == "object_type_activities" ||
+        value == "OBJECT_TYPE_ACTIVITIES") {
+      if (prefilter != minera::OcelAssociationPrefilter::kNone)
+        throw std::invalid_argument(
+            "prefilter applies only to association statistics");
+      variant = minera::OcelStatisticsVariant::kObjectTypeActivities;
+      response.set_content(minera::serialize_ocel_statistics_json(log, variant),
+                           "application/json");
+    } else if (value == "objects_ot_count" || value == "OBJECTS_OT_COUNT") {
+      if (prefilter != minera::OcelAssociationPrefilter::kNone)
+        throw std::invalid_argument(
+            "prefilter applies only to association statistics");
+      variant = minera::OcelStatisticsVariant::kObjectsOtCount;
+      response.set_content(minera::serialize_ocel_statistics_json(log, variant),
+                           "application/json");
+    } else if (value == "activity_associations" ||
+               value == "ACTIVITY_ASSOCIATIONS") {
+      response.set_content(
+          minera::serialize_ocel_statistics_json(
+              minera::activity_associations(log, prefilter)),
+          "application/json");
+    } else if (value == "object_type_activity_associations" ||
+               value == "OBJECT_TYPE_ACTIVITY_ASSOCIATIONS") {
+      response.set_content(
+          minera::serialize_ocel_statistics_json(
+              minera::object_type_activity_associations(log, prefilter)),
+          "application/json");
+    } else if (value == "edge_associations" || value == "EDGE_ASSOCIATIONS") {
+      if (prefilter != minera::OcelAssociationPrefilter::kNone)
+        throw std::invalid_argument(
+            "prefilter applies only to association statistics");
+      response.set_content(
+          minera::serialize_ocel_statistics_json(minera::edge_associations(log)),
+          "application/json");
+    } else {
+      throw std::invalid_argument(
+          "variant expects object_type_activities, objects_ot_count, activity_associations, object_type_activity_associations, or edge_associations");
+    }
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

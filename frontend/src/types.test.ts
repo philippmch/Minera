@@ -30,6 +30,17 @@ describe("isOcelStatisticsResult", () => {
       family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
       objects_ot_count: { e1: { item: 2 } },
     })).toBe(true);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
+      associations: { Create: [["e1", "o1"]] },
+    })).toBe(true);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "EDGE_ASSOCIATIONS",
+      edges: { item: { "Create->Ship": {
+        event_couples: [["e1", "e2"]], unique_objects: ["o1"],
+        event_objects: [["e1", "e2", "o1"]], performance: [1],
+      } } },
+    })).toBe(true);
   });
   it("rejects malformed summary payloads", () => {
     expect(isOcelStatisticsResult({
@@ -39,6 +50,10 @@ describe("isOcelStatisticsResult", () => {
     expect(isOcelStatisticsResult({
       family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
       objects_ot_count: { e1: { item: -1 } },
+    })).toBe(false);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
+      associations: { Create: [["e1"]] },
     })).toBe(false);
   });
 });

@@ -862,25 +862,69 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
       row.every((entry) => typeof entry === "number" && Number.isFinite(entry)));
 }
 
-export type OcelStatisticsVariant = "OBJECT_TYPE_ACTIVITIES" | "OBJECTS_OT_COUNT";
+export type OcelStatisticsVariant =
+  | "OBJECT_TYPE_ACTIVITIES"
+  | "OBJECTS_OT_COUNT"
+  | "ACTIVITY_ASSOCIATIONS"
+  | "OBJECT_TYPE_ACTIVITY_ASSOCIATIONS"
+  | "EDGE_ASSOCIATIONS";
+export type OcelAssociationPair = [string, string];
+export interface OcelEdgeAssociationMetric {
+  event_couples: Array<[string, string]>;
+  unique_objects: string[];
+  event_objects: Array<[string, string, string]>;
+  performance: number[];
+}
 export interface OcelStatisticsResult {
   family: "OCEL_STATISTICS";
   variant: OcelStatisticsVariant;
   object_type_activities?: Record<string, string[]>;
   objects_ot_count?: Record<string, Record<string, number>>;
+  associations?: Record<string, OcelAssociationPair[]> |
+    Record<string, Record<string, OcelAssociationPair[]>>;
+  edges?: Record<string, Record<string, OcelEdgeAssociationMetric>>;
 }
 export function isOcelStatisticsResult(value: unknown): value is OcelStatisticsResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_STATISTICS" ||
-      !["OBJECT_TYPE_ACTIVITIES", "OBJECTS_OT_COUNT"].includes(String(value.variant))) return false;
+      !["OBJECT_TYPE_ACTIVITIES", "OBJECTS_OT_COUNT", "ACTIVITY_ASSOCIATIONS",
+        "OBJECT_TYPE_ACTIVITY_ASSOCIATIONS", "EDGE_ASSOCIATIONS"].includes(String(value.variant))) return false;
   if (value.variant === "OBJECT_TYPE_ACTIVITIES") {
     if (!isOcelRecord(value.object_type_activities)) return false;
     return Object.values(value.object_type_activities).every((activities) =>
       Array.isArray(activities) && activities.every((activity) => typeof activity === "string"));
   }
-  if (!isOcelRecord(value.objects_ot_count)) return false;
-  return Object.values(value.objects_ot_count).every((counts) =>
-    isOcelRecord(counts) && Object.values(counts).every((count) =>
-      typeof count === "number" && Number.isInteger(count) && count >= 0));
+  if (value.variant === "OBJECTS_OT_COUNT") {
+    if (!isOcelRecord(value.objects_ot_count)) return false;
+    return Object.values(value.objects_ot_count).every((counts) =>
+      isOcelRecord(counts) && Object.values(counts).every((count) =>
+        typeof count === "number" && Number.isInteger(count) && count >= 0));
+  }
+  if (value.variant === "ACTIVITY_ASSOCIATIONS") {
+    if (!isOcelRecord(value.associations)) return false;
+    return Object.values(value.associations).every((pairs) =>
+      Array.isArray(pairs) && pairs.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+        pair.every((item) => typeof item === "string")));
+  }
+  if (value.variant === "OBJECT_TYPE_ACTIVITY_ASSOCIATIONS") {
+    if (!isOcelRecord(value.associations)) return false;
+    return Object.values(value.associations).every((activities) =>
+      isOcelRecord(activities) && Object.values(activities).every((pairs) =>
+        Array.isArray(pairs) && pairs.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+          pair.every((item) => typeof item === "string"))));
+  }
+  if (!isOcelRecord(value.edges)) return false;
+  return Object.values(value.edges).every((edges) =>
+    isOcelRecord(edges) && Object.values(edges).every((metric) =>
+      isOcelRecord(metric) && Array.isArray(metric.event_couples) &&
+      metric.event_couples.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+        pair.every((item) => typeof item === "string")) &&
+      Array.isArray(metric.unique_objects) &&
+      metric.unique_objects.every((item) => typeof item === "string") &&
+      Array.isArray(metric.event_objects) &&
+      metric.event_objects.every((triple) => Array.isArray(triple) && triple.length === 3 &&
+        triple.every((item) => typeof item === "string")) &&
+      Array.isArray(metric.performance) &&
+      metric.performance.every((item) => typeof item === "number" && Number.isFinite(item))));
 }
 
 export type TransitionSystemView = "sequence" | "set" | "multiset";

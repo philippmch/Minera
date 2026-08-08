@@ -5,6 +5,8 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <utility>
 
 #include "minera/ocel.hpp"
 
@@ -19,11 +21,95 @@ using OcelObjectTypeActivities =
 using OcelObjectsOtCount =
     std::map<std::string, std::map<std::string, std::size_t>>;
 
+// Deterministic association summaries used by the native OCEL statistics
+// implementation.  The pair is (event id, object id).
+using OcelAssociationPair = std::pair<std::string, std::string>;
+using OcelActivityAssociations =
+    std::map<std::string, std::set<OcelAssociationPair>>;
+using OcelObjectTypeActivityAssociations =
+    std::map<std::string, OcelActivityAssociations>;
+using OcelActivityAssociationMap = OcelActivityAssociations;
+using OcelObjectTypeAssociationMap = OcelObjectTypeActivityAssociations;
+
+enum class OcelAssociationPrefilter {
+  kNone,
+  kStart,
+  kEnd,
+  NONE = kNone,
+  START = kStart,
+  END = kEnd,
+};
+using OcelAssociationFilter = OcelAssociationPrefilter;
+using OcelPrefilterMode = OcelAssociationPrefilter;
+
+struct OcelAssociationAggregates {
+  std::set<std::string> event_ids;
+  std::set<std::string> object_ids;
+  std::size_t pair_count = 0;
+};
+
+using OcelEdgeAssociations =
+    std::map<std::string,
+             std::map<std::pair<std::string, std::string>, OcdfgEdgeMetric>>;
+using OcelEdgeAssociationMap = OcelEdgeAssociations;
+
+[[nodiscard]] OcelActivityAssociations activity_associations(
+    const Ocel& log,
+    OcelAssociationPrefilter prefilter = OcelAssociationPrefilter::kNone);
+[[nodiscard]] OcelObjectTypeActivityAssociations
+object_type_activity_associations(
+    const Ocel& log,
+    OcelAssociationPrefilter prefilter = OcelAssociationPrefilter::kNone);
+[[nodiscard]] OcelAssociationAggregates aggregate_associations(
+    const OcelActivityAssociations& associations);
+[[nodiscard]] std::set<std::string> association_event_ids(
+    const OcelActivityAssociations& associations);
+[[nodiscard]] std::set<std::string> association_object_ids(
+    const OcelActivityAssociations& associations);
+[[nodiscard]] std::size_t association_pair_count(
+    const OcelActivityAssociations& associations);
+[[nodiscard]] OcelEdgeAssociations edge_associations(const Ocel& log);
+
+// Explicitly named aliases for callers that prefer the ``find_*`` spelling.
+[[nodiscard]] inline OcelActivityAssociations find_activity_associations(
+    const Ocel& log,
+    OcelAssociationPrefilter prefilter = OcelAssociationPrefilter::kNone) {
+  return activity_associations(log, prefilter);
+}
+[[nodiscard]] inline OcelObjectTypeActivityAssociations
+find_object_type_activity_associations(
+    const Ocel& log,
+    OcelAssociationPrefilter prefilter = OcelAssociationPrefilter::kNone) {
+  return object_type_activity_associations(log, prefilter);
+}
+[[nodiscard]] inline OcelEdgeAssociations find_edge_associations(
+    const Ocel& log) {
+  return edge_associations(log);
+}
+[[nodiscard]] inline std::set<std::string> association_events(
+    const OcelActivityAssociations& associations) {
+  return association_event_ids(associations);
+}
+[[nodiscard]] inline std::set<std::string> association_objects(
+    const OcelActivityAssociations& associations) {
+  return association_object_ids(associations);
+}
+[[nodiscard]] inline std::size_t association_count(
+    const OcelActivityAssociations& associations) {
+  return association_pair_count(associations);
+}
+
 enum class OcelStatisticsVariant {
   kObjectTypeActivities,
   kObjectsOtCount,
+  kActivityAssociations,
+  kObjectTypeActivityAssociations,
+  kEdgeAssociations,
   OBJECT_TYPE_ACTIVITIES = kObjectTypeActivities,
   OBJECTS_OT_COUNT = kObjectsOtCount,
+  ACTIVITY_ASSOCIATIONS = kActivityAssociations,
+  OBJECT_TYPE_ACTIVITY_ASSOCIATIONS = kObjectTypeActivityAssociations,
+  EDGE_ASSOCIATIONS = kEdgeAssociations,
 };
 
 // Returns the distinct activities related to each object type.  Only valid
@@ -45,6 +131,12 @@ enum class OcelStatisticsVariant {
     const OcelObjectTypeActivities& activities);
 [[nodiscard]] std::string serialize_ocel_statistics_json(
     const OcelObjectsOtCount& counts);
+[[nodiscard]] std::string serialize_ocel_statistics_json(
+    const OcelActivityAssociations& associations);
+[[nodiscard]] std::string serialize_ocel_statistics_json(
+    const OcelObjectTypeActivityAssociations& associations);
+[[nodiscard]] std::string serialize_ocel_statistics_json(
+    const OcelEdgeAssociations& associations);
 [[nodiscard]] std::string serialize_ocel_statistics_json(
     const Ocel& log,
     OcelStatisticsVariant variant =

@@ -243,8 +243,8 @@ describe("OCEL API", () => {
       numeric_event_attributes: ["z", "a"],
       string_object_attributes: ["color"],
     })).toBe("variant=objects&max_features=12&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color");
-    expect(ocelStatisticsQuery({ variant: "objects_ot_count" }))
-      .toBe("variant=objects_ot_count");
+    expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))
+      .toBe("variant=activity_associations&prefilter=start");
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
     expect(ocelFilterQuery({
@@ -332,13 +332,13 @@ describe("OCEL API", () => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
       expect(init.body).toBeInstanceOf(FormData);
       return { ok: true, json: async () => ({
-        family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
-        objects_ot_count: { e1: { item: 2 } },
+        family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
+        associations: { Create: [["e1", "o1"]] },
       }) };
     }));
     await expect(requestOcelStatistics(new File(["{}"], "log.json"), {
-      variant: "objects_ot_count",
-    })).resolves.toMatchObject({ family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT" });
+      variant: "activity_associations", prefilter: "start",
+    })).resolves.toMatchObject({ family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS" });
     vi.unstubAllGlobals();
   });
 
