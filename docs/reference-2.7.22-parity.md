@@ -567,15 +567,17 @@ output ordering.
 The native OCEL filtering surface now supports positive and negative event
 attribute, object attribute, object-type, object-id, and event-id selection,
 inclusive timestamp windows, activity-to-object-type matching, per-event
-object-type count thresholds, and first/last lifecycle events per object type.
-Event, object, and relation selections propagate deterministically to the
-related tables, retaining only valid links, object changes, and object-to-object
-relations; empty selections clear the dependent tables according to the
-selected propagation direction. The standalone `minera_ocel` command exposes
-the count, start-event, and end-event variants with strict bounded arguments.
-Focused tests cover typed scalar attributes, duplicate relation counts, orphan
-removal, inclusive boundaries, lifecycle endpoints, empty maps, and malformed
-bounds.
+object-type count thresholds, first/last lifecycle events per object type,
+activity-connected relations, recursive object expansion, and connected-
+component object/length/type/activity filters. Event, object, and relation
+selections propagate deterministically to the related tables, retaining only
+valid links, object changes, and object-to-object relations; empty selections
+clear the dependent tables according to the selected propagation direction.
+The standalone `minera_ocel` command exposes every OCEL filtering variant with
+strict bounded arguments. Focused tests cover typed scalar attributes,
+duplicate relation counts, orphan removal, inclusive boundaries, lifecycle
+endpoints, recursive expansion, singleton components, component predicates,
+empty maps, and malformed bounds.
 
 ## Correlation-mining parity evidence
 

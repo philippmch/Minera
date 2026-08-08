@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "minera/ocel.hpp"
@@ -24,14 +25,21 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-start-events TYPE] [--filter-end-events TYPE] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
                         split_object_type, normative_path, csv_objects_path,
                         normative_csv_objects_path;
     std::map<std::string, std::size_t> filter_object_counts;
+    std::vector<std::string> filter_object_types, filter_object_ids;
+    std::size_t filter_object_level = 1;
+    bool filter_object_level_set = false, filter_object_negative = false;
     std::string filter_start_events_type, filter_end_events_type;
+    std::string filter_activities_object_type, filter_cc_object,
+        filter_cc_object_type, filter_cc_activity;
+    std::optional<std::pair<std::size_t, std::size_t>> filter_cc_length;
+    bool filter_cc_object_type_negative = false;
     bool csv_input = false, xml_input = false;
     minera::Ocel log;
     bool ocpn_playout = false;
@@ -100,6 +108,27 @@ int main(int argc, char** argv) {
           throw std::invalid_argument(
               "--filter-object-count repeats an object type");
         }
+      } else if ((option == "--filter-object-types" ||
+                  option == "--filter-object-ids") && i + 1 < argc) {
+        const auto values = list(argv[++i]);
+        if (values.empty()) {
+          throw std::invalid_argument(option + " expects a non-empty list");
+        }
+        if (option == "--filter-object-types")
+          filter_object_types = values;
+        else
+          filter_object_ids = values;
+      } else if (option == "--filter-object-level" && i + 1 < argc) {
+        const auto parsed = number(argv[++i], "--filter-object-level");
+        if (std::floor(parsed) != parsed ||
+            parsed > static_cast<double>(std::numeric_limits<std::size_t>::max())) {
+          throw std::invalid_argument(
+              "--filter-object-level expects a non-negative integer");
+        }
+        filter_object_level = static_cast<std::size_t>(parsed);
+        filter_object_level_set = true;
+      } else if (option == "--filter-object-negative") {
+        filter_object_negative = true;
       } else if (option == "--filter-start-events" && i + 1 < argc) {
         if (!filter_start_events_type.empty()) {
           throw std::invalid_argument("--filter-start-events may be specified once");
@@ -116,6 +145,61 @@ int main(int argc, char** argv) {
         if (filter_end_events_type.empty()) {
           throw std::invalid_argument("--filter-end-events expects a type");
         }
+      } else if (option == "--filter-activities-object-type" && i + 1 < argc) {
+        if (!filter_activities_object_type.empty()) {
+          throw std::invalid_argument(
+              "--filter-activities-object-type may be specified once");
+        }
+        filter_activities_object_type = argv[++i];
+        if (filter_activities_object_type.empty()) {
+          throw std::invalid_argument(
+              "--filter-activities-object-type expects a type");
+        }
+      } else if (option == "--filter-cc-object" && i + 1 < argc) {
+        if (!filter_cc_object.empty()) {
+          throw std::invalid_argument("--filter-cc-object may be specified once");
+        }
+        filter_cc_object = argv[++i];
+        if (filter_cc_object.empty())
+          throw std::invalid_argument("--filter-cc-object expects an id");
+      } else if (option == "--filter-cc-length" && i + 1 < argc) {
+        const std::string spec = argv[++i];
+        const auto separator = spec.find(':');
+        if (separator == std::string::npos || separator == 0 ||
+            separator + 1 >= spec.size()) {
+          throw std::invalid_argument(
+              "--filter-cc-length expects MIN:MAX");
+        }
+        const auto parse_size = [&](const std::string& text) {
+          const auto parsed = number(text, "--filter-cc-length");
+          if (std::floor(parsed) != parsed ||
+              parsed > static_cast<double>(std::numeric_limits<std::size_t>::max())) {
+            throw std::invalid_argument(
+                "--filter-cc-length expects non-negative integer bounds");
+          }
+          return static_cast<std::size_t>(parsed);
+        };
+        filter_cc_length = std::make_pair(
+            parse_size(spec.substr(0, separator)),
+            parse_size(spec.substr(separator + 1)));
+      } else if (option == "--filter-cc-object-type" && i + 1 < argc) {
+        if (!filter_cc_object_type.empty()) {
+          throw std::invalid_argument(
+              "--filter-cc-object-type may be specified once");
+        }
+        filter_cc_object_type = argv[++i];
+        if (filter_cc_object_type.empty())
+          throw std::invalid_argument("--filter-cc-object-type expects a type");
+      } else if (option == "--filter-cc-object-type-negative") {
+        filter_cc_object_type_negative = true;
+      } else if (option == "--filter-cc-activity" && i + 1 < argc) {
+        if (!filter_cc_activity.empty()) {
+          throw std::invalid_argument(
+              "--filter-cc-activity may be specified once");
+        }
+        filter_cc_activity = argv[++i];
+        if (filter_cc_activity.empty())
+          throw std::invalid_argument("--filter-cc-activity expects an activity");
       } else if ((option == "--format" || option == "--features" ||
            option == "--discover" ||
            option == "--split") && i + 1 < argc) {
@@ -354,8 +438,26 @@ int main(int argc, char** argv) {
         if (!input) throw std::runtime_error("cannot open input");
         std::ostringstream text;
         text << input.rdbuf();
-      log = minera::parse_ocel_json(text.str());
+        log = minera::parse_ocel_json(text.str());
       }
+    }
+    if (filter_object_level_set && filter_object_types.empty() &&
+        filter_object_ids.empty()) {
+      throw std::invalid_argument(
+          "--filter-object-level requires object type or id filters");
+    }
+    if (filter_object_negative && filter_object_types.empty() &&
+        filter_object_ids.empty()) {
+      throw std::invalid_argument(
+          "--filter-object-negative requires object type or id filters");
+    }
+    if (!filter_object_types.empty()) {
+      log = minera::filter_ocel_object_types(
+          log, filter_object_types, !filter_object_negative, filter_object_level);
+    }
+    if (!filter_object_ids.empty()) {
+      log = minera::filter_ocel_objects(
+          log, filter_object_ids, !filter_object_negative, filter_object_level);
     }
     if (!filter_object_counts.empty()) {
       log = minera::filter_ocel_events_object_type_counts(
@@ -368,6 +470,27 @@ int main(int argc, char** argv) {
     if (!filter_end_events_type.empty()) {
       log = minera::filter_ocel_end_events_per_object_type(
           log, filter_end_events_type);
+    }
+    if (!filter_activities_object_type.empty()) {
+      log = minera::filter_ocel_activities_connected_object_type(
+          log, filter_activities_object_type);
+    }
+    if (!filter_cc_object.empty()) {
+      log = minera::filter_ocel_cc_object(log, filter_cc_object);
+    }
+    if (filter_cc_length) {
+      log = minera::filter_ocel_cc_length(
+          log, filter_cc_length->first, filter_cc_length->second);
+    }
+    if (!filter_cc_object_type.empty()) {
+      log = minera::filter_ocel_cc_object_type(
+          log, filter_cc_object_type, !filter_cc_object_type_negative);
+    } else if (filter_cc_object_type_negative) {
+      throw std::invalid_argument(
+          "--filter-cc-object-type-negative requires --filter-cc-object-type");
+    }
+    if (!filter_cc_activity.empty()) {
+      log = minera::filter_ocel_cc_activity(log, filter_cc_activity);
     }
     if (!features.empty() &&
         (!discover.empty() || !split.empty() || !conformance.empty() ||

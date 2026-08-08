@@ -20,11 +20,11 @@ namespace minera {
 
 [[nodiscard]] Ocel filter_ocel_object_types(
     const Ocel& log, const std::vector<std::string>& types,
-    bool positive = true);
+    bool positive = true, std::size_t level = 1);
 
 [[nodiscard]] Ocel filter_ocel_objects(
     const Ocel& log, const std::vector<std::string>& object_ids,
-    bool positive = true);
+    bool positive = true, std::size_t level = 1);
 
 [[nodiscard]] Ocel filter_ocel_events(
     const Ocel& log, const std::vector<std::string>& event_ids,
@@ -56,5 +56,24 @@ ocel_event_object_type_counts(const Ocel& log);
 
 [[nodiscard]] Ocel filter_ocel_end_events_per_object_type(
     const Ocel& log, std::string_view object_type);
+
+// Keep all relations whose event activity occurs on at least one object of
+// the selected type, including relations to other object types.
+[[nodiscard]] Ocel filter_ocel_activities_connected_object_type(
+    const Ocel& log, std::string_view object_type);
+
+[[nodiscard]] Ocel filter_ocel_cc_object(const Ocel& log,
+                                         std::string_view object_id);
+
+[[nodiscard]] Ocel filter_ocel_cc_length(const Ocel& log,
+                                         std::size_t minimum_size,
+                                         std::size_t maximum_size);
+
+[[nodiscard]] Ocel filter_ocel_cc_object_type(const Ocel& log,
+                                              std::string_view object_type,
+                                              bool positive = true);
+
+[[nodiscard]] Ocel filter_ocel_cc_activity(const Ocel& log,
+                                           std::string_view activity);
 
 }  // namespace minera
