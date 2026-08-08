@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { temporalValidationMessage } from "./Filters";
+import { segmentValidationMessage, temporalValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -27,5 +27,14 @@ describe("temporal filter validation", () => {
     expect(temporalValidationMessage({ ...valid, batchMergeDistanceSeconds: "Infinity" })).toContain("merge distance");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "1" })).toContain("minimum size");
     expect(temporalValidationMessage({ ...valid, batchMinSize: "2.1" })).toContain("minimum size");
+  });
+});
+
+describe("segment filter validation", () => {
+  it("requires both between endpoints", () => {
+    expect(segmentValidationMessage({ betweenStart: "A", betweenEnd: "" })).toContain("both");
+    expect(segmentValidationMessage({ betweenStart: "", betweenEnd: "B" })).toContain("both");
+    expect(segmentValidationMessage({ betweenStart: "A", betweenEnd: "B" })).toBeNull();
+    expect(segmentValidationMessage({ betweenStart: "", betweenEnd: "" })).toBeNull();
   });
 });

@@ -783,6 +783,61 @@ MineParams parse_mine_params(const FieldLookup& field,
     return present ? present(name) : !field(name).empty();
   };
 
+  const bool segment_prefix_supplied =
+      supplied("segment_prefix_activity") || supplied("segment_prefix_strict") ||
+      supplied("segment_prefix_occurrence");
+  const bool segment_suffix_supplied =
+      supplied("segment_suffix_activity") || supplied("segment_suffix_strict") ||
+      supplied("segment_suffix_occurrence");
+  const bool segment_between_supplied =
+      supplied("segment_between_starts") || supplied("segment_between_ends") ||
+      supplied("segment_between_separator");
+  if (segment_prefix_supplied || segment_suffix_supplied || segment_between_supplied) {
+    SegmentFilterOptions options;
+    const auto parse_occurrence = [&](std::string_view name) {
+      const auto value = field(name);
+      if (value == "first") return AnchorOccurrence::first;
+      if (value == "last") return AnchorOccurrence::last;
+      throw std::invalid_argument(std::string(name) + ": expected first or last");
+    };
+    if (segment_prefix_supplied) {
+      if (!supplied("segment_prefix_activity") || field("segment_prefix_activity").empty())
+        throw std::invalid_argument("segment_prefix_activity: required when segment prefix filtering is enabled");
+      options.prefix.activity = field("segment_prefix_activity");
+      if (supplied("segment_prefix_strict"))
+        options.prefix.strict = parse_boolean(field("segment_prefix_strict"), "segment_prefix_strict");
+      if (supplied("segment_prefix_occurrence"))
+        options.prefix.occurrence = parse_occurrence("segment_prefix_occurrence");
+      options.use_prefix = true;
+    }
+    if (segment_suffix_supplied) {
+      if (!supplied("segment_suffix_activity") || field("segment_suffix_activity").empty())
+        throw std::invalid_argument("segment_suffix_activity: required when segment suffix filtering is enabled");
+      options.suffix.activity = field("segment_suffix_activity");
+      if (supplied("segment_suffix_strict"))
+        options.suffix.strict = parse_boolean(field("segment_suffix_strict"), "segment_suffix_strict");
+      if (supplied("segment_suffix_occurrence"))
+        options.suffix.occurrence = parse_occurrence("segment_suffix_occurrence");
+      options.use_suffix = true;
+    }
+    if (segment_between_supplied) {
+      if (!supplied("segment_between_starts") || !supplied("segment_between_ends"))
+        throw std::invalid_argument("segment_between_starts and segment_between_ends: both are required");
+      options.between.start_activities = parse_strict_csv(field("segment_between_starts"), "segment_between_starts");
+      options.between.end_activities = parse_strict_csv(field("segment_between_ends"), "segment_between_ends");
+      if (options.between.start_activities.empty() || options.between.end_activities.empty())
+        throw std::invalid_argument("segment_between_starts/ends: at least one activity is required");
+      if (supplied("segment_between_separator")) {
+        options.between.case_id_separator = field("segment_between_separator");
+        if (options.between.case_id_separator.empty())
+          throw std::invalid_argument("segment_between_separator: must not be empty");
+      }
+      options.use_between = true;
+    }
+    params.segment = std::move(options);
+    params.segment_enabled = true;
+  }
+
   // Optional bounded temporal predicate. Presence of any ltl_* field opts in;
   // all supplied values are then parsed strictly so malformed requests fail
   // before a potentially surprising discovery run.

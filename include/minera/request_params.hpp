@@ -57,6 +57,7 @@
 #include "minera/role_discovery.hpp"
 #include "minera/local_diagnostics.hpp"
 #include "minera/clustering.hpp"
+#include "minera/segment_filter.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -111,6 +112,10 @@ struct MineParams {
   // Optional bounded temporal predicate, applied after traditional filters.
   std::optional<LtlFilterOptions> ltl;
   bool ltl_enabled = false;
+  // Optional segment operations, applied after ordinary log filters and
+  // before the bounded LTL predicate.
+  std::optional<SegmentFilterOptions> segment;
+  bool segment_enabled = false;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;
