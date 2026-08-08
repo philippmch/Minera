@@ -10,6 +10,8 @@
 
 namespace minera {
 
+class DirectlyFollowsGraph;
+
 // The classic DFG text interchange format consists of an activity-name
 // registry, start and end boundary rows, followed by directly-follows rows.
 // Rows use the compact `idxcount` and `source>targetxcount` spellings
@@ -20,6 +22,11 @@ void write_dfg(std::ostream& out, const DfgCleanAnalysis& dfg);
 [[nodiscard]] std::string to_dfg(const DfgCleanAnalysis& dfg);
 
 [[nodiscard]] DfgCleanAnalysis parse_dfg(std::string_view text);
+
+// Projects a discovered graph onto the classic interchange payload. Registry
+// entries with no edge or boundary frequency are intentionally omitted.
+[[nodiscard]] DfgCleanAnalysis to_dfg_analysis(
+    const DirectlyFollowsGraph& graph);
 
 [[nodiscard]] DfgCleanAnalysis import_dfg(std::istream& input);
 
