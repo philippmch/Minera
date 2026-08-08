@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, type MineraExport } from "./types";
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
@@ -17,6 +17,29 @@ describe("isOcelFeatureResult", () => {
   it("rejects ragged and non-finite tables", () => {
     expect(isOcelFeatureResult({ ...valid, values: [[]] })).toBe(false);
     expect(isOcelFeatureResult({ ...valid, values: [[Number.NaN]] })).toBe(false);
+  });
+});
+
+describe("isOcelStatisticsResult", () => {
+  it("accepts both deterministic summary variants", () => {
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "OBJECT_TYPE_ACTIVITIES",
+      object_type_activities: { item: ["Create", "Ship"] },
+    })).toBe(true);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
+      objects_ot_count: { e1: { item: 2 } },
+    })).toBe(true);
+  });
+  it("rejects malformed summary payloads", () => {
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "OBJECT_TYPE_ACTIVITIES",
+      object_type_activities: { item: [1] },
+    })).toBe(false);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "OBJECTS_OT_COUNT",
+      objects_ot_count: { e1: { item: -1 } },
+    })).toBe(false);
   });
 });
 

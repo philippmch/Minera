@@ -38,6 +38,7 @@ import {
   type OcelSplitResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
+  type OcelStatisticsResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -64,6 +65,7 @@ import {
   isOcelSplitResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
+  isOcelStatisticsResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2624,6 +2626,34 @@ export async function requestOcelFeatures(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelFeatureResult(payload)) throw new Error("the Minera backend returned an invalid OCEL feature table");
+  return payload;
+}
+
+export interface OcelStatisticsOptions {
+  variant?: "object_type_activities" | "objects_ot_count";
+}
+
+export function ocelStatisticsQuery(options: OcelStatisticsOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  return query.toString();
+}
+
+export async function requestOcelStatistics(
+  log: Blob,
+  options: OcelStatisticsOptions = {},
+): Promise<OcelStatisticsResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelStatisticsQuery(options);
+  const response = await fetch(`/api/ocel/statistics${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelStatisticsResult(payload)) throw new Error("the Minera backend returned an invalid OCEL statistics result");
   return payload;
 }
 

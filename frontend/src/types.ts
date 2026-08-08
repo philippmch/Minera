@@ -862,6 +862,27 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
       row.every((entry) => typeof entry === "number" && Number.isFinite(entry)));
 }
 
+export type OcelStatisticsVariant = "OBJECT_TYPE_ACTIVITIES" | "OBJECTS_OT_COUNT";
+export interface OcelStatisticsResult {
+  family: "OCEL_STATISTICS";
+  variant: OcelStatisticsVariant;
+  object_type_activities?: Record<string, string[]>;
+  objects_ot_count?: Record<string, Record<string, number>>;
+}
+export function isOcelStatisticsResult(value: unknown): value is OcelStatisticsResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_STATISTICS" ||
+      !["OBJECT_TYPE_ACTIVITIES", "OBJECTS_OT_COUNT"].includes(String(value.variant))) return false;
+  if (value.variant === "OBJECT_TYPE_ACTIVITIES") {
+    if (!isOcelRecord(value.object_type_activities)) return false;
+    return Object.values(value.object_type_activities).every((activities) =>
+      Array.isArray(activities) && activities.every((activity) => typeof activity === "string"));
+  }
+  if (!isOcelRecord(value.objects_ot_count)) return false;
+  return Object.values(value.objects_ot_count).every((counts) =>
+    isOcelRecord(counts) && Object.values(counts).every((count) =>
+      typeof count === "number" && Number.isInteger(count) && count >= 0));
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

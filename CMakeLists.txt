@@ -76,6 +76,7 @@ add_library(minera_core
   src/ocel_filter.cpp
   src/ocel_xml.cpp
   src/ocel_features.cpp
+  src/ocel_statistics.cpp
   src/ocel_playout.cpp
   src/ocel_transform.cpp
   src/performance.cpp
@@ -208,6 +209,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_filter_tests COMMAND minera_ocel_filter_tests)
+
+  add_executable(minera_ocel_statistics_tests
+    tests/test_ocel_statistics.cpp
+  )
+  target_link_libraries(minera_ocel_statistics_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_statistics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_statistics_tests COMMAND minera_ocel_statistics_tests)
 
   add_executable(minera_dfg_filter_tests
     tests/test_dfg_filter.cpp
