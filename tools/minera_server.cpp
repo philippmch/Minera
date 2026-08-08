@@ -86,6 +86,7 @@
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
 #include "minera/segment_filter.hpp"
+#include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
@@ -362,6 +363,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
     if (params.segment_enabled && params.segment) {
       log = minera::filter_segments(log, *params.segment);
+    }
+    if (params.path_enabled && params.path) {
+      log = minera::filter_adjacent_path(log, *params.path);
     }
     if (params.ltl_enabled && params.ltl) {
       log = minera::filter_ltl_event_log(log, *params.ltl);

@@ -1010,6 +1010,26 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ segmentPrefixStrict: false })).toBe(false);
   });
 
+  it("maps adjacent path options including zero bounds and polarity", () => {
+    expect(mineFormEntries({
+      pathPredecessor: "A",
+      pathSuccessor: "B",
+      pathMinPerformance: 0,
+      pathMaxPerformance: 2.5,
+      pathPositive: false,
+    })).toEqual([
+      ["path_predecessor", "A"],
+      ["path_successor", "B"],
+      ["path_min_performance", "0"],
+      ["path_max_performance", "2.5"],
+      ["path_positive", "false"],
+    ]);
+    expect(hasActiveFilters({ pathPredecessor: "A" })).toBe(false);
+    expect(hasActiveFilters({ pathMinPerformance: 0 })).toBe(false);
+    expect(mineFormEntries({ pathPredecessor: "A", pathMinPerformance: 0 })).toEqual([["path_predecessor", "A"]]);
+    expect(mineFormEntries({ pathPositive: false })).toEqual([]);
+  });
+
   it("maps the attribute filter and requires its key", () => {
     const entries = mineFormEntries({
       attributeKey: "channel",

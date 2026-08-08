@@ -42,6 +42,12 @@ the same process-mining question, equivalent supported data, canonicalized
 model/output behavior, the same quality metric or diagnostic meaning, and
 documented differences where multiple mathematically valid outputs exist.
 
+Adjacent path filtering is tracked as an integration surface: predecessor and
+successor adjacency, optional inclusive elapsed-time bounds, and positive or
+negative polarity are implemented natively. Strict request parsing, CLI flags,
+local-server fields, and compact frontend controls/serialization apply the
+operation after ordinary log filters and segment extraction and before LTL.
+
 ## Algorithm-family checklist
 
 This is the human-owned acceptance matrix. The audit script is the
@@ -215,7 +221,7 @@ this traditional-log vertical.
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG output through CLI/server/frontend adapters are present; DFG input adapters remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
 | Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — most basic log/performance/resource statistics; overlap/cube/OCEL gaps |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |

@@ -79,6 +79,7 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/request_params.hpp"
 #include "minera/segment_filter.hpp"
+#include "minera/path_filter.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/timestamp_interleavings.hpp"
 #include "minera/minimum_self_distance.hpp"
@@ -497,6 +498,11 @@ int usage(const char* program) {
                "  --segment-between-starts <a,b,...> Segment start activities\n"
                "  --segment-between-ends <a,b,...> Segment end activities\n"
                "  --segment-between-separator <text> Segment case-id separator\n"
+               "  --path-predecessor <name> Adjacent-path predecessor activity\n"
+               "  --path-successor <name>  Adjacent-path successor activity\n"
+               "  --path-min-performance <seconds> Inclusive lower elapsed bound\n"
+               "  --path-max-performance <seconds> Inclusive upper elapsed bound\n"
+               "  --path-positive <bool>   Keep matching adjacent paths (default: true)\n"
                "  --spectrum <a,b,c>        Compute the performance spectrum\n"
                "                            over this activity pattern (2+\n"
                "                            steps): per occurrence, when each\n"
@@ -943,6 +949,7 @@ int main(int argc, char** argv) {
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
   std::map<std::string, std::string> segment_fields;
+  std::map<std::string, std::string> path_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
@@ -1132,6 +1139,16 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       segment_fields[key] = value;
+      continue;
+    }
+    if (arg == "--path-predecessor" || arg == "--path-successor" ||
+        arg == "--path-min-performance" || arg == "--path-max-performance" ||
+        arg == "--path-positive") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      path_fields[key] = value;
       continue;
     }
     if (arg == "--dfg") {
@@ -2985,6 +3002,18 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_mine_params(lookup, present);
       if (params.segment_enabled && params.segment)
         log = minera::filter_segments(log, *params.segment);
+    }
+    if (!path_fields.empty()) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = path_fields.find(std::string(name));
+        return it == path_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return path_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_mine_params(lookup, present);
+      if (params.path_enabled && params.path)
+        log = minera::filter_adjacent_path(log, *params.path);
     }
     if (!ltl_fields.empty()) {
       const auto lookup = [&](std::string_view name) {
