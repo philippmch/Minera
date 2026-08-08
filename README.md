@@ -501,7 +501,7 @@ and embeds the rules in the export under `decisions`.
 `--xes out.xes` additionally writes the event log — after any filtering — as
 standard XES, making the CLI double as a CSV-to-XES converter. `--bpmn
 out.bpmn` writes a discovered model as BPMN 2.0, with `--bpmn-miner`
-(inductive, alpha, or heuristic) picking which — mirroring `--pnml` /
+(inductive, alpha, heuristic, or powl) picking which — mirroring `--pnml` /
 `--pnml-miner`.
 
 Other filters include `--min-variant-frequency`, `--variant-coverage` (keep
@@ -549,7 +549,7 @@ re-mines the original upload — so a threshold can always be relaxed again.
 
 The JSON export also carries the performance (`performance`) and resource
 (`resources`) perspectives. To additionally write a model as PNML, pass
-`--pnml <path>` (and `--pnml-miner inductive|alpha|heuristic`, default
+`--pnml <path>` (and `--pnml-miner inductive|alpha|heuristic|powl`, default
 `inductive`); the running server exposes the same export at
 `GET /api/pnml?miner=…`:
 

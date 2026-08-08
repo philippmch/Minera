@@ -981,7 +981,8 @@ export type PowlNode =
 
 /** Runtime validation for the recursive model used by the POWL renderer. */
 export function isPowlNode(value: unknown, activityCount?: number, depth = 0): value is PowlNode {
-  if (depth > 256 || typeof value !== "object" || value === null) return false;
+  // Native discovery bounds recursive model traversal at 512 levels.
+  if (depth > 512 || typeof value !== "object" || value === null) return false;
   const node = value as Record<string, unknown>;
   if (node.kind === "silent") return true;
   if (node.kind === "transition") {
@@ -990,29 +991,49 @@ export function isPowlNode(value: unknown, activityCount?: number, depth = 0): v
     if (activityCount !== undefined && node.activity >= activityCount) return false;
     if (typeof frequency !== "object" || frequency === null) return false;
     const range = frequency as Record<string, unknown>;
-    if (typeof range.minimum !== "number" || !Number.isInteger(range.minimum) || range.minimum < 0) return false;
-    if (range.maximum !== null && (typeof range.maximum !== "number" || !Number.isInteger(range.maximum) || range.maximum < range.minimum)) return false;
+    if (typeof range.minimum !== "number" || !Number.isInteger(range.minimum) ||
+        (range.minimum !== 0 && range.minimum !== 1)) return false;
+    if (range.maximum !== null && (typeof range.maximum !== "number" || !Number.isInteger(range.maximum) || range.maximum !== 1 || range.maximum < range.minimum)) return false;
     return true;
   }
   if (node.kind === "xor" || node.kind === "loop") {
     const children = node.children;
-    return Array.isArray(children) && children.length > 0 &&
-      children.every((child) => isPowlNode(child, activityCount, depth + 1));
+    if (!Array.isArray(children) ||
+        (node.kind === "xor" ? children.length < 2 : children.length !== 2)) return false;
+    return children.every((child) => isPowlNode(child, activityCount, depth + 1));
   }
   if (node.kind !== "strict_partial_order") return false;
   const children = node.children;
   const order = node.order;
-  if (!Array.isArray(children) || !Array.isArray(order) || children.length === 0 ||
+  if (!Array.isArray(children) || !Array.isArray(order) ||
       !children.every((child) => isPowlNode(child, activityCount, depth + 1))) return false;
-  return order.every((edge) => {
+  const adjacency: number[][] = children.map(() => []);
+  if (!order.every((edge) => {
     if (typeof edge !== "object" || edge === null) return false;
     const pair = edge as Record<string, unknown>;
-    return typeof pair.source === "number" && Number.isInteger(pair.source) &&
+    const valid = typeof pair.source === "number" && Number.isInteger(pair.source) &&
       typeof pair.target === "number" && Number.isInteger(pair.target) &&
       pair.source >= 0 && pair.target >= 0 &&
       pair.source < children.length && pair.target < children.length &&
       pair.source !== pair.target;
-  });
+    if (valid) adjacency[pair.source as number].push(pair.target as number);
+    return valid;
+  })) return false;
+  // Native strict partial orders reject cyclic relations (including self
+  // loops, handled above), while an empty order is valid for zero children.
+  const indegree = adjacency.map(() => 0);
+  for (const targets of adjacency) for (const target of targets) indegree[target]++;
+  const ready = indegree.reduce<number[]>((queue, degree, index) => {
+    if (degree === 0) queue.push(index);
+    return queue;
+  }, []);
+  let visited = 0;
+  while (ready.length > 0) {
+    const source = ready.pop() as number;
+    visited++;
+    for (const target of adjacency[source]) if (--indegree[target] === 0) ready.push(target);
+  }
+  return visited === children.length;
 }
 
 /** One ordered relation in a classic log-skeleton model. */

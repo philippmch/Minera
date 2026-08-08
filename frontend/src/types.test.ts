@@ -250,8 +250,8 @@ describe("isMineraExport", () => {
     const powl = {
       kind: "strict_partial_order",
       children: [
-        { kind: "transition", activity: 0, frequency: { minimum: 1, maximum: 2 } },
-        { kind: "loop", children: [{ kind: "xor", children: [{ kind: "silent" }, { kind: "transition", activity: 0, frequency: { minimum: 0, maximum: null } }] }] },
+        { kind: "transition", activity: 0, frequency: { minimum: 1, maximum: 1 } },
+        { kind: "loop", children: [{ kind: "xor", children: [{ kind: "silent" }, { kind: "transition", activity: 0, frequency: { minimum: 0, maximum: null } }] }, { kind: "silent" }] },
       ],
       order: [{ source: 0, target: 1 }],
     };
@@ -265,6 +265,29 @@ describe("isMineraExport", () => {
     expect(isMineraExport({ ...base, powl: { kind: "transition", activity: 0, frequency: { minimum: 2, maximum: 1 } } })).toBe(false);
     expect(isMineraExport({ ...base, powl: { kind: "strict_partial_order", children: [{ kind: "silent" }], order: [{ source: 0, target: 1 }] } })).toBe(false);
     expect(isMineraExport({ ...base, powl: { kind: "xor", children: [{ kind: "unknown" }] } })).toBe(false);
+  });
+
+  it("matches native POWL node cardinality and empty-order invariants", () => {
+    expect(isPowlNode({ kind: "strict_partial_order", children: [], order: [] })).toBe(true);
+    expect(isPowlNode({ kind: "strict_partial_order", children: [], order: [{ source: 0, target: 0 }] })).toBe(false);
+    expect(isPowlNode({ kind: "strict_partial_order", children: [{ kind: "silent" }, { kind: "silent" }], order: [{ source: 0, target: 1 }, { source: 1, target: 0 }] })).toBe(false);
+    expect(isPowlNode({ kind: "xor", children: [{ kind: "silent" }] })).toBe(false);
+    expect(isPowlNode({ kind: "loop", children: [{ kind: "silent" }] })).toBe(false);
+    expect(isPowlNode({ kind: "loop", children: [{ kind: "silent" }, { kind: "silent" }, { kind: "silent" }] })).toBe(false);
+  });
+
+  it("enforces native transition frequencies and recursion depth", () => {
+    const transition = (frequency: { minimum: number; maximum: number | null }) => ({ kind: "transition", activity: 0, frequency });
+    expect(isPowlNode(transition({ minimum: 0, maximum: 1 }))).toBe(true);
+    expect(isPowlNode(transition({ minimum: 1, maximum: null }))).toBe(true);
+    expect(isPowlNode(transition({ minimum: 2, maximum: 1 }))).toBe(false);
+    expect(isPowlNode(transition({ minimum: 2, maximum: null }))).toBe(false);
+    expect(isPowlNode(transition({ minimum: 0, maximum: 2 }))).toBe(false);
+    let deep: unknown = { kind: "silent" };
+    for (let i = 0; i < 512; i++) deep = { kind: "loop", children: [deep, { kind: "silent" }] };
+    expect(isPowlNode(deep)).toBe(true);
+    deep = { kind: "loop", children: [deep, { kind: "silent" }] };
+    expect(isPowlNode(deep)).toBe(false);
   });
 
   it("guards timestamp interleavings results", () => {
