@@ -314,11 +314,15 @@ IdSet expand_object_ids(const Ocel& log, IdSet selected, std::size_t level) {
   }
   for (std::size_t depth = 1; depth < level; ++depth) {
     const IdSet frontier = selected;
+    bool changed = false;
     for (const auto& object_id : frontier) {
       const auto adjacency_it = adjacency.find(object_id);
       if (adjacency_it == adjacency.end()) continue;
-      selected.insert(adjacency_it->second.begin(), adjacency_it->second.end());
+      for (const auto& neighbour : adjacency_it->second) {
+        changed = selected.insert(neighbour).second || changed;
+      }
     }
+    if (!changed) break;
   }
   return selected;
 }

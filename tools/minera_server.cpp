@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -64,6 +65,7 @@
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel.hpp"
 #include "minera/ocel_features.hpp"
+#include "minera/ocel_filter.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
@@ -122,6 +124,7 @@ constexpr std::size_t kServerGeneticMaxStates = 1'000'000;
 constexpr std::size_t kServerTvqMaxOutputTraces = 100'000;
 constexpr std::size_t kServerTvqMaxOutputVariants = 100'000;
 constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
+constexpr std::size_t kServerOcelFilterMaxLevel = 32;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -576,23 +579,20 @@ std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
   return result;
 }
 
+std::vector<std::string> split_ocel_filter_value(std::string_view value,
+                                                 char delimiter);
+
 std::vector<std::string> ocel_query_list(const httplib::Request& request,
                                          std::string_view name) {
   const auto key = std::string(name);
   if (!request.has_param(key)) return {};
-  std::vector<std::string> result;
-  std::size_t begin = 0;
-  const auto value = request.get_param_value(key);
-  while (begin <= value.size()) {
-    const auto end = value.find(',', begin);
-    const auto item = value.substr(begin, end == std::string::npos
-                                            ? std::string::npos
-                                            : end - begin);
-    if (item.empty())
-      throw std::invalid_argument(key + ": expected non-empty comma-separated names");
-    result.push_back(item);
-    if (end == std::string::npos) break;
-    begin = end + 1;
+  const auto result = split_ocel_filter_value(
+      request.get_param_value(key), ',');
+  if (result.empty() ||
+      std::any_of(result.begin(), result.end(),
+                  [](const std::string& item) { return item.empty(); })) {
+    throw std::invalid_argument(
+        key + ": expected non-empty comma-separated names");
   }
   return result;
 }
@@ -609,6 +609,273 @@ std::string ocel_conformance_response(std::string_view variant,
   return std::string("{\"family\":\"OCEL_CONFORMANCE\",\"variant\":\"") +
          std::string(variant) + "\",\"result\":" + std::move(payload) +
          "}";
+}
+
+std::string lower_ascii(std::string value) {
+  for (auto& character : value) {
+    character = static_cast<char>(
+        std::tolower(static_cast<unsigned char>(character)));
+  }
+  return value;
+}
+
+std::vector<std::string> split_ocel_filter_value(std::string_view value,
+                                                 char delimiter) {
+  std::vector<std::string> result;
+  std::string current;
+  bool escaped = false;
+  for (const char character : value) {
+    if (escaped) {
+      if (character != '\\' && character != ',' && character != ':' &&
+          character != ';' && character != '|') {
+        throw std::invalid_argument(
+            "OCEL filter values use \\\\, \\\\: , \\\\; , or \\\\| escapes");
+      }
+      current.push_back(character);
+      escaped = false;
+    } else if (character == '\\') {
+      escaped = true;
+    } else if (character == delimiter) {
+      result.push_back(std::move(current));
+      current.clear();
+    } else {
+      current.push_back(character);
+    }
+  }
+  if (escaped) throw std::invalid_argument("OCEL filter value has dangling escape");
+  result.push_back(std::move(current));
+  return result;
+}
+
+std::vector<minera::OcelValue> parse_ocel_filter_values(
+    const httplib::Request& request) {
+  std::vector<minera::OcelValue> result;
+  if (!request.has_param("attribute_values")) return result;
+  for (const auto& encoded : split_ocel_filter_value(
+           request.get_param_value("attribute_values"), ',')) {
+    const auto fields = split_ocel_filter_value(encoded, ':');
+    if (fields.size() == 1) {
+      result.emplace_back(fields.front());
+      continue;
+    }
+    if (fields.size() != 2) {
+      throw std::invalid_argument(
+          "attribute_values expects typed scalar entries");
+    }
+    const auto& type = fields[0];
+    const auto& value = fields[1];
+    if (type == "s") {
+      result.emplace_back(value);
+    } else if (type == "i") {
+      if (value.empty() || value.front() == '+')
+        throw std::invalid_argument("attribute_values has an invalid integer");
+      char* end = nullptr;
+      const auto parsed = std::strtoll(value.c_str(), &end, 10);
+      if (end != value.c_str() + value.size())
+        throw std::invalid_argument("attribute_values has an invalid integer");
+      result.emplace_back(static_cast<std::int64_t>(parsed));
+    } else if (type == "d") {
+      char* end = nullptr;
+      const auto parsed = std::strtod(value.c_str(), &end);
+      if (end != value.c_str() + value.size() || !std::isfinite(parsed))
+        throw std::invalid_argument("attribute_values has an invalid number");
+      result.emplace_back(parsed);
+    } else if (type == "b") {
+      if (value == "true" || value == "1") {
+        result.emplace_back(true);
+      } else if (value == "false" || value == "0") {
+        result.emplace_back(false);
+      } else {
+        throw std::invalid_argument("attribute_values has an invalid boolean");
+      }
+    } else if (type == "n" && value.empty()) {
+      result.emplace_back(nullptr);
+    } else {
+      throw std::invalid_argument("attribute_values has an unknown scalar type");
+    }
+  }
+  return result;
+}
+
+std::map<std::string, std::size_t> parse_ocel_filter_counts(
+    const httplib::Request& request) {
+  std::map<std::string, std::size_t> result;
+  if (!request.has_param("minimum_counts")) return result;
+  const auto raw = request.get_param_value("minimum_counts");
+  for (const auto& item : split_ocel_filter_value(raw, ',')) {
+    const auto fields = split_ocel_filter_value(item, ':');
+    if (fields.size() != 2 || fields[0].empty() || fields[1].empty()) {
+      throw std::invalid_argument(
+          "minimum_counts expects TYPE:COUNT entries");
+    }
+    const auto& type = fields[0];
+    const auto& count = fields[1];
+    if (count.empty() || count.front() == '-') {
+      throw std::invalid_argument(
+          "minimum_counts expects non-negative integer counts");
+    }
+    char* end_pointer = nullptr;
+    const auto parsed = std::strtoull(count.c_str(), &end_pointer, 10);
+    if (end_pointer != count.c_str() + count.size() ||
+        parsed > std::numeric_limits<std::size_t>::max()) {
+      throw std::invalid_argument(
+          "minimum_counts expects non-negative integer counts");
+    }
+    if (!result.emplace(type, static_cast<std::size_t>(parsed)).second) {
+      throw std::invalid_argument("minimum_counts repeats an object type");
+    }
+  }
+  return result;
+}
+
+std::map<std::string, std::vector<std::string>> parse_ocel_filter_allowed(
+    const httplib::Request& request) {
+  std::map<std::string, std::vector<std::string>> result;
+  if (!request.has_param("allowed")) return result;
+  const auto raw = request.get_param_value("allowed");
+  for (const auto& item : split_ocel_filter_value(raw, ';')) {
+    const auto fields = split_ocel_filter_value(item, ':');
+    if (fields.size() != 2 || fields[0].empty() || fields[1].empty()) {
+      throw std::invalid_argument(
+          "allowed expects TYPE:ACTIVITY|ACTIVITY entries");
+    }
+    const auto& type = fields[0];
+    for (const auto& activity : split_ocel_filter_value(fields[1], '|')) {
+      if (activity.empty()) {
+        throw std::invalid_argument("allowed contains an empty activity");
+      }
+      result[type].push_back(activity);
+    }
+  }
+  return result;
+}
+
+void handle_ocel_filter(const httplib::Request& request,
+                        httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "attribute_key", "attribute_values", "positive", "types",
+        "ids", "event_ids", "from", "to", "object_type", "activity",
+        "minimum_counts", "level", "object_id", "min_size", "max_size",
+        "allowed"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) {
+        throw std::invalid_argument("unknown OCEL filter parameter: " + key);
+      }
+    }
+    const auto variant = lower_ascii(
+        request.has_param("variant") ? request.get_param_value("variant")
+                                      : std::string("object_count"));
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto source = minera::parse_ocel_json(body);
+    const bool positive = ocel_query_bool(request, "positive", true);
+    const auto object_type = request.has_param("object_type")
+                                 ? request.get_param_value("object_type")
+                                 : std::string{};
+    const auto activity = request.has_param("activity")
+                              ? request.get_param_value("activity")
+                              : std::string{};
+    const auto level = ocel_query_size(request, "level", 1);
+    if (level > kServerOcelFilterMaxLevel) {
+      throw std::invalid_argument(
+          "level exceeds the OCEL filter server safety limit");
+    }
+    minera::Ocel filtered;
+    std::string canonical;
+    if (variant == "event_attribute") {
+      if (!request.has_param("attribute_key"))
+        throw std::invalid_argument("event_attribute requires attribute_key");
+      filtered = minera::filter_ocel_event_attribute(
+          source, request.get_param_value("attribute_key"),
+          parse_ocel_filter_values(request), positive);
+      canonical = "EVENT_ATTRIBUTE";
+    } else if (variant == "object_attribute") {
+      if (!request.has_param("attribute_key"))
+        throw std::invalid_argument("object_attribute requires attribute_key");
+      filtered = minera::filter_ocel_object_attribute(
+          source, request.get_param_value("attribute_key"),
+          parse_ocel_filter_values(request), positive);
+      canonical = "OBJECT_ATTRIBUTE";
+    } else if (variant == "object_types") {
+      filtered = minera::filter_ocel_object_types(
+          source, ocel_query_list(request, "types"), positive, level);
+      canonical = "OBJECT_TYPES";
+    } else if (variant == "objects") {
+      filtered = minera::filter_ocel_objects(
+          source, ocel_query_list(request, "ids"), positive, level);
+      canonical = "OBJECTS";
+    } else if (variant == "events") {
+      filtered = minera::filter_ocel_events(
+          source, ocel_query_list(request, "event_ids"), positive);
+      canonical = "EVENTS";
+    } else if (variant == "timestamp") {
+      filtered = minera::filter_ocel_events_timestamp(
+          source, request.has_param("from") ? request.get_param_value("from")
+                                             : std::string{},
+          request.has_param("to") ? request.get_param_value("to")
+                                   : std::string{});
+      canonical = "TIMESTAMP";
+    } else if (variant == "activity_type_matching") {
+      filtered = minera::filter_ocel_activity_type_matching(
+          source, parse_ocel_filter_allowed(request));
+      canonical = "ACTIVITY_TYPE_MATCHING";
+    } else if (variant == "object_count") {
+      filtered = minera::filter_ocel_events_object_type_counts(
+          source, parse_ocel_filter_counts(request));
+      canonical = "OBJECT_COUNT";
+    } else if (variant == "start_events" || variant == "end_events") {
+      if (object_type.empty())
+        throw std::invalid_argument(variant + " requires object_type");
+      filtered = variant == "start_events"
+                     ? minera::filter_ocel_start_events_per_object_type(
+                           source, object_type)
+                     : minera::filter_ocel_end_events_per_object_type(
+                           source, object_type);
+      canonical = variant == "start_events" ? "START_EVENTS" : "END_EVENTS";
+    } else if (variant == "activities_object_type") {
+      if (object_type.empty())
+        throw std::invalid_argument(
+            "activities_object_type requires object_type");
+      filtered = minera::filter_ocel_activities_connected_object_type(
+          source, object_type);
+      canonical = "ACTIVITIES_OBJECT_TYPE";
+    } else if (variant == "cc_object") {
+      if (!request.has_param("object_id"))
+        throw std::invalid_argument("cc_object requires object_id");
+      filtered = minera::filter_ocel_cc_object(
+          source, request.get_param_value("object_id"));
+      canonical = "CC_OBJECT";
+    } else if (variant == "cc_length") {
+      if (!request.has_param("min_size") || !request.has_param("max_size"))
+        throw std::invalid_argument("cc_length requires min_size and max_size");
+      filtered = minera::filter_ocel_cc_length(
+          source, ocel_query_size(request, "min_size", 0),
+          ocel_query_size(request, "max_size", 0));
+      canonical = "CC_LENGTH";
+    } else if (variant == "cc_object_type") {
+      if (object_type.empty())
+        throw std::invalid_argument("cc_object_type requires object_type");
+      filtered = minera::filter_ocel_cc_object_type(source, object_type, positive);
+      canonical = "CC_OBJECT_TYPE";
+    } else if (variant == "cc_activity") {
+      if (activity.empty())
+        throw std::invalid_argument("cc_activity requires activity");
+      filtered = minera::filter_ocel_cc_activity(source, activity);
+      canonical = "CC_ACTIVITY";
+    } else {
+      throw std::invalid_argument("variant is not a supported OCEL filter");
+    }
+    response.set_content(
+        std::string("{\"family\":\"OCEL_FILTER\",\"variant\":\"") +
+            canonical + "\",\"log\":" +
+            minera::serialize_ocel_json(filtered) + "}",
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_ocel_discovery(const httplib::Request& request,
@@ -2787,6 +3054,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
+  server.Options("/api/ocel/filter", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -2839,6 +3107,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
+  server.Post("/api/ocel/filter", handle_ocel_filter);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

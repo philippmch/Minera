@@ -771,6 +771,16 @@ export interface OcelConformanceResult {
   variant: OcelConformanceVariant;
   result: Record<string, unknown>;
 }
+export type OcelFilterVariant =
+  | "EVENT_ATTRIBUTE" | "OBJECT_ATTRIBUTE" | "OBJECT_TYPES" | "OBJECTS"
+  | "EVENTS" | "TIMESTAMP" | "ACTIVITY_TYPE_MATCHING" | "OBJECT_COUNT"
+  | "START_EVENTS" | "END_EVENTS" | "ACTIVITIES_OBJECT_TYPE" | "CC_OBJECT"
+  | "CC_LENGTH" | "CC_OBJECT_TYPE" | "CC_ACTIVITY";
+export interface OcelFilterResult {
+  family: "OCEL_FILTER";
+  variant: OcelFilterVariant;
+  log: Record<string, unknown>;
+}
 export interface OcelSplitResult {
   family: "OCEL_SPLIT";
   variant: OcelSplitVariant;
@@ -800,6 +810,16 @@ export function isOcelConformanceResult(value: unknown): value is OcelConformanc
   if (!isOcelRecord(value) || value.family !== "OCEL_CONFORMANCE") return false;
   return ["etot", "ocdfg", "otg"].includes(String(value.variant))
     && isOcelRecord(value.result);
+}
+export function isOcelFilterResult(value: unknown): value is OcelFilterResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_FILTER" ||
+      !["EVENT_ATTRIBUTE", "OBJECT_ATTRIBUTE", "OBJECT_TYPES", "OBJECTS",
+        "EVENTS", "TIMESTAMP", "ACTIVITY_TYPE_MATCHING", "OBJECT_COUNT",
+        "START_EVENTS", "END_EVENTS", "ACTIVITIES_OBJECT_TYPE", "CC_OBJECT",
+        "CC_LENGTH", "CC_OBJECT_TYPE", "CC_ACTIVITY"].includes(String(value.variant)) ||
+      !isOcelRecord(value.log)) return false;
+  const log = value.log;
+  return isOcelRecord(log["ocel:events"]) && isOcelRecord(log["ocel:objects"]);
 }
 export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_SPLIT" ||
