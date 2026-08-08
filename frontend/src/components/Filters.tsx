@@ -72,6 +72,29 @@ export function segmentValidationMessage(input: {
   return null;
 }
 
+/** Adjacent path bounds use zero as the implicit lower bound. */
+export function pathValidationMessage(input: {
+  predecessor: string;
+  successor: string;
+  minPerformance: string;
+  maxPerformance: string;
+  positive: boolean;
+}): string | null {
+  const configured = input.predecessor || input.successor ||
+    input.minPerformance.trim() || input.maxPerformance.trim() || !input.positive;
+  if (!configured) return null;
+  if (!input.predecessor || !input.successor)
+    return "Path filtering needs both predecessor and successor activities.";
+  const min = input.minPerformance.trim() ? Number(input.minPerformance) : undefined;
+  const max = input.maxPerformance.trim() ? Number(input.maxPerformance) : undefined;
+  if ((min !== undefined && !Number.isFinite(min)) ||
+      (max !== undefined && !Number.isFinite(max)))
+    return "Path performance bounds must be finite numbers.";
+  if (max !== undefined && (min ?? 0) > max)
+    return "Path minimum performance must not exceed the maximum.";
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -106,6 +129,11 @@ export function Filters({
   const [segmentSuffixOccurrence, setSegmentSuffixOccurrence] = useState<"first" | "last">("first");
   const [segmentBetweenStart, setSegmentBetweenStart] = useState("");
   const [segmentBetweenEnd, setSegmentBetweenEnd] = useState("");
+  const [pathPredecessor, setPathPredecessor] = useState("");
+  const [pathSuccessor, setPathSuccessor] = useState("");
+  const [pathMinPerformance, setPathMinPerformance] = useState("");
+  const [pathMaxPerformance, setPathMaxPerformance] = useState("");
+  const [pathPositive, setPathPositive] = useState(true);
   // One succession constraint: keep or drop cases where `from` is directly /
   // eventually followed by `to` (the CLI accepts several pairs; the UI one).
   const [successionAction, setSuccessionAction] = useState<
@@ -443,9 +471,16 @@ export function Filters({
     betweenStart: segmentBetweenStart,
     betweenEnd: segmentBetweenEnd,
   });
+  const pathValidationError = pathValidationMessage({
+    predecessor: pathPredecessor,
+    successor: pathSuccessor,
+    minPerformance: pathMinPerformance,
+    maxPerformance: pathMaxPerformance,
+    positive: pathPositive,
+  });
 
   const apply = () => {
-    if (temporalValidationError || ltlValidationError || segmentValidationError) return;
+    if (temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -495,6 +530,11 @@ export function Filters({
       segmentSuffixOccurrence: segmentSuffixActivity ? segmentSuffixOccurrence : undefined,
       segmentBetweenStarts: segmentBetweenStart ? [segmentBetweenStart] : undefined,
       segmentBetweenEnds: segmentBetweenEnd ? [segmentBetweenEnd] : undefined,
+      pathPredecessor: pathPredecessor || undefined,
+      pathSuccessor: pathSuccessor || undefined,
+      pathMinPerformance: pathMinPerformance.trim() ? Number(pathMinPerformance) : undefined,
+      pathMaxPerformance: pathMaxPerformance.trim() ? Number(pathMaxPerformance) : undefined,
+      pathPositive: pathPredecessor && pathSuccessor ? pathPositive : undefined,
       removeActivities: removeList.length > 0 ? removeList : undefined,
       removeResources:
         removeResourceList.length > 0 ? removeResourceList : undefined,
@@ -741,6 +781,11 @@ export function Filters({
     setSegmentSuffixOccurrence("first");
     setSegmentBetweenStart("");
     setSegmentBetweenEnd("");
+    setPathPredecessor("");
+    setPathSuccessor("");
+    setPathMinPerformance("");
+    setPathMaxPerformance("");
+    setPathPositive(true);
     onApply({});
   };
 
@@ -759,6 +804,11 @@ export function Filters({
     segmentSuffixActivity !== "" ||
     segmentBetweenStart !== "" ||
     segmentBetweenEnd !== "" ||
+    pathPredecessor !== "" ||
+    pathSuccessor !== "" ||
+    pathMinPerformance !== "" ||
+    pathMaxPerformance !== "" ||
+    !pathPositive ||
     successionAction !== "off" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
@@ -1388,6 +1438,39 @@ export function Filters({
             </label>
           </div>
 
+          <div className="filters-subhead">Adjacent path filter</div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Predecessor</span>
+              <select value={pathPredecessor} onChange={(e) => setPathPredecessor(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Successor</span>
+              <select value={pathSuccessor} onChange={(e) => setPathSuccessor(e.target.value)}>
+                <option value="">off</option>
+                {activities.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Min seconds</span>
+              <input type="number" step="any" value={pathMinPerformance} onChange={(e) => setPathMinPerformance(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Max seconds</span>
+              <input type="number" step="any" value={pathMaxPerformance} onChange={(e) => setPathMaxPerformance(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Match polarity</span>
+              <select value={pathPositive ? "positive" : "negative"} onChange={(e) => setPathPositive(e.target.value === "positive")}>
+                <option value="positive">positive (keep matches)</option>
+                <option value="negative">negative (drop matches)</option>
+              </select>
+            </label>
+          </div>
+
           <div className="filters-row">
             <label className="filters-field">
               <span>Succession</span>
@@ -1996,11 +2079,11 @@ export function Filters({
             </label>
           </div>
 
-          {(temporalValidationError || ltlValidationError || segmentValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError}</p>
+          {(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError)}>
               Apply
             </button>
             <button

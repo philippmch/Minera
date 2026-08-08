@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { segmentValidationMessage, temporalValidationMessage } from "./Filters";
+import { pathValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -36,5 +36,22 @@ describe("segment filter validation", () => {
     expect(segmentValidationMessage({ betweenStart: "", betweenEnd: "B" })).toContain("both");
     expect(segmentValidationMessage({ betweenStart: "A", betweenEnd: "B" })).toBeNull();
     expect(segmentValidationMessage({ betweenStart: "", betweenEnd: "" })).toBeNull();
+  });
+});
+
+describe("adjacent path validation", () => {
+  const validPath = {
+    predecessor: "A",
+    successor: "B",
+    minPerformance: "",
+    maxPerformance: "",
+    positive: true,
+  };
+
+  it("requires both activities and rejects max-only negative ranges", () => {
+    expect(pathValidationMessage({ ...validPath, predecessor: "" })).toContain("both");
+    expect(pathValidationMessage(validPath)).toBeNull();
+    expect(pathValidationMessage({ ...validPath, maxPerformance: "-1" })).toContain("must not exceed");
+    expect(pathValidationMessage({ ...validPath, minPerformance: "-2", maxPerformance: "-1" })).toBeNull();
   });
 });

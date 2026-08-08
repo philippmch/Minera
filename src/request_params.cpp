@@ -838,6 +838,43 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.segment_enabled = true;
   }
 
+  // Optional adjacent-path predicate. Presence of any path option opts in;
+  // both predecessor and successor activities are required and all supplied
+  // bounds/booleans are validated strictly.
+  const bool path_supplied = supplied("path_predecessor") ||
+                             supplied("path_successor") ||
+                             supplied("path_min_performance") ||
+                             supplied("path_max_performance") ||
+                             supplied("path_positive");
+  if (path_supplied) {
+    AdjacentPathFilterOptions options;
+    if (!supplied("path_predecessor") || field("path_predecessor").empty())
+      throw std::invalid_argument(
+          "path_predecessor: required when path filtering is enabled");
+    if (!supplied("path_successor") || field("path_successor").empty())
+      throw std::invalid_argument(
+          "path_successor: required when path filtering is enabled");
+    options.predecessor = field("path_predecessor");
+    options.successor = field("path_successor");
+    if (supplied("path_min_performance")) {
+      options.min_elapsed_seconds = parse_finite_double(
+          field("path_min_performance"), "path_min_performance");
+    }
+    if (supplied("path_max_performance")) {
+      options.max_elapsed_seconds = parse_finite_double(
+          field("path_max_performance"), "path_max_performance");
+    }
+    if (options.max_elapsed_seconds &&
+        options.min_elapsed_seconds.value_or(0.0) >
+            *options.max_elapsed_seconds)
+      throw std::invalid_argument(
+          "path_min_performance: must be less than or equal to path_max_performance");
+    if (supplied("path_positive"))
+      options.positive = parse_boolean(field("path_positive"), "path_positive");
+    params.path = std::move(options);
+    params.path_enabled = true;
+  }
+
   // Optional bounded temporal predicate. Presence of any ltl_* field opts in;
   // all supplied values are then parsed strictly so malformed requests fail
   // before a potentially surprising discovery run.

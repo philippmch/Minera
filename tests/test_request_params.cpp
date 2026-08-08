@@ -90,6 +90,53 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.batch_options.min_batch_size == 2);
   assert(!params.ltl_enabled && !params.ltl);
   assert(!params.segment_enabled && !params.segment);
+  assert(!params.path_enabled && !params.path);
+}
+
+void adjacent_path_filter_params_contract() {
+  const auto params = minera::parse_mine_params(fields({
+      {"path_predecessor", "A"},
+      {"path_successor", "B"},
+      {"path_min_performance", "0"},
+      {"path_max_performance", "2.5"},
+      {"path_positive", "false"},
+  }));
+  assert(params.path_enabled && params.path);
+  assert(params.path->predecessor == "A");
+  assert(params.path->successor == "B");
+  assert(params.path->min_elapsed_seconds && *params.path->min_elapsed_seconds == 0.0);
+  assert(params.path->max_elapsed_seconds && *params.path->max_elapsed_seconds == 2.5);
+  assert(!params.path->positive);
+  for (const auto& item : {
+           std::pair{"path_predecessor", ""},
+           std::pair{"path_successor", ""},
+           std::pair{"path_min_performance", "nan"},
+           std::pair{"path_max_performance", "inf"},
+           std::pair{"path_positive", "maybe"},
+       }) {
+    std::map<std::string, std::string> values{{"path_predecessor", "A"},
+                                               {"path_successor", "B"}};
+    values[item.first] = item.second;
+    bool threw = false;
+    try { (void)minera::parse_mine_params(fields(std::move(values))); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"path_predecessor", "A"},
+                                            {"path_successor", "B"},
+                                            {"path_min_performance", "3"},
+                                            {"path_max_performance", "2"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"path_predecessor", "A"},
+                                            {"path_successor", "B"},
+                                            {"path_max_performance", "-1"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
 }
 
 void segment_filter_params_contract() {
@@ -1955,6 +2002,7 @@ int main() {
   error_json_escapes_quotes_and_backslashes();
   parse_mine_params_defaults_when_empty();
   segment_filter_params_contract();
+  adjacent_path_filter_params_contract();
   ltl_filter_params_contract();
   parse_mine_params_maps_correlation_options();
   parse_mine_params_preserves_explicit_empty_correlation_timestamp();

@@ -192,6 +192,12 @@ export interface FilterOptions extends LtlFilterOptions {
   segmentBetweenStarts?: string[];
   segmentBetweenEnds?: string[];
   segmentBetweenSeparator?: string;
+  /** Optional adjacent predecessor/successor path filter. */
+  pathPredecessor?: string;
+  pathSuccessor?: string;
+  pathMinPerformance?: number;
+  pathMaxPerformance?: number;
+  pathPositive?: boolean;
   minLength?: number;
   maxLength?: number;
   /** ISO-8601 bounds, both inclusive; either side may be open. */
@@ -506,6 +512,21 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("segment_between_ends", options.segmentBetweenEnds.join(","));
     if (options.segmentBetweenSeparator)
       add("segment_between_separator", options.segmentBetweenSeparator);
+  }
+  if (options.pathPredecessor || options.pathSuccessor ||
+      options.pathMinPerformance !== undefined ||
+      options.pathMaxPerformance !== undefined ||
+      options.pathPositive !== undefined) {
+    if (options.pathPredecessor) add("path_predecessor", options.pathPredecessor);
+    if (options.pathSuccessor) add("path_successor", options.pathSuccessor);
+    if (options.pathPredecessor && options.pathSuccessor) {
+      if (options.pathMinPerformance !== undefined)
+        add("path_min_performance", String(options.pathMinPerformance));
+      if (options.pathMaxPerformance !== undefined)
+        add("path_max_performance", String(options.pathMaxPerformance));
+      if (options.pathPositive !== undefined)
+        add("path_positive", String(options.pathPositive));
+    }
   }
   if (options.ltlVariant && options.ltlAttributeValues?.length) {
     add("ltl_variant", options.ltlVariant);

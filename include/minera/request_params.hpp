@@ -58,6 +58,7 @@
 #include "minera/local_diagnostics.hpp"
 #include "minera/clustering.hpp"
 #include "minera/segment_filter.hpp"
+#include "minera/path_filter.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -116,6 +117,10 @@ struct MineParams {
   // before the bounded LTL predicate.
   std::optional<SegmentFilterOptions> segment;
   bool segment_enabled = false;
+  // Optional adjacent predecessor/successor path predicate, applied after
+  // ordinary filters and segment extraction and before LTL.
+  std::optional<AdjacentPathFilterOptions> path;
+  bool path_enabled = false;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;
