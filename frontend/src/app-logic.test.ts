@@ -578,6 +578,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({})).toBe(false);
     expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
+    expect(hasActiveMinerOptions({ inductiveVariant: "imf" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(false);
     expect(hasActiveMinerOptions({
       heuristicVariant: "classic",

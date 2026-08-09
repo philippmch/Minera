@@ -1003,6 +1003,13 @@ void parse_mine_params_rejects_invalid_footprints_options() {
   assert(threw);
 }
 
+void parse_mine_params_accepts_infrequent_inductive_variant() {
+  const auto params = minera::parse_mine_params(
+      fields({{"inductive_variant", "imf"}, {"noise_threshold", "0.2"}}));
+  assert(params.inductive.variant == minera::InductiveMinerVariant::kImf);
+  assert(params.inductive.noise_threshold == 0.2);
+}
+
 void parse_mine_params_rejects_invalid_repetition_fields() {
   for (const auto& item : std::vector<std::pair<std::string, std::string>>{
            {"repetition_attribute_key", "channel"},
@@ -2172,6 +2179,7 @@ int main() {
   parse_mine_params_rejects_a_malformed_succession();
   parse_mine_params_rejects_an_unknown_alpha_variant();
   parse_mine_params_rejects_an_unknown_inductive_variant();
+  parse_mine_params_accepts_infrequent_inductive_variant();
   parse_mine_params_rejects_unknown_heuristic_settings();
   parse_mine_params_maps_spectrum_and_batch_options();
   parse_mine_params_maps_overlap_options();

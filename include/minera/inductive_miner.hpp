@@ -10,6 +10,9 @@ enum class InductiveMinerVariant {
   // graph of each sublog, and the *log* is split and re-mined per child, so
   // every recursion level sees the true relations of its own traces.
   kLog,
+  // IMf: the infrequent variant, using the configured noise threshold with
+  // the same log-splitting recursion.
+  kImf,
   // IMd, the directly-follows variant: the log is read exactly once to build
   // the directly-follows graph, and the recursion then projects the *graph*
   // onto each child instead of splitting traces. Memory and time become
@@ -17,6 +20,9 @@ enum class InductiveMinerVariant {
   // events, at some model-quality cost: a projected graph can imply orderings
   // no trace exhibits, which the log-splitting recursion would filter out.
   kDfg,
+  IMF = kImf,
+  IM = kLog,
+  IMD = kDfg,
 };
 
 struct InductiveMinerOptions {
