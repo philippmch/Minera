@@ -3198,6 +3198,56 @@ export interface DataPetriNetTransition {
   write_variables: string[];
 }
 
+export interface DecisionTableRow {
+  features: Array<number | null>;
+  target: number;
+}
+
+export interface EncodedDecisionTable {
+  place: number;
+  classes: string[];
+  feature_names: string[];
+  rows: DecisionTableRow[];
+}
+
+export interface DecisionTablesResult {
+  family: "DECISION_TABLES";
+  variant: "encoded";
+  trace_count: number;
+  observed_traces: number;
+  tables: EncodedDecisionTable[];
+}
+
+function isDecisionTablesResult(value: unknown): value is DecisionTablesResult {
+  if (!isOcelRecord(value) || value.family !== "DECISION_TABLES" ||
+      value.variant !== "encoded" || !Number.isSafeInteger(value.trace_count) ||
+      (value.trace_count as number) < 0 || !Number.isSafeInteger(value.observed_traces) ||
+      (value.observed_traces as number) < 0 ||
+      (value.observed_traces as number) > (value.trace_count as number) ||
+      !Array.isArray(value.tables)) return false;
+  return value.tables.every((rawTable) => {
+    if (!isOcelRecord(rawTable)) return false;
+    const table = rawTable;
+    const classes = table.classes;
+    const featureNames = table.feature_names;
+    const rows = table.rows;
+    if (!Number.isSafeInteger(table.place) || (table.place as number) < 0 ||
+        !Array.isArray(classes) || !classes.every((entry) => typeof entry === "string") ||
+        !Array.isArray(featureNames) ||
+        !featureNames.every((entry) => typeof entry === "string") ||
+        !Array.isArray(rows)) return false;
+    return rows.every((rawRow) => {
+      if (!isOcelRecord(rawRow)) return false;
+      const row = rawRow;
+      const features = row.features;
+      return Array.isArray(features) && features.length === featureNames.length &&
+        features.every((entry) => entry === null || finite(entry)) &&
+        Number.isSafeInteger(row.target) && (row.target as number) >= 0 &&
+        (row.target as number) < classes.length;
+    });
+  });
+}
+
 export interface DataPetriNetResult {
   family: "DATA_PETRI_NET";
   variant: string;
@@ -3208,6 +3258,7 @@ export interface DataPetriNetResult {
   activities: string[];
   transitions: DataPetriNetTransition[];
   decisions: Decisions;
+  decision_tables?: DecisionTablesResult;
 }
 
 export interface MineraExport {
@@ -3342,7 +3393,8 @@ export function isDataPetriNetResult(value: unknown): value is DataPetriNetResul
       (value.decisions.observed_traces as number) < 0 ||
       !Number.isSafeInteger(value.decisions.trace_count) ||
       (value.decisions.trace_count as number) < 0 ||
-      !Array.isArray(value.decisions.decision_points)) return false;
+      !Array.isArray(value.decisions.decision_points) ||
+      (value.decision_tables !== undefined && !isDecisionTablesResult(value.decision_tables))) return false;
   return value.transitions.every((transition) => isOcelRecord(transition) &&
     Number.isSafeInteger(transition.index) && (transition.index as number) >= 0 &&
     (typeof transition.activity === "string" || transition.activity === null) &&
