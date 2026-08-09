@@ -31,6 +31,7 @@ add_library(minera_core
   src/batches.cpp
   src/case_relations.cpp
   src/case_arrival.cpp
+  src/case_statistics.cpp
   src/oc_causal_net.cpp
   src/conformance.cpp
   src/concept_drift.cpp
@@ -466,6 +467,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_variant_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_variant_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_variant_statistics_tests COMMAND minera_variant_statistics_tests)
+
+  add_executable(minera_case_statistics_tests tests/test_case_statistics.cpp)
+  target_link_libraries(minera_case_statistics_tests PRIVATE minera::core)
+  target_compile_features(minera_case_statistics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_case_statistics_tests COMMAND minera_case_statistics_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
