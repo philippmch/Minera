@@ -55,6 +55,7 @@
 #include "minera/overlap.hpp"
 #include "minera/passed_time.hpp"
 #include "minera/service_time.hpp"
+#include "minera/rework.hpp"
 #include "minera/resource_profiles.hpp"
 #include "minera/role_discovery.hpp"
 #include "minera/local_diagnostics.hpp"
@@ -296,6 +297,7 @@ void write_analysis_json(std::ostream& out,
     const ChaoticActivitiesResult& result);
 [[nodiscard]] std::string passed_time_json(const PassedTimeResult& result);
 [[nodiscard]] std::string service_time_json(const ServiceTimeResult& result);
+[[nodiscard]] std::string rework_json(const ReworkResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(

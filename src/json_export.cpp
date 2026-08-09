@@ -4014,6 +4014,36 @@ std::string service_time_json(const ServiceTimeResult& result) {
   return out.str();
 }
 
+std::string rework_json(const ReworkResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"REWORK\",\"variant\":\""
+      << rework_variant_name(result.variant) << '\"';
+  if (result.variant == ReworkVariant::kActivities) {
+    out << ",\"activity_cases\":{";
+    std::size_t index = 0;
+    for (const auto& [activity, count] : result.activity_cases) {
+      if (index++) out << ',';
+      write_json_string(out, activity);
+      out << ':' << count;
+    }
+    out << '}';
+  } else if (result.variant == ReworkVariant::kCases) {
+    out << ",\"cases\":{";
+    std::size_t index = 0;
+    for (const auto& [case_id, stats] : result.cases) {
+      if (index++) out << ',';
+      write_json_string(out, case_id);
+      out << ":{\"number_activities\":" << stats.number_activities
+          << ",\"rework\":" << stats.rework << '}';
+    }
+    out << '}';
+  } else {
+    throw std::invalid_argument("rework: unknown variant");
+  }
+  out << '}';
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

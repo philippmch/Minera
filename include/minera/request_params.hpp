@@ -63,6 +63,7 @@
 #include "minera/chaotic_activities.hpp"
 #include "minera/passed_time.hpp"
 #include "minera/service_time.hpp"
+#include "minera/rework.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -262,6 +263,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field);
 [[nodiscard]] ServiceTimeOptions parse_service_time_params(
     const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] ReworkOptions parse_rework_params(const FieldLookup& field);
+[[nodiscard]] ReworkOptions parse_rework_params(const FieldLookup& field,
+                                                const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(
     const FieldLookup& field);

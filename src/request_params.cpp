@@ -3372,4 +3372,37 @@ ServiceTimeOptions parse_service_time_params(const FieldLookup& field,
   return options;
 }
 
+ReworkOptions parse_rework_params(const FieldLookup& field) {
+  return parse_rework_params(field, {});
+}
+
+ReworkOptions parse_rework_params(const FieldLookup& field,
+                                  const FieldPresence& present) {
+  ReworkOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("rework_variant")) {
+    const auto value = require("rework_variant");
+    if (value == "activities" || value == "ACTIVITIES")
+      options.variant = ReworkVariant::kActivities;
+    else if (value == "cases" || value == "CASES")
+      options.variant = ReworkVariant::kCases;
+    else
+      throw std::invalid_argument(
+          "rework_variant: expected activities or cases");
+  }
+  if (supplied("rework_activity_key"))
+    options.activity_key = require("rework_activity_key");
+  if (supplied("rework_case_id_key"))
+    options.case_id_key = require("rework_case_id_key");
+  return options;
+}
+
 }  // namespace minera
