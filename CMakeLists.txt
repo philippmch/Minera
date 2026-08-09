@@ -24,6 +24,7 @@ add_library(minera_core
   src/activity_split.cpp
   src/attribute_value_repetition.cpp
   src/case_grouping.cpp
+  src/chaotic_activities.cpp
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
@@ -312,6 +313,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_embeddings_tests PRIVATE cxx_std_20)
   target_compile_options(minera_embeddings_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_embeddings_tests COMMAND minera_embeddings_tests)
+
+  add_executable(minera_chaotic_activities_tests
+    tests/test_chaotic_activities.cpp
+  )
+  target_link_libraries(minera_chaotic_activities_tests PRIVATE minera::core)
+  target_compile_features(minera_chaotic_activities_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_chaotic_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_chaotic_activities_tests COMMAND minera_chaotic_activities_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp
