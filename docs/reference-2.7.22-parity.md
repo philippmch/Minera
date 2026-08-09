@@ -219,10 +219,10 @@ this traditional-log vertical.
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object relations, o2o links, object changes, scalar globals, and classic/standard JSON parsing are present; e2e, richer value types, and full schema coverage remain |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
-| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG output through CLI/server/frontend adapters are present; DFG input adapters remain |
+| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
-| Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — interval-event, case-envelope, and concurrent-activity overlap plus OCEL object-type summaries, activity/object associations, and edge metrics are available through native/CLI/server/frontend adapters; process-cube and business-calendar/statistical aggregation extensions remain |
+| Statistics | endpoints/attributes/variants, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics | **Partial** — interval-event, case-envelope, and concurrent-activity overlap, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics are available through native/CLI/server/frontend adapters; business-calendar/statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
@@ -249,16 +249,18 @@ multipart local `POST /api/ocel/statistics`, and typed frontend
 request/response guard share the `OCEL_STATISTICS` JSON envelope. Empty logs,
 unreferenced objects, duplicate relations, invalid identifiers, prefilters,
 repeated activity labels, and malformed timestamps are covered by focused
-Release tests; categorical/composite process-cube dimensions and business-calendar extensions remain open.
+Release tests.
 
-Process-cube evidence: `process_cube` validates rectangular typed numeric feature
-tables, supports exact numeric columns, prefix indicator columns, mixed numeric/
-prefix Cartesian cells, explicit or equal-width numeric edges, and mean, sum,
-min, max, count, median, first, and last aggregation. The deterministic
+Process-cube evidence: `process_cube` validates rectangular typed feature tables,
+supports exact numeric and categorical columns, composite categorical dimensions,
+prefix indicator columns, mixed numeric/prefix Cartesian cells, explicit or
+equal-width numeric edges, and mean, sum, min, max, count, median, first, and last
+aggregation. The deterministic
 `PROCESS_CUBE` JSON envelope is shared by the native tests, the headless
 `minera_process_cube` CLI, local `POST /api/process-cube`, and typed frontend
 request/response guards. Explicit bins are sorted and deduplicated, configured
-cells retain their case-id sets, and malformed JSON, ragged rows, non-finite
+cells retain their case-id sets, composite names accept escaped comma-delimited
+CLI/query lists, and malformed JSON, ragged rows, mixed scalar types, non-finite
 values, and unsafe division limits are rejected at the boundary.
 
 DFG interchange evidence: the strict classic text parser and deterministic

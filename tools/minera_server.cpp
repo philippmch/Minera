@@ -3181,8 +3181,8 @@ void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "x_col", "y_col", "agg_col", "aggregation", "max_divisions_x",
-        "max_divisions_y", "x_bins", "y_bins"};
+        "x_col", "x_cols", "y_col", "y_cols", "agg_col", "aggregation",
+        "max_divisions_x", "max_divisions_y", "x_bins", "y_bins"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3192,7 +3192,9 @@ void handle_process_cube(const httplib::Request& request,
     if (body.empty()) throw std::invalid_argument("missing process cube table body");
     minera::ProcessCubeOptions options;
     if (request.has_param("x_col")) options.x_col = request.get_param_value("x_col");
+    if (request.has_param("x_cols")) options.x_columns = ocel_query_list(request, "x_cols");
     if (request.has_param("y_col")) options.y_col = request.get_param_value("y_col");
+    if (request.has_param("y_cols")) options.y_columns = ocel_query_list(request, "y_cols");
     if (request.has_param("agg_col"))
       options.aggregation_column = request.get_param_value("agg_col");
     if (request.has_param("aggregation"))

@@ -864,7 +864,8 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
 
 export interface ProcessCubeTable {
   case_ids: string[];
-  columns: Record<string, number[]>;
+  columns: Record<string, number[] | string[]>;
+  categorical_columns?: Record<string, string[]>;
 }
 export interface ProcessCubeBin {
   label: string;
@@ -893,8 +894,21 @@ export function isProcessCubeTable(value: unknown): value is ProcessCubeTable {
   if (!isOcelRecord(value) || !Array.isArray(value.case_ids) ||
       !value.case_ids.every((id) => typeof id === "string") ||
       !isOcelRecord(value.columns)) return false;
-  return Object.values(value.columns).every((column) =>
-    Array.isArray(column) && column.every((entry) => finite(entry)));
+  const columns = value.columns;
+  const rows = value.case_ids.length;
+  const isColumn = (column: unknown): column is number[] | string[] =>
+    Array.isArray(column) && column.length === rows &&
+    (column.every((entry) => finite(entry)) ||
+     column.every((entry) => typeof entry === "string"));
+  if (!Object.values(columns).every(isColumn)) return false;
+  if (value.categorical_columns !== undefined) {
+    if (!isOcelRecord(value.categorical_columns) ||
+        Object.keys(value.categorical_columns).some((name) => name in columns) ||
+        !Object.values(value.categorical_columns).every((column) =>
+          Array.isArray(column) && column.length === rows &&
+          column.every((entry) => typeof entry === "string"))) return false;
+  }
+  return true;
 }
 export function isProcessCubeResult(value: unknown): value is ProcessCubeResult {
   if (!isOcelRecord(value) || value.family !== "PROCESS_CUBE" ||

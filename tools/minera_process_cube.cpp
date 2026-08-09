@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "minera/process_cube.hpp"
@@ -49,6 +50,32 @@ std::vector<double> parse_bins(std::string_view text, std::string_view option) {
   return result;
 }
 
+std::vector<std::string> parse_names(std::string_view text, std::string_view option) {
+  std::vector<std::string> result;
+  std::string current;
+  bool escaped = false;
+  for (const char value : text) {
+    if (escaped) {
+      if (value != '\\' && value != ',')
+        throw std::invalid_argument(std::string(option) + " supports only \\, and \\\\ escapes");
+      current.push_back(value);
+      escaped = false;
+    } else if (value == '\\') {
+      escaped = true;
+    } else if (value == ',') {
+      if (current.empty()) throw std::invalid_argument(std::string(option) + " contains an empty name");
+      result.push_back(std::move(current));
+      current.clear();
+    } else {
+      current.push_back(value);
+    }
+  }
+  if (escaped) throw std::invalid_argument(std::string(option) + " has a dangling escape");
+  if (current.empty()) throw std::invalid_argument(std::string(option) + " contains an empty name");
+  result.push_back(std::move(current));
+  return result;
+}
+
 minera::ProcessCubeAggregation parse_aggregation(std::string_view value) {
   if (value == "mean") return minera::ProcessCubeAggregation::kMean;
   if (value == "sum") return minera::ProcessCubeAggregation::kSum;
@@ -64,7 +91,8 @@ minera::ProcessCubeAggregation parse_aggregation(std::string_view value) {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " TABLE.json --x-col NAME --y-col NAME --agg-col NAME"
+            << " TABLE.json (--x-col NAME | --x-cols A,B,...)"
+               " (--y-col NAME | --y-cols A,B,...) --agg-col NAME"
                " [--aggregation mean|sum|min|max|count|median|first|last]"
                " [--max-divisions-x N] [--max-divisions-y N]"
                " [--x-bins A,B,...] [--y-bins A,B,...]\n";
@@ -83,7 +111,9 @@ int main(int argc, char** argv) {
       if (i + 1 >= argc) return usage(argv[0]);
       const std::string value = argv[++i];
       if (option == "--x-col") options.x_col = value;
+      else if (option == "--x-cols") options.x_columns = parse_names(value, option);
       else if (option == "--y-col") options.y_col = value;
+      else if (option == "--y-cols") options.y_columns = parse_names(value, option);
       else if (option == "--agg-col") options.aggregation_column = value;
       else if (option == "--aggregation") options.aggregation = parse_aggregation(value);
       else if (option == "--max-divisions-x") options.max_divisions_x = parse_size(value, option);

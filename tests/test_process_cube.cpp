@@ -49,6 +49,47 @@ int main() {
   const auto unicode = parse_process_cube_table_json(
       R"({"case_ids":["caf\u00e9"],"columns":{"x":[1],"y":[1],"v":[1]}})");
   assert(unicode.case_ids.front() == "caf\xC3\xA9");
+
+  // Existing categorical columns form deterministic bins, while a tuple of
+  // categorical columns forms one composite bin per observed combination.
+  ProcessCubeTable categorical;
+  categorical.case_ids = {"c1", "c2", "c3"};
+  categorical.categorical_columns = {
+      {"region", {"US", "DE", "US"}},
+      {"segment", {"retail", "retail", "online"}},
+  };
+  categorical.columns = {{"value", {1.0, 3.0, 5.0}}, {"score", {0.0, 1.0, 2.0}}};
+  ProcessCubeOptions category_options;
+  category_options.x_col = "region";
+  category_options.y_col = "segment";
+  category_options.aggregation_column = "value";
+  auto category_result = process_cube(categorical, category_options);
+  assert(category_result.x_bins.size() == 2 && !category_result.x_bins[0].numeric);
+  assert(category_result.x_bins[0].label == "DE" && category_result.x_bins[1].label == "US");
+  assert(category_result.cells[0][1].has_value() && *category_result.cells[0][1] == 3.0);
+  assert(category_result.cells[1][0].has_value() && *category_result.cells[1][0] == 5.0);
+
+  category_options = {};
+  category_options.x_columns = {"region", "segment"};
+  category_options.y_col = "score";
+  category_options.aggregation_column = "value";
+  category_result = process_cube(categorical, category_options);
+  assert(category_result.x_bins.size() == 3);
+  assert(category_result.x_bins[0].label == "(DE,retail)");
+  assert(category_result.case_ids[0][2].count("c2") == 1);
+
+  const auto categorical_json = parse_process_cube_table_json(
+      R"({"case_ids":["a","b"],"columns":{"region":["US","DE"],"value":[2,4]}})");
+  assert(categorical_json.categorical_columns.at("region")[1] == "DE");
+
+  threw = false;
+  try {
+    auto invalid = categorical;
+    invalid.columns.emplace("region", std::vector<double>{1, 2, 3});
+    (void)process_cube(invalid, category_options);
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+
   const auto encoded = serialize_process_cube_json(r);
   assert(encoded.find("\"family\":\"PROCESS_CUBE\"") != std::string::npos);
 

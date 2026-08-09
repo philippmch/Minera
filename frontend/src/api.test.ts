@@ -34,6 +34,13 @@ describe("process cube API", () => {
       max_divisions_x: 3,
       x_bins: [0, 1.5, 4],
     })).toBe("x_col=throughput&y_col=cost&agg_col=value&aggregation=median&max_divisions_x=3&x_bins=0%2C1.5%2C4");
+    expect(processCubeQuery({
+      x_cols: ["region", "segment"],
+      y_col: "score",
+    })).toBe("x_cols=region%2Csegment&y_col=score");
+    expect(processCubeQuery({ x_cols: ["a,b", "c\\d"] }))
+      .toBe("x_cols=a%5C%2Cb%2Cc%5C%5Cd");
+    expect(() => processCubeQuery({ x_col: "x", x_cols: ["x", "y"] })).toThrow(/mutually exclusive/);
   });
 
   it("posts a typed table and validates the result envelope", async () => {
@@ -73,7 +80,7 @@ describe("process cube API", () => {
     await expect(requestProcessCube(
       { case_ids: ["case-1"], columns: { x: [Number.NaN] } },
       { x_col: "x", y_col: "y", agg_col: "v" },
-    )).rejects.toThrow(/finite numeric columns/);
+    )).rejects.toThrow(/rectangular finite numeric or categorical columns/);
   });
 });
 
