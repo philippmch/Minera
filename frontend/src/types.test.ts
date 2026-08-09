@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -228,6 +228,18 @@ describe("isBoundaryActivitiesResult", () => {
   it("rejects invalid counts and variants", () => {
     expect(isBoundaryActivitiesResult({ ...valid, variant: "OTHER" })).toBe(false);
     expect(isBoundaryActivitiesResult({ ...valid, starts: { A: -1 } })).toBe(false);
+  });
+});
+
+describe("isVariantStatisticsResult", () => {
+  const valid = {
+    family: "VARIANT_STATISTICS", variant: "CLASSIC", activity_key: "activity",
+    variants: [{ activities: ["A"], count: 1, probability: 1 }],
+  };
+  it("accepts variant counts", () => expect(isVariantStatisticsResult(valid)).toBe(true));
+  it("rejects invalid probabilities", () => {
+    expect(isVariantStatisticsResult({ ...valid, variants: [{ ...valid.variants[0], probability: 2 }] })).toBe(false);
+    expect(isVariantStatisticsResult({ ...valid, variants: [{ ...valid.variants[0], count: 1.5 }] })).toBe(false);
   });
 });
 

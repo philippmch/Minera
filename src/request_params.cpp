@@ -3531,4 +3531,30 @@ BoundaryActivitiesOptions parse_boundary_activities_params(
   return options;
 }
 
+VariantStatisticsOptions parse_variant_statistics_params(
+    const FieldLookup& field) {
+  return parse_variant_statistics_params(field, {});
+}
+
+VariantStatisticsOptions parse_variant_statistics_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  VariantStatisticsOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("variant_statistics_activity_key"))
+    options.activity_key = require("variant_statistics_activity_key");
+  if (supplied("variant_statistics_max_variants"))
+    options.max_variants = parse_nonnegative_size(
+        require("variant_statistics_max_variants"),
+        "variant_statistics_max_variants");
+  return options;
+}
+
 }  // namespace minera

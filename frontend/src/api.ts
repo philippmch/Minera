@@ -125,6 +125,8 @@ import {
   type AttributeStatisticsOptions,
   type BoundaryActivitiesResult,
   type BoundaryActivitiesOptions,
+  type VariantStatisticsResult,
+  type VariantStatisticsOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -149,6 +151,7 @@ import {
   isCaseArrivalResult,
   isAttributeStatisticsResult,
   isBoundaryActivitiesResult,
+  isVariantStatisticsResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1668,6 +1671,27 @@ export function requestBoundaryActivities(options: BoundaryActivitiesOptions = {
   return postChecked(`/api/boundary-activities${query ? `?${query}` : ""}`, isBoundaryActivitiesResult, "boundary activities");
 }
 export const discoverBoundaryActivities = requestBoundaryActivities;
+
+export function variantStatisticsQuery(options: VariantStatisticsOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant_statistics_activity_key !== undefined) {
+    if (!options.variant_statistics_activity_key)
+      throw new Error("variant_statistics_activity_key must not be empty");
+    query.set("variant_statistics_activity_key", options.variant_statistics_activity_key);
+  }
+  if (options.variant_statistics_max_variants !== undefined) {
+    if (!Number.isInteger(options.variant_statistics_max_variants) || options.variant_statistics_max_variants < 0)
+      throw new Error("variant_statistics_max_variants must be a non-negative integer");
+    query.set("variant_statistics_max_variants", String(options.variant_statistics_max_variants));
+  }
+  return query.toString();
+}
+
+export function requestVariantStatistics(options: VariantStatisticsOptions = {}): Promise<VariantStatisticsResult> {
+  const query = variantStatisticsQuery(options);
+  return postChecked(`/api/variant-statistics${query ? `?${query}` : ""}`, isVariantStatisticsResult, "variant statistics");
+}
+export const discoverVariantStatistics = requestVariantStatistics;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

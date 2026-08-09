@@ -2772,6 +2772,41 @@ export function isBoundaryActivitiesResult(
     valid(data.ends as Record<string, unknown>);
 }
 
+export interface VariantStatisticsOptions {
+  variant_statistics_activity_key?: string;
+  variant_statistics_max_variants?: number;
+}
+
+export interface VariantStatisticsEntry {
+  activities: string[];
+  count: number;
+  probability: number;
+}
+
+export interface VariantStatisticsResult {
+  family: "VARIANT_STATISTICS";
+  variant: "CLASSIC";
+  activity_key: string;
+  variants: VariantStatisticsEntry[];
+}
+
+export function isVariantStatisticsResult(
+  value: unknown,
+): value is VariantStatisticsResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<VariantStatisticsResult>;
+  if (data.family !== "VARIANT_STATISTICS" || data.variant !== "CLASSIC" ||
+      typeof data.activity_key !== "string" || !Array.isArray(data.variants)) return false;
+  return data.variants.every((entry) => {
+    if (typeof entry !== "object" || entry === null) return false;
+    const item = entry as Partial<VariantStatisticsEntry>;
+    return Array.isArray(item.activities) && item.activities.every((activity) => typeof activity === "string") &&
+      typeof item.count === "number" && Number.isInteger(item.count) && item.count >= 0 &&
+      typeof item.probability === "number" && Number.isFinite(item.probability) &&
+      item.probability >= 0 && item.probability <= 1;
+  });
+}
+
 export function isReworkResult(value: unknown): value is ReworkResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<ReworkResult>;

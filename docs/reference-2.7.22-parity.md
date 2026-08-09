@@ -283,6 +283,14 @@ traces and missing boundary values. The standalone CLI,
 share the `BOUNDARY_ACTIVITIES` envelope; focused tests cover all variants,
 custom keys, empty traces, and malformed counts.
 
+Variant-statistics evidence: `discover_variant_statistics` groups complete trace
+activity sequences, sorts them by descending frequency and deterministic
+sequence order, and emits normalized stochastic-language probabilities with an
+optional result bound. The standalone CLI, `POST /api/variant-statistics`,
+strict request parser, and typed frontend API share the `VARIANT_STATISTICS`
+envelope; focused tests cover empty traces, custom keys, limits, and probability
+validation.
+
 Rework evidence: `discover_rework` exposes the activity variant (number of
 cases containing repeated activity occurrences) and the cases variant (total
 events and total repeated-activity count per case), with custom activity and

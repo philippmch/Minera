@@ -120,6 +120,7 @@ add_library(minera_core
   src/temporal_profile.cpp
   src/timestamp_interleavings.cpp
   src/transition_system.cpp
+  src/variant_statistics.cpp
   src/trace_variant_query.cpp
   src/trie.cpp
   src/trie_conversion.cpp
@@ -459,6 +460,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_boundary_activities_tests PRIVATE cxx_std_20)
   target_compile_options(minera_boundary_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_boundary_activities_tests COMMAND minera_boundary_activities_tests)
+
+  add_executable(minera_variant_statistics_tests tests/test_variant_statistics.cpp)
+  target_link_libraries(minera_variant_statistics_tests PRIVATE minera::core)
+  target_compile_features(minera_variant_statistics_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_variant_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_variant_statistics_tests COMMAND minera_variant_statistics_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

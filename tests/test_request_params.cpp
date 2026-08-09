@@ -425,6 +425,22 @@ void boundary_activities_params_contract() {
   assert(rejected);
 }
 
+void variant_statistics_params_contract() {
+  const auto options = minera::parse_variant_statistics_params(fields({
+      {"variant_statistics_activity_key", "phase"},
+      {"variant_statistics_max_variants", "3"}}));
+  assert(options.activity_key == "phase");
+  assert(options.max_variants == 3);
+  bool rejected = false;
+  try {
+    (void)minera::parse_variant_statistics_params(fields({
+        {"variant_statistics_max_variants", "-1"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2417,5 +2433,6 @@ int main() {
   case_arrival_params_contract();
   attribute_statistics_params_contract();
   boundary_activities_params_contract();
+  variant_statistics_params_contract();
   return 0;
 }

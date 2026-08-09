@@ -4113,6 +4113,28 @@ std::string boundary_activities_json(const BoundaryActivitiesResult& result) {
   return out.str();
 }
 
+std::string variant_statistics_json(const VariantStatisticsResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"VARIANT_STATISTICS\",\"variant\":\""
+      << variant_statistics_variant_name() << "\",\"activity_key\":";
+  write_json_string(out, result.activity_key);
+  out << ",\"variants\":[";
+  for (std::size_t i = 0; i < result.variants.size(); ++i) {
+    if (i) out << ',';
+    const auto& entry = result.variants[i];
+    out << "{\"activities\":[";
+    for (std::size_t j = 0; j < entry.activities.size(); ++j) {
+      if (j) out << ',';
+      write_json_string(out, entry.activities[j]);
+    }
+    out << "],\"count\":" << entry.count
+        << ",\"probability\":" << std::setprecision(17)
+        << entry.probability << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

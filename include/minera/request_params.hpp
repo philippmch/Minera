@@ -64,6 +64,7 @@
 #include "minera/attribute_statistics.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
+#include "minera/variant_statistics.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/passed_time.hpp"
 #include "minera/service_time.hpp"
@@ -290,6 +291,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] BoundaryActivitiesOptions parse_boundary_activities_params(
     const FieldLookup& field);
 [[nodiscard]] BoundaryActivitiesOptions parse_boundary_activities_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] VariantStatisticsOptions parse_variant_statistics_params(
+    const FieldLookup& field);
+[[nodiscard]] VariantStatisticsOptions parse_variant_statistics_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(
