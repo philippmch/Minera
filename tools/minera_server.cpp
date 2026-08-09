@@ -25,6 +25,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/attribute_statistics.hpp"
+#include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
@@ -1989,6 +1990,46 @@ void handle_attribute_statistics(const httplib::Request& request,
   }
 }
 
+void handle_attribute_distribution(const httplib::Request& request,
+                                   httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "attribute_distribution_type",
+        "attribute_distribution_timestamp_key"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown attribute-distribution parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options =
+        minera::parse_attribute_distribution_params(lookup, present);
+    response.set_content(
+        minera::attribute_distribution_json(
+            minera::discover_event_distribution(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_boundary_activities(const httplib::Request& request,
                                 httplib::Response& response) {
   try {
@@ -3822,6 +3863,7 @@ int main(int argc, char** argv) {
   server.Options("/api/case-arrival", preflight);
   server.Options("/api/case-statistics", preflight);
   server.Options("/api/attribute-statistics", preflight);
+  server.Options("/api/attribute-distribution", preflight);
   server.Options("/api/boundary-activities", preflight);
   server.Options("/api/variant-statistics", preflight);
   server.Options("/api/trace-variant-query", preflight);
@@ -3890,6 +3932,7 @@ int main(int argc, char** argv) {
   server.Post("/api/case-arrival", handle_case_arrival);
   server.Post("/api/case-statistics", handle_case_statistics);
   server.Post("/api/attribute-statistics", handle_attribute_statistics);
+  server.Post("/api/attribute-distribution", handle_attribute_distribution);
   server.Post("/api/boundary-activities", handle_boundary_activities);
   server.Post("/api/variant-statistics", handle_variant_statistics);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);

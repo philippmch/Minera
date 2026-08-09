@@ -20,6 +20,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/attribute_statistics.hpp"
+#include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
@@ -666,6 +667,9 @@ int usage(const char* program) {
                "  --attribute-statistics-key <name> Attribute to count\n"
                "  --attribute-statistics-scope <events|traces> Counting scope\n"
                "  --attribute-statistics-keep-once-per-case <bool> Deduplicate per trace\n"
+               "  --attribute-distribution   Emit calendar event distribution JSON\n"
+               "  --attribute-distribution-type <name> days_month, months, years, hours, days_week, weeks\n"
+               "  --attribute-distribution-timestamp-key <name> Timestamp attribute\n"
                "  --boundary-activities     Emit start/end activity counts JSON\n"
                "  --boundary-activities-variant <start|end|both> Boundary selection\n"
                "  --boundary-activities-activity-key <name> Activity attribute\n"
@@ -1038,6 +1042,7 @@ int main(int argc, char** argv) {
   bool case_arrival_requested = false;
   bool case_statistics_requested = false;
   bool attribute_statistics_requested = false;
+  bool attribute_distribution_requested = false;
   bool boundary_activities_requested = false;
   bool variant_statistics_requested = false;
   bool activity_split_option_used = false;
@@ -1052,6 +1057,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> case_arrival_fields;
   std::map<std::string, std::string> case_statistics_fields;
   std::map<std::string, std::string> attribute_statistics_fields;
+  std::map<std::string, std::string> attribute_distribution_fields;
   std::map<std::string, std::string> boundary_activities_fields;
   std::map<std::string, std::string> variant_statistics_fields;
   minera::CsvImportOptions options;
@@ -1444,6 +1450,20 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       attribute_statistics_fields[key] = value;
       attribute_statistics_requested = true;
+      continue;
+    }
+    if (arg == "--attribute-distribution") {
+      attribute_distribution_requested = true;
+      continue;
+    }
+    if (arg == "--attribute-distribution-type" ||
+        arg == "--attribute-distribution-timestamp-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      attribute_distribution_fields[key] = value;
+      attribute_distribution_requested = true;
       continue;
     }
     if (arg == "--boundary-activities") {
@@ -3630,6 +3650,30 @@ int main(int argc, char** argv) {
           minera::parse_attribute_statistics_params(lookup, present);
       const auto body = minera::attribute_statistics_json(
           minera::discover_attribute_statistics(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (attribute_distribution_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = attribute_distribution_fields.find(std::string(name));
+        return it == attribute_distribution_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return attribute_distribution_fields.contains(std::string(name));
+      };
+      const auto params =
+          minera::parse_attribute_distribution_params(lookup, present);
+      const auto body = minera::attribute_distribution_json(
+          minera::discover_event_distribution(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

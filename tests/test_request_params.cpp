@@ -439,6 +439,22 @@ void attribute_statistics_params_contract() {
   assert(rejected);
 }
 
+void attribute_distribution_params_contract() {
+  const auto options = minera::parse_attribute_distribution_params(fields({
+      {"attribute_distribution_type", "days_week"},
+      {"attribute_distribution_timestamp_key", "occurred_at"}}));
+  assert(options.distribution == minera::EventDistributionType::kDaysWeek);
+  assert(options.timestamp_key == "occurred_at");
+  bool rejected = false;
+  try {
+    (void)minera::parse_attribute_distribution_params(fields({
+        {"attribute_distribution_type", "unknown"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void boundary_activities_params_contract() {
   const auto options = minera::parse_boundary_activities_params(fields({
       {"boundary_activities_variant", "end"},
@@ -2463,6 +2479,7 @@ int main() {
   case_arrival_params_contract();
   case_statistics_params_contract();
   attribute_statistics_params_contract();
+  attribute_distribution_params_contract();
   boundary_activities_params_contract();
   variant_statistics_params_contract();
   return 0;

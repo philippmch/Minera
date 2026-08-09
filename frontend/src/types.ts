@@ -2799,6 +2799,37 @@ export function isAttributeStatisticsResult(
     .every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0);
 }
 
+export interface AttributeDistributionOptions {
+  attribute_distribution_type?:
+    | "days_month" | "months" | "years" | "hours" | "days_week" | "weeks";
+  attribute_distribution_timestamp_key?: string;
+}
+
+export interface AttributeDistributionResult {
+  family: "ATTRIBUTE_DISTRIBUTION";
+  variant: "DAYS_MONTH" | "MONTHS" | "YEARS" | "HOURS" | "DAYS_WEEK" | "WEEKS";
+  timestamp_key: string;
+  labels: string[];
+  counts: number[];
+  timed_events: number;
+}
+
+export function isAttributeDistributionResult(
+  value: unknown,
+): value is AttributeDistributionResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<AttributeDistributionResult>;
+  if (data.family !== "ATTRIBUTE_DISTRIBUTION" ||
+      !["DAYS_MONTH", "MONTHS", "YEARS", "HOURS", "DAYS_WEEK", "WEEKS"].includes(data.variant ?? "") ||
+      typeof data.timestamp_key !== "string" || !Array.isArray(data.labels) ||
+      !data.labels.every((label) => typeof label === "string") ||
+      !Array.isArray(data.counts) || data.labels.length !== data.counts.length ||
+      typeof data.timed_events !== "number" || !Number.isInteger(data.timed_events) ||
+      data.timed_events < 0) return false;
+  return data.counts.every((count) => typeof count === "number" &&
+    Number.isInteger(count) && count >= 0);
+}
+
 export interface BoundaryActivitiesOptions {
   boundary_activities_variant?: "start" | "end" | "both";
   boundary_activities_activity_key?: string;

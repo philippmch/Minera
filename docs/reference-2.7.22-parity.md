@@ -222,7 +222,7 @@ this traditional-log vertical.
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
-| Statistics | endpoints/attributes/variants, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
+| Statistics | endpoints/attributes/variants, calendar attribute distributions, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
@@ -275,6 +275,14 @@ occurrence per case. The standalone CLI, `POST /api/attribute-statistics`,
 strict request parser, and typed frontend API share the
 `ATTRIBUTE_STATISTICS` envelope; focused tests cover both scopes, deduplication,
 missing values, custom attributes, and count validation.
+
+Attribute-distribution evidence: `discover_event_distribution` implements the
+calendar buckets `DAYS_MONTH`, `MONTHS`, `YEARS`, `HOURS`, `DAYS_WEEK`, and
+`WEEKS`, fills the complete fixed ranges where applicable, and validates every
+configured timestamp. The standalone CLI, `POST /api/attribute-distribution`,
+strict request parser, and typed frontend API share the
+`ATTRIBUTE_DISTRIBUTION` envelope; focused tests cover custom timestamp keys,
+zero-filled bins, ISO week boundaries, and malformed values.
 
 Boundary-activity evidence: `discover_boundary_activities` exposes START, END,
 and BOTH counts for configurable activity-like event attributes, skipping empty
