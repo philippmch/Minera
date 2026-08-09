@@ -394,12 +394,14 @@ int usage(const char* program) {
                "  --tvq-k <n>              Maximum prefix length (0 = empty)\n"
                "  --tvq-p <n>              Minimum released frequency\n"
                "  --tvq-seed <n>           Deterministic noise seed\n"
+               "  --tvq-secure-random <bool> Use OS entropy for noise\n"
                "  --tvq-max-output-traces <n> Safety trace cap\n"
                "  --tvq-max-output-variants <n> Candidate cap\n"
                "  --pripel <query.csv|.xes>  Emit PRIPEL JSON using a query log\n"
                "  --pripel-epsilon <f>      Positive privacy parameter\n"
                "  --pripel-blocklist <a,b>  Attributes to remove\n"
                "  --pripel-seed <n>         Deterministic anonymization seed\n"
+               "  --pripel-secure-random <bool> Use OS entropy for noise\n"
                "  --pripel-max-output-traces <n> Output trace cap\n"
                "  --pripel-max-distance <n>  Nearest-variant distance cap\n"
                "                            recurse) or dfg (IMd: recurse on\n"
@@ -1392,7 +1394,8 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
           "tvq_variant", "tvq_epsilon", "tvq_k", "tvq_p", "tvq_seed",
-          "tvq_max_output_traces", "tvq_max_output_variants"};
+          "tvq_secure_random", "tvq_max_output_traces",
+          "tvq_max_output_variants"};
       if (!names.contains(key)) return usage(argv[0]);
       trace_variant_query_fields.insert_or_assign(std::move(key), value);
       trace_variant_query_requested = true;
@@ -1412,7 +1415,8 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
           "pripel_epsilon", "pripel_blocklist", "pripel_seed",
-          "pripel_max_output_traces", "pripel_max_distance"};
+          "pripel_secure_random", "pripel_max_output_traces",
+          "pripel_max_distance"};
       if (!names.contains(key)) return usage(argv[0]);
       pripel_fields.insert_or_assign(std::move(key), value);
       pripel_requested = true;

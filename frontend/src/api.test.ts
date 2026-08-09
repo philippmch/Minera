@@ -307,8 +307,8 @@ describe("role discovery API", () => {
 
 describe("trace-variant query API", () => {
   it("encodes deterministic privacy and bound options", () => {
-    expect(traceVariantQuery({ tvq_variant: "laplace", tvq_epsilon: 0.5, tvq_k: 3, tvq_p: 2, tvq_seed: 9, tvq_max_output_traces: 20 }))
-      .toBe("tvq_variant=laplace&tvq_epsilon=0.5&tvq_k=3&tvq_p=2&tvq_seed=9&tvq_max_output_traces=20");
+    expect(traceVariantQuery({ tvq_variant: "laplace", tvq_epsilon: 0.5, tvq_k: 3, tvq_p: 2, tvq_seed: 9, tvq_secure_random: true, tvq_max_output_traces: 20 }))
+      .toBe("tvq_variant=laplace&tvq_epsilon=0.5&tvq_k=3&tvq_p=2&tvq_seed=9&tvq_secure_random=true&tvq_max_output_traces=20");
   });
   it("rejects malformed backend payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "TRACE_VARIANT_QUERY", variant: "sacofa" }) })));
@@ -319,8 +319,8 @@ describe("trace-variant query API", () => {
 
 describe("PRIPEL API", () => {
   it("encodes privacy, blocklist, and matching bounds", () => {
-    expect(pripelQuery({ pripel_epsilon: 0.5, pripel_blocklist: ["case,id", "resource"], pripel_seed: 4, pripel_max_distance: 2 }))
-      .toBe("pripel_epsilon=0.5&pripel_blocklist=case%5C%2Cid%2Cresource&pripel_seed=4&pripel_max_distance=2");
+    expect(pripelQuery({ pripel_epsilon: 0.5, pripel_blocklist: ["case,id", "resource"], pripel_seed: 4, pripel_secure_random: true, pripel_max_distance: 2 }))
+      .toBe("pripel_epsilon=0.5&pripel_blocklist=case%5C%2Cid%2Cresource&pripel_seed=4&pripel_secure_random=true&pripel_max_distance=2");
   });
   it("posts a query log and rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {

@@ -339,6 +339,7 @@ export interface TraceVariantQueryDiagnostics {
   candidate_count: number;
   retained_variant_count: number;
   released_trace_count: number;
+  secure_random?: boolean;
   output_truncated: boolean;
   message: string;
 }
@@ -359,6 +360,7 @@ export interface TraceVariantQueryOptions {
   tvq_k?: number;
   tvq_p?: number;
   tvq_seed?: number;
+  tvq_secure_random?: boolean;
   tvq_max_output_traces?: number;
   tvq_max_output_variants?: number;
 }
@@ -381,6 +383,7 @@ export function isTraceVariantQueryResult(value: unknown): value is TraceVariant
   if (!Number.isInteger(d.candidate_count) || (d.candidate_count as number) < 0
       || !Number.isInteger(d.retained_variant_count) || (d.retained_variant_count as number) < 0
       || !Number.isInteger(d.released_trace_count) || (d.released_trace_count as number) < 0
+      || (d.secure_random !== undefined && typeof d.secure_random !== "boolean")
       || typeof d.output_truncated !== "boolean" || typeof d.message !== "string") return false;
   const l = c.log as Partial<TraceVariantQueryResult["log"]>;
   if (!Array.isArray(l.traces) || (l.attributes !== undefined && !isStringMap(l.attributes))) return false;
@@ -404,6 +407,7 @@ export interface PripelDiagnostics {
   nearest_matches: number;
   synthesized_traces: number;
   synthesized_events: number;
+  secure_random?: boolean;
   output_truncated: boolean;
   message: string;
 }
@@ -416,6 +420,7 @@ export interface PripelOptions {
   pripel_epsilon?: number;
   pripel_blocklist?: string[];
   pripel_seed?: number;
+  pripel_secure_random?: boolean;
   pripel_max_output_traces?: number;
   pripel_max_distance?: number;
 }
@@ -430,7 +435,9 @@ export function isPripelResult(value: unknown): value is PripelResult {
       || !nonnegative(d.seed) || !nonnegative(d.query_trace_count)
       || !nonnegative(d.released_trace_count) || !nonnegative(d.exact_matches)
       || !nonnegative(d.nearest_matches) || !nonnegative(d.synthesized_traces)
-      || !nonnegative(d.synthesized_events) || typeof d.output_truncated !== "boolean"
+      || !nonnegative(d.synthesized_events)
+      || (d.secure_random !== undefined && typeof d.secure_random !== "boolean")
+      || typeof d.output_truncated !== "boolean"
       || typeof d.message !== "string") return false;
   const l = c.log as Partial<PripelResult["log"]>;
   if (!Array.isArray(l.traces) || (l.attributes !== undefined && !isStringMap(l.attributes))) return false;

@@ -1685,7 +1685,8 @@ void handle_trace_variant_query(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "tvq_variant", "tvq_epsilon", "tvq_k", "tvq_p", "tvq_seed",
-        "tvq_max_output_traces", "tvq_max_output_variants"};
+        "tvq_secure_random", "tvq_max_output_traces",
+        "tvq_max_output_variants"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1732,7 +1733,8 @@ void handle_pripel(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "pripel_epsilon", "pripel_blocklist", "pripel_seed",
-        "pripel_max_output_traces", "pripel_max_distance"};
+        "pripel_secure_random", "pripel_max_output_traces",
+        "pripel_max_distance"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))

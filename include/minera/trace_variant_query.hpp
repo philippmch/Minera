@@ -27,6 +27,8 @@ struct TraceVariantQueryOptions {
   std::size_t max_prefix_length = 0;
   std::uint64_t prune_threshold = 1;
   std::uint64_t seed = 0;
+  // When enabled, replace the deterministic seed with one OS entropy draw.
+  bool secure_random = false;
   // Safety limits apply before materialising the returned EventLog.
   std::size_t max_output_traces = 100000;
   std::size_t max_output_variants = 10000;
@@ -38,6 +40,7 @@ struct TraceVariantQueryDiagnostics {
   std::size_t max_prefix_length = 0;
   std::uint64_t prune_threshold = 0;
   std::uint64_t seed = 0;
+  bool secure_random = false;
   std::size_t candidate_count = 0;
   std::size_t retained_variant_count = 0;
   std::uint64_t released_trace_count = 0;

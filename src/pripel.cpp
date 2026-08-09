@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "minera/timestamp.hpp"
+#include "minera/secure_random.hpp"
 
 namespace minera {
 namespace {
@@ -105,6 +106,7 @@ std::string PripelDiagnostics::to_json() const {
       << ",\"nearest_matches\":" << nearest_matches
       << ",\"synthesized_traces\":" << synthesized_traces
       << ",\"synthesized_events\":" << synthesized_events
+      << ",\"secure_random\":" << (secure_random ? "true" : "false")
       << ",\"output_truncated\":" << (output_truncated ? "true" : "false")
       << ",\"message\":\"" << json_escape(message) << "\"}";
   return out.str();
@@ -129,6 +131,7 @@ PripelResult anonymize_pripel(const EventLog& source,
   PripelResult result;
   result.diagnostics.epsilon = options.epsilon;
   result.diagnostics.seed = options.seed;
+  result.diagnostics.secure_random = options.secure_random;
   result.diagnostics.query_trace_count = released_query.traces.size();
 
   std::set<std::string> deny(options.blocklist.begin(), options.blocklist.end());
@@ -165,6 +168,11 @@ PripelResult anonymize_pripel(const EventLog& source,
     }
   }
 
+  auto random_value = [&](std::uint64_t salt, std::string_view text) {
+    return options.secure_random ? secure_random_u64()
+                                 : hash_text(options.seed + salt, text);
+  };
+
   auto randomized = [&](std::string value, std::string_view key,
                         std::uint64_t salt) {
     auto it = categorical.find(std::string(key));
@@ -175,9 +183,9 @@ PripelResult anonymize_pripel(const EventLog& source,
                             : std::exp(options.epsilon) /
                                   (std::exp(options.epsilon) +
                                    static_cast<double>(domain.size() - 1));
-    if (unit(hash_text(options.seed ^ salt, value)) < keep) return value;
+    if (unit(random_value(salt, value)) < keep) return value;
     const std::size_t index = static_cast<std::size_t>(
-        hash_text(options.seed + salt + 17, value) % (domain.size() - 1));
+        random_value(salt + 17, value) % (domain.size() - 1));
     std::size_t i = 0;
     for (const auto& candidate : domain) {
       if (candidate == value) continue;
@@ -195,7 +203,7 @@ PripelResult anonymize_pripel(const EventLog& source,
       double v = std::stod(text);
       const double span = b.hi - b.lo;
       if (span > 0.0) {
-        const double noise = (unit(hash_text(options.seed ^ salt, text)) - .5) *
+        const double noise = (unit(random_value(salt, text)) - .5) *
                              (span / options.epsilon);
         v = std::clamp(v + noise, b.lo, b.hi);
       }
@@ -276,7 +284,7 @@ PripelResult anonymize_pripel(const EventLog& source,
       if (auto ts = parse_timestamp(out.timestamp)) {
         double t = *ts;
         if (have_time && time_hi > time_lo)
-          t = std::clamp(t + (unit(hash_text(options.seed + 333,
+          t = std::clamp(t + (unit(random_value(333,
                                               std::to_string((emitted + 1) * 1009 + ei))) - .5) *
                                  ((time_hi - time_lo) / options.epsilon), time_lo, time_hi);
         if (t < previous_time) t = previous_time;

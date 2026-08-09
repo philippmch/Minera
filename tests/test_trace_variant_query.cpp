@@ -61,6 +61,12 @@ void sacofa_and_pruning() {
   options.prune_threshold = 1000000;
   const auto pruned = minera::anonymize_trace_variant_query(log, options);
   assert(pruned.frequencies.empty());
+
+  options.prune_threshold = 1;
+  options.secure_random = true;
+  const auto secure = minera::anonymize_trace_variant_query(log, options);
+  assert(secure.diagnostics.secure_random);
+  assert(secure.log.trace_count() <= options.max_output_traces);
 }
 
 }  // namespace

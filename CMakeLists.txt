@@ -107,6 +107,7 @@ add_library(minera_core
   src/resource_analysis.cpp
   src/resource_profiles.cpp
   src/role_discovery.cpp
+  src/secure_random.cpp
   src/timestamp.cpp
   src/temporal_profile.cpp
   src/timestamp_interleavings.cpp
@@ -127,6 +128,10 @@ target_include_directories(minera_core
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+if(WIN32)
+  target_link_libraries(minera_core PRIVATE bcrypt)
+endif()
 
 if(MSVC)
   target_compile_options(minera_core PRIVATE /W4 /permissive-)

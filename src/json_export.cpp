@@ -3883,6 +3883,8 @@ std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
       << ",\"k\":" << result.diagnostics.max_prefix_length
       << ",\"p\":" << result.diagnostics.prune_threshold
       << ",\"seed\":" << result.diagnostics.seed
+      << ",\"secure_random\":"
+      << (result.diagnostics.secure_random ? "true" : "false")
       << ",\"frequencies\":[";
   std::size_t index = 0;
   for (const auto& [prefix, count] : result.frequencies) {
@@ -3899,7 +3901,9 @@ std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
       << d.candidate_count << ",\"retained_variant_count\":"
       << d.retained_variant_count << ",\"released_trace_count\":"
       << d.released_trace_count << ",\"output_truncated\":"
-      << (d.output_truncated ? "true" : "false") << ",\"message\":";
+      << (d.output_truncated ? "true" : "false")
+      << ",\"secure_random\":"
+      << (d.secure_random ? "true" : "false") << ",\"message\":";
   write_json_string(out, d.message);
   out << "},\"log\":";
   write_projected_log(out, result.log);

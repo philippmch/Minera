@@ -2964,6 +2964,9 @@ TraceVariantQueryOptions parse_trace_variant_query_params(
   if (supplied("tvq_seed"))
     options.seed = static_cast<std::uint64_t>(
         parse_nonnegative_size(require("tvq_seed"), "tvq_seed"));
+  if (supplied("tvq_secure_random"))
+    options.secure_random = parse_boolean(require("tvq_secure_random"),
+                                          "tvq_secure_random");
   if (supplied("tvq_max_output_traces"))
     options.max_output_traces = parse_nonnegative_size(
         require("tvq_max_output_traces"), "tvq_max_output_traces");
@@ -3007,6 +3010,9 @@ PripelOptions parse_pripel_params(const FieldLookup& field,
   if (supplied("pripel_seed"))
     options.seed = static_cast<std::uint64_t>(
         parse_nonnegative_size(require("pripel_seed"), "pripel_seed"));
+  if (supplied("pripel_secure_random"))
+    options.secure_random = parse_boolean(require("pripel_secure_random"),
+                                          "pripel_secure_random");
   if (supplied("pripel_max_output_traces"))
     options.max_output_traces = parse_nonnegative_size(
         require("pripel_max_output_traces"), "pripel_max_output_traces");

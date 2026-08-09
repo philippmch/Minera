@@ -49,6 +49,11 @@ int main() {
   options.max_output_traces = 1;
   assert(minera::anonymize_pripel(source(), query(), options).log.trace_count() == 1);
   options.max_output_traces = 100;
+  options.secure_random = true;
+  const auto secure = minera::anonymize_pripel(source(), query(), options);
+  assert(secure.diagnostics.secure_random);
+  assert(secure.log.trace_count() <= options.max_output_traces);
+  options.secure_random = false;
   options.epsilon = 0.0;
   bool threw = false;
   try { (void)minera::anonymize_pripel(source(), query(), options); }
