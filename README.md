@@ -301,6 +301,9 @@ and tracks every family as complete, partial, or missing.
 - `minera_export` CLI that mines a CSV log and emits the event log, the
   discovered graph, the process tree, and conformance results as JSON, with
   optional log-filtering flags.
+- `minera_dfg` CLI that strictly reads and normalizes classic DFG text (or
+  writes it to a requested output path); the same parser is available through
+  the local server's `POST /api/dfg` and the typed frontend import helper.
 - A React + TypeScript frontend (`frontend/`) that uploads a CSV event log to
   the backend, shows the imported log first, and puts the directly-follows
   graph and the discovered process model one tab away each.
