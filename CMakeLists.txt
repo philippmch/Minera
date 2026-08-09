@@ -78,6 +78,7 @@ add_library(minera_core
   src/service_time.cpp
   src/streaming_dfg.cpp
   src/streaming_footprints.cpp
+  src/streaming_import.cpp
   src/streaming_temporal.cpp
   src/streaming_tbr.cpp
   src/ltl_filter.cpp
@@ -208,6 +209,12 @@ add_executable(minera_live_stream
 )
 target_link_libraries(minera_live_stream PRIVATE minera::core)
 target_compile_features(minera_live_stream PRIVATE cxx_std_20)
+
+add_executable(minera_stream_import
+  tools/minera_stream_import.cpp
+)
+target_link_libraries(minera_stream_import PRIVATE minera::core)
+target_compile_features(minera_stream_import PRIVATE cxx_std_20)
 
 add_executable(minera_playout
   tools/minera_playout.cpp
@@ -545,6 +552,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_live_stream_tests PRIVATE cxx_std_20)
   target_compile_options(minera_live_stream_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_live_stream_tests COMMAND minera_live_stream_tests)
+
+  add_executable(minera_streaming_import_tests tests/test_streaming_import.cpp)
+  target_link_libraries(minera_streaming_import_tests PRIVATE minera::core)
+  target_compile_features(minera_streaming_import_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_streaming_import_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_streaming_import_tests COMMAND minera_streaming_import_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
