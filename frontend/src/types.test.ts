@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
+
+describe("isDfgPetriConversionResult", () => {
+  const valid = {
+    family: "DFG_CONVERSION", variant: "ACTIVITY_DEFINES_PLACE",
+    source: 0, sink: 1, activities: ["A"], place_count: 2,
+    transitions: [{ activity: 0, inputs: [0], outputs: [1] }],
+  };
+  it("accepts the canonical conversion envelope", () => {
+    expect(isDfgPetriConversionResult(valid)).toBe(true);
+  });
+  it("rejects invalid place and activity references", () => {
+    expect(isDfgPetriConversionResult({ ...valid, sink: 2 })).toBe(false);
+    expect(isDfgPetriConversionResult({ ...valid, transitions: [{ activity: 1, inputs: [0], outputs: [1] }] })).toBe(false);
+    expect(isDfgPetriConversionResult({ ...valid, transitions: [{ activity: null, inputs: [2], outputs: [1] }] })).toBe(false);
+  });
+});
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };

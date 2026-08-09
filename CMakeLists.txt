@@ -40,6 +40,7 @@ add_library(minera_core
   src/dfg_playout.cpp
   src/dfg_alignment.cpp
   src/dfg_filter.cpp
+  src/dfg_conversion.cpp
   src/dfg_io.cpp
   src/decomposed_alignment.cpp
   src/dfg_variants.cpp
@@ -241,6 +242,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dfg_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_filter_tests COMMAND minera_dfg_filter_tests)
+
+  add_executable(minera_dfg_conversion_tests
+    tests/test_dfg_conversion.cpp
+  )
+  target_link_libraries(minera_dfg_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_conversion_tests COMMAND minera_dfg_conversion_tests)
 
   add_executable(minera_activity_split_tests
     tests/test_activity_split.cpp
