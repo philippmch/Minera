@@ -1028,6 +1028,42 @@ export function isStreamingFootprintsResult(value: unknown): value is StreamingF
     typeof item.first_activity === "string" && typeof item.last_activity === "string");
 }
 
+export interface StreamingTemporalDeviation {
+  source: string;
+  target: string;
+  elapsed_seconds: number;
+  standard_deviation_distance: number;
+}
+export interface StreamingTemporalCase {
+  events: number;
+  deviations: number;
+}
+export interface StreamingTemporalResult {
+  family: "STREAMING_TEMPORAL";
+  total_events_processed: number;
+  total_deviations: number;
+  cases: Record<string, StreamingTemporalCase>;
+  deviations: Record<string, StreamingTemporalDeviation[]>;
+}
+export function isStreamingTemporalResult(value: unknown): value is StreamingTemporalResult {
+  if (!isOcelRecord(value) || value.family !== "STREAMING_TEMPORAL" ||
+      !Number.isSafeInteger(value.total_events_processed) ||
+      (value.total_events_processed as number) < 0 ||
+      !Number.isSafeInteger(value.total_deviations) ||
+      (value.total_deviations as number) < 0 ||
+      !isOcelRecord(value.cases) || !isOcelRecord(value.deviations)) return false;
+  const cases = Object.values(value.cases);
+  if (!cases.every((item) => isOcelRecord(item) && Number.isSafeInteger(item.events) &&
+      (item.events as number) >= 0 && Number.isSafeInteger(item.deviations) &&
+      (item.deviations as number) >= 0)) return false;
+  return Object.values(value.deviations).every((items) => Array.isArray(items) &&
+    items.every((item) => isOcelRecord(item) && typeof item.source === "string" &&
+      typeof item.target === "string" && typeof item.elapsed_seconds === "number" &&
+      Number.isFinite(item.elapsed_seconds) && typeof item.standard_deviation_distance === "number" &&
+      Number.isFinite(item.standard_deviation_distance) &&
+      item.elapsed_seconds >= 0 && item.standard_deviation_distance >= 0));
+}
+
 export type OcelStatisticsVariant =
   | "OBJECT_TYPE_ACTIVITIES"
   | "OBJECTS_OT_COUNT"
