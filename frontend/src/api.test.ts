@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, attributeStatisticsQuery, requestAttributeStatistics, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -241,6 +241,40 @@ describe("case-arrival statistics API", () => {
     }));
     await expect(requestCaseArrival({ case_arrival_business_hours: true }))
       .resolves.toMatchObject({ family: "CASE_ARRIVAL", variant: "CLASSIC" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("case statistics API", () => {
+  it("serializes sorting and bounds", () => {
+    expect(caseStatisticsQuery({
+      case_statistics_case_id_key: "case:concept:name",
+      case_statistics_timestamp_key: "occurred_at",
+      case_statistics_sort_by: "duration",
+      case_statistics_sort_ascending: false,
+      case_statistics_max_cases: 2,
+      case_statistics_business_hours: true,
+      case_statistics_business_hour_slots: "28800-43200",
+    })).toBe("case_statistics_case_id_key=case%3Aconcept%3Aname&case_statistics_timestamp_key=occurred_at&case_statistics_sort_by=duration&case_statistics_business_hour_slots=28800-43200&case_statistics_sort_ascending=false&case_statistics_business_hours=true&case_statistics_max_cases=2");
+    expect(() => caseStatisticsQuery({ case_statistics_max_cases: -1 })).toThrow(/non-negative/);
+    expect(() => caseStatisticsQuery({ case_statistics_sort_by: "other" as never })).toThrow(/not supported/);
+  });
+
+  it("posts and validates case rows", async () => {
+    const payload = {
+      family: "CASE_STATISTICS", variant: "CLASSIC",
+      case_id_key: "case_id", timestamp_key: "timestamp",
+      enable_sort: true, sort_by: "CASE_ID", sort_ascending: true,
+      max_cases: 0, use_business_hours: false,
+      cases: [{ case_id: "c1", start_time: 1, end_time: 3, case_duration: 2 }],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/case-statistics?case_statistics_max_cases=1");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestCaseStatistics({ case_statistics_max_cases: 1 }))
+      .resolves.toMatchObject({ family: "CASE_STATISTICS", variant: "CLASSIC" });
     vi.unstubAllGlobals();
   });
 });

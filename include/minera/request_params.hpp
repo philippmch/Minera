@@ -64,6 +64,7 @@
 #include "minera/attribute_statistics.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
+#include "minera/case_statistics.hpp"
 #include "minera/variant_statistics.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/passed_time.hpp"
@@ -281,6 +282,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] CaseArrivalOptions parse_case_arrival_params(
     const FieldLookup& field);
 [[nodiscard]] CaseArrivalOptions parse_case_arrival_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] CaseStatisticsOptions parse_case_statistics_params(
+    const FieldLookup& field);
+[[nodiscard]] CaseStatisticsOptions parse_case_statistics_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] AttributeStatisticsOptions parse_attribute_statistics_params(

@@ -1,4 +1,5 @@
 #include "minera/case_statistics.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -30,6 +31,9 @@ int main() {
   assert(result.cases.size() == 2);
   assert(result.cases.front().case_id == "a");
   assert(std::abs(result.cases.front().case_duration - 3600.0) < 1e-9);
+  const auto json = minera::case_statistics_json(result);
+  assert(json.find("\"family\":\"CASE_STATISTICS\"") !=
+         std::string::npos);
   minera::CaseStatisticsOptions options;
   options.sort_by = minera::CaseStatisticsSortBy::kDuration;
   options.sort_ascending = false;

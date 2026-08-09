@@ -392,6 +392,36 @@ void case_arrival_params_contract() {
   assert(rejected);
 }
 
+void case_statistics_params_contract() {
+  const auto options = minera::parse_case_statistics_params(fields({
+      {"case_statistics_case_id_key", "case:concept:name"},
+      {"case_statistics_timestamp_key", "occurred_at"},
+      {"case_statistics_enable_sort", "true"},
+      {"case_statistics_sort_by", "duration"},
+      {"case_statistics_sort_ascending", "false"},
+      {"case_statistics_max_cases", "3"},
+      {"case_statistics_business_hours", "true"},
+      {"case_statistics_business_hour_slots", "28800-43200"}}));
+  assert(options.case_id_key == "case:concept:name");
+  assert(options.timestamp_key == "occurred_at");
+  assert(options.enable_sort &&
+         options.sort_by == minera::CaseStatisticsSortBy::kDuration);
+  assert(!options.sort_ascending && options.max_cases == 3);
+  assert(options.use_business_hours && options.business_hour_slots.size() == 1);
+  for (const auto& item : {
+           std::pair{"case_statistics_sort_by", "bad"},
+           std::pair{"case_statistics_max_cases", "-1"},
+           std::pair{"case_statistics_enable_sort", "maybe"}}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_case_statistics_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
 void attribute_statistics_params_contract() {
   const auto options = minera::parse_attribute_statistics_params(fields({
       {"attribute_statistics_key", "region"},
@@ -2431,6 +2461,7 @@ int main() {
   rework_params_contract();
   cycle_time_params_contract();
   case_arrival_params_contract();
+  case_statistics_params_contract();
   attribute_statistics_params_contract();
   boundary_activities_params_contract();
   variant_statistics_params_contract();
