@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -203,6 +203,19 @@ describe("isCaseArrivalResult", () => {
   it("rejects invalid averages and counts", () => {
     expect(isCaseArrivalResult({ ...valid, arrival_average: -1 })).toBe(false);
     expect(isCaseArrivalResult({ ...valid, timed_ends: 1.5 })).toBe(false);
+  });
+});
+
+describe("isAttributeStatisticsResult", () => {
+  const valid = {
+    family: "ATTRIBUTE_STATISTICS", scope: "EVENTS",
+    attribute_key: "activity", keep_once_per_case: true,
+    values: { A: 2 },
+  };
+  it("accepts deterministic attribute counts", () => expect(isAttributeStatisticsResult(valid)).toBe(true));
+  it("rejects negative or fractional counts", () => {
+    expect(isAttributeStatisticsResult({ ...valid, values: { A: -1 } })).toBe(false);
+    expect(isAttributeStatisticsResult({ ...valid, values: { A: 1.5 } })).toBe(false);
   });
 });
 

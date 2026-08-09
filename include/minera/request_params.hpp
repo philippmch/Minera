@@ -61,6 +61,7 @@
 #include "minera/path_filter.hpp"
 #include "minera/overlap.hpp"
 #include "minera/chaotic_activities.hpp"
+#include "minera/attribute_statistics.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/passed_time.hpp"
@@ -278,6 +279,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] CaseArrivalOptions parse_case_arrival_params(
     const FieldLookup& field);
 [[nodiscard]] CaseArrivalOptions parse_case_arrival_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] AttributeStatisticsOptions parse_attribute_statistics_params(
+    const FieldLookup& field);
+[[nodiscard]] AttributeStatisticsOptions parse_attribute_statistics_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(

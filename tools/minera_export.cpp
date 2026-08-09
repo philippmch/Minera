@@ -19,6 +19,7 @@
 
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
+#include "minera/attribute_statistics.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/case_arrival.hpp"
@@ -650,6 +651,10 @@ int usage(const char* program) {
                "  --case-arrival-timestamp-key <name> Timestamp attribute\n"
                "  --case-arrival-business-hours <bool> Use business-hour gaps\n"
                "  --case-arrival-business-hour-slots <a-b,...> Business-hour slots\n"
+               "  --attribute-statistics    Emit event/trace attribute counts JSON\n"
+               "  --attribute-statistics-key <name> Attribute to count\n"
+               "  --attribute-statistics-scope <events|traces> Counting scope\n"
+               "  --attribute-statistics-keep-once-per-case <bool> Deduplicate per trace\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -1014,6 +1019,7 @@ int main(int argc, char** argv) {
   bool rework_requested = false;
   bool cycle_time_requested = false;
   bool case_arrival_requested = false;
+  bool attribute_statistics_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
@@ -1024,6 +1030,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> rework_fields;
   std::map<std::string, std::string> cycle_time_fields;
   std::map<std::string, std::string> case_arrival_fields;
+  std::map<std::string, std::string> attribute_statistics_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1379,6 +1386,21 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       case_arrival_fields[key] = value;
       case_arrival_requested = true;
+      continue;
+    }
+    if (arg == "--attribute-statistics") {
+      attribute_statistics_requested = true;
+      continue;
+    }
+    if (arg == "--attribute-statistics-key" ||
+        arg == "--attribute-statistics-scope" ||
+        arg == "--attribute-statistics-keep-once-per-case") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      attribute_statistics_fields[key] = value;
+      attribute_statistics_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3490,6 +3512,30 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_case_arrival_params(lookup, present);
       const auto body = minera::case_arrival_json(
           minera::discover_case_arrival(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (attribute_statistics_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = attribute_statistics_fields.find(std::string(name));
+        return it == attribute_statistics_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return attribute_statistics_fields.contains(std::string(name));
+      };
+      const auto params =
+          minera::parse_attribute_statistics_params(lookup, present);
+      const auto body = minera::attribute_statistics_json(
+          minera::discover_attribute_statistics(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

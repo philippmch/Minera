@@ -4071,6 +4071,26 @@ std::string case_arrival_json(const CaseArrivalResult& result) {
   return out.str();
 }
 
+std::string attribute_statistics_json(
+    const AttributeStatisticsResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"ATTRIBUTE_STATISTICS\",\"scope\":\""
+      << attribute_statistics_scope_name(result.scope)
+      << "\",\"attribute_key\":";
+  write_json_string(out, result.attribute_key);
+  out << ",\"keep_once_per_case\":"
+      << (result.keep_once_per_case ? "true" : "false")
+      << ",\"values\":{";
+  std::size_t index = 0;
+  for (const auto& [value, count] : result.values) {
+    if (index++) out << ',';
+    write_json_string(out, value);
+    out << ':' << count;
+  }
+  out << "}}";
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

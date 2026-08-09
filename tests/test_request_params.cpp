@@ -392,6 +392,23 @@ void case_arrival_params_contract() {
   assert(rejected);
 }
 
+void attribute_statistics_params_contract() {
+  const auto options = minera::parse_attribute_statistics_params(fields({
+      {"attribute_statistics_key", "region"},
+      {"attribute_statistics_scope", "traces"},
+      {"attribute_statistics_keep_once_per_case", "true"}}));
+  assert(options.attribute_key == "region");
+  assert(options.scope == minera::AttributeStatisticsScope::kTraces);
+  assert(!options.keep_once_per_case);
+  bool rejected = false;
+  try {
+    (void)minera::parse_attribute_statistics_params(fields({}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2382,5 +2399,6 @@ int main() {
   rework_params_contract();
   cycle_time_params_contract();
   case_arrival_params_contract();
+  attribute_statistics_params_contract();
   return 0;
 }

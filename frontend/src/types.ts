@@ -2715,6 +2715,35 @@ export function isCaseArrivalResult(value: unknown): value is CaseArrivalResult 
     Number.isInteger(data.timed_ends) && data.timed_ends >= 0;
 }
 
+export interface AttributeStatisticsOptions {
+  attribute_statistics_key?: string;
+  attribute_statistics_scope?: "events" | "traces";
+  attribute_statistics_keep_once_per_case?: boolean;
+}
+
+export interface AttributeStatisticsResult {
+  family: "ATTRIBUTE_STATISTICS";
+  scope: "EVENTS" | "TRACES";
+  attribute_key: string;
+  keep_once_per_case: boolean;
+  values: Record<string, number>;
+}
+
+export function isAttributeStatisticsResult(
+  value: unknown,
+): value is AttributeStatisticsResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<AttributeStatisticsResult>;
+  if (data.family !== "ATTRIBUTE_STATISTICS" ||
+      (data.scope !== "EVENTS" && data.scope !== "TRACES") ||
+      typeof data.attribute_key !== "string" ||
+      typeof data.keep_once_per_case !== "boolean" ||
+      typeof data.values !== "object" || data.values === null ||
+      Array.isArray(data.values)) return false;
+  return Object.values(data.values as Record<string, unknown>)
+    .every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0);
+}
+
 export function isReworkResult(value: unknown): value is ReworkResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<ReworkResult>;
