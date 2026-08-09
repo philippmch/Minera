@@ -557,6 +557,20 @@ export interface TrieResult {
   family: "LOG_TO_TRIE";
   root: TrieNode;
 }
+export interface TriePetriConversionTransition {
+  activity: number | null;
+  inputs: number[];
+  outputs: number[];
+}
+export interface TriePetriConversionResult {
+  family: "TRIE_CONVERSION";
+  variant: "TO_PETRI_NET";
+  source: number;
+  sink: number;
+  activities: string[];
+  place_count: number;
+  transitions: TriePetriConversionTransition[];
+}
 function isTrieNode(value: unknown): value is TrieNode {
   if (!value || typeof value !== "object") return false;
   const node = value as Partial<TrieNode>;
@@ -567,6 +581,29 @@ function isTrieNode(value: unknown): value is TrieNode {
 export function isTrieResult(value: unknown): value is TrieResult {
   return !!value && typeof value === "object" && (value as Partial<TrieResult>).family === "LOG_TO_TRIE"
     && isTrieNode((value as Partial<TrieResult>).root);
+}
+export function isTriePetriConversionResult(value: unknown): value is TriePetriConversionResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<TriePetriConversionResult>;
+  if (candidate.family !== "TRIE_CONVERSION" || candidate.variant !== "TO_PETRI_NET" ||
+      !Number.isInteger(candidate.source) || (candidate.source as number) < 0 ||
+      !Number.isInteger(candidate.sink) || (candidate.sink as number) < 0 ||
+      !Number.isInteger(candidate.place_count) || (candidate.place_count as number) <= 0 ||
+      !Array.isArray(candidate.activities) || !Array.isArray(candidate.transitions)) return false;
+  const placeCount = candidate.place_count as number;
+  const activities = candidate.activities as string[];
+  if ((candidate.source as number) >= placeCount || (candidate.sink as number) >= placeCount ||
+      !activities.every((activity) => typeof activity === "string")) return false;
+  return candidate.transitions.every((transition) => {
+    if (!transition || typeof transition !== "object") return false;
+    const item = transition as Partial<TriePetriConversionTransition>;
+    const places = (values: unknown): values is number[] => Array.isArray(values) &&
+      values.every((place) => Number.isInteger(place) && (place as number) >= 0 && (place as number) < placeCount);
+    return (item.activity === null ||
+      (Number.isInteger(item.activity) && (item.activity as number) >= 0 &&
+       (item.activity as number) < activities.length)) &&
+      places(item.inputs) && places(item.outputs);
+  });
 }
 
 export interface OpenPathInterval {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -14,6 +14,18 @@ describe("isDfgPetriConversionResult", () => {
     expect(isDfgPetriConversionResult({ ...valid, sink: 2 })).toBe(false);
     expect(isDfgPetriConversionResult({ ...valid, transitions: [{ activity: 1, inputs: [0], outputs: [1] }] })).toBe(false);
     expect(isDfgPetriConversionResult({ ...valid, transitions: [{ activity: null, inputs: [2], outputs: [1] }] })).toBe(false);
+  });
+});
+
+describe("isTriePetriConversionResult", () => {
+  const valid = {
+    family: "TRIE_CONVERSION", variant: "TO_PETRI_NET", source: 0,
+    sink: 1, activities: ["A"], place_count: 2,
+    transitions: [{ activity: 0, inputs: [0], outputs: [1] }],
+  };
+  it("accepts and rejects bounded references", () => {
+    expect(isTriePetriConversionResult(valid)).toBe(true);
+    expect(isTriePetriConversionResult({ ...valid, transitions: [{ activity: null, inputs: [2], outputs: [1] }] })).toBe(false);
   });
 });
 

@@ -60,6 +60,7 @@
 #include "minera/label_splitting.hpp"
 #include "minera/link_analysis.hpp"
 #include "minera/trie.hpp"
+#include "minera/trie_conversion.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
@@ -2091,6 +2092,46 @@ void handle_trie(const httplib::Request& request,
   }
 }
 
+void handle_trie_to_petri(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "trie_activity_key", "trie_max_path_length"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown trie parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_trie_params(lookup, present);
+    const auto net = minera::convert_trie_to_petri_net(
+        minera::discover_trie(session->log, options));
+    response.set_content(minera::serialize_trie_petri_net_json(net),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_interval_tree(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -3384,6 +3425,7 @@ int main(int argc, char** argv) {
   server.Options("/api/label-splitting", preflight);
   server.Options("/api/transform-label-splitting", preflight);
   server.Options("/api/trie", preflight);
+  server.Options("/api/trie-to-petri", preflight);
   server.Options("/api/interval-tree", preflight);
   server.Options("/api/merge-case-relations", preflight);
   server.Options("/api/timestamp-interleavings", preflight);
@@ -3441,6 +3483,7 @@ int main(int argc, char** argv) {
   server.Post("/api/label-splitting", handle_label_splitting);
   server.Post("/api/transform-label-splitting", handle_label_splitting);
   server.Get("/api/trie", handle_trie);
+  server.Get("/api/trie-to-petri", handle_trie_to_petri);
   server.Get("/api/interval-tree", handle_interval_tree);
   server.Post("/api/merge-case-relations", handle_case_relations);
   server.Post("/api/timestamp-interleavings", handle_timestamp_interleavings);

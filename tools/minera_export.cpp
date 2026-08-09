@@ -55,6 +55,7 @@
 #include "minera/label_splitting.hpp"
 #include "minera/link_analysis.hpp"
 #include "minera/trie.hpp"
+#include "minera/trie_conversion.hpp"
 #include "minera/interval_tree.hpp"
 #include "minera/case_relations.hpp"
 #include "minera/random_tree.hpp"
@@ -565,6 +566,7 @@ int usage(const char* program) {
                "  --label-splitting-activities-suffix <text> Replacement suffix\n"
                "  --label-splitting-target-activities <a,b> Optional target labels\n"
                "  --trie                   Emit standalone log-trie JSON\n"
+               "  --trie-to-petri          Convert the discovered trie to a Petri net\n"
                "  --trie-activity-key <name> Event activity attribute\n"
                "  --trie-max-path-length <n> Positive variant path limit\n"
                "  --interval-tree          Emit open-path interval JSON\n"
@@ -1019,6 +1021,7 @@ int main(int argc, char** argv) {
   bool label_splitting_requested = false;
   std::map<std::string, std::string> label_splitting_fields;
   bool trie_requested = false;
+  bool trie_to_petri_requested = false;
   std::map<std::string, std::string> trie_fields;
   bool interval_requested = false;
   std::map<std::string, std::string> interval_fields;
@@ -1524,6 +1527,11 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--trie") { trie_requested = true; continue; }
+    if (arg == "--trie-to-petri") {
+      trie_requested = true;
+      trie_to_petri_requested = true;
+      continue;
+    }
     if (arg.rfind("--trie-", 0) == 0) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -3468,8 +3476,13 @@ int main(int argc, char** argv) {
         return trie_fields.contains(std::string(name));
       };
       const auto params = minera::parse_trie_params(lookup, present);
-      std::cout << minera::trie_json(minera::discover_trie(log, params))
-                << '\n';
+      const auto trie = minera::discover_trie(log, params);
+      if (trie_to_petri_requested) {
+        const auto net = minera::convert_trie_to_petri_net(trie);
+        std::cout << minera::serialize_trie_petri_net_json(net) << '\n';
+      } else {
+        std::cout << minera::trie_json(trie) << '\n';
+      }
       return 0;
     }
     if (interval_requested) {
