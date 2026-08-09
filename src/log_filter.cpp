@@ -481,6 +481,23 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     kept = std::move(repetition_log.traces);
   }
 
+  if (options.consecutive_activity_grouping) {
+    EventLog grouped;
+    grouped.traces = std::move(kept);
+    grouped.attributes = log.attributes;
+    grouped = group_consecutive_activities(
+        grouped, *options.consecutive_activity_grouping);
+    kept = std::move(grouped.traces);
+  }
+  if (options.timestamp_case_grouping) {
+    EventLog grouped;
+    grouped.traces = std::move(kept);
+    grouped.attributes = log.attributes;
+    grouped = group_same_timestamp_events(grouped,
+                                          *options.timestamp_case_grouping);
+    kept = std::move(grouped.traces);
+  }
+
   const bool by_frequency = options.min_variant_frequency > 1;
   const bool by_rank = options.top_variants != 0;
   const bool by_coverage = options.variant_coverage > 0.0;

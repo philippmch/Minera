@@ -9,6 +9,7 @@
 
 #include "minera/activity_split.hpp"
 #include "minera/attribute_value_repetition.hpp"
+#include "minera/case_grouping.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -179,6 +180,12 @@ struct LogFilterOptions {
   // Optional whole-trace attribute/value repetition range.
   std::optional<AttributeValueRepetitionOptions> attribute_value_repetition;
 
+  // Optional case-grouping transformations. Each is applied after ordinary
+  // projections and before variant selection.
+  std::optional<ConsecutiveActivityGroupingOptions>
+      consecutive_activity_grouping;
+  std::optional<TimestampCaseGroupingOptions> timestamp_case_grouping;
+
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
@@ -200,7 +207,9 @@ struct LogFilterOptions {
            !end_activities.empty() || min_variant_frequency > 1 ||
            top_variants != 0 || variant_coverage != 0.0 ||
            !activity_split_activities.empty() ||
-           attribute_value_repetition.has_value();
+           attribute_value_repetition.has_value() ||
+           consecutive_activity_grouping.has_value() ||
+           timestamp_case_grouping.has_value();
   }
 };
 

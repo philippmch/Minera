@@ -1141,6 +1141,71 @@ MineParams parse_mine_params(const FieldLookup& field,
           "repetition_min: must not exceed repetition_max");
     }
   }
+  const bool consecutive_grouping_supplied =
+      supplied("consecutive_case_grouping") ||
+      supplied("consecutive_case_grouping_type") ||
+      supplied("consecutive_case_grouping_activity_key") ||
+      supplied("consecutive_grouping");
+  if (consecutive_grouping_supplied) {
+    params.filter.consecutive_activity_grouping =
+        ConsecutiveActivityGroupingOptions{};
+    auto& grouping = *params.filter.consecutive_activity_grouping;
+    const auto type = supplied("consecutive_case_grouping")
+                          ? field("consecutive_case_grouping")
+                          : supplied("consecutive_case_grouping_type")
+                                ? field("consecutive_case_grouping_type")
+                                : supplied("consecutive_grouping")
+                                      ? field("consecutive_grouping")
+                                      : std::string("first");
+    if (type == "first") {
+      grouping.filter_type = CaseGroupingFilterType::kFirst;
+    } else if (type == "last") {
+      grouping.filter_type = CaseGroupingFilterType::kLast;
+    } else {
+      throw std::invalid_argument(
+          "consecutive_case_grouping: expected first or last");
+    }
+    if (supplied("consecutive_case_grouping_activity_key"))
+      grouping.activity_key = field("consecutive_case_grouping_activity_key");
+  }
+  const bool timestamp_grouping_supplied =
+      supplied("timestamp_case_grouping") ||
+      supplied("timestamp_case_grouping_type") ||
+      supplied("timestamp_case_grouping_activity_key") ||
+      supplied("timestamp_case_grouping_timestamp_key") ||
+      supplied("timestamp_case_grouping_separator") ||
+      supplied("timestamp_grouping");
+  if (timestamp_grouping_supplied) {
+    params.filter.timestamp_case_grouping = TimestampCaseGroupingOptions{};
+    auto& grouping = *params.filter.timestamp_case_grouping;
+    const auto type = supplied("timestamp_case_grouping")
+                          ? field("timestamp_case_grouping")
+                          : supplied("timestamp_case_grouping_type")
+                                ? field("timestamp_case_grouping_type")
+                                : supplied("timestamp_grouping")
+                                      ? field("timestamp_grouping")
+                                      : std::string("first");
+    if (type == "first") {
+      grouping.filter_type = TimestampCaseGroupingType::kFirst;
+    } else if (type == "last") {
+      grouping.filter_type = TimestampCaseGroupingType::kLast;
+    } else if (type == "concat") {
+      grouping.filter_type = TimestampCaseGroupingType::kConcat;
+    } else {
+      throw std::invalid_argument(
+          "timestamp_case_grouping: expected first, last, or concat");
+    }
+    if (supplied("timestamp_case_grouping_activity_key"))
+      grouping.activity_key = field("timestamp_case_grouping_activity_key");
+    if (supplied("timestamp_case_grouping_timestamp_key"))
+      grouping.timestamp_key = field("timestamp_case_grouping_timestamp_key");
+    if (supplied("timestamp_case_grouping_separator")) {
+      grouping.concat_separator = field("timestamp_case_grouping_separator");
+      if (grouping.concat_separator.empty())
+        throw std::invalid_argument(
+            "timestamp_case_grouping_separator: must not be empty");
+    }
+  }
   if (const auto value = field("start_activities"); !value.empty()) {
     params.filter.start_activities = split_csv(value);
   }

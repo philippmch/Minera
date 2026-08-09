@@ -574,6 +574,12 @@ void parse_mine_params_maps_filters() {
       {"repetition_attribute_key", "channel"},
       {"repetition_min", "2"},
       {"repetition_max", "4"},
+      {"consecutive_case_grouping", "last"},
+      {"consecutive_case_grouping_activity_key", "activity"},
+      {"timestamp_case_grouping", "concat"},
+      {"timestamp_case_grouping_activity_key", "activity"},
+      {"timestamp_case_grouping_timestamp_key", "timestamp"},
+      {"timestamp_case_grouping_separator", "+"},
       {"attribute_key", "channel"},
       {"keep_attribute_values", "web, phone"},
       {"remove_attribute_values", "fax"},
@@ -621,6 +627,16 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.attribute_value_repetition->attribute_key == "channel");
   assert(params.filter.attribute_value_repetition->min_repetitions == 2);
   assert(params.filter.attribute_value_repetition->max_repetitions == 4);
+  assert(params.filter.consecutive_activity_grouping.has_value());
+  assert(params.filter.consecutive_activity_grouping->filter_type ==
+         minera::CaseGroupingFilterType::kLast);
+  assert(params.filter.consecutive_activity_grouping->activity_key == "activity");
+  assert(params.filter.timestamp_case_grouping.has_value());
+  assert(params.filter.timestamp_case_grouping->filter_type ==
+         minera::TimestampCaseGroupingType::kConcat);
+  assert(params.filter.timestamp_case_grouping->activity_key == "activity");
+  assert(params.filter.timestamp_case_grouping->timestamp_key == "timestamp");
+  assert(params.filter.timestamp_case_grouping->concat_separator == "+");
   assert(params.filter.attribute_key == "channel");
   assert((params.filter.keep_attribute_values ==
           std::vector<std::string>{"web", "phone"}));
@@ -1016,6 +1032,34 @@ void parse_mine_params_rejects_invalid_repetition_fields() {
     range_threw = true;
   }
   assert(range_threw);
+}
+
+void parse_mine_params_rejects_invalid_case_grouping_fields() {
+  for (const auto& item : std::vector<std::pair<std::string, std::string>>{
+           {"consecutive_case_grouping", "bad"},
+           {"timestamp_case_grouping", "bad"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const auto lookup = fields({{"timestamp_case_grouping", "concat"},
+                              {"timestamp_case_grouping_separator", ""}});
+  const auto present = [](std::string_view name) {
+    return name == "timestamp_case_grouping" ||
+           name == "timestamp_case_grouping_separator";
+  };
+  bool separator_threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    separator_threw = true;
+  }
+  assert(separator_threw);
 }
 
 void parse_mine_params_maps_dfg_variant_options() {
@@ -2116,6 +2160,7 @@ int main() {
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();
+  parse_mine_params_rejects_invalid_case_grouping_fields();
   parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_rejects_an_unknown_attribute_mode();
   parse_mine_params_rejects_a_malformed_succession();

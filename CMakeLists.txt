@@ -23,6 +23,7 @@ add_library(minera_core
   src/alpha_miner.cpp
   src/activity_split.cpp
   src/attribute_value_repetition.cpp
+  src/case_grouping.cpp
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
@@ -256,6 +257,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_attribute_value_repetition_tests PRIVATE cxx_std_20)
   target_compile_options(minera_attribute_value_repetition_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_attribute_value_repetition_tests COMMAND minera_attribute_value_repetition_tests)
+
+  add_executable(minera_case_grouping_tests
+    tests/test_case_grouping.cpp
+  )
+  target_link_libraries(minera_case_grouping_tests PRIVATE minera::core)
+  target_compile_features(minera_case_grouping_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_grouping_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_case_grouping_tests COMMAND minera_case_grouping_tests)
 
   add_executable(minera_ltl_filter_tests
     tests/test_ltl_filter.cpp

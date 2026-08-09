@@ -155,7 +155,9 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.ltlVariant && filters.ltlAttributeValues?.length ||
       (filters.betweenStart && filters.betweenEnd) ||
       filters.activitySplit?.length ||
-      filters.repetitionValue !== undefined,
+      filters.repetitionValue !== undefined ||
+      filters.consecutiveGrouping ||
+      filters.timestampGrouping,
   );
 }
 

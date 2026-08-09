@@ -280,6 +280,13 @@ through strict mine-request fields, CLI flags, local-server form handling, and
 frontend serialization/controls. Focused tests cover default and zero ranges,
 generic attributes, missing values, aliases, and invalid bounds.
 
+Case-grouping evidence: consecutive activity runs support first/last event
+retention, while same-timestamp groups support first, last, and deterministic
+lexical activity concatenation. First-class and generic event keys, custom
+timestamp keys, and a configurable non-empty concatenation separator are
+validated. Native, request, CLI, local-server, and frontend surfaces share
+the same grouping options and focused edge-case coverage.
+
 DFG interchange evidence: the strict classic text parser and deterministic
 writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
 validates, and normalizes a document (or writes it to an explicit output path),
