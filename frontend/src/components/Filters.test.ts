@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pathValidationMessage, repetitionValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
+import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -75,5 +75,13 @@ describe("attribute repetition validation", () => {
     expect(repetitionValidationMessage({ value: "A", min: "1.5", max: "" })).toContain("minimum");
     expect(repetitionValidationMessage({ value: "A", min: "3", max: "2" })).toContain("must not exceed");
     expect(repetitionValidationMessage({ value: "A", min: "", max: "-1" })).toContain("maximum");
+  });
+});
+
+describe("case grouping validation", () => {
+  it("requires a separator only for concatenation", () => {
+    expect(caseGroupingValidationMessage({ timestampGrouping: "first", timestampGroupingSeparator: "" })).toBeNull();
+    expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: " & " })).toBeNull();
+    expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: "" })).toContain("separator");
   });
 });

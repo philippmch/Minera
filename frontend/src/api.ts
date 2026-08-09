@@ -197,6 +197,14 @@ export interface FilterOptions extends LtlFilterOptions {
   repetitionAttributeKey?: string;
   repetitionMin?: number;
   repetitionMax?: number;
+  /** Collapse consecutive equal activities, retaining first or last event. */
+  consecutiveGrouping?: "first" | "last";
+  consecutiveGroupingActivityKey?: string;
+  /** Collapse events sharing a timestamp, optionally concatenating activities. */
+  timestampGrouping?: "first" | "last" | "concat";
+  timestampGroupingActivityKey?: string;
+  timestampGroupingTimestampKey?: string;
+  timestampGroupingSeparator?: string;
   /** Optional native segment operations, applied after ordinary filters. */
   segmentPrefixActivity?: string;
   segmentPrefixStrict?: boolean;
@@ -412,6 +420,20 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("repetition_min", String(options.repetitionMin));
     if (options.repetitionMax !== undefined)
       add("repetition_max", String(options.repetitionMax));
+  }
+  if (options.consecutiveGrouping) {
+    add("consecutive_case_grouping", options.consecutiveGrouping);
+    if (options.consecutiveGroupingActivityKey)
+      add("consecutive_case_grouping_activity_key", options.consecutiveGroupingActivityKey);
+  }
+  if (options.timestampGrouping) {
+    add("timestamp_case_grouping", options.timestampGrouping);
+    if (options.timestampGroupingActivityKey)
+      add("timestamp_case_grouping_activity_key", options.timestampGroupingActivityKey);
+    if (options.timestampGroupingTimestampKey)
+      add("timestamp_case_grouping_timestamp_key", options.timestampGroupingTimestampKey);
+    if (options.timestampGroupingSeparator)
+      add("timestamp_case_grouping_separator", options.timestampGroupingSeparator);
   }
   if (options.minLength) add("min_length", String(options.minLength));
   if (options.maxLength) add("max_length", String(options.maxLength));

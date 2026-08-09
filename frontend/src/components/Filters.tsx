@@ -120,6 +120,17 @@ export function repetitionValidationMessage(input: {
   return null;
 }
 
+/** Concatenation needs a non-empty separator at the request boundary. */
+export function caseGroupingValidationMessage(input: {
+  timestampGrouping: "" | "first" | "last" | "concat";
+  timestampGroupingSeparator: string;
+}): string | null {
+  if (input.timestampGrouping === "concat" &&
+      input.timestampGroupingSeparator.length === 0)
+    return "Timestamp-group concatenation needs a non-empty separator.";
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -150,6 +161,12 @@ export function Filters({
   const [repetitionAttributeKey, setRepetitionAttributeKey] = useState("");
   const [repetitionMin, setRepetitionMin] = useState("");
   const [repetitionMax, setRepetitionMax] = useState("");
+  const [consecutiveGrouping, setConsecutiveGrouping] = useState<"" | "first" | "last">("");
+  const [consecutiveGroupingActivityKey, setConsecutiveGroupingActivityKey] = useState("");
+  const [timestampGrouping, setTimestampGrouping] = useState<"" | "first" | "last" | "concat">("");
+  const [timestampGroupingActivityKey, setTimestampGroupingActivityKey] = useState("");
+  const [timestampGroupingTimestampKey, setTimestampGroupingTimestampKey] = useState("");
+  const [timestampGroupingSeparator, setTimestampGroupingSeparator] = useState(" & ");
   const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
   const [prefixActivity, setPrefixActivity] = useState("");
   const [suffixActivity, setSuffixActivity] = useState("");
@@ -523,10 +540,14 @@ export function Filters({
     min: repetitionMin,
     max: repetitionMax,
   });
+  const caseGroupingValidationError = caseGroupingValidationMessage({
+    timestampGrouping,
+    timestampGroupingSeparator,
+  });
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
-        pathValidationError || repetitionValidationError) return;
+        pathValidationError || repetitionValidationError || caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -600,6 +621,12 @@ export function Filters({
       repetitionAttributeKey: repetitionValue ? repetitionAttributeKey || undefined : undefined,
       repetitionMin: repetitionValue && repetitionMin.trim() ? Number(repetitionMin) : undefined,
       repetitionMax: repetitionValue && repetitionMax.trim() ? Number(repetitionMax) : undefined,
+      consecutiveGrouping: consecutiveGrouping || undefined,
+      consecutiveGroupingActivityKey: consecutiveGrouping ? consecutiveGroupingActivityKey || undefined : undefined,
+      timestampGrouping: timestampGrouping || undefined,
+      timestampGroupingActivityKey: timestampGrouping ? timestampGroupingActivityKey || undefined : undefined,
+      timestampGroupingTimestampKey: timestampGrouping ? timestampGroupingTimestampKey || undefined : undefined,
+      timestampGroupingSeparator: timestampGrouping ? timestampGroupingSeparator : undefined,
       attributeKey: removeValueList.length > 0 ? attributeKey : undefined,
       removeAttributeValues:
         removeValueList.length > 0 ? removeValueList : undefined,
@@ -760,6 +787,12 @@ export function Filters({
     setRepetitionAttributeKey("");
     setRepetitionMin("");
     setRepetitionMax("");
+    setConsecutiveGrouping("");
+    setConsecutiveGroupingActivityKey("");
+    setTimestampGrouping("");
+    setTimestampGroupingActivityKey("");
+    setTimestampGroupingTimestampKey("");
+    setTimestampGroupingSeparator(" & ");
     setVariantCoverage("");
     setPrefixActivity("");
     setSuffixActivity("");
@@ -877,6 +910,8 @@ export function Filters({
     (repetitionValue !== "" && repetitionAttributeKey !== "") ||
     (repetitionValue !== "" && repetitionMin !== "") ||
     (repetitionValue !== "" && repetitionMax !== "") ||
+    consecutiveGrouping !== "" ||
+    timestampGrouping !== "" ||
     prefixActivity !== "" ||
     suffixActivity !== "" ||
     segmentPrefixActivity !== "" ||
@@ -1548,6 +1583,73 @@ export function Filters({
           {repetitionValidationError && (
             <div className="filters-warning" role="alert">{repetitionValidationError}</div>
           )}
+          {caseGroupingValidationError && (
+            <div className="filters-warning" role="alert">{caseGroupingValidationError}</div>
+          )}
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Consecutive activity groups</span>
+              <select
+                value={consecutiveGrouping}
+                onChange={(e) => setConsecutiveGrouping(e.target.value as "" | "first" | "last")}
+              >
+                <option value="">off</option>
+                <option value="first">keep first event</option>
+                <option value="last">keep last event</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>activity key <small>(blank = activity)</small></span>
+              <input
+                type="text"
+                value={consecutiveGroupingActivityKey}
+                disabled={!consecutiveGrouping}
+                onChange={(e) => setConsecutiveGroupingActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Same-timestamp groups</span>
+              <select
+                value={timestampGrouping}
+                onChange={(e) => setTimestampGrouping(e.target.value as "" | "first" | "last" | "concat")}
+              >
+                <option value="">off</option>
+                <option value="first">keep first event</option>
+                <option value="last">keep last event</option>
+                <option value="concat">concatenate activities</option>
+              </select>
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>group activity key</span>
+              <input
+                type="text"
+                value={timestampGroupingActivityKey}
+                disabled={!timestampGrouping}
+                onChange={(e) => setTimestampGroupingActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>group timestamp key</span>
+              <input
+                type="text"
+                value={timestampGroupingTimestampKey}
+                disabled={!timestampGrouping}
+                onChange={(e) => setTimestampGroupingTimestampKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>concat separator</span>
+              <input
+                type="text"
+                value={timestampGroupingSeparator}
+                disabled={timestampGrouping !== "concat"}
+                onChange={(e) => setTimestampGroupingSeparator(e.target.value)}
+              />
+            </label>
+          </div>
 
           <div className="filters-row">
             <label className="filters-field">

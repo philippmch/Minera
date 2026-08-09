@@ -505,6 +505,12 @@ int usage(const char* program) {
                "  --repetition-attribute-key <name> Attribute to count\n"
                "  --repetition-min <n>      Inclusive repetition lower bound\n"
                "  --repetition-max <n>      Inclusive repetition upper bound\n"
+               "  --consecutive-case-grouping <first|last> Collapse activity runs\n"
+               "  --consecutive-case-grouping-activity-key <name> Run key\n"
+               "  --timestamp-case-grouping <first|last|concat> Collapse timestamps\n"
+               "  --timestamp-case-grouping-activity-key <name> Activity key\n"
+               "  --timestamp-case-grouping-timestamp-key <name> Timestamp key\n"
+               "  --timestamp-case-grouping-separator <text> Concat separator\n"
                "  --path-predecessor <name> Adjacent-path predecessor activity\n"
                "  --path-successor <name>  Adjacent-path successor activity\n"
                "  --path-min-performance <seconds> Inclusive lower elapsed bound\n"
@@ -961,6 +967,7 @@ int main(int argc, char** argv) {
   bool overlap_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
+  bool case_grouping_option_used = false;
   std::map<std::string, std::string> overlap_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
@@ -968,6 +975,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> segment_fields;
   std::map<std::string, std::string> path_fields;
   std::map<std::string, std::string> repetition_fields;
+  std::map<std::string, std::string> case_grouping_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
@@ -1201,6 +1209,20 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       repetition_fields[key] = value;
       repetition_option_used = true;
+      continue;
+    }
+    if (arg == "--consecutive-case-grouping" ||
+        arg == "--consecutive-case-grouping-activity-key" ||
+        arg == "--timestamp-case-grouping" ||
+        arg == "--timestamp-case-grouping-activity-key" ||
+        arg == "--timestamp-case-grouping-timestamp-key" ||
+        arg == "--timestamp-case-grouping-separator") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      case_grouping_fields[key] = value;
+      case_grouping_option_used = true;
       continue;
     }
     if (arg == "--overlap") {
@@ -2777,6 +2799,29 @@ int main(int argc, char** argv) {
       }
       filter.attribute_value_repetition =
           parsed.filter.attribute_value_repetition;
+    } catch (const std::exception& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
+  if (case_grouping_option_used) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = case_grouping_fields.find(std::string(name));
+      return it == case_grouping_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return case_grouping_fields.contains(std::string(name));
+    };
+    try {
+      const auto parsed = minera::parse_mine_params(lookup, present);
+      if (!parsed.filter.consecutive_activity_grouping &&
+          !parsed.filter.timestamp_case_grouping) {
+        std::cerr << "error: case grouping requires a grouping type\n";
+        return 2;
+      }
+      filter.consecutive_activity_grouping =
+          parsed.filter.consecutive_activity_grouping;
+      filter.timestamp_case_grouping = parsed.filter.timestamp_case_grouping;
     } catch (const std::exception& error) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;

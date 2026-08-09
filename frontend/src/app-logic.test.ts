@@ -1061,6 +1061,26 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ repetitionValue: "web" })).toBe(true);
   });
 
+  it("maps consecutive and timestamp case-grouping variants", () => {
+    expect(mineFormEntries({
+      consecutiveGrouping: "last",
+      consecutiveGroupingActivityKey: "activity",
+      timestampGrouping: "concat",
+      timestampGroupingActivityKey: "activity",
+      timestampGroupingTimestampKey: "timestamp",
+      timestampGroupingSeparator: "+",
+    })).toEqual([
+      ["consecutive_case_grouping", "last"],
+      ["consecutive_case_grouping_activity_key", "activity"],
+      ["timestamp_case_grouping", "concat"],
+      ["timestamp_case_grouping_activity_key", "activity"],
+      ["timestamp_case_grouping_timestamp_key", "timestamp"],
+      ["timestamp_case_grouping_separator", "+"],
+    ]);
+    expect(hasActiveFilters({ consecutiveGrouping: "first" })).toBe(true);
+    expect(hasActiveFilters({ timestampGroupingSeparator: "+" })).toBe(false);
+  });
+
   it("maps adjacent path options including zero bounds and polarity", () => {
     expect(mineFormEntries({
       pathPredecessor: "A",
