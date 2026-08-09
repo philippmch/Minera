@@ -44,6 +44,7 @@ import {
   type ProcessCubeTable,
   type ProcessCubeResult,
   type StreamingDfgResult,
+  type StreamingFootprintsResult,
   type TriePetriConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
@@ -74,6 +75,7 @@ import {
   isOcelStatisticsResult,
   isProcessCubeResult,
   isStreamingDfgResult,
+  isStreamingFootprintsResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -2229,6 +2231,98 @@ export async function requestStreamingDfg(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isStreamingDfgResult(payload))
     throw new Error("the Minera backend returned an invalid streaming DFG");
+  return payload;
+}
+
+export interface StreamingFootprintsOptions {
+  streaming_footprints_case_id_column?: string;
+  streaming_footprints_activity_column?: string;
+  streaming_footprints_activities: string[];
+  streaming_footprints_start_activities?: string[];
+  streaming_footprints_end_activities?: string[];
+  streaming_footprints_sequence?: Array<[string, string]>;
+  streaming_footprints_parallel?: Array<[string, string]>;
+  streaming_footprints_terminate_all?: boolean;
+}
+
+function validateStreamingFootprintActivity(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized.includes(",") || normalized.includes("->"))
+    throw new Error("streaming footprints activity names cannot be empty or contain ',' or '->'");
+  return normalized;
+}
+
+function serializeStreamingFootprintList(values: string[], name: string): string {
+  if (!Array.isArray(values) || values.length === 0)
+    throw new Error(`${name} must be a non-empty list`);
+  return values.map(validateStreamingFootprintActivity).join(",");
+}
+
+function serializeStreamingFootprintPairs(
+  values: Array<[string, string]>, name: string,
+): string {
+  if (!Array.isArray(values) || values.length === 0)
+    throw new Error(`${name} must be a non-empty list`);
+  return values.map((pair) => {
+    if (!Array.isArray(pair) || pair.length !== 2)
+      throw new Error(`${name} must contain source/target pairs`);
+    return `${validateStreamingFootprintActivity(pair[0])}->${validateStreamingFootprintActivity(pair[1])}`;
+  }).join(",");
+}
+
+export function streamingFootprintsQuery(options: StreamingFootprintsOptions): string {
+  const query = new URLSearchParams();
+  for (const name of [
+    "streaming_footprints_case_id_column",
+    "streaming_footprints_activity_column",
+  ] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      query.set(name, value.trim());
+    }
+  }
+  query.set("streaming_footprints_activities",
+    serializeStreamingFootprintList(options.streaming_footprints_activities,
+      "streaming_footprints_activities"));
+  for (const name of [
+    "streaming_footprints_start_activities",
+    "streaming_footprints_end_activities",
+  ] as const) {
+    if (options[name] !== undefined)
+      query.set(name, serializeStreamingFootprintList(options[name]!, name));
+  }
+  for (const name of ["streaming_footprints_sequence", "streaming_footprints_parallel"] as const) {
+    if (options[name] !== undefined)
+      query.set(name, serializeStreamingFootprintPairs(options[name]!, name));
+  }
+  if (options.streaming_footprints_terminate_all !== undefined)
+    query.set("streaming_footprints_terminate_all",
+      options.streaming_footprints_terminate_all ? "true" : "false");
+  return query.toString();
+}
+
+export async function requestStreamingFootprints(
+  log: Blob, options: StreamingFootprintsOptions,
+): Promise<StreamingFootprintsResult> {
+  const form = new FormData();
+  const name = typeof File !== "undefined" && log instanceof File ? log.name : "log.csv";
+  form.append("log", log, name);
+  const query = streamingFootprintsQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/streaming-footprints?${query}`, {
+      method: "POST", body: form,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isStreamingFootprintsResult(payload))
+    throw new Error("the Minera backend returned invalid streaming footprints");
   return payload;
 }
 

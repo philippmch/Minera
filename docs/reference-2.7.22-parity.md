@@ -773,6 +773,18 @@ standalone `minera_streaming_dfg` CSV command, multipart `POST
 `STREAMING_DFG` JSON contract; focused tests cover interleaved cases, empty
 records, reset, deterministic serialization, and malformed frontend payloads.
 
+## Streaming footprints evidence
+
+`StreamingFootprintsConformance` keeps a mutex-serialized last activity for each
+open case and checks model activities, first-activity boundaries, allowed
+sequence/parallel pairs, and final end activities on explicit termination.
+Snapshots expose deterministic per-case prefix diagnostics and aggregate event
+and deviation counts. The standalone `minera_streaming_footprints` command,
+multipart `POST /api/streaming-footprints`, and typed frontend request/response
+guard expose the same `STREAMING_FOOTPRINTS` contract; focused tests cover
+interleaved cases, unknown activities, boundary and pair deviations, reset,
+termination, deterministic serialization, and malformed frontend payloads.
+
 ## Segment-filter evidence
 
 The native segment surface exposes prefix and suffix cuts with first/last
