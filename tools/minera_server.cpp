@@ -75,6 +75,7 @@
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
 #include "minera/performance.hpp"
+#include "minera/passed_time.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
 #include "minera/petri_net.hpp"
@@ -1702,6 +1703,46 @@ void handle_chaotic_activities(const httplib::Request& request,
     response.set_content(
         minera::chaotic_activities_json(
             minera::discover_chaotic_activities(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_passed_time(const httplib::Request& request,
+                        httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "passed_time_activity", "passed_time_variant",
+        "passed_time_activity_key", "passed_time_timestamp_key",
+        "passed_time_start_timestamp_key", "passed_time_aggregation",
+        "passed_time_business_hours", "passed_time_business_hour_slots"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown passed-time parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_passed_time_params(lookup, present);
+    response.set_content(
+        minera::passed_time_json(
+            minera::discover_passed_time(session->log, options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -3457,6 +3498,7 @@ int main(int argc, char** argv) {
   server.Options("/api/local-diagnostics", preflight);
   server.Options("/api/clustering", preflight);
   server.Options("/api/chaotic-activities", preflight);
+  server.Options("/api/passed-time", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -3516,6 +3558,7 @@ int main(int argc, char** argv) {
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/chaotic-activities", handle_chaotic_activities);
+  server.Post("/api/passed-time", handle_passed_time);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

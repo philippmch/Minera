@@ -3956,6 +3956,47 @@ std::string chaotic_activities_json(const ChaoticActivitiesResult& result) {
   return out.str();
 }
 
+std::string passed_time_json(const PassedTimeResult& result) {
+  const auto write_entries = [](std::ostringstream& out,
+                                const std::vector<PassedTimeEntry>& entries) {
+    out << '[';
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+      if (i) out << ',';
+      const auto& entry = entries[i];
+      out << "{\"activity\":";
+      write_json_string(out, entry.activity);
+      out << ",\"performance\":" << std::setprecision(17)
+          << entry.performance << ",\"frequency\":" << entry.frequency
+          << '}';
+    }
+    out << ']';
+  };
+  if (!std::isfinite(result.pre_avg_perf) ||
+      !std::isfinite(result.post_avg_perf)) {
+    throw std::invalid_argument("passed time averages must be finite");
+  }
+  for (const auto& entry : result.pre) {
+    if (!std::isfinite(entry.performance))
+      throw std::invalid_argument("passed time performance must be finite");
+  }
+  for (const auto& entry : result.post) {
+    if (!std::isfinite(entry.performance))
+      throw std::invalid_argument("passed time performance must be finite");
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"PASSED_TIME\",\"variant\":\""
+      << passed_time_variant_name(result.variant) << "\",\"activity\":";
+  write_json_string(out, result.activity);
+  out << ",\"pre\":";
+  write_entries(out, result.pre);
+  out << ",\"post\":";
+  write_entries(out, result.post);
+  out << ",\"pre_avg_perf\":" << std::setprecision(17)
+      << result.pre_avg_perf << ",\"post_avg_perf\":"
+      << result.post_avg_perf << '}';
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

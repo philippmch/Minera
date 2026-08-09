@@ -3255,4 +3255,72 @@ ChaoticActivitiesOptions parse_chaotic_activities_params(
   return options;
 }
 
+PassedTimeOptions parse_passed_time_params(const FieldLookup& field) {
+  return parse_passed_time_params(field, {});
+}
+
+PassedTimeOptions parse_passed_time_params(const FieldLookup& field,
+                                           const FieldPresence& present) {
+  PassedTimeOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (!supplied("passed_time_activity"))
+    throw std::invalid_argument("passed_time_activity: required");
+  options.activity = require("passed_time_activity");
+  if (supplied("passed_time_variant")) {
+    const auto value = require("passed_time_variant");
+    if (value == "pre" || value == "PRE")
+      options.variant = PassedTimeVariant::kPre;
+    else if (value == "post" || value == "POST")
+      options.variant = PassedTimeVariant::kPost;
+    else if (value == "prepost" || value == "PREPOST" ||
+             value == "pre_post")
+      options.variant = PassedTimeVariant::kPrePost;
+    else
+      throw std::invalid_argument(
+          "passed_time_variant: expected pre, post, or prepost");
+  }
+  if (supplied("passed_time_activity_key"))
+    options.activity_key = require("passed_time_activity_key");
+  if (supplied("passed_time_timestamp_key"))
+    options.timestamp_key = require("passed_time_timestamp_key");
+  if (supplied("passed_time_start_timestamp_key"))
+    options.start_timestamp_key = require("passed_time_start_timestamp_key");
+  if (supplied("passed_time_aggregation")) {
+    const auto value = require("passed_time_aggregation");
+    if (value == "mean")
+      options.performance_aggregation = DfgPerformanceAggregation::kMean;
+    else if (value == "median")
+      options.performance_aggregation = DfgPerformanceAggregation::kMedian;
+    else if (value == "min" || value == "minimum")
+      options.performance_aggregation = DfgPerformanceAggregation::kMinimum;
+    else if (value == "max" || value == "maximum")
+      options.performance_aggregation = DfgPerformanceAggregation::kMaximum;
+    else if (value == "stdev" || value == "standard_deviation")
+      options.performance_aggregation =
+          DfgPerformanceAggregation::kStandardDeviation;
+    else if (value == "sum")
+      options.performance_aggregation = DfgPerformanceAggregation::kSum;
+    else
+      throw std::invalid_argument(
+          "passed_time_aggregation: expected mean, median, min, max, stdev, or sum");
+  }
+  if (supplied("passed_time_business_hours"))
+    options.use_business_hours =
+        parse_boolean(require("passed_time_business_hours"),
+                      "passed_time_business_hours");
+  if (supplied("passed_time_business_hour_slots"))
+    options.business_hour_slots = parse_business_hour_slots(
+        require("passed_time_business_hour_slots"),
+        "passed_time_business_hour_slots");
+  return options;
+}
+
 }  // namespace minera

@@ -61,6 +61,7 @@
 #include "minera/path_filter.hpp"
 #include "minera/overlap.hpp"
 #include "minera/chaotic_activities.hpp"
+#include "minera/passed_time.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -249,6 +250,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
     const FieldLookup& field);
 [[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] PassedTimeOptions parse_passed_time_params(
+    const FieldLookup& field);
+[[nodiscard]] PassedTimeOptions parse_passed_time_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(

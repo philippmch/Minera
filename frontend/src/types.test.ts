@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -140,6 +140,24 @@ describe("isChaoticActivitiesResult", () => {
       activities: [{ ...valid.activities[0], entropy: Number.NaN }] })).toBe(false);
     expect(isChaoticActivitiesResult({ ...valid,
       diagnostics: { ...valid.diagnostics, event_count: -1 } })).toBe(false);
+  });
+});
+
+describe("isPassedTimeResult", () => {
+  const valid = {
+    family: "PASSED_TIME", variant: "PREPOST", activity: "B",
+    pre: [{ activity: "A", performance: 1200, frequency: 2 }],
+    post: [{ activity: "C", performance: 900, frequency: 2 }],
+    pre_avg_perf: 1200, post_avg_perf: 900,
+  };
+  it("accepts all three-variant envelope fields", () => {
+    expect(isPassedTimeResult(valid)).toBe(true);
+  });
+  it("rejects malformed performance and frequencies", () => {
+    expect(isPassedTimeResult({ ...valid,
+      pre: [{ ...valid.pre[0], performance: Number.NaN }] })).toBe(false);
+    expect(isPassedTimeResult({ ...valid,
+      post: [{ ...valid.post[0], frequency: -1 }] })).toBe(false);
   });
 });
 

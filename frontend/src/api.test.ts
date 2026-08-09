@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -111,6 +111,38 @@ describe("chaotic-activity statistics API", () => {
     }));
     await expect(requestChaoticActivities({ chaotic_alpha: 0.5 }))
       .resolves.toMatchObject({ family: "CHAOTIC_ACTIVITIES" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("passed-time statistics API", () => {
+  it("serializes the selected variant and target", () => {
+    expect(passedTimeQuery({
+      passed_time_activity: "B",
+      passed_time_variant: "prepost",
+      passed_time_activity_key: "phase",
+      passed_time_aggregation: "median",
+      passed_time_business_hours: true,
+    })).toBe("passed_time_activity=B&passed_time_variant=prepost&passed_time_activity_key=phase&passed_time_aggregation=median&passed_time_business_hours=true");
+    expect(() => passedTimeQuery({ passed_time_activity: "" })).toThrow(/must not be empty/);
+    expect(() => passedTimeQuery({ passed_time_variant: "bad" as never })).toThrow(/not supported/);
+    expect(() => passedTimeQuery({ passed_time_aggregation: "all" as never })).toThrow(/not supported/);
+  });
+
+  it("posts and validates the passed-time envelope", async () => {
+    const payload = {
+      family: "PASSED_TIME", variant: "PREPOST", activity: "B",
+      pre: [{ activity: "A", performance: 1200, frequency: 2 }],
+      post: [{ activity: "C", performance: 900, frequency: 2 }],
+      pre_avg_perf: 1200, post_avg_perf: 900,
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/passed-time?passed_time_activity=B&passed_time_variant=prepost");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestPassedTime({ passed_time_activity: "B", passed_time_variant: "prepost" }))
+      .resolves.toMatchObject({ family: "PASSED_TIME", variant: "PREPOST" });
     vi.unstubAllGlobals();
   });
 });
