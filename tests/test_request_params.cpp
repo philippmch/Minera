@@ -341,6 +341,20 @@ void service_time_params_contract() {
   assert(threw);
 }
 
+void rework_params_contract() {
+  const auto parsed = minera::parse_rework_params(fields({
+      {"rework_variant", "cases"},
+      {"rework_activity_key", "phase"},
+      {"rework_case_id_key", "region"}}));
+  assert(parsed.variant == minera::ReworkVariant::kCases);
+  assert(parsed.activity_key == "phase" && parsed.case_id_key == "region");
+  bool threw = false;
+  try {
+    (void)minera::parse_rework_params(fields({{"rework_variant", "bad"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2328,5 +2342,6 @@ int main() {
   chaotic_activities_params_contract();
   passed_time_params_contract();
   service_time_params_contract();
+  rework_params_contract();
   return 0;
 }

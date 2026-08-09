@@ -115,6 +115,8 @@ import {
   type PassedTimeOptions,
   type ServiceTimeResult,
   type ServiceTimeOptions,
+  type ReworkResult,
+  type ReworkOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -134,6 +136,7 @@ import {
   isChaoticActivitiesResult,
   isPassedTimeResult,
   isServiceTimeResult,
+  isReworkResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1537,6 +1540,30 @@ export function requestServiceTime(options: ServiceTimeOptions = {}): Promise<Se
   return postChecked(`/api/service-time${query ? `?${query}` : ""}`, isServiceTimeResult, "service time");
 }
 export const discoverServiceTime = requestServiceTime;
+
+export function reworkQuery(options: ReworkOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.rework_variant !== undefined &&
+      !["activities", "cases"].includes(options.rework_variant))
+    throw new Error("rework_variant is not supported");
+  if (options.rework_variant !== undefined) query.set("rework_variant", options.rework_variant);
+  for (const [key, value] of [
+    ["rework_activity_key", options.rework_activity_key],
+    ["rework_case_id_key", options.rework_case_id_key],
+  ] as const) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  return query.toString();
+}
+
+export function requestRework(options: ReworkOptions = {}): Promise<ReworkResult> {
+  const query = reworkQuery(options);
+  return postChecked(`/api/rework${query ? `?${query}` : ""}`, isReworkResult, "rework");
+}
+export const discoverRework = requestRework;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

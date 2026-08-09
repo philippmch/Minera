@@ -107,6 +107,7 @@ add_library(minera_core
   src/pnml.cpp
   src/ptml.cpp
   src/request_params.cpp
+  src/rework.cpp
   src/resource_analysis.cpp
   src/resource_profiles.cpp
   src/role_discovery.cpp
@@ -339,6 +340,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_service_time_tests PRIVATE cxx_std_20)
   target_compile_options(minera_service_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_service_time_tests COMMAND minera_service_time_tests)
+
+  add_executable(minera_rework_tests
+    tests/test_rework.cpp
+  )
+  target_link_libraries(minera_rework_tests PRIVATE minera::core)
+  target_compile_features(minera_rework_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_rework_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_rework_tests COMMAND minera_rework_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp

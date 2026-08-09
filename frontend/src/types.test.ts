@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -167,6 +167,17 @@ describe("isServiceTimeResult", () => {
   it("rejects non-finite values and wrong variants", () => {
     expect(isServiceTimeResult({ ...valid, values: { A: Number.NaN } })).toBe(false);
     expect(isServiceTimeResult({ ...valid, variant: "OTHER" })).toBe(false);
+  });
+});
+
+describe("isReworkResult", () => {
+  it("accepts activity and case variants", () => {
+    expect(isReworkResult({ family: "REWORK", variant: "ACTIVITIES", activity_cases: { A: 1 } })).toBe(true);
+    expect(isReworkResult({ family: "REWORK", variant: "CASES", cases: { c1: { number_activities: 3, rework: 1 } } })).toBe(true);
+  });
+  it("rejects impossible counts", () => {
+    expect(isReworkResult({ family: "REWORK", variant: "ACTIVITIES", activity_cases: { A: -1 } })).toBe(false);
+    expect(isReworkResult({ family: "REWORK", variant: "CASES", cases: { c1: { number_activities: 1, rework: 2 } } })).toBe(false);
   });
 });
 

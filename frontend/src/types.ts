@@ -2646,6 +2646,47 @@ export function isServiceTimeResult(value: unknown): value is ServiceTimeResult 
     .every((entry) => typeof entry === "number" && Number.isFinite(entry));
 }
 
+export interface ReworkOptions {
+  rework_variant?: "activities" | "cases";
+  rework_activity_key?: string;
+  rework_case_id_key?: string;
+}
+
+export interface ReworkCaseStats {
+  number_activities: number;
+  rework: number;
+}
+
+export interface ReworkResult {
+  family: "REWORK";
+  variant: "ACTIVITIES" | "CASES";
+  activity_cases?: Record<string, number>;
+  cases?: Record<string, ReworkCaseStats>;
+}
+
+export function isReworkResult(value: unknown): value is ReworkResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<ReworkResult>;
+  if (data.family !== "REWORK" ||
+      (data.variant !== "ACTIVITIES" && data.variant !== "CASES")) return false;
+  if (data.variant === "ACTIVITIES") {
+    if (typeof data.activity_cases !== "object" || data.activity_cases === null ||
+        Array.isArray(data.activity_cases)) return false;
+    return Object.values(data.activity_cases as Record<string, unknown>)
+      .every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0);
+  }
+  if (typeof data.cases !== "object" || data.cases === null || Array.isArray(data.cases))
+    return false;
+  return Object.values(data.cases as Record<string, unknown>).every((entry) => {
+    if (typeof entry !== "object" || entry === null) return false;
+    const stats = entry as Partial<ReworkCaseStats>;
+    return typeof stats.number_activities === "number" &&
+      Number.isInteger(stats.number_activities) && stats.number_activities >= 0 &&
+      typeof stats.rework === "number" && Number.isInteger(stats.rework) &&
+      stats.rework >= 0 && stats.rework <= stats.number_activities;
+  });
+}
+
 export function isChaoticActivitiesResult(
   value: unknown,
 ): value is ChaoticActivitiesResult {

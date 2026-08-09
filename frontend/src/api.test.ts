@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -169,6 +169,26 @@ describe("service-time statistics API", () => {
     }));
     await expect(requestServiceTime({ service_time_aggregation: "sum" }))
       .resolves.toMatchObject({ family: "SERVICE_TIME", variant: "CLASSIC" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("rework statistics API", () => {
+  it("serializes the selected rework variant", () => {
+    expect(reworkQuery({ rework_variant: "cases", rework_case_id_key: "region" }))
+      .toBe("rework_variant=cases&rework_case_id_key=region");
+    expect(() => reworkQuery({ rework_variant: "other" as never })).toThrow(/not supported/);
+  });
+
+  it("posts and validates activity rework", async () => {
+    const payload = { family: "REWORK", variant: "ACTIVITIES", activity_cases: { A: 2 } };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/rework?rework_variant=activities");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestRework({ rework_variant: "activities" }))
+      .resolves.toMatchObject({ family: "REWORK", variant: "ACTIVITIES" });
     vi.unstubAllGlobals();
   });
 });
