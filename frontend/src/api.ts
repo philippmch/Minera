@@ -1998,10 +1998,31 @@ export async function fetchXes(): Promise<string> {
  * classic text interchange format. The graph is generated from the cached
  * post-filter session on the backend.
  */
-export async function fetchDfg(): Promise<string> {
+export interface DfgExportOptions {
+  noise_threshold?: number;
+  most_common_paths?: string;
+}
+
+export function dfgExportQuery(options: DfgExportOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.noise_threshold !== undefined) {
+    if (!Number.isFinite(options.noise_threshold))
+      throw new Error("noise_threshold must be finite");
+    query.set("noise_threshold", String(options.noise_threshold));
+  }
+  if (options.most_common_paths !== undefined) {
+    const paths = options.most_common_paths.trim();
+    if (!paths) throw new Error("most_common_paths must not be empty");
+    query.set("most_common_paths", paths);
+  }
+  return query.toString();
+}
+
+export async function fetchDfg(options: DfgExportOptions = {}): Promise<string> {
   let response: Response;
   try {
-    response = await fetch("/api/dfg");
+    const query = dfgExportQuery(options);
+    response = await fetch(`/api/dfg${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
