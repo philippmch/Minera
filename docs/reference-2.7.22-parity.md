@@ -798,6 +798,18 @@ the same `STREAMING_TEMPORAL` contract; focused tests cover prior-event pairing,
 zero-variance profiles, custom attributes, invalid timestamps, reset, and
 malformed frontend payloads.
 
+## Streaming token-replay evidence
+
+`StreamingTokenReplay` keeps one marking per open case and supports forward and
+backwards replay variants, bounded silent-transition routing, weak firing with
+missing-token accounting, duplicate-label handling, immediate-stop behavior,
+final-marking checks, reset, and deterministic JSON snapshots. The standalone
+`minera_streaming_tbr` PNML/CSV command, multipart `POST /api/streaming-tbr`,
+and typed frontend request/response guard expose the same `STREAMING_TBR`
+contract. Focused Release tests cover linear
+replay, missing tokens, silent prefixes, backwards selection, reset, and
+termination diagnostics.
+
 ## Segment-filter evidence
 
 The native segment surface exposes prefix and suffix cuts with first/last

@@ -1064,6 +1064,35 @@ export function isStreamingTemporalResult(value: unknown): value is StreamingTem
       item.elapsed_seconds >= 0 && item.standard_deviation_distance >= 0));
 }
 
+export interface StreamingTbrCase {
+  events: number;
+  missing: number;
+  remaining: number;
+  is_fit: boolean;
+  marking: number[];
+}
+export interface StreamingTbrResult {
+  family: "STREAMING_TBR";
+  variant: "FORWARD" | "BACKWARDS";
+  total_events_processed: number;
+  total_missing: number;
+  cases: Record<string, StreamingTbrCase>;
+}
+export function isStreamingTbrResult(value: unknown): value is StreamingTbrResult {
+  if (!isOcelRecord(value) || value.family !== "STREAMING_TBR" ||
+      (value.variant !== "FORWARD" && value.variant !== "BACKWARDS") ||
+      !Number.isSafeInteger(value.total_events_processed) ||
+      (value.total_events_processed as number) < 0 ||
+      !Number.isSafeInteger(value.total_missing) ||
+      (value.total_missing as number) < 0 || !isOcelRecord(value.cases)) return false;
+  return Object.values(value.cases).every((item) => isOcelRecord(item) &&
+    Number.isSafeInteger(item.events) && (item.events as number) >= 0 &&
+    Number.isSafeInteger(item.missing) && (item.missing as number) >= 0 &&
+    Number.isSafeInteger(item.remaining) && (item.remaining as number) >= 0 &&
+    typeof item.is_fit === "boolean" && Array.isArray(item.marking) &&
+    item.marking.every((token) => Number.isSafeInteger(token) && (token as number) >= 0));
+}
+
 export type OcelStatisticsVariant =
   | "OBJECT_TYPE_ACTIVITIES"
   | "OBJECTS_OT_COUNT"

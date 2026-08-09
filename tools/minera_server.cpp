@@ -102,6 +102,7 @@
 #include "minera/streaming_dfg.hpp"
 #include "minera/streaming_footprints.hpp"
 #include "minera/streaming_temporal.hpp"
+#include "minera/streaming_tbr.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -4015,6 +4016,72 @@ void handle_streaming_temporal(const httplib::Request& request,
   }
 }
 
+void handle_streaming_tbr(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "streaming_tbr_variant", "streaming_tbr_case_id_column",
+        "streaming_tbr_activity_column", "streaming_tbr_max_invisible",
+        "streaming_tbr_stop_immediately"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown streaming TBR parameter: " + key);
+    }
+    if (!request.is_multipart_form_data() || !request.has_file("model") ||
+        !request.has_file("log")) {
+      throw std::invalid_argument(
+          "streaming TBR requires multipart model and log fields");
+    }
+    minera::StreamingTbrOptions options;
+    if (request.has_param("streaming_tbr_variant")) {
+      const auto variant = request.get_param_value("streaming_tbr_variant");
+      if (variant == "forward")
+        options.variant = minera::StreamingTbrVariant::kForward;
+      else if (variant == "backwards")
+        options.variant = minera::StreamingTbrVariant::kBackwards;
+      else
+        throw std::invalid_argument(
+            "streaming_tbr_variant must be forward or backwards");
+    }
+    minera::CsvImportOptions import_options;
+    if (request.has_param("streaming_tbr_case_id_column"))
+      import_options.case_id_column =
+          request.get_param_value("streaming_tbr_case_id_column");
+    if (request.has_param("streaming_tbr_activity_column"))
+      import_options.activity_column =
+          request.get_param_value("streaming_tbr_activity_column");
+    if (import_options.case_id_column.empty() ||
+        import_options.activity_column.empty())
+      throw std::invalid_argument(
+          "streaming TBR column names must not be empty");
+    options.case_id_attribute = import_options.case_id_column;
+    options.activity_attribute = import_options.activity_column;
+    options.maximum_iterations_invisibles = ocel_query_size(
+        request, "streaming_tbr_max_invisible",
+        options.maximum_iterations_invisibles);
+    options.stop_immediately_unfit =
+        ocel_query_bool(request, "streaming_tbr_stop_immediately", false);
+    const auto model_body = form_field(request, "model");
+    const auto log_body = form_field(request, "log");
+    if (model_body.empty() || log_body.empty())
+      throw std::invalid_argument("streaming TBR model and log cannot be empty");
+    const auto net = minera::parse_pnml(model_body);
+    std::istringstream input(log_body);
+    const auto log = minera::import_csv_event_log(input, import_options);
+    minera::StreamingTokenReplay replay(std::move(net), options);
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        (void)replay.receive(event, trace.case_id);
+    response.set_content(
+        minera::serialize_streaming_tbr_json(replay.snapshot()),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -4177,6 +4244,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-dfg", preflight);
   server.Options("/api/streaming-footprints", preflight);
   server.Options("/api/streaming-temporal", preflight);
+  server.Options("/api/streaming-tbr", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -4253,6 +4321,7 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-dfg", handle_streaming_dfg);
   server.Post("/api/streaming-footprints", handle_streaming_footprints);
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
+  server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 

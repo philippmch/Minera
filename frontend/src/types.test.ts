@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isStreamingDfgResult", () => {
   const valid = {
@@ -40,6 +40,19 @@ describe("isStreamingTemporalResult", () => {
     expect(isStreamingTemporalResult(valid)).toBe(true);
     expect(isStreamingTemporalResult({ ...valid, deviations: { c1: [{ ...valid.deviations.c1[0], elapsed_seconds: Number.NaN }] } })).toBe(false);
     expect(isStreamingTemporalResult({ ...valid, cases: { c1: { events: 2.5, deviations: 1 } } })).toBe(false);
+  });
+});
+
+describe("isStreamingTbrResult", () => {
+  const valid = {
+    family: "STREAMING_TBR", variant: "FORWARD", total_events_processed: 1,
+    total_missing: 0, cases: { c1: { events: 1, missing: 0, remaining: 0,
+      is_fit: true, marking: [0, 1] } },
+  };
+  it("accepts snapshots and rejects invalid markings", () => {
+    expect(isStreamingTbrResult(valid)).toBe(true);
+    expect(isStreamingTbrResult({ ...valid, variant: "unknown" })).toBe(false);
+    expect(isStreamingTbrResult({ ...valid, cases: { c1: { ...valid.cases.c1, marking: [-1] } } })).toBe(false);
   });
 });
 

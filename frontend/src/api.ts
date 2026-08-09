@@ -46,6 +46,7 @@ import {
   type StreamingDfgResult,
   type StreamingFootprintsResult,
   type StreamingTemporalResult,
+  type StreamingTbrResult,
   type TriePetriConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
@@ -78,6 +79,7 @@ import {
   isStreamingDfgResult,
   isStreamingFootprintsResult,
   isStreamingTemporalResult,
+  isStreamingTbrResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -2400,6 +2402,64 @@ export async function requestStreamingTemporal(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isStreamingTemporalResult(payload))
     throw new Error("the Minera backend returned invalid streaming temporal conformance");
+  return payload;
+}
+
+export interface StreamingTbrOptions {
+  streaming_tbr_variant?: "forward" | "backwards";
+  streaming_tbr_case_id_column?: string;
+  streaming_tbr_activity_column?: string;
+  streaming_tbr_max_invisible?: number;
+  streaming_tbr_stop_immediately?: boolean;
+}
+
+export function streamingTbrQuery(options: StreamingTbrOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.streaming_tbr_variant !== undefined) {
+    if (options.streaming_tbr_variant !== "forward" && options.streaming_tbr_variant !== "backwards")
+      throw new Error("streaming_tbr_variant must be forward or backwards");
+    query.set("streaming_tbr_variant", options.streaming_tbr_variant);
+  }
+  for (const name of ["streaming_tbr_case_id_column", "streaming_tbr_activity_column"] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      query.set(name, value.trim());
+    }
+  }
+  if (options.streaming_tbr_max_invisible !== undefined) {
+    if (!Number.isSafeInteger(options.streaming_tbr_max_invisible) || options.streaming_tbr_max_invisible < 0)
+      throw new Error("streaming_tbr_max_invisible must be a non-negative integer");
+    query.set("streaming_tbr_max_invisible", String(options.streaming_tbr_max_invisible));
+  }
+  if (options.streaming_tbr_stop_immediately !== undefined)
+    query.set("streaming_tbr_stop_immediately", options.streaming_tbr_stop_immediately ? "true" : "false");
+  return query.toString();
+}
+
+export async function requestStreamingTbr(
+  model: Blob, log: Blob, options: StreamingTbrOptions = {},
+): Promise<StreamingTbrResult> {
+  const form = new FormData();
+  const modelName = typeof File !== "undefined" && model instanceof File ? model.name : "model.pnml";
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "log.csv";
+  form.append("model", model, modelName);
+  form.append("log", log, logName);
+  const query = streamingTbrQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/streaming-tbr${query ? `?${query}` : ""}`, {
+      method: "POST", body: form,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isStreamingTbrResult(payload))
+    throw new Error("the Minera backend returned invalid streaming token replay");
   return payload;
 }
 

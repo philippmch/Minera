@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("serializes optional noise cleaning settings", () => {
@@ -173,6 +173,30 @@ describe("streaming temporal API", () => {
     }));
     await expect(requestStreamingTemporal(new Blob(["case_id,activity,timestamp\nc1,A,2024-01-01T00:00:00Z\nc1,B,2024-01-01T00:00:20Z\n"]), options))
       .resolves.toMatchObject({ family: "STREAMING_TEMPORAL", total_deviations: 1 });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("streaming token replay API", () => {
+  it("serializes bounded variant settings", () => {
+    expect(streamingTbrQuery({ streaming_tbr_variant: "backwards", streaming_tbr_max_invisible: 4, streaming_tbr_stop_immediately: true }))
+      .toBe("streaming_tbr_variant=backwards&streaming_tbr_max_invisible=4&streaming_tbr_stop_immediately=true");
+    expect(() => streamingTbrQuery({ streaming_tbr_max_invisible: -1 })).toThrow(/non-negative/);
+  });
+  it("uploads model and log and validates snapshots", async () => {
+    const payload = {
+      family: "STREAMING_TBR", variant: "FORWARD", total_events_processed: 1,
+      total_missing: 0, cases: { c1: { events: 1, missing: 0, remaining: 0,
+        is_fit: true, marking: [0, 1] } },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/streaming-tbr?streaming_tbr_variant=forward");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestStreamingTbr(new Blob(["<pnml/>"]), new Blob(["case_id,activity\nc1,A\n"]), {
+      streaming_tbr_variant: "forward",
+    })).resolves.toMatchObject({ family: "STREAMING_TBR", variant: "FORWARD" });
     vi.unstubAllGlobals();
   });
 });
