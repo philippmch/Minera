@@ -1985,6 +1985,45 @@ void handle_boundary_activities(const httplib::Request& request,
   }
 }
 
+void handle_variant_statistics(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "variant_statistics_activity_key", "variant_statistics_max_variants"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown variant-statistics parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options =
+        minera::parse_variant_statistics_params(lookup, present);
+    response.set_content(
+        minera::variant_statistics_json(
+            minera::discover_variant_statistics(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // Hidden cached-session adapter for trace-variant query anonymization. The
 // source log remains in the latest mined session; only the released variant
 // distribution is returned.
@@ -3740,6 +3779,7 @@ int main(int argc, char** argv) {
   server.Options("/api/case-arrival", preflight);
   server.Options("/api/attribute-statistics", preflight);
   server.Options("/api/boundary-activities", preflight);
+  server.Options("/api/variant-statistics", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -3806,6 +3846,7 @@ int main(int argc, char** argv) {
   server.Post("/api/case-arrival", handle_case_arrival);
   server.Post("/api/attribute-statistics", handle_attribute_statistics);
   server.Post("/api/boundary-activities", handle_boundary_activities);
+  server.Post("/api/variant-statistics", handle_variant_statistics);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);

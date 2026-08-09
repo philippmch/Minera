@@ -33,6 +33,7 @@
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/transition_system.hpp"
+#include "minera/variant_statistics.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/process_tree_alignment.hpp"
@@ -308,6 +309,8 @@ void write_analysis_json(std::ostream& out,
     const AttributeStatisticsResult& result);
 [[nodiscard]] std::string boundary_activities_json(
     const BoundaryActivitiesResult& result);
+[[nodiscard]] std::string variant_statistics_json(
+    const VariantStatisticsResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(

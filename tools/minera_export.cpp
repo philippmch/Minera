@@ -659,6 +659,9 @@ int usage(const char* program) {
                "  --boundary-activities     Emit start/end activity counts JSON\n"
                "  --boundary-activities-variant <start|end|both> Boundary selection\n"
                "  --boundary-activities-activity-key <name> Activity attribute\n"
+               "  --variant-statistics      Emit variant counts/probabilities JSON\n"
+               "  --variant-statistics-activity-key <name> Activity attribute\n"
+               "  --variant-statistics-max-variants <n> Limit returned variants\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -1025,6 +1028,7 @@ int main(int argc, char** argv) {
   bool case_arrival_requested = false;
   bool attribute_statistics_requested = false;
   bool boundary_activities_requested = false;
+  bool variant_statistics_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
@@ -1037,6 +1041,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> case_arrival_fields;
   std::map<std::string, std::string> attribute_statistics_fields;
   std::map<std::string, std::string> boundary_activities_fields;
+  std::map<std::string, std::string> variant_statistics_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1421,6 +1426,20 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       boundary_activities_fields[key] = value;
       boundary_activities_requested = true;
+      continue;
+    }
+    if (arg == "--variant-statistics") {
+      variant_statistics_requested = true;
+      continue;
+    }
+    if (arg == "--variant-statistics-activity-key" ||
+        arg == "--variant-statistics-max-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      variant_statistics_fields[key] = value;
+      variant_statistics_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3580,6 +3599,29 @@ int main(int argc, char** argv) {
           minera::parse_boundary_activities_params(lookup, present);
       const auto body = minera::boundary_activities_json(
           minera::discover_boundary_activities(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (variant_statistics_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = variant_statistics_fields.find(std::string(name));
+        return it == variant_statistics_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return variant_statistics_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_variant_statistics_params(lookup, present);
+      const auto body = minera::variant_statistics_json(
+          minera::discover_variant_statistics(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {
