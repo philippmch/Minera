@@ -1645,7 +1645,9 @@ export async function importDfg(document: Blob): Promise<string> {
 
 export interface ProcessCubeOptions {
   x_col?: string;
+  x_cols?: string[];
   y_col?: string;
+  y_cols?: string[];
   agg_col?: string;
   aggregation?: "mean" | "sum" | "min" | "max" | "count" | "median" | "first" | "last";
   max_divisions_x?: number;
@@ -1662,8 +1664,22 @@ export function processCubeQuery(options: ProcessCubeOptions = {}): string {
       query.set(name, value);
     }
   };
+  const addNames = (name: string, values: string[] | undefined) => {
+    if (values !== undefined) {
+      if (values.length === 0 || values.some((value) => !value.trim()))
+        throw new Error(`${name} must contain non-empty names`);
+      const encoded = values.map((value) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,"));
+      query.set(name, encoded.join(","));
+    }
+  };
+  if (options.x_col !== undefined && options.x_cols !== undefined)
+    throw new Error("x_col and x_cols are mutually exclusive");
+  if (options.y_col !== undefined && options.y_cols !== undefined)
+    throw new Error("y_col and y_cols are mutually exclusive");
   addName("x_col", options.x_col);
+  addNames("x_cols", options.x_cols);
   addName("y_col", options.y_col);
+  addNames("y_cols", options.y_cols);
   addName("agg_col", options.agg_col);
   if (options.aggregation !== undefined) {
     if (!["mean", "sum", "min", "max", "count", "median", "first", "last"]
@@ -1696,7 +1712,7 @@ export async function requestProcessCube(
   options: ProcessCubeOptions = {},
 ): Promise<ProcessCubeResult> {
   if (!isProcessCubeTable(table))
-    throw new Error("process cube tables require string case_ids and finite numeric columns");
+    throw new Error("process cube tables require rectangular finite numeric or categorical columns");
   const query = processCubeQuery(options);
   let response: Response;
   try {

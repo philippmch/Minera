@@ -13,14 +13,88 @@
 namespace minera {
 namespace {
 struct Axis {
-  bool numeric = false;
+  enum class Mode { kNumeric, kPrefix, kCategorical };
+  Mode mode = Mode::kNumeric;
   std::string name;
+  std::vector<std::string> columns;
   std::vector<ProcessCubeBin> bins;
   std::map<std::string, std::size_t> labels;
 };
 
 std::string choose(const std::string& a, const std::string& b) {
   return a.empty() ? b : a;
+}
+
+std::string join_names(const std::vector<std::string>& names) {
+  std::ostringstream out;
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    if (i) out << ',';
+    out << names[i];
+  }
+  return out.str();
+}
+
+void merge_numeric_columns(ProcessCubeTable& table) {
+  if (table.columns.empty()) {
+    table.columns = table.numeric_columns;
+    return;
+  }
+  for (const auto& [name, values] : table.numeric_columns) {
+    auto [it, inserted] = table.columns.emplace(name, values);
+    if (!inserted && it->second != values)
+      throw std::invalid_argument("duplicate process cube numeric column: " + name);
+  }
+}
+
+void merge_categorical_columns(ProcessCubeTable& table) {
+  if (table.categorical_columns.empty()) {
+    table.categorical_columns = table.string_columns;
+    return;
+  }
+  for (const auto& [name, values] : table.string_columns) {
+    auto [it, inserted] = table.categorical_columns.emplace(name, values);
+    if (!inserted && it->second != values)
+      throw std::invalid_argument("duplicate process cube categorical column: " + name);
+  }
+}
+
+std::string scalar_label(const ProcessCubeTable& table, const std::string& name,
+                         std::size_t row) {
+  if (const auto it = table.categorical_columns.find(name);
+      it != table.categorical_columns.end()) {
+    return it->second[row];
+  }
+  const auto it = table.columns.find(name);
+  if (it == table.columns.end())
+    throw std::invalid_argument("unknown process cube dimension column: " + name);
+  std::ostringstream out;
+  out.precision(17);
+  out << it->second[row];
+  return out.str();
+}
+
+std::string categorical_key(const std::vector<std::string>& values) {
+  // Length-prefixing keeps distinct tuples distinct even when values contain
+  // punctuation used by the human-readable bin label.
+  std::ostringstream key;
+  for (const auto& value : values) key << value.size() << ':' << value;
+  return key.str();
+}
+
+std::string categorical_axis_key(const std::vector<std::string>& values) {
+  return values.size() == 1 ? values.front() : categorical_key(values);
+}
+
+std::string categorical_display(const std::vector<std::string>& values) {
+  if (values.size() == 1) return values.front();
+  std::ostringstream display;
+  display << '(';
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if (i) display << ',';
+    display << values[i];
+  }
+  display << ')';
+  return display.str();
 }
 
 std::vector<double> normalise_edges(std::vector<double> edges) {
@@ -35,7 +109,7 @@ std::vector<double> normalise_edges(std::vector<double> edges) {
 
 Axis numeric_axis(const std::string& name, const std::vector<double>& values,
                   const std::vector<double>& requested, std::size_t max_divisions) {
-  Axis axis; axis.numeric = true; axis.name = name;
+  Axis axis; axis.mode = Axis::Mode::kNumeric; axis.name = name;
   std::vector<double> edges;
   if (!requested.empty()) edges = normalise_edges(requested);
   else {
@@ -63,7 +137,7 @@ Axis numeric_axis(const std::string& name, const std::vector<double>& values,
 }
 
 Axis prefix_axis(const std::string& name, const ProcessCubeTable& table) {
-  Axis axis; axis.name = name; axis.numeric = false;
+  Axis axis; axis.mode = Axis::Mode::kPrefix; axis.name = name;
   const std::string prefix = name + "_";
   for (const auto& [column, values] : table.columns) {
     if (column.rfind(prefix, 0) != 0 || column.size() == prefix.size()) continue;
@@ -73,6 +147,77 @@ Axis prefix_axis(const std::string& name, const ProcessCubeTable& table) {
   }
   if (axis.bins.empty()) throw std::invalid_argument("unknown process cube dimension: " + name);
   return axis;
+}
+
+Axis categorical_axis(const std::string& name,
+                      const std::vector<std::string>& columns,
+                      const ProcessCubeTable& table) {
+  Axis axis;
+  axis.mode = Axis::Mode::kCategorical;
+  axis.name = name;
+  axis.columns = columns;
+  std::map<std::string, std::vector<std::string>> values;
+  for (std::size_t row = 0; row < table.case_ids.size(); ++row) {
+    std::vector<std::string> parts;
+    parts.reserve(columns.size());
+    for (const auto& column : columns) parts.push_back(scalar_label(table, column, row));
+    values.emplace(categorical_axis_key(parts), std::move(parts));
+  }
+  for (auto& [key, parts] : values) {
+    const auto index = axis.bins.size();
+    axis.labels.emplace(key, index);
+    ProcessCubeBin bin;
+    bin.label = categorical_display(parts);
+    bin.numeric = false;
+    axis.bins.push_back(std::move(bin));
+  }
+  if (axis.bins.empty())
+    throw std::invalid_argument("process cube categorical dimension has no values: " + name);
+  return axis;
+}
+
+std::vector<std::string> dimension_columns(const ProcessCubeOptions& options,
+                                           bool x_axis) {
+  const auto& explicit_columns = x_axis ? options.x_columns : options.y_columns;
+  const auto& short_name = x_axis ? options.x_col : options.y_col;
+  const auto& long_name = x_axis ? options.x_dimension : options.y_dimension;
+  if (!explicit_columns.empty()) {
+    if (!short_name.empty() || !long_name.empty())
+      throw std::invalid_argument("process cube composite dimensions cannot be combined with x_col/y_col aliases");
+    for (const auto& column : explicit_columns)
+      if (column.empty()) throw std::invalid_argument("process cube dimension names must not be empty");
+    return explicit_columns;
+  }
+  const auto name = choose(short_name, long_name);
+  if (name.empty()) throw std::invalid_argument("process cube dimensions are required");
+  return {name};
+}
+
+Axis make_axis(const std::vector<std::string>& columns,
+               const ProcessCubeTable& table,
+               const std::vector<double>& requested,
+               std::size_t max_divisions) {
+  if (columns.size() > 1) {
+    if (!requested.empty())
+      throw std::invalid_argument("process cube composite dimensions do not accept numeric bins");
+    return categorical_axis(join_names(columns), columns, table);
+  }
+  const auto& name = columns.front();
+  const auto numeric = table.columns.find(name);
+  const auto categorical = table.categorical_columns.find(name);
+  if (numeric != table.columns.end() && categorical != table.categorical_columns.end())
+    throw std::invalid_argument("process cube dimension has both numeric and categorical columns: " + name);
+  if (numeric != table.columns.end()) {
+    auto axis = numeric_axis(name, numeric->second, requested, max_divisions);
+    axis.columns = {name};
+    return axis;
+  }
+  if (categorical != table.categorical_columns.end()) {
+    if (!requested.empty())
+      throw std::invalid_argument("process cube categorical dimensions do not accept numeric bins");
+    return categorical_axis(name, columns, table);
+  }
+  return prefix_axis(name, table);
 }
 
 std::size_t numeric_index(const Axis& axis, double value) {
@@ -331,7 +476,13 @@ void write_bin(std::ostringstream& out, const ProcessCubeBin& bin) {
 
 ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeOptions& options) {
   ProcessCubeTable data = table;
-  if (data.columns.empty()) data.columns = data.numeric_columns;
+  merge_numeric_columns(data);
+  merge_categorical_columns(data);
+  for (const auto& [name, values] : data.categorical_columns) {
+    if (data.columns.contains(name))
+      throw std::invalid_argument("process cube column has both numeric and categorical values: " + name);
+    (void)values;
+  }
   if (options.max_divisions_x == 0 || options.max_divisions_y == 0)
     throw std::invalid_argument("process cube division limits must be positive");
   if (table.case_ids.size() == 0) {
@@ -344,15 +495,16 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
     if (values.size() != table.case_ids.size()) throw std::invalid_argument("process cube row lengths differ");
     for (double v : values) if (!std::isfinite(v)) throw std::invalid_argument("process cube values must be finite");
   }
-  const std::string xname = choose(options.x_col, options.x_dimension);
-  const std::string yname = choose(options.y_col, options.y_dimension);
-  if (xname.empty() || yname.empty()) throw std::invalid_argument("process cube dimensions are required");
-  Axis x, y;
-  auto xit = data.columns.find(xname), yit = data.columns.find(yname);
-  if (xit != data.columns.end()) x = numeric_axis(xname, xit->second, options.x_bins, options.max_divisions_x);
-  else x = prefix_axis(xname, data);
-  if (yit != data.columns.end()) y = numeric_axis(yname, yit->second, options.y_bins, options.max_divisions_y);
-  else y = prefix_axis(yname, data);
+  for (const auto& [name, values] : data.categorical_columns) {
+    if (name.empty()) throw std::invalid_argument("column name must not be empty");
+    if (values.size() != table.case_ids.size()) throw std::invalid_argument("process cube row lengths differ");
+  }
+  const auto xcolumns = dimension_columns(options, true);
+  const auto ycolumns = dimension_columns(options, false);
+  Axis x = make_axis(xcolumns, data, options.x_bins, options.max_divisions_x);
+  Axis y = make_axis(ycolumns, data, options.y_bins, options.max_divisions_y);
+  const std::string xname = x.name;
+  const std::string yname = y.name;
   const std::string value_name = choose(options.aggregation_column, options.value_column);
   if (value_name.empty())
     throw std::invalid_argument("aggregation column is required");
@@ -387,13 +539,35 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
   std::vector<std::vector<double>> values(x.bins.size() * y.bins.size());
   for (std::size_t r = 0; r < data.case_ids.size(); ++r) {
     std::vector<std::size_t> xi, yi;
-    if (x.numeric) { auto i = numeric_index(x, xit->second[r]); if (i < x.bins.size()) xi.push_back(i); }
-    else for (const auto& [label, i] : x.labels) {
-      auto it = data.columns.find(xname + "_" + label); if (it != data.columns.end() && it->second[r] >= 1.0) xi.push_back(i);
+    if (x.mode == Axis::Mode::kNumeric) {
+      const auto it = data.columns.find(x.columns.front());
+      auto i = numeric_index(x, it->second[r]);
+      if (i < x.bins.size()) xi.push_back(i);
+    } else if (x.mode == Axis::Mode::kCategorical) {
+      std::vector<std::string> parts;
+      for (const auto& column : x.columns) parts.push_back(scalar_label(data, column, r));
+      const auto it = x.labels.find(categorical_axis_key(parts));
+      if (it != x.labels.end()) xi.push_back(it->second);
+    } else {
+      for (const auto& [label, i] : x.labels) {
+        auto it = data.columns.find(xname + "_" + label);
+        if (it != data.columns.end() && it->second[r] >= 1.0) xi.push_back(i);
+      }
     }
-    if (y.numeric) { auto i = numeric_index(y, yit->second[r]); if (i < y.bins.size()) yi.push_back(i); }
-    else for (const auto& [label, i] : y.labels) {
-      auto it = data.columns.find(yname + "_" + label); if (it != data.columns.end() && it->second[r] >= 1.0) yi.push_back(i);
+    if (y.mode == Axis::Mode::kNumeric) {
+      const auto it = data.columns.find(y.columns.front());
+      auto i = numeric_index(y, it->second[r]);
+      if (i < y.bins.size()) yi.push_back(i);
+    } else if (y.mode == Axis::Mode::kCategorical) {
+      std::vector<std::string> parts;
+      for (const auto& column : y.columns) parts.push_back(scalar_label(data, column, r));
+      const auto it = y.labels.find(categorical_axis_key(parts));
+      if (it != y.labels.end()) yi.push_back(it->second);
+    } else {
+      for (const auto& [label, i] : y.labels) {
+        auto it = data.columns.find(yname + "_" + label);
+        if (it != data.columns.end() && it->second[r] >= 1.0) yi.push_back(i);
+      }
     }
     for (auto i : xi) for (auto j : yi) {
       const auto k = i * y.bins.size() + j;
@@ -430,18 +604,57 @@ ProcessCubeTable parse_process_cube_table_json(std::string_view json) {
   }
   for (const auto& [name, values] : columns_value.object()) {
     if (name.empty() || !values.is_array())
-      throw std::invalid_argument("process cube columns must be named numeric arrays");
-    auto& output = table.columns[name];
-    output.reserve(values.array().size());
-    for (const auto& value : values.array()) {
-      if (!value.is_number() || !std::isfinite(value.number()))
-        throw std::invalid_argument("process cube columns must contain finite numbers");
-      output.push_back(value.number());
+      throw std::invalid_argument("process cube columns must be named scalar arrays");
+    if (values.array().empty()) {
+      table.columns.emplace(name, std::vector<double>{});
+      continue;
+    }
+    const bool numeric = values.array().front().is_number();
+    const bool categorical = values.array().front().is_string();
+    if (!numeric && !categorical)
+      throw std::invalid_argument("process cube columns must contain numbers or strings");
+    if (numeric) {
+      auto& output = table.columns[name];
+      output.reserve(values.array().size());
+      for (const auto& value : values.array()) {
+        if (!value.is_number() || !std::isfinite(value.number()))
+          throw std::invalid_argument("process cube numeric columns must contain finite numbers");
+        output.push_back(value.number());
+      }
+    } else {
+      auto& output = table.categorical_columns[name];
+      output.reserve(values.array().size());
+      for (const auto& value : values.array()) {
+        if (!value.is_string())
+          throw std::invalid_argument("process cube categorical columns must contain strings");
+        output.push_back(value.string());
+      }
+    }
+  }
+  if (const auto categorical_value = root.find("categorical_columns");
+      categorical_value != root.end()) {
+    if (!categorical_value->second.is_object())
+      throw std::invalid_argument("process cube categorical_columns must be an object");
+    for (const auto& [name, values] : categorical_value->second.object()) {
+      if (name.empty() || !values.is_array())
+        throw std::invalid_argument("process cube categorical columns must be named arrays");
+      if (table.columns.contains(name) || table.categorical_columns.contains(name))
+        throw std::invalid_argument("duplicate process cube categorical column: " + name);
+      auto& output = table.categorical_columns[name];
+      output.reserve(values.array().size());
+      for (const auto& value : values.array()) {
+        if (!value.is_string())
+          throw std::invalid_argument("process cube categorical columns must contain strings");
+        output.push_back(value.string());
+      }
     }
   }
   for (const auto& [name, values] : table.columns)
     if (values.size() != table.case_ids.size())
       throw std::invalid_argument("process cube JSON column length differs from case_ids");
+  for (const auto& [name, values] : table.categorical_columns)
+    if (values.size() != table.case_ids.size())
+      throw std::invalid_argument("process cube JSON categorical column length differs from case_ids");
   return table;
 }
 

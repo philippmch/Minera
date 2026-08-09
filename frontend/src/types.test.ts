@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
@@ -34,6 +34,27 @@ describe("isProcessCubeResult", () => {
     expect(isProcessCubeResult({ ...valid, cells: [[]] })).toBe(false);
     expect(isProcessCubeResult({ ...valid, cells: [[Number.NaN]] })).toBe(false);
     expect(isProcessCubeResult(null)).toBe(false);
+  });
+});
+
+describe("isProcessCubeTable", () => {
+  it("accepts rectangular numeric, categorical, and mixed columns", () => {
+    expect(isProcessCubeTable({
+      case_ids: ["a", "b"],
+      columns: { region: ["US", "DE"], value: [1, 2] },
+    })).toBe(true);
+    expect(isProcessCubeTable({
+      case_ids: ["a", "b"],
+      columns: { value: [1, 2] },
+      categorical_columns: { region: ["US", "DE"] },
+    })).toBe(true);
+  });
+  it("rejects ragged, mixed-type, or duplicate categorical columns", () => {
+    expect(isProcessCubeTable({ case_ids: ["a", "b"], columns: { x: [1] } })).toBe(false);
+    expect(isProcessCubeTable({ case_ids: ["a", "b"], columns: { x: [1, "two"] } })).toBe(false);
+    expect(isProcessCubeTable({
+      case_ids: ["a", "b"], columns: { x: [1, 2] }, categorical_columns: { x: ["a", "b"] },
+    })).toBe(false);
   });
 });
 

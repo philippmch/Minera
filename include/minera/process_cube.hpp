@@ -15,6 +15,12 @@ struct ProcessCubeTable {
   std::map<std::string, std::vector<double>> columns;
   // Compatibility spelling for callers that explicitly say numeric_columns.
   std::map<std::string, std::vector<double>> numeric_columns;
+  // Categorical dimensions are represented as one string value per case.
+  // They may be supplied either in `columns` (when decoding JSON) or in this
+  // explicitly named map for callers that want an unambiguous schema.
+  std::map<std::string, std::vector<std::string>> categorical_columns;
+  // Compatibility spelling for callers that use the shorter string name.
+  std::map<std::string, std::vector<std::string>> string_columns;
 };
 
 enum class ProcessCubeAggregation {
@@ -33,6 +39,10 @@ struct ProcessCubeOptions {
   std::string y_col;
   std::string aggregation_column;
   std::string value_column;
+  // A one-element vector is equivalent to x_col/y_col. Multiple names form a
+  // deterministic composite categorical dimension.
+  std::vector<std::string> x_columns;
+  std::vector<std::string> y_columns;
   ProcessCubeAggregation aggregation = ProcessCubeAggregation::kMean;
   std::size_t max_divisions_x = 4;
   std::size_t max_divisions_y = 4;
