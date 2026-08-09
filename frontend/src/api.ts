@@ -2749,6 +2749,8 @@ export interface OcelStatisticsOptions {
   variant?: "object_type_activities" | "objects_ot_count" |
     "activity_associations" | "object_type_activity_associations" | "edge_associations";
   prefilter?: "none" | "start" | "end";
+  business_hours?: boolean;
+  business_hour_slots?: string;
 }
 
 export function ocelStatisticsQuery(options: OcelStatisticsOptions = {}): string {
@@ -2756,6 +2758,24 @@ export function ocelStatisticsQuery(options: OcelStatisticsOptions = {}): string
   if (options.variant !== undefined) query.set("variant", options.variant);
   if (options.prefilter !== undefined && options.prefilter !== "none")
     query.set("prefilter", options.prefilter);
+  if (options.business_hours !== undefined)
+    query.set("business_hours", options.business_hours ? "true" : "false");
+  const slots = options.business_hour_slots?.trim();
+  if (slots) {
+    if (options.business_hours === false)
+      throw new Error("business-hour slots require business_hours=true");
+    const valid = slots.split(",").every((part) => {
+      const separator = part.includes(":") ? part.indexOf(":") : part.indexOf("-");
+      if (separator <= 0 || separator === part.length - 1) return false;
+      const start = Number(part.slice(0, separator));
+      const end = Number(part.slice(separator + 1));
+      return Number.isFinite(start) && Number.isFinite(end) &&
+        start >= 0 && start < end && end <= 604800;
+    });
+    if (!valid) throw new Error("business-hour slots must satisfy 0 <= start < end <= 604800");
+    if (options.business_hours === undefined) query.set("business_hours", "true");
+    query.set("business_hour_slots", slots);
+  }
   return query.toString();
 }
 

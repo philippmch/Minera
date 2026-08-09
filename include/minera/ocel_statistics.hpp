@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "minera/ocel.hpp"
+#include "minera/temporal_profile.hpp"
 
 namespace minera {
 
@@ -53,6 +54,14 @@ using OcelEdgeAssociations =
              std::map<std::pair<std::string, std::string>, OcdfgEdgeMetric>>;
 using OcelEdgeAssociationMap = OcelEdgeAssociations;
 
+struct OcelEdgeAssociationOptions {
+  // When enabled, performance samples measure active seconds in the supplied
+  // weekly schedule instead of absolute timestamp seconds.  Empty slots use
+  // the deterministic Monday-Friday 07:00-17:00 schedule.
+  bool use_business_hours = false;
+  std::vector<BusinessHourSlot> business_hour_slots;
+};
+
 [[nodiscard]] OcelActivityAssociations activity_associations(
     const Ocel& log,
     OcelAssociationPrefilter prefilter = OcelAssociationPrefilter::kNone);
@@ -68,7 +77,9 @@ object_type_activity_associations(
     const OcelActivityAssociations& associations);
 [[nodiscard]] std::size_t association_pair_count(
     const OcelActivityAssociations& associations);
-[[nodiscard]] OcelEdgeAssociations edge_associations(const Ocel& log);
+[[nodiscard]] OcelEdgeAssociations edge_associations(
+    const Ocel& log,
+    const OcelEdgeAssociationOptions& options = {});
 
 // Explicitly named aliases for callers that prefer the ``find_*`` spelling.
 [[nodiscard]] inline OcelActivityAssociations find_activity_associations(
@@ -83,8 +94,9 @@ find_object_type_activity_associations(
   return object_type_activity_associations(log, prefilter);
 }
 [[nodiscard]] inline OcelEdgeAssociations find_edge_associations(
-    const Ocel& log) {
-  return edge_associations(log);
+    const Ocel& log,
+    const OcelEdgeAssociationOptions& options = {}) {
+  return edge_associations(log, options);
 }
 [[nodiscard]] inline std::set<std::string> association_events(
     const OcelActivityAssociations& associations) {
@@ -141,6 +153,9 @@ enum class OcelStatisticsVariant {
     const Ocel& log,
     OcelStatisticsVariant variant =
         OcelStatisticsVariant::kObjectTypeActivities);
+[[nodiscard]] std::string serialize_ocel_statistics_json(
+    const Ocel& log, OcelStatisticsVariant variant,
+    const OcelEdgeAssociationOptions& edge_options);
 
 // Descriptive aliases for callers that prefer an explicit getter naming
 // convention or an OCEL-prefixed function name.

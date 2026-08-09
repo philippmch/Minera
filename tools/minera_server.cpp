@@ -654,6 +654,39 @@ std::vector<double> process_cube_query_bins(const httplib::Request& request,
   return result;
 }
 
+std::vector<minera::BusinessHourSlot> ocel_business_hour_slots(
+    const httplib::Request& request) {
+  const auto values = ocel_query_list(request, "business_hour_slots");
+  std::vector<minera::BusinessHourSlot> slots;
+  slots.reserve(values.size());
+  for (const auto& value : values) {
+    auto separator = value.find(':');
+    if (separator == std::string::npos) separator = value.find('-');
+    if (separator == std::string::npos || separator == 0 ||
+        separator + 1 == value.size())
+      throw std::invalid_argument(
+          "business_hour_slots expects START-END pairs");
+    const auto parse = [&](std::string_view text) {
+      const std::string owned(text);
+      char* end = nullptr;
+      const double parsed = std::strtod(owned.c_str(), &end);
+      if (end != owned.c_str() + owned.size() || !std::isfinite(parsed))
+        throw std::invalid_argument(
+            "business_hour_slots expects finite seconds");
+      return parsed;
+    };
+    const double start = parse(std::string_view(value).substr(0, separator));
+    const double end = parse(std::string_view(value).substr(separator + 1));
+    if (start < 0.0 || start >= end || end > 604800.0)
+      throw std::invalid_argument(
+          "business_hour_slots requires 0 <= start < end <= 604800");
+    slots.push_back({start, end});
+  }
+  if (request.has_param("business_hour_slots") && slots.empty())
+    throw std::invalid_argument("business_hour_slots expects a non-empty list");
+  return slots;
+}
+
 minera::ProcessCubeAggregation process_cube_aggregation(std::string_view value) {
   if (value == "mean") return minera::ProcessCubeAggregation::kMean;
   if (value == "sum") return minera::ProcessCubeAggregation::kSum;
@@ -1218,7 +1251,8 @@ void handle_ocel_features(const httplib::Request& request,
 void handle_ocel_statistics(const httplib::Request& request,
                             httplib::Response& response) {
   try {
-    static const std::set<std::string> allowed = {"variant", "prefilter"};
+    static const std::set<std::string> allowed = {
+        "variant", "prefilter", "business_hours", "business_hour_slots"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1239,6 +1273,15 @@ void handle_ocel_statistics(const httplib::Request& request,
                                : prefilter_value == "end"
                                      ? minera::OcelAssociationPrefilter::kEnd
                                      : minera::OcelAssociationPrefilter::kNone;
+    const bool business_hours =
+        request.has_param("business_hours")
+            ? ocel_query_bool(request, "business_hours", false)
+            : false;
+    const auto business_hour_slots = ocel_business_hour_slots(request);
+    if ((business_hours || !business_hour_slots.empty()) &&
+        value != "edge_associations" && value != "EDGE_ASSOCIATIONS")
+      throw std::invalid_argument(
+          "business-hour options apply only to edge_associations");
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const auto log = minera::parse_ocel_json(body);
@@ -1273,8 +1316,12 @@ void handle_ocel_statistics(const httplib::Request& request,
       if (prefilter != minera::OcelAssociationPrefilter::kNone)
         throw std::invalid_argument(
             "prefilter applies only to association statistics");
+      minera::OcelEdgeAssociationOptions edge_options;
+      edge_options.use_business_hours = business_hours;
+      edge_options.business_hour_slots = business_hour_slots;
       response.set_content(
-          minera::serialize_ocel_statistics_json(minera::edge_associations(log)),
+          minera::serialize_ocel_statistics_json(
+              minera::edge_associations(log, edge_options)),
           "application/json");
     } else {
       throw std::invalid_argument(
