@@ -103,6 +103,23 @@ export function pathValidationMessage(input: {
   return null;
 }
 
+/** Repetition bounds are inclusive and default to [2, +infinity]. */
+export function repetitionValidationMessage(input: {
+  value: string;
+  min: string;
+  max: string;
+}): string | null {
+  if (!input.value.trim()) return null;
+  const min = input.min.trim() ? Number(input.min) : 2;
+  const max = input.max.trim() ? Number(input.max) : Number.MAX_SAFE_INTEGER;
+  if (!Number.isFinite(min) || !Number.isInteger(min) || min < 0)
+    return "Repetition minimum must be a non-negative integer.";
+  if (!Number.isFinite(max) || !Number.isInteger(max) || max < 0)
+    return "Repetition maximum must be a non-negative integer.";
+  if (min > max) return "Repetition minimum must not exceed the maximum.";
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -129,6 +146,10 @@ export function Filters({
   const [activitySplitActivity, setActivitySplitActivity] = useState("");
   const [activitySplitSeparator, setActivitySplitSeparator] = useState("##@@");
   const [activitySplitCutMode, setActivitySplitCutMode] = useState<"this" | "next">("this");
+  const [repetitionValue, setRepetitionValue] = useState("");
+  const [repetitionAttributeKey, setRepetitionAttributeKey] = useState("");
+  const [repetitionMin, setRepetitionMin] = useState("");
+  const [repetitionMax, setRepetitionMax] = useState("");
   const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
   const [prefixActivity, setPrefixActivity] = useState("");
   const [suffixActivity, setSuffixActivity] = useState("");
@@ -497,9 +518,15 @@ export function Filters({
     maxPerformance: pathMaxPerformance,
     positive: pathPositive,
   });
+  const repetitionValidationError = repetitionValidationMessage({
+    value: repetitionValue,
+    min: repetitionMin,
+    max: repetitionMax,
+  });
 
   const apply = () => {
-    if (temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError) return;
+    if (temporalValidationError || ltlValidationError || segmentValidationError ||
+        pathValidationError || repetitionValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -569,6 +596,10 @@ export function Filters({
       activitySplit: activitySplitActivity ? [activitySplitActivity] : undefined,
       activitySplitSeparator: activitySplitActivity ? activitySplitSeparator : undefined,
       activitySplitCutMode: activitySplitActivity ? activitySplitCutMode : undefined,
+      repetitionValue: repetitionValue || undefined,
+      repetitionAttributeKey: repetitionValue ? repetitionAttributeKey || undefined : undefined,
+      repetitionMin: repetitionValue && repetitionMin.trim() ? Number(repetitionMin) : undefined,
+      repetitionMax: repetitionValue && repetitionMax.trim() ? Number(repetitionMax) : undefined,
       attributeKey: removeValueList.length > 0 ? attributeKey : undefined,
       removeAttributeValues:
         removeValueList.length > 0 ? removeValueList : undefined,
@@ -725,6 +756,10 @@ export function Filters({
     setActivitySplitActivity("");
     setActivitySplitSeparator("##@@");
     setActivitySplitCutMode("this");
+    setRepetitionValue("");
+    setRepetitionAttributeKey("");
+    setRepetitionMin("");
+    setRepetitionMax("");
     setVariantCoverage("");
     setPrefixActivity("");
     setSuffixActivity("");
@@ -838,6 +873,10 @@ export function Filters({
     activitySplitActivity !== "" ||
     (activitySplitActivity !== "" && activitySplitSeparator !== "##@@") ||
     (activitySplitActivity !== "" && activitySplitCutMode !== "this") ||
+    repetitionValue !== "" ||
+    (repetitionValue !== "" && repetitionAttributeKey !== "") ||
+    (repetitionValue !== "" && repetitionMin !== "") ||
+    (repetitionValue !== "" && repetitionMax !== "") ||
     prefixActivity !== "" ||
     suffixActivity !== "" ||
     segmentPrefixActivity !== "" ||
@@ -1458,6 +1497,57 @@ export function Filters({
               />
             </label>
           </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Repeated value</span>
+              <select
+                value={repetitionValue}
+                onChange={(e) => setRepetitionValue(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>attribute key <small>(blank = activity)</small></span>
+              <input
+                type="text"
+                value={repetitionAttributeKey}
+                disabled={!repetitionValue}
+                onChange={(e) => setRepetitionAttributeKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>min repetitions</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="2"
+                value={repetitionMin}
+                disabled={!repetitionValue}
+                onChange={(e) => setRepetitionMin(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>max repetitions</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="unbounded"
+                value={repetitionMax}
+                disabled={!repetitionValue}
+                onChange={(e) => setRepetitionMax(e.target.value)}
+              />
+            </label>
+          </div>
+          {repetitionValidationError && (
+            <div className="filters-warning" role="alert">{repetitionValidationError}</div>
+          )}
 
           <div className="filters-row">
             <label className="filters-field">

@@ -192,6 +192,11 @@ export interface FilterOptions extends LtlFilterOptions {
   activitySplit?: string[];
   activitySplitSeparator?: string;
   activitySplitCutMode?: "this" | "next";
+  /** Keep whole cases whose target attribute/value count is in a range. */
+  repetitionValue?: string;
+  repetitionAttributeKey?: string;
+  repetitionMin?: number;
+  repetitionMax?: number;
   /** Optional native segment operations, applied after ordinary filters. */
   segmentPrefixActivity?: string;
   segmentPrefixStrict?: boolean;
@@ -398,6 +403,15 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("activity_split_separator", options.activitySplitSeparator);
     if (options.activitySplitCutMode)
       add("activity_split_cut_mode", options.activitySplitCutMode);
+  }
+  if (options.repetitionValue !== undefined) {
+    add("repetition_value", options.repetitionValue);
+    if (options.repetitionAttributeKey)
+      add("repetition_attribute_key", options.repetitionAttributeKey);
+    if (options.repetitionMin !== undefined)
+      add("repetition_min", String(options.repetitionMin));
+    if (options.repetitionMax !== undefined)
+      add("repetition_max", String(options.repetitionMax));
   }
   if (options.minLength) add("min_length", String(options.minLength));
   if (options.maxLength) add("max_length", String(options.maxLength));

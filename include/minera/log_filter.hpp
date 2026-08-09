@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "minera/activity_split.hpp"
+#include "minera/attribute_value_repetition.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -175,6 +176,9 @@ struct LogFilterOptions {
   std::string activity_split_separator = "##@@";
   ActivitySplitCutMode activity_split_cut_mode = ActivitySplitCutMode::kThis;
 
+  // Optional whole-trace attribute/value repetition range.
+  std::optional<AttributeValueRepetitionOptions> attribute_value_repetition;
+
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
@@ -195,7 +199,8 @@ struct LogFilterOptions {
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || min_variant_frequency > 1 ||
            top_variants != 0 || variant_coverage != 0.0 ||
-           !activity_split_activities.empty();
+           !activity_split_activities.empty() ||
+           attribute_value_repetition.has_value();
   }
 };
 

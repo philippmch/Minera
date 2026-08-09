@@ -272,6 +272,14 @@ frontend form/serializer expose the same operation; focused tests cover
 multiple anchors, no-match traces, attributes, case-id synchronization, and
 invalid options.
 
+Attribute-value repetition evidence: a whole-trace filter counts matching
+activity, resource, lifecycle, timestamp, or generic event-attribute values
+and keeps traces inside an inclusive repetition range. The native operation
+preserves log and trace attributes, validates min/max ordering, and is wired
+through strict mine-request fields, CLI flags, local-server form handling, and
+frontend serialization/controls. Focused tests cover default and zero ranges,
+generic attributes, missing values, aliases, and invalid bounds.
+
 DFG interchange evidence: the strict classic text parser and deterministic
 writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
 validates, and normalizes a document (or writes it to an explicit output path),

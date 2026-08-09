@@ -1106,6 +1106,41 @@ MineParams parse_mine_params(const FieldLookup& field,
       }
     }
   }
+  const bool repetition_value_supplied =
+      supplied("repetition_value") || supplied("attribute_value_repetition") ||
+      supplied("attr_value_repetition");
+  const bool repetition_supplied =
+      repetition_value_supplied || supplied("repetition_attribute_key") ||
+      supplied("repetition_min") || supplied("repetition_max");
+  if (repetition_supplied) {
+    std::string_view value_field;
+    if (supplied("repetition_value")) {
+      value_field = "repetition_value";
+    } else if (supplied("attribute_value_repetition")) {
+      value_field = "attribute_value_repetition";
+    } else if (supplied("attr_value_repetition")) {
+      value_field = "attr_value_repetition";
+    } else {
+      throw std::invalid_argument(
+          "repetition_value: required when repetition filtering is enabled");
+    }
+    params.filter.attribute_value_repetition =
+        AttributeValueRepetitionOptions{};
+    auto& repetition = *params.filter.attribute_value_repetition;
+    repetition.value = field(value_field);
+    if (supplied("repetition_attribute_key"))
+      repetition.attribute_key = field("repetition_attribute_key");
+    if (supplied("repetition_min"))
+      repetition.min_repetitions =
+          parse_nonnegative_u64(field("repetition_min"), "repetition_min");
+    if (supplied("repetition_max"))
+      repetition.max_repetitions =
+          parse_nonnegative_u64(field("repetition_max"), "repetition_max");
+    if (repetition.min_repetitions > repetition.max_repetitions) {
+      throw std::invalid_argument(
+          "repetition_min: must not exceed repetition_max");
+    }
+  }
   if (const auto value = field("start_activities"); !value.empty()) {
     params.filter.start_activities = split_csv(value);
   }

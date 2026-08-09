@@ -472,6 +472,15 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     kept = std::move(split_log.traces);
   }
 
+  if (options.attribute_value_repetition) {
+    EventLog repetition_log;
+    repetition_log.traces = std::move(kept);
+    repetition_log.attributes = log.attributes;
+    repetition_log = filter_attribute_value_repetition(
+        repetition_log, *options.attribute_value_repetition);
+    kept = std::move(repetition_log.traces);
+  }
+
   const bool by_frequency = options.min_variant_frequency > 1;
   const bool by_rank = options.top_variants != 0;
   const bool by_coverage = options.variant_coverage > 0.0;
