@@ -4044,6 +4044,17 @@ std::string rework_json(const ReworkResult& result) {
   return out.str();
 }
 
+std::string cycle_time_json(const CycleTimeResult& result) {
+  if (!std::isfinite(result.cycle_time) || result.cycle_time < 0.0)
+    throw std::invalid_argument("cycle time must be finite and non-negative");
+  std::ostringstream out;
+  out << "{\"family\":\"CYCLE_TIME\",\"variant\":\"CLASSIC\","
+      << "\"cycle_time\":" << result.cycle_time
+      << ",\"instances\":" << result.instances
+      << ",\"timed_events\":" << result.timed_events << '}';
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

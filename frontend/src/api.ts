@@ -117,6 +117,8 @@ import {
   type ServiceTimeOptions,
   type ReworkResult,
   type ReworkOptions,
+  type CycleTimeResult,
+  type CycleTimeOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -137,6 +139,7 @@ import {
   isPassedTimeResult,
   isServiceTimeResult,
   isReworkResult,
+  isCycleTimeResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1564,6 +1567,26 @@ export function requestRework(options: ReworkOptions = {}): Promise<ReworkResult
   return postChecked(`/api/rework${query ? `?${query}` : ""}`, isReworkResult, "rework");
 }
 export const discoverRework = requestRework;
+
+export function cycleTimeQuery(options: CycleTimeOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of [
+    ["cycle_time_timestamp_key", options.cycle_time_timestamp_key],
+    ["cycle_time_start_timestamp_key", options.cycle_time_start_timestamp_key],
+  ] as const) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  return query.toString();
+}
+
+export function requestCycleTime(options: CycleTimeOptions = {}): Promise<CycleTimeResult> {
+  const query = cycleTimeQuery(options);
+  return postChecked(`/api/cycle-time${query ? `?${query}` : ""}`, isCycleTimeResult, "cycle time");
+}
+export const discoverCycleTime = requestCycleTime;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

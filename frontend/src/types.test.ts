@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -178,6 +178,18 @@ describe("isReworkResult", () => {
   it("rejects impossible counts", () => {
     expect(isReworkResult({ family: "REWORK", variant: "ACTIVITIES", activity_cases: { A: -1 } })).toBe(false);
     expect(isReworkResult({ family: "REWORK", variant: "CASES", cases: { c1: { number_activities: 1, rework: 2 } } })).toBe(false);
+  });
+});
+
+describe("isCycleTimeResult", () => {
+  const valid = {
+    family: "CYCLE_TIME", variant: "CLASSIC",
+    cycle_time: 10, instances: 2, timed_events: 4,
+  };
+  it("accepts the bounded timing envelope", () => expect(isCycleTimeResult(valid)).toBe(true));
+  it("rejects negative or non-integral diagnostics", () => {
+    expect(isCycleTimeResult({ ...valid, cycle_time: -1 })).toBe(false);
+    expect(isCycleTimeResult({ ...valid, instances: 1.5 })).toBe(false);
   });
 });
 
