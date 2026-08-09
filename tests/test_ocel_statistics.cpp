@@ -82,6 +82,17 @@ int main() {
   assert(edge.unique_objects == expected_objects);
   assert(edge.event_objects == expected_triples);
   assert(edge.performance.size() == 1);
+  const auto business_edges = minera::edge_associations(
+      log, minera::OcelEdgeAssociationOptions{.use_business_hours = true});
+  assert(business_edges.at("Item").at({"Create", "Ship"}).performance.size() == 1);
+  assert(business_edges.at("Item").at({"Create", "Ship"}).performance.front() ==
+         10.0 * 3600.0);
+  const auto custom_edges = minera::edge_associations(
+      log, minera::OcelEdgeAssociationOptions{
+               .use_business_hours = true,
+               .business_hour_slots = {{0.0, 3600.0}}});
+  assert(custom_edges.at("Item").at({"Create", "Ship"}).performance.front() ==
+         3600.0);
 
   assert(minera::get_object_type_activities(log) == activities);
   assert(minera::ocel_object_type_activities(log) == activities);
@@ -122,6 +133,11 @@ int main() {
          std::string::npos);
   assert(edge_json.find("\"Create->Ship\":{\"event_couples\"") !=
          std::string::npos);
+  const auto business_json = minera::serialize_ocel_statistics_json(
+      log, minera::OcelStatisticsVariant::kEdgeAssociations,
+      minera::OcelEdgeAssociationOptions{.use_business_hours = true});
+  assert(business_json.find("\"variant\":\"EDGE_ASSOCIATIONS\"") !=
+         std::string::npos);
 
   auto invalid = log;
   invalid.relations.push_back({"missing", "o1", ""});
@@ -149,6 +165,22 @@ int main() {
   // and simply omits performance when one endpoint cannot be parsed.
   assert(minera::activity_associations(invalid).size() == 2);
   assert(minera::edge_associations(invalid).at("Item").at({"Create", "Ship"}).performance.empty());
+  assert(minera::edge_associations(
+             invalid, minera::OcelEdgeAssociationOptions{.use_business_hours = true})
+             .at("Item")
+             .at({"Create", "Ship"})
+             .performance.empty());
+
+  rejected = false;
+  try {
+    (void)minera::edge_associations(
+        log, minera::OcelEdgeAssociationOptions{
+                 .use_business_hours = true,
+                 .business_hour_slots = {{10.0, 0.0}}});
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
 
   invalid = log;
   invalid.events.push_back({"e1", "Other", "", {}});

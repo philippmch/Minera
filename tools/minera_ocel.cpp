@@ -26,7 +26,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
@@ -52,6 +52,8 @@ int main(int argc, char** argv) {
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
     std::optional<double> split_max_degree_centrality;
     bool compute_edges_performance = true;
+    bool statistics_business_hours = false;
+    std::vector<minera::BusinessHourSlot> statistics_business_hour_slots;
     bool include_description_timestamps = true;
     double alpha = 1.0, beta = 1.0, gamma = 1.0, delta = 1.0;
     double etot_theta = 0.1, otg_theta = 0.2;
@@ -78,6 +80,49 @@ int main(int argc, char** argv) {
         begin = end + 1;
       }
       return result;
+    };
+    const auto business_slots = [](const std::string& value) {
+      std::vector<minera::BusinessHourSlot> slots;
+      for (const auto& part : [&] {
+             std::vector<std::string> parts;
+             std::size_t begin = 0;
+             while (begin <= value.size()) {
+               const auto end = value.find(',', begin);
+               parts.push_back(value.substr(begin, end == std::string::npos
+                                                     ? std::string::npos
+                                                     : end - begin));
+               if (end == std::string::npos) break;
+               begin = end + 1;
+             }
+             return parts;
+           }()) {
+        const auto separator = part.find(':') == std::string::npos
+                                   ? part.find('-')
+                                   : part.find(':');
+        if (separator == std::string::npos || separator == 0 ||
+            separator + 1 == part.size())
+          throw std::invalid_argument(
+              "--statistics-business-hour-slots expects START-END pairs");
+        const auto parse = [&](std::string_view text) {
+          const std::string owned(text);
+          char* end = nullptr;
+          const double parsed = std::strtod(owned.c_str(), &end);
+          if (end != owned.c_str() + owned.size() || !std::isfinite(parsed))
+            throw std::invalid_argument(
+                "--statistics-business-hour-slots expects finite seconds");
+          return parsed;
+        };
+        const double start = parse(std::string_view(part).substr(0, separator));
+        const double end = parse(std::string_view(part).substr(separator + 1));
+        if (start < 0.0 || start >= end || end > 604800.0)
+          throw std::invalid_argument(
+              "--statistics-business-hour-slots requires 0 <= start < end <= 604800");
+        slots.push_back({start, end});
+      }
+      if (slots.empty())
+        throw std::invalid_argument(
+            "--statistics-business-hour-slots expects a non-empty list");
+      return slots;
     };
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
@@ -210,6 +255,14 @@ int main(int argc, char** argv) {
         if (statistics_prefilter != "none")
           throw std::invalid_argument("--statistics-prefilter may be specified once");
         statistics_prefilter = argv[++i];
+      } else if (option == "--statistics-business-hours") {
+        statistics_business_hours = true;
+      } else if (option == "--statistics-business-hour-slots" && i + 1 < argc) {
+        if (!statistics_business_hour_slots.empty())
+          throw std::invalid_argument(
+              "--statistics-business-hour-slots may be specified once");
+        statistics_business_hour_slots = business_slots(argv[++i]);
+        statistics_business_hours = true;
       } else if ((option == "--format" || option == "--features" ||
            option == "--discover" ||
            option == "--split") && i + 1 < argc) {
@@ -386,6 +439,10 @@ int main(int argc, char** argv) {
         statistics != "object_type_activity_associations")
       throw std::invalid_argument(
           "statistics-prefilter applies only to association statistics");
+    if ((statistics_business_hours || !statistics_business_hour_slots.empty()) &&
+        statistics != "edge_associations")
+      throw std::invalid_argument(
+          "statistics business-hour options apply only to edge_associations");
     if (!discover.empty() && discover != "etot" && discover != "ocdfg" &&
         discover != "ocpn" && discover != "otg" && discover != "saw") {
       throw std::invalid_argument("discover must be etot, ocdfg, ocpn, otg, or saw");
@@ -547,8 +604,11 @@ int main(int argc, char** argv) {
                          minera::object_type_activity_associations(log, prefilter))
                   << '\n';
       } else if (statistics == "edge_associations") {
+        minera::OcelEdgeAssociationOptions edge_options;
+        edge_options.use_business_hours = statistics_business_hours;
+        edge_options.business_hour_slots = statistics_business_hour_slots;
         std::cout << minera::serialize_ocel_statistics_json(
-                         minera::edge_associations(log))
+                         minera::edge_associations(log, edge_options))
                   << '\n';
       } else {
         const auto variant = statistics == "object_type_activities"

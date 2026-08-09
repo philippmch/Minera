@@ -1,8 +1,11 @@
 #include "minera/ocel_statistics.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
-#include <algorithm>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +19,99 @@ struct OcelLookups {
   std::unordered_map<std::string, std::string> event_activities;
   std::unordered_map<std::string, std::string> object_types;
 };
+
+constexpr double kWeekSeconds = 7.0 * 86400.0;
+
+std::vector<BusinessHourSlot> default_business_slots() {
+  std::vector<BusinessHourSlot> slots;
+  slots.reserve(5);
+  for (int day = 0; day < 5; ++day) {
+    const double start = static_cast<double>(day) * 86400.0 + 7.0 * 3600.0;
+    slots.push_back({start, start + 10.0 * 3600.0});
+  }
+  return slots;
+}
+
+std::vector<BusinessHourSlot> normalized_business_slots(
+    const OcelEdgeAssociationOptions& options) {
+  auto slots = options.business_hour_slots.empty()
+                   ? default_business_slots()
+                   : options.business_hour_slots;
+  for (const auto& slot : slots) {
+    if (!std::isfinite(slot.start_seconds) ||
+        !std::isfinite(slot.end_seconds) || slot.start_seconds < 0.0 ||
+        slot.start_seconds >= slot.end_seconds ||
+        slot.end_seconds > kWeekSeconds) {
+      throw std::invalid_argument(
+          "OCEL edge business-hour slots must satisfy 0 <= start < end <= 604800");
+    }
+  }
+  std::sort(slots.begin(), slots.end(), [](const auto& lhs, const auto& rhs) {
+    if (lhs.start_seconds != rhs.start_seconds)
+      return lhs.start_seconds < rhs.start_seconds;
+    return lhs.end_seconds < rhs.end_seconds;
+  });
+  std::vector<BusinessHourSlot> merged;
+  for (const auto& slot : slots) {
+    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds) {
+      merged.back().end_seconds =
+          std::max(merged.back().end_seconds, slot.end_seconds);
+    } else {
+      merged.push_back(slot);
+    }
+  }
+  return merged;
+}
+
+std::optional<double> local_wall_instant(std::string_view text) {
+  if (!parse_timestamp(text)) return std::nullopt;
+  std::size_t end = text.size();
+  while (end > 0 &&
+         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+    --end;
+  }
+  const auto timezone = text.substr(0, end).find_first_of("Zz+-", 10);
+  if (timezone != std::string_view::npos) end = timezone;
+  return parse_timestamp(text.substr(0, end));
+}
+
+double active_business_segment(double start, double end,
+                               const std::vector<BusinessHourSlot>& slots) {
+  double total = 0.0;
+  for (const auto& slot : slots) {
+    const double left = std::max(start, slot.start_seconds);
+    const double right = std::min(end, slot.end_seconds);
+    if (right > left) total += right - left;
+  }
+  return total;
+}
+
+double business_elapsed(double source, double target,
+                        const std::vector<BusinessHourSlot>& slots) {
+  if (target <= source || slots.empty()) return 0.0;
+  constexpr double kEpochToMonday = 3.0 * 86400.0;
+  const double adjusted_source = source + kEpochToMonday;
+  const double adjusted_target = target + kEpochToMonday;
+  const auto source_week = static_cast<long long>(
+      std::floor(adjusted_source / kWeekSeconds));
+  const auto target_week = static_cast<long long>(
+      std::floor(adjusted_target / kWeekSeconds));
+  const double source_offset =
+      adjusted_source - source_week * kWeekSeconds;
+  const double target_offset =
+      adjusted_target - target_week * kWeekSeconds;
+  double full_week_seconds = 0.0;
+  for (const auto& slot : slots)
+    full_week_seconds += slot.end_seconds - slot.start_seconds;
+  if (source_week == target_week)
+    return active_business_segment(source_offset, target_offset, slots);
+  const auto full_weeks = target_week - source_week - 1;
+  double total = active_business_segment(source_offset, kWeekSeconds, slots) +
+                 active_business_segment(0.0, target_offset, slots);
+  if (full_weeks > 0)
+    total += static_cast<double>(full_weeks) * full_week_seconds;
+  return total;
+}
 
 OcelLookups validate_and_index(const Ocel& log) {
   OcelLookups lookups;
@@ -349,8 +445,13 @@ OcelAssociationAggregates aggregate_associations(
           association_pair_count(associations)};
 }
 
-OcelEdgeAssociations edge_associations(const Ocel& log) {
+OcelEdgeAssociations edge_associations(
+    const Ocel& log, const OcelEdgeAssociationOptions& options) {
   const auto lookups = validate_and_index(log);
+  const auto business_slots =
+      options.use_business_hours || !options.business_hour_slots.empty()
+          ? normalized_business_slots(options)
+          : std::vector<BusinessHourSlot>{};
   std::map<std::string, std::set<std::string>> object_events;
   for (const auto& relation : log.relations)
     object_events[relation.object_id].insert(relation.event_id);
@@ -373,9 +474,18 @@ OcelEdgeAssociations edge_associations(const Ocel& log) {
       metric.event_couples.emplace_back(source.id, target.id);
       metric.unique_objects.push_back(object_id);
       metric.event_objects.emplace_back(source.id, target.id, object_id);
-      const auto from = parse_timestamp(source.timestamp);
-      const auto to = parse_timestamp(target.timestamp);
-      if (from && to) metric.performance.push_back(*to - *from);
+      const auto from = options.use_business_hours
+                            ? local_wall_instant(source.timestamp)
+                            : parse_timestamp(source.timestamp);
+      const auto to = options.use_business_hours
+                          ? local_wall_instant(target.timestamp)
+                          : parse_timestamp(target.timestamp);
+      if (from && to) {
+        metric.performance.push_back(
+            options.use_business_hours
+                ? business_elapsed(*from, *to, business_slots)
+                : *to - *from);
+      }
     }
   }
   for (auto& [type, metrics] : result) {
@@ -456,6 +566,14 @@ std::string serialize_ocel_statistics_json(const Ocel& log,
       return serialize_edges(edge_associations(log));
   }
   throw std::invalid_argument("unknown OCEL statistics variant");
+}
+
+std::string serialize_ocel_statistics_json(
+    const Ocel& log, OcelStatisticsVariant variant,
+    const OcelEdgeAssociationOptions& edge_options) {
+  if (variant != OcelStatisticsVariant::kEdgeAssociations)
+    return serialize_ocel_statistics_json(log, variant);
+  return serialize_edges(edge_associations(log, edge_options));
 }
 
 }  // namespace minera

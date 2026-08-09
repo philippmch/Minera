@@ -322,6 +322,17 @@ describe("OCEL API", () => {
     })).toBe("variant=objects&max_features=12&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color");
     expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))
       .toBe("variant=activity_associations&prefilter=start");
+    expect(ocelStatisticsQuery({
+      variant: "edge_associations", business_hours: true,
+      business_hour_slots: "0-3600,86400:90000",
+    })).toBe("variant=edge_associations&business_hours=true&business_hour_slots=0-3600%2C86400%3A90000");
+    expect(() => ocelStatisticsQuery({
+      variant: "edge_associations", business_hour_slots: "0-604801",
+    })).toThrow(/<= 604800/);
+    expect(() => ocelStatisticsQuery({
+      variant: "edge_associations", business_hours: false,
+      business_hour_slots: "0-3600",
+    })).toThrow(/business_hours=true/);
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
     expect(ocelFilterQuery({
@@ -406,16 +417,21 @@ describe("OCEL API", () => {
   });
 
   it("posts an OCEL statistics request and validates the summary", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init: RequestInit) => {
+      expect(path).toBe("/api/ocel/statistics?variant=edge_associations&business_hours=true&business_hour_slots=0-3600");
       expect(init.body).toBeInstanceOf(FormData);
       return { ok: true, json: async () => ({
-        family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
-        associations: { Create: [["e1", "o1"]] },
+        family: "OCEL_STATISTICS", variant: "EDGE_ASSOCIATIONS",
+        edges: { Item: { "Create->Ship": {
+          event_couples: [["e1", "e2"]], unique_objects: ["o1"],
+          event_objects: [["e1", "e2", "o1"]], performance: [3600],
+        } } },
       }) };
     }));
     await expect(requestOcelStatistics(new File(["{}"], "log.json"), {
-      variant: "activity_associations", prefilter: "start",
-    })).resolves.toMatchObject({ family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS" });
+      variant: "edge_associations", business_hours: true,
+      business_hour_slots: "0-3600",
+    })).resolves.toMatchObject({ family: "OCEL_STATISTICS", variant: "EDGE_ASSOCIATIONS" });
     vi.unstubAllGlobals();
   });
 
