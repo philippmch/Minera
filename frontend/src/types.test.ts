@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isStreamingDfgResult", () => {
   const valid = {
@@ -12,6 +12,20 @@ describe("isStreamingDfgResult", () => {
   it("rejects negative counts and malformed edges", () => {
     expect(isStreamingDfgResult({ ...valid, events: -1 })).toBe(false);
     expect(isStreamingDfgResult({ ...valid, graph: [{ source: "A", target: "B", count: 0 }] })).toBe(false);
+  });
+});
+
+describe("isStreamingFootprintsResult", () => {
+  const valid = {
+    family: "STREAMING_FOOTPRINTS", total_events_processed: 2,
+    total_deviations: 0,
+    cases: [{ case_id: "c1", events: 2, deviations: 0, is_fit: true,
+      first_activity: "A", last_activity: "B" }],
+  };
+  it("accepts snapshots and rejects invalid counters", () => {
+    expect(isStreamingFootprintsResult(valid)).toBe(true);
+    expect(isStreamingFootprintsResult({ ...valid, total_deviations: -1 })).toBe(false);
+    expect(isStreamingFootprintsResult({ ...valid, cases: [{ ...valid.cases[0], deviations: 1.5 }] })).toBe(false);
   });
 });
 

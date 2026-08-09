@@ -1001,6 +1001,33 @@ export function isStreamingDfgResult(value: unknown): value is StreamingDfgResul
     Number.isSafeInteger(edge.count) && (edge.count as number) > 0);
 }
 
+export interface StreamingFootprintsCase {
+  case_id: string;
+  events: number;
+  deviations: number;
+  is_fit: boolean;
+  first_activity: string;
+  last_activity: string;
+}
+export interface StreamingFootprintsResult {
+  family: "STREAMING_FOOTPRINTS";
+  total_events_processed: number;
+  total_deviations: number;
+  cases: StreamingFootprintsCase[];
+}
+export function isStreamingFootprintsResult(value: unknown): value is StreamingFootprintsResult {
+  if (!isOcelRecord(value) || value.family !== "STREAMING_FOOTPRINTS" ||
+      !Number.isSafeInteger(value.total_events_processed) ||
+      (value.total_events_processed as number) < 0 ||
+      !Number.isSafeInteger(value.total_deviations) ||
+      (value.total_deviations as number) < 0 || !Array.isArray(value.cases)) return false;
+  return value.cases.every((item) => isOcelRecord(item) &&
+    typeof item.case_id === "string" && Number.isSafeInteger(item.events) &&
+    (item.events as number) >= 0 && Number.isSafeInteger(item.deviations) &&
+    (item.deviations as number) >= 0 && typeof item.is_fit === "boolean" &&
+    typeof item.first_activity === "string" && typeof item.last_activity === "string");
+}
+
 export type OcelStatisticsVariant =
   | "OBJECT_TYPE_ACTIVITIES"
   | "OBJECTS_OT_COUNT"

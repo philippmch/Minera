@@ -100,6 +100,7 @@
 #include "minera/request_params.hpp"
 #include "minera/segment_filter.hpp"
 #include "minera/streaming_dfg.hpp"
+#include "minera/streaming_footprints.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -3812,6 +3813,107 @@ void handle_streaming_dfg(const httplib::Request& request,
   }
 }
 
+void handle_streaming_footprints(const httplib::Request& request,
+                                 httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "streaming_footprints_case_id_column",
+        "streaming_footprints_activity_column",
+        "streaming_footprints_activities",
+        "streaming_footprints_start_activities",
+        "streaming_footprints_end_activities",
+        "streaming_footprints_sequence",
+        "streaming_footprints_parallel",
+        "streaming_footprints_terminate_all"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown streaming footprints parameter: " + key);
+    }
+    minera::CsvImportOptions import_options;
+    if (request.has_param("streaming_footprints_case_id_column"))
+      import_options.case_id_column =
+          request.get_param_value("streaming_footprints_case_id_column");
+    if (request.has_param("streaming_footprints_activity_column"))
+      import_options.activity_column =
+          request.get_param_value("streaming_footprints_activity_column");
+    if (import_options.case_id_column.empty() ||
+        import_options.activity_column.empty()) {
+      throw std::invalid_argument(
+          "streaming footprints column names must not be empty");
+    }
+    if (!request.has_param("streaming_footprints_activities"))
+      throw std::invalid_argument(
+          "streaming footprints activities are required");
+
+    const auto split_list = [](std::string_view text) {
+      std::set<std::string> result;
+      std::size_t begin = 0;
+      while (begin <= text.size()) {
+        const auto end = text.find(',', begin);
+        auto token = text.substr(
+            begin, end == std::string_view::npos ? text.size() - begin
+                                                   : end - begin);
+        const auto left = token.find_first_not_of(' ');
+        const auto right = token.find_last_not_of(' ');
+        if (left == std::string_view::npos)
+          throw std::invalid_argument(
+              "streaming footprints activity lists cannot be empty");
+        token = token.substr(left, right - left + 1);
+        if (token.empty())
+          throw std::invalid_argument(
+              "streaming footprints activity lists cannot be empty");
+        result.emplace(token);
+        if (end == std::string_view::npos) break;
+        begin = end + 1;
+      }
+      return result;
+    };
+    minera::Footprint model;
+    model.start_activities_present =
+        request.has_param("streaming_footprints_start_activities");
+    model.end_activities_present =
+        request.has_param("streaming_footprints_end_activities");
+    model.activities = split_list(
+        request.get_param_value("streaming_footprints_activities"));
+    if (request.has_param("streaming_footprints_start_activities"))
+      model.start_activities = split_list(
+          request.get_param_value("streaming_footprints_start_activities"));
+    if (request.has_param("streaming_footprints_end_activities"))
+      model.end_activities = split_list(
+          request.get_param_value("streaming_footprints_end_activities"));
+    if (request.has_param("streaming_footprints_sequence")) {
+      for (const auto& pair : minera::parse_activity_pairs(
+               request.get_param_value("streaming_footprints_sequence")))
+        model.sequence.emplace(pair.predecessor, pair.successor);
+    }
+    if (request.has_param("streaming_footprints_parallel")) {
+      for (const auto& pair : minera::parse_activity_pairs(
+               request.get_param_value("streaming_footprints_parallel")))
+        model.parallel.emplace(pair.predecessor, pair.successor);
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing CSV log body");
+    std::istringstream input(body);
+    const auto log = minera::import_csv_event_log(input, import_options);
+    minera::StreamingFootprintsConformance monitor(
+        std::move(model),
+        {import_options.activity_column, import_options.case_id_column});
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        (void)monitor.receive(event, trace.case_id);
+    if (ocel_query_bool(request, "streaming_footprints_terminate_all", false))
+      monitor.terminate_all();
+    response.set_content(
+        minera::serialize_streaming_footprints_json(monitor.snapshot()),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -3972,6 +4074,7 @@ int main(int argc, char** argv) {
   server.Options("/api/dfg-to-petri", preflight);
   server.Options("/api/process-cube", preflight);
   server.Options("/api/streaming-dfg", preflight);
+  server.Options("/api/streaming-footprints", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -4046,6 +4149,7 @@ int main(int argc, char** argv) {
   server.Post("/api/dfg-to-petri", handle_dfg_conversion);
   server.Post("/api/process-cube", handle_process_cube);
   server.Post("/api/streaming-dfg", handle_streaming_dfg);
+  server.Post("/api/streaming-footprints", handle_streaming_footprints);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 
