@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -58,5 +59,10 @@ get_trace_attribute_values(const EventLog& log, std::string_view attribute_key) 
 
 [[nodiscard]] const char* attribute_statistics_scope_name(
     AttributeStatisticsScope scope);
+
+[[nodiscard]] std::set<std::string> get_all_event_attributes_from_log(
+    const EventLog& log);
+[[nodiscard]] std::set<std::string> get_all_trace_attributes_from_log(
+    const EventLog& log);
 
 }  // namespace minera

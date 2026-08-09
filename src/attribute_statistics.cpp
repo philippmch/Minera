@@ -26,6 +26,34 @@ const std::string* trace_value(const Trace& trace, std::string_view key) {
 
 }  // namespace
 
+std::set<std::string> get_all_event_attributes_from_log(const EventLog& log) {
+  std::set<std::string> result;
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      if (!event.activity.empty()) result.insert("concept:name");
+      if (!event.timestamp.empty()) result.insert("time:timestamp");
+      if (!event.resource.empty()) result.insert("org:resource");
+      // Keep the transition field out of this event-attribute inventory.
+      for (const auto& attribute : event.attributes)
+        if (attribute.key != "lifecycle:transition")
+          result.insert(attribute.key);
+    }
+  }
+  return result;
+}
+
+std::set<std::string> get_all_trace_attributes_from_log(const EventLog& log) {
+  std::set<std::string> result;
+  for (const auto& trace : log.traces) {
+    for (const auto& attribute : trace.attributes) {
+      if (attribute.key != "concept:name" &&
+          attribute.key != "case:concept:name")
+        result.insert(attribute.key);
+    }
+  }
+  return result;
+}
+
 const char* attribute_statistics_scope_name(AttributeStatisticsScope scope) {
   switch (scope) {
     case AttributeStatisticsScope::kEvents: return "EVENTS";
