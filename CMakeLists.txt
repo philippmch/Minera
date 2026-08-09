@@ -68,6 +68,7 @@ add_library(minera_core
   src/path_filter.cpp
   src/passed_time.cpp
   src/segment_filter.cpp
+  src/service_time.cpp
   src/ltl_filter.cpp
   src/log_to_features.cpp
   src/log_to_target.cpp
@@ -330,6 +331,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_passed_time_tests PRIVATE cxx_std_20)
   target_compile_options(minera_passed_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_passed_time_tests COMMAND minera_passed_time_tests)
+
+  add_executable(minera_service_time_tests
+    tests/test_service_time.cpp
+  )
+  target_link_libraries(minera_service_time_tests PRIVATE minera::core)
+  target_compile_features(minera_service_time_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_service_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_service_time_tests COMMAND minera_service_time_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp

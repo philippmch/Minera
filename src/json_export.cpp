@@ -3997,6 +3997,23 @@ std::string passed_time_json(const PassedTimeResult& result) {
   return out.str();
 }
 
+std::string service_time_json(const ServiceTimeResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"SERVICE_TIME\",\"variant\":\"CLASSIC\",\"aggregation\":\""
+      << service_time_aggregation_name(result.aggregation)
+      << "\",\"values\":{";
+  std::size_t index = 0;
+  for (const auto& [activity, value] : result.values) {
+    if (!std::isfinite(value))
+      throw std::invalid_argument("service time values must be finite");
+    if (index++) out << ',';
+    write_json_string(out, activity);
+    out << ':' << std::setprecision(17) << value;
+  }
+  out << "}}";
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

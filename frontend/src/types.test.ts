@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -158,6 +158,15 @@ describe("isPassedTimeResult", () => {
       pre: [{ ...valid.pre[0], performance: Number.NaN }] })).toBe(false);
     expect(isPassedTimeResult({ ...valid,
       post: [{ ...valid.post[0], frequency: -1 }] })).toBe(false);
+  });
+});
+
+describe("isServiceTimeResult", () => {
+  const valid = { family: "SERVICE_TIME", variant: "CLASSIC", aggregation: "MEAN", values: { A: 900, B: 2100 } };
+  it("accepts finite activity values", () => expect(isServiceTimeResult(valid)).toBe(true));
+  it("rejects non-finite values and wrong variants", () => {
+    expect(isServiceTimeResult({ ...valid, values: { A: Number.NaN } })).toBe(false);
+    expect(isServiceTimeResult({ ...valid, variant: "OTHER" })).toBe(false);
   });
 });
 

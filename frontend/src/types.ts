@@ -2619,6 +2619,33 @@ export function isPassedTimeResult(value: unknown): value is PassedTimeResult {
     Number.isFinite(data.post_avg_perf);
 }
 
+export interface ServiceTimeOptions {
+  service_time_activity_key?: string;
+  service_time_start_timestamp_key?: string;
+  service_time_timestamp_key?: string;
+  service_time_aggregation?: "mean" | "median" | "min" | "max" | "sum";
+  service_time_business_hours?: boolean;
+  service_time_business_hour_slots?: string;
+}
+
+export interface ServiceTimeResult {
+  family: "SERVICE_TIME";
+  variant: "CLASSIC";
+  aggregation: "MEAN" | "MEDIAN" | "MIN" | "MAX" | "SUM";
+  values: Record<string, number>;
+}
+
+export function isServiceTimeResult(value: unknown): value is ServiceTimeResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<ServiceTimeResult>;
+  if (data.family !== "SERVICE_TIME" || data.variant !== "CLASSIC" ||
+      !["MEAN", "MEDIAN", "MIN", "MAX", "SUM"].includes(data.aggregation ?? "") ||
+      typeof data.values !== "object" || data.values === null || Array.isArray(data.values))
+    return false;
+  return Object.values(data.values as Record<string, unknown>)
+    .every((entry) => typeof entry === "number" && Number.isFinite(entry));
+}
+
 export function isChaoticActivitiesResult(
   value: unknown,
 ): value is ChaoticActivitiesResult {

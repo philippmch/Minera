@@ -113,6 +113,8 @@ import {
   type ChaoticActivitiesOptions,
   type PassedTimeResult,
   type PassedTimeOptions,
+  type ServiceTimeResult,
+  type ServiceTimeOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -131,6 +133,7 @@ import {
   isMonteCarloResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
+  isServiceTimeResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1505,6 +1508,35 @@ export function requestPassedTime(options: PassedTimeOptions = {}): Promise<Pass
   return postChecked(`/api/passed-time${query ? `?${query}` : ""}`, isPassedTimeResult, "passed time");
 }
 export const discoverPassedTime = requestPassedTime;
+
+export function serviceTimeQuery(options: ServiceTimeOptions = {}): string {
+  const query = new URLSearchParams();
+  const strings: Array<[string, string | undefined]> = [
+    ["service_time_activity_key", options.service_time_activity_key],
+    ["service_time_start_timestamp_key", options.service_time_start_timestamp_key],
+    ["service_time_timestamp_key", options.service_time_timestamp_key],
+    ["service_time_aggregation", options.service_time_aggregation],
+    ["service_time_business_hour_slots", options.service_time_business_hour_slots],
+  ];
+  for (const [key, value] of strings) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  if (options.service_time_business_hours !== undefined &&
+      typeof options.service_time_business_hours !== "boolean")
+    throw new Error("service_time_business_hours must be boolean");
+  if (options.service_time_business_hours !== undefined)
+    query.set("service_time_business_hours", String(options.service_time_business_hours));
+  return query.toString();
+}
+
+export function requestServiceTime(options: ServiceTimeOptions = {}): Promise<ServiceTimeResult> {
+  const query = serviceTimeQuery(options);
+  return postChecked(`/api/service-time${query ? `?${query}` : ""}`, isServiceTimeResult, "service time");
+}
+export const discoverServiceTime = requestServiceTime;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

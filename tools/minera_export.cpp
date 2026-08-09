@@ -66,6 +66,7 @@
 #include "minera/batches.hpp"
 #include "minera/chaotic_activities.hpp"
 #include "minera/passed_time.hpp"
+#include "minera/service_time.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/powl_conversion.hpp"
@@ -628,6 +629,13 @@ int usage(const char* program) {
                "  --passed-time-aggregation <id> mean, median, min, max, stdev, sum\n"
                "  --passed-time-business-hours <bool> Use business-hour elapsed time\n"
                "  --passed-time-business-hour-slots <a-b,...> Business-hour slots\n"
+               "  --service-time             Emit per-activity service-time JSON\n"
+               "  --service-time-activity-key <name> Activity attribute\n"
+               "  --service-time-start-timestamp-key <name> Start timestamp attribute\n"
+               "  --service-time-timestamp-key <name> Completion timestamp attribute\n"
+               "  --service-time-aggregation <id> mean, median, min, max, or sum\n"
+               "  --service-time-business-hours <bool> Use business-hour elapsed time\n"
+               "  --service-time-business-hour-slots <a-b,...> Business-hour slots\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -988,12 +996,14 @@ int main(int argc, char** argv) {
   bool overlap_requested = false;
   bool chaotic_activities_requested = false;
   bool passed_time_requested = false;
+  bool service_time_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
   std::map<std::string, std::string> overlap_fields;
   std::map<std::string, std::string> chaotic_activities_fields;
   std::map<std::string, std::string> passed_time_fields;
+  std::map<std::string, std::string> service_time_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1288,6 +1298,24 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       passed_time_fields[key] = value;
       passed_time_requested = true;
+      continue;
+    }
+    if (arg == "--service-time") {
+      service_time_requested = true;
+      continue;
+    }
+    if (arg == "--service-time-activity-key" ||
+        arg == "--service-time-start-timestamp-key" ||
+        arg == "--service-time-timestamp-key" ||
+        arg == "--service-time-aggregation" ||
+        arg == "--service-time-business-hours" ||
+        arg == "--service-time-business-hour-slots") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      service_time_fields[key] = value;
+      service_time_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3307,6 +3335,29 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_passed_time_params(lookup, present);
       const auto body = minera::passed_time_json(
           minera::discover_passed_time(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (service_time_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = service_time_fields.find(std::string(name));
+        return it == service_time_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return service_time_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_service_time_params(lookup, present);
+      const auto body = minera::service_time_json(
+          minera::discover_service_time(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

@@ -320,6 +320,27 @@ void passed_time_params_contract() {
   assert(missing);
 }
 
+void service_time_params_contract() {
+  const auto parsed = minera::parse_service_time_params(fields({
+      {"service_time_activity_key", "phase"},
+      {"service_time_start_timestamp_key", "started_at"},
+      {"service_time_timestamp_key", "finished_at"},
+      {"service_time_aggregation", "sum"},
+      {"service_time_business_hours", "true"},
+      {"service_time_business_hour_slots", "0:3600"}}));
+  assert(parsed.activity_key == "phase");
+  assert(parsed.start_timestamp_key == "started_at");
+  assert(parsed.timestamp_key == "finished_at");
+  assert(parsed.aggregation == minera::DfgPerformanceAggregation::kSum);
+  assert(parsed.use_business_hours && parsed.business_hour_slots.size() == 1);
+  bool threw = false;
+  try {
+    (void)minera::parse_service_time_params(fields({
+        {"service_time_aggregation", "raw_values"}}));
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2306,5 +2327,6 @@ int main() {
   clustering_params_contract();
   chaotic_activities_params_contract();
   passed_time_params_contract();
+  service_time_params_contract();
   return 0;
 }
