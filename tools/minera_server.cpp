@@ -34,6 +34,7 @@
 #include "minera/cycle_time.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/data_petri_net.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -3331,6 +3332,42 @@ void handle_monte_carlo_json(const httplib::Request& request,
   }
 }
 
+// Materializes the learned decision rules as guards on a workflow net from
+// the most recent mine. The response keeps the decision-tree diagnostics and
+// emits a deterministic data-Petri-net model envelope.
+void handle_data_petri_net(const httplib::Request& request,
+                           httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  const std::string miner = request.has_param("miner")
+                                ? request.get_param_value("miner")
+                                : std::string("inductive");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+  try {
+    const auto result = minera::mine_data_petri_net(session->log, it->second);
+    response.set_content(minera::serialize_data_petri_net_json(result, miner),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 // Simulates one model from the most recent mine into a synthetic event log,
 // served as XES. The `miner` query parameter picks a Petri model
 // ("inductive" | "alpha" | "heuristic" | "powl" | "imported", default
@@ -4236,6 +4273,7 @@ int main(int argc, char** argv) {
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
+  server.Options("/api/data-petri-net", preflight);
   server.Options("/api/check-model", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
@@ -4309,6 +4347,7 @@ int main(int argc, char** argv) {
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);
+  server.Post("/api/data-petri-net", handle_data_petri_net);
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
   server.Get("/api/bpmn", handle_bpmn);

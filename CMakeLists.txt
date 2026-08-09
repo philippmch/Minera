@@ -40,6 +40,7 @@ add_library(minera_core
   src/correlation_miner.cpp
   src/clustering.cpp
   src/csv_event_log_importer.cpp
+  src/data_petri_net.cpp
   src/declare.cpp
   src/declare_playout.cpp
   src/declare_streaming.cpp
@@ -209,6 +210,12 @@ add_executable(minera_live_stream
 )
 target_link_libraries(minera_live_stream PRIVATE minera::core)
 target_compile_features(minera_live_stream PRIVATE cxx_std_20)
+
+add_executable(minera_data_petri
+  tools/minera_data_petri.cpp
+)
+target_link_libraries(minera_data_petri PRIVATE minera::core)
+target_compile_features(minera_data_petri PRIVATE cxx_std_20)
 
 add_executable(minera_stream_import
   tools/minera_stream_import.cpp
@@ -558,6 +565,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_streaming_import_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_import_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_import_tests COMMAND minera_streaming_import_tests)
+
+  add_executable(minera_data_petri_net_tests tests/test_data_petri_net.cpp)
+  target_link_libraries(minera_data_petri_net_tests PRIVATE minera::core)
+  target_compile_features(minera_data_petri_net_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_data_petri_net_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_data_petri_net_tests COMMAND minera_data_petri_net_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
