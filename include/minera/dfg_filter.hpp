@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -32,6 +33,27 @@ struct DfgFilterData {
 [[nodiscard]] DfgFilterData filter_dfg_keep_connected(
     const DfgFilterData& data, double dependency_threshold,
     bool keep_all_activities = false);
+
+// Removes low-support directly-following edges using the strongest incoming
+// or outgoing edge touching each endpoint as its local reference. An edge is
+// retained when its count is at least
+// min(max_endpoint_source, max_endpoint_target) * noise_threshold. Explicit
+// most-common paths are retained even when they fall below that boundary.
+// Activity, start, and end tables are preserved; only ordinary edges can be
+// cleaned.
+[[nodiscard]] DfgFilterData clean_dfg_based_on_noise_threshold(
+    const DfgFilterData& data, double noise_threshold,
+    const std::set<std::pair<std::string, std::string>>& most_common_paths =
+        {});
+
+// Short spelling retained for callers that use the classic filter name.
+[[nodiscard]] inline DfgFilterData clean_dfg_based_on_noise_thresh(
+    const DfgFilterData& data, double noise_threshold,
+    const std::set<std::pair<std::string, std::string>>& most_common_paths =
+        {}) {
+  return clean_dfg_based_on_noise_threshold(data, noise_threshold,
+                                             most_common_paths);
+}
 
 [[nodiscard]] DfgFilterData filter_dfg_to_activity(
     const DfgFilterData& data, const std::string& activity);

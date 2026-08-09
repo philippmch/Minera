@@ -1,6 +1,8 @@
 #include "minera/dfg_filter.hpp"
 
 #include <cassert>
+#include <limits>
+#include <set>
 #include <stdexcept>
 
 namespace {
@@ -61,6 +63,29 @@ int main() {
   assert_well_formed(dependency_filtered);
   assert(!dependency_filtered.activities.count("f"));
   assert(!dependency_filtered.activities.count("g"));
+
+  auto noisy = data;
+  noisy.edges[{"b", "a"}] = 1;
+  const auto cleaned =
+      minera::clean_dfg_based_on_noise_threshold(noisy, 0.75);
+  assert_well_formed(cleaned);
+  assert(cleaned.activities.size() == noisy.activities.size());
+  assert(cleaned.start_activities == noisy.start_activities);
+  assert(cleaned.end_activities == noisy.end_activities);
+  assert(cleaned.edges.count({"a", "b"}));
+  assert(!cleaned.edges.count({"b", "a"}));
+  std::set<std::pair<std::string, std::string>> forced{{"b", "a"}};
+  const auto forced_clean =
+      minera::clean_dfg_based_on_noise_thresh(noisy, 0.75, forced);
+  assert(forced_clean.edges.count({"b", "a"}));
+  bool finite_rejected = false;
+  try {
+    (void)minera::clean_dfg_based_on_noise_threshold(
+        data, std::numeric_limits<double>::quiet_NaN());
+  } catch (const std::invalid_argument&) {
+    finite_rejected = true;
+  }
+  assert(finite_rejected);
 
   const auto to_c = minera::filter_dfg_to_activity(data, "c");
   assert(to_c.end_activities.size() == 1 && to_c.end_activities.count("c"));

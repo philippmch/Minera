@@ -345,6 +345,46 @@ DfgFilterData filter_dfg_keep_connected(const DfgFilterData& input,
   return prune_to_boundaries(std::move(data));
 }
 
+DfgFilterData clean_dfg_based_on_noise_threshold(
+    const DfgFilterData& input, double noise_threshold,
+    const std::set<std::pair<std::string, std::string>>& most_common_paths) {
+  if (!std::isfinite(noise_threshold)) {
+    throw std::invalid_argument(
+        "DFG noise threshold must be finite");
+  }
+
+  // The reference cleaning rule uses the maximum ordinary edge count on
+  // either side of each activity. Boundary counts are intentionally not part
+  // of this local edge-support estimate.
+  std::map<std::string, std::uint64_t> maximum;
+  for (const auto& [edge, count] : input.edges) {
+    auto& source_max = maximum[edge.first];
+    source_max = std::max(source_max, count);
+    auto& target_max = maximum[edge.second];
+    target_max = std::max(target_max, count);
+  }
+
+  DfgFilterData result = input;
+  for (auto it = result.edges.begin(); it != result.edges.end();) {
+    const auto& edge = it->first;
+    if (most_common_paths.contains(edge)) {
+      ++it;
+      continue;
+    }
+    const auto source_max = maximum[edge.first];
+    const auto target_max = maximum[edge.second];
+    const auto local_max = std::min(source_max, target_max);
+    const double boundary =
+        static_cast<double>(local_max) * noise_threshold;
+    if (static_cast<double>(it->second) < boundary) {
+      it = result.edges.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  return result;
+}
+
 DfgFilterData filter_dfg_to_activity(const DfgFilterData& input,
                                      const std::string& activity) {
   if (!input.activities.count(activity)) {
