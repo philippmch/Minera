@@ -664,6 +664,17 @@ regressions cover perfect replay, multi-step silent routing, forced missing
 tokens, immediate stop, unknown labels, duplicate labels, weighted arcs, and
 empty logs.
 
+## Live-stream transport evidence
+
+Native live event and trace streams expose inactive, active, and finished
+states, accept items before activation, dispatch through a bounded worker pool,
+and drain accepted items before stop returns. Observer registration and
+deregistration are synchronized, observer exceptions are isolated, and a
+finished stream cannot be restarted or appended to. Focused Release tests cover
+queueing, drain-on-stop, observer failures, invalid pool sizes, and lifecycle
+transitions; the headless `minera_live_stream` command exercises CSV event
+delivery end to end.
+
 ## Log-skeleton parity evidence
 
 Classic log-skeleton discovery exposes all six pinned constraint families:

@@ -68,6 +68,7 @@ add_library(minera_core
   src/interval_tree.cpp
   src/overlap.cpp
   src/label_splitting.cpp
+  src/live_stream.cpp
   src/link_analysis.cpp
   src/json_export.cpp
   src/log_filter.cpp
@@ -201,6 +202,12 @@ add_executable(minera_streaming_tbr
 )
 target_link_libraries(minera_streaming_tbr PRIVATE minera::core)
 target_compile_features(minera_streaming_tbr PRIVATE cxx_std_20)
+
+add_executable(minera_live_stream
+  tools/minera_live_stream.cpp
+)
+target_link_libraries(minera_live_stream PRIVATE minera::core)
+target_compile_features(minera_live_stream PRIVATE cxx_std_20)
 
 add_executable(minera_playout
   tools/minera_playout.cpp
@@ -532,6 +539,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_streaming_tbr_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_tbr_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_tbr_tests COMMAND minera_streaming_tbr_tests)
+
+  add_executable(minera_live_stream_tests tests/test_live_stream.cpp)
+  target_link_libraries(minera_live_stream_tests PRIVATE minera::core)
+  target_compile_features(minera_live_stream_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_live_stream_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_live_stream_tests COMMAND minera_live_stream_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp
