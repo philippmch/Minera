@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, processCubeQuery, requestProcessCube } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -21,6 +21,59 @@ describe("classic DFG export API", () => {
     })));
     await expect(fetchDfg()).rejects.toThrow(/no mined log/);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("process cube API", () => {
+  it("serializes bounded dimensions, aggregation, and explicit edges", () => {
+    expect(processCubeQuery({
+      x_col: "throughput",
+      y_col: "cost",
+      agg_col: "value",
+      aggregation: "median",
+      max_divisions_x: 3,
+      x_bins: [0, 1.5, 4],
+    })).toBe("x_col=throughput&y_col=cost&agg_col=value&aggregation=median&max_divisions_x=3&x_bins=0%2C1.5%2C4");
+  });
+
+  it("posts a typed table and validates the result envelope", async () => {
+    const payload = {
+      family: "PROCESS_CUBE",
+      x_dimension: "x",
+      y_dimension: "y",
+      aggregation: "mean",
+      x_bins: [{ label: "[0,1]", lower: 0, upper: 1, numeric: true }],
+      y_bins: [{ label: "[0,1]", lower: 0, upper: 1, numeric: true }],
+      x_edges: [0, 1],
+      y_edges: [0, 1],
+      cells: [[2]],
+      case_ids: [[['case-1']]],
+    };
+    const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/process-cube?x_col=x&y_col=y&agg_col=v");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({ "Content-Type": "application/json" });
+      expect(init?.body).toBe(JSON.stringify({ case_ids: ["case-1"], columns: { x: [0.5], y: [0.5], v: [2] } }));
+      return { ok: true, json: async () => payload };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(requestProcessCube(
+      { case_ids: ["case-1"], columns: { x: [0.5], y: [0.5], v: [2] } },
+      { x_col: "x", y_col: "y", agg_col: "v" },
+    )).resolves.toMatchObject({ family: "PROCESS_CUBE" });
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects unsafe explicit bins before making a request", () => {
+    expect(() => processCubeQuery({ x_bins: [0, Number.POSITIVE_INFINITY] })).toThrow(/finite edges/);
+    expect(() => processCubeQuery({ x_col: " " })).toThrow(/must not be empty/);
+  });
+
+  it("rejects malformed input tables before making a request", async () => {
+    await expect(requestProcessCube(
+      { case_ids: ["case-1"], columns: { x: [Number.NaN] } },
+      { x_col: "x", y_col: "y", agg_col: "v" },
+    )).rejects.toThrow(/finite numeric columns/);
   });
 });
 

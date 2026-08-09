@@ -46,6 +46,9 @@ int main() {
   const auto round_trip = parse_process_cube_table_json(
       R"({"case_ids":["a","b"],"columns":{"x":[1,2],"y":[3,4],"v":[5,6]}})");
   assert(round_trip.case_ids.size() == 2 && round_trip.columns.at("v")[1] == 6.0);
+  const auto unicode = parse_process_cube_table_json(
+      R"({"case_ids":["caf\u00e9"],"columns":{"x":[1],"y":[1],"v":[1]}})");
+  assert(unicode.case_ids.front() == "caf\xC3\xA9");
   const auto encoded = serialize_process_cube_json(r);
   assert(encoded.find("\"family\":\"PROCESS_CUBE\"") != std::string::npos);
 

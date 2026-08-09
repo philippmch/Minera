@@ -39,6 +39,8 @@ import {
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelStatisticsResult,
+  type ProcessCubeTable,
+  type ProcessCubeResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -66,6 +68,8 @@ import {
   isOcelPlayoutResult,
   isOcelFeatureResult,
   isOcelStatisticsResult,
+  isProcessCubeResult,
+  isProcessCubeTable,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -1616,6 +1620,81 @@ export async function fetchDfg(): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+export interface ProcessCubeOptions {
+  x_col?: string;
+  y_col?: string;
+  agg_col?: string;
+  aggregation?: "mean" | "sum" | "min" | "max" | "count" | "median" | "first" | "last";
+  max_divisions_x?: number;
+  max_divisions_y?: number;
+  x_bins?: number[];
+  y_bins?: number[];
+}
+
+export function processCubeQuery(options: ProcessCubeOptions = {}): string {
+  const query = new URLSearchParams();
+  const addName = (name: string, value: string | undefined) => {
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      query.set(name, value);
+    }
+  };
+  addName("x_col", options.x_col);
+  addName("y_col", options.y_col);
+  addName("agg_col", options.agg_col);
+  if (options.aggregation !== undefined) {
+    if (!["mean", "sum", "min", "max", "count", "median", "first", "last"]
+      .includes(options.aggregation)) throw new Error("aggregation is not supported");
+    query.set("aggregation", options.aggregation);
+  }
+  const addDivision = (name: string, value: number | undefined) => {
+    if (value !== undefined) {
+      if (!Number.isSafeInteger(value) || value < 1 || value > 10000)
+        throw new Error(`${name} must be an integer from 1 through 10000`);
+      query.set(name, String(value));
+    }
+  };
+  addDivision("max_divisions_x", options.max_divisions_x);
+  addDivision("max_divisions_y", options.max_divisions_y);
+  const addBins = (name: string, values: number[] | undefined) => {
+    if (values !== undefined) {
+      if (values.length < 2 || values.some((value) => !Number.isFinite(value)))
+        throw new Error(`${name} must contain at least two finite edges`);
+      query.set(name, values.join(","));
+    }
+  };
+  addBins("x_bins", options.x_bins);
+  addBins("y_bins", options.y_bins);
+  return query.toString();
+}
+
+export async function requestProcessCube(
+  table: ProcessCubeTable,
+  options: ProcessCubeOptions = {},
+): Promise<ProcessCubeResult> {
+  if (!isProcessCubeTable(table))
+    throw new Error("process cube tables require string case_ids and finite numeric columns");
+  const query = processCubeQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/process-cube${query ? `?${query}` : ""}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(table),
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok)
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isProcessCubeResult(payload))
+    throw new Error("the Minera backend returned an invalid process cube");
+  return payload;
 }
 
 /**

@@ -92,6 +92,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/process_cube.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/timestamp_interleavings.hpp"
@@ -634,6 +635,36 @@ std::vector<std::string> ocel_query_list(const httplib::Request& request,
         key + ": expected non-empty comma-separated names");
   }
   return result;
+}
+
+std::vector<double> process_cube_query_bins(const httplib::Request& request,
+                                             std::string_view name) {
+  const auto values = ocel_query_list(request, name);
+  std::vector<double> result;
+  result.reserve(values.size());
+  for (const auto& value : values) {
+    char* end = nullptr;
+    const double parsed = std::strtod(value.c_str(), &end);
+    if (end != value.c_str() + value.size() || !std::isfinite(parsed))
+      throw std::invalid_argument(std::string(name) + ": expected finite numeric edges");
+    result.push_back(parsed);
+  }
+  if (!result.empty() && result.size() < 2)
+    throw std::invalid_argument(std::string(name) + ": expected at least two edges");
+  return result;
+}
+
+minera::ProcessCubeAggregation process_cube_aggregation(std::string_view value) {
+  if (value == "mean") return minera::ProcessCubeAggregation::kMean;
+  if (value == "sum") return minera::ProcessCubeAggregation::kSum;
+  if (value == "min") return minera::ProcessCubeAggregation::kMin;
+  if (value == "max") return minera::ProcessCubeAggregation::kMax;
+  if (value == "count") return minera::ProcessCubeAggregation::kCount;
+  if (value == "median") return minera::ProcessCubeAggregation::kMedian;
+  if (value == "first") return minera::ProcessCubeAggregation::kFirst;
+  if (value == "last") return minera::ProcessCubeAggregation::kLast;
+  throw std::invalid_argument(
+      "aggregation expects mean, sum, min, max, count, median, first, or last");
 }
 
 std::string ocel_discovery_response(std::string_view variant,
@@ -3133,6 +3164,48 @@ void handle_dfg(const httplib::Request&, httplib::Response& response) {
   }
 }
 
+void handle_process_cube(const httplib::Request& request,
+                         httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "x_col", "y_col", "agg_col", "aggregation", "max_divisions_x",
+        "max_divisions_y", "x_bins", "y_bins"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown process cube parameter: " + key);
+    }
+    const auto body = ocel_request_body(request, "table");
+    if (body.empty()) throw std::invalid_argument("missing process cube table body");
+    minera::ProcessCubeOptions options;
+    if (request.has_param("x_col")) options.x_col = request.get_param_value("x_col");
+    if (request.has_param("y_col")) options.y_col = request.get_param_value("y_col");
+    if (request.has_param("agg_col"))
+      options.aggregation_column = request.get_param_value("agg_col");
+    if (request.has_param("aggregation"))
+      options.aggregation = process_cube_aggregation(
+          request.get_param_value("aggregation"));
+    options.max_divisions_x = ocel_query_size(
+        request, "max_divisions_x", options.max_divisions_x);
+    options.max_divisions_y = ocel_query_size(
+        request, "max_divisions_y", options.max_divisions_y);
+    if (options.max_divisions_x == 0 || options.max_divisions_x > 10000 ||
+        options.max_divisions_y == 0 || options.max_divisions_y > 10000)
+      throw std::invalid_argument(
+          "process cube division limits must be from 1 through 10000");
+    options.x_bins = process_cube_query_bins(request, "x_bins");
+    options.y_bins = process_cube_query_bins(request, "y_bins");
+    response.set_content(minera::serialize_process_cube_json(
+                             minera::process_cube(
+                                 minera::parse_process_cube_table_json(body),
+                                 options)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " [options]\n"
@@ -3234,6 +3307,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
+  server.Options("/api/process-cube", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -3292,6 +3366,7 @@ int main(int argc, char** argv) {
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
   server.Get("/api/dfg", handle_dfg);
+  server.Post("/api/process-cube", handle_process_cube);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 

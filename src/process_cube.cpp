@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <limits>
@@ -51,8 +52,13 @@ Axis numeric_axis(const std::string& name, const std::vector<double>& values,
       }
     }
   }
-  for (std::size_t i = 0; i + 1 < edges.size(); ++i)
-    axis.bins.push_back({{}, edges[i], edges[i + 1], true});
+  for (std::size_t i = 0; i + 1 < edges.size(); ++i) {
+    std::ostringstream label;
+    label.precision(17);
+    label << '[' << edges[i] << ',' << edges[i + 1]
+          << (i + 2 == edges.size() ? ']' : ')');
+    axis.bins.push_back({label.str(), edges[i], edges[i + 1], true});
+  }
   return axis;
 }
 
@@ -126,6 +132,9 @@ struct JsonValue {
   double number() const { return std::get<double>(value); }
 };
 
+int json_hex_digit(char value);
+void append_utf8(std::string& output, std::uint32_t codepoint);
+
 class JsonParser {
  public:
   explicit JsonParser(std::string_view input) : input_(input) {
@@ -173,6 +182,34 @@ class JsonParser {
         case 'n': result.push_back('\n'); break;
         case 'r': result.push_back('\r'); break;
         case 't': result.push_back('\t'); break;
+        case 'u': {
+          if (pos_ + 4 > input_.size()) fail("short unicode escape");
+          std::uint32_t codepoint = 0;
+          for (int i = 0; i < 4; ++i) {
+            const int digit = json_hex_digit(input_[pos_++]);
+            if (digit < 0) fail("invalid unicode escape");
+            codepoint = (codepoint << 4) | static_cast<std::uint32_t>(digit);
+          }
+          if (codepoint >= 0xd800 && codepoint <= 0xdbff) {
+            if (pos_ + 6 > input_.size() || input_[pos_] != '\\' ||
+                input_[pos_ + 1] != 'u')
+              fail("unpaired unicode surrogate");
+            pos_ += 2;
+            std::uint32_t low = 0;
+            for (int i = 0; i < 4; ++i) {
+              const int digit = json_hex_digit(input_[pos_++]);
+              if (digit < 0) fail("invalid unicode escape");
+              low = (low << 4) | static_cast<std::uint32_t>(digit);
+            }
+            if (low < 0xdc00 || low > 0xdfff)
+              fail("invalid unicode surrogate pair");
+            codepoint = 0x10000 + ((codepoint - 0xd800) << 10) + (low - 0xdc00);
+          } else if (codepoint >= 0xdc00 && codepoint <= 0xdfff) {
+            fail("unpaired unicode surrogate");
+          }
+          append_utf8(result, codepoint);
+          break;
+        }
         default: fail("unsupported string escape");
       }
     }
@@ -255,6 +292,31 @@ void json_string(std::ostringstream& out, std::string_view value) {
     }
   }
   out << '"';
+}
+
+int json_hex_digit(char value) {
+  if (value >= '0' && value <= '9') return value - '0';
+  if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+  if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+  return -1;
+}
+
+void append_utf8(std::string& output, std::uint32_t codepoint) {
+  if (codepoint <= 0x7f) {
+    output.push_back(static_cast<char>(codepoint));
+  } else if (codepoint <= 0x7ff) {
+    output.push_back(static_cast<char>(0xc0 | (codepoint >> 6)));
+    output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+  } else if (codepoint <= 0xffff) {
+    output.push_back(static_cast<char>(0xe0 | (codepoint >> 12)));
+    output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+  } else {
+    output.push_back(static_cast<char>(0xf0 | (codepoint >> 18)));
+    output.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | (codepoint & 0x3f)));
+  }
 }
 
 void write_bin(std::ostringstream& out, const ProcessCubeBin& bin) {
