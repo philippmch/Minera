@@ -121,6 +121,8 @@ import {
   type CycleTimeOptions,
   type CaseArrivalResult,
   type CaseArrivalOptions,
+  type AttributeStatisticsResult,
+  type AttributeStatisticsOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -143,6 +145,7 @@ import {
   isReworkResult,
   isCycleTimeResult,
   isCaseArrivalResult,
+  isAttributeStatisticsResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1615,6 +1618,32 @@ export function requestCaseArrival(options: CaseArrivalOptions = {}): Promise<Ca
   return postChecked(`/api/case-arrival${query ? `?${query}` : ""}`, isCaseArrivalResult, "case arrival");
 }
 export const discoverCaseArrival = requestCaseArrival;
+
+export function attributeStatisticsQuery(options: AttributeStatisticsOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.attribute_statistics_key !== undefined) {
+    if (!options.attribute_statistics_key)
+      throw new Error("attribute_statistics_key must not be empty");
+    query.set("attribute_statistics_key", options.attribute_statistics_key);
+  }
+  if (options.attribute_statistics_scope !== undefined) {
+    if (!["events", "traces"].includes(options.attribute_statistics_scope))
+      throw new Error("attribute_statistics_scope is not supported");
+    query.set("attribute_statistics_scope", options.attribute_statistics_scope);
+  }
+  if (options.attribute_statistics_keep_once_per_case !== undefined) {
+    if (typeof options.attribute_statistics_keep_once_per_case !== "boolean")
+      throw new Error("attribute_statistics_keep_once_per_case must be boolean");
+    query.set("attribute_statistics_keep_once_per_case", String(options.attribute_statistics_keep_once_per_case));
+  }
+  return query.toString();
+}
+
+export function requestAttributeStatistics(options: AttributeStatisticsOptions = {}): Promise<AttributeStatisticsResult> {
+  const query = attributeStatisticsQuery(options);
+  return postChecked(`/api/attribute-statistics${query ? `?${query}` : ""}`, isAttributeStatisticsResult, "attribute statistics");
+}
+export const discoverAttributeStatistics = requestAttributeStatistics;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

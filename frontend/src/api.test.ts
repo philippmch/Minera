@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, attributeStatisticsQuery, requestAttributeStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -241,6 +241,34 @@ describe("case-arrival statistics API", () => {
     }));
     await expect(requestCaseArrival({ case_arrival_business_hours: true }))
       .resolves.toMatchObject({ family: "CASE_ARRIVAL", variant: "CLASSIC" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("attribute statistics API", () => {
+  it("serializes scope and once-per-case settings", () => {
+    expect(attributeStatisticsQuery({
+      attribute_statistics_key: "activity",
+      attribute_statistics_scope: "events",
+      attribute_statistics_keep_once_per_case: true,
+    })).toBe("attribute_statistics_key=activity&attribute_statistics_scope=events&attribute_statistics_keep_once_per_case=true");
+    expect(() => attributeStatisticsQuery({ attribute_statistics_scope: "other" as never })).toThrow(/not supported/);
+  });
+
+  it("posts and validates attribute counts", async () => {
+    const payload = {
+      family: "ATTRIBUTE_STATISTICS", scope: "TRACES",
+      attribute_key: "region", keep_once_per_case: false,
+      values: { north: 1, south: 1 },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/attribute-statistics?attribute_statistics_key=region&attribute_statistics_scope=traces");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestAttributeStatistics({
+      attribute_statistics_key: "region", attribute_statistics_scope: "traces",
+    })).resolves.toMatchObject({ family: "ATTRIBUTE_STATISTICS", scope: "TRACES" });
     vi.unstubAllGlobals();
   });
 });

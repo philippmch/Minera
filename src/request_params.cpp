@@ -3458,4 +3458,43 @@ CaseArrivalOptions parse_case_arrival_params(const FieldLookup& field,
   return options;
 }
 
+AttributeStatisticsOptions parse_attribute_statistics_params(
+    const FieldLookup& field) {
+  return parse_attribute_statistics_params(field, {});
+}
+
+AttributeStatisticsOptions parse_attribute_statistics_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  AttributeStatisticsOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (!supplied("attribute_statistics_key"))
+    throw std::invalid_argument("attribute_statistics_key: required");
+  options.attribute_key = require("attribute_statistics_key");
+  if (supplied("attribute_statistics_scope")) {
+    const auto value = require("attribute_statistics_scope");
+    if (value == "events" || value == "event" || value == "EVENTS")
+      options.scope = AttributeStatisticsScope::kEvents;
+    else if (value == "traces" || value == "trace" || value == "TRACES")
+      options.scope = AttributeStatisticsScope::kTraces;
+    else
+      throw std::invalid_argument(
+          "attribute_statistics_scope: expected events or traces");
+  }
+  if (supplied("attribute_statistics_keep_once_per_case"))
+    options.keep_once_per_case = parse_boolean(
+        require("attribute_statistics_keep_once_per_case"),
+        "attribute_statistics_keep_once_per_case");
+  if (options.scope == AttributeStatisticsScope::kTraces)
+    options.keep_once_per_case = false;
+  return options;
+}
+
 }  // namespace minera

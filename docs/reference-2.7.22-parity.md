@@ -268,6 +268,14 @@ strict request parser, and typed frontend API share the `CASE_ARRIVAL`
 envelope; focused tests cover custom timestamps, business-hour validation,
 empty gaps, and malformed response values.
 
+Attribute-statistics evidence: `discover_attribute_statistics` counts event or
+trace attribute values deterministically, supports first-class activity,
+timestamp, resource, lifecycle, and case-id aliases, and optionally keeps one
+occurrence per case. The standalone CLI, `POST /api/attribute-statistics`,
+strict request parser, and typed frontend API share the
+`ATTRIBUTE_STATISTICS` envelope; focused tests cover both scopes, deduplication,
+missing values, custom attributes, and count validation.
+
 Rework evidence: `discover_rework` exposes the activity variant (number of
 cases containing repeated activity occurrences) and the cases variant (total
 events and total repeated-activity count per case), with custom activity and
