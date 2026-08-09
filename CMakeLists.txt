@@ -45,6 +45,7 @@ add_library(minera_core
   src/declare_playout.cpp
   src/declare_streaming.cpp
   src/decision_mining.cpp
+  src/decision_table.cpp
   src/dfg_playout.cpp
   src/dfg_alignment.cpp
   src/dfg_filter.cpp
@@ -216,6 +217,12 @@ add_executable(minera_data_petri
 )
 target_link_libraries(minera_data_petri PRIVATE minera::core)
 target_compile_features(minera_data_petri PRIVATE cxx_std_20)
+
+add_executable(minera_decision_table
+  tools/minera_decision_table.cpp
+)
+target_link_libraries(minera_decision_table PRIVATE minera::core)
+target_compile_features(minera_decision_table PRIVATE cxx_std_20)
 
 add_executable(minera_stream_import
   tools/minera_stream_import.cpp
@@ -571,6 +578,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_data_petri_net_tests PRIVATE cxx_std_20)
   target_compile_options(minera_data_petri_net_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_data_petri_net_tests COMMAND minera_data_petri_net_tests)
+
+  add_executable(minera_decision_table_tests tests/test_decision_table.cpp)
+  target_link_libraries(minera_decision_table_tests PRIVATE minera::core)
+  target_compile_features(minera_decision_table_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_decision_table_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_decision_table_tests COMMAND minera_decision_table_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

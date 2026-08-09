@@ -136,6 +136,7 @@ DataPetriNet mine_data_petri_net(const EventLog& log, const PetriNet& net,
   result.net = net;
   const auto learned_decisions = mine_decisions(log, net);
   result.decisions = learned_decisions;
+  result.decision_tables = mine_decision_tables(log, net);
 
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t transition = 0; transition < net.transitions().size();
@@ -249,7 +250,9 @@ std::string serialize_data_petri_net_json(const DataPetriNet& result,
     }
     out << '}';
   }
-  out << "],\"decisions\":" << decisions_json(result.decisions) << '}';
+  out << "],\"decisions\":" << decisions_json(result.decisions)
+      << ",\"decision_tables\":"
+      << serialize_decision_tables_json(result.decision_tables) << '}';
   return out.str();
 }
 

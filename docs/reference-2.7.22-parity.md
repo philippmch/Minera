@@ -225,7 +225,7 @@ this traditional-log vertical.
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, Declare, footprints, token, and temporal conformance are present; persistent stores remain |
-| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; encoded decision tables remain |
+| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules, deterministic encoded numeric/one-hot tables, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; richer classifier/table parameter parity remains |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Missing** |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
@@ -671,8 +671,11 @@ decision-tree diagnostics. Each observed branch path becomes a deterministic
 guard and read-variable set; transitions consuming multiple decision places
 combine those rules conjunctively. The native API, standalone
 `minera_data_petri`, cached local `POST /api/data-petri-net`, and typed frontend
-request/response guard expose the same `DATA_PETRI_NET` envelope. Encoded
-decision tables remain a separate pending surface.
+request/response guard expose the same `DATA_PETRI_NET` envelope. The native
+`mine_decision_tables` API and `minera_decision_table` command emit the clean
+replay observations as deterministic numeric and one-hot columns; the same
+encoded-table envelope is nested in the data-Petri response and validated by
+the frontend. Richer classifier and look-back parameter parity remains open.
 
 ## Live-stream transport evidence
 

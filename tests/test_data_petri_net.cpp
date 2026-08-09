@@ -44,6 +44,7 @@ void mines_guards_and_serializes() {
   const auto result = minera::mine_data_petri_net(decision_log(), decision_net());
   assert(result.decisions.observed_traces == 4);
   assert(!result.decisions.decision_points.empty());
+  assert(result.decision_tables.tables.size() == 1);
   assert(!result.guarded_transitions.empty());
   assert(result.guarded_transitions.front().transition_index == 1 ||
          result.guarded_transitions.front().transition_index == 2);
@@ -51,6 +52,7 @@ void mines_guards_and_serializes() {
   assert(json.find("\"family\":\"DATA_PETRI_NET\"") != std::string::npos);
   assert(json.find("\"guard\":") != std::string::npos);
   assert(json.find("\"decisions\":") != std::string::npos);
+  assert(json.find("\"decision_tables\":") != std::string::npos);
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/decision_mining.hpp"
+#include "minera/decision_table.hpp"
 
 namespace minera {
 
@@ -26,6 +27,7 @@ struct DataPetriNet {
   std::string variant = "decision_tree";
   PetriNet net;
   DecisionMiningResult decisions;
+  DecisionTablesResult decision_tables;
   std::vector<DataPetriNetTransition> guarded_transitions;
 };
 
