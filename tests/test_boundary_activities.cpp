@@ -32,6 +32,10 @@ int main() {
   const auto both = minera::discover_boundary_activities(log);
   assert(both.starts.at("A") == 2);
   assert(both.ends.at("B") == 1 && both.ends.at("C") == 1);
+  const auto sorted_starts = minera::get_sorted_start_activities_list(log);
+  assert(sorted_starts.size() == 1 && sorted_starts.front().first == "A");
+  const auto sorted_ends = minera::get_sorted_end_activities_list(log);
+  assert(sorted_ends.size() == 2 && sorted_ends.front().first == "B");
   const auto json = minera::boundary_activities_json(both);
   assert(json.find("\"family\":\"BOUNDARY_ACTIVITIES\"") !=
          std::string::npos);
