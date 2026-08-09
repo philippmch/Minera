@@ -147,6 +147,12 @@ add_executable(minera_process_cube
 target_link_libraries(minera_process_cube PRIVATE minera::core)
 target_compile_features(minera_process_cube PRIVATE cxx_std_20)
 
+add_executable(minera_dfg
+  tools/minera_dfg.cpp
+)
+target_link_libraries(minera_dfg PRIVATE minera::core)
+target_compile_features(minera_dfg PRIVATE cxx_std_20)
+
 add_executable(minera_playout
   tools/minera_playout.cpp
 )

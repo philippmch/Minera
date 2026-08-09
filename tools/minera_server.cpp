@@ -3164,6 +3164,19 @@ void handle_dfg(const httplib::Request&, httplib::Response& response) {
   }
 }
 
+void handle_dfg_import(const httplib::Request& request,
+                       httplib::Response& response) {
+  try {
+    const auto body = ocel_request_body(request, "dfg");
+    if (body.empty()) throw std::invalid_argument("missing DFG text body");
+    response.set_content(
+        minera::to_dfg(minera::parse_dfg(body)), "text/plain");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -3366,6 +3379,7 @@ int main(int argc, char** argv) {
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
   server.Get("/api/dfg", handle_dfg);
+  server.Post("/api/dfg", handle_dfg_import);
   server.Post("/api/process-cube", handle_process_cube);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);

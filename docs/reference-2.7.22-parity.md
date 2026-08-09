@@ -261,6 +261,12 @@ request/response guards. Explicit bins are sorted and deduplicated, configured
 cells retain their case-id sets, and malformed JSON, ragged rows, non-finite
 values, and unsafe division limits are rejected at the boundary.
 
+DFG interchange evidence: the strict classic text parser and deterministic
+writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
+validates, and normalizes a document (or writes it to an explicit output path),
+local `POST /api/dfg` accepts raw DFG text and returns the canonical document,
+and the typed frontend `importDfg` helper exposes the same validation path.
+
 ## Delivery order
 
 1. Stabilize the native semantic contracts and differential fixture format.

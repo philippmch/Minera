@@ -1622,6 +1622,27 @@ export async function fetchDfg(): Promise<string> {
   return response.text();
 }
 
+/** Validates and normalizes a classic DFG text document through the backend. */
+export async function importDfg(document: Blob): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch("/api/dfg", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: document,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}
+
 export interface ProcessCubeOptions {
   x_col?: string;
   y_col?: string;
