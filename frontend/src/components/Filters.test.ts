@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pathValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
+import { pathValidationMessage, repetitionValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -61,5 +61,19 @@ describe("adjacent path validation", () => {
     expect(pathValidationMessage(validPath)).toBeNull();
     expect(pathValidationMessage({ ...validPath, maxPerformance: "-1" })).toContain("must not exceed");
     expect(pathValidationMessage({ ...validPath, minPerformance: "-2", maxPerformance: "-1" })).toBeNull();
+  });
+});
+
+describe("attribute repetition validation", () => {
+  it("accepts the default lower bound and optional upper bound", () => {
+    expect(repetitionValidationMessage({ value: "A", min: "", max: "" })).toBeNull();
+    expect(repetitionValidationMessage({ value: "A", min: "0", max: "2" })).toBeNull();
+    expect(repetitionValidationMessage({ value: "", min: "bad", max: "-1" })).toBeNull();
+  });
+
+  it("rejects non-integer and inverted active bounds", () => {
+    expect(repetitionValidationMessage({ value: "A", min: "1.5", max: "" })).toContain("minimum");
+    expect(repetitionValidationMessage({ value: "A", min: "3", max: "2" })).toContain("must not exceed");
+    expect(repetitionValidationMessage({ value: "A", min: "", max: "-1" })).toContain("maximum");
   });
 });

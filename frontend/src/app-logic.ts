@@ -154,7 +154,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.caseAttributeKey ||
       filters.ltlVariant && filters.ltlAttributeValues?.length ||
       (filters.betweenStart && filters.betweenEnd) ||
-      filters.activitySplit?.length,
+      filters.activitySplit?.length ||
+      filters.repetitionValue !== undefined,
   );
 }
 

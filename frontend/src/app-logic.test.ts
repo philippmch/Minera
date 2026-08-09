@@ -1045,6 +1045,22 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ activitySplitSeparator: "::" })).toBe(false);
   });
 
+  it("maps repetition ranges only when a target value is present", () => {
+    expect(mineFormEntries({
+      repetitionValue: "web",
+      repetitionAttributeKey: "channel",
+      repetitionMin: 2,
+      repetitionMax: 4,
+    })).toEqual([
+      ["repetition_value", "web"],
+      ["repetition_attribute_key", "channel"],
+      ["repetition_min", "2"],
+      ["repetition_max", "4"],
+    ]);
+    expect(mineFormEntries({ repetitionMin: 2 })).toEqual([]);
+    expect(hasActiveFilters({ repetitionValue: "web" })).toBe(true);
+  });
+
   it("maps adjacent path options including zero bounds and polarity", () => {
     expect(mineFormEntries({
       pathPredecessor: "A",

@@ -570,6 +570,10 @@ void parse_mine_params_maps_filters() {
       {"activity_split", "a, c"},
       {"activity_split_separator", "::"},
       {"activity_split_cut_mode", "next"},
+      {"repetition_value", "web"},
+      {"repetition_attribute_key", "channel"},
+      {"repetition_min", "2"},
+      {"repetition_max", "4"},
       {"attribute_key", "channel"},
       {"keep_attribute_values", "web, phone"},
       {"remove_attribute_values", "fax"},
@@ -612,6 +616,11 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.activity_split_separator == "::");
   assert(params.filter.activity_split_cut_mode ==
          minera::ActivitySplitCutMode::kNext);
+  assert(params.filter.attribute_value_repetition.has_value());
+  assert(params.filter.attribute_value_repetition->value == "web");
+  assert(params.filter.attribute_value_repetition->attribute_key == "channel");
+  assert(params.filter.attribute_value_repetition->min_repetitions == 2);
+  assert(params.filter.attribute_value_repetition->max_repetitions == 4);
   assert(params.filter.attribute_key == "channel");
   assert((params.filter.keep_attribute_values ==
           std::vector<std::string>{"web", "phone"}));
@@ -976,6 +985,37 @@ void parse_mine_params_rejects_invalid_footprints_options() {
     threw = true;
   }
   assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_repetition_fields() {
+  for (const auto& item : std::vector<std::pair<std::string, std::string>>{
+           {"repetition_attribute_key", "channel"},
+           {"repetition_min", "2"},
+           {"repetition_max", "2"},
+           {"repetition_value", "web"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    if (item.first == "repetition_value") {
+      assert(!threw);
+    } else {
+      assert(threw);
+    }
+  }
+  bool range_threw = false;
+  try {
+    (void)minera::parse_mine_params(
+        fields({{"repetition_value", "web"},
+                {"repetition_min", "3"},
+                {"repetition_max", "2"}}));
+  } catch (const std::invalid_argument&) {
+    range_threw = true;
+  }
+  assert(range_threw);
 }
 
 void parse_mine_params_maps_dfg_variant_options() {
@@ -2075,6 +2115,7 @@ int main() {
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_invalid_activity_split_fields();
+  parse_mine_params_rejects_invalid_repetition_fields();
   parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_rejects_an_unknown_attribute_mode();
   parse_mine_params_rejects_a_malformed_succession();

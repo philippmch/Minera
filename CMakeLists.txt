@@ -22,6 +22,7 @@ endif()
 add_library(minera_core
   src/alpha_miner.cpp
   src/activity_split.cpp
+  src/attribute_value_repetition.cpp
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
@@ -247,6 +248,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_activity_split_tests PRIVATE cxx_std_20)
   target_compile_options(minera_activity_split_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_activity_split_tests COMMAND minera_activity_split_tests)
+
+  add_executable(minera_attribute_value_repetition_tests
+    tests/test_attribute_value_repetition.cpp
+  )
+  target_link_libraries(minera_attribute_value_repetition_tests PRIVATE minera::core)
+  target_compile_features(minera_attribute_value_repetition_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_attribute_value_repetition_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_attribute_value_repetition_tests COMMAND minera_attribute_value_repetition_tests)
 
   add_executable(minera_ltl_filter_tests
     tests/test_ltl_filter.cpp

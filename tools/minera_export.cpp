@@ -501,6 +501,10 @@ int usage(const char* program) {
                "  --activity-split <a,b,...> Split cases at anchor activities\n"
                "  --activity-split-separator <text> Activity-split case-id separator\n"
                "  --activity-split-cut-mode <this|next> Anchor/new-event split mode\n"
+               "  --repetition-value <value> Keep cases with repeated value\n"
+               "  --repetition-attribute-key <name> Attribute to count\n"
+               "  --repetition-min <n>      Inclusive repetition lower bound\n"
+               "  --repetition-max <n>      Inclusive repetition upper bound\n"
                "  --path-predecessor <name> Adjacent-path predecessor activity\n"
                "  --path-successor <name>  Adjacent-path successor activity\n"
                "  --path-min-performance <seconds> Inclusive lower elapsed bound\n"
@@ -956,12 +960,14 @@ int main(int argc, char** argv) {
   minera::BatchDiscoveryOptions batch_options;
   bool overlap_requested = false;
   bool activity_split_option_used = false;
+  bool repetition_option_used = false;
   std::map<std::string, std::string> overlap_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
   std::map<std::string, std::string> segment_fields;
   std::map<std::string, std::string> path_fields;
+  std::map<std::string, std::string> repetition_fields;
   minera::InductiveMinerOptions inductive_options;
   minera::AlphaMinerOptions alpha_options;
   minera::HeuristicMinerOptions heuristic_options;
@@ -1182,6 +1188,19 @@ int main(int argc, char** argv) {
         std::cerr << "error: --activity-split-cut-mode expects this or next\n";
         return 2;
       }
+      continue;
+    }
+    if (arg == "--repetition-value" ||
+        arg == "--attribute-value-repetition" ||
+        arg == "--attr-value-repetition" ||
+        arg == "--repetition-attribute-key" || arg == "--repetition-min" ||
+        arg == "--repetition-max") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      repetition_fields[key] = value;
+      repetition_option_used = true;
       continue;
     }
     if (arg == "--overlap") {
@@ -2741,6 +2760,27 @@ int main(int argc, char** argv) {
   if (activity_split_option_used && filter.activity_split_activities.empty()) {
     std::cerr << "error: --activity-split requires at least one activity\n";
     return 2;
+  }
+  if (repetition_option_used) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = repetition_fields.find(std::string(name));
+      return it == repetition_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return repetition_fields.contains(std::string(name));
+    };
+    try {
+      const auto parsed = minera::parse_mine_params(lookup, present);
+      if (!parsed.filter.attribute_value_repetition) {
+        std::cerr << "error: repetition filtering requires a value\n";
+        return 2;
+      }
+      filter.attribute_value_repetition =
+          parsed.filter.attribute_value_repetition;
+    } catch (const std::exception& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
   }
   if (petri_option_used && !align_petri_anti && !align_petri_multi) {
     std::cerr << "error: --petri-* options require --align-petri-anti or --align-petri-multi\n";
