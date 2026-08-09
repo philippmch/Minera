@@ -21,6 +21,7 @@
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
+#include "minera/case_arrival.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
@@ -645,6 +646,10 @@ int usage(const char* program) {
                "  --cycle-time              Emit cycle-time statistics JSON\n"
                "  --cycle-time-timestamp-key <name> Completion timestamp attribute\n"
                "  --cycle-time-start-timestamp-key <name> Start timestamp attribute\n"
+               "  --case-arrival            Emit case-arrival/dispersion JSON\n"
+               "  --case-arrival-timestamp-key <name> Timestamp attribute\n"
+               "  --case-arrival-business-hours <bool> Use business-hour gaps\n"
+               "  --case-arrival-business-hour-slots <a-b,...> Business-hour slots\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -1008,6 +1013,7 @@ int main(int argc, char** argv) {
   bool service_time_requested = false;
   bool rework_requested = false;
   bool cycle_time_requested = false;
+  bool case_arrival_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
@@ -1017,6 +1023,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> service_time_fields;
   std::map<std::string, std::string> rework_fields;
   std::map<std::string, std::string> cycle_time_fields;
+  std::map<std::string, std::string> case_arrival_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1357,6 +1364,21 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       cycle_time_fields[key] = value;
       cycle_time_requested = true;
+      continue;
+    }
+    if (arg == "--case-arrival") {
+      case_arrival_requested = true;
+      continue;
+    }
+    if (arg == "--case-arrival-timestamp-key" ||
+        arg == "--case-arrival-business-hours" ||
+        arg == "--case-arrival-business-hour-slots") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      case_arrival_fields[key] = value;
+      case_arrival_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3445,6 +3467,29 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_cycle_time_params(lookup, present);
       const auto body = minera::cycle_time_json(
           minera::discover_cycle_time(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (case_arrival_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = case_arrival_fields.find(std::string(name));
+        return it == case_arrival_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return case_arrival_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_case_arrival_params(lookup, present);
+      const auto body = minera::case_arrival_json(
+          minera::discover_case_arrival(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

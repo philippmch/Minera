@@ -2688,6 +2688,33 @@ export function isCycleTimeResult(value: unknown): value is CycleTimeResult {
     Number.isInteger(data.timed_events) && data.timed_events >= 0;
 }
 
+export interface CaseArrivalOptions {
+  case_arrival_timestamp_key?: string;
+  case_arrival_business_hours?: boolean;
+  case_arrival_business_hour_slots?: string;
+}
+
+export interface CaseArrivalResult {
+  family: "CASE_ARRIVAL";
+  variant: "CLASSIC";
+  arrival_average: number;
+  dispersion_average: number;
+  timed_starts: number;
+  timed_ends: number;
+}
+
+export function isCaseArrivalResult(value: unknown): value is CaseArrivalResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<CaseArrivalResult>;
+  return data.family === "CASE_ARRIVAL" && data.variant === "CLASSIC" &&
+    typeof data.arrival_average === "number" && Number.isFinite(data.arrival_average) &&
+    data.arrival_average >= 0 && typeof data.dispersion_average === "number" &&
+    Number.isFinite(data.dispersion_average) && data.dispersion_average >= 0 &&
+    typeof data.timed_starts === "number" && Number.isInteger(data.timed_starts) &&
+    data.timed_starts >= 0 && typeof data.timed_ends === "number" &&
+    Number.isInteger(data.timed_ends) && data.timed_ends >= 0;
+}
+
 export function isReworkResult(value: unknown): value is ReworkResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<ReworkResult>;

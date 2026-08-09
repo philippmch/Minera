@@ -261,6 +261,13 @@ The standalone CLI, `POST /api/cycle-time`, strict request parser, and typed
 frontend API share the `CYCLE_TIME` envelope; focused tests cover custom keys,
 empty/invalid timestamps, interval merging, and bounded diagnostics.
 
+Case-arrival evidence: `discover_case_arrival` computes mean gaps between
+sorted case starts and sorted case ends, with optional business-hour slots and
+zero-safe single-case behavior. The standalone CLI, `POST /api/case-arrival`,
+strict request parser, and typed frontend API share the `CASE_ARRIVAL`
+envelope; focused tests cover custom timestamps, business-hour validation,
+empty gaps, and malformed response values.
+
 Rework evidence: `discover_rework` exposes the activity variant (number of
 cases containing repeated activity occurrences) and the cases variant (total
 events and total repeated-activity count per case), with custom activity and
