@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isStreamingDfgResult", () => {
   const valid = {
@@ -12,6 +12,21 @@ describe("isStreamingDfgResult", () => {
   it("rejects negative counts and malformed edges", () => {
     expect(isStreamingDfgResult({ ...valid, events: -1 })).toBe(false);
     expect(isStreamingDfgResult({ ...valid, graph: [{ source: "A", target: "B", count: 0 }] })).toBe(false);
+  });
+});
+
+describe("isDataPetriNetResult", () => {
+  const valid = {
+    family: "DATA_PETRI_NET", variant: "decision_tree", place_count: 3,
+    source: 0, sink: 2, activities: ["A"],
+    transitions: [{ index: 0, activity: "A", silent: false, inputs: [0], outputs: [2],
+      guard: "true", read_variables: [], write_variables: [] }],
+    decisions: { observed_traces: 1, trace_count: 1, decision_points: [] },
+  };
+  it("accepts guarded net envelopes", () => expect(isDataPetriNetResult(valid)).toBe(true));
+  it("rejects malformed guard transitions", () => {
+    expect(isDataPetriNetResult({ ...valid, transitions: [{ ...valid.transitions[0], guard: 4 }] })).toBe(false);
+    expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, observed_traces: -1 } })).toBe(false);
   });
 });
 

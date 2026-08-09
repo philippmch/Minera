@@ -3187,6 +3187,29 @@ export interface Decisions {
   decision_points: DecisionPoint[];
 }
 
+export interface DataPetriNetTransition {
+  index: number;
+  activity: string | null;
+  silent: boolean;
+  inputs: number[];
+  outputs: number[];
+  guard: string | null;
+  read_variables: string[];
+  write_variables: string[];
+}
+
+export interface DataPetriNetResult {
+  family: "DATA_PETRI_NET";
+  variant: string;
+  miner?: string;
+  place_count: number;
+  source: number;
+  sink: number;
+  activities: string[];
+  transitions: DataPetriNetTransition[];
+  decisions: Decisions;
+}
+
 export interface MineraExport {
   dataset: string;
   generator?: string;
@@ -3304,6 +3327,34 @@ export function isMineraExport(value: unknown): value is MineraExport {
           typeof row.first === "string" && typeof row.second === "string" &&
           Number.isInteger(row.count) && row.count >= 0;
       })));
+}
+
+export function isDataPetriNetResult(value: unknown): value is DataPetriNetResult {
+  if (!isOcelRecord(value) || value.family !== "DATA_PETRI_NET" ||
+      typeof value.variant !== "string" ||
+      !Number.isSafeInteger(value.place_count) || (value.place_count as number) < 1 ||
+      !Number.isSafeInteger(value.source) || (value.source as number) < 0 ||
+      !Number.isSafeInteger(value.sink) || (value.sink as number) < 0 ||
+      !Array.isArray(value.activities) ||
+      !value.activities.every((activity) => typeof activity === "string") ||
+      !Array.isArray(value.transitions) || !isOcelRecord(value.decisions)) return false;
+  if (!Number.isSafeInteger(value.decisions.observed_traces) ||
+      (value.decisions.observed_traces as number) < 0 ||
+      !Number.isSafeInteger(value.decisions.trace_count) ||
+      (value.decisions.trace_count as number) < 0 ||
+      !Array.isArray(value.decisions.decision_points)) return false;
+  return value.transitions.every((transition) => isOcelRecord(transition) &&
+    Number.isSafeInteger(transition.index) && (transition.index as number) >= 0 &&
+    (typeof transition.activity === "string" || transition.activity === null) &&
+    typeof transition.silent === "boolean" && Array.isArray(transition.inputs) &&
+    transition.inputs.every((place) => Number.isSafeInteger(place) && (place as number) >= 0) &&
+    Array.isArray(transition.outputs) &&
+    transition.outputs.every((place) => Number.isSafeInteger(place) && (place as number) >= 0) &&
+    (typeof transition.guard === "string" || transition.guard === null) &&
+    Array.isArray(transition.read_variables) &&
+    transition.read_variables.every((variable) => typeof variable === "string") &&
+    Array.isArray(transition.write_variables) &&
+    transition.write_variables.every((variable) => typeof variable === "string"));
 }
 
 /** Virtual node ids for the trace entry and exit points. */

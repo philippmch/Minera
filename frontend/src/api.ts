@@ -7,6 +7,7 @@ import {
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
   FOOTPRINTS_DISCOVERY_VARIANTS,
   type Decisions,
+  type DataPetriNetResult,
   type MineraExport,
   type ModelConformance,
   type DfgAlignmentOptions,
@@ -80,6 +81,7 @@ import {
   isStreamingFootprintsResult,
   isStreamingTemporalResult,
   isStreamingTbrResult,
+  isDataPetriNetResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -1999,6 +2001,14 @@ export async function fetchXes(): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+/** Requests a guarded data-Petri-net projection of the latest cached model. */
+export function requestDataPetriNet(miner = "inductive"): Promise<DataPetriNetResult> {
+  if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
+  const query = new URLSearchParams({ miner });
+  return postChecked(`/api/data-petri-net?${query.toString()}`,
+                     isDataPetriNetResult, "data Petri net");
 }
 
 /**
