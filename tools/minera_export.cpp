@@ -65,6 +65,7 @@
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
 #include "minera/chaotic_activities.hpp"
+#include "minera/passed_time.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/powl_conversion.hpp"
@@ -618,6 +619,15 @@ int usage(const char* program) {
                "  --chaotic-alpha <f>       Non-negative smoothing parameter\n"
                "  --chaotic-max-activities <n> Activity safety bound\n"
                "  --chaotic-max-events <n> Event safety bound\n"
+               "  --passed-time              Emit passed-time statistics JSON\n"
+               "  --passed-time-variant <id> pre, post, or prepost\n"
+               "  --passed-time-activity <name> Target activity\n"
+               "  --passed-time-activity-key <name> Activity attribute\n"
+               "  --passed-time-timestamp-key <name> Completion timestamp attribute\n"
+               "  --passed-time-start-timestamp-key <name> Start timestamp attribute\n"
+               "  --passed-time-aggregation <id> mean, median, min, max, stdev, sum\n"
+               "  --passed-time-business-hours <bool> Use business-hour elapsed time\n"
+               "  --passed-time-business-hour-slots <a-b,...> Business-hour slots\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -977,11 +987,13 @@ int main(int argc, char** argv) {
   minera::BatchDiscoveryOptions batch_options;
   bool overlap_requested = false;
   bool chaotic_activities_requested = false;
+  bool passed_time_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
   std::map<std::string, std::string> overlap_fields;
   std::map<std::string, std::string> chaotic_activities_fields;
+  std::map<std::string, std::string> passed_time_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1256,6 +1268,26 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       chaotic_activities_fields[key] = value;
       chaotic_activities_requested = true;
+      continue;
+    }
+    if (arg == "--passed-time") {
+      passed_time_requested = true;
+      continue;
+    }
+    if (arg == "--passed-time-variant" ||
+        arg == "--passed-time-activity" ||
+        arg == "--passed-time-activity-key" ||
+        arg == "--passed-time-timestamp-key" ||
+        arg == "--passed-time-start-timestamp-key" ||
+        arg == "--passed-time-aggregation" ||
+        arg == "--passed-time-business-hours" ||
+        arg == "--passed-time-business-hour-slots") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      passed_time_fields[key] = value;
+      passed_time_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3252,6 +3284,29 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_chaotic_activities_params(lookup, present);
       const auto body = minera::chaotic_activities_json(
           minera::discover_chaotic_activities(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (passed_time_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = passed_time_fields.find(std::string(name));
+        return it == passed_time_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return passed_time_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_passed_time_params(lookup, present);
+      const auto body = minera::passed_time_json(
+          minera::discover_passed_time(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

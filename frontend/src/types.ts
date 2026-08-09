@@ -2570,6 +2570,55 @@ export interface ChaoticActivitiesResult {
   diagnostics: ChaoticActivitiesDiagnostics;
 }
 
+export interface PassedTimeEntry {
+  activity: string;
+  performance: number;
+  frequency: number;
+}
+
+export interface PassedTimeOptions {
+  passed_time_activity?: string;
+  passed_time_variant?: "pre" | "post" | "prepost";
+  passed_time_activity_key?: string;
+  passed_time_timestamp_key?: string;
+  passed_time_start_timestamp_key?: string;
+  passed_time_aggregation?: "mean" | "median" | "min" | "max" | "stdev" | "sum";
+  passed_time_business_hours?: boolean;
+  passed_time_business_hour_slots?: string;
+}
+
+export interface PassedTimeResult {
+  family: "PASSED_TIME";
+  variant: "PRE" | "POST" | "PREPOST";
+  activity: string;
+  pre: PassedTimeEntry[];
+  post: PassedTimeEntry[];
+  pre_avg_perf: number;
+  post_avg_perf: number;
+}
+
+function isPassedTimeEntries(value: unknown): value is PassedTimeEntry[] {
+  return Array.isArray(value) && value.every((item) => {
+    if (typeof item !== "object" || item === null) return false;
+    const entry = item as Partial<PassedTimeEntry>;
+    return typeof entry.activity === "string" &&
+      typeof entry.performance === "number" && Number.isFinite(entry.performance) &&
+      typeof entry.frequency === "number" && Number.isInteger(entry.frequency) &&
+      entry.frequency >= 0;
+  });
+}
+
+export function isPassedTimeResult(value: unknown): value is PassedTimeResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<PassedTimeResult>;
+  return data.family === "PASSED_TIME" &&
+    (data.variant === "PRE" || data.variant === "POST" || data.variant === "PREPOST") &&
+    typeof data.activity === "string" && isPassedTimeEntries(data.pre) &&
+    isPassedTimeEntries(data.post) && typeof data.pre_avg_perf === "number" &&
+    Number.isFinite(data.pre_avg_perf) && typeof data.post_avg_perf === "number" &&
+    Number.isFinite(data.post_avg_perf);
+}
+
 export function isChaoticActivitiesResult(
   value: unknown,
 ): value is ChaoticActivitiesResult {

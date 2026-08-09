@@ -111,6 +111,8 @@ import {
   type MonteCarloResult,
   type ChaoticActivitiesResult,
   type ChaoticActivitiesOptions,
+  type PassedTimeResult,
+  type PassedTimeOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -128,6 +130,7 @@ import {
   isPetriUsageComparison,
   isMonteCarloResult,
   isChaoticActivitiesResult,
+  isPassedTimeResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1461,6 +1464,47 @@ export function requestChaoticActivities(
   );
 }
 export const discoverChaoticActivities = requestChaoticActivities;
+
+export function passedTimeQuery(options: PassedTimeOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.passed_time_activity !== undefined) {
+    if (!options.passed_time_activity) throw new Error("passed_time_activity must not be empty");
+    query.set("passed_time_activity", options.passed_time_activity);
+  }
+  const strings: Array<[string, string | undefined]> = [
+    ["passed_time_variant", options.passed_time_variant],
+    ["passed_time_activity_key", options.passed_time_activity_key],
+    ["passed_time_timestamp_key", options.passed_time_timestamp_key],
+    ["passed_time_start_timestamp_key", options.passed_time_start_timestamp_key],
+    ["passed_time_aggregation", options.passed_time_aggregation],
+    ["passed_time_business_hour_slots", options.passed_time_business_hour_slots],
+  ];
+  if (options.passed_time_variant !== undefined &&
+      !["pre", "post", "prepost"].includes(options.passed_time_variant))
+    throw new Error("passed_time_variant is not supported");
+  if (options.passed_time_aggregation !== undefined &&
+      !["mean", "median", "min", "max", "stdev", "sum"]
+        .includes(options.passed_time_aggregation))
+    throw new Error("passed_time_aggregation is not supported");
+  for (const [key, value] of strings) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  if (options.passed_time_business_hours !== undefined &&
+      typeof options.passed_time_business_hours !== "boolean")
+    throw new Error("passed_time_business_hours must be boolean");
+  if (options.passed_time_business_hours !== undefined)
+    query.set("passed_time_business_hours", String(options.passed_time_business_hours));
+  return query.toString();
+}
+
+export function requestPassedTime(options: PassedTimeOptions = {}): Promise<PassedTimeResult> {
+  const query = passedTimeQuery(options);
+  return postChecked(`/api/passed-time${query ? `?${query}` : ""}`, isPassedTimeResult, "passed time");
+}
+export const discoverPassedTime = requestPassedTime;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

@@ -284,6 +284,42 @@ void chaotic_activities_params_contract() {
   assert(empty_key_threw);
 }
 
+void passed_time_params_contract() {
+  const auto parsed = minera::parse_passed_time_params(fields({
+      {"passed_time_activity", "B"},
+      {"passed_time_variant", "prepost"},
+      {"passed_time_activity_key", "phase"},
+      {"passed_time_timestamp_key", "occurred_at"},
+      {"passed_time_start_timestamp_key", "started_at"},
+      {"passed_time_aggregation", "median"},
+      {"passed_time_business_hours", "true"},
+      {"passed_time_business_hour_slots", "0:3600,7200:10800"}}));
+  assert(parsed.activity == "B");
+  assert(parsed.variant == minera::PassedTimeVariant::kPrePost);
+  assert(parsed.activity_key == "phase");
+  assert(parsed.timestamp_key == "occurred_at");
+  assert(parsed.start_timestamp_key == "started_at");
+  assert(parsed.performance_aggregation ==
+         minera::DfgPerformanceAggregation::kMedian);
+  assert(parsed.use_business_hours && parsed.business_hour_slots.size() == 2);
+  for (const auto& item : {std::pair{"passed_time_variant", "bad"},
+                           std::pair{"passed_time_aggregation", "all"},
+                           std::pair{"passed_time_business_hours", "maybe"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_passed_time_params(fields({
+          {"passed_time_activity", "B"}, item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool missing = false;
+  try { (void)minera::parse_passed_time_params(fields({})); }
+  catch (const std::invalid_argument&) { missing = true; }
+  assert(missing);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2269,5 +2305,6 @@ int main() {
   resource_profiles_params_contract();
   clustering_params_contract();
   chaotic_activities_params_contract();
+  passed_time_params_contract();
   return 0;
 }

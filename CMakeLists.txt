@@ -66,6 +66,7 @@ add_library(minera_core
   src/json_export.cpp
   src/log_filter.cpp
   src/path_filter.cpp
+  src/passed_time.cpp
   src/segment_filter.cpp
   src/ltl_filter.cpp
   src/log_to_features.cpp
@@ -321,6 +322,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_chaotic_activities_tests PRIVATE cxx_std_20)
   target_compile_options(minera_chaotic_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_chaotic_activities_tests COMMAND minera_chaotic_activities_tests)
+
+  add_executable(minera_passed_time_tests
+    tests/test_passed_time.cpp
+  )
+  target_link_libraries(minera_passed_time_tests PRIVATE minera::core)
+  target_compile_features(minera_passed_time_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_passed_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_passed_time_tests COMMAND minera_passed_time_tests)
 
   add_executable(minera_ilp_miner_tests
     tests/test_ilp_miner.cpp
