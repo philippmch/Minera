@@ -257,6 +257,33 @@ void clustering_params_contract() {
   assert(missing);
 }
 
+void chaotic_activities_params_contract() {
+  const auto parsed = minera::parse_chaotic_activities_params(fields({
+      {"chaotic_activity_key", "phase"},
+      {"chaotic_alpha", "0.25"},
+      {"chaotic_max_activities", "8"},
+      {"chaotic_max_events", "100"}}));
+  assert(parsed.activity_key == "phase" && parsed.alpha && *parsed.alpha == 0.25);
+  assert(parsed.max_activities == 8 && parsed.max_events == 100);
+  for (const auto& item : {std::pair{"chaotic_alpha", "nan"},
+                           std::pair{"chaotic_alpha", "-1"},
+                           std::pair{"chaotic_max_activities", "0"},
+                           std::pair{"chaotic_max_events", "0"}}) {
+    bool threw = false;
+    try { (void)minera::parse_chaotic_activities_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  const auto lookup = fields({{"chaotic_activity_key", ""}});
+  const auto present = [](std::string_view name) {
+    return name == "chaotic_activity_key";
+  };
+  bool empty_key_threw = false;
+  try { (void)minera::parse_chaotic_activities_params(lookup, present); }
+  catch (const std::invalid_argument&) { empty_key_threw = true; }
+  assert(empty_key_threw);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2241,5 +2268,6 @@ int main() {
   timestamp_interleavings_params_contract();
   resource_profiles_params_contract();
   clustering_params_contract();
+  chaotic_activities_params_contract();
   return 0;
 }

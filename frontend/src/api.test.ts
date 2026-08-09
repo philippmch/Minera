@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -81,6 +81,37 @@ describe("process cube API", () => {
       { case_ids: ["case-1"], columns: { x: [Number.NaN] } },
       { x_col: "x", y_col: "y", agg_col: "v" },
     )).rejects.toThrow(/rectangular finite numeric or categorical columns/);
+  });
+});
+
+describe("chaotic-activity statistics API", () => {
+  it("serializes bounded entropy controls", () => {
+    expect(chaoticActivitiesQuery({
+      chaotic_activity_key: "phase",
+      chaotic_alpha: 0.25,
+      chaotic_max_activities: 8,
+      chaotic_max_events: 100,
+    })).toBe("chaotic_activity_key=phase&chaotic_alpha=0.25&chaotic_max_activities=8&chaotic_max_events=100");
+    expect(() => chaoticActivitiesQuery({ chaotic_alpha: -1 })).toThrow(/non-negative/);
+    expect(() => chaoticActivitiesQuery({ chaotic_max_events: 0 })).toThrow(/positive integer/);
+  });
+
+  it("posts and validates the deterministic result envelope", async () => {
+    const payload = {
+      family: "CHAOTIC_ACTIVITIES", variant: "NIEK_SIDOROVA", alpha: 0.5,
+      activities: [{ activity: "A", frequency: 2, entropy: 0,
+        entropy_smooth: 1, entropy_gain: 0.25, chaotic_score: 0.625 }],
+      diagnostics: { activity_count: 1, event_count: 2,
+        output_truncated: false, message: "ok" },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/chaotic-activities?chaotic_alpha=0.5");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestChaoticActivities({ chaotic_alpha: 0.5 }))
+      .resolves.toMatchObject({ family: "CHAOTIC_ACTIVITIES" });
+    vi.unstubAllGlobals();
   });
 });
 

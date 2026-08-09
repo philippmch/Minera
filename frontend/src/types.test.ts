@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -121,6 +121,25 @@ describe("isOcelStatisticsResult", () => {
       family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
       associations: { Create: [["e1"]] },
     })).toBe(false);
+  });
+});
+
+describe("isChaoticActivitiesResult", () => {
+  const valid = {
+    family: "CHAOTIC_ACTIVITIES", variant: "NIEK_SIDOROVA", alpha: 0.5,
+    activities: [{ activity: "A", frequency: 2, entropy: 0,
+      entropy_smooth: 1, entropy_gain: 0.25, chaotic_score: 0.625 }],
+    diagnostics: { activity_count: 1, event_count: 2,
+      output_truncated: false, message: "ok" },
+  };
+  it("accepts the deterministic envelope", () => {
+    expect(isChaoticActivitiesResult(valid)).toBe(true);
+  });
+  it("rejects non-finite metrics and malformed diagnostics", () => {
+    expect(isChaoticActivitiesResult({ ...valid,
+      activities: [{ ...valid.activities[0], entropy: Number.NaN }] })).toBe(false);
+    expect(isChaoticActivitiesResult({ ...valid,
+      diagnostics: { ...valid.diagnostics, event_count: -1 } })).toBe(false);
   });
 });
 

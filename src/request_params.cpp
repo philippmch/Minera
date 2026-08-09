@@ -3220,4 +3220,39 @@ TraceAttributeClusteringOptions parse_clustering_params(const FieldLookup& field
   return o;
 }
 
+ChaoticActivitiesOptions parse_chaotic_activities_params(
+    const FieldLookup& field) {
+  return parse_chaotic_activities_params(field, {});
+}
+
+ChaoticActivitiesOptions parse_chaotic_activities_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  ChaoticActivitiesOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("chaotic_activity_key"))
+    options.activity_key = require("chaotic_activity_key");
+  if (supplied("chaotic_alpha")) {
+    options.alpha = parse_finite_double(require("chaotic_alpha"),
+                                        "chaotic_alpha");
+    if (*options.alpha < 0.0)
+      throw std::invalid_argument(
+          "chaotic_alpha: expected a finite non-negative number");
+  }
+  if (supplied("chaotic_max_activities"))
+    options.max_activities = parse_positive_size(
+        require("chaotic_max_activities"), "chaotic_max_activities");
+  if (supplied("chaotic_max_events"))
+    options.max_events = parse_positive_size(require("chaotic_max_events"),
+                                             "chaotic_max_events");
+  return options;
+}
+
 }  // namespace minera

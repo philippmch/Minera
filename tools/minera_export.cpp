@@ -64,6 +64,7 @@
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
+#include "minera/chaotic_activities.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/powl_conversion.hpp"
@@ -612,6 +613,11 @@ int usage(const char* program) {
                "  --overlap-completion-attribute <name> Optional completion timestamp attribute\n"
                "  --overlap-epsilon <f>     Non-negative overlap boundary epsilon\n"
                "  --overlap-strict          Exclude endpoint-only overlap\n"
+               "  --chaotic-activities      Emit entropy-based activity-chaos JSON\n"
+               "  --chaotic-activity-key <name> Activity attribute\n"
+               "  --chaotic-alpha <f>       Non-negative smoothing parameter\n"
+               "  --chaotic-max-activities <n> Activity safety bound\n"
+               "  --chaotic-max-events <n> Event safety bound\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
@@ -970,10 +976,12 @@ int main(int argc, char** argv) {
   bool batch_option_used = false;
   minera::BatchDiscoveryOptions batch_options;
   bool overlap_requested = false;
+  bool chaotic_activities_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
   bool case_grouping_option_used = false;
   std::map<std::string, std::string> overlap_fields;
+  std::map<std::string, std::string> chaotic_activities_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
@@ -1234,6 +1242,20 @@ int main(int argc, char** argv) {
     if (arg == "--overlap") {
       overlap_requested = true;
       overlap_fields["overlap"] = "true";
+      continue;
+    }
+    if (arg == "--chaotic-activities") {
+      chaotic_activities_requested = true;
+      continue;
+    }
+    if (arg == "--chaotic-activity-key" || arg == "--chaotic-alpha" ||
+        arg == "--chaotic-max-activities" || arg == "--chaotic-max-events") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      chaotic_activities_fields[key] = value;
+      chaotic_activities_requested = true;
       continue;
     }
     if (arg == "--overlap-strict") {
@@ -3218,6 +3240,29 @@ int main(int argc, char** argv) {
         overlap_concurrent_activities = minera::discover_concurrent_activity_overlap(
             log, params.overlap_options);
       }
+    }
+    if (chaotic_activities_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = chaotic_activities_fields.find(std::string(name));
+        return it == chaotic_activities_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return chaotic_activities_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_chaotic_activities_params(lookup, present);
+      const auto body = minera::chaotic_activities_json(
+          minera::discover_chaotic_activities(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
     }
     if (ilp_mine_requested) {
       const auto lookup = [&](std::string_view name) {

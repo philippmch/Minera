@@ -2539,6 +2539,65 @@ export interface OverlapExport {
   concurrent_activities: ConcurrentActivityOverlapExport[];
 }
 
+export interface ChaoticActivityMetric {
+  activity: string;
+  frequency: number;
+  entropy: number;
+  entropy_smooth: number;
+  entropy_gain: number;
+  chaotic_score: number;
+}
+
+export interface ChaoticActivitiesOptions {
+  chaotic_activity_key?: string;
+  chaotic_alpha?: number;
+  chaotic_max_activities?: number;
+  chaotic_max_events?: number;
+}
+
+export interface ChaoticActivitiesDiagnostics {
+  activity_count: number;
+  event_count: number;
+  output_truncated: boolean;
+  message: string;
+}
+
+export interface ChaoticActivitiesResult {
+  family: "CHAOTIC_ACTIVITIES";
+  variant: "NIEK_SIDOROVA";
+  alpha: number;
+  activities: ChaoticActivityMetric[];
+  diagnostics: ChaoticActivitiesDiagnostics;
+}
+
+export function isChaoticActivitiesResult(
+  value: unknown,
+): value is ChaoticActivitiesResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<ChaoticActivitiesResult>;
+  if (data.family !== "CHAOTIC_ACTIVITIES" ||
+      data.variant !== "NIEK_SIDOROVA" ||
+      typeof data.alpha !== "number" || !Number.isFinite(data.alpha) ||
+      data.alpha < 0 || !Array.isArray(data.activities)) return false;
+  if (!data.activities.every((row) => {
+    if (typeof row !== "object" || row === null) return false;
+    const metric = row as Partial<ChaoticActivityMetric>;
+    return typeof metric.activity === "string" &&
+      typeof metric.frequency === "number" && Number.isInteger(metric.frequency) &&
+      metric.frequency >= 0 &&
+      typeof metric.entropy === "number" && Number.isFinite(metric.entropy) &&
+      typeof metric.entropy_smooth === "number" && Number.isFinite(metric.entropy_smooth) &&
+      typeof metric.entropy_gain === "number" && Number.isFinite(metric.entropy_gain) &&
+      typeof metric.chaotic_score === "number" && Number.isFinite(metric.chaotic_score);
+  })) return false;
+  const diagnostics = data.diagnostics;
+  return typeof diagnostics === "object" && diagnostics !== null &&
+    Number.isInteger(diagnostics.activity_count) && diagnostics.activity_count >= 0 &&
+    Number.isInteger(diagnostics.event_count) && diagnostics.event_count >= 0 &&
+    typeof diagnostics.output_truncated === "boolean" &&
+    typeof diagnostics.message === "string";
+}
+
 export interface ResourceStat {
   name: string;
   event_count: number;

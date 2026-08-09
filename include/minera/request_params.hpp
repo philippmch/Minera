@@ -60,6 +60,7 @@
 #include "minera/segment_filter.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/overlap.hpp"
+#include "minera/chaotic_activities.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -243,6 +244,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] TraceAttributeClusteringOptions parse_clustering_params(
     const FieldLookup& field);
 [[nodiscard]] TraceAttributeClusteringOptions parse_clustering_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
+    const FieldLookup& field);
+[[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(

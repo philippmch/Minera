@@ -22,6 +22,7 @@
 #include "minera/performance.hpp"
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
+#include "minera/chaotic_activities.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/powl.hpp"
 #include "minera/process_tree.hpp"
@@ -289,6 +290,8 @@ void write_analysis_json(std::ostream& out,
 
 // Standalone deterministic JSON for PRIPEL-style contextual anonymization.
 [[nodiscard]] std::string pripel_json(const PripelResult& result);
+[[nodiscard]] std::string chaotic_activities_json(
+    const ChaoticActivitiesResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(
