@@ -249,8 +249,8 @@ export interface FilterOptions extends LtlFilterOptions {
 export interface MinerOptions {
   /** Inductive Miner – infrequent noise threshold in [0, 1]; 0 is classic. */
   noiseThreshold?: number;
-  /** "log" (default) splits sublogs; "dfg" recurses on the graph (IMd). */
-  inductiveVariant?: "log" | "dfg";
+  /** "log" splits sublogs; "imf" applies infrequent filtering; "dfg" recurses on the graph (IMd). */
+  inductiveVariant?: "log" | "imf" | "dfg";
   /** "plus" (default) handles short loops; "classic" is the textbook Alpha. */
   alphaVariant?: "plus" | "classic";
   /** Heuristic Miner algorithm variant (classic by default). */

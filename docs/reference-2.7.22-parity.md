@@ -69,7 +69,7 @@ are reconciled.
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, native APIs, headless OCEL CLI output, and multipart local-server/frontend API adapters; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
-| Discovery: Inductive | IM, IMf, IMd | **Complete** |
+| Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, and graph-recursive `dfg` selectors share the validated native/request/CLI/frontend surface |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; differential edge-contract review remains |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |

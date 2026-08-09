@@ -351,7 +351,8 @@ int usage(const char* program) {
                "  --delimiter <char>        Field delimiter (default: ,)\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
-               "  --inductive-variant <id>  log (default: split the log and\n"
+               "  --inductive-variant <id>  log (default), imf (infrequent),\n"
+               "                            or dfg (IMd: graph recursion)\n"
                "  --ilp-mine                Emit standalone classic ILP JSON\n"
                "  --ilp-activity-key <name> Event attribute used as activity\n"
                "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
@@ -2523,10 +2524,13 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       const std::string_view variant = value;
-      if (variant != "log" && variant != "dfg") return usage(argv[0]);
+      if (variant != "log" && variant != "imf" && variant != "dfg")
+        return usage(argv[0]);
       inductive_options.variant = variant == "dfg"
                                       ? minera::InductiveMinerVariant::kDfg
-                                      : minera::InductiveMinerVariant::kLog;
+                                      : variant == "imf"
+                                            ? minera::InductiveMinerVariant::kImf
+                                            : minera::InductiveMinerVariant::kLog;
     } else if (arg == "--alpha-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);

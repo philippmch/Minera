@@ -1232,12 +1232,14 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.inductive.noise_threshold = std::atof(value.c_str());
   }
   if (const auto value = field("inductive_variant"); !value.empty()) {
-    if (value != "log" && value != "dfg") {
+    if (value != "log" && value != "imf" && value != "dfg") {
       throw std::invalid_argument(
-          "inductive_variant: expected log or dfg, got '" + value + "'");
+          "inductive_variant: expected log, imf, or dfg, got '" + value + "'");
     }
-    params.inductive.variant = value == "dfg" ? InductiveMinerVariant::kDfg
-                                              : InductiveMinerVariant::kLog;
+    params.inductive.variant = value == "dfg"
+                                   ? InductiveMinerVariant::kDfg
+                                   : value == "imf" ? InductiveMinerVariant::kImf
+                                                    : InductiveMinerVariant::kLog;
   }
   if (const auto value = field("alpha_variant"); !value.empty()) {
     if (value != "classic" && value != "plus") {

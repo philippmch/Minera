@@ -215,7 +215,7 @@ export function Filters({
   );
   // Miner settings; an empty field leaves the backend default in charge.
   const [noiseThreshold, setNoiseThreshold] = useState("");
-  const [inductiveVariant, setInductiveVariant] = useState<"log" | "dfg">("log");
+  const [inductiveVariant, setInductiveVariant] = useState<"log" | "imf" | "dfg">("log");
   const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("plus");
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
@@ -2017,10 +2017,11 @@ export function Filters({
               <select
                 value={inductiveVariant}
                 onChange={(e) =>
-                  setInductiveVariant(e.target.value as "log" | "dfg")
+                  setInductiveVariant(e.target.value as "log" | "imf" | "dfg")
                 }
               >
                 <option value="log">split the log (default)</option>
+                <option value="imf">infrequent (IMf)</option>
                 <option value="dfg">graph only (IMd, huge logs)</option>
               </select>
             </label>
