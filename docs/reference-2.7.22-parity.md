@@ -215,7 +215,7 @@ this traditional-log vertical.
 
 | Surface | Required variations | Minera status |
 |---|---|---|
-| Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes; no stream/columnar adapter |
+| Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object relations, o2o links, object changes, scalar globals, and classic/standard JSON parsing are present; e2e, richer value types, and full schema coverage remain |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
@@ -224,7 +224,7 @@ this traditional-log vertical.
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
-| Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance and deterministic incremental DFG snapshots are present; stream readers, other online algorithms, and persistent stores remain |
+| Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, Declare, footprints, token, and temporal conformance are present; persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Missing** |
@@ -674,6 +674,13 @@ finished stream cannot be restarted or appended to. Focused Release tests cover
 queueing, drain-on-stop, observer failures, invalid pool sizes, and lifecycle
 transitions; the headless `minera_live_stream` command exercises CSV event
 delivery end to end.
+
+`CsvEventStreamReader`, `XesEventStreamReader`, and `XesTraceStreamReader` are
+restartable readers with transformation and acceptance callbacks. They expose
+single-item reads and direct delivery into the live event or trace stream;
+focused tests cover filtering, reset behavior, XES trace grouping, and complete
+delivery counts. The headless `minera_stream_import` command exercises both
+event and trace modes without a GUI.
 
 ## Log-skeleton parity evidence
 
