@@ -99,6 +99,7 @@
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
 #include "minera/segment_filter.hpp"
+#include "minera/streaming_dfg.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -3771,6 +3772,46 @@ void handle_dfg_conversion(const httplib::Request& request,
   }
 }
 
+void handle_streaming_dfg(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "streaming_case_id_column" &&
+          key != "streaming_activity_column") {
+        throw std::invalid_argument("unknown streaming DFG parameter: " + key);
+      }
+    }
+    minera::CsvImportOptions import_options;
+    if (request.has_param("streaming_case_id_column"))
+      import_options.case_id_column =
+          request.get_param_value("streaming_case_id_column");
+    if (request.has_param("streaming_activity_column"))
+      import_options.activity_column =
+          request.get_param_value("streaming_activity_column");
+    if (import_options.case_id_column.empty() ||
+        import_options.activity_column.empty()) {
+      throw std::invalid_argument(
+          "streaming DFG column names must not be empty");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing CSV log body");
+    std::istringstream input(body);
+    const auto log = minera::import_csv_event_log(input, import_options);
+    minera::StreamingDfgDiscovery stream(
+        {import_options.activity_column, import_options.case_id_column});
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        stream.receive(event, trace.case_id);
+    response.set_content(
+        minera::serialize_streaming_dfg_json(stream.snapshot()),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -3930,6 +3971,7 @@ int main(int argc, char** argv) {
   server.Options("/api/dfg", preflight);
   server.Options("/api/dfg-to-petri", preflight);
   server.Options("/api/process-cube", preflight);
+  server.Options("/api/streaming-dfg", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -4003,6 +4045,7 @@ int main(int argc, char** argv) {
   server.Post("/api/dfg", handle_dfg_import);
   server.Post("/api/dfg-to-petri", handle_dfg_conversion);
   server.Post("/api/process-cube", handle_process_cube);
+  server.Post("/api/streaming-dfg", handle_streaming_dfg);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 

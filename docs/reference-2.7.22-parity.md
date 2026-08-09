@@ -224,7 +224,7 @@ this traditional-log vertical.
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
-| Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
+| Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance and deterministic incremental DFG snapshots are present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Missing** |
@@ -760,6 +760,18 @@ rejected, and UTF-8 labels plus stream/path aliases round-trip through the
 native `DfgCleanAnalysis` payload. Trace variants and activity totals are not
 invented into this format; CLI/server/frontend output adapters serialize the
 cached post-filter graph, while input adapters remain open.
+
+## Streaming DFG evidence
+
+`StreamingDfgDiscovery` consumes case/activity events in arrival order, keeps
+the latest activity for every open case, increments starts, activity totals,
+and directly-following edges atomically, and derives deterministic current end
+counts from the open-case table. Empty identifiers are skipped, reset clears
+all state, and snapshots include open cases for downstream consumers. The
+standalone `minera_streaming_dfg` CSV command, multipart `POST
+/api/streaming-dfg`, and typed frontend request/response guard expose the same
+`STREAMING_DFG` JSON contract; focused tests cover interleaved cases, empty
+records, reset, deterministic serialization, and malformed frontend payloads.
 
 ## Segment-filter evidence
 

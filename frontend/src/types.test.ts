@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+
+describe("isStreamingDfgResult", () => {
+  const valid = {
+    family: "STREAMING_DFG", events: 2,
+    graph: [{ source: "A", target: "B", count: 1 }],
+    activities: { A: 1, B: 1 }, start_activities: { A: 1 },
+    end_activities: { B: 1 }, open_cases: { c1: "B" },
+  };
+  it("accepts deterministic snapshots", () => expect(isStreamingDfgResult(valid)).toBe(true));
+  it("rejects negative counts and malformed edges", () => {
+    expect(isStreamingDfgResult({ ...valid, events: -1 })).toBe(false);
+    expect(isStreamingDfgResult({ ...valid, graph: [{ source: "A", target: "B", count: 0 }] })).toBe(false);
+  });
+});
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
