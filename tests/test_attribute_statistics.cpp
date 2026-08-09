@@ -58,6 +58,13 @@ int main() {
   assert(json.find("\"family\":\"ATTRIBUTE_STATISTICS\"") !=
          std::string::npos);
   assert(json.find("\"scope\":\"TRACES\"") != std::string::npos);
+  const auto event_attributes =
+      minera::get_all_event_attributes_from_log(log);
+  assert(event_attributes.contains("concept:name") &&
+         event_attributes.contains("channel"));
+  const auto trace_attributes =
+      minera::get_all_trace_attributes_from_log(log);
+  assert(trace_attributes.contains("region"));
 
   bool rejected = false;
   try {
