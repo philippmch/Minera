@@ -785,6 +785,19 @@ guard expose the same `STREAMING_FOOTPRINTS` contract; focused tests cover
 interleaved cases, unknown activities, boundary and pair deviations, reset,
 termination, deterministic serialization, and malformed frontend payloads.
 
+## Streaming temporal evidence
+
+`StreamingTemporalConformance` validates each arriving event against every
+eligible earlier event in the same case, using profile means, standard
+deviations, and a positive zeta threshold. It supports canonical or generic
+activity/timestamp attributes, skips incomplete or unparsable records, keeps
+per-case histories isolated, and emits deterministic deviation diagnostics.
+The standalone `minera_streaming_temporal` command, multipart
+`POST /api/streaming-temporal`, and typed frontend request/response guard expose
+the same `STREAMING_TEMPORAL` contract; focused tests cover prior-event pairing,
+zero-variance profiles, custom attributes, invalid timestamps, reset, and
+malformed frontend payloads.
+
 ## Segment-filter evidence
 
 The native segment surface exposes prefix and suffix cuts with first/last

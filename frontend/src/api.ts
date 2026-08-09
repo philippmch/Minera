@@ -45,6 +45,7 @@ import {
   type ProcessCubeResult,
   type StreamingDfgResult,
   type StreamingFootprintsResult,
+  type StreamingTemporalResult,
   type TriePetriConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
@@ -76,6 +77,7 @@ import {
   isProcessCubeResult,
   isStreamingDfgResult,
   isStreamingFootprintsResult,
+  isStreamingTemporalResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -2323,6 +2325,81 @@ export async function requestStreamingFootprints(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isStreamingFootprintsResult(payload))
     throw new Error("the Minera backend returned invalid streaming footprints");
+  return payload;
+}
+
+export interface StreamingTemporalOptions {
+  streaming_temporal_profile: Array<[string, string, number, number]>;
+  streaming_temporal_case_id_column?: string;
+  streaming_temporal_activity_column?: string;
+  streaming_temporal_start_timestamp_column?: string;
+  streaming_temporal_timestamp_column?: string;
+  streaming_temporal_zeta?: number;
+}
+
+function serializeStreamingTemporalProfile(
+  values: Array<[string, string, number, number]>,
+): string {
+  if (!Array.isArray(values) || values.length === 0)
+    throw new Error("streaming_temporal_profile must be a non-empty list");
+  return values.map((entry) => {
+    const source = validateStreamingFootprintActivity(entry[0]);
+    const target = validateStreamingFootprintActivity(entry[1]);
+    if (!Array.isArray(entry) || entry.length !== 4 ||
+        !Number.isFinite(entry[2]) || entry[2] < 0 ||
+        !Number.isFinite(entry[3]) || entry[3] < 0 ||
+        source.includes(":") || target.includes(":")) {
+      throw new Error("streaming temporal profile entries must be source/target/mean/stddev");
+    }
+    return `${source}->${target}:${entry[2]}:${entry[3]}`;
+  }).join(",");
+}
+
+export function streamingTemporalQuery(options: StreamingTemporalOptions): string {
+  const query = new URLSearchParams();
+  query.set("streaming_temporal_profile",
+    serializeStreamingTemporalProfile(options.streaming_temporal_profile));
+  for (const name of [
+    "streaming_temporal_case_id_column",
+    "streaming_temporal_activity_column",
+    "streaming_temporal_start_timestamp_column",
+    "streaming_temporal_timestamp_column",
+  ] as const) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      query.set(name, value.trim());
+    }
+  }
+  if (options.streaming_temporal_zeta !== undefined) {
+    if (!Number.isFinite(options.streaming_temporal_zeta) || options.streaming_temporal_zeta <= 0)
+      throw new Error("streaming_temporal_zeta must be finite and greater than zero");
+    query.set("streaming_temporal_zeta", String(options.streaming_temporal_zeta));
+  }
+  return query.toString();
+}
+
+export async function requestStreamingTemporal(
+  log: Blob, options: StreamingTemporalOptions,
+): Promise<StreamingTemporalResult> {
+  const form = new FormData();
+  const name = typeof File !== "undefined" && log instanceof File ? log.name : "log.csv";
+  form.append("log", log, name);
+  const query = streamingTemporalQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/streaming-temporal?${query}`, {
+      method: "POST", body: form,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isStreamingTemporalResult(payload))
+    throw new Error("the Minera backend returned invalid streaming temporal conformance");
   return payload;
 }
 

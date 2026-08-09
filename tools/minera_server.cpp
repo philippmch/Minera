@@ -101,6 +101,7 @@
 #include "minera/segment_filter.hpp"
 #include "minera/streaming_dfg.hpp"
 #include "minera/streaming_footprints.hpp"
+#include "minera/streaming_temporal.hpp"
 #include "minera/path_filter.hpp"
 #include "minera/decomposed_alignment.hpp"
 #include "minera/petri_anti_alignment.hpp"
@@ -3914,6 +3915,106 @@ void handle_streaming_footprints(const httplib::Request& request,
   }
 }
 
+void handle_streaming_temporal(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "streaming_temporal_profile",
+        "streaming_temporal_case_id_column",
+        "streaming_temporal_activity_column",
+        "streaming_temporal_start_timestamp_column",
+        "streaming_temporal_timestamp_column",
+        "streaming_temporal_zeta"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown streaming temporal parameter: " + key);
+    }
+    if (!request.has_param("streaming_temporal_profile"))
+      throw std::invalid_argument("streaming temporal profile is required");
+    minera::TemporalProfile profile;
+    const auto profile_text =
+        request.get_param_value("streaming_temporal_profile");
+    std::size_t begin = 0;
+    while (begin <= profile_text.size()) {
+      const auto end = profile_text.find(',', begin);
+      const auto item = profile_text.substr(
+          begin, end == std::string::npos ? std::string::npos : end - begin);
+      const auto arrow = item.find("->");
+      const auto first_colon = item.find(':');
+      const auto second_colon = item.find(':', first_colon == std::string::npos
+                                                     ? 0
+                                                     : first_colon + 1);
+      if (arrow == std::string::npos || first_colon == std::string::npos ||
+          second_colon == std::string::npos || arrow == 0 ||
+          first_colon <= arrow + 2 || second_colon <= first_colon + 1 ||
+          second_colon + 1 >= item.size()) {
+        throw std::invalid_argument(
+            "streaming temporal profile entries must use source->target:mean:stddev");
+      }
+      char* mean_end = nullptr;
+      char* stddev_end = nullptr;
+      const auto mean_text = item.substr(first_colon + 1,
+                                         second_colon - first_colon - 1);
+      const auto stddev_text = item.substr(second_colon + 1);
+      const double mean = std::strtod(mean_text.c_str(), &mean_end);
+      const double stddev = std::strtod(stddev_text.c_str(), &stddev_end);
+      if (mean_end != mean_text.c_str() + mean_text.size() ||
+          stddev_end != stddev_text.c_str() + stddev_text.size() ||
+          !std::isfinite(mean) || mean < 0.0 || !std::isfinite(stddev) ||
+          stddev < 0.0) {
+        throw std::invalid_argument(
+            "streaming temporal profile timings must be finite and non-negative");
+      }
+      profile.entries.push_back(
+          {item.substr(0, arrow),
+           item.substr(arrow + 2, first_colon - arrow - 2), 1, mean, stddev});
+      if (end == std::string::npos) break;
+      begin = end + 1;
+    }
+    minera::CsvImportOptions import_options;
+    if (request.has_param("streaming_temporal_case_id_column"))
+      import_options.case_id_column =
+          request.get_param_value("streaming_temporal_case_id_column");
+    if (request.has_param("streaming_temporal_activity_column"))
+      import_options.activity_column =
+          request.get_param_value("streaming_temporal_activity_column");
+    if (request.has_param("streaming_temporal_timestamp_column"))
+      import_options.timestamp_column =
+          request.get_param_value("streaming_temporal_timestamp_column");
+    if (import_options.case_id_column.empty() ||
+        import_options.activity_column.empty() ||
+        import_options.timestamp_column.empty()) {
+      throw std::invalid_argument(
+          "streaming temporal column names must not be empty");
+    }
+    minera::StreamingTemporalOptions options;
+    options.activity_attribute = import_options.activity_column;
+    options.case_id_attribute = import_options.case_id_column;
+    options.timestamp_attribute = import_options.timestamp_column;
+    if (request.has_param("streaming_temporal_start_timestamp_column"))
+      options.start_timestamp_attribute = request.get_param_value(
+          "streaming_temporal_start_timestamp_column");
+    options.zeta = ocel_query_number(request, "streaming_temporal_zeta",
+                                     options.zeta);
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing CSV log body");
+    std::istringstream input(body);
+    const auto log = minera::import_csv_event_log(input, import_options);
+    minera::StreamingTemporalConformance monitor(std::move(profile), options);
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        (void)monitor.receive(event, trace.case_id);
+    response.set_content(
+        minera::serialize_streaming_temporal_json(monitor.snapshot()),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -4075,6 +4176,7 @@ int main(int argc, char** argv) {
   server.Options("/api/process-cube", preflight);
   server.Options("/api/streaming-dfg", preflight);
   server.Options("/api/streaming-footprints", preflight);
+  server.Options("/api/streaming-temporal", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -4150,6 +4252,7 @@ int main(int argc, char** argv) {
   server.Post("/api/process-cube", handle_process_cube);
   server.Post("/api/streaming-dfg", handle_streaming_dfg);
   server.Post("/api/streaming-footprints", handle_streaming_footprints);
+  server.Post("/api/streaming-temporal", handle_streaming_temporal);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 

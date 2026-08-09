@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isStreamingDfgResult", () => {
   const valid = {
@@ -26,6 +26,20 @@ describe("isStreamingFootprintsResult", () => {
     expect(isStreamingFootprintsResult(valid)).toBe(true);
     expect(isStreamingFootprintsResult({ ...valid, total_deviations: -1 })).toBe(false);
     expect(isStreamingFootprintsResult({ ...valid, cases: [{ ...valid.cases[0], deviations: 1.5 }] })).toBe(false);
+  });
+});
+
+describe("isStreamingTemporalResult", () => {
+  const valid = {
+    family: "STREAMING_TEMPORAL", total_events_processed: 2,
+    total_deviations: 1, cases: { c1: { events: 2, deviations: 1 } },
+    deviations: { c1: [{ source: "A", target: "B", elapsed_seconds: 19,
+      standard_deviation_distance: 4.5 }] },
+  };
+  it("accepts finite diagnostics and rejects malformed values", () => {
+    expect(isStreamingTemporalResult(valid)).toBe(true);
+    expect(isStreamingTemporalResult({ ...valid, deviations: { c1: [{ ...valid.deviations.c1[0], elapsed_seconds: Number.NaN }] } })).toBe(false);
+    expect(isStreamingTemporalResult({ ...valid, cases: { c1: { events: 2.5, deviations: 1 } } })).toBe(false);
   });
 });
 
