@@ -43,6 +43,7 @@ import {
   type OcelStatisticsResult,
   type ProcessCubeTable,
   type ProcessCubeResult,
+  type TriePetriConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -72,6 +73,7 @@ import {
   isOcelStatisticsResult,
   isProcessCubeResult,
   isProcessCubeTable,
+  isTriePetriConversionResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2316,6 +2318,16 @@ export async function requestTrie(options: TrieOptions = {}): Promise<TrieResult
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isTrieResult(payload)) throw new Error("the Minera backend returned an invalid trie");
+  return payload;
+}
+
+export async function requestTriePetriNet(options: TrieOptions = {}): Promise<TriePetriConversionResult> {
+  const query = trieQuery(options);
+  const response = await fetch(`/api/trie-to-petri${query ? `?${query}` : ""}`);
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isTriePetriConversionResult(payload))
+    throw new Error("the Minera backend returned an invalid trie conversion");
   return payload;
 }
 

@@ -113,6 +113,7 @@ add_library(minera_core
   src/transition_system.cpp
   src/trace_variant_query.cpp
   src/trie.cpp
+  src/trie_conversion.cpp
   src/process_cube.cpp
   src/xes_event_log_importer.cpp
   src/xes_export.cpp
@@ -673,6 +674,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_trie_tests PRIVATE cxx_std_20)
   target_compile_options(minera_trie_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_trie_tests COMMAND minera_trie_tests)
+
+  add_executable(minera_trie_conversion_tests
+    tests/test_trie_conversion.cpp
+  )
+  target_link_libraries(minera_trie_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_trie_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_trie_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_trie_conversion_tests COMMAND minera_trie_conversion_tests)
 
   add_executable(minera_interval_tree_tests
     tests/test_interval_tree.cpp
