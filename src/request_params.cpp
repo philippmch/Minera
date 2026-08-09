@@ -3323,4 +3323,53 @@ PassedTimeOptions parse_passed_time_params(const FieldLookup& field,
   return options;
 }
 
+ServiceTimeOptions parse_service_time_params(const FieldLookup& field) {
+  return parse_service_time_params(field, {});
+}
+
+ServiceTimeOptions parse_service_time_params(const FieldLookup& field,
+                                             const FieldPresence& present) {
+  ServiceTimeOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("service_time_activity_key"))
+    options.activity_key = require("service_time_activity_key");
+  if (supplied("service_time_start_timestamp_key"))
+    options.start_timestamp_key = require("service_time_start_timestamp_key");
+  if (supplied("service_time_timestamp_key"))
+    options.timestamp_key = require("service_time_timestamp_key");
+  if (supplied("service_time_aggregation")) {
+    const auto value = require("service_time_aggregation");
+    if (value == "mean")
+      options.aggregation = DfgPerformanceAggregation::kMean;
+    else if (value == "median")
+      options.aggregation = DfgPerformanceAggregation::kMedian;
+    else if (value == "min" || value == "minimum")
+      options.aggregation = DfgPerformanceAggregation::kMinimum;
+    else if (value == "max" || value == "maximum")
+      options.aggregation = DfgPerformanceAggregation::kMaximum;
+    else if (value == "sum")
+      options.aggregation = DfgPerformanceAggregation::kSum;
+    else
+      throw std::invalid_argument(
+          "service_time_aggregation: expected mean, median, min, max, or sum");
+  }
+  if (supplied("service_time_business_hours"))
+    options.use_business_hours =
+        parse_boolean(require("service_time_business_hours"),
+                      "service_time_business_hours");
+  if (supplied("service_time_business_hour_slots"))
+    options.business_hour_slots = parse_business_hour_slots(
+        require("service_time_business_hour_slots"),
+        "service_time_business_hour_slots");
+  return options;
+}
+
 }  // namespace minera
