@@ -57,7 +57,7 @@ are reconciled.
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
-| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded deterministic PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; secure production privacy RNG and differential edge-contract review remain |
+| Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic profile clustering now has a bounded native API with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain bounded JSON/server/CLI/frontend adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
 | Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
@@ -226,7 +226,7 @@ this traditional-log vertical.
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules; no data-Petri-net object |
-| Privacy | anonymization algorithms and privacy-preserving query variants | **Missing** |
+| Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Missing** |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
 | Connectors | Outlook, Windows events, browsers, GitHub, Camunda, SAP O2C/accounting | **Missing / Integration** |
@@ -374,18 +374,22 @@ seeded non-negative integer noise, prunes by the configured minimum frequency,
 and expands released frequencies into timestamp-neutral event traces with
 stable case identifiers. SaCoFa additionally filters prefixes by observed
 first-event and all-order predecessor/follower relations. The deterministic
-seed is an explicit testing/reproducibility extension; it is not a claim of a
-cryptographically secure privacy source.
+seed is an explicit testing/reproducibility extension. Both privacy surfaces
+also accept an explicit secure-random switch that draws one key from the host
+operating system entropy provider per release call; the effective key is not
+returned in diagnostics.
 
 Strict `tvq_*` request parsing, standalone JSON, CLI
 (`--trace-variant-query`), cached-session server endpoints, frontend query
-serialization, response guards, output caps, and focused Release tests cover
+serialization, response guards, output caps, secure-random parsing, and focused
+Release tests cover
 both variants, empty prefix bounds, malformed privacy settings, pruning,
 reproducibility, and non-negative release counts. The PRIPEL-style adapter
 matches exact and bounded nearest variants, removes identity/blocklisted
 attributes, preserves monotonic event time, and applies deterministic bounded
-categorical/numeric release noise. A cryptographically secure production RNG
-and full differential edge-contract review remain open.
+categorical/numeric release noise, with the same transformations optionally
+keyed by secure OS entropy. Full differential edge-contract review remains
+open.
 
 ## Target-transformation evidence
 

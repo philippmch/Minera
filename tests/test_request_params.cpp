@@ -2064,16 +2064,19 @@ void trace_variant_query_params_contract() {
       {"tvq_k", "4"},
       {"tvq_p", "2"},
       {"tvq_seed", "19"},
+      {"tvq_secure_random", "true"},
       {"tvq_max_output_traces", "40"},
       {"tvq_max_output_variants", "7"}}));
   assert(parsed.variant == minera::TraceVariantQueryVariant::kSacofa);
   assert(parsed.epsilon == 0.75 && parsed.max_prefix_length == 4);
   assert(parsed.prune_threshold == 2 && parsed.seed == 19);
   assert(parsed.max_output_traces == 40 && parsed.max_output_variants == 7);
+  assert(parsed.secure_random);
   for (const auto& item : {std::pair{"tvq_variant", "other"},
                            std::pair{"tvq_epsilon", "0"},
                            std::pair{"tvq_k", "-1"},
-                           std::pair{"tvq_p", "0"}}) {
+                           std::pair{"tvq_p", "0"},
+                           std::pair{"tvq_secure_random", "maybe"}}) {
     bool threw = false;
     try { (void)minera::parse_trace_variant_query_params(fields({item})); }
     catch (const std::invalid_argument&) { threw = true; }
@@ -2086,16 +2089,19 @@ void pripel_params_contract() {
       {"pripel_epsilon", "0.5"},
       {"pripel_blocklist", "case_id,resource"},
       {"pripel_seed", "8"},
+      {"pripel_secure_random", "1"},
       {"pripel_max_output_traces", "20"},
       {"pripel_max_distance", "2"}}));
   assert(parsed.epsilon == 0.5);
   assert((parsed.blocklist == std::vector<std::string>{"case_id", "resource"}));
   assert(parsed.seed == 8 && parsed.max_output_traces == 20 &&
          parsed.max_distance == 2);
+  assert(parsed.secure_random);
   for (const auto& item : {std::pair{"pripel_epsilon", "0"},
                            std::pair{"pripel_blocklist", "a,a"},
                            std::pair{"pripel_seed", "-1"},
-                           std::pair{"pripel_max_distance", "-1"}}) {
+                           std::pair{"pripel_max_distance", "-1"},
+                           std::pair{"pripel_secure_random", "unknown"}}) {
     bool threw = false;
     try { (void)minera::parse_pripel_params(fields({item})); }
     catch (const std::invalid_argument&) { threw = true; }

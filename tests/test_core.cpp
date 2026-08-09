@@ -4970,6 +4970,7 @@ void trace_variant_query_json_is_standalone_and_deterministic() {
   assert(first == second);
   assert(first.find("\"family\":\"TRACE_VARIANT_QUERY\"") != std::string::npos);
   assert(first.find("\"variant\":\"laplace\"") != std::string::npos);
+  assert(first.find("\"secure_random\":false") != std::string::npos);
   assert(first.find("\"frequencies\":") != std::string::npos);
   assert(first.find("\"log\":") != std::string::npos);
 }
@@ -4981,6 +4982,7 @@ void pripel_json_is_standalone_and_escapes_diagnostics() {
   const auto json = minera::pripel_json(result);
   assert(json.find("\"family\":\"PRIPEL\"") != std::string::npos);
   assert(json.find("ok \\\"quoted\\\"") != std::string::npos);
+  assert(json.find("\"secure_random\":false") != std::string::npos);
   assert(json.find("\"log\":{\"traces\":[]}") != std::string::npos);
 }
 

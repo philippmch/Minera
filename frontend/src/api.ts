@@ -1437,6 +1437,7 @@ export function traceVariantQuery(options: TraceVariantQueryOptions = {}): strin
     ["tvq_k", options.tvq_k === undefined ? undefined : String(options.tvq_k)],
     ["tvq_p", options.tvq_p === undefined ? undefined : String(options.tvq_p)],
     ["tvq_seed", options.tvq_seed === undefined ? undefined : String(options.tvq_seed)],
+    ["tvq_secure_random", options.tvq_secure_random === undefined ? undefined : String(options.tvq_secure_random)],
     ["tvq_max_output_traces", options.tvq_max_output_traces === undefined ? undefined : String(options.tvq_max_output_traces)],
     ["tvq_max_output_variants", options.tvq_max_output_variants === undefined ? undefined : String(options.tvq_max_output_variants)],
   ];
@@ -1457,6 +1458,7 @@ export function pripelQuery(options: PripelOptions = {}): string {
     ["pripel_epsilon", options.pripel_epsilon === undefined ? undefined : String(options.pripel_epsilon)],
     ["pripel_blocklist", options.pripel_blocklist === undefined ? undefined : options.pripel_blocklist.map(escape).join(",")],
     ["pripel_seed", options.pripel_seed === undefined ? undefined : String(options.pripel_seed)],
+    ["pripel_secure_random", options.pripel_secure_random === undefined ? undefined : String(options.pripel_secure_random)],
     ["pripel_max_output_traces", options.pripel_max_output_traces === undefined ? undefined : String(options.pripel_max_output_traces)],
     ["pripel_max_distance", options.pripel_max_distance === undefined ? undefined : String(options.pripel_max_distance)],
   ];

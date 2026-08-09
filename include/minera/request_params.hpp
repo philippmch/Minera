@@ -210,13 +210,15 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field, const FieldPresence& present);
 
 // Strict wire parser for trace-variant query anonymization. Fields use the
-// `tvq_` prefix: variant, epsilon, k, p, seed, and output safety bounds.
+// `tvq_` prefix: variant, epsilon, k, p, seed, secure randomness, and output
+// safety bounds.
 [[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
     const FieldLookup& field);
 [[nodiscard]] TraceVariantQueryOptions parse_trace_variant_query_params(
     const FieldLookup& field, const FieldPresence& present);
 
-// Strict PRIPEL-style anonymization parser. Fields use the `pripel_` prefix.
+// Strict PRIPEL-style anonymization parser. Fields use the `pripel_` prefix,
+// including the opt-in secure randomness switch.
 [[nodiscard]] PripelOptions parse_pripel_params(const FieldLookup& field);
 [[nodiscard]] PripelOptions parse_pripel_params(
     const FieldLookup& field, const FieldPresence& present);

@@ -13,6 +13,8 @@ struct PripelOptions {
   double epsilon = 1.0;
   std::vector<std::string> blocklist;
   std::uint64_t seed = 0;
+  // When enabled, replace the deterministic seed with one OS entropy draw.
+  bool secure_random = false;
   std::size_t max_output_traces = 100000;
   std::size_t max_distance = 3;
 };
@@ -20,6 +22,7 @@ struct PripelOptions {
 struct PripelDiagnostics {
   double epsilon = 0.0;
   std::uint64_t seed = 0;
+  bool secure_random = false;
   std::size_t query_trace_count = 0;
   std::size_t released_trace_count = 0;
   std::size_t exact_matches = 0;

@@ -1,4 +1,5 @@
 #include "minera/trace_variant_query.hpp"
+#include "minera/secure_random.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -47,8 +48,10 @@ double uniform01(std::uint64_t value) {
 
 std::int64_t laplace_noise(std::uint64_t seed,
                            const TraceVariantQueryPrefix& prefix,
-                           double epsilon) {
-  const double u = uniform01(hash_prefix(seed, prefix)) - 0.5;
+                           double epsilon, bool secure_random) {
+  const auto sample = secure_random ? secure_random_u64()
+                                    : hash_prefix(seed, prefix);
+  const double u = uniform01(sample) - 0.5;
   const double magnitude = -std::log1p(-2.0 * std::abs(u)) / epsilon;
   const double signed_noise = std::copysign(magnitude, u);
   if (signed_noise >= static_cast<double>(std::numeric_limits<std::int64_t>::max()))
@@ -94,6 +97,7 @@ TraceVariantQueryResult anonymize_trace_variant_query(
   result.diagnostics.max_prefix_length = options.max_prefix_length;
   result.diagnostics.prune_threshold = options.prune_threshold;
   result.diagnostics.seed = options.seed;
+  result.diagnostics.secure_random = options.secure_random;
   if (options.max_prefix_length == 0 || log.traces.empty()) {
     result.diagnostics.message = options.max_prefix_length == 0
                                      ? "empty prefix bound"
@@ -184,8 +188,8 @@ TraceVariantQueryResult anonymize_trace_variant_query(
   }
 
   // The exponential-mechanism step is only needed when the candidate set is
-  // larger than the configured bound. A stable weighted key gives deterministic
-  // sampling without relying on implementation-specific distribution details.
+  // larger than the configured bound. Deterministic mode uses a stable weighted
+  // key; secure mode draws each ranking sample from the OS entropy provider.
   if (candidates.size() > options.max_output_variants) {
     if (options.max_output_variants == 0) {
       candidates.clear();
@@ -195,8 +199,11 @@ TraceVariantQueryResult anonymize_trace_variant_query(
       std::vector<Ranked> ranked;
       ranked.reserve(candidates.size());
       for (std::size_t i = 0; i < candidates.size(); ++i) {
-        const double u = uniform01(hash_prefix(options.seed + 0x517cc1b727220a95ULL,
-                                                candidates[i].prefix));
+        const auto sample = options.secure_random
+                                ? secure_random_u64()
+                                : hash_prefix(options.seed + 0x517cc1b727220a95ULL,
+                                              candidates[i].prefix);
+        const double u = uniform01(sample);
         const double weight = std::exp(std::min(40.0, options.epsilon * candidates[i].score));
         ranked.push_back({-std::log(u) / std::max(weight, 1e-300), i});
       }
@@ -219,7 +226,8 @@ TraceVariantQueryResult anonymize_trace_variant_query(
   for (const auto& candidate : candidates) {
     const auto released = add_noise(candidate.count,
                                     laplace_noise(options.seed, candidate.prefix,
-                                                  options.epsilon));
+                                                  options.epsilon,
+                                                  options.secure_random));
     if (released < options.prune_threshold) continue;
     result.frequencies.emplace(candidate.prefix, released);
   }
