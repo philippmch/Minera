@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, attributeStatisticsQuery, requestAttributeStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, attributeStatisticsQuery, requestAttributeStatistics, boundaryActivitiesQuery, requestBoundaryActivities } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -269,6 +269,31 @@ describe("attribute statistics API", () => {
     await expect(requestAttributeStatistics({
       attribute_statistics_key: "region", attribute_statistics_scope: "traces",
     })).resolves.toMatchObject({ family: "ATTRIBUTE_STATISTICS", scope: "TRACES" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("boundary-activities statistics API", () => {
+  it("serializes variant and activity key", () => {
+    expect(boundaryActivitiesQuery({
+      boundary_activities_variant: "start",
+      boundary_activities_activity_key: "phase",
+    })).toBe("boundary_activities_variant=start&boundary_activities_activity_key=phase");
+    expect(() => boundaryActivitiesQuery({ boundary_activities_variant: "other" as never })).toThrow(/not supported/);
+  });
+
+  it("posts and validates start/end counts", async () => {
+    const payload = {
+      family: "BOUNDARY_ACTIVITIES", variant: "BOTH",
+      starts: { A: 2 }, ends: { B: 1 },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/boundary-activities?boundary_activities_variant=both");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestBoundaryActivities({ boundary_activities_variant: "both" }))
+      .resolves.toMatchObject({ family: "BOUNDARY_ACTIVITIES", variant: "BOTH" });
     vi.unstubAllGlobals();
   });
 });

@@ -23,6 +23,7 @@ add_library(minera_core
   src/alpha_miner.cpp
   src/activity_split.cpp
   src/attribute_statistics.cpp
+  src/boundary_activities.cpp
   src/attribute_value_repetition.cpp
   src/case_grouping.cpp
   src/chaotic_activities.cpp
@@ -452,6 +453,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_attribute_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_attribute_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_attribute_statistics_tests COMMAND minera_attribute_statistics_tests)
+
+  add_executable(minera_boundary_activities_tests tests/test_boundary_activities.cpp)
+  target_link_libraries(minera_boundary_activities_tests PRIVATE minera::core)
+  target_compile_features(minera_boundary_activities_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_boundary_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_boundary_activities_tests COMMAND minera_boundary_activities_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -216,6 +216,18 @@ describe("isAttributeStatisticsResult", () => {
   it("rejects negative or fractional counts", () => {
     expect(isAttributeStatisticsResult({ ...valid, values: { A: -1 } })).toBe(false);
     expect(isAttributeStatisticsResult({ ...valid, values: { A: 1.5 } })).toBe(false);
+  });
+});
+
+describe("isBoundaryActivitiesResult", () => {
+  const valid = {
+    family: "BOUNDARY_ACTIVITIES", variant: "BOTH",
+    starts: { A: 2 }, ends: { B: 1 },
+  };
+  it("accepts the boundary envelope", () => expect(isBoundaryActivitiesResult(valid)).toBe(true));
+  it("rejects invalid counts and variants", () => {
+    expect(isBoundaryActivitiesResult({ ...valid, variant: "OTHER" })).toBe(false);
+    expect(isBoundaryActivitiesResult({ ...valid, starts: { A: -1 } })).toBe(false);
   });
 });
 

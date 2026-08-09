@@ -2744,6 +2744,34 @@ export function isAttributeStatisticsResult(
     .every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0);
 }
 
+export interface BoundaryActivitiesOptions {
+  boundary_activities_variant?: "start" | "end" | "both";
+  boundary_activities_activity_key?: string;
+}
+
+export interface BoundaryActivitiesResult {
+  family: "BOUNDARY_ACTIVITIES";
+  variant: "START" | "END" | "BOTH";
+  starts: Record<string, number>;
+  ends: Record<string, number>;
+}
+
+export function isBoundaryActivitiesResult(
+  value: unknown,
+): value is BoundaryActivitiesResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<BoundaryActivitiesResult>;
+  if (data.family !== "BOUNDARY_ACTIVITIES" ||
+      !["START", "END", "BOTH"].includes(data.variant ?? "") ||
+      typeof data.starts !== "object" || data.starts === null || Array.isArray(data.starts) ||
+      typeof data.ends !== "object" || data.ends === null || Array.isArray(data.ends))
+    return false;
+  const valid = (map: Record<string, unknown>) =>
+    Object.values(map).every((count) => typeof count === "number" && Number.isInteger(count) && count >= 0);
+  return valid(data.starts as Record<string, unknown>) &&
+    valid(data.ends as Record<string, unknown>);
+}
+
 export function isReworkResult(value: unknown): value is ReworkResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<ReworkResult>;

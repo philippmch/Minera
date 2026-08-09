@@ -276,6 +276,13 @@ strict request parser, and typed frontend API share the
 `ATTRIBUTE_STATISTICS` envelope; focused tests cover both scopes, deduplication,
 missing values, custom attributes, and count validation.
 
+Boundary-activity evidence: `discover_boundary_activities` exposes START, END,
+and BOTH counts for configurable activity-like event attributes, skipping empty
+traces and missing boundary values. The standalone CLI,
+`POST /api/boundary-activities`, strict request parser, and typed frontend API
+share the `BOUNDARY_ACTIVITIES` envelope; focused tests cover all variants,
+custom keys, empty traces, and malformed counts.
+
 Rework evidence: `discover_rework` exposes the activity variant (number of
 cases containing repeated activity occurrences) and the cases variant (total
 events and total repeated-activity count per case), with custom activity and

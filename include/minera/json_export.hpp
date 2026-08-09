@@ -24,6 +24,7 @@
 #include "minera/batches.hpp"
 #include "minera/chaotic_activities.hpp"
 #include "minera/attribute_statistics.hpp"
+#include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/petri_net.hpp"
@@ -305,6 +306,8 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string case_arrival_json(const CaseArrivalResult& result);
 [[nodiscard]] std::string attribute_statistics_json(
     const AttributeStatisticsResult& result);
+[[nodiscard]] std::string boundary_activities_json(
+    const BoundaryActivitiesResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(
