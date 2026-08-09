@@ -123,6 +123,8 @@ import {
   type CaseArrivalOptions,
   type AttributeStatisticsResult,
   type AttributeStatisticsOptions,
+  type BoundaryActivitiesResult,
+  type BoundaryActivitiesOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -146,6 +148,7 @@ import {
   isCycleTimeResult,
   isCaseArrivalResult,
   isAttributeStatisticsResult,
+  isBoundaryActivitiesResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1644,6 +1647,27 @@ export function requestAttributeStatistics(options: AttributeStatisticsOptions =
   return postChecked(`/api/attribute-statistics${query ? `?${query}` : ""}`, isAttributeStatisticsResult, "attribute statistics");
 }
 export const discoverAttributeStatistics = requestAttributeStatistics;
+
+export function boundaryActivitiesQuery(options: BoundaryActivitiesOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.boundary_activities_variant !== undefined) {
+    if (!["start", "end", "both"].includes(options.boundary_activities_variant))
+      throw new Error("boundary_activities_variant is not supported");
+    query.set("boundary_activities_variant", options.boundary_activities_variant);
+  }
+  if (options.boundary_activities_activity_key !== undefined) {
+    if (!options.boundary_activities_activity_key)
+      throw new Error("boundary_activities_activity_key must not be empty");
+    query.set("boundary_activities_activity_key", options.boundary_activities_activity_key);
+  }
+  return query.toString();
+}
+
+export function requestBoundaryActivities(options: BoundaryActivitiesOptions = {}): Promise<BoundaryActivitiesResult> {
+  const query = boundaryActivitiesQuery(options);
+  return postChecked(`/api/boundary-activities${query ? `?${query}` : ""}`, isBoundaryActivitiesResult, "boundary activities");
+}
+export const discoverBoundaryActivities = requestBoundaryActivities;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

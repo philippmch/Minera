@@ -4091,6 +4091,28 @@ std::string attribute_statistics_json(
   return out.str();
 }
 
+std::string boundary_activities_json(const BoundaryActivitiesResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"BOUNDARY_ACTIVITIES\",\"variant\":\""
+      << boundary_activities_variant_name(result.variant)
+      << "\",\"starts\":{";
+  std::size_t index = 0;
+  for (const auto& [activity, count] : result.starts) {
+    if (index++) out << ',';
+    write_json_string(out, activity);
+    out << ':' << count;
+  }
+  out << "},\"ends\":{";
+  index = 0;
+  for (const auto& [activity, count] : result.ends) {
+    if (index++) out << ',';
+    write_json_string(out, activity);
+    out << ':' << count;
+  }
+  out << "}}";
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

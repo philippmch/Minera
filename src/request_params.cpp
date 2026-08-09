@@ -3497,4 +3497,38 @@ AttributeStatisticsOptions parse_attribute_statistics_params(
   return options;
 }
 
+BoundaryActivitiesOptions parse_boundary_activities_params(
+    const FieldLookup& field) {
+  return parse_boundary_activities_params(field, {});
+}
+
+BoundaryActivitiesOptions parse_boundary_activities_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  BoundaryActivitiesOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("boundary_activities_variant")) {
+    const auto value = require("boundary_activities_variant");
+    if (value == "start" || value == "START")
+      options.variant = BoundaryActivitiesVariant::kStart;
+    else if (value == "end" || value == "END")
+      options.variant = BoundaryActivitiesVariant::kEnd;
+    else if (value == "both" || value == "BOTH")
+      options.variant = BoundaryActivitiesVariant::kBoth;
+    else
+      throw std::invalid_argument(
+          "boundary_activities_variant: expected start, end, or both");
+  }
+  if (supplied("boundary_activities_activity_key"))
+    options.activity_key = require("boundary_activities_activity_key");
+  return options;
+}
+
 }  // namespace minera
