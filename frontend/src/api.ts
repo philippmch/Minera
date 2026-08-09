@@ -109,6 +109,8 @@ import {
   type StochasticPlayoutOptions,
   type MonteCarloOptions,
   type MonteCarloResult,
+  type ChaoticActivitiesResult,
+  type ChaoticActivitiesOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -125,6 +127,7 @@ import {
   isMineraExport,
   isPetriUsageComparison,
   isMonteCarloResult,
+  isChaoticActivitiesResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1418,6 +1421,46 @@ export function requestLocalDiagnostics(options: LocalDiagnosticsOptions = {}): 
   return postChecked(`/api/local-diagnostics${query ? `?${query}` : ""}`, isLocalDiagnosticsResult, "local diagnostics");
 }
 export const discoverLocalDiagnostics = requestLocalDiagnostics;
+
+/** Query string for the cached-session chaotic-activity statistics endpoint. */
+export function chaoticActivitiesQuery(
+  options: ChaoticActivitiesOptions = {},
+): string {
+  const query = new URLSearchParams();
+  if (options.chaotic_activity_key !== undefined) {
+    const key = options.chaotic_activity_key.trim();
+    if (!key) throw new Error("chaotic_activity_key must not be empty");
+    query.set("chaotic_activity_key", key);
+  }
+  if (options.chaotic_alpha !== undefined) {
+    if (!Number.isFinite(options.chaotic_alpha) || options.chaotic_alpha < 0)
+      throw new Error("chaotic_alpha must be finite and non-negative");
+    query.set("chaotic_alpha", String(options.chaotic_alpha));
+  }
+  for (const [name, value] of [
+    ["chaotic_max_activities", options.chaotic_max_activities],
+    ["chaotic_max_events", options.chaotic_max_events],
+  ] as const) {
+    if (value !== undefined) {
+      if (!Number.isInteger(value) || value <= 0)
+        throw new Error(`${name} must be a positive integer`);
+      query.set(name, String(value));
+    }
+  }
+  return query.toString();
+}
+
+export function requestChaoticActivities(
+  options: ChaoticActivitiesOptions = {},
+): Promise<ChaoticActivitiesResult> {
+  const query = chaoticActivitiesQuery(options);
+  return postChecked(
+    `/api/chaotic-activities${query ? `?${query}` : ""}`,
+    isChaoticActivitiesResult,
+    "chaotic activities",
+  );
+}
+export const discoverChaoticActivities = requestChaoticActivities;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

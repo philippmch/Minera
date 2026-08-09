@@ -3920,6 +3920,42 @@ std::string pripel_json(const PripelResult& result) {
   return out.str();
 }
 
+std::string chaotic_activities_json(const ChaoticActivitiesResult& result) {
+  if (!std::isfinite(result.diagnostics.alpha) ||
+      result.diagnostics.alpha < 0.0)
+    throw std::invalid_argument("chaotic activity alpha must be finite and non-negative");
+  for (const auto& row : result.activities) {
+    if (!std::isfinite(row.entropy) || !std::isfinite(row.entropy_smooth) ||
+        !std::isfinite(row.entropy_gain) ||
+        !std::isfinite(row.chaotic_score))
+      throw std::invalid_argument("chaotic activity metrics must be finite");
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"CHAOTIC_ACTIVITIES\",\"variant\":\"NIEK_SIDOROVA\",\"alpha\":"
+      << std::setprecision(17) << result.diagnostics.alpha
+      << ",\"activities\":[";
+  for (std::size_t i = 0; i < result.activities.size(); ++i) {
+    if (i) out << ',';
+    const auto& row = result.activities[i];
+    out << "{\"activity\":";
+    write_json_string(out, row.activity);
+    out << ",\"frequency\":" << row.frequency
+        << ",\"entropy\":" << std::setprecision(17) << row.entropy
+        << ",\"entropy_smooth\":" << row.entropy_smooth
+        << ",\"entropy_gain\":" << row.entropy_gain
+        << ",\"chaotic_score\":" << row.chaotic_score << '}';
+  }
+  const auto& diagnostics = result.diagnostics;
+  out << "],\"diagnostics\":{\"activity_count\":"
+      << diagnostics.activity_count << ",\"event_count\":"
+      << diagnostics.event_count << ",\"output_truncated\":"
+      << (diagnostics.output_truncated ? "true" : "false")
+      << ",\"message\":";
+  write_json_string(out, diagnostics.message);
+  out << "}}";
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

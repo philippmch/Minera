@@ -1,4 +1,5 @@
 #include "minera/chaotic_activities.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -55,9 +56,21 @@ void supports_custom_activity_attributes_and_validation() {
   assert(threw);
 }
 
+void serializes_a_stable_json_envelope() {
+  const auto result = minera::discover_chaotic_activities(log());
+  const auto json = minera::chaotic_activities_json(result);
+  assert(json.find("\"family\":\"CHAOTIC_ACTIVITIES\"") !=
+         std::string::npos);
+  assert(json.find("\"variant\":\"NIEK_SIDOROVA\"") !=
+         std::string::npos);
+  assert(json.find("\"diagnostics\":") != std::string::npos);
+  assert(json == minera::chaotic_activities_json(result));
+}
+
 }  // namespace
 
 int main() {
   computes_deterministic_entropy_metrics();
   supports_custom_activity_attributes_and_validation();
+  serializes_a_stable_json_envelope();
 }

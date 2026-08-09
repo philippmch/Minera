@@ -133,6 +133,8 @@ constexpr std::size_t kServerTvqMaxOutputTraces = 100'000;
 constexpr std::size_t kServerTvqMaxOutputVariants = 100'000;
 constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
 constexpr std::size_t kServerOcelFilterMaxLevel = 32;
+constexpr std::size_t kServerChaoticMaxActivities = 100'000;
+constexpr std::size_t kServerChaoticMaxEvents = 1'000'000;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -1664,6 +1666,47 @@ void handle_clustering(const httplib::Request& request, httplib::Response& respo
     const auto o=minera::parse_clustering_params(lookup,present);
     response.set_content(minera::trace_attribute_clustering_json(minera::discover_trace_attribute_clustering(session->log,o)),"application/json");
   } catch (const std::exception& e) { response.status=400; response.set_content(error_json(e.what()),"application/json"); }
+}
+
+void handle_chaotic_activities(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "chaotic_activity_key", "chaotic_alpha", "chaotic_max_activities",
+        "chaotic_max_events"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown chaotic-activities parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    auto options = minera::parse_chaotic_activities_params(lookup, present);
+    if (options.max_activities > kServerChaoticMaxActivities ||
+        options.max_events > kServerChaoticMaxEvents)
+      throw std::invalid_argument("chaotic-activities safety bound exceeded");
+    response.set_content(
+        minera::chaotic_activities_json(
+            minera::discover_chaotic_activities(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 // Hidden cached-session adapter for trace-variant query anonymization. The
@@ -3413,6 +3456,7 @@ int main(int argc, char** argv) {
   server.Options("/api/resource-profiles", preflight);
   server.Options("/api/local-diagnostics", preflight);
   server.Options("/api/clustering", preflight);
+  server.Options("/api/chaotic-activities", preflight);
   server.Options("/api/trace-variant-query", preflight);
   server.Options("/api/anonymize-trace-variants", preflight);
   server.Options("/api/pripel", preflight);
@@ -3471,6 +3515,7 @@ int main(int argc, char** argv) {
   server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
+  server.Post("/api/chaotic-activities", handle_chaotic_activities);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
   server.Post("/api/anonymize-trace-variants", handle_trace_variant_query);
   server.Post("/api/pripel", handle_pripel);
