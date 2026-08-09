@@ -3428,4 +3428,34 @@ CycleTimeOptions parse_cycle_time_params(const FieldLookup& field,
   return options;
 }
 
+CaseArrivalOptions parse_case_arrival_params(const FieldLookup& field) {
+  return parse_case_arrival_params(field, {});
+}
+
+CaseArrivalOptions parse_case_arrival_params(const FieldLookup& field,
+                                             const FieldPresence& present) {
+  CaseArrivalOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("case_arrival_timestamp_key"))
+    options.timestamp_key = require("case_arrival_timestamp_key");
+  if (supplied("case_arrival_business_hours"))
+    options.use_business_hours = parse_boolean(
+        require("case_arrival_business_hours"), "case_arrival_business_hours");
+  if (supplied("case_arrival_business_hour_slots"))
+    options.business_hour_slots = parse_business_hour_slots(
+        require("case_arrival_business_hour_slots"),
+        "case_arrival_business_hour_slots");
+  if (!options.use_business_hours && !options.business_hour_slots.empty())
+    options.business_hour_slots.clear();
+  return options;
+}
+
 }  // namespace minera

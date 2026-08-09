@@ -28,6 +28,7 @@ add_library(minera_core
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
+  src/case_arrival.cpp
   src/oc_causal_net.cpp
   src/conformance.cpp
   src/concept_drift.cpp
@@ -438,6 +439,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_cycle_time_tests PRIVATE cxx_std_20)
   target_compile_options(minera_cycle_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_cycle_time_tests COMMAND minera_cycle_time_tests)
+
+  add_executable(minera_case_arrival_tests tests/test_case_arrival.cpp)
+  target_link_libraries(minera_case_arrival_tests PRIVATE minera::core)
+  target_compile_features(minera_case_arrival_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_case_arrival_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_case_arrival_tests COMMAND minera_case_arrival_tests)
 
   add_executable(minera_process_tree_playout_tests
     tests/test_process_tree_playout.cpp

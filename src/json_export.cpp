@@ -4055,6 +4055,22 @@ std::string cycle_time_json(const CycleTimeResult& result) {
   return out.str();
 }
 
+std::string case_arrival_json(const CaseArrivalResult& result) {
+  if (!std::isfinite(result.arrival_average) ||
+      !std::isfinite(result.dispersion_average) ||
+      result.arrival_average < 0.0 || result.dispersion_average < 0.0) {
+    throw std::invalid_argument(
+        "case arrival averages must be finite and non-negative");
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"CASE_ARRIVAL\",\"variant\":\"CLASSIC\","
+      << "\"arrival_average\":" << result.arrival_average
+      << ",\"dispersion_average\":" << result.dispersion_average
+      << ",\"timed_starts\":" << result.timed_starts
+      << ",\"timed_ends\":" << result.timed_ends << '}';
+  return out.str();
+}
+
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
   const char* variant = "handover";
   switch (result.variant) {

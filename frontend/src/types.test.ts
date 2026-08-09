@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -190,6 +190,19 @@ describe("isCycleTimeResult", () => {
   it("rejects negative or non-integral diagnostics", () => {
     expect(isCycleTimeResult({ ...valid, cycle_time: -1 })).toBe(false);
     expect(isCycleTimeResult({ ...valid, instances: 1.5 })).toBe(false);
+  });
+});
+
+describe("isCaseArrivalResult", () => {
+  const valid = {
+    family: "CASE_ARRIVAL", variant: "CLASSIC",
+    arrival_average: 7200, dispersion_average: 7200,
+    timed_starts: 3, timed_ends: 3,
+  };
+  it("accepts the arrival envelope", () => expect(isCaseArrivalResult(valid)).toBe(true));
+  it("rejects invalid averages and counts", () => {
+    expect(isCaseArrivalResult({ ...valid, arrival_average: -1 })).toBe(false);
+    expect(isCaseArrivalResult({ ...valid, timed_ends: 1.5 })).toBe(false);
   });
 });
 

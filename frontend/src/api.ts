@@ -119,6 +119,8 @@ import {
   type ReworkOptions,
   type CycleTimeResult,
   type CycleTimeOptions,
+  type CaseArrivalResult,
+  type CaseArrivalOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
@@ -140,6 +142,7 @@ import {
   isServiceTimeResult,
   isReworkResult,
   isCycleTimeResult,
+  isCaseArrivalResult,
 } from "./types";
 
 export interface CsvOptions {
@@ -1587,6 +1590,31 @@ export function requestCycleTime(options: CycleTimeOptions = {}): Promise<CycleT
   return postChecked(`/api/cycle-time${query ? `?${query}` : ""}`, isCycleTimeResult, "cycle time");
 }
 export const discoverCycleTime = requestCycleTime;
+
+export function caseArrivalQuery(options: CaseArrivalOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of [
+    ["case_arrival_timestamp_key", options.case_arrival_timestamp_key],
+    ["case_arrival_business_hour_slots", options.case_arrival_business_hour_slots],
+  ] as const) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  if (options.case_arrival_business_hours !== undefined) {
+    if (typeof options.case_arrival_business_hours !== "boolean")
+      throw new Error("case_arrival_business_hours must be boolean");
+    query.set("case_arrival_business_hours", String(options.case_arrival_business_hours));
+  }
+  return query.toString();
+}
+
+export function requestCaseArrival(options: CaseArrivalOptions = {}): Promise<CaseArrivalResult> {
+  const query = caseArrivalQuery(options);
+  return postChecked(`/api/case-arrival${query ? `?${query}` : ""}`, isCaseArrivalResult, "case arrival");
+}
+export const discoverCaseArrival = requestCaseArrival;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));

@@ -23,6 +23,7 @@
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
 #include "minera/chaotic_activities.hpp"
+#include "minera/case_arrival.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/powl.hpp"
@@ -300,6 +301,7 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string service_time_json(const ServiceTimeResult& result);
 [[nodiscard]] std::string rework_json(const ReworkResult& result);
 [[nodiscard]] std::string cycle_time_json(const CycleTimeResult& result);
+[[nodiscard]] std::string case_arrival_json(const CaseArrivalResult& result);
 [[nodiscard]] std::string organizational_sna_json(
     const OrganizationalSnaResult& result);
 [[nodiscard]] std::string network_analysis_json(

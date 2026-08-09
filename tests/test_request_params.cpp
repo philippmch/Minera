@@ -374,6 +374,24 @@ void cycle_time_params_contract() {
   assert(rejected);
 }
 
+void case_arrival_params_contract() {
+  const auto options = minera::parse_case_arrival_params(fields({
+      {"case_arrival_timestamp_key", "occurred_at"},
+      {"case_arrival_business_hours", "true"},
+      {"case_arrival_business_hour_slots", "28800-43200"}}));
+  assert(options.timestamp_key == "occurred_at");
+  assert(options.use_business_hours);
+  assert(options.business_hour_slots.size() == 1);
+  bool rejected = false;
+  try {
+    (void)minera::parse_case_arrival_params(fields({
+        {"case_arrival_business_hours", "maybe"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2363,5 +2381,6 @@ int main() {
   service_time_params_contract();
   rework_params_contract();
   cycle_time_params_contract();
+  case_arrival_params_contract();
   return 0;
 }
