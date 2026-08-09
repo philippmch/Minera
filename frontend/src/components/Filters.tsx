@@ -126,6 +126,9 @@ export function Filters({
   const [reworkMin, setReworkMin] = useState("");
   const [betweenStart, setBetweenStart] = useState("");
   const [betweenEnd, setBetweenEnd] = useState("");
+  const [activitySplitActivity, setActivitySplitActivity] = useState("");
+  const [activitySplitSeparator, setActivitySplitSeparator] = useState("##@@");
+  const [activitySplitCutMode, setActivitySplitCutMode] = useState<"this" | "next">("this");
   const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
   const [prefixActivity, setPrefixActivity] = useState("");
   const [suffixActivity, setSuffixActivity] = useState("");
@@ -563,6 +566,9 @@ export function Filters({
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
       betweenEnd: betweenStart && betweenEnd ? betweenEnd : undefined,
+      activitySplit: activitySplitActivity ? [activitySplitActivity] : undefined,
+      activitySplitSeparator: activitySplitActivity ? activitySplitSeparator : undefined,
+      activitySplitCutMode: activitySplitActivity ? activitySplitCutMode : undefined,
       attributeKey: removeValueList.length > 0 ? attributeKey : undefined,
       removeAttributeValues:
         removeValueList.length > 0 ? removeValueList : undefined,
@@ -716,6 +722,9 @@ export function Filters({
     setReworkMin("");
     setBetweenStart("");
     setBetweenEnd("");
+    setActivitySplitActivity("");
+    setActivitySplitSeparator("##@@");
+    setActivitySplitCutMode("this");
     setVariantCoverage("");
     setPrefixActivity("");
     setSuffixActivity("");
@@ -826,6 +835,9 @@ export function Filters({
     reworkActivity !== "" ||
     betweenStart !== "" ||
     betweenEnd !== "" ||
+    activitySplitActivity !== "" ||
+    (activitySplitActivity !== "" && activitySplitSeparator !== "##@@") ||
+    (activitySplitActivity !== "" && activitySplitCutMode !== "this") ||
     prefixActivity !== "" ||
     suffixActivity !== "" ||
     segmentPrefixActivity !== "" ||
@@ -1409,6 +1421,41 @@ export function Filters({
                   </option>
                 ))}
               </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Split cases at</span>
+              <select
+                value={activitySplitActivity}
+                onChange={(e) => setActivitySplitActivity(e.target.value)}
+              >
+                <option value="">off</option>
+                {activities.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>split mode</span>
+              <select
+                value={activitySplitCutMode}
+                disabled={!activitySplitActivity}
+                onChange={(e) => setActivitySplitCutMode(e.target.value as "this" | "next")}
+              >
+                <option value="this">anchor starts new case</option>
+                <option value="next">following event starts new case</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>case-id separator</span>
+              <input
+                type="text"
+                value={activitySplitSeparator}
+                disabled={!activitySplitActivity}
+                onChange={(e) => setActivitySplitSeparator(e.target.value)}
+              />
             </label>
           </div>
 

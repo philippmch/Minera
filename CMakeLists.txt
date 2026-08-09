@@ -21,6 +21,7 @@ endif()
 
 add_library(minera_core
   src/alpha_miner.cpp
+  src/activity_split.cpp
   src/bpmn.cpp
   src/batches.cpp
   src/case_relations.cpp
@@ -238,6 +239,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dfg_filter_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_filter_tests COMMAND minera_dfg_filter_tests)
+
+  add_executable(minera_activity_split_tests
+    tests/test_activity_split.cpp
+  )
+  target_link_libraries(minera_activity_split_tests PRIVATE minera::core)
+  target_compile_features(minera_activity_split_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_activity_split_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_activity_split_tests COMMAND minera_activity_split_tests)
 
   add_executable(minera_ltl_filter_tests
     tests/test_ltl_filter.cpp

@@ -263,6 +263,15 @@ cells retain their case-id sets, composite names accept escaped comma-delimited
 CLI/query lists, and malformed JSON, ragged rows, mixed scalar types, non-finite
 values, and unsafe division limits are rejected at the boundary.
 
+Activity-split evidence: the native log filter splits every non-empty trace at
+one or more anchor activities, preserves event/trace/log attributes, rewrites
+case ids with a deterministic separator and zero-based suffix, and supports
+both anchor-in-new-case (`this`) and following-event-in-new-case (`next`)
+modes. Strict request parsing, CLI flags, local mine-server fields, and the
+frontend form/serializer expose the same operation; focused tests cover
+multiple anchors, no-match traces, attributes, case-id synchronization, and
+invalid options.
+
 DFG interchange evidence: the strict classic text parser and deterministic
 writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
 validates, and normalizes a document (or writes it to an explicit output path),
