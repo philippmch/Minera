@@ -31,6 +31,7 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/dfg_conversion.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
@@ -3224,6 +3225,40 @@ void handle_dfg_import(const httplib::Request& request,
   }
 }
 
+void handle_dfg_conversion(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "variant" && key != "artificial_start_activity" &&
+          key != "artificial_end_activity") {
+        throw std::invalid_argument("unknown DFG conversion parameter: " + key);
+      }
+    }
+    const auto body = ocel_request_body(request, "dfg");
+    if (body.empty()) throw std::invalid_argument("missing DFG text body");
+    minera::DfgPetriConversionOptions options;
+    if (request.has_param("variant")) {
+      options.variant = minera::parse_dfg_petri_conversion_variant(
+          request.get_param_value("variant"));
+    }
+    if (request.has_param("artificial_start_activity"))
+      options.artificial_start_activity =
+          request.get_param_value("artificial_start_activity");
+    if (request.has_param("artificial_end_activity"))
+      options.artificial_end_activity =
+          request.get_param_value("artificial_end_activity");
+    const auto net = minera::convert_dfg_to_petri_net(
+        minera::parse_dfg(body), options);
+    response.set_content(
+        minera::serialize_dfg_petri_net_json(net, options.variant),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_process_cube(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -3369,6 +3404,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
+  server.Options("/api/dfg-to-petri", preflight);
   server.Options("/api/process-cube", preflight);
 
   server.Post("/api/mine", handle_mine);
@@ -3429,6 +3465,7 @@ int main(int argc, char** argv) {
   server.Get("/api/xes", handle_xes);
   server.Get("/api/dfg", handle_dfg);
   server.Post("/api/dfg", handle_dfg_import);
+  server.Post("/api/dfg-to-petri", handle_dfg_conversion);
   server.Post("/api/process-cube", handle_process_cube);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);

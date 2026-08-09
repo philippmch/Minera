@@ -11,6 +11,8 @@ import {
   type ModelConformance,
   type DfgAlignmentOptions,
   type DfgAlignmentResult,
+  type DfgPetriConversionOptions,
+  type DfgPetriConversionResult,
   type EditDistanceOptions,
   type EditDistanceResult,
   type EvaluationOptions,
@@ -108,6 +110,7 @@ import {
   type DfgPlayoutOptions,
   type PetriUsageComparison,
   isDfgAlignmentResult,
+  isDfgPetriConversionResult,
   isEditDistanceResult,
   isModelEvaluation,
   isPetriAnalysisResult,
@@ -1688,6 +1691,45 @@ export async function importDfg(document: Blob): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+export function dfgPetriConversionQuery(options: DfgPetriConversionOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  for (const [key, value] of [
+    ["artificial_start_activity", options.artificial_start_activity],
+    ["artificial_end_activity", options.artificial_end_activity],
+  ] as const) {
+    if (value !== undefined) {
+      if (value.trim() === "") throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  return query.toString();
+}
+
+export async function convertDfgToPetriNet(
+  document: Blob,
+  options: DfgPetriConversionOptions = {},
+): Promise<DfgPetriConversionResult> {
+  const query = dfgPetriConversionQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/dfg-to-petri${query ? `?${query}` : ""}`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: document,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (parsed && typeof parsed === "object" && "error" in parsed)
+    throw new Error(String((parsed as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isDfgPetriConversionResult(parsed))
+    throw new Error("the Minera backend returned an invalid DFG conversion");
+  return parsed;
 }
 
 export interface ProcessCubeOptions {

@@ -218,7 +218,7 @@ this traditional-log vertical.
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes; no stream/columnar adapter |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object relations, o2o links, object changes, scalar globals, and classic/standard JSON parsing are present; e2e, richer value types, and full schema coverage remain |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
-| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN to workflow nets, tree to POWL, and tree/net to BPMN; remaining DFG/trie/object-centric and adapter conversions are absent |
+| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN and both classic DFG-to-Petri constructions to workflow nets, tree to POWL, and tree/net to BPMN; remaining trie/object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
@@ -292,6 +292,14 @@ writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
 validates, and normalizes a document (or writes it to an explicit output path),
 local `POST /api/dfg` accepts raw DFG text and returns the canonical document,
 and the typed frontend `importDfg` helper exposes the same validation path.
+
+DFG conversion evidence: both classic DFG-to-workflow-net constructions are
+available as deterministic native APIs: activity-defines-place emits one
+visible transition per start or edge occurrence, while invisibles-no-duplicates
+emits one visible transition per activity and silent edge routing. Boundary
+activities are inferred when omitted, artificial names are collision-checked,
+and the standalone DFG CLI, local conversion endpoint, and typed frontend
+adapter share a validated `DFG_CONVERSION` envelope.
 
 ## Delivery order
 

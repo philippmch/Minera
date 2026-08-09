@@ -1538,6 +1538,29 @@ export interface DfgAlignmentResult {
   projected_log?: unknown;
 }
 
+export type DfgPetriConversionVariant =
+  | "ACTIVITY_DEFINES_PLACE"
+  | "INVISIBLES_NO_DUPLICATES";
+export interface DfgPetriConversionOptions {
+  variant?: DfgPetriConversionVariant;
+  artificial_start_activity?: string;
+  artificial_end_activity?: string;
+}
+export interface DfgPetriConversionTransition {
+  activity: number | null;
+  inputs: number[];
+  outputs: number[];
+}
+export interface DfgPetriConversionResult {
+  family: "DFG_CONVERSION";
+  variant: DfgPetriConversionVariant;
+  source: number;
+  sink: number;
+  activities: string[];
+  place_count: number;
+  transitions: DfgPetriConversionTransition[];
+}
+
 export type EditDistanceVariant = "EDIT_DISTANCE";
 export interface EditDistanceOptions {
   variant?: EditDistanceVariant;
@@ -1779,6 +1802,32 @@ export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResul
       !Number.isInteger(value.unique_variants) || !Array.isArray(value.alignments)) return false;
   return value.alignments.every((a) => isRecord(a) && finite(a.cost) && finite(a.internal_cost) &&
     finite(a.fitness) && Array.isArray(a.moves) && a.moves.every((m) => isRecord(m) && typeof m.log === "string" && typeof m.model === "string"));
+}
+const nonNegativeIntArray = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((item) => Number.isInteger(item) && (item as number) >= 0);
+export function isDfgPetriConversionResult(
+  value: unknown,
+): value is DfgPetriConversionResult {
+  if (!isRecord(value) || value.family !== "DFG_CONVERSION" ||
+      !["ACTIVITY_DEFINES_PLACE", "INVISIBLES_NO_DUPLICATES"].includes(value.variant as string) ||
+      !Number.isInteger(value.source) || (value.source as number) < 0 ||
+      !Number.isInteger(value.sink) || (value.sink as number) < 0 ||
+      !Number.isInteger(value.place_count) || (value.place_count as number) <= 0 ||
+      !Array.isArray(value.activities) || !Array.isArray(value.transitions)) return false;
+  const activities = value.activities as unknown[];
+  const placeCount = value.place_count as number;
+  if ((value.source as number) >= placeCount ||
+      (value.sink as number) >= placeCount ||
+      !activities.every((activity) => typeof activity === "string")) return false;
+  return value.transitions.every((transition) => {
+    if (!isRecord(transition) ||
+        !(transition.activity === null ||
+          (Number.isInteger(transition.activity) && (transition.activity as number) >= 0 &&
+           (transition.activity as number) < activities.length)) ||
+        !nonNegativeIntArray(transition.inputs) || !nonNegativeIntArray(transition.outputs)) return false;
+    return transition.inputs.every((place) => place < placeCount) &&
+      transition.outputs.every((place) => place < placeCount);
+  });
 }
 export function isEditDistanceResult(value: unknown): value is EditDistanceResult {
   if (!isRecord(value) || value.family !== "EDIT_DISTANCE" || value.variant !== "EDIT_DISTANCE" ||
