@@ -3458,6 +3458,63 @@ CaseArrivalOptions parse_case_arrival_params(const FieldLookup& field,
   return options;
 }
 
+CaseStatisticsOptions parse_case_statistics_params(const FieldLookup& field) {
+  return parse_case_statistics_params(field, {});
+}
+
+CaseStatisticsOptions parse_case_statistics_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  CaseStatisticsOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("case_statistics_case_id_key"))
+    options.case_id_key = require("case_statistics_case_id_key");
+  if (supplied("case_statistics_timestamp_key"))
+    options.timestamp_key = require("case_statistics_timestamp_key");
+  if (supplied("case_statistics_enable_sort"))
+    options.enable_sort = parse_boolean(require("case_statistics_enable_sort"),
+                                        "case_statistics_enable_sort");
+  if (supplied("case_statistics_sort_by")) {
+    const auto value = require("case_statistics_sort_by");
+    if (value == "case_id" || value == "CASE_ID")
+      options.sort_by = CaseStatisticsSortBy::kCaseId;
+    else if (value == "start_time" || value == "START_TIME")
+      options.sort_by = CaseStatisticsSortBy::kStartTime;
+    else if (value == "end_time" || value == "END_TIME")
+      options.sort_by = CaseStatisticsSortBy::kEndTime;
+    else if (value == "duration" || value == "DURATION")
+      options.sort_by = CaseStatisticsSortBy::kDuration;
+    else
+      throw std::invalid_argument(
+          "case_statistics_sort_by: expected case_id, start_time, end_time, or duration");
+  }
+  if (supplied("case_statistics_sort_ascending"))
+    options.sort_ascending = parse_boolean(
+        require("case_statistics_sort_ascending"),
+        "case_statistics_sort_ascending");
+  if (supplied("case_statistics_max_cases"))
+    options.max_cases = parse_nonnegative_size(
+        require("case_statistics_max_cases"), "case_statistics_max_cases");
+  if (supplied("case_statistics_business_hours"))
+    options.use_business_hours = parse_boolean(
+        require("case_statistics_business_hours"),
+        "case_statistics_business_hours");
+  if (supplied("case_statistics_business_hour_slots"))
+    options.business_hour_slots = parse_business_hour_slots(
+        require("case_statistics_business_hour_slots"),
+        "case_statistics_business_hour_slots");
+  if (!options.use_business_hours && !options.business_hour_slots.empty())
+    options.business_hour_slots.clear();
+  return options;
+}
+
 AttributeStatisticsOptions parse_attribute_statistics_params(
     const FieldLookup& field) {
   return parse_attribute_statistics_params(field, {});

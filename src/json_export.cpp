@@ -4071,6 +4071,44 @@ std::string case_arrival_json(const CaseArrivalResult& result) {
   return out.str();
 }
 
+std::string case_statistics_json(const CaseStatisticsResult& result) {
+  (void)case_statistics_sort_name(result.options.sort_by);
+  for (const auto& entry : result.cases) {
+    if (!std::isfinite(entry.start_time) || !std::isfinite(entry.end_time) ||
+        !std::isfinite(entry.case_duration) || entry.case_duration < 0.0) {
+      throw std::invalid_argument(
+          "case statistics values must be finite and non-negative");
+    }
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"CASE_STATISTICS\",\"variant\":\"CLASSIC\""
+      << ",\"case_id_key\":";
+  write_json_string(out, result.options.case_id_key);
+  out << ",\"timestamp_key\":";
+  write_json_string(out, result.options.timestamp_key);
+  out << ",\"enable_sort\":"
+      << (result.options.enable_sort ? "true" : "false")
+      << ",\"sort_by\":";
+  write_json_string(out, case_statistics_sort_name(result.options.sort_by));
+  out << ",\"sort_ascending\":"
+      << (result.options.sort_ascending ? "true" : "false")
+      << ",\"max_cases\":" << result.options.max_cases
+      << ",\"use_business_hours\":"
+      << (result.options.use_business_hours ? "true" : "false")
+      << ",\"cases\":[";
+  for (std::size_t i = 0; i < result.cases.size(); ++i) {
+    if (i != 0) out << ',';
+    const auto& entry = result.cases[i];
+    out << "{\"case_id\":";
+    write_json_string(out, entry.case_id);
+    out << ",\"start_time\":" << std::setprecision(17)
+        << entry.start_time << ",\"end_time\":" << entry.end_time
+        << ",\"case_duration\":" << entry.case_duration << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string attribute_statistics_json(
     const AttributeStatisticsResult& result) {
   std::ostringstream out;

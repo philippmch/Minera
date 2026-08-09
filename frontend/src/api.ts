@@ -121,6 +121,8 @@ import {
   type CycleTimeOptions,
   type CaseArrivalResult,
   type CaseArrivalOptions,
+  type CaseStatisticsResult,
+  type CaseStatisticsOptions,
   type AttributeStatisticsResult,
   type AttributeStatisticsOptions,
   type BoundaryActivitiesResult,
@@ -149,6 +151,7 @@ import {
   isReworkResult,
   isCycleTimeResult,
   isCaseArrivalResult,
+  isCaseStatisticsResult,
   isAttributeStatisticsResult,
   isBoundaryActivitiesResult,
   isVariantStatisticsResult,
@@ -1624,6 +1627,46 @@ export function requestCaseArrival(options: CaseArrivalOptions = {}): Promise<Ca
   return postChecked(`/api/case-arrival${query ? `?${query}` : ""}`, isCaseArrivalResult, "case arrival");
 }
 export const discoverCaseArrival = requestCaseArrival;
+
+export function caseStatisticsQuery(options: CaseStatisticsOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of [
+    ["case_statistics_case_id_key", options.case_statistics_case_id_key],
+    ["case_statistics_timestamp_key", options.case_statistics_timestamp_key],
+    ["case_statistics_sort_by", options.case_statistics_sort_by],
+    ["case_statistics_business_hour_slots", options.case_statistics_business_hour_slots],
+  ] as const) {
+    if (value !== undefined) {
+      if (!value) throw new Error(`${key} must not be empty`);
+      query.set(key, value);
+    }
+  }
+  for (const [key, value] of [
+    ["case_statistics_enable_sort", options.case_statistics_enable_sort],
+    ["case_statistics_sort_ascending", options.case_statistics_sort_ascending],
+    ["case_statistics_business_hours", options.case_statistics_business_hours],
+  ] as const) {
+    if (value !== undefined) {
+      if (typeof value !== "boolean") throw new Error(`${key} must be boolean`);
+      query.set(key, String(value));
+    }
+  }
+  if (options.case_statistics_max_cases !== undefined) {
+    if (!Number.isInteger(options.case_statistics_max_cases) || options.case_statistics_max_cases < 0)
+      throw new Error("case_statistics_max_cases must be a non-negative integer");
+    query.set("case_statistics_max_cases", String(options.case_statistics_max_cases));
+  }
+  if (options.case_statistics_sort_by !== undefined &&
+      !["case_id", "start_time", "end_time", "duration"].includes(options.case_statistics_sort_by))
+    throw new Error("case_statistics_sort_by is not supported");
+  return query.toString();
+}
+
+export function requestCaseStatistics(options: CaseStatisticsOptions = {}): Promise<CaseStatisticsResult> {
+  const query = caseStatisticsQuery(options);
+  return postChecked(`/api/case-statistics${query ? `?${query}` : ""}`, isCaseStatisticsResult, "case statistics");
+}
+export const discoverCaseStatistics = requestCaseStatistics;
 
 export function attributeStatisticsQuery(options: AttributeStatisticsOptions = {}): string {
   const query = new URLSearchParams();

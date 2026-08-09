@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -203,6 +203,21 @@ describe("isCaseArrivalResult", () => {
   it("rejects invalid averages and counts", () => {
     expect(isCaseArrivalResult({ ...valid, arrival_average: -1 })).toBe(false);
     expect(isCaseArrivalResult({ ...valid, timed_ends: 1.5 })).toBe(false);
+  });
+});
+
+describe("isCaseStatisticsResult", () => {
+  const valid = {
+    family: "CASE_STATISTICS", variant: "CLASSIC",
+    case_id_key: "case_id", timestamp_key: "timestamp", enable_sort: true,
+    sort_by: "CASE_ID", sort_ascending: true, max_cases: 0,
+    use_business_hours: false,
+    cases: [{ case_id: "c1", start_time: 1, end_time: 3, case_duration: 2 }],
+  };
+  it("accepts per-case timing rows", () => expect(isCaseStatisticsResult(valid)).toBe(true));
+  it("rejects invalid durations and limits", () => {
+    expect(isCaseStatisticsResult({ ...valid, max_cases: -1 })).toBe(false);
+    expect(isCaseStatisticsResult({ ...valid, cases: [{ ...valid.cases[0], case_duration: -1 }] })).toBe(false);
   });
 });
 

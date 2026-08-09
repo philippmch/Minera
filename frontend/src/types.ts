@@ -2715,6 +2715,61 @@ export function isCaseArrivalResult(value: unknown): value is CaseArrivalResult 
     Number.isInteger(data.timed_ends) && data.timed_ends >= 0;
 }
 
+export interface CaseStatisticsOptions {
+  case_statistics_case_id_key?: string;
+  case_statistics_timestamp_key?: string;
+  case_statistics_enable_sort?: boolean;
+  case_statistics_sort_by?: "case_id" | "start_time" | "end_time" | "duration";
+  case_statistics_sort_ascending?: boolean;
+  case_statistics_max_cases?: number;
+  case_statistics_business_hours?: boolean;
+  case_statistics_business_hour_slots?: string;
+}
+
+export interface CaseStatisticsEntry {
+  case_id: string;
+  start_time: number;
+  end_time: number;
+  case_duration: number;
+}
+
+export interface CaseStatisticsResult {
+  family: "CASE_STATISTICS";
+  variant: "CLASSIC";
+  case_id_key: string;
+  timestamp_key: string;
+  enable_sort: boolean;
+  sort_by: "CASE_ID" | "START_TIME" | "END_TIME" | "DURATION";
+  sort_ascending: boolean;
+  max_cases: number;
+  use_business_hours: boolean;
+  cases: CaseStatisticsEntry[];
+}
+
+export function isCaseStatisticsResult(
+  value: unknown,
+): value is CaseStatisticsResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<CaseStatisticsResult>;
+  if (data.family !== "CASE_STATISTICS" || data.variant !== "CLASSIC" ||
+      typeof data.case_id_key !== "string" || typeof data.timestamp_key !== "string" ||
+      typeof data.enable_sort !== "boolean" ||
+      !["CASE_ID", "START_TIME", "END_TIME", "DURATION"].includes(data.sort_by ?? "") ||
+      typeof data.sort_ascending !== "boolean" ||
+      typeof data.max_cases !== "number" || !Number.isInteger(data.max_cases) ||
+      data.max_cases < 0 || typeof data.use_business_hours !== "boolean" ||
+      !Array.isArray(data.cases)) return false;
+  return data.cases.every((entry) => {
+    if (typeof entry !== "object" || entry === null) return false;
+    const item = entry as Partial<CaseStatisticsEntry>;
+    return typeof item.case_id === "string" &&
+      typeof item.start_time === "number" && Number.isFinite(item.start_time) &&
+      typeof item.end_time === "number" && Number.isFinite(item.end_time) &&
+      typeof item.case_duration === "number" && Number.isFinite(item.case_duration) &&
+      item.case_duration >= 0;
+  });
+}
+
 export interface AttributeStatisticsOptions {
   attribute_statistics_key?: string;
   attribute_statistics_scope?: "events" | "traces";
