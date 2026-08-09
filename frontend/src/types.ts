@@ -862,6 +862,57 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
       row.every((entry) => typeof entry === "number" && Number.isFinite(entry)));
 }
 
+export interface ProcessCubeTable {
+  case_ids: string[];
+  columns: Record<string, number[]>;
+}
+export interface ProcessCubeBin {
+  label: string;
+  lower: number;
+  upper: number;
+  numeric: boolean;
+}
+export interface ProcessCubeResult {
+  family: "PROCESS_CUBE";
+  x_dimension: string;
+  y_dimension: string;
+  aggregation: string;
+  x_bins: ProcessCubeBin[];
+  y_bins: ProcessCubeBin[];
+  x_edges: number[];
+  y_edges: number[];
+  cells: Array<Array<number | null>>;
+  case_ids: Array<Array<string[]>>;
+}
+function isProcessCubeBins(value: unknown): value is ProcessCubeBin[] {
+  return Array.isArray(value) && value.every((bin) => isOcelRecord(bin) &&
+    typeof bin.label === "string" && finite(bin.lower) && finite(bin.upper) &&
+    typeof bin.numeric === "boolean");
+}
+export function isProcessCubeTable(value: unknown): value is ProcessCubeTable {
+  if (!isOcelRecord(value) || !Array.isArray(value.case_ids) ||
+      !value.case_ids.every((id) => typeof id === "string") ||
+      !isOcelRecord(value.columns)) return false;
+  return Object.values(value.columns).every((column) =>
+    Array.isArray(column) && column.every((entry) => finite(entry)));
+}
+export function isProcessCubeResult(value: unknown): value is ProcessCubeResult {
+  if (!isOcelRecord(value) || value.family !== "PROCESS_CUBE" ||
+      typeof value.x_dimension !== "string" || typeof value.y_dimension !== "string" ||
+      typeof value.aggregation !== "string") return false;
+  const xBins = value.x_bins;
+  const yBins = value.y_bins;
+  if (!isProcessCubeBins(xBins) || !isProcessCubeBins(yBins) ||
+      !Array.isArray(value.x_edges) || !value.x_edges.every((edge) => finite(edge)) ||
+      !Array.isArray(value.y_edges) || !value.y_edges.every((edge) => finite(edge)) ||
+      !Array.isArray(value.cells) || !Array.isArray(value.case_ids) ||
+      value.cells.length !== xBins.length || value.case_ids.length !== xBins.length) return false;
+  if (!value.cells.every((row) => Array.isArray(row) && row.length === yBins.length &&
+      row.every((cell) => cell === null || finite(cell)))) return false;
+  return value.case_ids.every((row) => Array.isArray(row) && row.length === yBins.length &&
+    row.every((cell) => Array.isArray(cell) && cell.every((id) => typeof id === "string")));
+}
+
 export type OcelStatisticsVariant =
   | "OBJECT_TYPE_ACTIVITIES"
   | "OBJECTS_OT_COUNT"

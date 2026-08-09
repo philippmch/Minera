@@ -249,7 +249,17 @@ multipart local `POST /api/ocel/statistics`, and typed frontend
 request/response guard share the `OCEL_STATISTICS` JSON envelope. Empty logs,
 unreferenced objects, duplicate relations, invalid identifiers, prefilters,
 repeated activity labels, and malformed timestamps are covered by focused
-Release tests; process-cube and business-calendar extensions remain open.
+Release tests; categorical/composite process-cube dimensions and business-calendar extensions remain open.
+
+Process-cube evidence: `process_cube` validates rectangular typed numeric feature
+tables, supports exact numeric columns, prefix indicator columns, mixed numeric/
+prefix Cartesian cells, explicit or equal-width numeric edges, and mean, sum,
+min, max, count, median, first, and last aggregation. The deterministic
+`PROCESS_CUBE` JSON envelope is shared by the native tests, the headless
+`minera_process_cube` CLI, local `POST /api/process-cube`, and typed frontend
+request/response guards. Explicit bins are sorted and deduplicated, configured
+cells retain their case-id sets, and malformed JSON, ragged rows, non-finite
+values, and unsafe division limits are rejected at the boundary.
 
 ## Delivery order
 

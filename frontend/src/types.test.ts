@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, type MineraExport } from "./types";
 
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
@@ -17,6 +17,23 @@ describe("isOcelFeatureResult", () => {
   it("rejects ragged and non-finite tables", () => {
     expect(isOcelFeatureResult({ ...valid, values: [[]] })).toBe(false);
     expect(isOcelFeatureResult({ ...valid, values: [[Number.NaN]] })).toBe(false);
+  });
+});
+
+describe("isProcessCubeResult", () => {
+  const valid = {
+    family: "PROCESS_CUBE", x_dimension: "x", y_dimension: "y", aggregation: "mean",
+    x_bins: [{ label: "[0,1]", lower: 0, upper: 1, numeric: true }],
+    y_bins: [{ label: "[0,1]", lower: 0, upper: 1, numeric: true }],
+    x_edges: [0, 1], y_edges: [0, 1], cells: [[2]], case_ids: [[['case-1']]],
+  };
+  it("accepts rectangular cells with finite bins and case sets", () => {
+    expect(isProcessCubeResult(valid)).toBe(true);
+  });
+  it("rejects ragged cells, non-finite values, and null envelopes", () => {
+    expect(isProcessCubeResult({ ...valid, cells: [[]] })).toBe(false);
+    expect(isProcessCubeResult({ ...valid, cells: [[Number.NaN]] })).toBe(false);
+    expect(isProcessCubeResult(null)).toBe(false);
   });
 });
 
