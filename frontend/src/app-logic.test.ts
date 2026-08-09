@@ -1029,6 +1029,22 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ segmentPrefixStrict: false })).toBe(false);
   });
 
+  it("maps activity-split anchors and keeps subordinate fields inactive alone", () => {
+    expect(mineFormEntries({
+      activitySplit: ["A", "B"],
+      activitySplitSeparator: "::",
+      activitySplitCutMode: "next",
+    })).toEqual([
+      ["activity_split", "A,B"],
+      ["activity_split_separator", "::"],
+      ["activity_split_cut_mode", "next"],
+    ]);
+    expect(mineFormEntries({ activitySplitSeparator: "::" })).toEqual([]);
+    expect(mineFormEntries({ activitySplitCutMode: "next" })).toEqual([]);
+    expect(hasActiveFilters({ activitySplit: ["A"] })).toBe(true);
+    expect(hasActiveFilters({ activitySplitSeparator: "::" })).toBe(false);
+  });
+
   it("maps adjacent path options including zero bounds and polarity", () => {
     expect(mineFormEntries({
       pathPredecessor: "A",

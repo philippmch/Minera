@@ -188,6 +188,10 @@ export interface FilterOptions extends LtlFilterOptions {
   /** Cut each case into the subtraces from betweenStart to betweenEnd. */
   betweenStart?: string;
   betweenEnd?: string;
+  /** Split each case at one or more anchor activities. */
+  activitySplit?: string[];
+  activitySplitSeparator?: string;
+  activitySplitCutMode?: "this" | "next";
   /** Optional native segment operations, applied after ordinary filters. */
   segmentPrefixActivity?: string;
   segmentPrefixStrict?: boolean;
@@ -387,6 +391,13 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.betweenStart && options.betweenEnd) {
     add("between_start", options.betweenStart);
     add("between_end", options.betweenEnd);
+  }
+  if (options.activitySplit?.length) {
+    add("activity_split", options.activitySplit.join(","));
+    if (options.activitySplitSeparator)
+      add("activity_split_separator", options.activitySplitSeparator);
+    if (options.activitySplitCutMode)
+      add("activity_split_cut_mode", options.activitySplitCutMode);
   }
   if (options.minLength) add("min_length", String(options.minLength));
   if (options.maxLength) add("max_length", String(options.maxLength));

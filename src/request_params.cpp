@@ -1071,6 +1071,41 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("between_end"); !value.empty()) {
     params.filter.between_end = value;
   }
+  const bool activity_split_supplied =
+      supplied("activity_split") || supplied("activity_split_activities") ||
+      supplied("activity_split_separator") ||
+      supplied("activity_split_cut_mode");
+  if (activity_split_supplied) {
+    const auto activity_field = supplied("activity_split")
+                                    ? std::string_view("activity_split")
+                                    : std::string_view("activity_split_activities");
+    if (!supplied(activity_field) || field(activity_field).empty()) {
+      throw std::invalid_argument(
+          "activity_split: at least one activity is required");
+    }
+    params.filter.activity_split_activities =
+        parse_strict_csv(field(activity_field), "activity_split");
+    if (supplied("activity_split_separator")) {
+      params.filter.activity_split_separator = field("activity_split_separator");
+      if (params.filter.activity_split_separator.empty()) {
+        throw std::invalid_argument(
+            "activity_split_separator: must not be empty");
+      }
+    }
+    if (supplied("activity_split_cut_mode")) {
+      const auto mode = field("activity_split_cut_mode");
+      if (mode == "this") {
+        params.filter.activity_split_cut_mode =
+            ActivitySplitCutMode::kThis;
+      } else if (mode == "next") {
+        params.filter.activity_split_cut_mode =
+            ActivitySplitCutMode::kNext;
+      } else {
+        throw std::invalid_argument(
+            "activity_split_cut_mode: expected this or next");
+      }
+    }
+  }
   if (const auto value = field("start_activities"); !value.empty()) {
     params.filter.start_activities = split_csv(value);
   }

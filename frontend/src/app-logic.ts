@@ -153,7 +153,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.attributeKey ||
       filters.caseAttributeKey ||
       filters.ltlVariant && filters.ltlAttributeValues?.length ||
-      (filters.betweenStart && filters.betweenEnd),
+      (filters.betweenStart && filters.betweenEnd) ||
+      filters.activitySplit?.length,
   );
 }
 

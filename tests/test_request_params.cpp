@@ -567,6 +567,9 @@ void parse_mine_params_maps_filters() {
       {"rework_min_occurrences", "3"},
       {"between_start", "a"},
       {"between_end", "c"},
+      {"activity_split", "a, c"},
+      {"activity_split_separator", "::"},
+      {"activity_split_cut_mode", "next"},
       {"attribute_key", "channel"},
       {"keep_attribute_values", "web, phone"},
       {"remove_attribute_values", "fax"},
@@ -604,6 +607,11 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.rework_min_occurrences == 3);
   assert(params.filter.between_start == "a");
   assert(params.filter.between_end == "c");
+  assert((params.filter.activity_split_activities ==
+          std::vector<std::string>{"a", "c"}));
+  assert(params.filter.activity_split_separator == "::");
+  assert(params.filter.activity_split_cut_mode ==
+         minera::ActivitySplitCutMode::kNext);
   assert(params.filter.attribute_key == "channel");
   assert((params.filter.keep_attribute_values ==
           std::vector<std::string>{"web", "phone"}));
@@ -670,6 +678,35 @@ void parse_mine_params_ignores_blank_fields() {
   assert(params.csv.case_id_column == "case_id");
   assert(params.csv.delimiter == ',');
   assert(params.filter.min_length == 0);
+}
+
+void parse_mine_params_rejects_invalid_activity_split_fields() {
+  for (const auto& item : std::vector<std::pair<std::string, std::string>>{
+           {"activity_split_cut_mode", "unknown"},
+           {"activity_split_activities", "a,,b"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  for (const auto& name : {std::string("activity_split"),
+                           std::string("activity_split_separator")}) {
+    const auto lookup = fields({{name, ""}});
+    const auto present = [name](std::string_view requested) {
+      return requested == name;
+    };
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(lookup, present);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_maps_transition_system_options() {
@@ -2037,6 +2074,7 @@ int main() {
   parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
+  parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_an_unknown_time_mode();
   parse_mine_params_rejects_an_unknown_attribute_mode();
   parse_mine_params_rejects_a_malformed_succession();

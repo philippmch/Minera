@@ -330,6 +330,12 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const double time_to = parse_time_bound(
       options.time_to, std::numeric_limits<double>::infinity());
 
+  if (!options.activity_split_activities.empty() &&
+      options.activity_split_separator.empty()) {
+    throw std::invalid_argument(
+        "activity split: subcase separator must not be empty");
+  }
+
   // Pass 1: constrain to the time range, then project activities and apply
   // per-trace structural filters.
   std::vector<Trace> kept;
@@ -454,12 +460,25 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     }
   }
 
+  if (!options.activity_split_activities.empty()) {
+    ActivitySplitOptions split_options;
+    split_options.activities = options.activity_split_activities;
+    split_options.subcase_separator = options.activity_split_separator;
+    split_options.cut_mode = options.activity_split_cut_mode;
+    EventLog split_log;
+    split_log.traces = std::move(kept);
+    split_log.attributes = log.attributes;
+    split_log = split_activity(split_log, split_options);
+    kept = std::move(split_log.traces);
+  }
+
   const bool by_frequency = options.min_variant_frequency > 1;
   const bool by_rank = options.top_variants != 0;
   const bool by_coverage = options.variant_coverage > 0.0;
   if (!by_frequency && !by_rank && !by_coverage) {
     EventLog result;
     result.traces = std::move(kept);
+    result.attributes = log.attributes;
     return result;
   }
 
@@ -505,6 +524,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   }
 
   EventLog result;
+  result.attributes = log.attributes;
   for (auto& trace : kept) {
     if (allowed.find(variant_key(trace)) != allowed.end()) {
       result.traces.push_back(std::move(trace));

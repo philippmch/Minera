@@ -498,6 +498,9 @@ int usage(const char* program) {
                "  --segment-between-starts <a,b,...> Segment start activities\n"
                "  --segment-between-ends <a,b,...> Segment end activities\n"
                "  --segment-between-separator <text> Segment case-id separator\n"
+               "  --activity-split <a,b,...> Split cases at anchor activities\n"
+               "  --activity-split-separator <text> Activity-split case-id separator\n"
+               "  --activity-split-cut-mode <this|next> Anchor/new-event split mode\n"
                "  --path-predecessor <name> Adjacent-path predecessor activity\n"
                "  --path-successor <name>  Adjacent-path successor activity\n"
                "  --path-min-performance <seconds> Inclusive lower elapsed bound\n"
@@ -952,6 +955,7 @@ int main(int argc, char** argv) {
   bool batch_option_used = false;
   minera::BatchDiscoveryOptions batch_options;
   bool overlap_requested = false;
+  bool activity_split_option_used = false;
   std::map<std::string, std::string> overlap_fields;
   minera::CsvImportOptions options;
   minera::LogFilterOptions filter;
@@ -1157,6 +1161,27 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       path_fields[key] = value;
+      continue;
+    }
+    if (arg == "--activity-split" ||
+        arg == "--activity-split-separator" ||
+        arg == "--activity-split-cut-mode") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      activity_split_option_used = true;
+      if (arg == "--activity-split") {
+        filter.activity_split_activities = split_csv(value);
+      } else if (arg == "--activity-split-separator") {
+        if (value[0] == '\0') return usage(argv[0]);
+        filter.activity_split_separator = value;
+      } else if (std::string_view(value) == "this") {
+        filter.activity_split_cut_mode = minera::ActivitySplitCutMode::kThis;
+      } else if (std::string_view(value) == "next") {
+        filter.activity_split_cut_mode = minera::ActivitySplitCutMode::kNext;
+      } else {
+        std::cerr << "error: --activity-split-cut-mode expects this or next\n";
+        return 2;
+      }
       continue;
     }
     if (arg == "--overlap") {
@@ -2711,6 +2736,10 @@ int main(int argc, char** argv) {
   if (spectrum_option_used && !spectrum_requested) {
     std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
                  "--spectrum-sort-log require --spectrum\n";
+    return 2;
+  }
+  if (activity_split_option_used && filter.activity_split_activities.empty()) {
+    std::cerr << "error: --activity-split requires at least one activity\n";
     return 2;
   }
   if (petri_option_used && !align_petri_anti && !align_petri_multi) {

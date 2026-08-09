@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "minera/activity_split.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -168,6 +169,12 @@ struct LogFilterOptions {
   std::size_t top_variants = 0;
   double variant_coverage = 0.0;
 
+  // Optional case split at one or more activities. The operation runs after
+  // the ordinary per-trace projections and before variant selection.
+  std::vector<std::string> activity_split_activities;
+  std::string activity_split_separator = "##@@";
+  ActivitySplitCutMode activity_split_cut_mode = ActivitySplitCutMode::kThis;
+
   [[nodiscard]] bool any() const {
     return !time_from.empty() || !time_to.empty() ||
            !keep_activities.empty() || !remove_activities.empty() ||
@@ -187,7 +194,8 @@ struct LogFilterOptions {
            !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || min_variant_frequency > 1 ||
-           top_variants != 0 || variant_coverage != 0.0;
+           top_variants != 0 || variant_coverage != 0.0 ||
+           !activity_split_activities.empty();
   }
 };
 
