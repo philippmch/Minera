@@ -62,6 +62,7 @@
 #include "minera/overlap.hpp"
 #include "minera/chaotic_activities.hpp"
 #include "minera/attribute_statistics.hpp"
+#include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/case_statistics.hpp"
@@ -292,6 +293,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] AttributeStatisticsOptions parse_attribute_statistics_params(
     const FieldLookup& field);
 [[nodiscard]] AttributeStatisticsOptions parse_attribute_statistics_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] AttributeDistributionOptions parse_attribute_distribution_params(
+    const FieldLookup& field);
+[[nodiscard]] AttributeDistributionOptions parse_attribute_distribution_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] BoundaryActivitiesOptions parse_boundary_activities_params(

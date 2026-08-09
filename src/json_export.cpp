@@ -4129,6 +4129,31 @@ std::string attribute_statistics_json(
   return out.str();
 }
 
+std::string attribute_distribution_json(
+    const AttributeDistributionResult& result) {
+  if (result.labels.size() != result.counts.size())
+    throw std::invalid_argument(
+        "attribute distribution labels and counts must have equal length");
+  (void)event_distribution_name(result.options.distribution);
+  std::ostringstream out;
+  out << "{\"family\":\"ATTRIBUTE_DISTRIBUTION\",\"variant\":\""
+      << event_distribution_name(result.options.distribution)
+      << "\",\"timestamp_key\":";
+  write_json_string(out, result.options.timestamp_key);
+  out << ",\"labels\":[";
+  for (std::size_t i = 0; i < result.labels.size(); ++i) {
+    if (i != 0) out << ',';
+    write_json_string(out, result.labels[i]);
+  }
+  out << "],\"counts\":[";
+  for (std::size_t i = 0; i < result.counts.size(); ++i) {
+    if (i != 0) out << ',';
+    out << result.counts[i];
+  }
+  out << "],\"timed_events\":" << result.timed_events << '}';
+  return out.str();
+}
+
 std::string boundary_activities_json(const BoundaryActivitiesResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"BOUNDARY_ACTIVITIES\",\"variant\":\""

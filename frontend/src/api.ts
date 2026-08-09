@@ -125,6 +125,8 @@ import {
   type CaseStatisticsOptions,
   type AttributeStatisticsResult,
   type AttributeStatisticsOptions,
+  type AttributeDistributionResult,
+  type AttributeDistributionOptions,
   type BoundaryActivitiesResult,
   type BoundaryActivitiesOptions,
   type VariantStatisticsResult,
@@ -153,6 +155,7 @@ import {
   isCaseArrivalResult,
   isCaseStatisticsResult,
   isAttributeStatisticsResult,
+  isAttributeDistributionResult,
   isBoundaryActivitiesResult,
   isVariantStatisticsResult,
 } from "./types";
@@ -1693,6 +1696,27 @@ export function requestAttributeStatistics(options: AttributeStatisticsOptions =
   return postChecked(`/api/attribute-statistics${query ? `?${query}` : ""}`, isAttributeStatisticsResult, "attribute statistics");
 }
 export const discoverAttributeStatistics = requestAttributeStatistics;
+
+export function attributeDistributionQuery(options: AttributeDistributionOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.attribute_distribution_type !== undefined) {
+    if (!["days_month", "months", "years", "hours", "days_week", "weeks"].includes(options.attribute_distribution_type))
+      throw new Error("attribute_distribution_type is not supported");
+    query.set("attribute_distribution_type", options.attribute_distribution_type);
+  }
+  if (options.attribute_distribution_timestamp_key !== undefined) {
+    if (!options.attribute_distribution_timestamp_key)
+      throw new Error("attribute_distribution_timestamp_key must not be empty");
+    query.set("attribute_distribution_timestamp_key", options.attribute_distribution_timestamp_key);
+  }
+  return query.toString();
+}
+
+export function requestAttributeDistribution(options: AttributeDistributionOptions = {}): Promise<AttributeDistributionResult> {
+  const query = attributeDistributionQuery(options);
+  return postChecked(`/api/attribute-distribution${query ? `?${query}` : ""}`, isAttributeDistributionResult, "attribute distribution");
+}
+export const discoverAttributeDistribution = requestAttributeDistribution;
 
 export function boundaryActivitiesQuery(options: BoundaryActivitiesOptions = {}): string {
   const query = new URLSearchParams();

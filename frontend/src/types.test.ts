@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isDfgPetriConversionResult", () => {
   const valid = {
@@ -231,6 +231,19 @@ describe("isAttributeStatisticsResult", () => {
   it("rejects negative or fractional counts", () => {
     expect(isAttributeStatisticsResult({ ...valid, values: { A: -1 } })).toBe(false);
     expect(isAttributeStatisticsResult({ ...valid, values: { A: 1.5 } })).toBe(false);
+  });
+});
+
+describe("isAttributeDistributionResult", () => {
+  const valid = {
+    family: "ATTRIBUTE_DISTRIBUTION", variant: "DAYS_MONTH",
+    timestamp_key: "timestamp", labels: ["01", "02"], counts: [2, 1],
+    timed_events: 3,
+  };
+  it("accepts aligned calendar bins", () => expect(isAttributeDistributionResult(valid)).toBe(true));
+  it("rejects misaligned or fractional bins", () => {
+    expect(isAttributeDistributionResult({ ...valid, labels: ["01"] })).toBe(false);
+    expect(isAttributeDistributionResult({ ...valid, counts: [2, 1.5] })).toBe(false);
   });
 });
 

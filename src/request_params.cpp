@@ -3554,6 +3554,46 @@ AttributeStatisticsOptions parse_attribute_statistics_params(
   return options;
 }
 
+AttributeDistributionOptions parse_attribute_distribution_params(
+    const FieldLookup& field) {
+  return parse_attribute_distribution_params(field, {});
+}
+
+AttributeDistributionOptions parse_attribute_distribution_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  AttributeDistributionOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("attribute_distribution_timestamp_key"))
+    options.timestamp_key = require("attribute_distribution_timestamp_key");
+  if (supplied("attribute_distribution_type")) {
+    const auto value = require("attribute_distribution_type");
+    if (value == "days_month" || value == "DAYS_MONTH")
+      options.distribution = EventDistributionType::kDaysMonth;
+    else if (value == "months" || value == "MONTHS")
+      options.distribution = EventDistributionType::kMonths;
+    else if (value == "years" || value == "YEARS")
+      options.distribution = EventDistributionType::kYears;
+    else if (value == "hours" || value == "HOURS")
+      options.distribution = EventDistributionType::kHours;
+    else if (value == "days_week" || value == "DAYS_WEEK")
+      options.distribution = EventDistributionType::kDaysWeek;
+    else if (value == "weeks" || value == "WEEKS")
+      options.distribution = EventDistributionType::kWeeks;
+    else
+      throw std::invalid_argument(
+          "attribute_distribution_type: expected days_month, months, years, hours, days_week, or weeks");
+  }
+  return options;
+}
+
 BoundaryActivitiesOptions parse_boundary_activities_params(
     const FieldLookup& field) {
   return parse_boundary_activities_params(field, {});
