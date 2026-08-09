@@ -374,8 +374,11 @@ the same grouping options and focused edge-case coverage.
 DFG interchange evidence: the strict classic text parser and deterministic
 writer now have public input and output adapters. `minera_dfg INPUT.dfg` reads,
 validates, and normalizes a document (or writes it to an explicit output path),
-local `POST /api/dfg` accepts raw DFG text and returns the canonical document,
-and the typed frontend `importDfg` helper exposes the same validation path.
+and its `--clean-noise` mode applies the native noise-threshold edge filter
+with optional most-common-path overrides. The cached `GET /api/dfg` route
+accepts the same cleaning query, while local `POST /api/dfg` accepts raw DFG
+text and returns the canonical document. The typed frontend `importDfg` and
+`fetchDfg` helpers expose the corresponding validation and export paths.
 
 DFG conversion evidence: both classic DFG-to-workflow-net constructions are
 available as deterministic native APIs: activity-defines-place emits one
