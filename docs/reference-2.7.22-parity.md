@@ -238,6 +238,12 @@ after all ordinary, segment, path, and LTL filters; JSON embeds the three
 arrays under `overlap`. CLI flags and server/frontend form fields are covered
 by `tests/test_request_params.cpp` and the focused overlap/native JSON tests.
 
+Chaotic-activity evidence: the native `discover_chaotic_activities` operation
+implements the single entropy-based ranking variant with configurable activity
+attribute, smoothing, and bounded input size. It returns deterministic
+frequency, entropy, entropy-gain, and combined-score metrics; focused tests
+cover repeated runs, custom attributes, empty input, and invalid bounds.
+
 OCEL statistics evidence: `object_type_activities` returns deterministic
 lexical object-type keys with deduplicated related activities, while
 `objects_ot_count` returns deterministic event/object-type maps and counts
