@@ -971,6 +971,36 @@ export function isProcessCubeResult(value: unknown): value is ProcessCubeResult 
     row.every((cell) => Array.isArray(cell) && cell.every((id) => typeof id === "string")));
 }
 
+export interface StreamingDfgEdge {
+  source: string;
+  target: string;
+  count: number;
+}
+export interface StreamingDfgResult {
+  family: "STREAMING_DFG";
+  events: number;
+  graph: StreamingDfgEdge[];
+  activities: Record<string, number>;
+  start_activities: Record<string, number>;
+  end_activities: Record<string, number>;
+  open_cases: Record<string, string>;
+}
+function isNonNegativeCountMap(value: unknown): value is Record<string, number> {
+  return isOcelRecord(value) && Object.values(value).every((entry) =>
+    Number.isSafeInteger(entry) && (entry as number) >= 0);
+}
+export function isStreamingDfgResult(value: unknown): value is StreamingDfgResult {
+  if (!isOcelRecord(value) || value.family !== "STREAMING_DFG" ||
+      !Number.isSafeInteger(value.events) || (value.events as number) < 0 ||
+      !Array.isArray(value.graph) || !isNonNegativeCountMap(value.activities) ||
+      !isNonNegativeCountMap(value.start_activities) ||
+      !isNonNegativeCountMap(value.end_activities) ||
+      !isStringMap(value.open_cases)) return false;
+  return value.graph.every((edge) => isOcelRecord(edge) &&
+    typeof edge.source === "string" && typeof edge.target === "string" &&
+    Number.isSafeInteger(edge.count) && (edge.count as number) > 0);
+}
+
 export type OcelStatisticsVariant =
   | "OBJECT_TYPE_ACTIVITIES"
   | "OBJECTS_OT_COUNT"

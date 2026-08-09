@@ -43,6 +43,7 @@ import {
   type OcelStatisticsResult,
   type ProcessCubeTable,
   type ProcessCubeResult,
+  type StreamingDfgResult,
   type TriePetriConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
@@ -72,6 +73,7 @@ import {
   isOcelFeatureResult,
   isOcelStatisticsResult,
   isProcessCubeResult,
+  isStreamingDfgResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -2186,6 +2188,47 @@ export async function requestProcessCube(
     throw new Error(`the Minera backend answered with status ${response.status}`);
   if (!isProcessCubeResult(payload))
     throw new Error("the Minera backend returned an invalid process cube");
+  return payload;
+}
+
+export interface StreamingDfgOptions {
+  streaming_case_id_column?: string;
+  streaming_activity_column?: string;
+}
+
+export function streamingDfgQuery(options: StreamingDfgOptions = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${key} must not be empty`);
+      query.set(key, value.trim());
+    }
+  }
+  return query.toString();
+}
+
+export async function requestStreamingDfg(
+  log: Blob,
+  options: StreamingDfgOptions = {},
+): Promise<StreamingDfgResult> {
+  const form = new FormData();
+  const name = typeof File !== "undefined" && log instanceof File ? log.name : "log.csv";
+  form.append("log", log, name);
+  const query = streamingDfgQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/streaming-dfg${query ? `?${query}` : ""}`, {
+      method: "POST", body: form,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isStreamingDfgResult(payload))
+    throw new Error("the Minera backend returned an invalid streaming DFG");
   return payload;
 }
 
