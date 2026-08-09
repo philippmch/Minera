@@ -221,7 +221,7 @@ this traditional-log vertical.
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
-| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
+| Filtering | attributes/cases/endpoints/variants/paths/LTL/time/between/rework/prefix/suffix/segments; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — thread-safe Declare AUTOMATA conformance core is present; stream readers, other online algorithms, and persistent stores remain |
@@ -724,13 +724,16 @@ case-attribute, clean-time, and causal artifacts.
 ## Connected DFG filtering evidence
 
 The native DFG filtering API now exposes deterministic activity-percentage,
-path-percentage, dependency-threshold, to-activity, from-activity, and
-contain-activity variations. Each filter works on explicit activity, boundary,
-and edge frequencies, removes only the requested low-support nodes or paths,
-and repairs the graph so retained activities remain reachable from a start and
-can reach an end. Focused tests cover boundary preservation, branch pruning,
-dependency ties, unknown activities, invalid thresholds, and deterministic
-output ordering.
+path-percentage, dependency-threshold, noise-threshold, to-activity,
+from-activity, and contain-activity variations. Each filter works on explicit
+activity, boundary, and edge frequencies, removes only the requested
+low-support nodes or paths, and repairs the graph so retained activities remain
+reachable from a start and can reach an end. Noise cleaning compares each edge
+with the smaller of the strongest ordinary edge counts at its endpoints and
+honors an explicit most-common-path keep set without changing activity or
+boundary tables. Focused tests cover boundary preservation, branch pruning,
+dependency ties, noise overrides, unknown activities, invalid thresholds, and
+deterministic output ordering.
 
 ## LTL trace-filter evidence
 
