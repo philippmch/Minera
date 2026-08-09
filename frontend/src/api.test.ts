@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime } from "./api";
 
 describe("classic DFG export API", () => {
   it("fetches the cached graph as text", async () => {
@@ -189,6 +189,31 @@ describe("rework statistics API", () => {
     }));
     await expect(requestRework({ rework_variant: "activities" }))
       .resolves.toMatchObject({ family: "REWORK", variant: "ACTIVITIES" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("cycle-time statistics API", () => {
+  it("serializes timestamp keys", () => {
+    expect(cycleTimeQuery({
+      cycle_time_timestamp_key: "finished_at",
+      cycle_time_start_timestamp_key: "started_at",
+    })).toBe("cycle_time_timestamp_key=finished_at&cycle_time_start_timestamp_key=started_at");
+    expect(() => cycleTimeQuery({ cycle_time_timestamp_key: "" })).toThrow(/must not be empty/);
+  });
+
+  it("posts and validates the cycle-time envelope", async () => {
+    const payload = {
+      family: "CYCLE_TIME", variant: "CLASSIC",
+      cycle_time: 10, instances: 2, timed_events: 4,
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/cycle-time?cycle_time_timestamp_key=finished_at");
+      expect(init?.method).toBe("POST");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestCycleTime({ cycle_time_timestamp_key: "finished_at" }))
+      .resolves.toMatchObject({ family: "CYCLE_TIME", variant: "CLASSIC" });
     vi.unstubAllGlobals();
   });
 });

@@ -355,6 +355,25 @@ void rework_params_contract() {
   assert(threw);
 }
 
+void cycle_time_params_contract() {
+  const auto options = minera::parse_cycle_time_params(fields({
+      {"cycle_time_timestamp_key", "finished_at"},
+      {"cycle_time_start_timestamp_key", "started_at"}}));
+  assert(options.timestamp_key == "finished_at");
+  assert(options.start_timestamp_key == "started_at");
+  bool rejected = false;
+  try {
+    const auto lookup = fields({{"cycle_time_timestamp_key", ""}});
+    const minera::FieldPresence present = [](std::string_view name) {
+      return name == "cycle_time_timestamp_key";
+    };
+    (void)minera::parse_cycle_time_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
@@ -2343,5 +2362,6 @@ int main() {
   passed_time_params_contract();
   service_time_params_contract();
   rework_params_contract();
+  cycle_time_params_contract();
   return 0;
 }

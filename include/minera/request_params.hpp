@@ -61,6 +61,7 @@
 #include "minera/path_filter.hpp"
 #include "minera/overlap.hpp"
 #include "minera/chaotic_activities.hpp"
+#include "minera/cycle_time.hpp"
 #include "minera/passed_time.hpp"
 #include "minera/service_time.hpp"
 #include "minera/rework.hpp"
@@ -267,6 +268,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ReworkOptions parse_rework_params(const FieldLookup& field);
 [[nodiscard]] ReworkOptions parse_rework_params(const FieldLookup& field,
                                                 const FieldPresence& present);
+
+[[nodiscard]] CycleTimeOptions parse_cycle_time_params(
+    const FieldLookup& field);
+[[nodiscard]] CycleTimeOptions parse_cycle_time_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] NetworkAnalysisOptions parse_network_analysis_params(
     const FieldLookup& field);

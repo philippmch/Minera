@@ -2664,6 +2664,30 @@ export interface ReworkResult {
   cases?: Record<string, ReworkCaseStats>;
 }
 
+export interface CycleTimeOptions {
+  cycle_time_timestamp_key?: string;
+  cycle_time_start_timestamp_key?: string;
+}
+
+export interface CycleTimeResult {
+  family: "CYCLE_TIME";
+  variant: "CLASSIC";
+  cycle_time: number;
+  instances: number;
+  timed_events: number;
+}
+
+export function isCycleTimeResult(value: unknown): value is CycleTimeResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<CycleTimeResult>;
+  return data.family === "CYCLE_TIME" && data.variant === "CLASSIC" &&
+    typeof data.cycle_time === "number" && Number.isFinite(data.cycle_time) &&
+    data.cycle_time >= 0 && typeof data.instances === "number" &&
+    Number.isInteger(data.instances) && data.instances >= 0 &&
+    typeof data.timed_events === "number" &&
+    Number.isInteger(data.timed_events) && data.timed_events >= 0;
+}
+
 export function isReworkResult(value: unknown): value is ReworkResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<ReworkResult>;

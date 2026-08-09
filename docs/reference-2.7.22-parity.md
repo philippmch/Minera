@@ -254,6 +254,13 @@ CLI, `POST /api/service-time`, strict request parser, and typed frontend API
 share the `SERVICE_TIME` envelope; focused tests cover custom keys,
 aggregation rejection, finite JSON values, and empty/invalid inputs.
 
+Cycle-time evidence: `discover_cycle_time` orders event intervals by their
+start instant, merges overlapping production spans, and reports completed
+span time per trace instance with configurable completion/start timestamp keys.
+The standalone CLI, `POST /api/cycle-time`, strict request parser, and typed
+frontend API share the `CYCLE_TIME` envelope; focused tests cover custom keys,
+empty/invalid timestamps, interval merging, and bounded diagnostics.
+
 Rework evidence: `discover_rework` exposes the activity variant (number of
 cases containing repeated activity occurrences) and the cases variant (total
 events and total repeated-activity count per case), with custom activity and
