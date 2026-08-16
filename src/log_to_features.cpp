@@ -450,17 +450,164 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
 
   if (options.variant != LogToFeaturesVariant::TEMPORAL) throw std::invalid_argument("log_to_features: unknown variant");
-  std::vector<TimedEvent> events; double origin = std::numeric_limits<double>::infinity();
-  for (std::size_t ti=0; ti<log.traces.size(); ++ti) for (std::size_t i=0;i<log.traces[ti].events.size();++i) { const auto& e=log.traces[ti].events[i]; double f=instant(e,options.timestamp_key,true); double s=f; if (!options.start_timestamp_key.empty()) s=instant(e,options.start_timestamp_key,true); if (s>f) throw std::invalid_argument("log_to_features: start timestamp after finish"); origin=std::min(origin,s); events.push_back({&e,f,s,ti,i}); }
+  std::vector<TimedEvent> events;
+  double origin = std::numeric_limits<double>::infinity();
+  struct CaseTemporal {
+    double start = std::numeric_limits<double>::infinity();
+    double finish = -std::numeric_limits<double>::infinity();
+    double service = 0.0;
+    std::size_t event_count = 0;
+    std::set<std::string> activities;
+    std::set<std::string> resources;
+  };
+  std::vector<CaseTemporal> cases(log.traces.size());
+  for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
+    auto& metrics = cases[ti];
+    for (std::size_t i = 0; i < log.traces[ti].events.size(); ++i) {
+      const auto& event = log.traces[ti].events[i];
+      const double finish = instant(event, options.timestamp_key, true);
+      const double start = options.start_timestamp_key.empty()
+                               ? finish
+                               : instant(event, options.start_timestamp_key, true);
+      if (start > finish)
+        throw std::invalid_argument("log_to_features: start timestamp after finish");
+      origin = std::min(origin, start);
+      events.push_back({&event, finish, start, ti, i});
+      metrics.start = std::min(metrics.start, start);
+      metrics.finish = std::max(metrics.finish, finish);
+      metrics.service += finish - start;
+      ++metrics.event_count;
+      metrics.activities.insert(value_for(event, options.activity_key));
+      const auto resource = value_for(event, options.resource_key);
+      if (!resource.empty()) metrics.resources.insert(resource);
+    }
+  }
   out.feature_names = options.feature_names;
-  if (out.feature_names.empty()) out.feature_names = {"arrivals", "finishes", "service_seconds", "waiting_seconds", "sojourn_seconds", "rework", "cases", "resource_workload"}; else validate_names(out.feature_names,"feature_names");
+  if (out.feature_names.empty()) {
+    out.feature_names = {
+        "unique_resources", "unique_activities", "num_events",
+        "average_arrival_rate", "average_finish_rate", "average_waiting_time",
+        "average_sojourn_time", "average_service_time",
+        "total_number_of_reworked_activities", "avg_cases_per_resource",
+        "avg_events_per_case", "number_of_cases", "avg_resources_per_case"};
+  } else {
+    validate_names(out.feature_names, "feature_names");
+  }
   if (events.empty()) return out;
+  std::vector<std::size_t> arrival_order(log.traces.size());
+  std::vector<std::size_t> finish_order(log.traces.size());
+  for (std::size_t i = 0; i < log.traces.size(); ++i) {
+    arrival_order[i] = i;
+    finish_order[i] = i;
+  }
+  auto case_less = [&](std::size_t lhs, std::size_t rhs, bool by_finish) {
+    const double a = by_finish ? cases[lhs].finish : cases[lhs].start;
+    const double b = by_finish ? cases[rhs].finish : cases[rhs].start;
+    if (a != b) return a < b;
+    if (log.traces[lhs].case_id != log.traces[rhs].case_id)
+      return log.traces[lhs].case_id < log.traces[rhs].case_id;
+    return lhs < rhs;
+  };
+  std::sort(arrival_order.begin(), arrival_order.end(),
+            [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, false); });
+  std::sort(finish_order.begin(), finish_order.end(),
+            [&](std::size_t lhs, std::size_t rhs) { return case_less(lhs, rhs, true); });
+  std::vector<double> arrival_rate(log.traces.size(), 0.0);
+  std::vector<double> finish_rate(log.traces.size(), 0.0);
+  for (std::size_t i = 1; i < arrival_order.size(); ++i)
+    arrival_rate[arrival_order[i]] = cases[arrival_order[i]].start - cases[arrival_order[i - 1]].start;
+  for (std::size_t i = 1; i < finish_order.size(); ++i)
+    finish_rate[finish_order[i]] = cases[finish_order[i]].finish - cases[finish_order[i - 1]].finish;
   std::map<long long,std::vector<const TimedEvent*>> buckets;
-  for (const auto& e:events) buckets[static_cast<long long>(std::floor((e.start-origin)/options.window_seconds))].push_back(&e);
+  for (const auto& event : events)
+    buckets[static_cast<long long>(std::floor((event.start-origin)/options.window_seconds))].push_back(&event);
   std::unordered_map<std::string,std::size_t> index; for (std::size_t i=0;i<out.feature_names.size();++i) index[out.feature_names[i]]=i;
-  for (const auto& [b,es]:buckets) { TemporalFeatureRow row; row.timestamp=origin + static_cast<double>(b)*options.window_seconds; row.values.assign(out.feature_names.size(), options.default_not_present); auto add=[&](const std::string& n,double v){auto i=index.find(n); if(i!=index.end()) row.values[i->second]=v;}; double service=0, wait=0, soj=0; std::set<std::size_t> cases; std::set<std::string> resources; std::map<std::size_t,double> last;
-    for(const auto* e:es){ add("arrivals", (index.count("arrivals")?row.values[index["arrivals"]]:0)+1); add("finishes", (index.count("finishes")?row.values[index["finishes"]]:0)+1); service += e->finish-e->start; soj += e->finish-e->start; cases.insert(e->trace); const auto r=value_for(*e->event,options.resource_key); if(!r.empty()) resources.insert(r); auto it=last.find(e->trace); if(it!=last.end()) wait += std::max(0.0,e->start-it->second); last[e->trace]=e->finish; }
-    add("service_seconds",service); add("waiting_seconds",wait); add("sojourn_seconds",soj); add("cases",static_cast<double>(cases.size())); add("resource_workload",static_cast<double>(es.size())); double rework=0; for(const auto* e:es){ int prior=0; for(const auto* q:es) if(q->trace==e->trace && q->index<e->index && q->event->activity==e->event->activity) ++prior; if(prior) rework+=1; } add("rework",rework); out.temporal_rows.push_back(std::move(row)); }
+  for (const auto& [bucket, bucket_events] : buckets) {
+    TemporalFeatureRow row;
+    row.timestamp = origin + static_cast<double>(bucket) * options.window_seconds;
+    row.values.assign(out.feature_names.size(), options.default_not_present);
+    auto add = [&](const std::string& name, double value) {
+      if (const auto it = index.find(name); it != index.end()) row.values[it->second] = value;
+    };
+    std::set<std::size_t> trace_ids;
+    std::set<std::string> resources;
+    std::set<std::string> activities;
+    std::map<std::size_t, std::vector<const TimedEvent*>> by_trace;
+    std::map<std::string, std::set<std::size_t>> cases_by_resource;
+    std::map<std::size_t, std::set<std::string>> resources_by_trace;
+    for (const auto* event : bucket_events) {
+      trace_ids.insert(event->trace);
+      by_trace[event->trace].push_back(event);
+      activities.insert(value_for(*event->event, options.activity_key));
+      const auto resource = value_for(*event->event, options.resource_key);
+      if (!resource.empty()) {
+        resources.insert(resource);
+        cases_by_resource[resource].insert(event->trace);
+        resources_by_trace[event->trace].insert(resource);
+      }
+    }
+    double average_arrival = 0.0, average_finish = 0.0;
+    double average_waiting = 0.0, average_sojourn = 0.0, average_service = 0.0;
+    for (const auto trace_id : trace_ids) {
+      average_arrival += arrival_rate[trace_id];
+      average_finish += finish_rate[trace_id];
+      const auto& metrics = cases[trace_id];
+      const double sojourn = metrics.finish - metrics.start;
+      average_waiting += sojourn - metrics.service;
+      average_sojourn += sojourn;
+      average_service += metrics.service;
+    }
+    const double case_count = static_cast<double>(trace_ids.size());
+    if (case_count > 0.0) {
+      average_arrival /= case_count;
+      average_finish /= case_count;
+      average_waiting /= case_count;
+      average_sojourn /= case_count;
+      average_service /= case_count;
+    }
+    double reworked = 0.0;
+    double events_per_case = 0.0;
+    double resources_per_case = 0.0;
+    for (const auto& [trace_id, trace_events] : by_trace) {
+      std::set<std::string> trace_activities;
+      for (const auto* event : trace_events)
+        trace_activities.insert(value_for(*event->event, options.activity_key));
+      reworked += static_cast<double>(trace_events.size() - trace_activities.size());
+      events_per_case += static_cast<double>(trace_events.size());
+      resources_per_case += static_cast<double>(resources_by_trace[trace_id].size());
+    }
+    if (case_count > 0.0) {
+      events_per_case /= case_count;
+      resources_per_case /= case_count;
+    }
+    double cases_per_resource = 0.0;
+    for (const auto& [resource, resource_cases] : cases_by_resource)
+      cases_per_resource += static_cast<double>(resource_cases.size());
+    if (!cases_by_resource.empty()) cases_per_resource /= static_cast<double>(cases_by_resource.size());
+    add("unique_resources", static_cast<double>(resources.size()));
+    add("unique_activities", static_cast<double>(activities.size()));
+    add("num_events", static_cast<double>(bucket_events.size()));
+    add("average_arrival_rate", average_arrival);
+    add("average_finish_rate", average_finish);
+    add("average_waiting_time", average_waiting);
+    add("average_sojourn_time", average_sojourn);
+    add("average_service_time", average_service);
+    add("total_number_of_reworked_activities", reworked);
+    add("avg_cases_per_resource", cases_per_resource);
+    add("avg_events_per_case", events_per_case);
+    add("number_of_cases", case_count);
+    add("avg_resources_per_case", resources_per_case);
+    // Keep the former compact schema as an explicit compatibility projection.
+    add("arrivals", static_cast<double>(bucket_events.size()));
+    add("finishes", static_cast<double>(bucket_events.size()));
+    add("service_seconds", average_service * case_count);
+    add("waiting_seconds", average_waiting * case_count);
+    add("sojourn_seconds", average_sojourn * case_count);
+    add("cases", case_count);
+    add("resource_workload", static_cast<double>(bucket_events.size()));
+    add("rework", reworked);
+    out.temporal_rows.push_back(std::move(row));
+  }
   return out;
 }
 
