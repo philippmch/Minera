@@ -162,9 +162,32 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << ",\"proper_completion\":"
       << (result.proper_completion ? "true" : "false")
       << ",\"dead_transitions\":" << numbers(result.dead_transitions)
+      << ",\"dead_tasks\":" << numbers(result.dead_tasks)
       << ",\"deadlocks\":" << markings(result.deadlocks)
+      << ",\"deadlock_witnesses\":[";
+  for (std::size_t i = 0; i < result.deadlock_witnesses.size(); ++i) {
+    if (i != 0) out << ',';
+    out << numbers(result.deadlock_witnesses[i]);
+  }
+  out
+      << "]"
       << ",\"improper_markings\":" << markings(result.improper_markings)
+      << ",\"improper_witnesses\":[";
+  for (std::size_t i = 0; i < result.improper_witnesses.size(); ++i) {
+    if (i != 0) out << ',';
+    out << numbers(result.improper_witnesses[i]);
+  }
+  out
+      << "]"
+      << ",\"completion_witness\":" << numbers(result.completion_witness)
       << ",\"locking_witness\":" << numbers(result.locking_witness)
+      << ",\"locking_scenarios\":[";
+  for (std::size_t i = 0; i < result.locking_scenarios.size(); ++i) {
+    if (i != 0) out << ',';
+    out << numbers(result.locking_scenarios[i]);
+  }
+  out
+      << "]"
       << ",\"unbounded_witness\":" << numbers(result.unbounded_witness)
       << ",\"reachable_marking_count\":" << result.reachable_marking_count
       << ",\"coverability_node_count\":" << result.coverability_node_count
@@ -185,6 +208,13 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << ",\"handled_pairs\":" << optional_index_vectors(result.handled_pairs)
       << ",\"not_well_handled_pairs\":"
       << optional_index_vectors(result.handled_pairs)
+      << ",\"structural_node_labels\":[";
+  for (std::size_t i = 0; i < result.structural_node_labels.size(); ++i) {
+    if (i != 0) out << ',';
+    out << quote(result.structural_node_labels[i]);
+  }
+  out
+      << "]"
       << ",\"error\":" << quote(result.error) << '}';
   return out.str();
 }

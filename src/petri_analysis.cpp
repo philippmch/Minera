@@ -155,6 +155,28 @@ std::vector<std::vector<std::size_t>> structural_pair_diagnostics(
   return result;
 }
 
+std::vector<std::string> structural_node_labels(const PetriNet& net) {
+  const auto element_count = net.place_count() + net.transitions().size();
+  std::vector<std::string> labels(element_count * 2);
+  for (std::size_t place = 0; place < net.place_count(); ++place) {
+    labels[place * 2] = "place:" + std::to_string(place) + ":in";
+    labels[place * 2 + 1] = "place:" + std::to_string(place) + ":out";
+  }
+  for (std::size_t transition = 0; transition < net.transitions().size(); ++transition) {
+    const auto node = (net.place_count() + transition) * 2;
+    std::string label = "transition:" + std::to_string(transition);
+    if (net.transitions()[transition].activity &&
+        *net.transitions()[transition].activity < net.activities().size()) {
+      label += ":" + net.activities()[*net.transitions()[transition].activity];
+    } else {
+      label += ":tau";
+    }
+    labels[node] = label + ":in";
+    labels[node + 1] = label + ":out";
+  }
+  return labels;
+}
+
 void validate_marking(const Marking& marking, std::size_t places,
                       const char* name) {
   if (marking.size() != places)
@@ -1003,6 +1025,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     return result;
   }
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
+  result.structural_node_labels = structural_node_labels(net);
   result.handled_pairs = structural_pair_diagnostics(net);
   if (options.max_states == 0)
     throw std::invalid_argument("max_states must be positive");
@@ -1082,7 +1105,10 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       }
       edges[id].push_back({it->second, t});
     }
-    if (!any && nodes[id].marking != markings.final) result.deadlocks.push_back(nodes[id].marking);
+    if (!any && nodes[id].marking != markings.final) {
+      result.deadlocks.push_back(nodes[id].marking);
+      result.deadlock_witnesses.push_back(path_to(id));
+    }
     bool covers_final = true;
     for (std::size_t p = 0; p < markings.final.size(); ++p) {
       if (nodes[id].marking[p] < markings.final[p]) {
@@ -1090,15 +1116,19 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
         break;
       }
     }
-    if (covers_final && nodes[id].marking != markings.final)
+    if (covers_final && nodes[id].marking != markings.final) {
       result.improper_markings.push_back(nodes[id].marking);
+      result.improper_witnesses.push_back(path_to(id));
+    }
   }
   result.bounded = true;
   result.reachable_marking_count = result.coverability_node_count = nodes.size();
   const auto final_it = ids.find(markings.final);
   result.final_reachable = final_it != ids.end();
+  if (final_it != ids.end()) result.completion_witness = path_to(final_it->second);
   result.proper_completion = result.improper_markings.empty();
   for (std::size_t t = 0; t < fired.size(); ++t) if (!fired[t]) result.dead_transitions.push_back(t);
+  result.dead_tasks = result.dead_transitions;
   std::vector<std::vector<std::size_t>> reverse(nodes.size());
   for (std::size_t from = 0; from < edges.size(); ++from)
     for (const auto [to, transition] : edges[from]) { (void)transition; reverse[to].push_back(from); }
@@ -1109,8 +1139,13 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   result.option_to_complete = std::all_of(can_complete.begin(), can_complete.end(), [](bool value) { return value; });
   if (!result.option_to_complete) {
-    for (std::size_t id = 1; id < nodes.size(); ++id)
-      if (!can_complete[id]) { result.locking_witness = path_to(id); break; }
+    for (std::size_t id = 1; id < nodes.size(); ++id) {
+      if (can_complete[id]) continue;
+      auto path = path_to(id);
+      if (path.empty()) continue;
+      if (result.locking_witness.empty()) result.locking_witness = path;
+      result.locking_scenarios.push_back(std::move(path));
+    }
   }
   const bool sound = result.final_reachable && result.option_to_complete &&
                      result.proper_completion && result.dead_transitions.empty();
@@ -1131,8 +1166,15 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
           "positive place-invariant coverage is missing for one or more places");
     if (!result.dead_transitions.empty())
       result.diagnostic_messages.push_back("the net contains dead transitions");
+    if (!result.dead_tasks.empty())
+      result.diagnostic_messages.push_back("dead tasks: " +
+                                           std::to_string(result.dead_tasks.size()));
     if (!result.deadlocks.empty())
       result.diagnostic_messages.push_back("the net contains non-final deadlocks");
+    if (!result.locking_scenarios.empty())
+      result.diagnostic_messages.push_back(
+          "locking scenarios: " +
+          std::to_string(result.locking_scenarios.size()));
   }
   return result;
 }

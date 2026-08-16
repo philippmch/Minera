@@ -433,6 +433,10 @@ the split-aware extended marking equation, structural workflow-net validation,
 and bounded soundness diagnostics. Structural pair diagnostics use a deterministic
 node-split unit-capacity flow graph and report both directions whose maximum flow
 exceeds one, preserving the duplicated-node coordinates in the JSON contract.
+Bounded exploration also returns every shortest path to a marking that cannot
+reach the final marking as `locking_scenarios`, alongside the compact first
+witness and the `dead_tasks` alias for never-enabled transitions. Every pair
+coordinate also has a stable place/transition input-output label for renderers.
 The extended equation keeps trace events in
 ordered segments, assigns each event to a synchronous or log move, constrains
 segment-boundary markings, and solves the resulting integer state equation with

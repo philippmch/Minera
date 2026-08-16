@@ -2655,8 +2655,16 @@ export interface PetriAnalysisResult {
   objective?: number;
   lower_bound?: number;
   status?: "sound" | "unsound" | "unknown";
+  dead_transitions?: number[];
+  dead_tasks?: number[];
+  deadlock_witnesses?: number[][];
+  improper_witnesses?: number[][];
+  completion_witness?: number[];
+  locking_witness?: number[];
+  locking_scenarios?: number[][];
   handled_pairs?: number[][] | null;
   not_well_handled_pairs?: number[][] | null;
+  structural_node_labels?: string[];
   error?: string;
   [key: string]: unknown;
 }
@@ -2667,11 +2675,31 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if (family !== "marking_equation" && family !== "extended_marking_equation" &&
       family !== "workflow_net" && family !== "soundness") return false;
   if (family !== "soundness") return true;
-  const result = value as { handled_pairs?: unknown; not_well_handled_pairs?: unknown };
+  const result = value as {
+    handled_pairs?: unknown; not_well_handled_pairs?: unknown;
+    structural_node_labels?: unknown;
+    dead_transitions?: unknown; dead_tasks?: unknown;
+    deadlock_witnesses?: unknown; improper_witnesses?: unknown;
+    completion_witness?: unknown;
+    locking_witness?: unknown; locking_scenarios?: unknown;
+  };
+  const validIndices = (indices: unknown) => indices === undefined ||
+    (Array.isArray(indices) && indices.every((item) => Number.isSafeInteger(item) && item >= 0));
   const validPairs = (pairs: unknown) => pairs === undefined || pairs === null ||
     (Array.isArray(pairs) && pairs.every((pair) => Array.isArray(pair) && pair.length === 2 &&
       pair.every((item) => Number.isSafeInteger(item) && item >= 0)));
-  return validPairs(result.handled_pairs) && validPairs(result.not_well_handled_pairs);
+  const validScenarios = result.locking_scenarios === undefined ||
+    (Array.isArray(result.locking_scenarios) && result.locking_scenarios.every(validIndices));
+  const validWitnesses = (witnesses: unknown) => witnesses === undefined ||
+    (Array.isArray(witnesses) && witnesses.every(validIndices));
+  const validLabels = result.structural_node_labels === undefined ||
+    (Array.isArray(result.structural_node_labels) &&
+      result.structural_node_labels.every((label) => typeof label === "string"));
+  return validIndices(result.dead_transitions) && validIndices(result.dead_tasks) &&
+    validIndices(result.completion_witness) && validIndices(result.locking_witness) &&
+    validWitnesses(result.deadlock_witnesses) && validWitnesses(result.improper_witnesses) &&
+    validScenarios &&
+    validPairs(result.handled_pairs) && validPairs(result.not_well_handled_pairs) && validLabels;
 }
 
 type EvaluationMetric = number | null;

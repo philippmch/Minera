@@ -230,6 +230,10 @@ void positive_invariant_diagnostics() {
   assert(serialized.find("\"not_well_handled_pairs\"") != std::string::npos);
   assert(sequential.handled_pairs.has_value());
   assert(sequential.handled_pairs->empty());
+  assert(sequential.completion_witness == std::vector<std::size_t>({0, 1}));
+  assert(sequential.structural_node_labels.size() == 10);
+  assert(sequential.structural_node_labels[0] == "place:0:in");
+  assert(sequential.structural_node_labels[6] == "transition:0:A:in");
 
   const auto parallel = analyze_soundness(parallel_net());
   assert(parallel.s_components.has_value());
@@ -262,6 +266,8 @@ void structural_pair_diagnostics() {
   const auto serialized = petri_analysis_json(result);
   assert(serialized.find("\"not_well_handled_pairs\":[[") !=
          std::string::npos);
+  assert(serialized.find("\"structural_node_labels\":[\"place:0:in\"") !=
+         std::string::npos);
 
   const auto split = analyze_soundness(splitting_pair_net());
   assert(split.handled_pairs.has_value());
@@ -278,6 +284,8 @@ void unsound_models() {
   improper.add_transition(std::nullopt, {extra}, {sink});
   auto result = analyze_soundness(improper);
   assert(result.status == SoundnessStatus::UNSOUND && !result.proper_completion && !result.improper_markings.empty());
+  assert(!result.improper_witnesses.empty());
+  assert(result.improper_witnesses.front() == std::vector<std::size_t>({0}));
 
   PetriNet dead; dead.set_activities({"A", "B"});
   const auto ds = dead.add_place(), dk = dead.add_place(); dead.set_source(ds); dead.set_sink(dk);
@@ -292,6 +300,17 @@ void unsound_models() {
   result = analyze_soundness(locking);
   assert(result.status == SoundnessStatus::UNSOUND && !result.deadlocks.empty());
   assert(result.locking_witness == std::vector<std::size_t>({0}));
+  assert(result.dead_tasks == std::vector<std::size_t>({1}));
+  assert(result.locking_scenarios ==
+         std::vector<std::vector<std::size_t>>{{0}});
+  assert(result.deadlock_witnesses ==
+         std::vector<std::vector<std::size_t>>{{0}});
+  const auto locking_json = petri_analysis_json(result);
+  assert(locking_json.find("\"dead_tasks\":[1]") != std::string::npos);
+  assert(locking_json.find("\"locking_scenarios\":[[0]]") !=
+         std::string::npos);
+  assert(locking_json.find("\"deadlock_witnesses\":[[0]]") !=
+         std::string::npos);
 
   PetriNet growing; growing.set_activities({"start", "grow", "finish"});
   const auto gs = growing.add_place(), gp = growing.add_place(), gk = growing.add_place();
