@@ -176,6 +176,7 @@ enum class PetriAnalysisFamily {
   kExtendedMarkingEquation,
   kWorkflowNet,
   kSoundness,
+  kWoflan,
 };
 
 struct PetriAnalysisParams {

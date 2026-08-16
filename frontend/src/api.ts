@@ -1323,7 +1323,7 @@ export async function evaluateModel(miner: string, options: EvaluationOptions = 
 /** Stable query serialization for the four native Petri-analysis families. */
 export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   const family = options.family ?? "marking_equation";
-  if (!["marking_equation", "extended_marking_equation", "workflow_net", "soundness"].includes(family)) {
+  if (!["marking_equation", "extended_marking_equation", "workflow_net", "soundness", "woflan"].includes(family)) {
     throw new Error("petri analysis family is invalid");
   }
   if (options.miner !== undefined && options.miner.trim() === "") throw new Error("petri analysis miner must not be empty");

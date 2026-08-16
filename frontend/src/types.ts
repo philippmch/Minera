@@ -2571,7 +2571,8 @@ export type PetriAnalysisFamily =
   | "marking_equation"
   | "extended_marking_equation"
   | "workflow_net"
-  | "soundness";
+  | "soundness"
+  | "woflan";
 
 export interface PetriAnalysisOptions {
   family?: PetriAnalysisFamily;
@@ -2733,8 +2734,10 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if (!value || typeof value !== "object") return false;
   const family = (value as { family?: unknown }).family;
   if (family !== "marking_equation" && family !== "extended_marking_equation" &&
-      family !== "workflow_net" && family !== "soundness") return false;
-  if (family !== "soundness") return true;
+      family !== "workflow_net" && family !== "soundness" && family !== "woflan") return false;
+  if (family !== "soundness" && family !== "woflan") return true;
+  if ("variant" in value && value.variant !== undefined &&
+      value.variant !== "soundness" && value.variant !== "woflan") return false;
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;

@@ -747,7 +747,7 @@ int usage(const char* program) {
                "  --simplicity-final-marking <n,...> Final place marking\n"
                "  --petri-analysis-family <id> marking_equation,\n"
                "                            extended_marking_equation,\n"
-               "                            workflow_net, or soundness\n"
+               "                            workflow_net, soundness, or woflan\n"
                "  --petri-analysis-miner <id> Model id (default: alpha)\n"
                "  --petri-analysis-trace-index <n> Extended-equation trace\n"
                "  --petri-analysis-initial-marking <n,...> Initial marking\n"
@@ -4725,8 +4725,12 @@ int main(int argc, char** argv) {
           result_json = minera::petri_analysis_json(
               minera::check_workflow_net(*model_it->second));
           break;
-        case minera::PetriAnalysisFamily::kSoundness: {
+        case minera::PetriAnalysisFamily::kSoundness:
+        case minera::PetriAnalysisFamily::kWoflan: {
           minera::SoundnessOptions options;
+          options.variant = request.family == minera::PetriAnalysisFamily::kWoflan
+                                ? minera::SoundnessVariant::kWoflan
+                                : minera::SoundnessVariant::kSoundness;
           options.initial_marking = request.initial_marking;
           options.final_marking = request.final_marking;
           options.max_states = request.max_states;
