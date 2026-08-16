@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -18,6 +20,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -82,6 +85,7 @@
 #include "minera/ocel.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_filter.hpp"
+#include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_statistics.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
@@ -1014,6 +1018,45 @@ void handle_ocel_filter(const httplib::Request& request,
             minera::serialize_ocel_json(filtered) + "}",
         "application/json");
   } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_sqlite(const httplib::Request& request,
+                        httplib::Response& response) {
+  std::filesystem::path temporary;
+  try {
+    if (!request.is_multipart_form_data() || !request.has_file("log"))
+      throw std::invalid_argument("OCEL SQLite import requires multipart field log");
+    const auto file = request.get_file_value("log");
+    if (file.content.empty()) throw std::invalid_argument("empty SQLite upload");
+    const auto stamp = std::chrono::high_resolution_clock::now()
+                           .time_since_epoch().count();
+    const auto thread = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    temporary = std::filesystem::temp_directory_path() /
+                ("minera_ocel_" + std::to_string(stamp) + "_" +
+                 std::to_string(thread) + ".sqlite");
+    {
+      std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+      if (!output) throw std::runtime_error("cannot create temporary SQLite upload");
+      output.write(file.content.data(),
+                   static_cast<std::streamsize>(file.content.size()));
+      if (!output) throw std::runtime_error("cannot write temporary SQLite upload");
+    }
+    const auto log = minera::import_ocel_sqlite(temporary);
+    std::error_code ignored;
+    std::filesystem::remove(temporary, ignored);
+    temporary.clear();
+    response.set_content(
+        std::string("{\"family\":\"OCEL_SQLITE\",\"variant\":\"IMPORT\",\"log\":") +
+            minera::serialize_ocel_json(log) + "}",
+        "application/json");
+  } catch (const std::exception& error) {
+    if (!temporary.empty()) {
+      std::error_code ignored;
+      std::filesystem::remove(temporary, ignored);
+    }
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
@@ -4537,6 +4580,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
   server.Options("/api/ocel/filter", preflight);
+  server.Options("/api/ocel/sqlite", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -4615,6 +4659,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);
   server.Post("/api/ocel/filter", handle_ocel_filter);
+  server.Post("/api/ocel/sqlite", handle_ocel_sqlite);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

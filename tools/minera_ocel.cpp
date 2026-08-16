@@ -14,6 +14,7 @@
 
 #include "minera/ocel.hpp"
 #include "minera/ocel_csv.hpp"
+#include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_xml.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel_features.hpp"
@@ -26,7 +27,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml [--csv] [--csv-objects OBJECTS.csv] [--xml] [--format classic|standard|xml|xml_standard] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
@@ -42,7 +43,8 @@ int main(int argc, char** argv) {
         filter_cc_object_type, filter_cc_activity;
     std::optional<std::pair<std::size_t, std::size_t>> filter_cc_length;
     bool filter_cc_object_type_negative = false;
-    bool csv_input = false, xml_input = false;
+    bool csv_input = false, xml_input = false, sqlite_input = false;
+    std::string sqlite_output_path;
     minera::Ocel log;
     bool ocpn_playout = false;
     bool oc_causal_net_playout = false;
@@ -130,6 +132,13 @@ int main(int argc, char** argv) {
         csv_input = true;
       } else if (option == "--xml") {
         xml_input = true;
+      } else if (option == "--sqlite") {
+        sqlite_input = true;
+      } else if (option == "--sqlite-output" && i + 1 < argc) {
+        sqlite_output_path = argv[++i];
+        if (sqlite_output_path.empty())
+          throw std::invalid_argument("--sqlite-output expects a path");
+        format = "sqlite";
       } else if (option == "--csv-objects" && i + 1 < argc) {
         csv_objects_path = argv[++i];
         csv_input = true;
@@ -410,10 +419,16 @@ int main(int argc, char** argv) {
       } else throw std::invalid_argument("unknown option: " + option);
     }
     if (format != "classic" && format != "standard" && format != "xml" &&
-        format != "xml_standard") {
+        format != "xml_standard" && format != "sqlite") {
       throw std::invalid_argument(
-          "format must be classic, standard, xml, or xml_standard");
+          "format must be classic, standard, xml, xml_standard, or sqlite");
     }
+    if (format == "sqlite" && sqlite_output_path.empty())
+      throw std::invalid_argument(
+          "--format sqlite requires --sqlite-output OUTPUT.sqlite");
+    if (!sqlite_output_path.empty() && format != "sqlite")
+      throw std::invalid_argument(
+          "--sqlite-output requires --format sqlite");
     if (!describe.empty() && describe != "text" && describe != "tuples") {
       throw std::invalid_argument("describe must be text or tuples");
     }
@@ -498,8 +513,12 @@ int main(int argc, char** argv) {
     const auto input_extension = lower_extension(input_path);
     csv_input = csv_input || input_extension == ".csv";
     xml_input = xml_input || input_extension == ".xml" || input_extension == ".xmlocel";
-    if (csv_input && xml_input) {
-      throw std::invalid_argument("CSV and XML input modes are mutually exclusive");
+    sqlite_input = sqlite_input || input_extension == ".sqlite" ||
+                   input_extension == ".sqlite3" || input_extension == ".db";
+    if ((csv_input && xml_input) || (csv_input && sqlite_input) ||
+        (xml_input && sqlite_input)) {
+      throw std::invalid_argument(
+          "CSV, XML, and SQLite input modes are mutually exclusive");
     }
     if (!csv_input && !csv_objects_path.empty()) {
       throw std::invalid_argument("--csv-objects requires a CSV input");
@@ -525,6 +544,8 @@ int main(int argc, char** argv) {
         }
       } else if (xml_input) {
         log = minera::import_ocel_xml(input_path);
+      } else if (sqlite_input) {
+        log = minera::import_ocel_sqlite(input_path);
       } else {
         std::ifstream input(input_path, std::ios::binary);
         if (!input) throw std::runtime_error("cannot open input");
@@ -686,6 +707,10 @@ int main(int argc, char** argv) {
         }
       } else if (normative_extension == ".xml" || normative_extension == ".xmlocel") {
         normative = minera::import_ocel_xml(normative_file);
+      } else if (normative_extension == ".sqlite" ||
+                 normative_extension == ".sqlite3" ||
+                 normative_extension == ".db") {
+        normative = minera::import_ocel_sqlite(normative_file);
       } else {
         std::ifstream normative_input(normative_file, std::ios::binary);
         if (!normative_input) throw std::runtime_error("cannot open normative input");
@@ -758,7 +783,12 @@ int main(int argc, char** argv) {
                 << '\n';
       return 0;
     }
-    if (format == "xml" || format == "xml_standard") {
+    if (format == "sqlite") {
+      if (sqlite_output_path.empty())
+        throw std::invalid_argument(
+            "--format sqlite requires --sqlite-output OUTPUT.sqlite");
+      minera::export_ocel_sqlite(log, std::filesystem::path(sqlite_output_path));
+    } else if (format == "xml" || format == "xml_standard") {
       minera::OcelXmlExportOptions options;
       options.format = format == "xml_standard"
                            ? minera::OcelXmlFormat::kStandard
