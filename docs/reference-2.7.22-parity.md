@@ -164,7 +164,7 @@ extended-table CSV (with an optional object table), typed OCEL 2 relational
 SQLite, and bounded classic/standard XML. CSV import validates headers,
 object-list cells, timestamps, ids, and cross-type references; SQLite
 round-trips the core relational tables plus typed attributes, event-to-event
-links, object changes, and globals, and imports standard type-specific
+links, object changes, and globals, and writes/imports standard type-specific
 attribute columns and object-change rows; XML import/export preserves scalar
 attributes, qualifiers, object-to-object links, object changes, globals, and
 deterministic ordering where the selected format carries them. `minera_ocel`
