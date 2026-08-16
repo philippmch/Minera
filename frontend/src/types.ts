@@ -315,6 +315,55 @@ export const isClusteringResult = (value: unknown): value is ClusteringResult =>
     [d.trace_count, d.group_count, d.node_count].every((n) => Number.isInteger(n) && (n as number) >= 0) &&
     typeof d.message === "string";
 };
+export interface ProfileClusteringOptions {
+  profile_cluster_count?: number;
+  profile_max_iterations?: number;
+  profile_max_traces?: number;
+  profile_max_features?: number;
+  profile_seed?: number;
+  profile_tolerance?: number;
+  profile_include_activity?: boolean;
+  profile_include_succession?: boolean;
+  profile_trace_string_attributes?: string[];
+  profile_event_string_attributes?: string[];
+  profile_trace_numeric_attributes?: string[];
+  profile_event_numeric_attributes?: string[];
+  profile_feature_names?: string[];
+}
+export interface ProfileClusteringResult {
+  family: "PROFILE_CLUSTERING";
+  labels: number[];
+  clusters: number[][];
+  feature_names: string[];
+  inertia: number;
+  diagnostics: {
+    computed: boolean;
+    converged: boolean;
+    trace_count: number;
+    feature_count: number;
+    cluster_count: number;
+    iterations: number;
+    message: string;
+  };
+}
+export function isProfileClusteringResult(value: unknown): value is ProfileClusteringResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Partial<ProfileClusteringResult>;
+  const diagnostics = candidate.diagnostics;
+  if (candidate.family !== "PROFILE_CLUSTERING" || !Array.isArray(candidate.labels) ||
+      !candidate.labels.every((label) => Number.isSafeInteger(label) && label >= 0) ||
+      !Array.isArray(candidate.clusters) ||
+      !candidate.clusters.every((cluster) => Array.isArray(cluster) &&
+        cluster.every((index) => Number.isSafeInteger(index) && index >= 0)) ||
+      !Array.isArray(candidate.feature_names) ||
+      !candidate.feature_names.every((name) => typeof name === "string") ||
+      typeof candidate.inertia !== "number" || !Number.isFinite(candidate.inertia) ||
+      candidate.inertia < 0 || !diagnostics || typeof diagnostics !== "object") return false;
+  const d = diagnostics as Partial<ProfileClusteringResult["diagnostics"]>;
+  return typeof d.computed === "boolean" && typeof d.converged === "boolean" &&
+    [d.trace_count, d.feature_count, d.cluster_count, d.iterations].every((n) =>
+      Number.isSafeInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+}
 export function isLocalDiagnosticsResult(value: unknown): value is LocalDiagnosticsResult {
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<LocalDiagnosticsResult>; const d = c.diagnostics;

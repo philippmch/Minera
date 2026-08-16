@@ -3490,6 +3490,71 @@ TraceAttributeClusteringOptions parse_clustering_params(const FieldLookup& field
   return o;
 }
 
+ProfileClusteringOptions parse_profile_clustering_params(const FieldLookup& field) {
+  return parse_profile_clustering_params(field, {});
+}
+
+ProfileClusteringOptions parse_profile_clustering_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  ProfileClusteringOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("profile_cluster_count"))
+    options.cluster_count = parse_positive_size(
+        require("profile_cluster_count"), "profile_cluster_count");
+  if (supplied("profile_max_iterations"))
+    options.max_iterations = parse_positive_size(
+        require("profile_max_iterations"), "profile_max_iterations");
+  if (supplied("profile_max_traces"))
+    options.max_traces = parse_positive_size(require("profile_max_traces"),
+                                             "profile_max_traces");
+  if (supplied("profile_max_features"))
+    options.max_features = parse_positive_size(
+        require("profile_max_features"), "profile_max_features");
+  if (supplied("profile_seed"))
+    options.seed = parse_nonnegative_size(require("profile_seed"),
+                                          "profile_seed");
+  if (supplied("profile_tolerance")) {
+    options.tolerance = parse_finite_double(require("profile_tolerance"),
+                                            "profile_tolerance");
+    if (options.tolerance < 0.0)
+      throw std::invalid_argument("profile_tolerance must be non-negative");
+  }
+  if (supplied("profile_include_activity"))
+    options.include_activity_representation = parse_boolean(
+        require("profile_include_activity"), "profile_include_activity");
+  if (supplied("profile_include_succession"))
+    options.include_succession_representation = parse_boolean(
+        require("profile_include_succession"), "profile_include_succession");
+  if (supplied("profile_trace_string_attributes"))
+    options.trace_string_attributes = parse_strict_csv(
+        require("profile_trace_string_attributes"),
+        "profile_trace_string_attributes");
+  if (supplied("profile_event_string_attributes"))
+    options.event_string_attributes = parse_strict_csv(
+        require("profile_event_string_attributes"),
+        "profile_event_string_attributes");
+  if (supplied("profile_trace_numeric_attributes"))
+    options.trace_numeric_attributes = parse_strict_csv(
+        require("profile_trace_numeric_attributes"),
+        "profile_trace_numeric_attributes");
+  if (supplied("profile_event_numeric_attributes"))
+    options.event_numeric_attributes = parse_strict_csv(
+        require("profile_event_numeric_attributes"),
+        "profile_event_numeric_attributes");
+  if (supplied("profile_feature_names"))
+    options.feature_names = parse_strict_csv(require("profile_feature_names"),
+                                             "profile_feature_names");
+  return options;
+}
+
 ChaoticActivitiesOptions parse_chaotic_activities_params(
     const FieldLookup& field) {
   return parse_chaotic_activities_params(field, {});

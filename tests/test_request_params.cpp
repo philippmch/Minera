@@ -257,6 +257,45 @@ void clustering_params_contract() {
   assert(missing);
 }
 
+void profile_clustering_params_contract() {
+  const auto parsed = minera::parse_profile_clustering_params(fields({
+      {"profile_cluster_count", "3"},
+      {"profile_max_iterations", "17"},
+      {"profile_max_traces", "99"},
+      {"profile_max_features", "123"},
+      {"profile_seed", "42"},
+      {"profile_tolerance", "0.001"},
+      {"profile_include_activity", "false"},
+      {"profile_include_succession", "1"},
+      {"profile_trace_string_attributes", "segment,region"},
+      {"profile_event_string_attributes", "phase"},
+      {"profile_trace_numeric_attributes", "amount"},
+      {"profile_event_numeric_attributes", "score"},
+      {"profile_feature_names", "f1,f2"}}));
+  assert(parsed.cluster_count == 3 && parsed.max_iterations == 17);
+  assert(parsed.max_traces == 99 && parsed.max_features == 123);
+  assert(parsed.seed == 42 && parsed.tolerance == 0.001);
+  assert(!parsed.include_activity_representation &&
+         parsed.include_succession_representation);
+  assert((parsed.trace_string_attributes ==
+          std::vector<std::string>{"segment", "region"}));
+  assert((parsed.event_string_attributes == std::vector<std::string>{"phase"}));
+  assert((parsed.trace_numeric_attributes == std::vector<std::string>{"amount"}));
+  assert((parsed.event_numeric_attributes == std::vector<std::string>{"score"}));
+  assert((parsed.feature_names == std::vector<std::string>{"f1", "f2"}));
+
+  for (const auto& item : {
+           std::pair{"profile_cluster_count", "0"},
+           std::pair{"profile_tolerance", "-0.1"},
+           std::pair{"profile_include_activity", "maybe"},
+           std::pair{"profile_event_string_attributes", "A,,B"}}) {
+    bool threw = false;
+    try { (void)minera::parse_profile_clustering_params(fields({item})); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+}
+
 void chaotic_activities_params_contract() {
   const auto parsed = minera::parse_chaotic_activities_params(fields({
       {"chaotic_activity_key", "phase"},
@@ -2749,6 +2788,7 @@ int main() {
   timestamp_interleavings_params_contract();
   resource_profiles_params_contract();
   clustering_params_contract();
+  profile_clustering_params_contract();
   chaotic_activities_params_contract();
   passed_time_params_contract();
   service_time_params_contract();

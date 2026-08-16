@@ -108,6 +108,9 @@ import {
   type ClusteringOptions,
   type ClusteringResult,
   isClusteringResult,
+  type ProfileClusteringOptions,
+  type ProfileClusteringResult,
+  isProfileClusteringResult,
   type EmdResult,
   type ProcessTreeAlignmentOptions,
   type ProcessTreeAlignmentResult,
@@ -1948,6 +1951,53 @@ export function requestClustering(options: ClusteringOptions = {}): Promise<Clus
   return postChecked(`/api/clustering${query ? `?${query}` : ""}`, isClusteringResult, "trace clustering");
 }
 export const discoverClustering = requestClustering;
+function profileAttributeList(values: string[] | undefined, name: string): string | undefined {
+  if (values === undefined) return undefined;
+  if (values.length === 0 || values.some((value) => !value))
+    throw new Error(`${name} must contain non-empty values`);
+  if (new Set(values).size !== values.length)
+    throw new Error(`${name} must not contain duplicates`);
+  return values.map((value) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,")).join(",");
+}
+export function profileClusteringQuery(options: ProfileClusteringOptions = {}): string {
+  const positive = [
+    ["profile_cluster_count", options.profile_cluster_count],
+    ["profile_max_iterations", options.profile_max_iterations],
+    ["profile_max_traces", options.profile_max_traces],
+    ["profile_max_features", options.profile_max_features],
+  ] as const;
+  for (const [name, value] of positive) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0 || value > 100000))
+      throw new Error(`${name} must be a positive integer within the safety limit`);
+  }
+  if (options.profile_seed !== undefined && (!Number.isSafeInteger(options.profile_seed) || options.profile_seed < 0))
+    throw new Error("profile_seed must be a non-negative integer");
+  if (options.profile_tolerance !== undefined && (!Number.isFinite(options.profile_tolerance) || options.profile_tolerance < 0))
+    throw new Error("profile_tolerance must be finite and non-negative");
+  const values: Record<string, string | undefined> = {
+    profile_cluster_count: options.profile_cluster_count === undefined ? undefined : String(options.profile_cluster_count),
+    profile_event_numeric_attributes: profileAttributeList(options.profile_event_numeric_attributes, "profile_event_numeric_attributes"),
+    profile_event_string_attributes: profileAttributeList(options.profile_event_string_attributes, "profile_event_string_attributes"),
+    profile_feature_names: profileAttributeList(options.profile_feature_names, "profile_feature_names"),
+    profile_include_activity: options.profile_include_activity === undefined ? undefined : String(options.profile_include_activity),
+    profile_include_succession: options.profile_include_succession === undefined ? undefined : String(options.profile_include_succession),
+    profile_max_features: options.profile_max_features === undefined ? undefined : String(options.profile_max_features),
+    profile_max_iterations: options.profile_max_iterations === undefined ? undefined : String(options.profile_max_iterations),
+    profile_max_traces: options.profile_max_traces === undefined ? undefined : String(options.profile_max_traces),
+    profile_seed: options.profile_seed === undefined ? undefined : String(options.profile_seed),
+    profile_tolerance: options.profile_tolerance === undefined ? undefined : String(options.profile_tolerance),
+    profile_trace_numeric_attributes: profileAttributeList(options.profile_trace_numeric_attributes, "profile_trace_numeric_attributes"),
+    profile_trace_string_attributes: profileAttributeList(options.profile_trace_string_attributes, "profile_trace_string_attributes"),
+  };
+  const query = new URLSearchParams();
+  for (const key of Object.keys(values).sort()) if (values[key] !== undefined) query.set(key, values[key] as string);
+  return query.toString();
+}
+export function requestProfileClustering(options: ProfileClusteringOptions = {}): Promise<ProfileClusteringResult> {
+  const query = profileClusteringQuery(options);
+  return postChecked(`/api/profile-clustering${query ? `?${query}` : ""}`, isProfileClusteringResult, "profile clustering");
+}
+export const discoverProfileClustering = requestProfileClustering;
 /** Query string for the cached-session trace-variant anonymizer. */
 export function traceVariantQuery(options: TraceVariantQueryOptions = {}): string {
   const query = new URLSearchParams();

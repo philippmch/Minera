@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("serializes optional noise cleaning settings", () => {
@@ -759,6 +759,33 @@ describe("trace clustering API", () => {
       diagnostics: { computed: true, output_truncated: false, trace_count: 2, group_count: 2, node_count: 3, message: "ok" },
     }), { status: 200 })));
     await expect(requestClustering()).rejects.toThrow(/invalid trace clustering/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("profile clustering API", () => {
+  it("serializes deterministic profile settings and escaped lists", () => {
+    expect(profileClusteringQuery({
+      profile_cluster_count: 3, profile_seed: 7,
+      profile_include_activity: false,
+      profile_trace_string_attributes: ["segment", "region"],
+      profile_feature_names: ["a,b", "c"],
+    })).toBe("profile_cluster_count=3&profile_feature_names=a%5C%2Cb%2Cc&profile_include_activity=false&profile_seed=7&profile_trace_string_attributes=segment%2Cregion");
+    expect(() => profileClusteringQuery({ profile_cluster_count: 0 })).toThrow(/positive/);
+    expect(() => profileClusteringQuery({ profile_feature_names: ["a", "a"] })).toThrow(/duplicates/);
+  });
+  it("validates the profile result envelope", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe("/api/profile-clustering?profile_cluster_count=2");
+      return new Response(JSON.stringify({
+        family: "PROFILE_CLUSTERING", labels: [0, 1], clusters: [[0], [1]],
+        feature_names: ["event:concept:name@A"], inertia: 0,
+        diagnostics: { computed: true, converged: true, trace_count: 2,
+          feature_count: 1, cluster_count: 2, iterations: 1, message: "converged" },
+      }), { status: 200 });
+    }));
+    await expect(requestProfileClustering({ profile_cluster_count: 2 }))
+      .resolves.toMatchObject({ family: "PROFILE_CLUSTERING", labels: [0, 1] });
     vi.unstubAllGlobals();
   });
 });

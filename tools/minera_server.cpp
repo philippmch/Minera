@@ -153,6 +153,10 @@ constexpr std::size_t kServerPripelMaxOutputTraces = 100'000;
 constexpr std::size_t kServerOcelFilterMaxLevel = 32;
 constexpr std::size_t kServerChaoticMaxActivities = 100'000;
 constexpr std::size_t kServerChaoticMaxEvents = 1'000'000;
+constexpr std::size_t kServerProfileMaxClusters = 10'000;
+constexpr std::size_t kServerProfileMaxIterations = 10'000;
+constexpr std::size_t kServerProfileMaxTraces = 100'000;
+constexpr std::size_t kServerProfileMaxFeatures = 10'000;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -1684,6 +1688,54 @@ void handle_clustering(const httplib::Request& request, httplib::Response& respo
     const auto o=minera::parse_clustering_params(lookup,present);
     response.set_content(minera::trace_attribute_clustering_json(minera::discover_trace_attribute_clustering(session->log,o)),"application/json");
   } catch (const std::exception& e) { response.status=400; response.set_content(error_json(e.what()),"application/json"); }
+}
+
+void handle_profile_clustering(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
+        "profile_max_features", "profile_seed", "profile_tolerance",
+        "profile_include_activity", "profile_include_succession",
+        "profile_trace_string_attributes", "profile_event_string_attributes",
+        "profile_trace_numeric_attributes", "profile_event_numeric_attributes",
+        "profile_feature_names"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown profile clustering parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_profile_clustering_params(lookup, present);
+    if (options.cluster_count > kServerProfileMaxClusters ||
+        options.max_iterations > kServerProfileMaxIterations ||
+        options.max_traces > kServerProfileMaxTraces ||
+        options.max_features > kServerProfileMaxFeatures) {
+      throw std::invalid_argument("profile clustering safety bound exceeded");
+    }
+    response.set_content(
+        minera::profile_clustering_json(
+            minera::discover_profile_clustering(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_chaotic_activities(const httplib::Request& request,
@@ -4440,6 +4492,7 @@ int main(int argc, char** argv) {
   server.Options("/api/resource-profiles", preflight);
   server.Options("/api/local-diagnostics", preflight);
   server.Options("/api/clustering", preflight);
+  server.Options("/api/profile-clustering", preflight);
   server.Options("/api/chaotic-activities", preflight);
   server.Options("/api/passed-time", preflight);
   server.Options("/api/service-time", preflight);
@@ -4516,6 +4569,7 @@ int main(int argc, char** argv) {
   server.Post("/api/resource-profiles", handle_resource_profiles);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
+  server.Post("/api/profile-clustering", handle_profile_clustering);
   server.Post("/api/chaotic-activities", handle_chaotic_activities);
   server.Post("/api/passed-time", handle_passed_time);
   server.Post("/api/service-time", handle_service_time);

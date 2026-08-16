@@ -255,6 +255,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field);
 [[nodiscard]] TraceAttributeClusteringOptions parse_clustering_params(
     const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] ProfileClusteringOptions parse_profile_clustering_params(
+    const FieldLookup& field);
+[[nodiscard]] ProfileClusteringOptions parse_profile_clustering_params(
+    const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
     const FieldLookup& field);
