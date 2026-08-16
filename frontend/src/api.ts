@@ -40,6 +40,7 @@ import {
   type OcelDiscoveryResult,
   type OcelConformanceResult,
   type OcelFilterResult,
+  type OcelSqliteResult,
   type OcelSplitResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
@@ -75,6 +76,7 @@ import {
   isOcelDiscoveryResult,
   isOcelConformanceResult,
   isOcelFilterResult,
+  isOcelSqliteResult,
   isOcelSplitResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
@@ -3549,6 +3551,18 @@ export async function requestOcelDiscovery(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelDiscoveryResult(payload)) throw new Error("the Minera backend returned an invalid OCEL discovery");
+  return payload;
+}
+
+/** Imports an OCEL 2 relational SQLite upload through the local backend. */
+export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.sqlite";
+  form.append("log", log, logName);
+  const response = await fetch("/api/ocel/sqlite", { method: "POST", body: form });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelSqliteResult(payload)) throw new Error("the Minera backend returned an invalid OCEL SQLite import");
   return payload;
 }
 

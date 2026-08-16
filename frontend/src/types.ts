@@ -936,6 +936,11 @@ export interface OcelFilterResult {
   variant: OcelFilterVariant;
   log: Record<string, unknown>;
 }
+export interface OcelSqliteResult {
+  family: "OCEL_SQLITE";
+  variant: "IMPORT";
+  log: Record<string, unknown>;
+}
 export interface OcelSplitResult {
   family: "OCEL_SPLIT";
   variant: OcelSplitVariant;
@@ -975,6 +980,12 @@ export function isOcelFilterResult(value: unknown): value is OcelFilterResult {
       !isOcelRecord(value.log)) return false;
   const log = value.log;
   return isOcelRecord(log["ocel:events"]) && isOcelRecord(log["ocel:objects"]);
+}
+export function isOcelSqliteResult(value: unknown): value is OcelSqliteResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_SQLITE" ||
+      value.variant !== "IMPORT" || !isOcelRecord(value.log)) return false;
+  return isOcelRecord(value.log["ocel:events"]) &&
+    isOcelRecord(value.log["ocel:objects"]);
 }
 export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_SPLIT" ||

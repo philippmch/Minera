@@ -97,6 +97,7 @@ add_library(minera_core
   src/minimum_self_distance.cpp
   src/ocel.cpp
   src/ocel_csv.cpp
+  src/ocel_sqlite.cpp
   src/ocel_filter.cpp
   src/ocel_xml.cpp
   src/ocel_features.cpp
@@ -152,7 +153,14 @@ target_include_directories(minera_core
 )
 
 if(WIN32)
-  target_link_libraries(minera_core PRIVATE bcrypt)
+  target_link_libraries(minera_core PRIVATE bcrypt winsqlite3)
+  target_compile_definitions(minera_core PUBLIC MINERA_HAS_SQLITE=1)
+else()
+  find_package(SQLite3 QUIET)
+  if(SQLite3_FOUND)
+    target_link_libraries(minera_core PRIVATE SQLite::SQLite3)
+    target_compile_definitions(minera_core PUBLIC MINERA_HAS_SQLITE=1)
+  endif()
 endif()
 
 if(MSVC)
@@ -290,6 +298,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_csv_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_csv_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_csv_tests COMMAND minera_ocel_csv_tests)
+
+  add_executable(minera_ocel_sqlite_tests
+    tests/test_ocel_sqlite.cpp
+  )
+  target_link_libraries(minera_ocel_sqlite_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_sqlite_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_sqlite_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_sqlite_tests COMMAND minera_ocel_sqlite_tests)
 
   add_executable(minera_ocel_xml_tests
     tests/test_ocel_xml.cpp
