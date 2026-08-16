@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isLogUtilityResult", () => {
   const event = { case_id: "c1", activity: "A", timestamp: "1", resource: "", lifecycle: "", input_order: 0, attributes: [] };
@@ -336,6 +336,19 @@ describe("isAttributeDistributionResult", () => {
   it("rejects misaligned or fractional bins", () => {
     expect(isAttributeDistributionResult({ ...valid, labels: ["01"] })).toBe(false);
     expect(isAttributeDistributionResult({ ...valid, counts: [2, 1.5] })).toBe(false);
+  });
+});
+
+describe("isAttributeKdeResult", () => {
+  const valid = {
+    family: "ATTRIBUTE_KDE", variant: "NUMERIC", attribute_key: "amount",
+    x: [1, 2, 3], y: [0.1, 0.2, 0.1],
+  };
+  it("accepts finite aligned density points", () => expect(isAttributeKdeResult(valid)).toBe(true));
+  it("rejects invalid alignment, order, and density", () => {
+    expect(isAttributeKdeResult({ ...valid, y: [0.1] })).toBe(false);
+    expect(isAttributeKdeResult({ ...valid, x: [1, 3, 2] })).toBe(false);
+    expect(isAttributeKdeResult({ ...valid, y: [0.1, -0.2, 0.1] })).toBe(false);
   });
 });
 

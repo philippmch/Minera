@@ -24,6 +24,7 @@
 #include "httplib.h"
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
+#include "minera/attribute_kde.hpp"
 #include "minera/attribute_statistics.hpp"
 #include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
@@ -157,6 +158,8 @@ constexpr std::size_t kServerProfileMaxClusters = 10'000;
 constexpr std::size_t kServerProfileMaxIterations = 10'000;
 constexpr std::size_t kServerProfileMaxTraces = 100'000;
 constexpr std::size_t kServerProfileMaxFeatures = 10'000;
+constexpr std::size_t kServerAttributeKdeMaxGraphPoints = 10'000;
+constexpr std::size_t kServerAttributeKdeMaxSamples = 100'000;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -2084,6 +2087,49 @@ void handle_attribute_distribution(const httplib::Request& request,
     response.set_content(
         minera::attribute_distribution_json(
             minera::discover_event_distribution(session->log, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_attribute_kde(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "attribute_kde_key", "attribute_kde_variant",
+        "attribute_kde_graph_points", "attribute_kde_points_to_sample"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown attribute-kde parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_attribute_kde_params(lookup, present);
+    if (options.graph_points > kServerAttributeKdeMaxGraphPoints ||
+        options.points_to_sample > kServerAttributeKdeMaxSamples) {
+      throw std::invalid_argument("attribute KDE safety bound exceeded");
+    }
+    response.set_content(
+        minera::attribute_kde_json(
+            minera::discover_attribute_kde(session->log, options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -4502,6 +4548,7 @@ int main(int argc, char** argv) {
   server.Options("/api/case-statistics", preflight);
   server.Options("/api/attribute-statistics", preflight);
   server.Options("/api/attribute-distribution", preflight);
+  server.Options("/api/attribute-kde", preflight);
   server.Options("/api/boundary-activities", preflight);
   server.Options("/api/variant-statistics", preflight);
   server.Options("/api/trace-variant-query", preflight);
@@ -4579,6 +4626,7 @@ int main(int argc, char** argv) {
   server.Post("/api/case-statistics", handle_case_statistics);
   server.Post("/api/attribute-statistics", handle_attribute_statistics);
   server.Post("/api/attribute-distribution", handle_attribute_distribution);
+  server.Post("/api/attribute-kde", handle_attribute_kde);
   server.Post("/api/boundary-activities", handle_boundary_activities);
   server.Post("/api/variant-statistics", handle_variant_statistics);
   server.Post("/api/trace-variant-query", handle_trace_variant_query);
