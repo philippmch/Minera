@@ -80,6 +80,7 @@ add_library(minera_core
   src/segment_filter.cpp
   src/service_time.cpp
   src/streaming_dfg.cpp
+  src/streaming_store.cpp
   src/streaming_footprints.cpp
   src/streaming_import.cpp
   src/streaming_temporal.cpp
@@ -576,6 +577,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_streaming_dfg_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_dfg_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_dfg_tests COMMAND minera_streaming_dfg_tests)
+
+  add_executable(minera_streaming_store_tests tests/test_streaming_store.cpp)
+  target_link_libraries(minera_streaming_store_tests PRIVATE minera::core)
+  target_compile_features(minera_streaming_store_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_streaming_store_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_streaming_store_tests COMMAND minera_streaming_store_tests)
 
   add_executable(minera_streaming_footprints_tests tests/test_streaming_footprints.cpp)
   target_link_libraries(minera_streaming_footprints_tests PRIVATE minera::core)
