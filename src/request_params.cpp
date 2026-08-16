@@ -1055,6 +1055,22 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("remove_eventually_follows"); !value.empty()) {
     params.filter.remove_eventually_follows = parse_activity_pairs(value);
   }
+  const bool trace_patterns_supplied =
+      supplied("trace_patterns") || supplied("trace_pattern") ||
+      supplied("trace_pattern_positive");
+  if (trace_patterns_supplied) {
+    const std::string_view pattern_field =
+        supplied("trace_patterns") ? "trace_patterns" : "trace_pattern";
+    if (!supplied(pattern_field) || field(pattern_field).empty()) {
+      throw std::invalid_argument(
+          "trace_patterns: at least one pattern is required when trace-pattern filtering is enabled");
+    }
+    params.filter.trace_patterns = parse_trace_patterns(field(pattern_field));
+    if (supplied("trace_pattern_positive")) {
+      params.filter.trace_pattern_positive = parse_boolean(
+          field("trace_pattern_positive"), "trace_pattern_positive");
+    }
+  }
   if (const auto value = field("prefix_activity"); !value.empty()) {
     params.filter.prefix_activity = value;
   }

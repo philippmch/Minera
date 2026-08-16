@@ -2748,6 +2748,51 @@ void filter_selects_cases_by_succession() {
   assert(minera::filter_event_log(log, either).trace_count() == 2);
 }
 
+void filter_matches_trace_patterns() {
+  const auto log = log_from_variants({{"a", "b", "c"},
+                                      {"x", "a", "b", "y"},
+                                      {"a", "c"},
+                                      {"b", "a"}});
+
+  const auto parsed = minera::parse_trace_patterns(
+      "a, b; ...,a,b,...; x,...,y");
+  assert(parsed.size() == 3);
+  assert(parsed[0] == minera::TracePattern({"a", "b"}));
+  assert(parsed[1] == minera::TracePattern({"...", "a", "b", "..."}));
+
+  minera::TracePatternFilterOptions exact;
+  exact.patterns = {parsed[0]};
+  const auto exact_log = minera::filter_trace_patterns(log, exact);
+  assert(exact_log.trace_count() == 0);
+
+  minera::TracePatternFilterOptions infix;
+  infix.patterns = {parsed[1]};
+  const auto infix_log = minera::filter_trace_patterns(log, infix);
+  assert(infix_log.trace_count() == 2);
+  assert(infix_log.traces[0].case_id == "0");
+  assert(infix_log.traces[1].case_id == "1");
+
+  minera::TracePatternFilterOptions negative;
+  negative.patterns = {minera::TracePattern{"...", "a", "b", "..."}};
+  negative.positive = false;
+  assert(minera::filter_trace_patterns(log, negative).trace_count() == 2);
+
+  minera::LogFilterOptions integrated;
+  integrated.trace_patterns = {minera::TracePattern{"a", "b", "..."}};
+  assert(minera::filter_event_log(log, integrated).trace_count() == 1);
+  integrated.trace_pattern_positive = false;
+  assert(minera::filter_event_log(log, integrated).trace_count() == 3);
+
+  assert(throws([] {
+    (void)minera::parse_trace_patterns("a,,b");
+  }));
+  assert(throws([] {
+    minera::TracePatternFilterOptions invalid;
+    invalid.patterns = {minera::TracePattern{}};
+    (void)minera::filter_trace_patterns(log_from_variants({{"a"}}), invalid);
+  }));
+}
+
 void filter_cuts_prefixes_and_suffixes() {
   const auto log = log_from_variants({{"a", "b", "c", "d"}, {"a", "d"}});
 
@@ -5100,6 +5145,7 @@ int main() {
   filter_keeps_only_the_top_variant();
   filter_keeps_variants_covering_a_share_of_cases();
   filter_selects_cases_by_succession();
+  filter_matches_trace_patterns();
   filter_cuts_prefixes_and_suffixes();
   parse_activity_pairs_reads_the_arrow_syntax();
   filter_projects_activities();

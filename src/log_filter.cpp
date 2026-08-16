@@ -229,6 +229,46 @@ std::string variant_key(const Trace& trace) {
   return key;
 }
 
+bool trace_matches_pattern(const Trace& trace, const TracePattern& pattern) {
+  const std::size_t event_count = trace.events.size();
+  std::vector<unsigned char> previous(event_count + 1, 0);
+  std::vector<unsigned char> current(event_count + 1, 0);
+  previous[0] = 1;
+  for (const auto& token : pattern) {
+    std::fill(current.begin(), current.end(), static_cast<unsigned char>(0));
+    if (token == "...") {
+      // A wildcard consumes zero or more events. The left-to-right recurrence
+      // keeps the implementation linear in the trace length for this token.
+      current[0] = previous[0];
+      for (std::size_t j = 1; j <= event_count; ++j) {
+        current[j] = static_cast<unsigned char>(
+            previous[j] != 0 || current[j - 1] != 0);
+      }
+    } else {
+      for (std::size_t j = 1; j <= event_count; ++j) {
+        if (previous[j - 1] != 0 && trace.events[j - 1].activity == token)
+          current[j] = 1;
+      }
+    }
+    previous.swap(current);
+  }
+  return previous[event_count] != 0;
+}
+
+bool trace_matches_any_pattern(const Trace& trace,
+                               const std::vector<TracePattern>& patterns) {
+  for (const auto& pattern : patterns) {
+    if (pattern.empty())
+      throw std::invalid_argument("trace pattern must not be empty");
+    for (const auto& token : pattern) {
+      if (token.empty())
+        throw std::invalid_argument("trace pattern activity must not be empty");
+    }
+    if (trace_matches_pattern(trace, pattern)) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
@@ -276,6 +316,52 @@ std::vector<ActivityPair> parse_activity_pairs(std::string_view text) {
     pairs.push_back({std::string(predecessor), std::string(successor)});
   }
   return pairs;
+}
+
+std::vector<TracePattern> parse_trace_patterns(std::string_view text) {
+  if (text.empty()) return {};
+  const auto trim = [](std::string_view value) {
+    const auto begin = value.find_first_not_of(" \t\r\n");
+    if (begin == std::string_view::npos) return std::string_view{};
+    const auto end = value.find_last_not_of(" \t\r\n");
+    return value.substr(begin, end - begin + 1);
+  };
+
+  std::vector<TracePattern> patterns;
+  std::size_t pattern_start = 0;
+  for (std::size_t i = 0; i <= text.size(); ++i) {
+    if (i != text.size() && text[i] != ';') continue;
+    const auto pattern_text = trim(text.substr(pattern_start, i - pattern_start));
+    if (pattern_text.empty())
+      throw std::invalid_argument("trace_patterns: patterns must not be empty");
+    TracePattern pattern;
+    std::size_t activity_start = 0;
+    for (std::size_t j = 0; j <= pattern_text.size(); ++j) {
+      if (j != pattern_text.size() && pattern_text[j] != ',') continue;
+      const auto token = trim(pattern_text.substr(activity_start,
+                                                  j - activity_start));
+      if (token.empty())
+        throw std::invalid_argument(
+            "trace_patterns: activities must not be empty");
+      pattern.emplace_back(token);
+      activity_start = j + 1;
+    }
+    patterns.push_back(std::move(pattern));
+    pattern_start = i + 1;
+  }
+  return patterns;
+}
+
+EventLog filter_trace_patterns(const EventLog& event_log,
+                               const TracePatternFilterOptions& options) {
+  if (options.patterns.empty()) return event_log;
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    const bool found = trace_matches_any_pattern(trace, options.patterns);
+    if (found == options.positive) result.traces.push_back(trace);
+  }
+  return result;
 }
 
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
@@ -382,6 +468,12 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
                                      remove_res, keep_life, remove_life,
                                      event_attribute);
     if (projected.events.empty()) continue;
+
+    if (!options.trace_patterns.empty()) {
+      const bool found = trace_matches_any_pattern(projected,
+                                                   options.trace_patterns);
+      if (found != options.trace_pattern_positive) continue;
+    }
 
     if (attribute.active() &&
         options.attribute_mode == AttributeFilterMode::traces &&
