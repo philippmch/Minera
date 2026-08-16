@@ -27,6 +27,15 @@ int main() {
   const auto er = log_to_features(log, e);
   assert(er.event_rows.size() == 1 && er.event_rows[0].size() == 2);
   assert(!er.feature_names.empty());
+  assert(std::find(er.feature_names.begin(), er.feature_names.end(), "event:amount") != er.feature_names.end());
+  e.min_num_different_string_values = 1;
+  const auto er_strings = log_to_features(log, e);
+  assert(std::find(er_strings.feature_names.begin(), er_strings.feature_names.end(), "event:kind@x") != er_strings.feature_names.end());
+  EventLog ragged = log;
+  ragged.traces.push_back(Trace{"c2", {Event{"c2", "A", "2024-01-01T02:00:00Z", "r2", 2}}});
+  const auto rectangular = log_to_features(ragged, e);
+  assert(rectangular.event_rows.size() == 2 && rectangular.event_rows[0].size() == 2 && rectangular.event_rows[1].size() == 2);
+  assert(std::all_of(rectangular.event_rows[1][1].begin(), rectangular.event_rows[1][1].end(), [](double value) { return value == 0.0; }));
   const auto event_json = log_to_features_json(er);
   assert(event_json.find("\"family\":\"LOG_TO_FEATURES\"") != std::string::npos);
   assert(event_json.find("\"event_rows\"") != std::string::npos);
