@@ -55,9 +55,27 @@ void mines_guards_and_serializes() {
   assert(json.find("\"decision_tables\":") != std::string::npos);
 }
 
+void shares_decision_controls_with_guards() {
+  minera::DataPetriNetOptions options;
+  options.decision_options.max_depth = 0;
+  options.decision_options.include_trace_attributes = false;
+  options.decision_options.attributes = {"customer"};
+  const auto result =
+      minera::mine_data_petri_net(decision_log(), decision_net(), options);
+  assert(result.decisions.decision_points.size() == 1);
+  assert(result.decisions.decision_points.front().nodes.size() == 1);
+  assert(result.guarded_transitions.size() == 1);
+  assert(!result.guarded_transitions.front().guard.empty());
+  assert(result.guarded_transitions.front().guard.find("amount") ==
+         std::string::npos);
+  assert(result.guarded_transitions.front().read_variables.empty());
+  assert(result.decision_tables.tables.size() == 1);
+}
+
 }  // namespace
 
 int main() {
   mines_guards_and_serializes();
+  shares_decision_controls_with_guards();
   return 0;
 }

@@ -3912,7 +3912,10 @@ void handle_data_petri_net(const httplib::Request& request,
     return;
   }
   try {
-    const auto result = minera::mine_data_petri_net(session->log, it->second);
+    minera::DataPetriNetOptions options;
+    options.decision_options = decision_mining_options(request);
+    const auto result =
+        minera::mine_data_petri_net(session->log, it->second, options);
     response.set_content(minera::serialize_data_petri_net_json(result, miner),
                          "application/json");
   } catch (const std::exception& error) {

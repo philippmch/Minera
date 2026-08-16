@@ -106,6 +106,18 @@ describe("data Petri net API", () => {
   it("rejects an empty miner", async () => {
     await expect(requestDataPetriNet(" ")).rejects.toThrow(/must not be empty/);
   });
+  it("shares decision controls with guarded-model projections", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe(
+        "/api/data-petri-net?miner=alpha&decision_max_depth=1&decision_attributes=amount",
+      );
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestDataPetriNet({
+      miner: "alpha", max_depth: 1, attributes: ["amount"],
+    })).resolves.toMatchObject({ family: "DATA_PETRI_NET" });
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("process cube API", () => {

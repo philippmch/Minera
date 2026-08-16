@@ -40,7 +40,7 @@ import {
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions } from "../api";
+import { fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -86,7 +86,7 @@ export function Conformance({
 }: {
   data: MineraExport;
   onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
-  onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
+  onRequestDecisions?: (minerId: string, options?: DecisionMiningOptions) => Promise<DecisionsResult>;
   onCheckModel?: (file: File) => Promise<ImportedModelCheck>;
   onRequestDfg?: (options?: DfgAlignmentOptions) => Promise<DfgAlignmentResult>;
   onRequestEditDistance?: (reference: File, options?: EditDistanceOptions) => Promise<EditDistanceResult>;
@@ -1157,7 +1157,7 @@ function DecisionsView({
   data: MineraExport;
   minerId: string;
   minerName: string;
-  onRequestDecisions?: (minerId: string) => Promise<DecisionsResult>;
+  onRequestDecisions?: (minerId: string, options?: DecisionMiningOptions) => Promise<DecisionsResult>;
 }) {
   const embedded =
     data.decisions && data.decisions.miner === minerId
@@ -1168,6 +1168,8 @@ function DecisionsView({
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<DecisionMiningOptions>({});
+  const [requestedOptions, setRequestedOptions] = useState<DecisionMiningOptions>({});
   const requestRef = useRef(onRequestDecisions);
   requestRef.current = onRequestDecisions;
 
@@ -1182,7 +1184,7 @@ function DecisionsView({
     setError(null);
     setLoading(true);
     requestRef
-      .current(minerId)
+      .current(minerId, requestedOptions)
       .then((result) => !cancelled && setFetched(result))
       .catch(
         (cause) =>
@@ -1193,7 +1195,7 @@ function DecisionsView({
     return () => {
       cancelled = true;
     };
-  }, [minerId, embedded]);
+  }, [minerId, embedded, requestedOptions]);
 
   if (!embedded && !onRequestDecisions) {
     return (
@@ -1226,7 +1228,27 @@ function DecisionsView({
       </section>
     );
   }
-  return <DecisionsResultView decisions={fetched} minerName={minerName} />;
+  const setNumber = (name: keyof DecisionMiningOptions, raw: string) =>
+    setOptions((current) => ({ ...current, [name]: raw === "" ? undefined : Number(raw) }));
+  const applyOptions = () => {
+    const attributes = (options.attributes ?? []).map((value) => value.trim()).filter(Boolean);
+    setRequestedOptions({ ...options, attributes: attributes.length > 0 ? attributes : undefined });
+  };
+  return <>
+    {!embedded && onRequestDecisions && <section className="panel conf-panel">
+      <div className="panel-head"><h3>Decision-tree controls</h3><span className="panel-meta">Bounded context and split search</span></div>
+      <div className="align-settings-grid">
+        <label>Max depth<input type="number" min={0} max={64} value={options.max_depth ?? ""} onChange={(event) => setNumber("max_depth", event.target.value)} /></label>
+        <label>Min split<input type="number" min={2} value={options.min_split ?? ""} onChange={(event) => setNumber("min_split", event.target.value)} /></label>
+        <label>Min leaf<input type="number" min={1} value={options.min_leaf ?? ""} onChange={(event) => setNumber("min_leaf", event.target.value)} /></label>
+        <label>Min gain<input type="number" min={0} step={0.000001} value={options.min_gain ?? ""} onChange={(event) => setNumber("min_gain", event.target.value)} /></label>
+        <label>Context attributes<input placeholder="amount,region" value={(options.attributes ?? []).join(",")} onChange={(event) => setOptions((current) => ({ ...current, attributes: event.target.value.split(",") }))} /></label>
+        <label className="checkbox-label"><input type="checkbox" checked={options.include_trace_attributes ?? true} onChange={(event) => setOptions((current) => ({ ...current, include_trace_attributes: event.target.checked }))} /> Include case attributes</label>
+      </div>
+      <button className="button" disabled={loading} onClick={applyOptions}>Remine decisions</button>
+    </section>}
+    <DecisionsResultView decisions={fetched} minerName={minerName} />
+  </>;
 }
 
 // One readable rule per leaf of the mined tree: the conjunction of conditions

@@ -2369,9 +2369,29 @@ export function requestDecisionTables(
 }
 
 /** Requests a guarded data-Petri-net projection of the latest cached model. */
-export function requestDataPetriNet(miner = "inductive"): Promise<DataPetriNetResult> {
+export function requestDataPetriNet(
+  miner?: string,
+  options?: DecisionMiningOptions,
+): Promise<DataPetriNetResult>;
+export function requestDataPetriNet(
+  options?: DecisionTablesRequestOptions,
+): Promise<DataPetriNetResult>;
+export function requestDataPetriNet(
+  minerOrOptions: string | DecisionTablesRequestOptions = "inductive",
+  legacyOptions: DecisionMiningOptions = {},
+): Promise<DataPetriNetResult> {
+  const options = typeof minerOrOptions === "string"
+    ? { ...legacyOptions, miner: minerOrOptions }
+    : (minerOrOptions ?? {});
+  const miner = options.miner ?? "inductive";
   if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
   const query = new URLSearchParams({ miner });
+  try {
+    for (const [key, value] of new URLSearchParams(decisionMiningQuery(options)))
+      query.append(key, value);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   return postChecked(`/api/data-petri-net?${query.toString()}`,
                      isDataPetriNetResult, "data Petri net");
 }
