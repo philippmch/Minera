@@ -673,9 +673,11 @@ combine those rules conjunctively. The native API, standalone
 `minera_data_petri`, cached local `POST /api/data-petri-net`, and typed frontend
 request/response guard expose the same `DATA_PETRI_NET` envelope. The native
 `mine_decision_tables` API and `minera_decision_table` command emit the clean
-replay observations as deterministic numeric and one-hot columns; the same
-encoded-table envelope is nested in the data-Petri response and validated by
-the frontend. Richer classifier and look-back parameter parity remains open.
+replay observations as deterministic numeric and one-hot columns. The standard
+export accepts `--decision-tables`, the cached server exposes
+`POST /api/decision-tables`, and the typed frontend request validates the same
+encoded-table envelope. It is also nested in the data-Petri response. Richer
+classifier and look-back parameter parity remains open.
 
 ## Live-stream transport evidence
 

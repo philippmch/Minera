@@ -3218,7 +3218,7 @@ export interface DecisionTablesResult {
   tables: EncodedDecisionTable[];
 }
 
-function isDecisionTablesResult(value: unknown): value is DecisionTablesResult {
+export function isDecisionTablesResult(value: unknown): value is DecisionTablesResult {
   if (!isOcelRecord(value) || value.family !== "DECISION_TABLES" ||
       value.variant !== "encoded" || !Number.isSafeInteger(value.trace_count) ||
       (value.trace_count as number) < 0 || !Number.isSafeInteger(value.observed_traces) ||
@@ -3355,6 +3355,8 @@ export interface MineraExport {
    * the CLI's --decisions flag; the server serves it on demand instead.
    */
   decisions?: Decisions;
+  /** Encoded decision tables embedded by the CLI's --decision-tables flag. */
+  decision_tables?: DecisionTablesResult;
 }
 
 export function isMineraExport(value: unknown): value is MineraExport {
@@ -3366,6 +3368,7 @@ export function isMineraExport(value: unknown): value is MineraExport {
     Array.isArray(data.variants) &&
     Number.isFinite(data.trace_count) &&
     (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
+    (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     (overlap === undefined || (
       typeof overlap === "object" && overlap !== null &&
       Array.isArray(overlap.interval_events) &&

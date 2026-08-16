@@ -9,6 +9,7 @@
 #include "minera/evaluation.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
+#include "minera/decision_table.hpp"
 #include "minera/decision_mining.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/directly_follows_graph.hpp"
@@ -158,7 +159,8 @@ void write_analysis_json(std::ostream& out,
                              interval_event_overlap_counts = nullptr,
                          const CaseOverlapCounts* case_overlap_counts = nullptr,
                          const ConcurrentActivityOverlapResult*
-                             concurrent_activity_overlap = nullptr);
+                             concurrent_activity_overlap = nullptr,
+                         const DecisionTablesResult* decision_tables = nullptr);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -210,7 +212,8 @@ void write_analysis_json(std::ostream& out,
     const EmdResult* earth_movers_distance = nullptr,
     const IntervalEventOverlapCounts* interval_event_overlap_counts = nullptr,
     const CaseOverlapCounts* case_overlap_counts = nullptr,
-    const ConcurrentActivityOverlapResult* concurrent_activity_overlap = nullptr);
+    const ConcurrentActivityOverlapResult* concurrent_activity_overlap = nullptr,
+    const DecisionTablesResult* decision_tables = nullptr);
 
 [[nodiscard]] std::string replay_fitness_json(
     const ReplayFitnessResult& result,
