@@ -3942,6 +3942,7 @@ export interface OcelPlayoutOptions {
   max_states?: number;
   objects?: Record<string, string[]>;
   objects_unique_per_trace?: boolean;
+  event_binding?: "independent" | "shared_activity";
   start?: number;
   case_interval?: number;
   event_interval?: number;
@@ -3981,6 +3982,13 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   }
   if (options.objects_unique_per_trace !== undefined)
     query.set("objects_unique_per_trace", options.objects_unique_per_trace ? "true" : "false");
+  if (options.event_binding !== undefined &&
+      options.event_binding !== "independent" &&
+      options.event_binding !== "shared_activity") {
+    throw new Error("OCEL playout event_binding is invalid");
+  }
+  if (options.event_binding !== undefined)
+    query.set("event_binding", options.event_binding);
   const addNumber = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isFinite(value)) query.set(name, String(value));
   };

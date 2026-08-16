@@ -11,6 +11,17 @@
 
 namespace minera {
 
+enum class OcpnEventBinding {
+  // Keep one emitted event for every object-local firing. This is the legacy
+  // projection and remains the default for source compatibility.
+  kIndependent,
+  // Coalesce firings with the same activity and local firing index into one
+  // event, retaining every participating object relation.
+  kSharedActivity,
+  INDEPENDENT = kIndependent,
+  SHARED_ACTIVITY = kSharedActivity,
+};
+
 struct OcpnPlayoutOptions {
   // Maximum number of firings of any visible activity in one object trace.
   // The extensive search is bounded by this value and by max_states.
@@ -21,6 +32,7 @@ struct OcpnPlayoutOptions {
   // id named <type>_1.
   std::map<std::string, std::vector<std::string>> objects;
   bool objects_unique_per_trace = false;
+  OcpnEventBinding event_binding = OcpnEventBinding::kIndependent;
   std::uint64_t seed = 1;
   double start = 1767225600.0;
   double case_interval = 60.0;

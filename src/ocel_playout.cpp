@@ -89,6 +89,11 @@ Ocel ocpn_extensive_playout(const OcpnGraph& graph,
   if (options.max_bindings_per_activity == 0)
     throw std::invalid_argument(
         "OCPN max_bindings_per_activity must be positive");
+  if (options.event_binding != OcpnEventBinding::kIndependent &&
+      options.event_binding != OcpnEventBinding::kSharedActivity) {
+    throw std::invalid_argument(
+        "OCPN event_binding must be independent or shared_activity");
+  }
   if (!std::isfinite(options.start) || !std::isfinite(options.case_interval) ||
       !std::isfinite(options.event_interval) || options.case_interval < 0.0 ||
       options.event_interval < 0.0) {
@@ -153,8 +158,19 @@ Ocel ocpn_extensive_playout(const OcpnGraph& graph,
                            index, choice});
       }
     }
+    const bool shared_activity =
+        options.event_binding == OcpnEventBinding::kSharedActivity;
     std::stable_sort(pending.begin(), pending.end(),
-                     [](const PendingEvent& left, const PendingEvent& right) {
+                     [shared_activity](const PendingEvent& left,
+                                       const PendingEvent& right) {
+                       if (shared_activity) {
+                         return std::tie(left.local_index, left.activity,
+                                         left.type, left.object_id,
+                                         left.choice_index) <
+                                std::tie(right.local_index, right.activity,
+                                         right.type, right.object_id,
+                                         right.choice_index);
+                       }
                        return std::tie(left.local_index, left.type, left.object_id,
                                        left.choice_index) <
                               std::tie(right.local_index, right.type,
@@ -172,16 +188,31 @@ Ocel ocpn_extensive_playout(const OcpnGraph& graph,
         object_types[id] = choice.type;
       }
     }
-    for (std::size_t index = 0; index < pending.size(); ++index) {
+    std::size_t emitted_index = 0;
+    for (std::size_t index = 0; index < pending.size();) {
       const auto& event = pending[index];
-      const auto id = emitted_object_ids.at(event.object_id + "\n" + event.type);
+      std::size_t end = index + 1;
+      if (shared_activity) {
+        while (end < pending.size() &&
+               pending[end].local_index == event.local_index &&
+               pending[end].activity == event.activity) {
+          ++end;
+        }
+      }
       const auto event_id = "event_" + std::to_string(result.events.size() + 1);
       const auto timestamp = format_timestamp(
           options.start + static_cast<double>(sequence_index) *
                               options.case_interval +
-          static_cast<double>(index) * options.event_interval);
+          static_cast<double>(emitted_index) * options.event_interval);
       result.events.push_back({event_id, event.activity, timestamp, {}});
-      result.relations.push_back({event_id, id, ""});
+      for (std::size_t relation = index; relation < end; ++relation) {
+        const auto& related = pending[relation];
+        const auto id = emitted_object_ids.at(related.object_id + "\n" +
+                                              related.type);
+        result.relations.push_back({event_id, id, ""});
+      }
+      ++emitted_index;
+      index = end;
     }
     ++sequence_index;
   };

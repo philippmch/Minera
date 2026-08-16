@@ -946,6 +946,11 @@ describe("OCEL API", () => {
       variant: "event_attribute", attribute_key: "label",
       attribute_values: ["a,b", 2, true, null], ids: ["id,1", "sales:2"],
     })).toBe("variant=event_attribute&attribute_key=label&attribute_values=s%3Aa%5C%2Cb%2Ci%3A2%2Cb%3Atrue%2Cn%3A&ids=id%5C%2C1%2Csales%5C%3A2");
+    expect(ocelPlayoutQuery({
+      model: "ocpn", event_binding: "shared_activity", objects_unique_per_trace: true,
+    })).toBe("model=ocpn&objects_unique_per_trace=true&event_binding=shared_activity");
+    expect(() => ocelPlayoutQuery({ event_binding: "invalid" as never }))
+      .toThrow(/event_binding is invalid/);
   });
 
   it("posts OCEL JSON as multipart data and validates the response", async () => {
