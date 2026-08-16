@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+
+describe("isLogUtilityResult", () => {
+  const event = { case_id: "c1", activity: "A", timestamp: "1", resource: "", lifecycle: "", input_order: 0, attributes: [] };
+  const log = { attributes: [], traces: [{ case_id: "c1", attributes: [], events: [event] }] };
+  it("accepts split, prefix, and target envelopes", () => {
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "SPLIT_TRAIN_TEST", training: log, testing: log })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "ALL_PREFIXES", log, change_indexes: [[0]] })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "UNTIL_ACTIVITY", log, elapsed_seconds: [1] })).toBe(true);
+  });
+  it("rejects malformed durations and event indexes", () => {
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "UNTIL_ACTIVITY", log, elapsed_seconds: [-1] })).toBe(false);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log: { ...log, traces: [{ ...log.traces[0], events: [{ ...event, input_order: -1 }] }] } })).toBe(false);
+  });
+});
 
 describe("isStreamingDfgResult", () => {
   const valid = {

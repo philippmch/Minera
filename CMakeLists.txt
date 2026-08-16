@@ -85,6 +85,8 @@ add_library(minera_core
   src/streaming_tbr.cpp
   src/ltl_filter.cpp
   src/log_to_features.cpp
+  src/log_util.cpp
+  src/log_util_json.cpp
   src/log_to_target.cpp
   src/local_diagnostics.cpp
   src/log_skeleton.cpp
@@ -175,6 +177,10 @@ add_executable(minera_process_cube
 )
 target_link_libraries(minera_process_cube PRIVATE minera::core)
 target_compile_features(minera_process_cube PRIVATE cxx_std_20)
+
+add_executable(minera_log_util tools/minera_log_util.cpp)
+target_link_libraries(minera_log_util PRIVATE minera::core)
+target_compile_features(minera_log_util PRIVATE cxx_std_20)
 
 add_executable(minera_dfg
   tools/minera_dfg.cpp
@@ -686,6 +692,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_to_features_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_to_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_to_features_tests COMMAND minera_log_to_features_tests)
+
+  add_executable(minera_log_util_tests tests/test_log_util.cpp)
+  target_link_libraries(minera_log_util_tests PRIVATE minera::core)
+  target_compile_features(minera_log_util_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_log_util_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_log_util_tests COMMAND minera_log_util_tests)
 
   add_executable(minera_label_splitting_tests
     tests/test_label_splitting.cpp
