@@ -370,13 +370,20 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
   const [result, setResult] = useState<ConceptDriftResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activityAttribute, setActivityAttribute] = useState("concept:name");
+  const [timestampAttribute, setTimestampAttribute] = useState("time:timestamp");
+  const [caseIdAttribute, setCaseIdAttribute] = useState("case:concept:name");
   const requestId = useRef(0);
   const run = async () => {
     if (!onRequest) return;
     const id = ++requestId.current;
     setBusy(true); setError(null); setResult(null);
     try {
-      const next = await onRequest();
+      const next = await onRequest({
+        drift_activity_attribute: activityAttribute.trim() || "concept:name",
+        drift_timestamp_attribute: timestampAttribute.trim() || "time:timestamp",
+        drift_case_id_attribute: caseIdAttribute.trim() || "case:concept:name",
+      });
       if (id === requestId.current) setResult(next);
     } catch (cause) {
       if (id === requestId.current) setError(cause instanceof Error ? cause.message : String(cause));
@@ -384,7 +391,7 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
       if (id === requestId.current) setBusy(false);
     }
   };
-  return <section className="panel other-align-card"><h3>Concept drift</h3><p>Detect distribution changes across consecutive sub-logs.</p><button className="button" disabled={!onRequest || busy} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>{error && <div className="error-banner">{error}</div>}{result && <small>{result.change_points.length} change point(s) across {result.sublogs.length} sub-logs.</small>}</section>;
+  return <section className="panel other-align-card"><h3>Concept drift</h3><p>Detect distribution changes across consecutive sub-logs.</p><div className="align-settings-grid"><label>Activity attribute<input value={activityAttribute} onChange={event => setActivityAttribute(event.target.value)} /></label><label>Timestamp attribute<input value={timestampAttribute} onChange={event => setTimestampAttribute(event.target.value)} /></label><label>Case-id attribute<input value={caseIdAttribute} onChange={event => setCaseIdAttribute(event.target.value)} /></label></div><button className="button" disabled={!onRequest || busy || !activityAttribute.trim() || !timestampAttribute.trim() || !caseIdAttribute.trim()} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>{error && <div className="error-banner">{error}</div>}{result && <small>{result.change_points.length} change point(s) across {result.sublogs.length} sub-logs.</small>}</section>;
 }
 
 function PetriUsageComparisonPanel() {

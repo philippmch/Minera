@@ -2697,6 +2697,17 @@ void handle_concept_drift(const httplib::Request& request,
                            "application/json");
       return;
     }
+    static const std::set<std::string> allowed = {
+        "drift_sub_log_size", "drift_window_size",
+        "drift_num_permutations", "drift_threshold",
+        "drift_max_no_change_points", "drift_seed",
+        "drift_include_timestamps", "drift_activity_attribute",
+        "drift_timestamp_attribute", "drift_case_id_attribute"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown concept drift parameter: " + key);
+    }
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
       return request.has_param(key) ? request.get_param_value(key) : std::string{};

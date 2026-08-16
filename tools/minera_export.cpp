@@ -576,6 +576,9 @@ int usage(const char* program) {
                "  --drift-max-no-change-points <n> Result cap\n"
                "  --drift-seed <n>         Non-negative RNG seed\n"
                "  --drift-include-timestamps <bool> Include timestamps\n"
+               "  --drift-activity-attribute <name> Event activity selector\n"
+               "  --drift-timestamp-attribute <name> Event timestamp selector\n"
+               "  --drift-case-id-attribute <name> Case identifier selector\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -2109,6 +2112,13 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "drift_sub_log_size", "drift_window_size",
+          "drift_num_permutations", "drift_threshold",
+          "drift_max_no_change_points", "drift_seed",
+          "drift_include_timestamps", "drift_activity_attribute",
+          "drift_timestamp_attribute", "drift_case_id_attribute"};
+      if (!names.contains(key)) return usage(argv[0]);
       concept_drift_fields.insert_or_assign(std::move(key), value);
       concept_drift_requested = true;
       continue;

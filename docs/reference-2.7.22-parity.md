@@ -500,9 +500,11 @@ The native concept-drift surface extracts deterministic relation-type count
 vectors from ordered trace sub-logs and evaluates adjacent windows with a
 seeded permutation test. It supports configurable sub-log/window sizes,
 permutation counts, p-value threshold, result cap, and optional case-start
-timestamps. Strict request parsing, standalone JSON, CLI, cached-session
-server, frontend request/response types, and focused native/request tests are
-included. The current row remains partial pending differential edge-contract
+timestamps. Activity, timestamp, and case-id selectors accept the standard
+keys or generic event/trace attributes, and the selected keys are echoed in
+the JSON response. Strict request parsing, standalone JSON, CLI, cached-session
+server, frontend request/response validation, and focused native/request tests
+are included. The current row remains partial pending differential edge-contract
 fixtures and the reference implementation's dataframe/lazyframe adapters.
 
 ## Trace-variant query anonymization evidence

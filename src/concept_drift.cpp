@@ -5,6 +5,7 @@
 #include <limits>
 #include <numeric>
 #include <random>
+#include <string_view>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -21,6 +22,11 @@ constexpr long double kMaxCumulativeEventCopies = 20'000'000.0L;
 
 void validate_options(const ConceptDriftOptions& options, std::size_t trace_count,
                      std::size_t event_count, std::size_t feature_size) {
+  if (options.activity_attribute.empty() ||
+      options.timestamp_attribute.empty() || options.case_id_attribute.empty()) {
+    throw std::invalid_argument(
+        "concept drift: activity, timestamp, and case-id attributes must not be empty");
+  }
   if (options.sub_log_size == 0) {
     throw std::invalid_argument("concept drift: sub_log_size must be positive");
   }
@@ -81,11 +87,35 @@ void validate_options(const ConceptDriftOptions& options, std::size_t trace_coun
   }
 }
 
+const std::string* event_value(const Event& event, std::string_view key) {
+  if (key.empty() || key == "activity" || key == "concept:name")
+    return &event.activity;
+  if (key == "timestamp" || key == "time:timestamp")
+    return &event.timestamp;
+  if (key == "resource" || key == "org:resource") return &event.resource;
+  if (key == "lifecycle" || key == "lifecycle:transition")
+    return &event.lifecycle;
+  return event.attribute(key);
+}
+
+const std::string* trace_value(const Trace& trace, std::string_view key) {
+  if (key.empty() || key == "case_id" || key == "case:id" ||
+      key == "case:concept:name" || key == "concept:name") {
+    return &trace.case_id;
+  }
+  if (const auto* value = trace.attribute(key)) return value;
+  if (!trace.events.empty()) return event_value(trace.events.front(), key);
+  return nullptr;
+}
+
 std::vector<std::string> sorted_activities_from_traces(
-    const std::vector<Trace>& traces) {
+    const std::vector<Trace>& traces, std::string_view activity_attribute) {
   std::vector<std::string> activities;
   for (const auto& trace : traces) {
-    for (const auto& event : trace.events) activities.push_back(event.activity);
+    for (const auto& event : trace.events) {
+      const auto* value = event_value(event, activity_attribute);
+      if (value && !value->empty()) activities.push_back(*value);
+    }
   }
   std::sort(activities.begin(), activities.end());
   activities.erase(std::unique(activities.begin(), activities.end()),
@@ -142,12 +172,33 @@ double permutation_p_value(const std::vector<std::vector<double>>& first,
 
 std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log) {
-  return sorted_activities_from_traces(log.traces);
+  return extract_concept_drift_activities(log, "concept:name");
+}
+
+std::vector<std::string> extract_concept_drift_activities(
+    const EventLog& log, std::string_view activity_attribute) {
+  if (activity_attribute.empty()) {
+    throw std::invalid_argument(
+        "concept drift: activity_attribute must not be empty");
+  }
+  return sorted_activities_from_traces(log.traces, activity_attribute);
 }
 
 std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
     const std::vector<std::string>& sorted_activities) {
+  return extract_concept_drift_features(traces, sorted_activities,
+                                         "concept:name");
+}
+
+std::vector<double> extract_concept_drift_features(
+    const std::vector<Trace>& traces,
+    const std::vector<std::string>& sorted_activities,
+    std::string_view activity_attribute) {
+  if (activity_attribute.empty()) {
+    throw std::invalid_argument(
+        "concept drift: activity_attribute must not be empty");
+  }
   // Normalize the supplied alphabet as well: this keeps the standalone
   // extractor deterministic when callers provide activities in input order.
   std::vector<std::string> activities = sorted_activities;
@@ -172,7 +223,9 @@ std::vector<double> extract_concept_drift_features(
     std::vector<std::size_t> seen;
     seen.reserve(trace.events.size());
     for (const auto& event : trace.events) {
-      const auto target_it = ids.find(event.activity);
+      const auto* activity = event_value(event, activity_attribute);
+      if (!activity) continue;
+      const auto target_it = ids.find(*activity);
       if (target_it == ids.end()) continue;
       const std::size_t target = target_it->second;
       present.insert(target);
@@ -205,12 +258,14 @@ std::vector<double> extract_concept_drift_features(
 
 std::vector<double> extract_concept_drift_features(const EventLog& log) {
   return extract_concept_drift_features(log.traces,
-                                        extract_concept_drift_activities(log));
+                                        extract_concept_drift_activities(log),
+                                        "concept:name");
 }
 
 ConceptDriftResult detect_concept_drift(const EventLog& log,
                                         ConceptDriftOptions options) {
-  const auto activities = extract_concept_drift_activities(log);
+  const auto activities = extract_concept_drift_activities(
+      log, options.activity_attribute);
   if (activities.size() > std::numeric_limits<std::size_t>::max() / 3) {
     throw std::invalid_argument("concept drift: activity feature vector is too large");
   }
@@ -222,9 +277,18 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
   }
   validate_options(options, log.traces.size(), event_count,
                    activities.size() * 3);
+  for (const auto& trace : log.traces) {
+    if (!trace_value(trace, options.case_id_attribute)) {
+      throw std::invalid_argument(
+          "concept drift: selected case-id attribute is missing");
+    }
+  }
 
   ConceptDriftResult result;
   result.activities = activities;
+  result.activity_attribute = options.activity_attribute;
+  result.timestamp_attribute = options.timestamp_attribute;
+  result.case_id_attribute = options.case_id_attribute;
   if (!log.traces.empty()) {
     const std::size_t sublog_count =
         (log.traces.size() - 1) / options.sub_log_size + 1;
@@ -247,7 +311,8 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
                       log.traces.begin() + end);
     result.sublogs.push_back(raw);
     result.feature_vectors.push_back(
-        extract_concept_drift_features(raw.traces, activities));
+        extract_concept_drift_features(raw.traces, activities,
+                                       options.activity_attribute));
     // Keep this field cumulative from the beginning, as requested by the API.
     EventLog cumulative_copy;
     cumulative_copy.attributes = log.attributes;
@@ -259,7 +324,13 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
         throw std::invalid_argument(
             "concept drift: requested timestamp for an empty case");
       }
-      const auto parsed = parse_timestamp(log.traces[start].events.front().timestamp);
+      const auto* timestamp = event_value(
+          log.traces[start].events.front(), options.timestamp_attribute);
+      if (!timestamp || timestamp->empty()) {
+        throw std::invalid_argument(
+            "concept drift: selected case-start timestamp is missing");
+      }
+      const auto parsed = parse_timestamp(*timestamp);
       if (!parsed || !std::isfinite(*parsed)) {
         throw std::invalid_argument(
             "concept drift: case-start timestamp is not finite");
