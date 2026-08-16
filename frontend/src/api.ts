@@ -238,6 +238,10 @@ export interface FilterOptions extends LtlFilterOptions {
    * from the first suffixActivity (anchor included); cases without it drop. */
   prefixActivity?: string;
   suffixActivity?: string;
+  prefixStrict?: boolean;
+  prefixOccurrence?: "first" | "last";
+  suffixStrict?: boolean;
+  suffixOccurrence?: "first" | "last";
   /** Cut each case into the subtraces from betweenStart to betweenEnd. */
   betweenStart?: string;
   betweenEnd?: string;
@@ -473,8 +477,20 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.tracePatternPositive === false)
       add("trace_pattern_positive", "false");
   }
-  if (options.prefixActivity) add("prefix_activity", options.prefixActivity);
-  if (options.suffixActivity) add("suffix_activity", options.suffixActivity);
+  if (options.prefixActivity) {
+    add("prefix_activity", options.prefixActivity);
+    if (options.prefixStrict !== undefined)
+      add("prefix_strict", String(options.prefixStrict));
+    if (options.prefixOccurrence !== undefined)
+      add("prefix_occurrence", options.prefixOccurrence);
+  }
+  if (options.suffixActivity) {
+    add("suffix_activity", options.suffixActivity);
+    if (options.suffixStrict !== undefined)
+      add("suffix_strict", String(options.suffixStrict));
+    if (options.suffixOccurrence !== undefined)
+      add("suffix_occurrence", options.suffixOccurrence);
+  }
   if (options.betweenStart && options.betweenEnd) {
     add("between_start", options.betweenStart);
     add("between_end", options.betweenEnd);

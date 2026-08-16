@@ -88,6 +88,17 @@ struct NumericAttributeFilterOptions {
   bool positive = true;
 };
 
+enum class FilterAnchorOccurrence { first, last };
+
+// Prefix/suffix anchor behavior. Strict cuts include the anchor event;
+// non-strict cuts stop immediately before/after it. A missing anchor drops
+// the trace, matching the ordinary prefix/suffix filter contract.
+struct PrefixSuffixFilterOptions {
+  std::string activity;
+  bool strict = true;
+  FilterAnchorOccurrence occurrence = FilterAnchorOccurrence::first;
+};
+
 // Parses a comma-separated list of successions ("a -> b, c -> d") into
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
@@ -202,6 +213,10 @@ struct LogFilterOptions {
   // cut applies first, so the suffix anchor is sought inside the kept head.
   std::string prefix_activity;
   std::string suffix_activity;
+  bool prefix_strict = true;
+  bool suffix_strict = true;
+  FilterAnchorOccurrence prefix_occurrence = FilterAnchorOccurrence::first;
+  FilterAnchorOccurrence suffix_occurrence = FilterAnchorOccurrence::first;
 
   // Between-extraction: cut each trace into the subtraces that run from an
   // occurrence of `between_start` to the next occurrence of `between_end`, both
@@ -269,6 +284,9 @@ struct LogFilterOptions {
            min_case_duration_seconds.has_value() ||
            max_case_duration_seconds.has_value() ||
            !prefix_activity.empty() || !suffix_activity.empty() ||
+           !prefix_strict || !suffix_strict ||
+           prefix_occurrence != FilterAnchorOccurrence::first ||
+           suffix_occurrence != FilterAnchorOccurrence::first ||
            !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || max_cases.has_value() ||
@@ -314,6 +332,22 @@ struct LogFilterOptions {
 [[nodiscard]] EventLog filter_numeric_attribute(
     const EventLog& event_log,
     const NumericAttributeFilterOptions& options);
+
+[[nodiscard]] EventLog filter_prefix(
+    const EventLog& event_log, const PrefixSuffixFilterOptions& options);
+
+[[nodiscard]] EventLog filter_suffix(
+    const EventLog& event_log, const PrefixSuffixFilterOptions& options);
+
+inline EventLog filter_prefixes(
+    const EventLog& event_log, const PrefixSuffixFilterOptions& options) {
+  return filter_prefix(event_log, options);
+}
+
+inline EventLog filter_suffixes(
+    const EventLog& event_log, const PrefixSuffixFilterOptions& options) {
+  return filter_suffix(event_log, options);
+}
 
 [[nodiscard]] EventLog filter_ncases(const EventLog& event_log,
                                      std::size_t max_cases = 1000);

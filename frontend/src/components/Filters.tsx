@@ -235,6 +235,12 @@ export function Filters({
   const [variantCoverage, setVariantCoverage] = useState(""); // percent, 1–100
   const [prefixActivity, setPrefixActivity] = useState("");
   const [suffixActivity, setSuffixActivity] = useState("");
+  const [prefixStrict, setPrefixStrict] = useState(true);
+  const [prefixOccurrence, setPrefixOccurrence] =
+    useState<"first" | "last">("first");
+  const [suffixStrict, setSuffixStrict] = useState(true);
+  const [suffixOccurrence, setSuffixOccurrence] =
+    useState<"first" | "last">("first");
   const [segmentPrefixActivity, setSegmentPrefixActivity] = useState("");
   const [segmentPrefixStrict, setSegmentPrefixStrict] = useState(true);
   const [segmentPrefixOccurrence, setSegmentPrefixOccurrence] = useState<"first" | "last">("first");
@@ -684,6 +690,10 @@ export function Filters({
         : undefined,
       prefixActivity: prefixActivity || undefined,
       suffixActivity: suffixActivity || undefined,
+      prefixStrict: prefixActivity ? prefixStrict : undefined,
+      prefixOccurrence: prefixActivity ? prefixOccurrence : undefined,
+      suffixStrict: suffixActivity ? suffixStrict : undefined,
+      suffixOccurrence: suffixActivity ? suffixOccurrence : undefined,
       segmentPrefixActivity: segmentPrefixActivity || undefined,
       segmentPrefixStrict: segmentPrefixActivity ? segmentPrefixStrict : undefined,
       segmentPrefixOccurrence: segmentPrefixActivity ? segmentPrefixOccurrence : undefined,
@@ -909,6 +919,10 @@ export function Filters({
     setVariantCoverage("");
     setPrefixActivity("");
     setSuffixActivity("");
+    setPrefixStrict(true);
+    setPrefixOccurrence("first");
+    setSuffixStrict(true);
+    setSuffixOccurrence("first");
     setSuccessionAction("off");
     setSuccessionRelation("directly");
     setSuccessionFrom("");
@@ -1039,6 +1053,8 @@ export function Filters({
     timestampGrouping !== "" ||
     prefixActivity !== "" ||
     suffixActivity !== "" ||
+    (prefixActivity !== "" && (!prefixStrict || prefixOccurrence !== "first")) ||
+    (suffixActivity !== "" && (!suffixStrict || suffixOccurrence !== "first")) ||
     segmentPrefixActivity !== "" ||
     segmentSuffixActivity !== "" ||
     segmentBetweenStart !== "" ||
@@ -1685,7 +1701,7 @@ export function Filters({
 
           <div className="filters-row">
             <label className="filters-field">
-              <span>Head: keep up to first</span>
+              <span>Head anchor</span>
               <select
                 value={prefixActivity}
                 onChange={(e) => setPrefixActivity(e.target.value)}
@@ -1699,7 +1715,7 @@ export function Filters({
               </select>
             </label>
             <label className="filters-field">
-              <span>Tail: keep from first</span>
+              <span>Tail anchor</span>
               <select
                 value={suffixActivity}
                 onChange={(e) => setSuffixActivity(e.target.value)}
@@ -1710,6 +1726,53 @@ export function Filters({
                     {name}
                   </option>
                 ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Head cut</span>
+              <select
+                value={prefixStrict ? "strict" : "non-strict"}
+                disabled={!prefixActivity}
+                onChange={(e) => setPrefixStrict(e.target.value === "strict")}
+              >
+                <option value="strict">include anchor</option>
+                <option value="non-strict">exclude anchor</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Head occurrence</span>
+              <select
+                value={prefixOccurrence}
+                disabled={!prefixActivity}
+                onChange={(e) => setPrefixOccurrence(e.target.value as "first" | "last")}
+              >
+                <option value="first">first</option>
+                <option value="last">last</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Tail cut</span>
+              <select
+                value={suffixStrict ? "strict" : "non-strict"}
+                disabled={!suffixActivity}
+                onChange={(e) => setSuffixStrict(e.target.value === "strict")}
+              >
+                <option value="strict">include anchor</option>
+                <option value="non-strict">exclude anchor</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Tail occurrence</span>
+              <select
+                value={suffixOccurrence}
+                disabled={!suffixActivity}
+                onChange={(e) => setSuffixOccurrence(e.target.value as "first" | "last")}
+              >
+                <option value="first">first</option>
+                <option value="last">last</option>
               </select>
             </label>
           </div>

@@ -388,6 +388,43 @@ bool numeric_trace_matches(const Trace& trace,
   return found == options.positive;
 }
 
+void validate_prefix_suffix_options(const PrefixSuffixFilterOptions& options) {
+  if (options.activity.empty()) {
+    throw std::invalid_argument(
+        "prefix/suffix filter: an anchor activity is required");
+  }
+}
+
+std::optional<Trace> cut_trace(const Trace& trace,
+                               const PrefixSuffixFilterOptions& options,
+                               bool prefix) {
+  const auto find_anchor = [&]() -> std::optional<std::size_t> {
+    if (options.occurrence == FilterAnchorOccurrence::first) {
+      for (std::size_t i = 0; i < trace.events.size(); ++i) {
+        if (trace.events[i].activity == options.activity) return i;
+      }
+    } else {
+      for (std::size_t i = trace.events.size(); i-- > 0;) {
+        if (trace.events[i].activity == options.activity) return i;
+      }
+    }
+    return std::nullopt;
+  };
+  const auto anchor = find_anchor();
+  if (!anchor) return std::nullopt;
+
+  const std::size_t begin = prefix ? 0 : *anchor + (options.strict ? 0 : 1);
+  const std::size_t end = prefix ? *anchor + (options.strict ? 1 : 0)
+                                 : trace.events.size();
+  if (begin >= end) return std::nullopt;
+  Trace result;
+  result.case_id = trace.case_id;
+  result.attributes = trace.attributes;
+  result.events.insert(result.events.end(), trace.events.begin() + begin,
+                       trace.events.begin() + end);
+  return result;
+}
+
 }  // namespace
 
 std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
@@ -537,6 +574,30 @@ EventLog filter_numeric_attribute(
   return result;
 }
 
+EventLog filter_prefix(const EventLog& event_log,
+                       const PrefixSuffixFilterOptions& options) {
+  validate_prefix_suffix_options(options);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    const auto cut = cut_trace(trace, options, true);
+    if (cut) result.traces.push_back(*cut);
+  }
+  return result;
+}
+
+EventLog filter_suffix(const EventLog& event_log,
+                       const PrefixSuffixFilterOptions& options) {
+  validate_prefix_suffix_options(options);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    const auto cut = cut_trace(trace, options, false);
+    if (cut) result.traces.push_back(*cut);
+  }
+  return result;
+}
+
 EventLog filter_ncases(const EventLog& event_log, std::size_t max_cases) {
   EventLog result;
   result.attributes = event_log.attributes;
@@ -571,6 +632,19 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
 
   if (options.numeric_attribute)
     validate_numeric_attribute_options(*options.numeric_attribute);
+
+  if (options.prefix_activity.empty() &&
+      (!options.prefix_strict ||
+       options.prefix_occurrence != FilterAnchorOccurrence::first)) {
+    throw std::invalid_argument(
+        "prefix filter: options require prefix_activity");
+  }
+  if (options.suffix_activity.empty() &&
+      (!options.suffix_strict ||
+       options.suffix_occurrence != FilterAnchorOccurrence::first)) {
+    throw std::invalid_argument(
+        "suffix filter: options require suffix_activity");
+  }
 
   const AttributeMatcher case_attribute{
       options.case_attribute_key,
@@ -727,22 +801,24 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     // Prefix/suffix cuts anchor on the first occurrence; a case without the
     // anchor is dropped rather than passed through whole.
     if (!options.prefix_activity.empty()) {
-      const auto anchor =
-          std::find_if(projected.events.begin(), projected.events.end(),
-                       [&](const Event& event) {
-                         return event.activity == options.prefix_activity;
-                       });
-      if (anchor == projected.events.end()) continue;
-      projected.events.erase(anchor + 1, projected.events.end());
+      const auto cut = cut_trace(
+          projected,
+          PrefixSuffixFilterOptions{options.prefix_activity,
+                                     options.prefix_strict,
+                                     options.prefix_occurrence},
+          true);
+      if (!cut) continue;
+      projected = *cut;
     }
     if (!options.suffix_activity.empty()) {
-      const auto anchor =
-          std::find_if(projected.events.begin(), projected.events.end(),
-                       [&](const Event& event) {
-                         return event.activity == options.suffix_activity;
-                       });
-      if (anchor == projected.events.end()) continue;
-      projected.events.erase(projected.events.begin(), anchor);
+      const auto cut = cut_trace(
+          projected,
+          PrefixSuffixFilterOptions{options.suffix_activity,
+                                     options.suffix_strict,
+                                     options.suffix_occurrence},
+          false);
+      if (!cut) continue;
+      projected = *cut;
     }
 
     std::vector<Trace> pieces;
