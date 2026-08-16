@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, dfgExportQuery, importDfg, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("serializes optional noise cleaning settings", () => {
@@ -957,6 +957,76 @@ describe("OCEL API", () => {
       blob: async () => new Blob(["not a database"]),
     })));
     await expect(requestOcelSqliteExport({})).rejects.toThrow(/invalid SQLite export/);
+    vi.unstubAllGlobals();
+  });
+
+  it("round-trips classic and standard OCEL JSON/XML through the exchange adapter", async () => {
+    expect(ocelExchangeQuery("xml_standard", "import"))
+      .toBe("format=xml_standard&mode=import");
+    const imported = {
+      family: "OCEL_IO", variant: "IMPORT_XML_STANDARD",
+      log: { "ocel:events": {}, "ocel:objects": {} },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/ocel/io?format=xml_standard&mode=import");
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => imported };
+    }));
+    await expect(requestOcelExchangeImport(new File(["<log/ >"], "log.xml"), "xml_standard"))
+      .resolves.toMatchObject({ family: "OCEL_IO", variant: "IMPORT_XML_STANDARD" });
+    vi.unstubAllGlobals();
+
+    const json = new Blob([JSON.stringify({ "ocel:events": {}, "ocel:objects": {} })], {
+      type: "application/json",
+    });
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/ocel/io?format=json_standard&mode=export");
+      expect(init?.headers).toEqual({ "Content-Type": "application/json" });
+      return { ok: true, blob: async () => json };
+    }));
+    await expect(requestOcelExchangeExport({ "ocel:events": {}, "ocel:objects": {} }, "json_standard"))
+      .resolves.toBe(json);
+    vi.unstubAllGlobals();
+  });
+
+  it("uploads an event CSV with an optional object table and exports CSV text", async () => {
+    const imported = {
+      family: "OCEL_IO", variant: "IMPORT_CSV",
+      log: { "ocel:events": {}, "ocel:objects": {} },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/ocel/io?format=csv&mode=import");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => imported };
+    }));
+    await expect(requestOcelExchangeImport(
+      new File(["ocel:eid,ocel:activity,ocel:timestamp\n"], "events.csv"),
+      "csv",
+      new File(["ocel:oid,ocel:type\n"], "objects.csv"),
+    )).resolves.toMatchObject({ family: "OCEL_IO", variant: "IMPORT_CSV" });
+    vi.unstubAllGlobals();
+
+    const csv = new Blob(["ocel:eid,ocel:activity,ocel:timestamp\n"], { type: "text/csv" });
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe("/api/ocel/io?format=csv_objects&mode=export");
+      return { ok: true, blob: async () => csv };
+    }));
+    await expect(requestOcelExchangeExport({}, "csv_objects")).resolves.toBe(csv);
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects unsupported CSV object-table imports", async () => {
+    await expect(requestOcelExchangeImport(new File([""], "objects.csv"), "csv_objects"))
+      .rejects.toThrow(/export-only/);
+  });
+
+  it("rejects malformed OCEL exchange downloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      blob: async () => new Blob(["not XML"]),
+    })));
+    await expect(requestOcelExchangeExport({}, "xml")).rejects.toThrow(/invalid OCEL XML/);
     vi.unstubAllGlobals();
   });
 

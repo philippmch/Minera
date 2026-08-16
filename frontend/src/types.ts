@@ -941,6 +941,20 @@ export interface OcelSqliteResult {
   variant: "IMPORT";
   log: Record<string, unknown>;
 }
+export type OcelExchangeFormat =
+  | "json" | "json_standard" | "xml" | "xml_standard"
+  | "csv" | "csv_objects";
+export type OcelExchangeImportVariant =
+  | "IMPORT_JSON"
+  | "IMPORT_JSON_STANDARD"
+  | "IMPORT_XML"
+  | "IMPORT_XML_STANDARD"
+  | "IMPORT_CSV";
+export interface OcelExchangeResult {
+  family: "OCEL_IO";
+  variant: OcelExchangeImportVariant;
+  log: Record<string, unknown>;
+}
 export interface OcelSplitResult {
   family: "OCEL_SPLIT";
   variant: OcelSplitVariant;
@@ -984,6 +998,14 @@ export function isOcelFilterResult(value: unknown): value is OcelFilterResult {
 export function isOcelSqliteResult(value: unknown): value is OcelSqliteResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_SQLITE" ||
       value.variant !== "IMPORT" || !isOcelRecord(value.log)) return false;
+  return isOcelRecord(value.log["ocel:events"]) &&
+    isOcelRecord(value.log["ocel:objects"]);
+}
+export function isOcelExchangeResult(value: unknown): value is OcelExchangeResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_IO" ||
+      !["IMPORT_JSON", "IMPORT_JSON_STANDARD", "IMPORT_XML",
+        "IMPORT_XML_STANDARD", "IMPORT_CSV"].includes(String(value.variant)) ||
+      !isOcelRecord(value.log)) return false;
   return isOcelRecord(value.log["ocel:events"]) &&
     isOcelRecord(value.log["ocel:objects"]);
 }
