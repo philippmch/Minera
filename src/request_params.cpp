@@ -1153,11 +1153,41 @@ MineParams parse_mine_params(const FieldLookup& field,
           field("trace_pattern_positive"), "trace_pattern_positive");
     }
   }
-  if (const auto value = field("prefix_activity"); !value.empty()) {
-    params.filter.prefix_activity = value;
+  const auto parse_filter_anchor_occurrence = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value == "first") return FilterAnchorOccurrence::first;
+    if (value == "last") return FilterAnchorOccurrence::last;
+    throw std::invalid_argument(std::string(name) + ": expected first or last");
+  };
+  const bool prefix_supplied = supplied("prefix_activity") ||
+                               supplied("prefix_strict") ||
+                               supplied("prefix_occurrence");
+  if (prefix_supplied) {
+    if (!supplied("prefix_activity") || field("prefix_activity").empty())
+      throw std::invalid_argument(
+          "prefix_activity: required when prefix filtering is enabled");
+    params.filter.prefix_activity = field("prefix_activity");
+    if (supplied("prefix_strict"))
+      params.filter.prefix_strict =
+          parse_boolean(field("prefix_strict"), "prefix_strict");
+    if (supplied("prefix_occurrence"))
+      params.filter.prefix_occurrence =
+          parse_filter_anchor_occurrence("prefix_occurrence");
   }
-  if (const auto value = field("suffix_activity"); !value.empty()) {
-    params.filter.suffix_activity = value;
+  const bool suffix_supplied = supplied("suffix_activity") ||
+                               supplied("suffix_strict") ||
+                               supplied("suffix_occurrence");
+  if (suffix_supplied) {
+    if (!supplied("suffix_activity") || field("suffix_activity").empty())
+      throw std::invalid_argument(
+          "suffix_activity: required when suffix filtering is enabled");
+    params.filter.suffix_activity = field("suffix_activity");
+    if (supplied("suffix_strict"))
+      params.filter.suffix_strict =
+          parse_boolean(field("suffix_strict"), "suffix_strict");
+    if (supplied("suffix_occurrence"))
+      params.filter.suffix_occurrence =
+          parse_filter_anchor_occurrence("suffix_occurrence");
   }
   if (const auto value = field("rework_min_occurrences"); !value.empty()) {
     params.filter.rework_min_occurrences =

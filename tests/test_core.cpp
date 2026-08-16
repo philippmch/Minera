@@ -3180,6 +3180,62 @@ void filter_numeric_attributes_support_event_and_trace_ranges() {
   }));
 }
 
+void filter_prefix_suffix_support_strictness_and_occurrence() {
+  const auto log = log_from_variants({{"a", "b", "a", "c"}, {"x", "y"}});
+
+  minera::PrefixSuffixFilterOptions prefix;
+  prefix.activity = "a";
+  auto first_strict = minera::filter_prefix(log, prefix);
+  assert(first_strict.trace_count() == 1);
+  assert((activity_names(first_strict.traces.front()) ==
+          std::vector<std::string>{"a"}));
+
+  prefix.occurrence = minera::FilterAnchorOccurrence::last;
+  const auto last_strict = minera::filter_prefix(log, prefix);
+  assert((activity_names(last_strict.traces.front()) ==
+          std::vector<std::string>{"a", "b", "a"}));
+
+  prefix.strict = false;
+  const auto last_non_strict = minera::filter_prefix(log, prefix);
+  assert((activity_names(last_non_strict.traces.front()) ==
+          std::vector<std::string>{"a", "b"}));
+
+  minera::PrefixSuffixFilterOptions suffix;
+  suffix.activity = "a";
+  const auto suffix_first = minera::filter_suffix(log, suffix);
+  assert((activity_names(suffix_first.traces.front()) ==
+          std::vector<std::string>{"a", "b", "a", "c"}));
+  suffix.occurrence = minera::FilterAnchorOccurrence::last;
+  const auto suffix_last = minera::filter_suffix(log, suffix);
+  assert((activity_names(suffix_last.traces.front()) ==
+          std::vector<std::string>{"a", "c"}));
+  suffix.strict = false;
+  const auto suffix_last_non_strict = minera::filter_suffix(log, suffix);
+  assert((activity_names(suffix_last_non_strict.traces.front()) ==
+          std::vector<std::string>{"c"}));
+
+  minera::LogFilterOptions integrated;
+  integrated.prefix_activity = "a";
+  integrated.prefix_strict = false;
+  integrated.prefix_occurrence = minera::FilterAnchorOccurrence::last;
+  integrated.suffix_activity = "b";
+  integrated.suffix_occurrence = minera::FilterAnchorOccurrence::first;
+  const auto combined = minera::filter_event_log(log, integrated);
+  assert(combined.trace_count() == 1);
+  assert((activity_names(combined.traces.front()) ==
+          std::vector<std::string>{"b"}));
+
+  assert(throws([&] {
+    minera::PrefixSuffixFilterOptions invalid;
+    (void)minera::filter_prefix(log, invalid);
+  }));
+  assert(throws([&] {
+    minera::LogFilterOptions invalid;
+    invalid.prefix_strict = false;
+    (void)minera::filter_event_log(log, invalid);
+  }));
+}
+
 void importer_rejects_malformed_rows() {
   // Too few fields for the declared header.
   assert(throws([] {
@@ -5281,6 +5337,7 @@ int main() {
   filter_case_performance_uses_inclusive_trace_duration();
   filter_case_selection_limits_cases_and_event_counts();
   filter_numeric_attributes_support_event_and_trace_ranges();
+  filter_prefix_suffix_support_strictness_and_occurrence();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();
   xes_export_round_trips_generic_attributes();

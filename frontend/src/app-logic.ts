@@ -128,6 +128,10 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.tracePatterns?.length ||
       filters.prefixActivity ||
       filters.suffixActivity ||
+      (filters.prefixActivity &&
+        (filters.prefixStrict === false || filters.prefixOccurrence === "last")) ||
+      (filters.suffixActivity &&
+        (filters.suffixStrict === false || filters.suffixOccurrence === "last")) ||
       filters.segmentPrefixActivity ||
       filters.segmentSuffixActivity ||
       (filters.segmentPrefixActivity &&

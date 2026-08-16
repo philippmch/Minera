@@ -830,7 +830,11 @@ void parse_mine_params_maps_filters() {
       {"trace_patterns", "a,b,...;...,x,y"},
       {"trace_pattern_positive", "false"},
       {"prefix_activity", "c"},
+      {"prefix_strict", "false"},
+      {"prefix_occurrence", "last"},
       {"suffix_activity", "a"},
+      {"suffix_strict", "true"},
+      {"suffix_occurrence", "last"},
       {"variant_coverage", "0.8"},
   }));
   assert(params.filter.time_from == "2024-01-01");
@@ -912,7 +916,13 @@ void parse_mine_params_maps_filters() {
           minera::TracePattern{"...", "x", "y"}));
   assert(!params.filter.trace_pattern_positive);
   assert(params.filter.prefix_activity == "c");
+  assert(!params.filter.prefix_strict);
+  assert(params.filter.prefix_occurrence ==
+         minera::FilterAnchorOccurrence::last);
   assert(params.filter.suffix_activity == "a");
+  assert(params.filter.suffix_strict);
+  assert(params.filter.suffix_occurrence ==
+         minera::FilterAnchorOccurrence::last);
   assert(params.filter.variant_coverage == 0.8);
   assert(params.filter.any());
 }
@@ -993,6 +1003,32 @@ void parse_mine_params_rejects_invalid_numeric_attribute_ranges() {
         {"numeric_attribute_key", "amount"},
         {"numeric_attribute_min", "4"},
         {"numeric_attribute_max", "3"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_prefix_suffix_options() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"prefix_activity", "a"}, {"prefix_strict", "maybe"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"suffix_activity", "a"}, {"suffix_occurrence", "middle"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({{"prefix_occurrence", "last"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -2527,6 +2563,7 @@ int main() {
   parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_case_selection_bounds();
   parse_mine_params_rejects_invalid_numeric_attribute_ranges();
+  parse_mine_params_rejects_invalid_prefix_suffix_options();
   parse_mine_params_rejects_invalid_trace_patterns();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();

@@ -957,12 +957,16 @@ int usage(const char* program) {
                 "  --trace-patterns <p1;p2> Keep traces matching an exact/prefix/\n"
                 "                            suffix/infix pattern; use ... as a wildcard\n"
                 "  --trace-pattern-positive <bool> Keep matching (default: true)\n"
-                "  --prefix-activity <a>     Keep each case's head up to (and\n"
+               "  --prefix-activity <a>     Keep each case's head up to (and\n"
                "                            including) the first <a>; cases\n"
                "                            without <a> are dropped\n"
+               "  --prefix-strict <bool>   Include the prefix anchor (default true)\n"
+               "  --prefix-occurrence <id> first (default) or last anchor\n"
                "  --suffix-activity <a>     Keep each case's tail from the\n"
                "                            first <a> on; cases without <a>\n"
                "                            are dropped\n"
+               "  --suffix-strict <bool>   Include the suffix anchor (default true)\n"
+               "  --suffix-occurrence <id> first (default) or last anchor\n"
                "  --between-start <a>       With --between-end: cut each trace\n"
                "  --between-end <b>         into the subtraces running from <a>\n"
                "                            to <b>, endpoints included\n"
@@ -1330,6 +1334,29 @@ int main(int argc, char** argv) {
               "--numeric-attribute-mode expects events or traces");
       } else {
         numeric.positive = parse_boolean(value, arg);
+      }
+      continue;
+    }
+    if (arg == "--prefix-strict" || arg == "--prefix-occurrence" ||
+        arg == "--suffix-strict" || arg == "--suffix-occurrence") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view text = value;
+      if (arg == "--prefix-strict") {
+        filter.prefix_strict = parse_boolean(value, arg);
+      } else if (arg == "--suffix-strict") {
+        filter.suffix_strict = parse_boolean(value, arg);
+      } else if (text == "first" || text == "last") {
+        const auto occurrence = text == "first"
+                                    ? minera::FilterAnchorOccurrence::first
+                                    : minera::FilterAnchorOccurrence::last;
+        if (arg == "--prefix-occurrence")
+          filter.prefix_occurrence = occurrence;
+        else
+          filter.suffix_occurrence = occurrence;
+      } else {
+        throw std::invalid_argument(
+            std::string(arg) + " expects first or last");
       }
       continue;
     }

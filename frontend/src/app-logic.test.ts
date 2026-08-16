@@ -1011,6 +1011,24 @@ describe("mineFormEntries", () => {
     expect(() => mineFormEntries({ minLength: 6, maxLength: 5 })).toThrow(/not exceed/);
     expect(hasActiveFilters({ maxCases: 0 })).toBe(true);
     expect(mineFormEntries({
+      prefixActivity: "A",
+      prefixStrict: false,
+      prefixOccurrence: "last",
+      suffixActivity: "B",
+      suffixStrict: true,
+      suffixOccurrence: "first",
+    })).toEqual([
+      ["prefix_activity", "A"],
+      ["prefix_strict", "false"],
+      ["prefix_occurrence", "last"],
+      ["suffix_activity", "B"],
+      ["suffix_strict", "true"],
+      ["suffix_occurrence", "first"],
+    ]);
+    expect(mineFormEntries({ prefixStrict: false, suffixOccurrence: "last" })).toEqual([]);
+    expect(hasActiveFilters({ prefixStrict: false })).toBe(false);
+    expect(hasActiveFilters({ prefixActivity: "A", prefixOccurrence: "last" })).toBe(true);
+    expect(mineFormEntries({
       numericAttributeKey: "amount",
       numericAttributeMin: -2,
       numericAttributeMax: 10,
