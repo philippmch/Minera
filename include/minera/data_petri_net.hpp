@@ -14,6 +14,9 @@ struct DataPetriNetOptions {
   // Keep the original decision-tree diagnostics in the result even when no
   // observed branch can be guarded.
   bool include_decision_diagnostics = true;
+  // Reuse the decision-mining controls for both guards and their encoded
+  // diagnostics so every projection sees the same feature scope and bounds.
+  DecisionMiningOptions decision_options;
 };
 
 struct DataPetriNetTransition {

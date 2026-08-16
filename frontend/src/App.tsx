@@ -67,6 +67,7 @@ import {
   conceptDriftQuery,
   requestConceptDrift,
   type ConceptDriftOptions,
+  type DecisionMiningOptions,
   checkModel,
   decideModel,
   mineCsv,
@@ -152,12 +153,13 @@ export default function App() {
   );
 
   // Decision mining for a model, fetched on demand and cached like alignments.
-  const requestDecisions = useCallback(async (minerId: string): Promise<Decisions> => {
-    const cached = decideCache.current[minerId];
+  const requestDecisions = useCallback(async (minerId: string, options: DecisionMiningOptions = {}): Promise<Decisions> => {
+    const cacheKey = `${minerId}|${JSON.stringify(options)}`;
+    const cached = decideCache.current[cacheKey];
     if (cached) return cached;
     const generation = cacheGeneration.current;
-    const result = await decideModel(minerId);
-    if (generation === cacheGeneration.current) decideCache.current = { ...decideCache.current, [minerId]: result };
+    const result = await decideModel(minerId, options);
+    if (generation === cacheGeneration.current) decideCache.current = { ...decideCache.current, [cacheKey]: result };
     return result;
   }, []);
 
@@ -256,8 +258,9 @@ export default function App() {
     alignCache.current = Object.fromEntries(
       Object.entries(alignCache.current).filter(([key]) => !key.startsWith("imported|")),
     );
-    const { imported: _droppedDecisions, ...restDecisions } = decideCache.current;
-    decideCache.current = restDecisions;
+    decideCache.current = Object.fromEntries(
+      Object.entries(decideCache.current).filter(([key]) => !key.startsWith("imported|")),
+    );
     decomposedCache.current = Object.fromEntries(Object.entries(decomposedCache.current).filter(([key]) => !key.startsWith("imported|")));
     petriAntiCache.current = Object.fromEntries(Object.entries(petriAntiCache.current).filter(([key]) => !key.startsWith("imported|")));
     petriMultiCache.current = Object.fromEntries(Object.entries(petriMultiCache.current).filter(([key]) => !key.startsWith("imported|")));

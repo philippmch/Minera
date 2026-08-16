@@ -753,8 +753,9 @@ export accepts `--decision-tables`, the cached server exposes
 encoded-table envelope. Decision depth, split/leaf minimums, candidate caps,
 gain threshold, trace-attribute inclusion, and selected context attributes are
 validated and shared by the native, CLI, server, and frontend decision paths.
-It is also nested in the data-Petri response. Richer classifier backends and
-columnar training integrations remain open.
+The same controls flow into guarded data-Petri projections and their nested
+tables. Richer classifier backends and columnar training integrations remain
+open.
 
 ## Live-stream transport evidence
 

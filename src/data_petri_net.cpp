@@ -134,9 +134,15 @@ DataPetriNet mine_data_petri_net(const EventLog& log, const PetriNet& net,
                                  const DataPetriNetOptions& options) {
   DataPetriNet result;
   result.net = net;
-  const auto learned_decisions = mine_decisions(log, net);
+  const auto learned_decisions =
+      mine_decisions(log, net, options.decision_options);
   result.decisions = learned_decisions;
-  result.decision_tables = mine_decision_tables(log, net);
+  DecisionTableOptions table_options;
+  table_options.mining = options.decision_options;
+  table_options.include_trace_attributes =
+      options.decision_options.include_trace_attributes;
+  table_options.attributes = options.decision_options.attributes;
+  result.decision_tables = mine_decision_tables(log, net, table_options);
 
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t transition = 0; transition < net.transitions().size();
