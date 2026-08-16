@@ -2838,6 +2838,12 @@ CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
       throw std::invalid_argument(std::string(name) + ": expected a value");
     return value;
   };
+  if (supplied("merge_variant")) {
+    const auto value = require("merge_variant");
+    if (value != "pandas" && value != "PANDAS")
+      throw std::invalid_argument("merge_variant: expected pandas");
+    params.variant = CaseRelationsVariant::kPandas;
+  }
   if (supplied("merge_timestamp_key"))
     params.timestamp_key = require("merge_timestamp_key");
   return params;
@@ -3404,6 +3410,12 @@ NetworkAnalysisOptions parse_network_analysis_params(const FieldLookup& field,
   NetworkAnalysisOptions options;
   const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
   const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("network_analysis_variant")) {
+    const auto value = require("network_analysis_variant");
+    if (value != "dataframe" && value != "DATAFRAME")
+      throw std::invalid_argument("network_analysis_variant: expected dataframe");
+    options.variant = NetworkAnalysisVariant::kDataframe;
+  }
   if (supplied("network_analysis_sorting_attribute")) options.sorting_attribute = require("network_analysis_sorting_attribute");
   if (supplied("network_analysis_timestamp_attribute")) options.timestamp_attribute = require("network_analysis_timestamp_attribute");
   if (supplied("network_analysis_source_node_attribute")) options.source_node_attribute = require("network_analysis_source_node_attribute");
@@ -3433,6 +3445,12 @@ RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field,
   RoleDiscoveryOptions options;
   const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
   const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
+  if (supplied("roles_variant")) {
+    const auto value = require("roles_variant");
+    if (value == "log" || value == "LOG") options.variant = RoleDiscoveryVariant::kLog;
+    else if (value == "pandas" || value == "PANDAS") options.variant = RoleDiscoveryVariant::kPandas;
+    else throw std::invalid_argument("roles_variant: expected log or pandas");
+  }
   if (supplied("roles_threshold")) {
     options.threshold = parse_finite_double(require("roles_threshold"), "roles_threshold");
     if (options.threshold < 0 || options.threshold > 1) throw std::invalid_argument("roles_threshold must be in [0,1]");

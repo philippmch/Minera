@@ -3787,9 +3787,12 @@ std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
   return out.str();
 }
 
-std::string case_relations_json(const EventLog& result) {
+std::string case_relations_json(const EventLog& result,
+                                CaseRelationsVariant variant) {
+  if (variant != CaseRelationsVariant::kPandas)
+    throw std::invalid_argument("case relations result has an unknown variant");
   std::ostringstream out;
-  out << "{\"family\":\"MERGE_CASE_RELATIONS\",\"log\":";
+  out << "{\"family\":\"MERGE_CASE_RELATIONS\",\"variant\":\"pandas\",\"log\":";
   write_projected_log(out, result);
   out << '}';
   return out.str();
@@ -4363,8 +4366,10 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
 }
 
 std::string network_analysis_json(const NetworkAnalysisResult& result) {
+  if (result.variant != NetworkAnalysisVariant::kDataframe)
+    throw std::invalid_argument("network analysis result has an unknown variant");
   std::ostringstream out;
-  out << "{\"family\":\"NETWORK_ANALYSIS\",\"edges\":[";
+  out << "{\"family\":\"NETWORK_ANALYSIS\",\"variant\":\"dataframe\",\"edges\":[";
   for (std::size_t i = 0; i < result.edges.size(); ++i) {
     if (i) out << ',';
     const auto& e = result.edges[i];
@@ -4390,8 +4395,16 @@ std::string network_analysis_json(const NetworkAnalysisResult& result) {
 }
 
 std::string role_discovery_json(const RoleDiscoveryResult& result) {
+  const char* variant = nullptr;
+  switch (result.variant) {
+    case RoleDiscoveryVariant::kLog: variant = "log"; break;
+    case RoleDiscoveryVariant::kPandas: variant = "pandas"; break;
+  }
+  if (variant == nullptr)
+    throw std::invalid_argument("role discovery result has an unknown variant");
   std::ostringstream out;
-  out << "{\"family\":\"ROLE_DISCOVERY\",\"roles\":[";
+  out << "{\"family\":\"ROLE_DISCOVERY\",\"variant\":\""
+      << variant << "\",\"roles\":[";
   for (std::size_t i = 0; i < result.roles.size(); ++i) {
     if (i) out << ',';
     const auto& role = result.roles[i];

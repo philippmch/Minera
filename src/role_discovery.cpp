@@ -64,6 +64,9 @@ double similarity(const WorkingRole& a, const WorkingRole& b) {
 
 RoleDiscoveryResult discover_roles(const EventLog& log,
                                    const RoleDiscoveryOptions& options) {
+  if (options.variant != RoleDiscoveryVariant::kLog &&
+      options.variant != RoleDiscoveryVariant::kPandas)
+    throw std::invalid_argument("roles_variant must be log or pandas");
   if (!std::isfinite(options.threshold) || options.threshold < 0.0 || options.threshold > 1.0)
     throw std::invalid_argument("roles_threshold must be finite and in [0,1]");
   if (options.max_resources == 0 || options.max_resources > 10000)
@@ -114,6 +117,7 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
   }
 
   RoleDiscoveryResult result;
+  result.variant = options.variant;
   std::sort(roles.begin(), roles.end(), final_role_order);
   result.diagnostics.trace_count = log.trace_count();
   result.diagnostics.event_count = log.event_count();

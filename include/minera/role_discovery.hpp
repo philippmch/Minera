@@ -8,8 +8,16 @@
 
 namespace minera {
 
+enum class RoleDiscoveryVariant {
+  kLog,
+  kPandas,
+  LOG = kLog,
+  PANDAS = kPandas,
+};
+
 struct RoleDiscoveryOptions {
   double threshold = 0.65;
+  RoleDiscoveryVariant variant = RoleDiscoveryVariant::kLog;
   std::size_t max_resources = 256;
   std::size_t max_activities = 10000;
 };
@@ -27,6 +35,7 @@ struct RoleDiscoveryDiagnostics {
   std::string message;
 };
 struct RoleDiscoveryResult {
+  RoleDiscoveryVariant variant = RoleDiscoveryVariant::kLog;
   std::vector<DiscoveredRole> roles;
   RoleDiscoveryDiagnostics diagnostics;
 };

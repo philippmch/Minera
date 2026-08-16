@@ -10,9 +10,15 @@
 
 namespace minera {
 
+enum class NetworkAnalysisVariant {
+  kDataframe,
+  DATAFRAME = kDataframe,
+};
+
 enum class NetworkAnalysisEdgeReference { kOut, kIn };
 
 struct NetworkAnalysisOptions {
+  NetworkAnalysisVariant variant = NetworkAnalysisVariant::kDataframe;
   std::string sorting_attribute = "time:timestamp";
   std::string timestamp_attribute = "time:timestamp";
   std::string source_node_attribute = "org:resource";
@@ -48,6 +54,7 @@ struct NetworkAnalysisDiagnostics {
 };
 
 struct NetworkAnalysisResult {
+  NetworkAnalysisVariant variant = NetworkAnalysisVariant::kDataframe;
   std::vector<NetworkAnalysisEdge> edges;
   NetworkAnalysisDiagnostics diagnostics;
 };

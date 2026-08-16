@@ -287,7 +287,9 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string trie_json(const TrieModel& result);
 [[nodiscard]] std::string interval_tree_json(
     const std::vector<OpenPathInterval>& result);
-[[nodiscard]] std::string case_relations_json(const EventLog& result);
+[[nodiscard]] std::string case_relations_json(
+    const EventLog& result,
+    CaseRelationsVariant variant = CaseRelationsVariant::kPandas);
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result);
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result,
                                             RandomTreeVariant variant);

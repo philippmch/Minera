@@ -14,7 +14,13 @@ struct CaseRelation {
   friend bool operator==(const CaseRelation&, const CaseRelation&) = default;
 };
 
+enum class CaseRelationsVariant {
+  kPandas,
+  PANDAS = kPandas,
+};
+
 struct CaseRelationsOptions {
+  CaseRelationsVariant variant = CaseRelationsVariant::kPandas;
   std::string timestamp_key = "time:timestamp";
 };
 

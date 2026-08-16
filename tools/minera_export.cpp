@@ -405,10 +405,12 @@ int usage(const char* program) {
                "  --sna-max-resources <n> Resource safety bound\n"
                "  --sna-max-edges <n>    Edge safety bound\n"
                "  --network-analysis     Emit organizational network analysis JSON\n"
+               "  --network-analysis-variant <id> dataframe (default)\n"
                "  --network-analysis-* <v> Network selectors, performance, hours, and bounds\n"
                "  --link-analysis       Emit classic link-analysis JSON\n"
                "  --link-analysis-* <v> Relation columns, ordering, propagation, and bounds\n"
                "  --roles                Emit deterministic role discovery JSON\n"
+               "  --roles-variant <id>   log (default) or pandas\n"
                "  --roles-threshold <f>  Merge threshold in [0,1]\n"
                "  --roles-max-resources <n> Resource safety bound\n"
                "  --roles-max-activities <n> Activity safety bound\n"
@@ -615,6 +617,7 @@ int usage(const char* program) {
                "  --merge-case-relations <file> Merge incoming CSV/XES log\n"
                "  --case-relations <file>       Relation CSV for merge\n"
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
+               "  --merge-variant <id>          pandas (default)\n"
                "  --merge-left-column <name>    Relation left-case column\n"
                "  --merge-right-column <name>   Relation right-case column\n"
                "  --timestamp-interleavings <file> Right CSV/XES log for interleavings\n"
@@ -1928,7 +1931,7 @@ int main(int argc, char** argv) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
-          "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
+          "network_analysis_variant", "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
           "network_analysis_source_node_attribute", "network_analysis_target_node_attribute",
           "network_analysis_edge_attribute", "network_analysis_edge_reference",
           "network_analysis_out_relation_attribute", "network_analysis_in_relation_attribute",
@@ -2004,7 +2007,7 @@ int main(int argc, char** argv) {
     if (arg.rfind("--roles-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
-      static const std::set<std::string> names = {"roles_threshold", "roles_max_resources", "roles_max_activities"};
+      static const std::set<std::string> names = {"roles_variant", "roles_threshold", "roles_max_resources", "roles_max_activities"};
       if (!names.contains(key)) return usage(argv[0]);
       roles_fields.insert_or_assign(std::move(key), value); roles_requested = true; continue;
     }
@@ -2232,7 +2235,7 @@ int main(int argc, char** argv) {
       merge_requested = true;
       continue;
     }
-    if (arg == "--merge-timestamp-key" || arg == "--merge-left-column" ||
+    if (arg == "--merge-variant" || arg == "--merge-timestamp-key" || arg == "--merge-left-column" ||
         arg == "--merge-right-column") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -3757,7 +3760,8 @@ int main(int argc, char** argv) {
       const auto relations = minera::parse_case_relations_csv(
           relation_input, left, right);
       std::cout << minera::case_relations_json(
-          minera::merge_case_relations(log, incoming, relations, params))
+          minera::merge_case_relations(log, incoming, relations, params),
+          params.variant)
                 << '\n';
       return 0;
     }

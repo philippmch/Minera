@@ -117,8 +117,8 @@ describe("native alignment adapters", () => {
     }
   });
   it("serializes case-relation merge controls and validates merged logs", async () => {
-    expect(caseRelationsQuery({ merge_timestamp_key: "completed", merge_left_column: "left", merge_right_column: "right" })).toBe("merge_timestamp_key=completed&merge_left_column=left&merge_right_column=right");
-    const valid = { family: "MERGE_CASE_RELATIONS", log: { traces: [{ case_id: "L1", events: [{ activity: "A", timestamp: "2024-01-01T00:00:00Z", resource: "", lifecycle: "", input_order: 0 }] }] } };
+    expect(caseRelationsQuery({ merge_variant: "pandas", merge_timestamp_key: "completed", merge_left_column: "left", merge_right_column: "right" })).toBe("merge_variant=pandas&merge_timestamp_key=completed&merge_left_column=left&merge_right_column=right");
+    const valid = { family: "MERGE_CASE_RELATIONS", variant: "pandas", log: { traces: [{ case_id: "L1", events: [{ activity: "A", timestamp: "2024-01-01T00:00:00Z", resource: "", lifecycle: "", input_order: 0 }] }] } };
     expect(isCaseRelationsResult(valid)).toBe(true);
     expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], events: [{ ...valid.log.traces[0].events[0], input_order: 0.5 }] }] } })).toBe(false);
     expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], attributes: [] }] } })).toBe(false);

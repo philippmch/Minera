@@ -204,8 +204,10 @@ export interface OrganizationalSnaOptions {
 
 export interface NetworkAnalysisEdge { source: string; target: string; activity: string; count: number; performance: number[]; }
 export interface NetworkAnalysisDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; link_count: number; row_count: number; performance_value_count: number; message: string; }
-export interface NetworkAnalysisResult { family: "NETWORK_ANALYSIS"; edges: NetworkAnalysisEdge[]; diagnostics: NetworkAnalysisDiagnostics; }
+export type NetworkAnalysisVariant = "dataframe";
+export interface NetworkAnalysisResult { family: "NETWORK_ANALYSIS"; variant: NetworkAnalysisVariant; edges: NetworkAnalysisEdge[]; diagnostics: NetworkAnalysisDiagnostics; }
 export interface NetworkAnalysisOptions {
+  network_analysis_variant?: NetworkAnalysisVariant;
   network_analysis_sorting_attribute?: string; network_analysis_timestamp_attribute?: string;
   network_analysis_source_node_attribute?: string; network_analysis_target_node_attribute?: string;
   network_analysis_edge_attribute?: string; network_analysis_edge_reference?: "_out" | "_in";
@@ -216,7 +218,7 @@ export interface NetworkAnalysisOptions {
 export function isNetworkAnalysisResult(value: unknown): value is NetworkAnalysisResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<NetworkAnalysisResult>;
-  if (v.family !== "NETWORK_ANALYSIS" || !Array.isArray(v.edges) || !v.diagnostics) return false;
+  if (v.family !== "NETWORK_ANALYSIS" || v.variant !== "dataframe" || !Array.isArray(v.edges) || !v.diagnostics) return false;
   if (!v.edges.every((e) => !!e && typeof e.source === "string" && typeof e.target === "string" && typeof e.activity === "string" && Number.isInteger(e.count) && e.count >= 0 && Array.isArray(e.performance) && e.performance.every((x) => typeof x === "number" && Number.isFinite(x)))) return false;
   const d = v.diagnostics as Partial<NetworkAnalysisDiagnostics>;
   return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && typeof d.message === "string";
@@ -245,12 +247,13 @@ export const isOrganizationalSna = isOrganizationalSnaResult;
 export interface RoleDiscoveryResource { name: string; count: number; }
 export interface DiscoveredRole { activities: string[]; resources: RoleDiscoveryResource[]; }
 export interface RoleDiscoveryDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; activity_count: number; resource_count: number; role_count: number; message: string; }
-export interface RoleDiscoveryResult { family: "ROLE_DISCOVERY"; roles: DiscoveredRole[]; diagnostics: RoleDiscoveryDiagnostics; }
-export interface RoleDiscoveryOptions { roles_threshold?: number; roles_max_resources?: number; roles_max_activities?: number; }
+export type RoleDiscoveryVariant = "log" | "pandas";
+export interface RoleDiscoveryResult { family: "ROLE_DISCOVERY"; variant: RoleDiscoveryVariant; roles: DiscoveredRole[]; diagnostics: RoleDiscoveryDiagnostics; }
+export interface RoleDiscoveryOptions { roles_variant?: RoleDiscoveryVariant; roles_threshold?: number; roles_max_resources?: number; roles_max_activities?: number; }
 export function isRoleDiscoveryResult(value: unknown): value is RoleDiscoveryResult {
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<RoleDiscoveryResult>;
-  if (c.family !== "ROLE_DISCOVERY" || !Array.isArray(c.roles) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
+  if (c.family !== "ROLE_DISCOVERY" || (c.variant !== "log" && c.variant !== "pandas") || !Array.isArray(c.roles) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
   if (!c.roles.every((r) => !!r && typeof r === "object" && Array.isArray(r.activities) && r.activities.every((a) => typeof a === "string") && Array.isArray(r.resources) && r.resources.every((x) => !!x && typeof x === "object" && typeof x.name === "string" && Number.isInteger(x.count) && (x.count as number) > 0))) return false;
   const d = c.diagnostics as Partial<RoleDiscoveryDiagnostics>;
   return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count, d.event_count, d.activity_count, d.resource_count, d.role_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
@@ -764,6 +767,7 @@ export interface CaseRelationsTrace {
 }
 export interface CaseRelationsResult {
   family: "MERGE_CASE_RELATIONS";
+  variant: "pandas";
   log: { traces: CaseRelationsTrace[]; attributes?: Record<string, string> };
 }
 function isStringRecord(value: unknown): value is Record<string, string> {
@@ -773,7 +777,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 export function isCaseRelationsResult(value: unknown): value is CaseRelationsResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CaseRelationsResult>;
-  if (candidate.family !== "MERGE_CASE_RELATIONS" || !candidate.log || typeof candidate.log !== "object" || !Array.isArray(candidate.log.traces)) return false;
+  if (candidate.family !== "MERGE_CASE_RELATIONS" || candidate.variant !== "pandas" || !candidate.log || typeof candidate.log !== "object" || !Array.isArray(candidate.log.traces)) return false;
   if (candidate.log.attributes !== undefined && !isStringRecord(candidate.log.attributes)) return false;
   return candidate.log.traces.every((trace) => {
     if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" || !Array.isArray(trace.events)) return false;

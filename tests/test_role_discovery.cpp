@@ -13,6 +13,7 @@ int main() {
   EventLog log{{Trace{"c", {Event{"c","A","","r1",0}, Event{"c","A","","r1",1}, Event{"c","B","","r1",2}, Event{"c","B","","r1",3}, Event{"c","B","","r2",4}}}}};
   RoleDiscoveryOptions merge_options; merge_options.threshold = 0.49;
   auto result = discover_roles(log, merge_options);
+  assert(result.variant == RoleDiscoveryVariant::kLog);
   assert(result.diagnostics.computed && result.roles.size() == 1);
   assert(result.roles[0].activities.size() == 2);
   assert(result.roles[0].resources[0].count == 4);
@@ -33,15 +34,18 @@ int main() {
 
   const auto parsed = parse_role_discovery_params(
       [](std::string_view name) {
+        if (name == "roles_variant") return std::string("pandas");
         if (name == "roles_threshold") return std::string("0.4");
         if (name == "roles_max_resources") return std::string("8");
         if (name == "roles_max_activities") return std::string("12");
         return std::string{};
       });
+  assert(parsed.variant == RoleDiscoveryVariant::kPandas);
   assert(parsed.threshold == 0.4 && parsed.max_resources == 8 &&
          parsed.max_activities == 12);
   const auto json = role_discovery_json(ordered);
   assert(json.find("\"family\":\"ROLE_DISCOVERY\"") != std::string::npos);
+  assert(json.find("\"variant\":\"log\"") != std::string::npos);
   assert(json.find("\"role_count\":3") != std::string::npos);
 
   bool threw = false; try { RoleDiscoveryOptions bad; bad.threshold = 2; const auto bad_result = discover_roles(log, bad); (void)bad_result; } catch (const std::invalid_argument&) { threw = true; }

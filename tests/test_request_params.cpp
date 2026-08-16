@@ -659,13 +659,13 @@ void interval_tree_params_contract() {
 
 void case_relations_params_contract() {
   const auto p = minera::parse_case_relations_params(
-      fields({{"merge_timestamp_key", "completed_at"}}));
+      fields({{"merge_variant", "pandas"}, {"merge_timestamp_key", "completed_at"}}));
+  assert(p.variant == minera::CaseRelationsVariant::kPandas);
   assert(p.timestamp_key == "completed_at");
   bool threw = false;
   try {
     (void)minera::parse_case_relations_params(
-        fields({{"merge_timestamp_key", ""}}),
-        [](std::string_view name) { return name == "merge_timestamp_key"; });
+        fields({{"merge_variant", "other"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -2638,12 +2638,15 @@ void organizational_sna_params_contract() {
 
 void role_discovery_params_contract() {
   const auto parsed = minera::parse_role_discovery_params(fields({
+      {"roles_variant", "pandas"},
       {"roles_threshold", "0.4"},
       {"roles_max_resources", "8"},
       {"roles_max_activities", "12"}}));
+  assert(parsed.variant == minera::RoleDiscoveryVariant::kPandas);
   assert(parsed.threshold == 0.4 && parsed.max_resources == 8 &&
          parsed.max_activities == 12);
-  for (const auto& item : {std::pair{"roles_threshold", "1.1"},
+  for (const auto& item : {std::pair{"roles_variant", "other"},
+                           std::pair{"roles_threshold", "1.1"},
                            std::pair{"roles_threshold", "nan"},
                            std::pair{"roles_max_resources", "0"},
                            std::pair{"roles_max_activities", "0"}}) {
