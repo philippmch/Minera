@@ -817,6 +817,11 @@ void parse_mine_params_maps_filters() {
       {"keep_attribute_values", "web, phone"},
       {"remove_attribute_values", "fax"},
       {"attribute_mode", "traces"},
+      {"numeric_attribute_key", "amount"},
+      {"numeric_attribute_min", "-2.5"},
+      {"numeric_attribute_max", "10"},
+      {"numeric_attribute_mode", "traces"},
+      {"numeric_attribute_positive", "false"},
       {"case_attribute_key", "region"},
       {"keep_case_attribute_values", "north, east"},
       {"remove_case_attribute_values", "south"},
@@ -881,6 +886,13 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.remove_attribute_values ==
           std::vector<std::string>{"fax"}));
   assert(params.filter.attribute_mode == minera::AttributeFilterMode::traces);
+  assert(params.filter.numeric_attribute.has_value());
+  assert(params.filter.numeric_attribute->attribute_key == "amount");
+  assert(params.filter.numeric_attribute->min_value == -2.5);
+  assert(params.filter.numeric_attribute->max_value == 10.0);
+  assert(params.filter.numeric_attribute->mode ==
+         minera::AttributeFilterMode::traces);
+  assert(!params.filter.numeric_attribute->positive);
   assert(params.filter.case_attribute_key == "region");
   assert((params.filter.keep_case_attribute_values ==
           std::vector<std::string>{"north", "east"}));
@@ -946,6 +958,41 @@ void parse_mine_params_rejects_invalid_case_selection_bounds() {
   try {
     (void)minera::parse_mine_params(fields({
         {"min_length", "5"}, {"max_length", "4"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_numeric_attribute_ranges() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"numeric_attribute_min", "nan"},
+           std::pair<std::string, std::string>{"numeric_attribute_mode", "bad"},
+           std::pair<std::string, std::string>{"numeric_attribute_positive", "maybe"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({
+          {"numeric_attribute_key", "amount"}, item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"numeric_attribute_key", "amount"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"numeric_attribute_key", "amount"},
+        {"numeric_attribute_min", "4"},
+        {"numeric_attribute_max", "3"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -2479,6 +2526,7 @@ int main() {
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_case_selection_bounds();
+  parse_mine_params_rejects_invalid_numeric_attribute_ranges();
   parse_mine_params_rejects_invalid_trace_patterns();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();

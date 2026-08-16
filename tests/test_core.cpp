@@ -3119,6 +3119,67 @@ void filter_case_selection_limits_cases_and_event_counts() {
   }));
 }
 
+void filter_numeric_attributes_support_event_and_trace_ranges() {
+  minera::EventLog log;
+  auto add = [&](std::string id, std::string value) {
+    minera::Trace trace;
+    trace.case_id = id;
+    minera::Event event{id, "A", "", "", 0, {}, ""};
+    if (!value.empty()) event.attributes.push_back({"score", value, {}});
+    trace.events.push_back(std::move(event));
+    log.traces.push_back(std::move(trace));
+  };
+  add("in", "3");
+  add("low", "1");
+  add("bad", "not-a-number");
+  add("missing", "");
+
+  minera::NumericAttributeFilterOptions range;
+  range.attribute_key = "score";
+  range.min_value = 2.0;
+  range.max_value = 4.0;
+  const auto events = minera::filter_numeric_attribute(log, range);
+  assert(events.trace_count() == 1);
+  assert(events.traces.front().case_id == "in");
+
+  range.positive = false;
+  const auto outside_events = minera::filter_numeric_attribute(log, range);
+  assert(outside_events.trace_count() == 1);
+  assert(outside_events.traces.front().case_id == "low");
+
+  range.mode = minera::AttributeFilterMode::traces;
+  range.positive = true;
+  const auto matching_cases = minera::filter_numeric_attribute(log, range);
+  assert(matching_cases.trace_count() == 1);
+  assert(matching_cases.traces.front().case_id == "in");
+
+  range.positive = false;
+  const auto nonmatching_cases = minera::filter_numeric_attribute(log, range);
+  assert(nonmatching_cases.trace_count() == 3);
+  assert(nonmatching_cases.traces[0].case_id == "low");
+  assert(nonmatching_cases.traces[1].case_id == "bad");
+  assert(nonmatching_cases.traces[2].case_id == "missing");
+
+  minera::LogFilterOptions integrated;
+  integrated.numeric_attribute = range;
+  integrated.numeric_attribute->positive = true;
+  integrated.numeric_attribute->mode = minera::AttributeFilterMode::events;
+  assert(integrated.any());
+  assert(minera::filter_event_log(log, integrated).trace_count() == 1);
+
+  assert(throws([&] {
+    minera::NumericAttributeFilterOptions invalid;
+    invalid.min_value = 2.0;
+    (void)minera::filter_numeric_attribute(log, invalid);
+  }));
+  assert(throws([&] {
+    auto invalid = range;
+    invalid.min_value = 5.0;
+    invalid.max_value = 4.0;
+    (void)minera::filter_numeric_attribute(log, invalid);
+  }));
+}
+
 void importer_rejects_malformed_rows() {
   // Too few fields for the declared header.
   assert(throws([] {
@@ -5219,6 +5280,7 @@ int main() {
   filter_time_range_rejects_a_malformed_bound();
   filter_case_performance_uses_inclusive_trace_duration();
   filter_case_selection_limits_cases_and_event_counts();
+  filter_numeric_attributes_support_event_and_trace_ranges();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();
   xes_export_round_trips_generic_attributes();

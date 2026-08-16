@@ -142,6 +142,27 @@ export function caseSelectionValidationMessage(input: {
   return null;
 }
 
+/** Numeric attribute ranges need a key and at least one finite bound. */
+export function numericAttributeValidationMessage(input: {
+  key: string;
+  min: string;
+  max: string;
+}): string | null {
+  const configured = input.key || input.min.trim() || input.max.trim();
+  if (!configured) return null;
+  if (!input.key) return "Numeric filtering needs an attribute key.";
+  if (!input.min.trim() && !input.max.trim())
+    return "Numeric filtering needs a minimum or maximum bound.";
+  const min = input.min.trim() ? Number(input.min) : undefined;
+  const max = input.max.trim() ? Number(input.max) : undefined;
+  if ((min !== undefined && !Number.isFinite(min)) ||
+      (max !== undefined && !Number.isFinite(max)))
+    return "Numeric attribute bounds must be finite numbers.";
+  if (min !== undefined && max !== undefined && min > max)
+    return "Numeric attribute minimum must not exceed the maximum.";
+  return null;
+}
+
 /** Repetition bounds are inclusive and default to [2, +infinity]. */
 export function repetitionValidationMessage(input: {
   value: string;
@@ -253,6 +274,13 @@ export function Filters({
   const [removedValues, setRemovedValues] = useState<Set<string>>(new Set());
   const [attributeMode, setAttributeMode] =
     useState<AttributeFilterMode>("events");
+  const [numericAttributeKey, setNumericAttributeKey] = useState("");
+  const [numericAttributeMin, setNumericAttributeMin] = useState("");
+  const [numericAttributeMax, setNumericAttributeMax] = useState("");
+  const [numericAttributeMode, setNumericAttributeMode] =
+    useState<AttributeFilterMode>("events");
+  const [numericAttributePositive, setNumericAttributePositive] =
+    useState(true);
   // Case-attribute filter: one key and its dropped values. Dropping a value
   // always removes the whole case — the attribute lives on the case itself.
   const [caseAttributeKey, setCaseAttributeKey] = useState("");
@@ -590,6 +618,11 @@ export function Filters({
     minLength,
     maxLength,
   });
+  const numericAttributeValidationError = numericAttributeValidationMessage({
+    key: numericAttributeKey,
+    min: numericAttributeMin,
+    max: numericAttributeMax,
+  });
   const repetitionValidationError = repetitionValidationMessage({
     value: repetitionValue,
     min: repetitionMin,
@@ -604,6 +637,7 @@ export function Filters({
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
         pathValidationError || caseDurationValidationError ||
         caseSelectionValidationError ||
+        numericAttributeValidationError ||
         repetitionValidationError || caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
@@ -676,6 +710,14 @@ export function Filters({
       maxCases: maxCases.trim() ? Number(maxCases) : undefined,
       minLength: minLength.trim() ? Number(minLength) : undefined,
       maxLength: maxLength.trim() ? Number(maxLength) : undefined,
+      numericAttributeKey: numericAttributeKey || undefined,
+      numericAttributeMin: numericAttributeKey && numericAttributeMin.trim()
+        ? Number(numericAttributeMin) : undefined,
+      numericAttributeMax: numericAttributeKey && numericAttributeMax.trim()
+        ? Number(numericAttributeMax) : undefined,
+      numericAttributeMode: numericAttributeKey ? numericAttributeMode : undefined,
+      numericAttributePositive: numericAttributeKey
+        ? numericAttributePositive : undefined,
       reworkActivity: reworkActivity || undefined,
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
@@ -879,6 +921,11 @@ export function Filters({
     setAttributeKey("");
     setRemovedValues(new Set());
     setAttributeMode("events");
+    setNumericAttributeKey("");
+    setNumericAttributeMin("");
+    setNumericAttributeMax("");
+    setNumericAttributeMode("events");
+    setNumericAttributePositive(true);
     setCaseAttributeKey("");
     setRemovedCaseValues(new Set());
     setNoiseThreshold("");
@@ -1007,6 +1054,11 @@ export function Filters({
     removedResources.size > 0 ||
     removedLifecycles.size > 0 ||
     attributeKey !== "" ||
+    numericAttributeKey !== "" ||
+    numericAttributeMin !== "" ||
+    numericAttributeMax !== "" ||
+    (numericAttributeKey !== "" && numericAttributeMode !== "events") ||
+    (numericAttributeKey !== "" && !numericAttributePositive) ||
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
@@ -2102,6 +2154,71 @@ export function Filters({
             </>
           )}
 
+          {attributes.length > 0 && (
+            <div className="filters-row">
+              <label className="filters-field">
+                <span>Numeric attribute</span>
+                <select
+                  value={numericAttributeKey}
+                  onChange={(e) => setNumericAttributeKey(e.target.value)}
+                >
+                  <option value="">off</option>
+                  {attributes.map((attribute) => (
+                    <option key={attribute.key} value={attribute.key}>
+                      {attribute.key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="filters-field">
+                <span>Numeric range applies to</span>
+                <select
+                  value={numericAttributeMode}
+                  onChange={(e) =>
+                    setNumericAttributeMode(e.target.value as AttributeFilterMode)
+                  }
+                >
+                  <option value="events">matching events</option>
+                  <option value="traces">whole cases with a match</option>
+                </select>
+              </label>
+              <label className="filters-field">
+                <span>Numeric polarity</span>
+                <select
+                  value={numericAttributePositive ? "keep" : "remove"}
+                  onChange={(e) => setNumericAttributePositive(e.target.value === "keep")}
+                >
+                  <option value="keep">keep in-range</option>
+                  <option value="remove">keep outside range</option>
+                </select>
+              </label>
+            </div>
+          )}
+          {numericAttributeKey && (
+            <div className="filters-row">
+              <label className="filters-field">
+                <span>Numeric minimum</span>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="unbounded"
+                  value={numericAttributeMin}
+                  onChange={(e) => setNumericAttributeMin(e.target.value)}
+                />
+              </label>
+              <label className="filters-field">
+                <span>Numeric maximum</span>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="unbounded"
+                  value={numericAttributeMax}
+                  onChange={(e) => setNumericAttributeMax(e.target.value)}
+                />
+              </label>
+            </div>
+          )}
+
           {caseAttributes.length > 0 && (
             <>
               <div className="filters-row">
@@ -2538,11 +2655,11 @@ export function Filters({
           </div>
 
           {(temporalValidationError || ltlValidationError || segmentValidationError ||
-            pathValidationError || caseDurationValidationError || caseSelectionValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError}</p>
+            pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError)}>
               Apply
             </button>
             <button

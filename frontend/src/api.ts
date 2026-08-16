@@ -292,6 +292,12 @@ export interface FilterOptions extends LtlFilterOptions {
   keepAttributeValues?: string[];
   removeAttributeValues?: string[];
   attributeMode?: AttributeFilterMode;
+  /** Inclusive numeric range over one generic event attribute. */
+  numericAttributeKey?: string;
+  numericAttributeMin?: number;
+  numericAttributeMax?: number;
+  numericAttributeMode?: AttributeFilterMode;
+  numericAttributePositive?: boolean;
   /** Case-attribute filter: the key and its value constraints; always
    * keeps or drops whole cases. */
   caseAttributeKey?: string;
@@ -544,6 +550,34 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
         "remove_case_attribute_values",
         options.removeCaseAttributeValues.join(","),
       );
+  }
+  const numericAttributeConfigured =
+    options.numericAttributeKey !== undefined ||
+    options.numericAttributeMin !== undefined ||
+    options.numericAttributeMax !== undefined ||
+    options.numericAttributeMode !== undefined ||
+    options.numericAttributePositive !== undefined;
+  if (numericAttributeConfigured) {
+    if (options.numericAttributeKey !== undefined)
+      add("numeric_attribute_key", options.numericAttributeKey);
+    if (options.numericAttributeMin !== undefined) {
+      if (!Number.isFinite(options.numericAttributeMin))
+        throw new Error("numericAttributeMin must be finite");
+      add("numeric_attribute_min", String(options.numericAttributeMin));
+    }
+    if (options.numericAttributeMax !== undefined) {
+      if (!Number.isFinite(options.numericAttributeMax))
+        throw new Error("numericAttributeMax must be finite");
+      add("numeric_attribute_max", String(options.numericAttributeMax));
+    }
+    if (options.numericAttributeMin !== undefined &&
+        options.numericAttributeMax !== undefined &&
+        options.numericAttributeMin > options.numericAttributeMax)
+      throw new Error("numericAttributeMin must not exceed numericAttributeMax");
+    if (options.numericAttributeMode !== undefined)
+      add("numeric_attribute_mode", options.numericAttributeMode);
+    if (options.numericAttributePositive !== undefined)
+      add("numeric_attribute_positive", String(options.numericAttributePositive));
   }
 
   // Miner settings. Zero is a meaningful heuristic threshold (unlike the

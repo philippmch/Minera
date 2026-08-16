@@ -1,9 +1,11 @@
 #include "minera/log_filter.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -323,6 +325,69 @@ bool case_size_matches(const Trace& trace, const CaseSizeFilterOptions& options)
   return true;
 }
 
+std::optional<double> numeric_attribute_value(const Event& event,
+                                              std::string_view key) {
+  const auto* text = event.attribute(key);
+  if (!text || text->empty()) return std::nullopt;
+  char* end = nullptr;
+  errno = 0;
+  const double value = std::strtod(text->c_str(), &end);
+  if (end != text->c_str() + text->size() || errno == ERANGE ||
+      !std::isfinite(value)) {
+    return std::nullopt;
+  }
+  return value;
+}
+
+void validate_numeric_attribute_options(
+    const NumericAttributeFilterOptions& options) {
+  if (options.attribute_key.empty()) {
+    throw std::invalid_argument(
+        "numeric attribute filter: an attribute key is required");
+  }
+  if (!options.min_value && !options.max_value) {
+    throw std::invalid_argument(
+        "numeric attribute filter: at least one bound is required");
+  }
+  if (options.min_value && !std::isfinite(*options.min_value)) {
+    throw std::invalid_argument(
+        "numeric attribute filter: minimum must be finite");
+  }
+  if (options.max_value && !std::isfinite(*options.max_value)) {
+    throw std::invalid_argument(
+        "numeric attribute filter: maximum must be finite");
+  }
+  if (options.max_value && options.min_value &&
+      *options.min_value > *options.max_value) {
+    throw std::invalid_argument(
+        "numeric attribute filter: minimum must not exceed the maximum");
+  }
+}
+
+bool numeric_attribute_in_range(const Event& event,
+                                const NumericAttributeFilterOptions& options) {
+  const auto value = numeric_attribute_value(event, options.attribute_key);
+  if (!value) return false;
+  if (options.min_value && *value < *options.min_value) return false;
+  if (options.max_value && *value > *options.max_value) return false;
+  return true;
+}
+
+bool numeric_attribute_event_survives(
+    const Event& event, const NumericAttributeFilterOptions& options) {
+  if (!numeric_attribute_value(event, options.attribute_key)) return false;
+  return numeric_attribute_in_range(event, options) == options.positive;
+}
+
+bool numeric_trace_matches(const Trace& trace,
+                           const NumericAttributeFilterOptions& options) {
+  const bool found = std::any_of(
+      trace.events.begin(), trace.events.end(), [&](const Event& event) {
+        return numeric_attribute_in_range(event, options);
+      });
+  return found == options.positive;
+}
+
 }  // namespace
 
 std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
@@ -448,6 +513,30 @@ EventLog filter_case_size(const EventLog& event_log, std::size_t min_length,
       event_log, CaseSizeFilterOptions{min_length, max_length});
 }
 
+EventLog filter_numeric_attribute(
+    const EventLog& event_log,
+    const NumericAttributeFilterOptions& options) {
+  validate_numeric_attribute_options(options);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    if (options.mode == AttributeFilterMode::traces) {
+      if (numeric_trace_matches(trace, options) && !trace.events.empty())
+        result.traces.push_back(trace);
+      continue;
+    }
+    Trace projected;
+    projected.case_id = trace.case_id;
+    projected.attributes = trace.attributes;
+    for (const auto& event : trace.events) {
+      if (numeric_attribute_event_survives(event, options))
+        projected.events.push_back(event);
+    }
+    if (!projected.events.empty()) result.traces.push_back(std::move(projected));
+  }
+  return result;
+}
+
 EventLog filter_ncases(const EventLog& event_log, std::size_t max_cases) {
   EventLog result;
   result.attributes = event_log.attributes;
@@ -479,6 +568,9 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       attribute.active() && options.attribute_mode == AttributeFilterMode::events
           ? &attribute
           : nullptr;
+
+  if (options.numeric_attribute)
+    validate_numeric_attribute_options(*options.numeric_attribute);
 
   const AttributeMatcher case_attribute{
       options.case_attribute_key,
@@ -571,6 +663,23 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     if (by_case_performance &&
         !case_duration_matches(trace, case_performance)) {
       continue;
+    }
+
+    Trace numeric_projected;
+    if (options.numeric_attribute) {
+      const auto& numeric = *options.numeric_attribute;
+      if (numeric.mode == AttributeFilterMode::traces) {
+        if (!numeric_trace_matches(*source, numeric)) continue;
+      } else {
+        numeric_projected.case_id = source->case_id;
+        numeric_projected.attributes = source->attributes;
+        for (const auto& event : source->events) {
+          if (numeric_attribute_event_survives(event, numeric))
+            numeric_projected.events.push_back(event);
+        }
+        if (numeric_projected.events.empty()) continue;
+        source = &numeric_projected;
+      }
     }
 
     Trace projected = project_events(*source, keep, remove, keep_res,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   caseDurationValidationMessage,
   caseSelectionValidationMessage,
+  numericAttributeValidationMessage,
 } from "./components/Filters";
 
 describe("case duration filter validation", () => {
@@ -30,5 +31,19 @@ describe("case count and size filter validation", () => {
     expect(caseSelectionValidationMessage({ maxCases: "1.5", minLength: "", maxLength: "" })).toMatch(/integer/);
     expect(caseSelectionValidationMessage({ maxCases: "-1", minLength: "", maxLength: "" })).toMatch(/non-negative/);
     expect(caseSelectionValidationMessage({ maxCases: "", minLength: "5", maxLength: "4" })).toMatch(/not exceed/);
+  });
+});
+
+describe("numeric attribute filter validation", () => {
+  it("accepts inclusive one-sided ranges", () => {
+    expect(numericAttributeValidationMessage({ key: "amount", min: "", max: "10" })).toBeNull();
+    expect(numericAttributeValidationMessage({ key: "amount", min: "-2", max: "10" })).toBeNull();
+  });
+
+  it("rejects missing keys, missing bounds, and reversed ranges", () => {
+    expect(numericAttributeValidationMessage({ key: "", min: "1", max: "2" })).toMatch(/key/);
+    expect(numericAttributeValidationMessage({ key: "amount", min: "", max: "" })).toMatch(/bound/);
+    expect(numericAttributeValidationMessage({ key: "amount", min: "3", max: "2" })).toMatch(/not exceed/);
+    expect(numericAttributeValidationMessage({ key: "amount", min: "nan", max: "" })).toMatch(/finite/);
   });
 });
