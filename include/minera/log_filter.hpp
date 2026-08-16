@@ -44,6 +44,23 @@ struct ActivityPair {
   std::string successor;
 };
 
+// An admitted trace pattern is an activity sequence. The special activity
+// token "..." matches zero or more activities, so patterns can describe an
+// exact variant ("A,B"), a prefix ("A,B,..."), a suffix ("...,A,B"), or an
+// infix ("...,A,B,..."). Literal activities are matched exactly.
+using TracePattern = std::vector<std::string>;
+
+// Parses semicolon-separated trace patterns. Within each pattern, activities
+// are comma-separated and surrounding whitespace is ignored. Empty patterns
+// or activity tokens are rejected; "..." is the only wildcard token.
+[[nodiscard]] std::vector<TracePattern> parse_trace_patterns(
+    std::string_view text);
+
+struct TracePatternFilterOptions {
+  std::vector<TracePattern> patterns;
+  bool positive = true;
+};
+
 // Parses a comma-separated list of successions ("a -> b, c -> d") into
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
@@ -135,6 +152,13 @@ struct LogFilterOptions {
   std::vector<ActivityPair> keep_eventually_follows;
   std::vector<ActivityPair> remove_eventually_follows;
 
+  // Trace-pattern filtering. Any admitted pattern may match. A positive
+  // filter keeps matching traces; a negative filter keeps non-matching ones.
+  // Patterns are judged after the ordinary event projection and before the
+  // remaining case-level filters.
+  std::vector<TracePattern> trace_patterns;
+  bool trace_pattern_positive = true;
+
   // Prefix/suffix cuts: reduce each case to its head up to the first
   // occurrence of `prefix_activity`, and/or its tail from the first
   // occurrence of `suffix_activity` — the anchor event included on both
@@ -201,6 +225,7 @@ struct LogFilterOptions {
            !remove_directly_follows.empty() ||
            !keep_eventually_follows.empty() ||
            !remove_eventually_follows.empty() ||
+           !trace_patterns.empty() ||
            !prefix_activity.empty() || !suffix_activity.empty() ||
            !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
@@ -228,5 +253,14 @@ struct LogFilterOptions {
 // requested filters. Traces left empty by activity projection are dropped.
 [[nodiscard]] EventLog filter_event_log(const EventLog& event_log,
                                         const LogFilterOptions& options);
+
+// Standalone trace-pattern filter preserving log- and trace-level metadata.
+[[nodiscard]] EventLog filter_trace_patterns(
+    const EventLog& event_log, const TracePatternFilterOptions& options);
+
+[[nodiscard]] inline EventLog trace_filter(
+    const EventLog& event_log, const TracePatternFilterOptions& options) {
+  return filter_trace_patterns(event_log, options);
+}
 
 }  // namespace minera

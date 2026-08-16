@@ -819,6 +819,8 @@ void parse_mine_params_maps_filters() {
       {"remove_case_attribute_values", "south"},
       {"keep_directly_follows", "a -> b, b->c"},
       {"remove_eventually_follows", "a -> d"},
+      {"trace_patterns", "a,b,...;...,x,y"},
+      {"trace_pattern_positive", "false"},
       {"prefix_activity", "c"},
       {"suffix_activity", "a"},
       {"variant_coverage", "0.8"},
@@ -885,10 +887,31 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.keep_directly_follows[1].successor == "c");
   assert(params.filter.remove_eventually_follows.size() == 1);
   assert(params.filter.remove_eventually_follows[0].successor == "d");
+  assert(params.filter.trace_patterns.size() == 2);
+  assert((params.filter.trace_patterns[0] ==
+          minera::TracePattern{"a", "b", "..."}));
+  assert((params.filter.trace_patterns[1] ==
+          minera::TracePattern{"...", "x", "y"}));
+  assert(!params.filter.trace_pattern_positive);
   assert(params.filter.prefix_activity == "c");
   assert(params.filter.suffix_activity == "a");
   assert(params.filter.variant_coverage == 0.8);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_invalid_trace_patterns() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"trace_patterns", "a,,b"},
+           std::pair<std::string, std::string>{"trace_pattern_positive", "maybe"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_a_malformed_succession() {
@@ -2401,6 +2424,7 @@ int main() {
   parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
+  parse_mine_params_rejects_invalid_trace_patterns();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();
   parse_mine_params_rejects_invalid_case_grouping_fields();
