@@ -18,6 +18,15 @@ constexpr std::size_t kHardGap = 10000;
 
 using Pair = std::pair<std::size_t, std::size_t>;
 
+bool handover_variant(OrganizationalSnaVariant variant) {
+  return variant == OrganizationalSnaVariant::kHandover ||
+         variant == OrganizationalSnaVariant::kHandoverPandas;
+}
+bool subcontracting_variant(OrganizationalSnaVariant variant) {
+  return variant == OrganizationalSnaVariant::kSubcontracting ||
+         variant == OrganizationalSnaVariant::kSubcontractingPandas;
+}
+
 std::vector<std::size_t> resource_ids(const Trace& trace,
                                       const std::unordered_map<std::string, std::size_t>& ids) {
   std::vector<std::size_t> result;
@@ -57,8 +66,8 @@ OrganizationalSnaResult discover_organizational_sna(
 
   OrganizationalSnaResult result;
   result.variant = options.variant;
-  result.directed = options.variant == OrganizationalSnaVariant::kHandover ||
-                    options.variant == OrganizationalSnaVariant::kSubcontracting;
+  result.directed = handover_variant(options.variant) ||
+                    subcontracting_variant(options.variant);
   result.diagnostics.trace_count = log.trace_count();
   result.diagnostics.event_count = log.event_count();
   std::set<std::string> names;
@@ -75,7 +84,8 @@ OrganizationalSnaResult discover_organizational_sna(
 
   std::map<Pair, double> weights;
   switch (options.variant) {
-    case OrganizationalSnaVariant::kHandover: {
+    case OrganizationalSnaVariant::kHandover:
+    case OrganizationalSnaVariant::kHandoverPandas: {
       std::map<std::vector<std::string>, std::size_t> variants;
       for (const auto& trace : log.traces) {
         std::vector<std::string> sequence;
@@ -105,7 +115,8 @@ OrganizationalSnaResult discover_organizational_sna(
         for (auto& [pair, weight] : weights) { (void)pair; weight /= dividend; }
       break;
     }
-    case OrganizationalSnaVariant::kWorkingTogether: {
+    case OrganizationalSnaVariant::kWorkingTogether:
+    case OrganizationalSnaVariant::kWorkingTogetherPandas: {
       if (log.trace_count() != 0) {
         const double normalizer = 1.0 / static_cast<double>(log.trace_count());
         for (const auto& trace : log.traces) {
@@ -122,7 +133,8 @@ OrganizationalSnaResult discover_organizational_sna(
       }
       break;
     }
-    case OrganizationalSnaVariant::kSubcontracting: {
+    case OrganizationalSnaVariant::kSubcontracting:
+    case OrganizationalSnaVariant::kSubcontractingPandas: {
       for (const auto& trace : log.traces) {
         std::vector<std::string> events;
         for (const auto& event : trace.events) events.push_back(event.resource);
@@ -141,7 +153,8 @@ OrganizationalSnaResult discover_organizational_sna(
         for (auto& [pair, weight] : weights) { (void)pair; weight /= log.trace_count(); }
       break;
     }
-    case OrganizationalSnaVariant::kJointActivities: {
+    case OrganizationalSnaVariant::kJointActivities:
+    case OrganizationalSnaVariant::kJointActivitiesPandas: {
       std::set<std::string> activity_names;
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events)

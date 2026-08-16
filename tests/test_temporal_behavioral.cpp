@@ -226,6 +226,16 @@ int main() {
   assert(discovered.groups[0].event_count == 4);
   assert(discovered.groups[0].resource.empty());
   assert(discovered.groups[1].batch_count == 1);
+  for (const auto variant : {minera::BatchDiscoveryVariant::kPandas,
+                             minera::BatchDiscoveryVariant::kPolars}) {
+    auto adapter_options = batch_options;
+    adapter_options.variant = variant;
+    const auto adapter_result =
+        minera::discover_batches(batch_log, adapter_options);
+    assert(adapter_result.variant == variant);
+    assert(adapter_result.groups.size() == discovered.groups.size());
+    assert(adapter_result.groups[0].event_count == discovered.groups[0].event_count);
+  }
   auto min_three = batch_options;
   min_three.min_batch_size = 3;
   const auto size_filtered = minera::discover_batches(batch_log, min_three);

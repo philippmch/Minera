@@ -732,14 +732,14 @@ describe("mineFormEntries", () => {
       spectrumSampleSize: 3, spectrumSortLog: false,
       spectrumActivityKey: "phase", spectrumTimestampKey: "occurred_at",
       spectrumCaseIdKey: "case_ref",
-      batches: true, batchMergeDistanceSeconds: 12, batchMinSize: 4,
+      batches: true, batchVariant: "polars", batchMergeDistanceSeconds: 12, batchMinSize: 4,
       batchStartTimestampAttribute: "started_at",
     })).toEqual([
       ["spectrum_activities", "A,B"], ["spectrum_variant", "disconnected"],
       ["spectrum_sample_size", "3"], ["spectrum_sort_log", "false"],
       ["spectrum_activity_key", "phase"], ["spectrum_timestamp_key", "occurred_at"],
       ["spectrum_case_id_key", "case_ref"],
-      ["batches", "true"], ["batch_merge_distance_seconds", "12"],
+      ["batches", "true"], ["batch_variant", "polars"], ["batch_merge_distance_seconds", "12"],
       ["batch_min_size", "4"], ["batch_start_timestamp_attribute", "started_at"],
     ]);
     expect(mineFormEntries({ spectrumActivities: ["A"], spectrumSampleSize: 10000, spectrumSortLog: true, batches: true, batchMergeDistanceSeconds: 900, batchMinSize: 2 })).toEqual([["batches", "true"]]);

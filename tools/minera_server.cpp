@@ -227,6 +227,12 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("entire_event_log")) {
     analysis.entire_event_log = log_fp;
   }
+  if (options.discovery_variants.contains("entire_dataframe")) {
+    analysis.entire_dataframe = log_fp;
+  }
+  if (options.discovery_variants.contains("polars_lazyframes")) {
+    analysis.polars_lazyframes = log_fp;
+  }
   if (options.discovery_variants.contains("trace_by_trace")) {
     analysis.trace_by_trace = traces();
   }

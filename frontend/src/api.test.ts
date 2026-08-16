@@ -754,6 +754,8 @@ describe("organizational SNA API", () => {
   it("serializes bounded metric options", () => {
     expect(organizationalSnaQuery({ sna_variant: "working_together", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
       .toBe("sna_variant=working_together&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
+    expect(organizationalSnaQuery({ sna_variant: "jointactivities_pandas", sna_beta: 0.25 }))
+      .toBe("sna_variant=jointactivities_pandas&sna_beta=0.25");
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "bad" }), { status: 200 })));

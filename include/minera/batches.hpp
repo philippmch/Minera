@@ -21,6 +21,20 @@ enum class BatchType {
   concurrent = kConcurrent,
 };
 
+// The log, pandas, and polars entry points share the same deterministic
+// interval semantics in the native adapter. Keeping the variation explicit
+// preserves the public selector vocabulary without requiring a columnar
+// runtime in the core library.
+enum class BatchDiscoveryVariant {
+  kLog,
+  kPandas,
+  kPolars,
+
+  LOG = kLog,
+  PANDAS = kPandas,
+  POLARS = kPolars,
+};
+
 struct BatchEvent {
   double start = 0.0;
   double complete = 0.0;
@@ -45,6 +59,7 @@ struct BatchGroup {
 };
 
 struct BatchDiscoveryOptions {
+  BatchDiscoveryVariant variant = BatchDiscoveryVariant::kLog;
   double merge_distance_seconds = 900.0;
   std::size_t min_batch_size = 2;
   // Empty means use the event timestamp as completion and start.
@@ -53,6 +68,7 @@ struct BatchDiscoveryOptions {
 
 struct BatchDiscovery {
   BatchDiscoveryOptions options;
+  BatchDiscoveryVariant variant = BatchDiscoveryVariant::kLog;
   std::vector<BatchGroup> groups;
 };
 

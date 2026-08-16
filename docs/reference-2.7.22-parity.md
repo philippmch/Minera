@@ -628,16 +628,19 @@ parameter rejection, candidate caps, and malformed frontend responses.
 The organizational SNA vertical exposes the four log variants as a separate
 deterministic contract: normalized directed handover and subcontracting
 weights, symmetric per-trace working-together weights, and symmetric Pearson
-joint-activities weights. Resource names and edge records are sorted for stable
-JSON; blank resources are excluded from the resource alphabet while empty or
-resource-less traces remain part of trace-count denominators. Handover beta,
-subcontracting distance, optional metric normalization, and output safety caps
-are strictly validated.
+joint-activities weights. Each variant is available through both the native
+log path and explicit `_pandas` adapter selectors, with the same validated
+semantics and deterministic output. Resource names and edge records are sorted
+for stable JSON; blank resources are excluded from the resource alphabet while
+empty or resource-less traces remain part of trace-count denominators. Handover
+beta, subcontracting distance, optional metric normalization, and output safety
+caps are strictly validated.
 
 Native tests cover repeated resources, normalized boundaries, symmetric output,
-degenerate correlations, truncation, and parser rejection. Standalone JSON,
-CLI flags, cached-session server routes, and frontend query/result guards cover
-all four selectable variants. Deterministic role discovery is also exposed via
+degenerate correlations, truncation, and parser rejection across the four
+`_pandas` selectors as well as their log counterparts. Standalone JSON, CLI
+flags, cached-session server routes, and frontend query/result guards cover all
+eight selectable variant names. Deterministic role discovery is also exposed via
 the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; local diagnostics
 and network analysis are documented below.
 
@@ -1083,7 +1086,9 @@ longest-subpattern semantics and documents that repair rather than reproducing
 the wrapper defect. Columnar and lazyframe implementations otherwise remain
 input adapters to the native behavior.
 
-Batch discovery groups events by activity and resource, using completion time
+Batch discovery exposes LOG, PANDAS, and POLARS selectors over the same
+deterministic interval core. Each variant groups events by activity and
+resource, using completion time
 as the default start or a configured interval-start attribute. It first merges
 strictly overlapping intervals transitively, then merges non-overlapping
 intervals whose gap is at most the configured distance. Groups smaller than
@@ -1094,9 +1099,11 @@ number of member events and retains trace/event identities so duplicate
 timestamp/case tuples are not collapsed.
 
 Spectrum variant, sampling, sorting, selected activity/timestamp/case-id
-attributes, batch enablement, merge distance, minimum size, and start attribute
-are available through strict request parsing, CLI, local server, deterministic
-prevalidated JSON, and frontend controls.
+attributes, batch variant/enablement, merge distance, minimum size, and start
+attribute are available through strict request parsing, CLI, local server,
+deterministic prevalidated JSON, and frontend controls. Batch JSON retains the
+selected variant name, while footprint JSON keeps separate dataframe and
+lazyframe discovery keys for adapter callers.
 Disconnected observations retain their per-point labels and explicit requested
 pattern offset in the JSON/UI, including when activity labels repeat. Batch
 JSON/UI exposes all five categories, group batch/event counts, resources,
@@ -1105,8 +1112,8 @@ ranges, and case evidence.
 Focused regressions cover stable sorting and its disable switch, overlapping
 connected windows, full and partial disconnected matches, loops, non-adjacent
 rejection, longest-first suppression, exact midpoint/extreme sampling, all five
-batch types, strict-overlap/touching/gap/transitive merging, custom starts,
-minimum size, empty resources, duplicate event identities, malformed
+batch types and all three batch selectors, strict-overlap/touching/gap/transitive
+merging, custom starts, minimum size, empty resources, duplicate event identities, malformed
 timestamps/options, JSON rejection before output, request boundaries, and
 frontend rendering.
 

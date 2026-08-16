@@ -27,6 +27,17 @@ int main() {
   assert(handover.resources[0] == "alice");
   assert(std::isfinite(handover.edges.front().weight));
   assert(handover.directed);
+  for (const auto variant : {minera::OrganizationalSnaVariant::kHandoverPandas,
+                             minera::OrganizationalSnaVariant::kWorkingTogetherPandas,
+                             minera::OrganizationalSnaVariant::kSubcontractingPandas,
+                             minera::OrganizationalSnaVariant::kJointActivitiesPandas}) {
+    auto adapter_options = options;
+    adapter_options.variant = variant;
+    const auto adapter_result =
+        minera::discover_organizational_sna(sample(), adapter_options);
+    assert(adapter_result.variant == variant);
+    assert(adapter_result.resources == handover.resources);
+  }
 
   options.beta = 0.0;
   const auto adjacent = minera::discover_organizational_sna(sample(), options);

@@ -48,6 +48,11 @@ BatchType classify(const std::vector<BatchEvent>& events) {
 
 BatchDiscovery discover_batches(const EventLog& log,
                                  BatchDiscoveryOptions options) {
+  if (options.variant != BatchDiscoveryVariant::kLog &&
+      options.variant != BatchDiscoveryVariant::kPandas &&
+      options.variant != BatchDiscoveryVariant::kPolars) {
+    throw std::invalid_argument("batches: unknown discovery variant");
+  }
   if (!std::isfinite(options.merge_distance_seconds) ||
       options.merge_distance_seconds < 0.0) {
     throw std::invalid_argument("batches: merge distance must be finite and non-negative");
@@ -144,7 +149,7 @@ BatchDiscovery discover_batches(const EventLog& log,
     if (a.batch_count != b.batch_count) return a.batch_count > b.batch_count;
     return std::tie(a.activity, a.resource) > std::tie(b.activity, b.resource);
   });
-  return BatchDiscovery{std::move(options), std::move(result)};
+  return BatchDiscovery{options, options.variant, std::move(result)};
 }
 
 }  // namespace minera
