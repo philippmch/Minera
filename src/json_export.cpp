@@ -2856,7 +2856,8 @@ void write_analysis_json(std::ostream& out,
                              interval_event_overlap_counts,
                          const CaseOverlapCounts* case_overlap_counts,
                          const ConcurrentActivityOverlapResult*
-                             concurrent_activity_overlap) {
+                             concurrent_activity_overlap,
+                         const DecisionTablesResult* decision_tables) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -3162,6 +3163,10 @@ void write_analysis_json(std::ostream& out,
     write_overlap(out, interval_event_overlap_counts, case_overlap_counts,
                   concurrent_activity_overlap);
   }
+  if (decision_tables != nullptr) {
+    out << ",\n  \"decision_tables\": "
+        << serialize_decision_tables_json(*decision_tables);
+  }
   out << '\n';
   out << "}\n";
 }
@@ -3219,7 +3224,8 @@ std::string analysis_json(std::string_view dataset,
                               interval_event_overlap_counts,
                           const CaseOverlapCounts* case_overlap_counts,
                           const ConcurrentActivityOverlapResult*
-                              concurrent_activity_overlap) {
+                              concurrent_activity_overlap,
+                          const DecisionTablesResult* decision_tables) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -3236,7 +3242,8 @@ std::string analysis_json(std::string_view dataset,
                       petri_anti_alignment, petri_multi_alignment,
                       reduced_process_tree, reduced_trace_index, evaluation,
                       earth_movers_distance, interval_event_overlap_counts,
-                      case_overlap_counts, concurrent_activity_overlap);
+                      case_overlap_counts, concurrent_activity_overlap,
+                      decision_tables);
   return out.str();
 }
 

@@ -7,6 +7,7 @@ import {
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
   FOOTPRINTS_DISCOVERY_VARIANTS,
   type Decisions,
+  type DecisionTablesResult,
   type DataPetriNetResult,
   type MineraExport,
   type ModelConformance,
@@ -82,6 +83,7 @@ import {
   isStreamingTemporalResult,
   isStreamingTbrResult,
   isDataPetriNetResult,
+  isDecisionTablesResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
   isILPMinerResult,
@@ -2001,6 +2003,19 @@ export async function fetchXes(): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+/** Requests the encoded decision tables for one cached model. */
+export function requestDecisionTables(
+  miner = "inductive",
+): Promise<DecisionTablesResult> {
+  if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
+  const query = new URLSearchParams({ miner });
+  return postChecked(
+    `/api/decision-tables?${query.toString()}`,
+    isDecisionTablesResult,
+    "decision tables",
+  );
 }
 
 /** Requests a guarded data-Petri-net projection of the latest cached model. */

@@ -32,6 +32,7 @@
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
 #include "minera/decision_mining.hpp"
+#include "minera/decision_table.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/dfg_playout.hpp"
@@ -124,6 +125,17 @@ std::vector<std::string> split_csv(std::string_view value) {
     }
   }
   return parts;
+}
+
+const minera::PetriNet* select_decision_model(
+    std::string_view miner, const minera::PetriNet& inductive,
+    const minera::PetriNet& alpha, const minera::PetriNet& heuristic,
+    const minera::PetriNet& powl) {
+  if (miner == "inductive") return &inductive;
+  if (miner == "alpha") return &alpha;
+  if (miner == "heuristic") return &heuristic;
+  if (miner == "powl") return &powl;
+  return nullptr;
 }
 
 std::vector<std::string> canonical_dfg_variants(
@@ -839,6 +851,10 @@ int usage(const char* program) {
                "                            or powl): which attribute values\n"
                "                            steer a case down which branch;\n"
                "                            embedded under \"decisions\"\n"
+               "  --decision-tables <miner> Mine encoded decision tables for one\n"
+               "                            model (inductive, alpha, heuristic,\n"
+               "                            or powl); embedded under\n"
+               "                            \"decision_tables\"\n"
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
@@ -984,6 +1000,7 @@ int main(int argc, char** argv) {
   std::string bpmn_miner = "inductive";
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
+  std::string decision_tables_miner;  // empty = no decision-table mining
   bool no_alignments = false;
   bool align_process_tree = false;
   std::map<std::string, std::string> pt_alignment_fields;
@@ -2220,10 +2237,14 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       process_tree_playout_fields.insert_or_assign(std::move(key), value);
       process_tree_playout_options_used = true;
-    } else if (arg == "--decisions") {
+    } else if (arg == "--decisions" || arg == "--decision-tables") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      decisions_miner = value;
+      if (arg == "--decisions") {
+        decisions_miner = value;
+      } else {
+        decision_tables_miner = value;
+      }
     } else if (arg == "--no-alignments") {
       no_alignments = true;
     } else if (arg == "--align-process-tree") {
@@ -4307,16 +4328,9 @@ int main(int argc, char** argv) {
     // Optionally mine the decision points of one model's net.
     std::optional<minera::DecisionMiningResult> decisions;
     if (!decisions_miner.empty()) {
-      const minera::PetriNet* selected = nullptr;
-      if (decisions_miner == "inductive") {
-        selected = &inductive_net;
-      } else if (decisions_miner == "alpha") {
-        selected = &net;
-      } else if (decisions_miner == "heuristic") {
-        selected = &heuristic_net;
-      } else if (decisions_miner == "powl") {
-        selected = &powl_net;
-      } else {
+      const auto* selected = select_decision_model(
+          decisions_miner, inductive_net, net, heuristic_net, powl_net);
+      if (selected == nullptr) {
         std::cerr << "error: unknown --decisions miner '" << decisions_miner
                   << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
@@ -4326,6 +4340,20 @@ int main(int argc, char** argv) {
     }
     const minera::DecisionMiningResult* decisions_ptr =
         decisions ? &*decisions : nullptr;
+    std::optional<minera::DecisionTablesResult> decision_tables;
+    if (!decision_tables_miner.empty()) {
+      const auto* selected = select_decision_model(
+          decision_tables_miner, inductive_net, net, heuristic_net, powl_net);
+      if (selected == nullptr) {
+        std::cerr << "error: unknown --decision-tables miner '"
+                  << decision_tables_miner
+                  << "' (expected inductive, alpha, heuristic, or powl)\n";
+        return 2;
+      }
+      decision_tables = minera::mine_decision_tables(log, *selected);
+    }
+    const auto* decision_tables_ptr =
+        decision_tables ? &*decision_tables : nullptr;
 
     // Frequency/performance annotations for every miner's Petri-net view —
     // the inductive net fits by construction, so its overlay always has data
@@ -4424,7 +4452,8 @@ int main(int argc, char** argv) {
           overlap_interval_events ? &*overlap_interval_events : nullptr,
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
-                                        : nullptr);
+                                        : nullptr,
+          decision_tables_ptr);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -4460,7 +4489,8 @@ int main(int argc, char** argv) {
           overlap_interval_events ? &*overlap_interval_events : nullptr,
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
-                                        : nullptr);
+                                        : nullptr,
+          decision_tables_ptr);
     }
 
     // Optionally emit one discovered model as standard PNML.
