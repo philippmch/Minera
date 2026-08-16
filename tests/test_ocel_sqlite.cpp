@@ -36,6 +36,64 @@ void exec_sql(sqlite3* db, const char* sql) {
     assert(false);
   }
 }
+
+std::string first_text(sqlite3* db, const std::string& sql,
+                       const std::string& parameter) {
+  sqlite3_stmt* statement = nullptr;
+  assert(sqlite3_prepare_v2(db, sql.c_str(), -1, &statement, nullptr) ==
+         SQLITE_OK);
+  assert(sqlite3_bind_text(statement, 1, parameter.c_str(), -1,
+                           SQLITE_TRANSIENT) == SQLITE_OK);
+  assert(sqlite3_step(statement) == SQLITE_ROW);
+  const auto* value = sqlite3_column_text(statement, 0);
+  const std::string result = value == nullptr
+                                 ? std::string{}
+                                 : std::string(reinterpret_cast<const char*>(value));
+  assert(sqlite3_finalize(statement) == SQLITE_OK);
+  return result;
+}
+
+void assert_standard_type_tables(const std::filesystem::path& path) {
+  sqlite3* db = nullptr;
+  assert(sqlite3_open_v2(path.string().c_str(), &db, SQLITE_OPEN_READONLY,
+                         nullptr) == SQLITE_OK);
+  const auto event_token = first_text(
+      db, "SELECT ocel_type_map FROM event_map_type WHERE ocel_type=?1",
+      "Create");
+  const auto object_token = first_text(
+      db, "SELECT ocel_type_map FROM object_map_type WHERE ocel_type=?1",
+      "sales:order");
+  sqlite3_stmt* event_statement = nullptr;
+  const auto event_query = "SELECT amount, note, empty FROM event_" + event_token;
+  assert(sqlite3_prepare_v2(db, event_query.c_str(), -1, &event_statement,
+                            nullptr) == SQLITE_OK);
+  assert(sqlite3_step(event_statement) == SQLITE_ROW);
+  assert(sqlite3_column_double(event_statement, 0) == 2.5);
+  assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(event_statement, 1))) ==
+         "quoted value");
+  assert(sqlite3_column_type(event_statement, 2) == SQLITE_NULL);
+  assert(sqlite3_finalize(event_statement) == SQLITE_OK);
+
+  sqlite3_stmt* object_statement = nullptr;
+  const auto object_query = "SELECT status, ocel_changed_field, \"@@cumcount\" FROM object_" + object_token +
+                             " ORDER BY \"@@cumcount\"";
+  assert(sqlite3_prepare_v2(db, object_query.c_str(), -1, &object_statement,
+                            nullptr) == SQLITE_OK);
+  assert(sqlite3_step(object_statement) == SQLITE_ROW);
+  assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 0))) ==
+         "open");
+  assert(sqlite3_column_type(object_statement, 1) == SQLITE_NULL);
+  assert(sqlite3_column_int64(object_statement, 2) == 0);
+  assert(sqlite3_step(object_statement) == SQLITE_ROW);
+  assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 0))) ==
+         "paid");
+  assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 1))) ==
+         "status");
+  assert(sqlite3_column_int64(object_statement, 2) == 1);
+  assert(sqlite3_step(object_statement) == SQLITE_DONE);
+  assert(sqlite3_finalize(object_statement) == SQLITE_OK);
+  assert(sqlite3_close(db) == SQLITE_OK);
+}
 #endif
 
 }  // namespace
@@ -84,6 +142,7 @@ int main() {
   std::string header(16, '\0');
   bytes.read(header.data(), static_cast<std::streamsize>(header.size()));
   assert(header == std::string("SQLite format 3", 15) + '\0');
+  assert_standard_type_tables(path);
 
   const auto round = minera::import_ocel_sqlite(path);
   assert(round.events.size() == 2 && round.objects.size() == 2);

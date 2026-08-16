@@ -6,10 +6,12 @@
 
 namespace minera {
 
-// SQLite interchange follows the OCEL 2 relational layout for the core
-// event, object, event-object, and object-object tables.  The importer and
-// exporter add compact auxiliary tables for typed attributes, event links,
-// object changes, and globals that are not represented by the base layout.
+// SQLite interchange follows the OCEL 2 relational layout for the core event,
+// object, event-object, and object-object tables. Type-specific event/object
+// tables carry typed columns and object-change rows; compact auxiliary tables
+// mirror scalar attributes, event links, object changes, and globals so the
+// native representation remains lossless for values outside the relational
+// column contract.
 struct OcelSqliteOptions {
   // Validate all relation references while importing and before exporting.
   bool validate_references = true;

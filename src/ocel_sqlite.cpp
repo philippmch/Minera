@@ -270,6 +270,147 @@ void insert_attribute(sqlite3* db, sqlite3_stmt* statement,
   step_done(db, statement);
 }
 
+void bind_scalar(sqlite3_stmt* statement, int index, const OcelValue& value) {
+  if (std::holds_alternative<std::nullptr_t>(value)) {
+    bind_null(statement, index);
+  } else if (const auto* boolean = std::get_if<bool>(&value)) {
+    bind_integer(statement, index, *boolean ? 1 : 0);
+  } else if (const auto* integer = std::get_if<std::int64_t>(&value)) {
+    bind_integer(statement, index, *integer);
+  } else if (const auto* real = std::get_if<double>(&value)) {
+    bind_double(statement, index, *real);
+  } else {
+    bind_text(statement, index, std::get<std::string>(value));
+  }
+}
+
+bool reserved_type_column(std::string_view key) {
+  return key.empty() || key == "ocel_id" || key == "ocel_time" ||
+         key == "ocel_changed_field" || key == "@@cumcount";
+}
+
+std::string attribute_declared_type(
+    const std::vector<const OcelValue*>& values) {
+  bool has_bool = false;
+  bool has_integer = false;
+  bool has_real = false;
+  bool has_string = false;
+  for (const auto* value : values) {
+    if (std::holds_alternative<bool>(*value)) has_bool = true;
+    else if (std::holds_alternative<std::int64_t>(*value)) has_integer = true;
+    else if (std::holds_alternative<double>(*value)) has_real = true;
+    else if (std::holds_alternative<std::string>(*value)) has_string = true;
+  }
+  if (has_string || (has_bool && (has_integer || has_real))) return "TEXT";
+  if (has_real) return "REAL";
+  if (has_integer) return "INTEGER";
+  if (has_bool) return "BOOLEAN";
+  return "TEXT";
+}
+
+using TypeColumns = std::vector<std::pair<std::string, std::string>>;
+
+TypeColumns collect_type_columns(
+    const std::vector<const std::vector<OcelAttribute>*>& rows) {
+  std::map<std::string, std::vector<const OcelValue*>> values;
+  for (const auto* row : rows) {
+    for (const auto& attribute : *row) {
+      if (!reserved_type_column(attribute.key)) {
+        values[attribute.key].push_back(&attribute.value);
+      }
+    }
+  }
+  TypeColumns result;
+  for (const auto& [key, entries] : values) {
+    result.emplace_back(key, attribute_declared_type(entries));
+  }
+  return result;
+}
+
+TypeColumns collect_type_columns(
+    const std::vector<const std::vector<OcelAttribute>*>& rows,
+    const std::vector<const OcelObjectChange*>& changes) {
+  std::map<std::string, std::vector<const OcelValue*>> values;
+  for (const auto* row : rows) {
+    for (const auto& attribute : *row) {
+      if (!reserved_type_column(attribute.key)) {
+        values[attribute.key].push_back(&attribute.value);
+      }
+    }
+  }
+  for (const auto* change : changes) {
+    if (!reserved_type_column(change->field)) {
+      values[change->field].push_back(&change->value);
+    }
+  }
+  TypeColumns result;
+  for (const auto& [key, entries] : values) {
+    result.emplace_back(key, attribute_declared_type(entries));
+  }
+  return result;
+}
+
+std::map<std::string, const OcelValue*> attribute_values(
+    const std::vector<OcelAttribute>& attributes) {
+  std::map<std::string, const OcelValue*> result;
+  for (const auto& attribute : attributes) {
+    if (!reserved_type_column(attribute.key)) result[attribute.key] = &attribute.value;
+  }
+  return result;
+}
+
+std::string type_table_schema(std::string_view table,
+                              const TypeColumns& columns,
+                              bool object_table, bool has_changes) {
+  std::string sql = "CREATE TABLE " + quote_identifier(table) +
+                    " (ocel_id TEXT, ocel_time TIMESTAMP";
+  for (const auto& [key, type] : columns) {
+    sql += "," + quote_identifier(key) + " " + type;
+  }
+  if (object_table && has_changes) {
+    sql += ",ocel_changed_field TEXT," + quote_identifier("@@cumcount") +
+           " INTEGER, PRIMARY KEY(ocel_id," + quote_identifier("@@cumcount") + ")";
+  } else {
+    sql += ", PRIMARY KEY(ocel_id)";
+  }
+  sql += ");";
+  return sql;
+}
+
+std::string type_table_insert_sql(std::string_view table,
+                                  const TypeColumns& columns,
+                                  bool object_table, bool has_changes) {
+  std::vector<std::string> names{"ocel_id", "ocel_time"};
+  for (const auto& [key, type] : columns) names.push_back(key);
+  if (object_table && has_changes) {
+    names.push_back("ocel_changed_field");
+    names.push_back("@@cumcount");
+  }
+  std::string sql = "INSERT INTO " + quote_identifier(table) + "(";
+  for (std::size_t index = 0; index < names.size(); ++index) {
+    if (index != 0) sql += ",";
+    sql += quote_identifier(names[index]);
+  }
+  sql += ") VALUES(";
+  for (std::size_t index = 0; index < names.size(); ++index) {
+    if (index != 0) sql += ",";
+    sql += "?" + std::to_string(index + 1);
+  }
+  sql += ")";
+  return sql;
+}
+
+void bind_type_attributes(sqlite3_stmt* statement, int start_index,
+                          const TypeColumns& columns,
+                          const std::vector<OcelAttribute>& attributes) {
+  const auto values = attribute_values(attributes);
+  for (std::size_t index = 0; index < columns.size(); ++index) {
+    const auto value = values.find(columns[index].first);
+    if (value == values.end()) bind_null(statement, start_index + static_cast<int>(index));
+    else bind_scalar(statement, start_index + static_cast<int>(index), *value->second);
+  }
+}
+
 OcelValue read_value(sqlite3_stmt* statement, int type_column, int text_column,
                      int int_column, int real_column, int bool_column) {
   const auto type = column_string(statement, type_column);
@@ -796,26 +937,69 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
     }
     for (const auto& activity : activities) {
       const auto table = "event_" + type_table_token(activity, options);
-      database.exec("CREATE TABLE " + quote_identifier(table) +
-                    " (ocel_id TEXT PRIMARY KEY, ocel_time TEXT);");
-      Statement statement(db, "INSERT INTO " + quote_identifier(table) +
-                             "(ocel_id, ocel_time) VALUES(?1,?2)");
+      std::vector<const std::vector<OcelAttribute>*> rows;
+      for (const auto* event : events) {
+        if (event->activity == activity) rows.push_back(&event->attributes);
+      }
+      const auto columns = collect_type_columns(rows);
+      database.exec(type_table_schema(table, columns, false, false));
+      Statement statement(db, type_table_insert_sql(table, columns, false, false));
       for (const auto* event : events) {
         if (event->activity != activity) continue;
         bind_text(statement.get(), 1, event->id);
         bind_text(statement.get(), 2, event->timestamp);
+        bind_type_attributes(statement.get(), 3, columns, event->attributes);
         step_done(db, statement.get());
       }
     }
+    std::map<std::string, std::string> object_id_types;
+    for (const auto* object : objects) object_id_types[object->id] = object->type;
     for (const auto& type : object_types) {
       const auto table = "object_" + type_table_token(type, options);
-      database.exec("CREATE TABLE " + quote_identifier(table) +
-                    " (ocel_id TEXT PRIMARY KEY);");
-      Statement statement(db, "INSERT INTO " + quote_identifier(table) +
-                             "(ocel_id) VALUES(?1)");
+      std::vector<const std::vector<OcelAttribute>*> rows;
+      for (const auto* object : objects) {
+        if (object->type == type) rows.push_back(&object->attributes);
+      }
+      std::vector<const OcelObjectChange*> changes;
+      for (const auto& change : log.object_changes) {
+        if (reserved_type_column(change.field)) continue;
+        std::string resolved_type = change.object_type;
+        if (resolved_type.empty()) {
+          const auto object_type = object_id_types.find(change.object_id);
+          if (object_type == object_id_types.end()) continue;
+          resolved_type = object_type->second;
+        }
+        if (resolved_type == type) changes.push_back(&change);
+      }
+      std::stable_sort(changes.begin(), changes.end(),
+                       [](const auto* left, const auto* right) {
+                         return std::tie(left->object_id, left->timestamp, left->field) <
+                                std::tie(right->object_id, right->timestamp, right->field);
+                       });
+      const bool has_changes = !changes.empty();
+      const auto columns = collect_type_columns(rows, changes);
+      database.exec(type_table_schema(table, columns, true, has_changes));
+      Statement statement(db, type_table_insert_sql(table, columns, true, has_changes));
       for (const auto* object : objects) {
         if (object->type != type) continue;
         bind_text(statement.get(), 1, object->id);
+        bind_null(statement.get(), 2);
+        bind_type_attributes(statement.get(), 3, columns, object->attributes);
+        if (has_changes) {
+          bind_null(statement.get(), 3 + static_cast<int>(columns.size()));
+          bind_integer(statement.get(), 4 + static_cast<int>(columns.size()), 0);
+        }
+        step_done(db, statement.get());
+      }
+      std::map<std::string, std::int64_t> change_counts;
+      for (const auto* change : changes) {
+        bind_text(statement.get(), 1, change->object_id);
+        bind_text(statement.get(), 2, change->timestamp);
+        bind_type_attributes(statement.get(), 3, columns,
+                             std::vector<OcelAttribute>{{change->field, change->value}});
+        bind_text(statement.get(), 3 + static_cast<int>(columns.size()), change->field);
+        bind_integer(statement.get(), 4 + static_cast<int>(columns.size()),
+                     ++change_counts[change->object_id]);
         step_done(db, statement.get());
       }
     }
