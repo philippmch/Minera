@@ -354,6 +354,19 @@ void validate_relative_attribute_occurrence_options(
   }
 }
 
+void validate_variant_share(const std::optional<double>& value,
+                            std::string_view name) {
+  if (!value) return;
+  if (!std::isfinite(*value) || *value < 0.0 || *value > 1.0) {
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a finite share in [0, 1]");
+  }
+}
+
+void validate_variant_share(double value, std::string_view name) {
+  validate_variant_share(std::optional<double>(value), name);
+}
+
 std::unordered_set<std::string> top_activity_values(
     const EventLog& event_log, const TopActivitiesFilterOptions& options,
     bool* projection_needed) {
@@ -704,6 +717,79 @@ EventLog filter_relative_attribute_occurrence(
   return result;
 }
 
+EventLog filter_start_activities(const EventLog& event_log,
+                                 const std::vector<std::string>& activities,
+                                 bool positive) {
+  if (!positive && activities.empty()) {
+    throw std::invalid_argument(
+        "start activity polarity requires at least one activity");
+  }
+  const auto allowed = to_set(activities);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    if (trace.events.empty()) continue;
+    const bool found = allowed.find(trace.events.front().activity) != allowed.end();
+    if (found == positive) result.traces.push_back(trace);
+  }
+  return result;
+}
+
+EventLog filter_end_activities(const EventLog& event_log,
+                               const std::vector<std::string>& activities,
+                               bool positive) {
+  if (!positive && activities.empty()) {
+    throw std::invalid_argument(
+        "end activity polarity requires at least one activity");
+  }
+  const auto allowed = to_set(activities);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    if (trace.events.empty()) continue;
+    const bool found = allowed.find(trace.events.back().activity) != allowed.end();
+    if (found == positive) result.traces.push_back(trace);
+  }
+  return result;
+}
+
+EventLog filter_variants_top_k(const EventLog& event_log, std::size_t k) {
+  if (k == 0) {
+    EventLog result;
+    result.attributes = event_log.attributes;
+    return result;
+  }
+  LogFilterOptions options;
+  options.top_variants = k;
+  return filter_event_log(event_log, options);
+}
+
+EventLog filter_variants_by_coverage_percentage(
+    const EventLog& event_log, double min_coverage_percentage) {
+  validate_variant_share(min_coverage_percentage,
+                         "variant minimum coverage");
+  LogFilterOptions options;
+  options.variant_min_coverage = min_coverage_percentage;
+  return filter_event_log(event_log, options);
+}
+
+EventLog filter_variants_by_maximum_coverage_percentage(
+    const EventLog& event_log, double max_coverage_percentage) {
+  validate_variant_share(max_coverage_percentage,
+                         "variant maximum coverage");
+  LogFilterOptions options;
+  options.variant_max_coverage = max_coverage_percentage;
+  return filter_event_log(event_log, options);
+}
+
+EventLog filter_log_variants_percentage(const EventLog& event_log,
+                                        double percentage) {
+  validate_variant_share(percentage, "variant percentage");
+  LogFilterOptions options;
+  options.variant_percentage = percentage;
+  return filter_event_log(event_log, options);
+}
+
 EventLog filter_prefix(const EventLog& event_log,
                        const PrefixSuffixFilterOptions& options) {
   validate_prefix_suffix_options(options);
@@ -812,6 +898,23 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   if (options.variant_coverage < 0.0 || options.variant_coverage > 1.0) {
     throw std::invalid_argument(
         "variant coverage: expected a share in (0, 1]");
+  }
+  validate_variant_share(options.variant_min_coverage,
+                         "variant minimum coverage");
+  validate_variant_share(options.variant_max_coverage,
+                         "variant maximum coverage");
+  if (options.variant_min_coverage && options.variant_max_coverage &&
+      *options.variant_min_coverage > *options.variant_max_coverage) {
+    throw std::invalid_argument(
+        "variant minimum coverage must not exceed the maximum");
+  }
+  if (!options.start_activities_positive && options.start_activities.empty()) {
+    throw std::invalid_argument(
+        "start activity polarity requires at least one activity");
+  }
+  if (!options.end_activities_positive && options.end_activities.empty()) {
+    throw std::invalid_argument(
+        "end activity polarity requires at least one activity");
   }
 
   const bool by_time = !options.time_from.empty() || !options.time_to.empty();
@@ -998,13 +1101,13 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       if (options.min_length != 0 && length < options.min_length) continue;
       if (options.max_length != 0 && length > options.max_length) continue;
 
-      if (!starts.empty() &&
-          starts.find(piece.events.front().activity) == starts.end()) {
-        continue;
+      if (!starts.empty()) {
+        const bool found = starts.find(piece.events.front().activity) != starts.end();
+        if (found != options.start_activities_positive) continue;
       }
-      if (!ends.empty() &&
-          ends.find(piece.events.back().activity) == ends.end()) {
-        continue;
+      if (!ends.empty()) {
+        const bool found = ends.find(piece.events.back().activity) != ends.end();
+        if (found != options.end_activities_positive) continue;
       }
       kept.push_back(std::move(piece));
     }
@@ -1051,7 +1154,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const bool by_frequency = options.min_variant_frequency > 1;
   const bool by_rank = options.top_variants != 0;
   const bool by_coverage = options.variant_coverage > 0.0;
-  if (!by_frequency && !by_rank && !by_coverage) {
+  const bool by_min_coverage = options.variant_min_coverage.has_value();
+  const bool by_max_coverage = options.variant_max_coverage.has_value();
+  const bool by_percentage = options.variant_percentage.has_value();
+  if (!by_frequency && !by_rank && !by_coverage && !by_min_coverage &&
+      !by_max_coverage && !by_percentage) {
     EventLog result;
     result.traces = std::move(kept);
     result.attributes = log.attributes;
@@ -1071,7 +1178,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     ++counts[key];
   }
 
-  if (by_rank || by_coverage) {
+  if (by_rank || by_coverage || by_percentage) {
     std::stable_sort(order.begin(), order.end(),
                      [&](const std::string& a, const std::string& b) {
                        return counts[a] > counts[b];
@@ -1093,11 +1200,41 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     }
   }
 
+  std::unordered_set<std::string> percentage_allowed;
+  if (by_percentage && !order.empty()) {
+    const double target =
+        *options.variant_percentage * static_cast<double>(kept.size());
+    double cumulative = 0.0;
+    std::size_t boundary = 0;
+    for (std::size_t i = 0; i < order.size(); ++i) {
+      cumulative += static_cast<double>(counts[order[i]]);
+      boundary = i;
+      if (cumulative >= target) break;
+    }
+    const auto boundary_count = counts[order[boundary]];
+    for (std::size_t i = 0; i <= boundary; ++i)
+      percentage_allowed.insert(order[i]);
+    for (std::size_t i = boundary + 1; i < order.size() &&
+         counts[order[i]] == boundary_count; ++i) {
+      percentage_allowed.insert(order[i]);
+    }
+  }
+
   std::unordered_set<std::string> allowed;
+  const double denominator = static_cast<double>(kept.size());
   for (std::size_t i = 0; i < order.size(); ++i) {
     if (by_rank && i >= options.top_variants) break;
     if (counts[order[i]] < options.min_variant_frequency) continue;
     if (by_coverage && covered.find(order[i]) == covered.end()) continue;
+    if (by_percentage && percentage_allowed.find(order[i]) ==
+                             percentage_allowed.end())
+      continue;
+    const double share = denominator == 0.0
+                             ? 0.0
+                             : static_cast<double>(counts[order[i]]) /
+                                   denominator;
+    if (by_min_coverage && share < *options.variant_min_coverage) continue;
+    if (by_max_coverage && share > *options.variant_max_coverage) continue;
     allowed.insert(order[i]);
   }
 

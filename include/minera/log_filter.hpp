@@ -133,8 +133,8 @@ struct PrefixSuffixFilterOptions {
 // case-level event-attribute filter, then rework, then the succession
 // (directly-/eventually-follows) filters, then the prefix/suffix cuts, then
 // between-extraction, then trace length, then endpoints, then the variant
-// filters (frequency, rank, coverage), and finally the optional case-count
-// limit.
+// filters (frequency, rank, coverage, and percentage), and finally the
+// optional case-count limit.
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -262,20 +262,31 @@ struct LogFilterOptions {
   std::optional<std::size_t> max_cases;
 
   // Endpoint constraints: keep only traces that start (respectively end) with
-  // one of the listed activities. Empty means "any".
+  // one of the listed activities. Empty means "any". With positive=false,
+  // traces whose endpoint is in the list are excluded instead.
   std::vector<std::string> start_activities;
   std::vector<std::string> end_activities;
+  bool start_activities_positive = true;
+  bool end_activities_positive = true;
 
   // Variant selection. Keep only traces whose variant (its activity sequence)
   // occurs at least `min_variant_frequency` times; when `top_variants` is
   // non-zero, only the `top_variants` most frequent variants; and when
   // `variant_coverage` is non-zero, the most frequent variants that together
   // cover at least that share of the surviving cases ((0, 1]; a value outside
-  // that range throws). A variant must satisfy every active constraint. All
-  // default to "keep everything".
+  // that range throws). The optional minimum/maximum coverage fields compare
+  // each variant's own case share inclusively. `variant_percentage` ranks
+  // variants by frequency and keeps enough cases to reach the requested
+  // cumulative share, retaining all variants tied at the boundary; it keeps
+  // at least the most frequent variant even when the percentage is zero.
+  // A variant must satisfy every active constraint. All default to "keep
+  // everything".
   std::uint64_t min_variant_frequency = 0;
   std::size_t top_variants = 0;
   double variant_coverage = 0.0;
+  std::optional<double> variant_min_coverage;
+  std::optional<double> variant_max_coverage;
+  std::optional<double> variant_percentage;
 
   // Optional case split at one or more activities. The operation runs after
   // the ordinary per-trace projections and before variant selection.
@@ -322,6 +333,8 @@ struct LogFilterOptions {
            !end_activities.empty() || max_cases.has_value() ||
            min_variant_frequency > 1 ||
            top_variants != 0 || variant_coverage != 0.0 ||
+           variant_min_coverage.has_value() ||
+           variant_max_coverage.has_value() || variant_percentage.has_value() ||
            !activity_split_activities.empty() ||
            attribute_value_repetition.has_value() ||
            consecutive_activity_grouping.has_value() ||
@@ -369,6 +382,31 @@ struct LogFilterOptions {
 [[nodiscard]] EventLog filter_relative_attribute_occurrence(
     const EventLog& event_log,
     const RelativeAttributeOccurrenceFilterOptions& options);
+
+// Endpoint filters preserve complete traces and metadata. Positive mode keeps
+// listed endpoints; negative mode drops them. Empty activity lists are a
+// no-op for positive mode and invalid for negative mode.
+[[nodiscard]] EventLog filter_start_activities(
+    const EventLog& event_log, const std::vector<std::string>& activities,
+    bool positive = true);
+
+[[nodiscard]] EventLog filter_end_activities(
+    const EventLog& event_log, const std::vector<std::string>& activities,
+    bool positive = true);
+
+// Variant-frequency selection helpers. Coverage bounds are inclusive shares
+// of the input cases; percentage is a cumulative top-variant target.
+[[nodiscard]] EventLog filter_variants_top_k(const EventLog& event_log,
+                                             std::size_t k);
+
+[[nodiscard]] EventLog filter_variants_by_coverage_percentage(
+    const EventLog& event_log, double min_coverage_percentage);
+
+[[nodiscard]] EventLog filter_variants_by_maximum_coverage_percentage(
+    const EventLog& event_log, double max_coverage_percentage);
+
+[[nodiscard]] EventLog filter_log_variants_percentage(
+    const EventLog& event_log, double percentage = 0.8);
 
 // Compatibility spellings used by the classic filtering surface.
 [[nodiscard]] inline EventLog filter_log_on_max_no_activities(

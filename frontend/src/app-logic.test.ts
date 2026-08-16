@@ -1066,6 +1066,30 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ relativeAttributeKeepOncePerCase: true })).toBe(false);
   });
 
+  it("serializes variant coverage modes and endpoint polarity only with endpoints", () => {
+    expect(mineFormEntries({
+      variantMinCoverage: 0.2,
+      variantMaxCoverage: 0.8,
+      variantPercentage: 0,
+      startActivities: ["A"],
+      startActivitiesPositive: false,
+      endActivities: ["Z"],
+      endActivitiesPositive: true,
+    })).toEqual([
+      ["variant_min_coverage", "0.2"],
+      ["variant_max_coverage", "0.8"],
+      ["variant_percentage", "0"],
+      ["start_activities", "A"],
+      ["start_activities_positive", "false"],
+      ["end_activities", "Z"],
+      ["end_activities_positive", "true"],
+    ]);
+    expect(mineFormEntries({ startActivitiesPositive: false })).toEqual([]);
+    expect(hasActiveFilters({ variantPercentage: 0 })).toBe(true);
+    expect(hasActiveFilters({ startActivitiesPositive: false })).toBe(false);
+    expect(() => mineFormEntries({ variantMinCoverage: 0.8, variantMaxCoverage: 0.2 })).toThrow(/not exceed/);
+  });
+
   it("maps the succession, cut, and coverage filters", () => {
     const entries = mineFormEntries({
       variantCoverage: 0.8,

@@ -790,7 +790,9 @@ void parse_mine_params_maps_filters() {
       {"keep_lifecycles", "complete"},
       {"remove_lifecycles", "schedule, suspend"},
       {"start_activities", "a"},
+      {"start_activities_positive", "false"},
       {"end_activities", "c"},
+      {"end_activities_positive", "true"},
       {"max_cases", "4"},
       {"max_activities", "3"},
       {"top_activities_attribute_key", "channel"},
@@ -841,6 +843,9 @@ void parse_mine_params_maps_filters() {
       {"suffix_strict", "true"},
       {"suffix_occurrence", "last"},
       {"variant_coverage", "0.8"},
+      {"variant_min_coverage", "0.2"},
+      {"variant_max_coverage", "0.8"},
+      {"variant_percentage", "0.6"},
   }));
   assert(params.filter.time_from == "2024-01-01");
   assert(params.filter.time_to == "2024-01-31T23:59:59");
@@ -859,7 +864,9 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.remove_lifecycles ==
           std::vector<std::string>{"schedule", "suspend"}));
   assert((params.filter.start_activities == std::vector<std::string>{"a"}));
+  assert(!params.filter.start_activities_positive);
   assert((params.filter.end_activities == std::vector<std::string>{"c"}));
+  assert(params.filter.end_activities_positive);
   assert(params.filter.max_cases && *params.filter.max_cases == 4);
   assert(params.filter.top_activities.has_value());
   assert(params.filter.top_activities->max_activities == 3);
@@ -936,7 +943,46 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.suffix_occurrence ==
          minera::FilterAnchorOccurrence::last);
   assert(params.filter.variant_coverage == 0.8);
+  assert(params.filter.variant_min_coverage == 0.2);
+  assert(params.filter.variant_max_coverage == 0.8);
+  assert(params.filter.variant_percentage == 0.6);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_variant_and_endpoint_filter_errors() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"variant_min_coverage", "nan"},
+           std::pair<std::string, std::string>{"variant_max_coverage", "1.1"},
+           std::pair<std::string, std::string>{"variant_percentage", "-0.1"},
+           std::pair<std::string, std::string>{"start_activities_positive", "maybe"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"variant_min_coverage", "0.8"},
+        {"variant_max_coverage", "0.2"},
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"end_activities_positive", "false"},
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_invalid_case_duration_bounds() {
@@ -2597,6 +2643,7 @@ int main() {
   parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
+  parse_mine_params_rejects_variant_and_endpoint_filter_errors();
   parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_case_selection_bounds();
   parse_mine_params_rejects_invalid_frequency_attribute_options();

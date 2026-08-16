@@ -920,6 +920,10 @@ int usage(const char* program) {
                "                            Attribute for relative occurrence\n"
                "  --relative-attribute-keep-once-per-case <bool>\n"
                "                            Count each value once per case\n"
+               "  --start-activities <a,b>  Keep traces starting with one of these\n"
+               "  --start-activities-positive <bool> Keep (or exclude) listed starts\n"
+               "  --end-activities <a,b>    Keep traces ending with one of these\n"
+               "  --end-activities-positive <bool> Keep (or exclude) listed ends\n"
                "  --min-length <n>          Drop traces shorter than n events\n"
                "  --max-length <n>          Drop traces longer than n events\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
@@ -982,13 +986,17 @@ int usage(const char* program) {
                "  --between-start <a>       With --between-end: cut each trace\n"
                "  --between-end <b>         into the subtraces running from <a>\n"
                "                            to <b>, endpoints included\n"
-               "  --start-activities <a,b>  Keep traces starting with one of these\n"
-               "  --end-activities <a,b>    Keep traces ending with one of these\n"
                "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
                "  --top-variants <n>        Keep only the n most frequent variants\n"
                "  --variant-coverage <f>    Keep the most frequent variants\n"
                "                            that together cover this share of\n"
-               "                            cases, f in (0,1]\n";
+               "                            cases, f in (0,1]\n"
+               "  --variant-min-coverage <f> Keep variants with at least this\n"
+               "                            individual case share, f in [0,1]\n"
+               "  --variant-max-coverage <f> Keep variants with at most this\n"
+               "                            individual case share, f in [0,1]\n"
+               "  --variant-percentage <f>  Keep top variants covering f cases;\n"
+               "                            ties at the boundary are retained\n";
   return 2;
 }
 
@@ -1385,6 +1393,34 @@ int main(int argc, char** argv) {
       } else {
         relative.keep_once_per_case = parse_boolean(value, arg);
       }
+      continue;
+    }
+    if (arg == "--start-activities-positive" ||
+        arg == "--end-activities-positive") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const bool positive = parse_boolean(value, arg);
+      if (arg == "--start-activities-positive")
+        filter.start_activities_positive = positive;
+      else
+        filter.end_activities_positive = positive;
+      continue;
+    }
+    if (arg == "--variant-min-coverage" ||
+        arg == "--variant-max-coverage" ||
+        arg == "--variant-percentage") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const double parsed = parse_finite_double(value, arg);
+      if (parsed < 0.0 || parsed > 1.0)
+        throw std::invalid_argument(
+            std::string(arg) + " expects a number in [0, 1]");
+      if (arg == "--variant-min-coverage")
+        filter.variant_min_coverage = parsed;
+      else if (arg == "--variant-max-coverage")
+        filter.variant_max_coverage = parsed;
+      else
+        filter.variant_percentage = parsed;
       continue;
     }
     if (arg == "--prefix-strict" || arg == "--prefix-occurrence" ||
@@ -3225,7 +3261,10 @@ int main(int argc, char** argv) {
     } else if (arg == "--variant-coverage") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
-      filter.variant_coverage = std::atof(value);
+      filter.variant_coverage = parse_finite_double(value, arg);
+      if (filter.variant_coverage < 0.0 || filter.variant_coverage > 1.0)
+        throw std::invalid_argument(
+            "--variant-coverage expects a number in [0, 1]");
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {

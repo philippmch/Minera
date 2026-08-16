@@ -212,6 +212,10 @@ export interface FilterOptions extends LtlFilterOptions {
   /** Cumulative variant coverage in (0, 1]: keep the most frequent variants
    * until together they cover this share of cases. */
   variantCoverage?: number;
+  /** Inclusive per-variant coverage bounds and cumulative top-variant target. */
+  variantMinCoverage?: number;
+  variantMaxCoverage?: number;
+  variantPercentage?: number;
   keepActivities?: string[];
   removeActivities?: string[];
   keepResources?: string[];
@@ -222,6 +226,8 @@ export interface FilterOptions extends LtlFilterOptions {
   removeLifecycles?: string[];
   startActivities?: string[];
   endActivities?: string[];
+  startActivitiesPositive?: boolean;
+  endActivitiesPositive?: boolean;
   /** Keep only cases where this activity occurs at least reworkMin times. */
   reworkActivity?: string;
   reworkMin?: number;
@@ -450,6 +456,26 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("min_variant_frequency", String(options.minVariantFrequency));
   if (options.variantCoverage)
     add("variant_coverage", String(options.variantCoverage));
+  const variantCoverageValues = [
+    ["variantMinCoverage", options.variantMinCoverage],
+    ["variantMaxCoverage", options.variantMaxCoverage],
+    ["variantPercentage", options.variantPercentage],
+  ] as const;
+  for (const [name, value] of variantCoverageValues) {
+    if (value === undefined) continue;
+    if (!Number.isFinite(value) || value < 0 || value > 1)
+      throw new Error(`${name} must be finite and in [0, 1]`);
+  }
+  if (options.variantMinCoverage !== undefined &&
+      options.variantMaxCoverage !== undefined &&
+      options.variantMinCoverage > options.variantMaxCoverage)
+    throw new Error("variantMinCoverage must not exceed variantMaxCoverage");
+  if (options.variantMinCoverage !== undefined)
+    add("variant_min_coverage", String(options.variantMinCoverage));
+  if (options.variantMaxCoverage !== undefined)
+    add("variant_max_coverage", String(options.variantMaxCoverage));
+  if (options.variantPercentage !== undefined)
+    add("variant_percentage", String(options.variantPercentage));
   if (options.keepActivities?.length)
     add("keep_activities", options.keepActivities.join(","));
   if (options.removeActivities?.length)
@@ -462,10 +488,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("keep_lifecycles", options.keepLifecycles.join(","));
   if (options.removeLifecycles?.length)
     add("remove_lifecycles", options.removeLifecycles.join(","));
-  if (options.startActivities?.length)
+  if (options.startActivities?.length) {
     add("start_activities", options.startActivities.join(","));
-  if (options.endActivities?.length)
+    if (options.startActivitiesPositive !== undefined)
+      add("start_activities_positive", String(options.startActivitiesPositive));
+  }
+  if (options.endActivities?.length) {
     add("end_activities", options.endActivities.join(","));
+    if (options.endActivitiesPositive !== undefined)
+      add("end_activities_positive", String(options.endActivitiesPositive));
+  }
   if (options.reworkActivity) {
     add("rework_activity", options.reworkActivity);
     if (options.reworkMin)

@@ -2718,6 +2718,59 @@ void filter_keeps_variants_covering_a_share_of_cases() {
   assert(throws([&] { (void)minera::filter_event_log(log, options); }));
 }
 
+void filter_supports_variant_percentage_and_endpoint_polarity() {
+  const auto log = log_from_variants({
+      {"A", "X"}, {"A", "X"}, {"A", "X"}, {"B", "X"},
+      {"B", "X"}, {"C", "X"},
+  });
+
+  assert(minera::filter_variants_top_k(log, 0).trace_count() == 0);
+  assert(minera::filter_variants_top_k(log, 1).trace_count() == 3);
+  assert(minera::filter_variants_by_coverage_percentage(log, 0.3)
+             .trace_count() == 5);
+  assert(minera::filter_variants_by_maximum_coverage_percentage(log, 0.2)
+             .trace_count() == 1);
+
+  // A zero target still keeps the top variant, while variants tied at the
+  // coverage boundary are retained together.
+  assert(minera::filter_log_variants_percentage(log, 0.0).trace_count() == 3);
+  const auto tied = log_from_variants({{"A"}, {"A"}, {"B"}, {"B"}, {"C"}});
+  assert(minera::filter_log_variants_percentage(tied, 0.4).trace_count() == 4);
+
+  const auto endpoints = log_from_variants({
+      {"A", "X"}, {"B", "X"}, {"A", "Y"}, {"B", "Y"},
+  });
+  assert(minera::filter_start_activities(endpoints, {"A"}).trace_count() == 2);
+  assert(minera::filter_start_activities(endpoints, {"A"}, false)
+             .trace_count() == 2);
+  assert(minera::filter_end_activities(endpoints, {"X"}, false)
+             .trace_count() == 2);
+
+  minera::LogFilterOptions combined;
+  combined.start_activities = {"A"};
+  combined.start_activities_positive = false;
+  combined.end_activities = {"Y"};
+  combined.end_activities_positive = false;
+  combined.variant_percentage = 0.0;
+  assert(combined.any());
+  assert(minera::filter_event_log(endpoints, combined).trace_count() == 1);
+
+  assert(throws([&] {
+    (void)minera::filter_start_activities(endpoints, {}, false);
+  }));
+  assert(throws([&] {
+    minera::LogFilterOptions invalid;
+    invalid.variant_min_coverage = 0.7;
+    invalid.variant_max_coverage = 0.6;
+    (void)minera::filter_event_log(log, invalid);
+  }));
+  assert(throws([&] {
+    minera::LogFilterOptions invalid;
+    invalid.start_activities_positive = false;
+    (void)minera::filter_event_log(log, invalid);
+  }));
+}
+
 void filter_selects_cases_by_succession() {
   const auto log = log_from_variants(
       {{"a", "b", "c"}, {"a", "c", "b"}, {"a", "b", "b", "c"}});
@@ -5379,6 +5432,7 @@ int main() {
   filter_keeps_frequent_variants();
   filter_keeps_only_the_top_variant();
   filter_keeps_variants_covering_a_share_of_cases();
+  filter_supports_variant_percentage_and_endpoint_polarity();
   filter_selects_cases_by_succession();
   filter_matches_trace_patterns();
   filter_cuts_prefixes_and_suffixes();
