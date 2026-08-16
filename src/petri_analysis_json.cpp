@@ -97,6 +97,14 @@ const char* status(SoundnessStatus value) {
   return "unknown";
 }
 
+const char* soundness_variant(SoundnessVariant value) {
+  switch (value) {
+    case SoundnessVariant::kSoundness: return "soundness";
+    case SoundnessVariant::kWoflan: return "woflan";
+  }
+  return "soundness";
+}
+
 std::string workflow(const WorkflowNetResult& result) {
   std::ostringstream out;
   out << "{\"variant\":\"petri_net\",\"valid\":"
@@ -161,8 +169,13 @@ std::string petri_analysis_json(const WorkflowNetResult& result) {
 
 std::string petri_analysis_json(const SoundnessResult& result) {
   std::ostringstream out;
+  const char* family = result.variant == SoundnessVariant::kWoflan
+                           ? "woflan"
+                           : "soundness";
   out << std::setprecision(17)
-      << "{\"family\":\"soundness\",\"status\":\"" << status(result.status)
+      << "{\"family\":\"" << family << "\",\"variant\":\""
+      << soundness_variant(result.variant) << "\",\"status\":\""
+      << status(result.status)
       << "\",\"computed\":" << (result.computed ? "true" : "false")
       << ",\"exhausted\":" << (result.exhausted ? "true" : "false")
       << ",\"workflow\":" << workflow(result.workflow)

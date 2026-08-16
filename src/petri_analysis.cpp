@@ -1101,6 +1101,7 @@ bool is_workflow_net(const PetriNet& net) { return check_workflow_net(net).valid
 
 SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& options) {
   SoundnessResult result;
+  result.variant = options.variant;
   result.workflow = check_workflow_net(net);
   const auto validation_error = validate_net(net);
   if (validation_error.empty()) {

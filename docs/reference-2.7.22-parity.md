@@ -437,7 +437,9 @@ not replace semantic tests.
 
 The native analysis surface now exposes the classic integer marking equation,
 the split-aware extended marking equation, structural workflow-net validation,
-and bounded soundness diagnostics. Structural pair diagnostics use a deterministic
+and bounded soundness diagnostics, including an explicit `woflan` family
+selector over the same reachability, coverability, invariant, and pair
+diagnostic contract. Structural pair diagnostics use a deterministic
 node-split unit-capacity flow graph and report both directions whose maximum flow
 exceeds one, preserving the duplicated-node coordinates in the JSON contract.
 Bounded exploration also returns every shortest path to a marking that cannot

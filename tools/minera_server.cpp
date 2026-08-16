@@ -3516,8 +3516,12 @@ void handle_petri_analysis(const httplib::Request& request,
             minera::petri_analysis_json(minera::check_workflow_net(net)),
             "application/json");
         return;
-      case minera::PetriAnalysisFamily::kSoundness: {
+      case minera::PetriAnalysisFamily::kSoundness:
+      case minera::PetriAnalysisFamily::kWoflan: {
         minera::SoundnessOptions options;
+        options.variant = params.family == minera::PetriAnalysisFamily::kWoflan
+                              ? minera::SoundnessVariant::kWoflan
+                              : minera::SoundnessVariant::kSoundness;
         options.initial_marking = params.initial_marking;
         options.final_marking = params.final_marking;
         options.max_states = params.max_states;

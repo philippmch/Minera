@@ -282,6 +282,17 @@ void structural_pair_diagnostics() {
   assert(serialized.find("\"structural_node_labels\":[\"place:0:in\"") !=
          std::string::npos);
 
+  SoundnessOptions woflan_options;
+  woflan_options.variant = SoundnessVariant::kWoflan;
+  const auto woflan_result = analyze_soundness(branching_pair_net(),
+                                                woflan_options);
+  assert(woflan_result.variant == SoundnessVariant::kWoflan);
+  const auto woflan_json = petri_analysis_json(woflan_result);
+  assert(woflan_json.find("\"family\":\"woflan\"") !=
+         std::string::npos);
+  assert(woflan_json.find("\"variant\":\"woflan\"") !=
+         std::string::npos);
+
   const auto split = analyze_soundness(splitting_pair_net());
   assert(split.handled_pairs.has_value());
   assert(std::find(split.handled_pairs->begin(), split.handled_pairs->end(),

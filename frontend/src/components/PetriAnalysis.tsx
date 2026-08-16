@@ -38,10 +38,10 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
   const [result, setResult] = useState<PetriAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const structuralPairs = result?.family === "soundness"
+  const structuralPairs = (result?.family === "soundness" || result?.family === "woflan")
     ? (result.not_well_handled_pairs ?? result.handled_pairs)
     : undefined;
-  const lockingScenarios = result?.family === "soundness" ? result.locking_scenarios : undefined;
+  const lockingScenarios = (result?.family === "soundness" || result?.family === "woflan") ? result.locking_scenarios : undefined;
 
   const run = async () => {
     if (!onRequest || !miner) return;
@@ -76,9 +76,9 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
     <div className="panel-head"><h2>Petri analysis</h2><span className="panel-meta">State equation · workflow structure · soundness</span></div>
     <div className="align-settings-grid">
       <label>Model<select value={miner} onChange={(event) => setMiner(event.target.value)} disabled={models.length === 0}>{models.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
-      <label>Family<select value={family} onChange={(event) => { setFamily(event.target.value as PetriAnalysisFamily); setResult(null); }}>{<><option value="soundness">Soundness</option><option value="workflow_net">Workflow net</option><option value="marking_equation">Marking equation</option><option value="extended_marking_equation">Extended marking equation</option></>}</select></label>
+      <label>Family<select value={family} onChange={(event) => { setFamily(event.target.value as PetriAnalysisFamily); setResult(null); }}>{<><option value="soundness">Soundness</option><option value="woflan">Woflan</option><option value="workflow_net">Workflow net</option><option value="marking_equation">Marking equation</option><option value="extended_marking_equation">Extended marking equation</option></>}</select></label>
       {family === "extended_marking_equation" && <label>Trace index<input type="number" min={0} value={traceIndex} onChange={(event) => setTraceIndex(event.target.value)} /></label>}
-      {(family === "marking_equation" || family === "extended_marking_equation" || family === "soundness") && <>
+      {(family === "marking_equation" || family === "extended_marking_equation" || family === "soundness" || family === "woflan") && <>
         <label>Initial marking<input placeholder="default" value={initial} onChange={(event) => setInitial(event.target.value)} /></label>
         <label>Final marking<input placeholder="default" value={final} onChange={(event) => setFinal(event.target.value)} /></label>
       </>}
@@ -91,8 +91,8 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
         <label>Max k<input type="number" min={0} value={maxK} onChange={(event) => setMaxK(event.target.value)} /></label>
         <label>Full bootstrap<select value={String(fullBootstrap)} onChange={(event) => setFullBootstrap(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>
       </>}
-      {(family === "extended_marking_equation" || family === "soundness" || family === "marking_equation") && <label>State limit<input type="number" min={1} value={maxStates} onChange={(event) => setMaxStates(event.target.value)} /></label>}
-      {family === "soundness" && <label>Diagnostics<select value={String(diagnostics)} onChange={(event) => setDiagnostics(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>}
+      {(family === "extended_marking_equation" || family === "soundness" || family === "woflan" || family === "marking_equation") && <label>State limit<input type="number" min={1} value={maxStates} onChange={(event) => setMaxStates(event.target.value)} /></label>}
+      {(family === "soundness" || family === "woflan") && <label>Diagnostics<select value={String(diagnostics)} onChange={(event) => setDiagnostics(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>}
     </div>
     {models.length === 0 && <p className="conf-inline-note">No Petri model is available in this analysis.</p>}
     <button type="button" className="button" disabled={!onRequest || !miner || loading} onClick={() => void run()}>{loading ? "Analyzing…" : "Run Petri analysis"}</button>
@@ -104,7 +104,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
           {result?.structural_node_labels?.[pair[0]] ?? `node ${pair[0]}`} → {result?.structural_node_labels?.[pair[1]] ?? `node ${pair[1]}`}
         </li>)}</ul>}
     </div>}
-    {result?.family === "soundness" && (result.dead_tasks || lockingScenarios) && <div className="conf-inline-note">
+    {(result?.family === "soundness" || result?.family === "woflan") && (result.dead_tasks || lockingScenarios) && <div className="conf-inline-note">
       <strong>Soundness witnesses</strong>
       {result.dead_tasks && <div>Dead tasks: {result.dead_tasks.length}</div>}
       {result.deadlock_witnesses && <div>Deadlock witnesses: {result.deadlock_witnesses.length}</div>}

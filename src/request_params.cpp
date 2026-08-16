@@ -2174,10 +2174,12 @@ PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field,
       params.family = PetriAnalysisFamily::kWorkflowNet;
     else if (value == "soundness")
       params.family = PetriAnalysisFamily::kSoundness;
+    else if (value == "woflan")
+      params.family = PetriAnalysisFamily::kWoflan;
     else
       throw std::invalid_argument(
           "petri_analysis_family: expected marking_equation, "
-          "extended_marking_equation, workflow_net, or soundness");
+          "extended_marking_equation, workflow_net, soundness, or woflan");
   }
   if (supplied("petri_analysis_miner"))
     params.miner = require("petri_analysis_miner");

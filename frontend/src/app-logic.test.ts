@@ -228,9 +228,14 @@ describe("evaluation adapters", () => {
     expect(query.get("petri_analysis_model_costs")).toBe("5,6");
     expect(query.get("petri_analysis_split_indices")).toBe("1,3");
     expect(query.get("petri_analysis_full_bootstrap")).toBe("false");
+    expect(new URLSearchParams(petriAnalysisQuery({ family: "woflan" }))
+      .get("petri_analysis_family")).toBe("woflan");
     expect(() => petriAnalysisQuery({ max_states: 0 })).toThrow(/valid/);
     expect(() => petriAnalysisQuery({ model_costs: [-1] })).toThrow(/costs/);
     expect(isPetriAnalysisResult({ family: "soundness", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "soundness", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "other" })).toBe(false);
     expect(isPetriAnalysisResult({ family: "unknown" })).toBe(false);
   });
 

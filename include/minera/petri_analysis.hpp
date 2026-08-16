@@ -99,7 +99,10 @@ struct WorkflowNetResult {
 
 enum class SoundnessStatus { SOUND, UNSOUND, UNKNOWN };
 
+enum class SoundnessVariant { kSoundness, kWoflan };
+
 struct SoundnessOptions {
+  SoundnessVariant variant = SoundnessVariant::kSoundness;
   Marking initial_marking;
   Marking final_marking;
   std::size_t max_states = 200000;
@@ -107,6 +110,7 @@ struct SoundnessOptions {
 };
 
 struct SoundnessResult {
+  SoundnessVariant variant = SoundnessVariant::kSoundness;
   SoundnessStatus status = SoundnessStatus::UNKNOWN;
   bool computed = false;
   bool exhausted = false;

@@ -2305,6 +2305,13 @@ void parse_petri_analysis_params_rejects_bad_values() {
   assert(threw);
 }
 
+void parse_petri_analysis_params_accepts_woflan_alias() {
+  const auto parsed = minera::parse_petri_analysis_params(
+      fields({{"petri_analysis_family", "woflan"},
+              {"petri_analysis_miner", "alpha"}}));
+  assert(parsed.family == minera::PetriAnalysisFamily::kWoflan);
+}
+
 void parse_process_tree_playout_params_maps_variants_and_limits() {
   const auto parsed = minera::parse_process_tree_playout_params(fields({
       {"playout_variant", "TOPBOTTOM"},
@@ -2815,6 +2822,7 @@ int main() {
   parse_mine_params_rejects_invalid_spectrum_and_batch_options();
   parse_mine_params_rejects_dependent_options_without_opt_in();
   parse_petri_analysis_params_maps_all_families_and_settings();
+  parse_petri_analysis_params_accepts_woflan_alias();
   parse_petri_analysis_params_rejects_bad_values();
   parse_process_tree_playout_params_maps_variants_and_limits();
   parse_process_tree_playout_params_rejects_bad_values();
