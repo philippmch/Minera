@@ -1649,6 +1649,69 @@ std::string serialize_ocel_description_json(
   return out.str();
 }
 
+const char* ocel_description_variant_name(OcelDescriptionVariant variant) {
+  switch (variant) {
+    case OcelDescriptionVariant::kVariant1: return "VARIANT1";
+    case OcelDescriptionVariant::kVariant2: return "VARIANT2";
+  }
+  throw std::invalid_argument("OCEL description variant is invalid");
+}
+
+std::string serialize_ocel_description_json(
+    const Ocel& log, OcelDescriptionVariant variant,
+    const OcelDescriptionOptions& options) {
+  if (variant != OcelDescriptionVariant::kVariant1 &&
+      variant != OcelDescriptionVariant::kVariant2)
+    throw std::invalid_argument("OCEL description variant is invalid");
+  std::ostringstream out;
+  out << "{\"family\":\"OCEL_DESCRIPTION\",\"variant\":\""
+      << ocel_description_variant_name(variant)
+      << "\",\"includes_timestamps\":"
+      << (options.include_timestamps ? "true" : "false");
+  if (variant == OcelDescriptionVariant::kVariant1) {
+    out << ",\"text\":";
+    write_string(out, describe_ocel_text(log, options));
+    out << '}';
+    return out.str();
+  }
+  const auto description = describe_ocel_tuples(log, options);
+  out << ",\"events\":[";
+  for (std::size_t index = 0; index < description.events.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& event = description.events[index];
+    out << '[';
+    write_string(out, event.activity);
+    for (const auto& object : event.related_objects) {
+      out << ',';
+      write_string(out, object);
+    }
+    if (description.includes_timestamps) {
+      out << ',';
+      write_string(out, event.timestamp);
+    }
+    out << ']';
+  }
+  out << "],\"objects\":[";
+  for (std::size_t index = 0; index < description.objects.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& object = description.objects[index];
+    out << '[';
+    write_string(out, object.id);
+    out << ',';
+    write_string(out, object.type);
+    if (description.includes_timestamps) {
+      out << ',';
+      write_string(out, object.lifecycle_start);
+      out << ',';
+      write_string(out, object.lifecycle_end);
+      out << ',' << std::setprecision(17) << object.lifecycle_seconds;
+    }
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 namespace {
 
 void validate_conformance_number(double value, const char* name) {

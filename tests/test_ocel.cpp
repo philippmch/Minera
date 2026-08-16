@@ -293,5 +293,19 @@ int main() {
          without_timestamps.events[0].timestamp.empty());
   assert(minera::serialize_ocel_description_json(without_timestamps).find(
              "\"timestamp\"") == std::string::npos);
+  const auto variant1 = minera::serialize_ocel_description_json(
+      log, minera::OcelDescriptionVariant::kVariant1);
+  assert(variant1.find("\"family\":\"OCEL_DESCRIPTION\"") !=
+         std::string::npos);
+  assert(variant1.find("\"variant\":\"VARIANT1\"") !=
+         std::string::npos);
+  assert(variant1.find("\"text\":") != std::string::npos);
+  const auto variant2 = minera::serialize_ocel_description_json(
+      log, minera::OcelDescriptionVariant::kVariant2);
+  assert(variant2.find("\"variant\":\"VARIANT2\"") !=
+         std::string::npos);
+  assert(variant2.find("\"events\":[[\"Create\",\"o1\",") !=
+         std::string::npos);
+  assert(variant2.find("\"objects\":[[") != std::string::npos);
   return 0;
 }

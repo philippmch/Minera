@@ -1323,6 +1323,34 @@ export function isOcelStatisticsResult(value: unknown): value is OcelStatisticsR
       metric.performance.every((item) => typeof item === "number" && Number.isFinite(item))));
 }
 
+export type OcelDescriptionVariant = "VARIANT1" | "VARIANT2";
+export interface OcelDescriptionResult {
+  family: "OCEL_DESCRIPTION";
+  variant: OcelDescriptionVariant;
+  includes_timestamps: boolean;
+  text?: string;
+  events?: string[][];
+  objects?: Array<Array<string | number>>;
+}
+export function isOcelDescriptionResult(value: unknown): value is OcelDescriptionResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_DESCRIPTION" ||
+      (value.variant !== "VARIANT1" && value.variant !== "VARIANT2") ||
+      typeof value.includes_timestamps !== "boolean") return false;
+  if (value.variant === "VARIANT1") return typeof value.text === "string";
+  if (!Array.isArray(value.events) || !value.events.every((event) =>
+      Array.isArray(event) && event.length >= 1 &&
+      event.every((item) => typeof item === "string"))) return false;
+  if (!Array.isArray(value.objects)) return false;
+  return value.objects.every((object) => {
+    if (!Array.isArray(object) || (value.includes_timestamps
+        ? object.length !== 5 : object.length !== 2)) return false;
+    return typeof object[0] === "string" && typeof object[1] === "string" &&
+      (!value.includes_timestamps ||
+        (typeof object[2] === "string" && typeof object[3] === "string" &&
+         typeof object[4] === "number" && Number.isFinite(object[4])));
+  });
+}
+
 export type TransitionSystemView = "sequence" | "set" | "multiset";
 export type TransitionSystemDirection = "forward" | "backward";
 export interface TransitionOccurrence {

@@ -48,6 +48,7 @@ import {
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelStatisticsResult,
+  type OcelDescriptionResult,
   type ProcessCubeTable,
   type ProcessCubeResult,
   type StreamingDfgResult,
@@ -85,6 +86,7 @@ import {
   isOcelPlayoutResult,
   isOcelFeatureResult,
   isOcelStatisticsResult,
+  isOcelDescriptionResult,
   isProcessCubeResult,
   isStreamingDfgResult,
   isStreamingFootprintsResult,
@@ -4156,6 +4158,37 @@ export async function requestOcelStatistics(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelStatisticsResult(payload)) throw new Error("the Minera backend returned an invalid OCEL statistics result");
+  return payload;
+}
+
+export interface OcelDescriptionOptions {
+  variant?: "variant1" | "variant2";
+  include_timestamps?: boolean;
+}
+
+export function ocelDescriptionQuery(options: OcelDescriptionOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.include_timestamps !== undefined)
+    query.set("include_timestamps", options.include_timestamps ? "true" : "false");
+  return query.toString();
+}
+
+export async function requestOcelDescription(
+  log: Blob,
+  options: OcelDescriptionOptions = {},
+): Promise<OcelDescriptionResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelDescriptionQuery(options);
+  const response = await fetch(`/api/ocel/description${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelDescriptionResult(payload)) throw new Error("the Minera backend returned an invalid OCEL description result");
   return payload;
 }
 

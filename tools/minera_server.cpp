@@ -1575,6 +1575,48 @@ void handle_ocel_statistics(const httplib::Request& request,
   }
 }
 
+void handle_ocel_description(const httplib::Request& request,
+                             httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"variant",
+                                                  "include_timestamps"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL description parameter: " +
+                                    key);
+    }
+    const auto raw_variant = lower_ascii(
+        request.has_param("variant") ? request.get_param_value("variant")
+                                      : std::string("variant1"));
+    minera::OcelDescriptionVariant variant;
+    if (raw_variant == "variant1" || raw_variant == "text" ||
+        raw_variant == "variant_1") {
+      variant = minera::OcelDescriptionVariant::kVariant1;
+    } else if (raw_variant == "variant2" || raw_variant == "tuples" ||
+               raw_variant == "variant_2") {
+      variant = minera::OcelDescriptionVariant::kVariant2;
+    } else {
+      throw std::invalid_argument(
+          "variant expects variant1 or variant2");
+    }
+    minera::OcelDescriptionOptions options;
+    options.include_timestamps = request.has_param("include_timestamps")
+                                     ? ocel_query_bool(request,
+                                                       "include_timestamps", true)
+                                     : true;
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto log = minera::parse_ocel_json(body);
+    response.set_content(
+        minera::serialize_ocel_description_json(log, variant, options),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_ocel_conformance(const httplib::Request& request,
                              httplib::Response& response) {
   try {
@@ -4824,6 +4866,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
+  server.Options("/api/ocel/description", preflight);
   server.Options("/api/ocel/filter", preflight);
   server.Options("/api/ocel/sqlite", preflight);
   server.Options("/api/ocel/io", preflight);
@@ -4905,6 +4948,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);
+  server.Post("/api/ocel/description", handle_ocel_description);
   server.Post("/api/ocel/filter", handle_ocel_filter);
   server.Post("/api/ocel/sqlite", handle_ocel_sqlite);
   server.Post("/api/ocel/io", handle_ocel_exchange);

@@ -84,7 +84,7 @@ are reconciled.
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN and causal-net extensive playout projections now support both independent object-local events and an explicit shared-activity binding mode through native, CLI, multipart local-server, and frontend adapters; richer marker-binding semantics remain |
-| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, deterministic OCEL text/tuple descriptions, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
+| Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
@@ -588,6 +588,18 @@ return inclusive interval indices, while range queries return every interval
 overlapping the inclusive bounds; malformed, non-finite, partial, or reversed
 query bounds are rejected consistently by native, CLI, server, and frontend
 adapters.
+
+## OCEL description evidence
+
+The object-centric description family exposes both deterministic variants:
+`VARIANT1` is the textual event/object representation and `VARIANT2` is the
+tuple representation, with optional timestamps and lifecycle durations. The
+native API preserves stable event and object ordering, the standalone
+`minera_ocel --describe variant1|variant2` selectors expose the same envelopes,
+and `POST /api/ocel/description` accepts multipart JSON with strict variant
+and timestamp controls. Frontend upload/query helpers validate the textual
+and tuple shapes, including timestamp-disabled tuples and malformed duration
+fields.
 
 ## Case-relations merging evidence
 
