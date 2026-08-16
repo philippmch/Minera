@@ -39,6 +39,8 @@ export interface ILPMinerTransition {
   activity: string | null;
   inputs: number[];
   outputs: number[];
+  reset_inputs?: number[];
+  inhibitor_inputs?: number[];
 }
 export interface ILPMinerNet {
   place_count: number;
@@ -99,6 +101,8 @@ export interface GeneticMinerTransition {
   activity: number | null;
   inputs: number[];
   outputs: number[];
+  reset_inputs?: number[];
+  inhibitor_inputs?: number[];
 }
 export interface GeneticMinerNet {
   place_count: number;
@@ -1716,6 +1720,10 @@ export interface DfgPetriConversionTransition {
   activity: number | null;
   inputs: number[];
   outputs: number[];
+  /** Places cleared when this transition fires. */
+  reset_inputs?: number[];
+  /** Places that must be empty for this transition to fire. */
+  inhibitor_inputs?: number[];
 }
 export interface DfgPetriConversionResult {
   family: "DFG_CONVERSION";

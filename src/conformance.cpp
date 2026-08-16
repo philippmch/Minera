@@ -413,10 +413,11 @@ class Replayer {
   void build_place_closure() {
     for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
       const auto& transition = net_.transitions()[t];
-      const bool ok = transition.silent()
+      const bool ok = !transition.has_extended_arcs() &&
+                      (transition.silent()
                           ? transition.inputs.size() == 1 &&
                                 transition.outputs.size() == 1
-                          : transition.inputs.size() == 1;
+                          : transition.inputs.size() == 1);
       if (!ok) return;  // fall back to the breadth-first closure
     }
 
@@ -497,11 +498,7 @@ class Replayer {
   }
 
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
-    std::unordered_map<std::size_t, std::size_t> required;
-    for (const std::size_t place : net_.transitions()[t].inputs) ++required[place];
-    for (const auto& [place, count] : required)
-      if (marking[place] < static_cast<int>(count)) return false;
-    return true;
+    return petri_transition_enabled(net_.transitions()[t], marking);
   }
 
   [[nodiscard]] bool any_enabled(const Marking& marking,
@@ -527,6 +524,12 @@ class Replayer {
         ++counts.missing;  // token had to be created to fire
       }
       ++counts.consumed;
+    }
+    for (const std::size_t place : transition.reset_inputs) {
+      if (marking[place] > 0) {
+        counts.consumed += static_cast<std::uint64_t>(marking[place]);
+        marking[place] = 0;
+      }
     }
     for (const std::size_t place : transition.outputs) {
       ++marking[place];
@@ -594,6 +597,7 @@ class Replayer {
   [[nodiscard]] std::optional<std::vector<std::size_t>> reverse_silent_path(
       const Marking& marking, std::size_t visible) const {
     const auto& target = net_.transitions()[visible];
+    if (target.has_extended_arcs()) return std::nullopt;
     Marking required(marking.size(), 0);
     for (const std::size_t p : target.inputs) ++required[p];
     const auto covers = [](const Marking& have, const Marking& need) {
@@ -634,6 +638,7 @@ class Replayer {
       for (const std::size_t s : silent_transitions_) {
         if (expanded[s]) continue;
         const auto& transition = net_.transitions()[s];
+        if (transition.has_extended_arcs()) continue;
         bool output_covers = true;
         Marking output_count(marking.size(), 0);
         for (const std::size_t p : transition.outputs) ++output_count[p];
@@ -921,6 +926,8 @@ double compute_simplicity(const PetriNet& net) {
     // arc-degree simplicity counts distinct arc objects, not multiplicity.
     std::unordered_set<std::size_t> in(transition.inputs.begin(), transition.inputs.end());
     std::unordered_set<std::size_t> out(transition.outputs.begin(), transition.outputs.end());
+    in.insert(transition.reset_inputs.begin(), transition.reset_inputs.end());
+    in.insert(transition.inhibitor_inputs.begin(), transition.inhibitor_inputs.end());
     arcs += in.size() + out.size();
   }
   // Every arc joins one place and one transition, so it adds 2 to the total
@@ -1323,6 +1330,7 @@ class Aligner {
       bool log_free = false;  // ids[pos] absent from the model: log is exact
     };
     const auto heuristic = [&](const State& state) -> std::optional<LpBound> {
+      if (net_.has_extended_arcs()) return LpBound{};
       const std::size_t pos = static_cast<std::size_t>(state.back());
       const auto& counts = suffix_counts[pos];
       const double constant = static_cast<double>(len - pos);
@@ -1607,9 +1615,7 @@ class Aligner {
         for (std::size_t t = 0; t < tcount; ++t) {
           if (!enabled(state, t)) continue;
           const auto& transition = net_.transitions()[t];
-          State fired = state;
-          for (const std::size_t place : transition.inputs) --fired[place];
-          for (const std::size_t place : transition.outputs) ++fired[place];
+          State fired = fire(state, t);
           if (transition.silent()) {
             relax(std::move(fired), g, node.state, AlignmentMoveType::kModel,
                   -1, true, h, static_cast<std::int32_t>(t), !use_lp || walked_model(t));
@@ -1844,7 +1850,8 @@ class Aligner {
       // The marking-equation bound is in undiscounted units and may
       // overestimate a discounted suffix.  Discounted search therefore uses
       // a zero heuristic (Dijkstra), preserving optimal goal termination.
-      if (options.variant != AlignmentVariant::kStateEquationAStar || discounted)
+      if (net_.has_extended_arcs() ||
+          options.variant != AlignmentVariant::kStateEquationAStar || discounted)
         return 0.0;
       const std::size_t pos = static_cast<std::size_t>(state.back());
       const std::size_t remaining = len - pos;
@@ -2025,8 +2032,7 @@ class Aligner {
         if (!enabled(node.state, t)) continue;
         const auto& tr = net_.transitions()[t];
         State fired = node.state;
-        for (const auto p : tr.inputs) --fired[p];
-        for (const auto p : tr.outputs) ++fired[p];
+        fire_petri_transition(tr, fired);
         if (tr.silent()) {
           push(std::move(fired), model_cost_for(t),
                {AlignmentMoveType::kModel, {}, t}, false);
@@ -2093,18 +2099,12 @@ class Aligner {
 
  private:
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
-    std::unordered_map<std::size_t, std::size_t> required;
-    for (const std::size_t place : net_.transitions()[t].inputs) ++required[place];
-    for (const auto& [place, count] : required)
-      if (marking[place] < static_cast<int>(count)) return false;
-    return true;
+    return petri_transition_enabled(net_.transitions()[t], marking);
   }
 
   [[nodiscard]] Marking fire(const Marking& marking, std::size_t t) const {
     Marking next = marking;
-    const auto& transition = net_.transitions()[t];
-    for (const std::size_t place : transition.inputs) --next[place];
-    for (const std::size_t place : transition.outputs) ++next[place];
+    fire_petri_transition(net_.transitions()[t], next);
     return next;
   }
 
@@ -2216,15 +2216,11 @@ Relation model_footprint(const PetriNet& net, bool& exhausted) {
   };
 
   const auto enabled = [&](const Marking& m, const PetriTransition& t) {
-    for (const std::size_t place : t.inputs) {
-      if (m[place] <= 0) return false;
-    }
-    return true;
+    return petri_transition_enabled(t, m);
   };
   const auto fire = [&](const Marking& m, const PetriTransition& t) {
     Marking next = m;
-    for (const std::size_t place : t.inputs) --next[place];
-    for (const std::size_t place : t.outputs) ++next[place];
+    fire_petri_transition(t, next);
     return next;
   };
 

@@ -23,7 +23,6 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
 
   std::vector<std::uint32_t> marking(net.place_count(), 0);
   std::vector<std::size_t> enabled;
-  std::vector<std::uint32_t> required(net.place_count(), 0);
 
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
@@ -44,18 +43,9 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
 
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
-        std::fill(required.begin(), required.end(), 0);
-        bool ready = true;
-        for (const auto place : transitions[t].inputs) {
-          ++required[place];
-        }
-        for (std::size_t p = 0; p < required.size(); ++p) {
-          if (required[p] > marking[p]) {
-            ready = false;
-            break;
-          }
-        }
-        if (ready && !transitions[t].inputs.empty()) {
+        if (petri_transition_enabled(transitions[t], marking) &&
+            (!transitions[t].inputs.empty() ||
+             transitions[t].has_extended_arcs())) {
           enabled.push_back(t);
         }
       }
@@ -66,14 +56,9 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
       const auto pick = std::uniform_int_distribution<std::size_t>(
           0, enabled.size() - 1)(rng);
       const auto& fired = transitions[enabled[pick]];
-      for (const auto place : fired.inputs) {
-        --marking[place];
-        --tokens;
-      }
-      for (const auto place : fired.outputs) {
-        ++marking[place];
-        ++tokens;
-      }
+      fire_petri_transition(fired, marking);
+      tokens = 0;
+      for (const auto value : marking) tokens += value;
 
       if (!fired.silent()) {
         Event event;
@@ -130,6 +115,12 @@ EventLog stochastic_playout(const PetriNet& net,
         throw std::invalid_argument("Petri transition output place is invalid");
       }
     }
+    for (const auto place : transition.reset_inputs) {
+      if (place >= places) throw std::invalid_argument("Petri transition reset place is invalid");
+    }
+    for (const auto place : transition.inhibitor_inputs) {
+      if (place >= places) throw std::invalid_argument("Petri transition inhibitor place is invalid");
+    }
     if (transition.activity && *transition.activity >= net.activities().size()) {
       throw std::invalid_argument("Petri transition activity is invalid");
     }
@@ -140,7 +131,6 @@ EventLog stochastic_playout(const PetriNet& net,
   log.traces.reserve(options.traces);
   std::vector<std::uint64_t> marking(places, 0);
   std::vector<std::size_t> enabled;
-  std::vector<std::uint64_t> required(places, 0);
   const auto is_final = [&](const std::vector<std::uint64_t>& candidate) {
     for (std::size_t p = 0; p < candidate.size(); ++p) {
       if (candidate[p] != (p == net.sink() ? 1U : 0U)) return false;
@@ -161,17 +151,9 @@ EventLog stochastic_playout(const PetriNet& net,
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
         const auto& transition = transitions[t];
-        if (transition.inputs.empty()) continue;
-        std::fill(required.begin(), required.end(), 0);
-        for (const auto place : transition.inputs) ++required[place];
-        bool ready = true;
-        for (std::size_t p = 0; p < places; ++p) {
-          if (required[p] > marking[p]) {
-            ready = false;
-            break;
-          }
-        }
-        if (ready) enabled.push_back(t);
+        if ((transition.inputs.empty() && !transition.has_extended_arcs()) ||
+            !petri_transition_enabled(transition, marking)) continue;
+        enabled.push_back(t);
       }
       if (enabled.empty()) break;
 
@@ -198,8 +180,7 @@ EventLog stochastic_playout(const PetriNet& net,
       }
 
       const auto& fired = transitions[selected];
-      for (const auto place : fired.inputs) --marking[place];
-      for (const auto place : fired.outputs) ++marking[place];
+      fire_petri_transition(fired, marking);
       if (!fired.silent()) {
         Event event;
         event.case_id = trace.case_id;
@@ -297,32 +278,15 @@ EventLog extensive_playout(const PetriNet& net,
 
     for (std::size_t t = 0; t < transitions.size(); ++t) {
       const auto& transition = transitions[t];
-      if (transition.inputs.empty()) continue;
+      if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
       if (!transition.silent() && state.events.size() >= options.max_length) {
         continue;  // would exceed the visible-length bound
       }
-      bool ready = true;
-      std::vector<std::uint32_t> required(state.marking.size(), 0);
-      for (const auto place : transition.inputs) {
-        if (place >= required.size()) {
-          ready = false;
-          break;
-        }
-        ++required[place];
-      }
-      if (!ready) continue;
-      for (std::size_t p = 0; p < required.size(); ++p) {
-        if (required[p] > state.marking[p]) {
-          ready = false;
-          break;
-        }
-      }
-      if (!ready) continue;
+      if (!petri_transition_enabled(transition, state.marking)) continue;
 
       EnumerationState next;
       next.marking = state.marking;
-      for (const auto place : transition.inputs) --next.marking[place];
-      for (const auto place : transition.outputs) ++next.marking[place];
+      fire_petri_transition(transition, next.marking);
       next.events = state.events;
       if (!transition.silent()) next.events.push_back(t);
 

@@ -67,7 +67,7 @@ void validate(const PetriNet& n, const PetriMultiAlignmentOptions& o) {
   if (!std::isfinite(o.exponent) || o.exponent <= 1.0) throw std::invalid_argument("petri multi-alignment exponent must be finite and > 1");
   if (!(o.max_states ? o.max_states : o.marking_limit)) throw std::invalid_argument("petri multi-alignment marking_limit must be positive");
   if (!n.place_count() || n.source() >= n.place_count() || n.sink() >= n.place_count()) throw std::invalid_argument("petri net has invalid source/sink places");
-  for (const auto& t : n.transitions()) { if (t.activity && *t.activity >= n.activities().size()) throw std::invalid_argument("petri transition activity index out of range"); for (auto p : t.inputs) if (p >= n.place_count()) throw std::invalid_argument("petri input place out of range"); for (auto p : t.outputs) if (p >= n.place_count()) throw std::invalid_argument("petri output place out of range"); }
+  for (const auto& t : n.transitions()) { if (t.activity && *t.activity >= n.activities().size()) throw std::invalid_argument("petri transition activity index out of range"); for (auto p : t.inputs) if (p >= n.place_count()) throw std::invalid_argument("petri input place out of range"); for (auto p : t.outputs) if (p >= n.place_count()) throw std::invalid_argument("petri output place out of range"); for (auto p : t.reset_inputs) if (p >= n.place_count()) throw std::invalid_argument("petri reset place out of range"); for (auto p : t.inhibitor_inputs) if (p >= n.place_count()) throw std::invalid_argument("petri inhibitor place out of range"); }
 }
 }
 
@@ -101,8 +101,12 @@ PetriMultiAlignmentResult multi_align_petri(const PetriNet& net, const EventLog&
     }
     ++closed[node.marking]; ++d.visited_states;
     for (std::size_t ti = 0; ti < net.transitions().size(); ++ti) {
-      const auto& t = net.transitions()[ti]; std::vector<std::size_t> req(net.place_count(), 0); for (auto p : t.inputs) ++req[p]; bool enabled = true; for (std::size_t p = 0; p < net.place_count(); ++p) if (node.marking[p] < req[p]) { enabled = false; break; } if (!enabled) continue; ++d.traversed_arcs;
-      auto marking = node.marking; for (std::size_t p = 0; p < net.place_count(); ++p) marking[p] -= req[p]; for (auto p : t.outputs) { if (marking[p] == std::numeric_limits<std::size_t>::max()) throw std::overflow_error("petri marking token count overflow"); ++marking[p]; }
+      const auto& t = net.transitions()[ti]; if (!petri_transition_enabled(t, node.marking)) continue; ++d.traversed_arcs;
+      auto marking = node.marking;
+      for (const auto p : t.outputs)
+        if (marking[p] == std::numeric_limits<std::size_t>::max())
+          throw std::overflow_error("petri marking token count overflow");
+      fire_petri_transition(t, marking);
       const auto closed_child = closed.find(marking);
       if (closed_child != closed.end() && closed_child->second > limit) { d.exhausted = true; continue; }
       Node child{std::move(marking), node.path, 0.0}; child.path.push_back(ti); child.priority = bound(child); if (child.priority == node.priority) continue; queue.push(std::move(child)); ++d.queued_states;

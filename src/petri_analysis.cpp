@@ -31,6 +31,10 @@ std::string validate_net(const PetriNet& net) {
       if (p >= net.place_count()) return "transition input place is outside the net";
     for (const auto p : transition.outputs)
       if (p >= net.place_count()) return "transition output place is outside the net";
+    for (const auto p : transition.reset_inputs)
+      if (p >= net.place_count()) return "transition reset place is outside the net";
+    for (const auto p : transition.inhibitor_inputs)
+      if (p >= net.place_count()) return "transition inhibitor place is outside the net";
   }
   return {};
 }
@@ -66,10 +70,7 @@ std::vector<std::int64_t> arc_weights(const std::vector<std::size_t>& arcs,
 }
 
 bool enabled(const Marking& marking, const PetriTransition& transition) {
-  const auto required = arc_weights(transition.inputs, marking.size());
-  for (std::size_t p = 0; p < marking.size(); ++p)
-    if (marking[p] < required[p]) return false;
-  return true;
+  return petri_transition_enabled(transition, marking);
 }
 
 bool fire(const Marking& marking, const PetriTransition& transition,
@@ -77,6 +78,7 @@ bool fire(const Marking& marking, const PetriTransition& transition,
   if (!enabled(marking, transition)) return false;
   next = marking;
   for (const auto p : transition.inputs) --next[p];
+  for (const auto p : transition.reset_inputs) next[p] = 0;
   for (const auto p : transition.outputs) {
     if (next[p] == std::numeric_limits<std::int64_t>::max()) return false;
     ++next[p];
@@ -419,6 +421,10 @@ CoverabilityResult coverability_search(const PetriNet& net,
     std::size_t transition;
   };
   CoverabilityResult result;
+  if (net.has_extended_arcs()) {
+    result.exhausted = true;
+    return result;
+  }
   std::vector<Node> nodes;
   nodes.push_back({initial, std::numeric_limits<std::size_t>::max(),
                    std::numeric_limits<std::size_t>::max()});
@@ -518,8 +524,14 @@ WorkflowMarkings default_workflow_markings(const PetriNet& net) {
 }
 
 MarkingEquationResult solve_marking_equation(const PetriNet& net,
-                                              const MarkingEquationOptions& options) {
+                                             const MarkingEquationOptions& options) {
   if (const auto error = validate_net(net); !error.empty()) throw std::invalid_argument(error);
+  if (net.has_extended_arcs()) {
+    MarkingEquationResult unsupported;
+    unsupported.computed = false;
+    unsupported.error = "marking equation does not represent reset or inhibitor arcs";
+    return unsupported;
+  }
   const auto markings = resolved_markings(net, options.initial_marking, options.final_marking);
   auto costs = options.transition_costs.empty()
                    ? default_marking_equation_costs(net)
@@ -578,6 +590,12 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
     const ExtendedMarkingEquationOptions& options) {
   if (const auto error = validate_net(net); !error.empty())
     throw std::invalid_argument(error);
+  if (net.has_extended_arcs()) {
+    ExtendedMarkingEquationResult unsupported;
+    unsupported.computed = false;
+    unsupported.error = "extended marking equation does not represent reset or inhibitor arcs";
+    return unsupported;
+  }
   const auto markings = resolved_markings(net, options.initial_marking,
                                           options.final_marking);
   if (options.realizability_limit == 0)
@@ -790,6 +808,14 @@ WorkflowNetResult check_workflow_net(const PetriNet& net) {
     for (const auto p : tr.outputs) {
       if (p >= net.place_count()) { result.offending_transitions.push_back(t); invalid = true; continue; }
       outgoing[node].push_back(p); incoming[p].push_back(node);
+    }
+    for (const auto p : tr.reset_inputs) {
+      if (p >= net.place_count()) { result.offending_transitions.push_back(t); invalid = true; continue; }
+      outgoing[p].push_back(node); incoming[node].push_back(p);
+    }
+    for (const auto p : tr.inhibitor_inputs) {
+      if (p >= net.place_count()) { result.offending_transitions.push_back(t); invalid = true; continue; }
+      outgoing[p].push_back(node); incoming[node].push_back(p);
     }
   }
   std::sort(result.offending_transitions.begin(), result.offending_transitions.end());

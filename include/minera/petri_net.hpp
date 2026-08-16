@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -12,14 +14,24 @@
 
 namespace minera {
 
+// Ordinary arcs consume/produce their multiplicity. Reset arcs remove every
+// token from their place when the transition fires, while inhibitor arcs only
+// allow firing when their place is empty.
+enum class PetriArcType { kNormal, kReset, kInhibitor };
+
 // A transition in a labeled workflow net. A transition with no activity is
 // silent (tau): it routes tokens but consumes no event during replay.
 struct PetriTransition {
   std::optional<std::size_t> activity;  // index into PetriNet::activities()
   std::vector<std::size_t> inputs;      // place ids consumed when firing
   std::vector<std::size_t> outputs;     // place ids produced when firing
+  std::vector<std::size_t> reset_inputs;      // reset arcs (place -> transition)
+  std::vector<std::size_t> inhibitor_inputs;  // inhibitor arcs
 
   [[nodiscard]] bool silent() const noexcept { return !activity.has_value(); }
+  [[nodiscard]] bool has_extended_arcs() const noexcept {
+    return !reset_inputs.empty() || !inhibitor_inputs.empty();
+  }
 };
 
 // A workflow net with exactly one source and one sink place, produced from a
@@ -33,8 +45,47 @@ class PetriNet {
                              std::vector<std::size_t> inputs,
                              std::vector<std::size_t> outputs) {
     transitions_.push_back(
-        PetriTransition{activity, std::move(inputs), std::move(outputs)});
+        PetriTransition{activity, std::move(inputs), std::move(outputs), {}, {}});
     return transitions_.size() - 1;
+  }
+
+  void add_arc(std::size_t transition, std::size_t place,
+               PetriArcType type = PetriArcType::kNormal) {
+    if (transition >= transitions_.size())
+      throw std::out_of_range("Petri transition index is invalid");
+    if (place >= place_count_)
+      throw std::out_of_range("Petri place index is invalid");
+    auto& target = transitions_[transition];
+    auto contains = [&](const std::vector<std::size_t>& values) {
+      return std::find(values.begin(), values.end(), place) != values.end();
+    };
+    if (type == PetriArcType::kNormal) {
+      if (contains(target.reset_inputs) || contains(target.inhibitor_inputs))
+        throw std::invalid_argument("Petri transition cannot mix arc types for a place");
+      target.inputs.push_back(place);
+      return;
+    }
+    if (contains(target.inputs) || contains(target.reset_inputs) ||
+        contains(target.inhibitor_inputs)) {
+      throw std::invalid_argument("Petri transition cannot duplicate arc types for a place");
+    }
+    if (type == PetriArcType::kReset) target.reset_inputs.push_back(place);
+    else target.inhibitor_inputs.push_back(place);
+  }
+
+  void add_reset_arc(std::size_t transition, std::size_t place) {
+    add_arc(transition, place, PetriArcType::kReset);
+  }
+
+  void add_inhibitor_arc(std::size_t transition, std::size_t place) {
+    add_arc(transition, place, PetriArcType::kInhibitor);
+  }
+
+  [[nodiscard]] bool has_extended_arcs() const noexcept {
+    return std::any_of(transitions_.begin(), transitions_.end(),
+                       [](const PetriTransition& transition) {
+                         return transition.has_extended_arcs();
+                       });
   }
 
   // Extends an existing transition while assembling composite model views
@@ -74,6 +125,35 @@ class PetriNet {
   std::vector<PetriTransition> transitions_;
   std::vector<std::string> activities_;
 };
+
+// Shared marking semantics for search and simulation code. The template keeps
+// the helper usable with signed replay markings and unsigned simulation ones.
+template <typename Token>
+[[nodiscard]] bool petri_transition_enabled(
+    const PetriTransition& transition, const std::vector<Token>& marking) {
+  std::vector<std::size_t> required(marking.size(), 0);
+  for (const auto place : transition.inputs) {
+    if (place >= marking.size()) return false;
+    if constexpr (std::is_signed_v<Token>) {
+      if (marking[place] < 0) return false;
+    }
+    ++required[place];
+    if (required[place] > static_cast<std::make_unsigned_t<Token>>(marking[place]))
+      return false;
+  }
+  for (const auto place : transition.inhibitor_inputs) {
+    if (place >= marking.size() || marking[place] != 0) return false;
+  }
+  return true;
+}
+
+template <typename Token>
+void fire_petri_transition(const PetriTransition& transition,
+                           std::vector<Token>& marking) {
+  for (const auto place : transition.inputs) --marking[place];
+  for (const auto place : transition.reset_inputs) marking[place] = 0;
+  for (const auto place : transition.outputs) ++marking[place];
+}
 
 // Translates a block-structured process tree into an equivalent workflow net.
 // Each operator expands to the textbook fragment: sequence chains its children

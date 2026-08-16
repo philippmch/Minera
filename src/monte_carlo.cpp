@@ -86,6 +86,12 @@ void validate_net(const PetriNet& net) {
             "Monte Carlo transition output place is invalid");
       }
     }
+    for (const auto place : transition.reset_inputs) {
+      if (place >= net.place_count()) throw std::invalid_argument("Monte Carlo transition reset place is invalid");
+    }
+    for (const auto place : transition.inhibitor_inputs) {
+      if (place >= net.place_count()) throw std::invalid_argument("Monte Carlo transition inhibitor place is invalid");
+    }
   }
 }
 
@@ -209,25 +215,8 @@ PreparedOptions prepare_options(const PetriNet& net,
   enabled.reserve(net.transitions().size());
   for (std::size_t index = 0; index < net.transitions().size(); ++index) {
     const auto& transition = net.transitions()[index];
-    if (transition.inputs.empty()) continue;
-    std::vector<std::uint64_t> required(net.place_count(), 0);
-    bool valid = true;
-    for (const auto place : transition.inputs) {
-      if (place >= required.size() || required[place] ==
-                                      std::numeric_limits<std::uint64_t>::max()) {
-        valid = false;
-        break;
-      }
-      ++required[place];
-    }
-    if (!valid) continue;
-    for (std::size_t place = 0; place < required.size(); ++place) {
-      if (required[place] > marking[place]) {
-        valid = false;
-        break;
-      }
-    }
-    if (valid) enabled.push_back(index);
+    if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
+    if (petri_transition_enabled(transition, marking)) enabled.push_back(index);
   }
   return enabled;
 }
@@ -337,6 +326,8 @@ double reserve_output_resources(
 
 void fire_transition(const PetriTransition& transition,
                      Marking& marking) {
+  if (!petri_transition_enabled(transition, marking))
+    throw std::runtime_error("Monte Carlo fired a disabled transition");
   std::vector<std::uint64_t> required(marking.size(), 0);
   for (const auto place : transition.inputs) {
     if (place >= marking.size() ||
@@ -350,6 +341,10 @@ void fire_transition(const PetriTransition& transition,
       throw std::runtime_error("Monte Carlo fired a disabled transition");
     }
     marking[place] -= required[place];
+  }
+  for (const auto place : transition.reset_inputs) {
+    if (place >= marking.size()) throw std::runtime_error("Monte Carlo reset place is invalid");
+    marking[place] = 0;
   }
   for (const auto place : transition.outputs) {
     if (place >= marking.size() ||

@@ -25,13 +25,10 @@ Marking initial(const PetriNet& n, const SimplicityOptions& o) {
   return m;
 }
 bool enabled(const PetriTransition& t, const Marking& m) {
-  std::unordered_map<std::size_t, int> need;
-  for (auto p : t.inputs) ++need[p];
-  for (auto [p, c] : need) if (p >= m.size() || m[p] < c) return false;
-  return true;
+  return petri_transition_enabled(t, m);
 }
 Marking fire(const PetriTransition& t, Marking m) {
-  for (auto p : t.inputs) --m[p]; for (auto p : t.outputs) ++m[p]; return m;
+  fire_petri_transition(t, m); return m;
 }
 bool silent_closure(const PetriNet& n, const Marking& start,
                     std::size_t cap, std::vector<Marking>& out) {

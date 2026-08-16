@@ -863,6 +863,10 @@ void write_petri_net(std::ostream& out,
     write_place_list(out, transition.inputs);
     out << ", \"outputs\": ";
     write_place_list(out, transition.outputs);
+    out << ", \"reset_inputs\": ";
+    write_place_list(out, transition.reset_inputs);
+    out << ", \"inhibitor_inputs\": ";
+    write_place_list(out, transition.inhibitor_inputs);
     out << '}' << (i + 1 < transitions.size() ? ", " : "");
   }
   out << "]}";
@@ -3800,6 +3804,16 @@ std::string ilp_miner_json(const ILPMinerResult& result) {
       if (j) out << ',';
       out << transition.outputs[j];
     }
+    out << "],\"reset_inputs\":[";
+    for (std::size_t j = 0; j < transition.reset_inputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.reset_inputs[j];
+    }
+    out << "],\"inhibitor_inputs\":[";
+    for (std::size_t j = 0; j < transition.inhibitor_inputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.inhibitor_inputs[j];
+    }
     out << "]}";
   }
   out << "]},\"markings\":{\"initial\":[";
@@ -3850,6 +3864,16 @@ std::string genetic_miner_json(const GeneticMinerResult& result) {
     for (std::size_t j = 0; j < transition.outputs.size(); ++j) {
       if (j) out << ',';
       out << transition.outputs[j];
+    }
+    out << "],\"reset_inputs\":[";
+    for (std::size_t j = 0; j < transition.reset_inputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.reset_inputs[j];
+    }
+    out << "],\"inhibitor_inputs\":[";
+    for (std::size_t j = 0; j < transition.inhibitor_inputs.size(); ++j) {
+      if (j) out << ',';
+      out << transition.inhibitor_inputs[j];
     }
     out << "]}";
   }

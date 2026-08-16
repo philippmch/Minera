@@ -853,6 +853,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_petri_analysis_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_petri_analysis_tests COMMAND minera_petri_analysis_tests)
 
+  add_executable(minera_petri_extended_arcs_tests
+    tests/test_petri_extended_arcs.cpp
+  )
+  target_link_libraries(minera_petri_extended_arcs_tests PRIVATE minera::core)
+  target_compile_features(minera_petri_extended_arcs_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_petri_extended_arcs_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_petri_extended_arcs_tests COMMAND minera_petri_extended_arcs_tests)
+
   add_executable(minera_petri_usage_comparison_tests
     tests/test_petri_usage_comparison.cpp
   )

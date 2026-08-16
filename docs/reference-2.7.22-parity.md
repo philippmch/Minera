@@ -217,7 +217,7 @@ this traditional-log vertical.
 |---|---|---|
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object relations, o2o links, object changes, scalar globals, and classic/standard JSON parsing are present; e2e, richer value types, and full schema coverage remain |
-| Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary Petri, process tree, BPMN, DFG, heuristics net, transition system, POWL, classic log-skeleton, and Declare objects; reset/inhibitor, object-centric, trie, and stochastic families remain |
+| Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; equation-based diagnostics explicitly report the nonlinear arc limitation, while object-centric, trie, and stochastic model families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON, deterministic extended-table CSV (with an optional object table), and bounded classic/standard XML round-trip through the native core/CLI; SQLite and the remaining schema-specific adapters remain |
@@ -430,6 +430,19 @@ tests cover the current vertical. Karp–Miller-style coverability witnesses,
 positive normalized invariant/S-component diagnostics, and their JSON fields are
 included; a complete black-box edge matrix remains open before this row can
 claim full parity.
+
+## Extended Petri-arc evidence
+
+Petri transitions now retain ordinary, reset, and inhibitor input arcs as
+separate deterministic lists. Reset firing clears every token in its place;
+inhibitor firing requires an empty place. Forward/backward replay, alignment
+search, reachability/soundness exploration, model footprints, and basic,
+stochastic, and extensive playout all use these enablement and firing rules.
+PNML round-trips annotate extended input arcs with `reset` or `inhibitor`, and
+the analysis JSON and frontend model type preserve both lists. Linear marking
+equations deliberately return a structured unsupported result for these
+nonlinear arcs instead of claiming an unsound solution; focused native tests
+cover both arc kinds, transport, replay, playout, and that guard.
 
 ## Petri usage comparison evidence
 
