@@ -26,6 +26,7 @@
 #include "minera/chaotic_activities.hpp"
 #include "minera/attribute_statistics.hpp"
 #include "minera/attribute_distribution.hpp"
+#include "minera/attribute_kde.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/case_statistics.hpp"
@@ -316,6 +317,7 @@ void write_analysis_json(std::ostream& out,
     const AttributeStatisticsResult& result);
 [[nodiscard]] std::string attribute_distribution_json(
     const AttributeDistributionResult& result);
+[[nodiscard]] std::string attribute_kde_json(const AttributeKdeResult& result);
 [[nodiscard]] std::string boundary_activities_json(
     const BoundaryActivitiesResult& result);
 [[nodiscard]] std::string variant_statistics_json(

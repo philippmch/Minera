@@ -4185,6 +4185,38 @@ std::string attribute_distribution_json(
   return out.str();
 }
 
+std::string attribute_kde_json(const AttributeKdeResult& result) {
+  if (result.x.size() != result.y.size())
+    throw std::invalid_argument("attribute KDE x and y must have equal length");
+  const auto variant = attribute_kde_variant_name(result.variant);
+  for (std::size_t i = 0; i < result.x.size(); ++i) {
+    if (!std::isfinite(result.x[i]) || !std::isfinite(result.y[i]) ||
+        result.y[i] < 0.0 ||
+        (i != 0 && result.x[i] < result.x[i - 1])) {
+      throw std::invalid_argument(
+          "attribute KDE points must be finite, ordered, and non-negative");
+    }
+  }
+  if (result.attribute_key.empty())
+    throw std::invalid_argument("attribute KDE attribute key is empty");
+  std::ostringstream out;
+  out << "{\"family\":\"ATTRIBUTE_KDE\",\"variant\":\""
+      << variant << "\",\"attribute_key\":";
+  write_json_string(out, result.attribute_key);
+  out << ",\"x\":[";
+  for (std::size_t i = 0; i < result.x.size(); ++i) {
+    if (i != 0) out << ',';
+    out << std::setprecision(17) << result.x[i];
+  }
+  out << "],\"y\":[";
+  for (std::size_t i = 0; i < result.y.size(); ++i) {
+    if (i != 0) out << ',';
+    out << std::setprecision(17) << result.y[i];
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string boundary_activities_json(const BoundaryActivitiesResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"BOUNDARY_ACTIVITIES\",\"variant\":\""

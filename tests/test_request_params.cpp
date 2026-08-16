@@ -494,6 +494,37 @@ void attribute_distribution_params_contract() {
   assert(rejected);
 }
 
+void attribute_kde_params_contract() {
+  const auto options = minera::parse_attribute_kde_params(fields({
+      {"attribute_kde_key", "amount"},
+      {"attribute_kde_variant", "date"},
+      {"attribute_kde_graph_points", "17"},
+      {"attribute_kde_points_to_sample", "31"}}));
+  assert(options.attribute_key == "amount");
+  assert(options.variant == minera::AttributeKdeVariant::kDate);
+  assert(options.graph_points == 17 && options.points_to_sample == 31);
+  for (const auto& item : {
+           std::pair{"attribute_kde_variant", "other"},
+           std::pair{"attribute_kde_graph_points", "0"},
+           std::pair{"attribute_kde_points_to_sample", "-1"}}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_attribute_kde_params(fields({
+          {"attribute_kde_key", "amount"}, item}));
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  bool rejected = false;
+  try {
+    (void)minera::parse_attribute_kde_params(fields({}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void boundary_activities_params_contract() {
   const auto options = minera::parse_boundary_activities_params(fields({
       {"boundary_activities_variant", "end"},
@@ -2798,6 +2829,7 @@ int main() {
   case_statistics_params_contract();
   attribute_statistics_params_contract();
   attribute_distribution_params_contract();
+  attribute_kde_params_contract();
   boundary_activities_params_contract();
   variant_statistics_params_contract();
   return 0;

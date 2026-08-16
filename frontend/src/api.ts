@@ -144,6 +144,8 @@ import {
   type AttributeStatisticsOptions,
   type AttributeDistributionResult,
   type AttributeDistributionOptions,
+  type AttributeKdeResult,
+  type AttributeKdeOptions,
   type BoundaryActivitiesResult,
   type BoundaryActivitiesOptions,
   type VariantStatisticsResult,
@@ -173,6 +175,7 @@ import {
   isCaseStatisticsResult,
   isAttributeStatisticsResult,
   isAttributeDistributionResult,
+  isAttributeKdeResult,
   isBoundaryActivitiesResult,
   isVariantStatisticsResult,
 } from "./types";
@@ -1899,6 +1902,36 @@ export function requestAttributeDistribution(options: AttributeDistributionOptio
   return postChecked(`/api/attribute-distribution${query ? `?${query}` : ""}`, isAttributeDistributionResult, "attribute distribution");
 }
 export const discoverAttributeDistribution = requestAttributeDistribution;
+
+export function attributeKdeQuery(options: AttributeKdeOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.attribute_kde_key !== undefined) {
+    if (!options.attribute_kde_key)
+      throw new Error("attribute_kde_key must not be empty");
+    query.set("attribute_kde_key", options.attribute_kde_key);
+  }
+  if (options.attribute_kde_variant !== undefined) {
+    if (!["numeric", "date"].includes(options.attribute_kde_variant))
+      throw new Error("attribute_kde_variant is not supported");
+    query.set("attribute_kde_variant", options.attribute_kde_variant);
+  }
+  const positiveInteger = (value: number, name: string, maximum: number) => {
+    if (!Number.isInteger(value) || value < 1 || value > maximum)
+      throw new Error(`${name} must be a positive integer no greater than ${maximum}`);
+    query.set(name, String(value));
+  };
+  if (options.attribute_kde_graph_points !== undefined)
+    positiveInteger(options.attribute_kde_graph_points, "attribute_kde_graph_points", 10000);
+  if (options.attribute_kde_points_to_sample !== undefined)
+    positiveInteger(options.attribute_kde_points_to_sample, "attribute_kde_points_to_sample", 100000);
+  return query.toString();
+}
+
+export function requestAttributeKde(options: AttributeKdeOptions = {}): Promise<AttributeKdeResult> {
+  const query = attributeKdeQuery(options);
+  return postChecked(`/api/attribute-kde${query ? `?${query}` : ""}`, isAttributeKdeResult, "attribute KDE");
+}
+export const discoverAttributeKde = requestAttributeKde;
 
 export function boundaryActivitiesQuery(options: BoundaryActivitiesOptions = {}): string {
   const query = new URLSearchParams();

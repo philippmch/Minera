@@ -3929,6 +3929,45 @@ AttributeDistributionOptions parse_attribute_distribution_params(
   return options;
 }
 
+AttributeKdeOptions parse_attribute_kde_params(const FieldLookup& field) {
+  return parse_attribute_kde_params(field, {});
+}
+
+AttributeKdeOptions parse_attribute_kde_params(const FieldLookup& field,
+                                               const FieldPresence& present) {
+  AttributeKdeOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (!supplied("attribute_kde_key"))
+    throw std::invalid_argument("attribute_kde_key: required");
+  options.attribute_key = require("attribute_kde_key");
+  if (supplied("attribute_kde_variant")) {
+    const auto value = require("attribute_kde_variant");
+    if (value == "numeric" || value == "NUMERIC")
+      options.variant = AttributeKdeVariant::kNumeric;
+    else if (value == "date" || value == "DATE")
+      options.variant = AttributeKdeVariant::kDate;
+    else
+      throw std::invalid_argument(
+          "attribute_kde_variant: expected numeric or date");
+  }
+  if (supplied("attribute_kde_graph_points"))
+    options.graph_points = parse_positive_size(
+        require("attribute_kde_graph_points"), "attribute_kde_graph_points");
+  if (supplied("attribute_kde_points_to_sample"))
+    options.points_to_sample = parse_positive_size(
+        require("attribute_kde_points_to_sample"),
+        "attribute_kde_points_to_sample");
+  return options;
+}
+
 BoundaryActivitiesOptions parse_boundary_activities_params(
     const FieldLookup& field) {
   return parse_boundary_activities_params(field, {});

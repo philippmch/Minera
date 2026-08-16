@@ -63,6 +63,7 @@
 #include "minera/chaotic_activities.hpp"
 #include "minera/attribute_statistics.hpp"
 #include "minera/attribute_distribution.hpp"
+#include "minera/attribute_kde.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/case_statistics.hpp"
@@ -302,6 +303,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] AttributeDistributionOptions parse_attribute_distribution_params(
     const FieldLookup& field);
 [[nodiscard]] AttributeDistributionOptions parse_attribute_distribution_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] AttributeKdeOptions parse_attribute_kde_params(
+    const FieldLookup& field);
+[[nodiscard]] AttributeKdeOptions parse_attribute_kde_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] BoundaryActivitiesOptions parse_boundary_activities_params(

@@ -3058,6 +3058,40 @@ export function isAttributeDistributionResult(
     Number.isInteger(count) && count >= 0);
 }
 
+export interface AttributeKdeOptions {
+  attribute_kde_key?: string;
+  attribute_kde_variant?: "numeric" | "date";
+  attribute_kde_graph_points?: number;
+  attribute_kde_points_to_sample?: number;
+}
+
+export interface AttributeKdeResult {
+  family: "ATTRIBUTE_KDE";
+  variant: "NUMERIC" | "DATE";
+  attribute_key: string;
+  x: number[];
+  y: number[];
+}
+
+export function isAttributeKdeResult(
+  value: unknown,
+): value is AttributeKdeResult {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as Partial<AttributeKdeResult>;
+  if (data.family !== "ATTRIBUTE_KDE" ||
+      (data.variant !== "NUMERIC" && data.variant !== "DATE") ||
+      typeof data.attribute_key !== "string" || !data.attribute_key ||
+      !Array.isArray(data.x) || !Array.isArray(data.y) ||
+      data.x.length !== data.y.length) return false;
+  if (!data.x.every((point) => typeof point === "number" && Number.isFinite(point)) ||
+      !data.y.every((density) => typeof density === "number" &&
+        Number.isFinite(density) && density >= 0)) return false;
+  for (let i = 1; i < data.x.length; ++i) {
+    if (data.x[i] < data.x[i - 1]) return false;
+  }
+  return true;
+}
+
 export interface BoundaryActivitiesOptions {
   boundary_activities_variant?: "start" | "end" | "both";
   boundary_activities_activity_key?: string;
