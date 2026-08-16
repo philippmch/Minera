@@ -52,6 +52,17 @@ describe("native alignment adapters", () => {
     ]);
     expect(hasActiveFilters({ ltlVariant: "four_eyes_principle", ltlAttributeValues: ["A", "B"] })).toBe(true);
   });
+  it("serializes trace-pattern filters with wildcard spans and polarity", () => {
+    expect(mineFormEntries({
+      tracePatterns: ["..., A, B, ...", "X,Y"],
+      tracePatternPositive: false,
+    })).toEqual([
+      ["trace_patterns", "..., A, B, ...;X,Y"],
+      ["trace_pattern_positive", "false"],
+    ]);
+    expect(hasActiveFilters({ tracePatterns: ["A,B"] })).toBe(true);
+    expect(hasActiveFilters({ tracePatternPositive: false })).toBe(false);
+  });
   it("serializes concept drift controls", () => {
     expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true })).toBe("drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_window_size=2");
   });
@@ -504,6 +515,7 @@ describe("hasActiveFilters", () => {
       { removeDirectlyFollows: ["a -> b"] },
       { keepEventuallyFollows: ["a -> b"] },
       { removeEventuallyFollows: ["a -> b"] },
+      { tracePatterns: ["..., a, b, ..."] },
       { prefixActivity: "a" },
       { suffixActivity: "b" },
       { removeLifecycles: ["start"] },

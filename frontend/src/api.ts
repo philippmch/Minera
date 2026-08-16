@@ -231,6 +231,9 @@ export interface FilterOptions extends LtlFilterOptions {
   removeDirectlyFollows?: string[];
   keepEventuallyFollows?: string[];
   removeEventuallyFollows?: string[];
+  /** Exact/prefix/suffix/infix activity patterns; `...` matches any span. */
+  tracePatterns?: string[];
+  tracePatternPositive?: boolean;
   /** Reduce each case to its head up to the first prefixActivity / its tail
    * from the first suffixActivity (anchor included); cases without it drop. */
   prefixActivity?: string;
@@ -449,6 +452,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("keep_eventually_follows", options.keepEventuallyFollows.join(","));
   if (options.removeEventuallyFollows?.length)
     add("remove_eventually_follows", options.removeEventuallyFollows.join(","));
+  if (options.tracePatterns?.length) {
+    add("trace_patterns", options.tracePatterns.join(";"));
+    if (options.tracePatternPositive === false)
+      add("trace_pattern_positive", "false");
+  }
   if (options.prefixActivity) add("prefix_activity", options.prefixActivity);
   if (options.suffixActivity) add("suffix_activity", options.suffixActivity);
   if (options.betweenStart && options.betweenEnd) {
