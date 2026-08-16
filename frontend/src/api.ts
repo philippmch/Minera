@@ -2132,16 +2132,69 @@ export function reduceProcessTree(traceIndex: number, options: ProcessTreeReduct
   return postChecked(`/api/reduce-process-tree?${query.toString()}`, isProcessTreeReductionResult, "process-tree reduction");
 }
 
+export interface DecisionMiningOptions {
+  max_depth?: number;
+  min_split?: number;
+  min_leaf?: number;
+  max_categories?: number;
+  max_thresholds?: number;
+  min_gain?: number;
+  include_trace_attributes?: boolean;
+  attributes?: string[];
+}
+
+export interface DecisionTablesRequestOptions extends DecisionMiningOptions {
+  miner?: string;
+}
+
+export function decisionMiningQuery(options: DecisionMiningOptions = {}): string {
+  const query = new URLSearchParams();
+  const integer = (name: string, value: number | undefined, minimum: number) => {
+    if (value === undefined) return;
+    if (!Number.isSafeInteger(value) || value < minimum)
+      throw new Error(`${name} must be a safe integer >= ${minimum}`);
+    query.set(name, String(value));
+  };
+  integer("decision_max_depth", options.max_depth, 0);
+  if (options.max_depth !== undefined && options.max_depth > 64)
+    throw new Error("decision_max_depth must be at most 64");
+  integer("decision_min_split", options.min_split, 2);
+  integer("decision_min_leaf", options.min_leaf, 1);
+  integer("decision_max_categories", options.max_categories, 1);
+  integer("decision_max_thresholds", options.max_thresholds, 1);
+  if (options.min_gain !== undefined) {
+    if (!Number.isFinite(options.min_gain) || options.min_gain < 0)
+      throw new Error("decision_min_gain must be finite and non-negative");
+    query.set("decision_min_gain", String(options.min_gain));
+  }
+  if (options.include_trace_attributes !== undefined)
+    query.set("decision_include_trace_attributes", String(options.include_trace_attributes));
+  if (options.attributes !== undefined) {
+    if (!Array.isArray(options.attributes) || options.attributes.length === 0 ||
+        options.attributes.some((attribute) => typeof attribute !== "string" ||
+          !attribute.trim() || attribute.includes(",")))
+      throw new Error("decision_attributes must contain non-empty comma-free names");
+    query.set("decision_attributes", options.attributes.map((attribute) => attribute.trim()).join(","));
+  }
+  return query.toString();
+}
+
 /**
  * Asks the backend to mine the decision points of one miner's model: which
  * attribute values steer a case down which branch. Like alignments this is
  * deferred to an on-demand request, so a mine never pays for decisions the
  * user may not open.
  */
-export async function decideModel(miner: string): Promise<Decisions> {
+export async function decideModel(
+  miner: string,
+  options: DecisionMiningOptions = {},
+): Promise<Decisions> {
+  if (!miner.trim()) throw new Error("miner must not be empty");
+  const params = new URLSearchParams(decisionMiningQuery(options));
+  params.set("miner", miner);
   let response: Response;
   try {
-    response = await fetch(`/api/decide?miner=${encodeURIComponent(miner)}`, {
+    response = await fetch(`/api/decide?${params.toString()}`, {
       method: "POST",
     });
   } catch {
@@ -2286,10 +2339,28 @@ export async function fetchXes(): Promise<string> {
 
 /** Requests the encoded decision tables for one cached model. */
 export function requestDecisionTables(
-  miner = "inductive",
+  miner?: string,
+  options?: DecisionMiningOptions,
+): Promise<DecisionTablesResult>;
+export function requestDecisionTables(
+  options?: DecisionTablesRequestOptions,
+): Promise<DecisionTablesResult>;
+export function requestDecisionTables(
+  minerOrOptions: string | DecisionTablesRequestOptions = "inductive",
+  legacyOptions: DecisionMiningOptions = {},
 ): Promise<DecisionTablesResult> {
+  const options = typeof minerOrOptions === "string"
+    ? { ...legacyOptions, miner: minerOrOptions }
+    : (minerOrOptions ?? {});
+  const miner = options.miner ?? "inductive";
   if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
   const query = new URLSearchParams({ miner });
+  try {
+    for (const [key, value] of new URLSearchParams(decisionMiningQuery(options)))
+      query.append(key, value);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   return postChecked(
     `/api/decision-tables?${query.toString()}`,
     isDecisionTablesResult,

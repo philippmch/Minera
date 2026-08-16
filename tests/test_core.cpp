@@ -4044,6 +4044,35 @@ void decision_mining_uses_prior_event_attributes_only() {
          blind.decision_points.front().majority_share);
 }
 
+void decision_mining_options_bound_tree_and_scope_attributes() {
+  const auto log = decision_amount_log();
+  const auto net = minera::to_petri_net(minera::discover_process_tree(log));
+
+  minera::DecisionMiningOptions shallow;
+  shallow.max_depth = 0;
+  const auto shallow_result = minera::mine_decisions(log, net, shallow);
+  assert(shallow_result.decision_points.size() == 1);
+  assert(shallow_result.decision_points.front().nodes.size() == 1);
+
+  minera::DecisionMiningOptions no_trace_attributes;
+  no_trace_attributes.include_trace_attributes = false;
+  no_trace_attributes.attributes = {"amount"};
+  const auto without_context =
+      minera::mine_decisions(log, net, no_trace_attributes);
+  assert(without_context.decision_points.size() == 1);
+  assert(without_context.decision_points.front().nodes.size() == 1);
+
+  bool threw = false;
+  try {
+    minera::DecisionMiningOptions invalid;
+    invalid.max_depth = 65;
+    (void)minera::mine_decisions(log, net, invalid);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void decision_mining_skips_deviating_traces() {
   auto log = decision_amount_log();
   const auto net = minera::to_petri_net(minera::discover_process_tree(log));
@@ -5538,6 +5567,7 @@ int main() {
   replay_firing_sequences_walk_fitting_variants();
   decision_mining_recovers_a_numeric_rule();
   decision_mining_uses_prior_event_attributes_only();
+  decision_mining_options_bound_tree_and_scope_attributes();
   decision_mining_skips_deviating_traces();
   json_export_carries_the_decisions_contract();
   importers_read_lifecycle_transitions();

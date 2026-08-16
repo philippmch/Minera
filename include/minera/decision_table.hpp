@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/decision_mining.hpp"
 #include "minera/petri_net.hpp"
 
 namespace minera {
@@ -14,6 +15,9 @@ namespace minera {
 // Controls the deterministic table extracted from the observations that are
 // available immediately before a model choice.
 struct DecisionTableOptions {
+  // The same tree controls are used when the table also carries decision
+  // diagnostics, keeping on-demand table and decision requests consistent.
+  DecisionMiningOptions mining;
   // The reference table uses event attributes by default. Case attributes can
   // be included explicitly without changing the source log.
   bool include_trace_attributes = false;

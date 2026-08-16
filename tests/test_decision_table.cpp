@@ -72,10 +72,25 @@ int main() {
       minera::mine_decision_tables(sample_log(), branching_net(), with_trace);
   assert(with_trace_result.tables.size() == 1);
 
+  with_trace.mining.max_depth = 0;
+  const auto shallow =
+      minera::mine_decision_tables(sample_log(), branching_net(), with_trace);
+  assert(shallow.tables.size() == 1);
+
   bool threw = false;
   try {
     minera::DecisionTableOptions invalid;
     invalid.lookback = 0;
+    (void)minera::mine_decision_tables(sample_log(), branching_net(), invalid);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    minera::DecisionTableOptions invalid;
+    invalid.mining.min_leaf = 0;
     (void)minera::mine_decision_tables(sample_log(), branching_net(), invalid);
   } catch (const std::invalid_argument&) {
     threw = true;

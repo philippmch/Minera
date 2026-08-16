@@ -3629,6 +3629,41 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+minera::DecisionMiningOptions decision_mining_options(
+    const httplib::Request& request) {
+  static const std::set<std::string> allowed = {
+      "miner", "decision_max_depth", "decision_min_split",
+      "decision_min_leaf", "decision_max_categories",
+      "decision_max_thresholds", "decision_min_gain",
+      "decision_include_trace_attributes", "decision_attributes"};
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (!allowed.contains(key))
+      throw std::invalid_argument("unknown decision parameter: " + key);
+  }
+  minera::DecisionMiningOptions options;
+  options.max_depth = ocel_query_size(request, "decision_max_depth",
+                                      options.max_depth);
+  if (options.max_depth > 64)
+    throw std::invalid_argument("decision_max_depth must be at most 64");
+  options.min_split = ocel_query_size(request, "decision_min_split",
+                                       options.min_split);
+  options.min_leaf = ocel_query_size(request, "decision_min_leaf",
+                                      options.min_leaf);
+  options.max_categories = ocel_query_size(
+      request, "decision_max_categories", options.max_categories);
+  options.max_thresholds = ocel_query_size(
+      request, "decision_max_thresholds", options.max_thresholds);
+  options.min_gain = ocel_query_number(request, "decision_min_gain",
+                                       options.min_gain);
+  options.include_trace_attributes = ocel_query_bool(
+      request, "decision_include_trace_attributes",
+      options.include_trace_attributes);
+  if (request.has_param("decision_attributes"))
+    options.attributes = ocel_query_list(request, "decision_attributes");
+  return options;
+}
+
 // On-demand decision mining of one model from the most recent mine: which
 // attribute values steer a case down which branch of the net. Expects a
 // `miner` query parameter like /api/align.
@@ -3656,7 +3691,8 @@ void handle_decide(const httplib::Request& request,
   }
 
   try {
-    auto decisions = minera::mine_decisions(session->log, it->second);
+    const auto options = decision_mining_options(request);
+    auto decisions = minera::mine_decisions(session->log, it->second, options);
     decisions.miner = miner;
     response.set_content(minera::decisions_json(decisions),
                          "application/json");
@@ -3834,7 +3870,13 @@ void handle_decision_tables(const httplib::Request& request,
     return;
   }
   try {
-    const auto result = minera::mine_decision_tables(session->log, it->second);
+    const auto mining = decision_mining_options(request);
+    minera::DecisionTableOptions options;
+    options.mining = mining;
+    options.include_trace_attributes = mining.include_trace_attributes;
+    options.attributes = mining.attributes;
+    const auto result =
+        minera::mine_decision_tables(session->log, it->second, options);
     response.set_content(minera::serialize_decision_tables_json(result),
                          "application/json");
   } catch (const std::exception& error) {
