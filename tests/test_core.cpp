@@ -3180,6 +3180,65 @@ void filter_numeric_attributes_support_event_and_trace_ranges() {
   }));
 }
 
+void filter_frequency_attribute_variants_support_top_and_relative_occurrence() {
+  const auto log = log_from_variants({
+      {"A", "A", "B"},
+      {"A", "C"},
+      {"B", "C"},
+  });
+
+  minera::TopActivitiesFilterOptions top;
+  top.max_activities = 2;
+  const auto top_two = minera::filter_top_activities(log, top);
+  assert(top_two.trace_count() == 3);
+  assert((activity_names(top_two.traces[0]) ==
+          std::vector<std::string>{"A", "A", "B"}));
+  assert((activity_names(top_two.traces[1]) ==
+          std::vector<std::string>{"A"}));
+  assert((activity_names(top_two.traces[2]) ==
+          std::vector<std::string>{"B"}));
+
+  top.max_activities = 0;
+  assert(minera::filter_log_on_max_no_activities(log, 0).trace_count() == 0);
+
+  minera::RelativeAttributeOccurrenceFilterOptions relative;
+  relative.min_relative_stake = 0.67;
+  const auto case_occurrence =
+      minera::filter_relative_attribute_occurrence(log, relative);
+  assert(case_occurrence.trace_count() == 0);
+
+  relative.min_relative_stake = 0.5;
+  const auto half_cases =
+      minera::filter_relative_attribute_occurrence(log, relative);
+  assert(half_cases.trace_count() == 3);
+  assert((activity_names(half_cases.traces[0]) ==
+          std::vector<std::string>{"A", "A", "B"}));
+
+  relative.keep_once_per_case = false;
+  relative.min_relative_stake = 0.4;
+  const auto event_occurrence =
+      minera::filter_relative_attribute_occurrence(log, relative);
+  assert(event_occurrence.trace_count() == 2);
+  assert((activity_names(event_occurrence.traces[0]) ==
+          std::vector<std::string>{"A", "A"}));
+  assert((activity_names(event_occurrence.traces[1]) ==
+          std::vector<std::string>{"A"}));
+
+  minera::LogFilterOptions integrated;
+  integrated.top_activities = minera::TopActivitiesFilterOptions{2, {}};
+  integrated.relative_attribute_occurrence =
+      minera::RelativeAttributeOccurrenceFilterOptions{"", 0.5, true};
+  assert(integrated.any());
+  const auto combined = minera::filter_event_log(log, integrated);
+  assert(combined.trace_count() == 3);
+
+  assert(throws([&] {
+    minera::RelativeAttributeOccurrenceFilterOptions invalid;
+    invalid.min_relative_stake = 1.1;
+    (void)minera::filter_relative_attribute_occurrence(log, invalid);
+  }));
+}
+
 void filter_prefix_suffix_support_strictness_and_occurrence() {
   const auto log = log_from_variants({{"a", "b", "a", "c"}, {"x", "y"}});
 
@@ -5337,6 +5396,7 @@ int main() {
   filter_case_performance_uses_inclusive_trace_duration();
   filter_case_selection_limits_cases_and_event_counts();
   filter_numeric_attributes_support_event_and_trace_ranges();
+  filter_frequency_attribute_variants_support_top_and_relative_occurrence();
   filter_prefix_suffix_support_strictness_and_occurrence();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();

@@ -1044,6 +1044,28 @@ describe("mineFormEntries", () => {
     expect(() => mineFormEntries({ numericAttributeKey: "amount", numericAttributeMin: 3, numericAttributeMax: 2 })).toThrow(/not exceed/);
   });
 
+  it("serializes frequency-based activity filters and treats subordinate settings consistently", () => {
+    expect(mineFormEntries({
+      maxActivities: 2,
+      topActivitiesAttributeKey: "channel",
+      relativeAttributeKey: "channel",
+      relativeAttributeStake: 0.5,
+      relativeAttributeKeepOncePerCase: false,
+    })).toEqual([
+      ["max_activities", "2"],
+      ["top_activities_attribute_key", "channel"],
+      ["relative_attribute_key", "channel"],
+      ["relative_attribute_stake", "0.5"],
+      ["relative_attribute_keep_once_per_case", "false"],
+    ]);
+    expect(() => mineFormEntries({ topActivitiesAttributeKey: "channel" })).toThrow(/maxActivities/);
+    expect(() => mineFormEntries({ relativeAttributeStake: 1.1 })).toThrow(/\[0, 1\]/);
+    expect(hasActiveFilters({ maxActivities: 0 })).toBe(true);
+    expect(hasActiveFilters({ topActivitiesAttributeKey: "channel" })).toBe(false);
+    expect(hasActiveFilters({ relativeAttributeKey: "channel" })).toBe(true);
+    expect(hasActiveFilters({ relativeAttributeKeepOncePerCase: true })).toBe(false);
+  });
+
   it("maps the succession, cut, and coverage filters", () => {
     const entries = mineFormEntries({
       variantCoverage: 0.8,

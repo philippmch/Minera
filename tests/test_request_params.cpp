@@ -792,6 +792,11 @@ void parse_mine_params_maps_filters() {
       {"start_activities", "a"},
       {"end_activities", "c"},
       {"max_cases", "4"},
+      {"max_activities", "3"},
+      {"top_activities_attribute_key", "channel"},
+      {"relative_attribute_key", "channel"},
+      {"relative_attribute_stake", "0.6"},
+      {"relative_attribute_keep_once_per_case", "false"},
       {"min_length", "2"},
       {"max_length", "10"},
       {"min_variant_frequency", "3"},
@@ -856,6 +861,13 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.start_activities == std::vector<std::string>{"a"}));
   assert((params.filter.end_activities == std::vector<std::string>{"c"}));
   assert(params.filter.max_cases && *params.filter.max_cases == 4);
+  assert(params.filter.top_activities.has_value());
+  assert(params.filter.top_activities->max_activities == 3);
+  assert(params.filter.top_activities->attribute_key == "channel");
+  assert(params.filter.relative_attribute_occurrence.has_value());
+  assert(params.filter.relative_attribute_occurrence->attribute_key == "channel");
+  assert(params.filter.relative_attribute_occurrence->min_relative_stake == 0.6);
+  assert(!params.filter.relative_attribute_occurrence->keep_once_per_case);
   assert(params.filter.min_length == 2);
   assert(params.filter.max_length == 10);
   assert(params.filter.min_variant_frequency == 3);
@@ -968,6 +980,31 @@ void parse_mine_params_rejects_invalid_case_selection_bounds() {
   try {
     (void)minera::parse_mine_params(fields({
         {"min_length", "5"}, {"max_length", "4"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_frequency_attribute_options() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"max_activities", "-1"},
+           std::pair<std::string, std::string>{"relative_attribute_stake", "nan"},
+           std::pair<std::string, std::string>{"relative_attribute_stake", "1.1"},
+           std::pair<std::string, std::string>{"relative_attribute_keep_once", "maybe"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"top_activities_attribute_key", "channel"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -2562,6 +2599,7 @@ int main() {
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_case_selection_bounds();
+  parse_mine_params_rejects_invalid_frequency_attribute_options();
   parse_mine_params_rejects_invalid_numeric_attribute_ranges();
   parse_mine_params_rejects_invalid_prefix_suffix_options();
   parse_mine_params_rejects_invalid_trace_patterns();

@@ -12,6 +12,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace minera {
 
@@ -1033,6 +1034,62 @@ MineParams parse_mine_params(const FieldLookup& field,
                                            : std::string_view("case_limit");
     params.filter.max_cases = parse_nonnegative_size(
         field(max_cases_field), max_cases_field);
+  }
+
+  // Frequency-based activity/attribute projections.  The maximum-activity
+  // field accepts the common aliases so old clients can opt into the same
+  // deterministic top-value filter.  Relative occurrence defaults to the
+  // activity field and counts each value once per case unless requested
+  // otherwise.
+  const bool top_activities_supplied =
+      supplied("max_activities") || supplied("max_no_activities") ||
+      supplied("top_activity_limit") ||
+      supplied("top_activities_attribute_key");
+  if (top_activities_supplied) {
+    const auto limit_field = supplied("max_activities")
+                                 ? std::string_view("max_activities")
+                                 : supplied("max_no_activities")
+                                       ? std::string_view("max_no_activities")
+                                       : std::string_view("top_activity_limit");
+    if (!supplied(limit_field)) {
+      throw std::invalid_argument(
+          "max_activities: a non-negative activity limit is required");
+    }
+    TopActivitiesFilterOptions top;
+    top.max_activities = parse_nonnegative_size(
+        field(limit_field), limit_field);
+    if (supplied("top_activities_attribute_key"))
+      top.attribute_key = field("top_activities_attribute_key");
+    params.filter.top_activities = std::move(top);
+  }
+
+  const bool relative_occurrence_supplied =
+      supplied("relative_attribute_key") ||
+      supplied("relative_attribute_stake") ||
+      supplied("relative_attribute_keep_once_per_case") ||
+      supplied("relative_attribute_keep_once");
+  if (relative_occurrence_supplied) {
+    RelativeAttributeOccurrenceFilterOptions relative;
+    if (supplied("relative_attribute_key"))
+      relative.attribute_key = field("relative_attribute_key");
+    if (supplied("relative_attribute_stake")) {
+      relative.min_relative_stake = parse_finite_double(
+          field("relative_attribute_stake"), "relative_attribute_stake");
+      if (relative.min_relative_stake < 0.0 ||
+          relative.min_relative_stake > 1.0) {
+        throw std::invalid_argument(
+            "relative_attribute_stake: expected a number in [0, 1]");
+      }
+    }
+    const auto keep_field = supplied("relative_attribute_keep_once_per_case")
+                                ? std::string_view(
+                                      "relative_attribute_keep_once_per_case")
+                                : std::string_view("relative_attribute_keep_once");
+    if (supplied(keep_field)) {
+      relative.keep_once_per_case = parse_boolean(
+          field(keep_field), keep_field);
+    }
+    params.filter.relative_attribute_occurrence = std::move(relative);
   }
   if (const auto value = field("keep_activities"); !value.empty()) {
     params.filter.keep_activities = split_csv(value);
