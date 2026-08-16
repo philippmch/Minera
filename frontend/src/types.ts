@@ -198,7 +198,8 @@ export interface OrganizationalSnaResult {
   diagnostics: OrganizationalSnaDiagnostics;
 }
 export interface OrganizationalSnaOptions {
-  sna_variant?: OrganizationalSnaVariant; sna_beta?: number; sna_n?: number;
+  sna_variant?: OrganizationalSnaVariant; sna_activity_attribute?: string; sna_resource_attribute?: string;
+  sna_beta?: number; sna_n?: number;
   sna_metric_normalization?: boolean; sna_max_resources?: number; sna_max_edges?: number;
 }
 
@@ -249,7 +250,7 @@ export interface DiscoveredRole { activities: string[]; resources: RoleDiscovery
 export interface RoleDiscoveryDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; activity_count: number; resource_count: number; role_count: number; message: string; }
 export type RoleDiscoveryVariant = "log" | "pandas";
 export interface RoleDiscoveryResult { family: "ROLE_DISCOVERY"; variant: RoleDiscoveryVariant; roles: DiscoveredRole[]; diagnostics: RoleDiscoveryDiagnostics; }
-export interface RoleDiscoveryOptions { roles_variant?: RoleDiscoveryVariant; roles_threshold?: number; roles_max_resources?: number; roles_max_activities?: number; }
+export interface RoleDiscoveryOptions { roles_variant?: RoleDiscoveryVariant; roles_activity_attribute?: string; roles_resource_attribute?: string; roles_threshold?: number; roles_max_resources?: number; roles_max_activities?: number; }
 export function isRoleDiscoveryResult(value: unknown): value is RoleDiscoveryResult {
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<RoleDiscoveryResult>;

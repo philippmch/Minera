@@ -18,6 +18,16 @@ constexpr std::size_t kHardGap = 10000;
 
 using Pair = std::pair<std::size_t, std::size_t>;
 
+std::string selected_value(const Event& event, const std::string& key,
+                           bool resource) {
+  if (resource && (key.empty() || key == "org:resource" || key == "resource"))
+    return event.resource;
+  if (!resource && (key.empty() || key == "concept:name" || key == "activity"))
+    return event.activity;
+  if (const auto* value = event.attribute(key)) return *value;
+  return {};
+}
+
 bool handover_variant(OrganizationalSnaVariant variant) {
   return variant == OrganizationalSnaVariant::kHandover ||
          variant == OrganizationalSnaVariant::kHandoverPandas;
@@ -27,12 +37,14 @@ bool subcontracting_variant(OrganizationalSnaVariant variant) {
          variant == OrganizationalSnaVariant::kSubcontractingPandas;
 }
 
-std::vector<std::size_t> resource_ids(const Trace& trace,
-                                      const std::unordered_map<std::string, std::size_t>& ids) {
+std::vector<std::size_t> resource_ids(
+    const Trace& trace, const std::unordered_map<std::string, std::size_t>& ids,
+    const std::string& resource_attribute) {
   std::vector<std::size_t> result;
   for (const auto& event : trace.events) {
-    if (event.resource.empty()) continue;
-    const auto it = ids.find(event.resource);
+    const auto resource = selected_value(event, resource_attribute, true);
+    if (resource.empty()) continue;
+    const auto it = ids.find(resource);
     if (it != ids.end()) result.push_back(it->second);
   }
   return result;
@@ -73,7 +85,8 @@ OrganizationalSnaResult discover_organizational_sna(
   std::set<std::string> names;
   for (const auto& trace : log.traces)
     for (const auto& event : trace.events)
-      if (!event.resource.empty()) names.insert(event.resource);
+      if (const auto resource = selected_value(event, options.resource_attribute, true);
+          !resource.empty()) names.insert(resource);
   if (names.size() > options.max_resources)
     throw std::invalid_argument("organizational SNA resource bound exceeded");
   result.resources.assign(names.begin(), names.end());
@@ -89,7 +102,8 @@ OrganizationalSnaResult discover_organizational_sna(
       std::map<std::vector<std::string>, std::size_t> variants;
       for (const auto& trace : log.traces) {
         std::vector<std::string> sequence;
-        for (const auto& event : trace.events) sequence.push_back(event.resource);
+        for (const auto& event : trace.events)
+          sequence.push_back(selected_value(event, options.resource_attribute, true));
         ++variants[std::move(sequence)];
       }
       double dividend = 0.0;
@@ -120,7 +134,7 @@ OrganizationalSnaResult discover_organizational_sna(
       if (log.trace_count() != 0) {
         const double normalizer = 1.0 / static_cast<double>(log.trace_count());
         for (const auto& trace : log.traces) {
-          auto events = resource_ids(trace, ids);
+          auto events = resource_ids(trace, ids, options.resource_attribute);
           std::sort(events.begin(), events.end());
           events.erase(std::unique(events.begin(), events.end()), events.end());
           for (std::size_t i = 0; i < events.size(); ++i) {
@@ -137,7 +151,8 @@ OrganizationalSnaResult discover_organizational_sna(
     case OrganizationalSnaVariant::kSubcontractingPandas: {
       for (const auto& trace : log.traces) {
         std::vector<std::string> events;
-        for (const auto& event : trace.events) events.push_back(event.resource);
+        for (const auto& event : trace.events)
+          events.push_back(selected_value(event, options.resource_attribute, true));
         for (std::size_t i = 0; i + options.n < events.size(); ++i) {
           if (events[i].empty() || events[i] != events[i + options.n]) continue;
           const auto source = ids.find(events[i]);
@@ -158,7 +173,8 @@ OrganizationalSnaResult discover_organizational_sna(
       std::set<std::string> activity_names;
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events)
-          if (!event.activity.empty()) activity_names.insert(event.activity);
+          if (const auto activity = selected_value(event, options.activity_attribute, false);
+              !activity.empty()) activity_names.insert(activity);
       std::vector<std::string> activities(activity_names.begin(), activity_names.end());
       std::unordered_map<std::string, std::size_t> activity_ids;
       for (std::size_t i = 0; i < activities.size(); ++i)
@@ -167,9 +183,11 @@ OrganizationalSnaResult discover_organizational_sna(
                                                 std::vector<double>(activities.size()));
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events) {
-          if (event.resource.empty() || event.activity.empty()) continue;
-          const auto ri = ids.find(event.resource);
-          const auto ai = activity_ids.find(event.activity);
+          const auto resource = selected_value(event, options.resource_attribute, true);
+          const auto activity = selected_value(event, options.activity_attribute, false);
+          if (resource.empty() || activity.empty()) continue;
+          const auto ri = ids.find(resource);
+          const auto ai = activity_ids.find(activity);
           if (ri != ids.end() && ai != activity_ids.end()) vectors[ri->second][ai->second] += 1.0;
         }
       for (std::size_t a = 0; a < vectors.size(); ++a) {

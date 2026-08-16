@@ -1594,6 +1594,8 @@ export function organizationalSnaQuery(options: OrganizationalSnaOptions = {}): 
   const query = new URLSearchParams();
   const entries: Array<[string, string | undefined]> = [
     ["sna_variant", options.sna_variant],
+    ["sna_activity_attribute", options.sna_activity_attribute],
+    ["sna_resource_attribute", options.sna_resource_attribute],
     ["sna_beta", options.sna_beta === undefined ? undefined : String(options.sna_beta)],
     ["sna_n", options.sna_n === undefined ? undefined : String(options.sna_n)],
     ["sna_metric_normalization", options.sna_metric_normalization === undefined ? undefined : String(options.sna_metric_normalization)],
@@ -1639,6 +1641,8 @@ export const discoverNetworkAnalysis = requestNetworkAnalysis;
 export function roleDiscoveryQuery(options: RoleDiscoveryOptions = {}): string {
   const query = new URLSearchParams();
   if (options.roles_variant !== undefined) query.set("roles_variant", options.roles_variant);
+  if (options.roles_activity_attribute !== undefined) query.set("roles_activity_attribute", options.roles_activity_attribute);
+  if (options.roles_resource_attribute !== undefined) query.set("roles_resource_attribute", options.roles_resource_attribute);
   if (options.roles_threshold !== undefined) query.set("roles_threshold", String(options.roles_threshold));
   if (options.roles_max_resources !== undefined) query.set("roles_max_resources", String(options.roles_max_resources));
   if (options.roles_max_activities !== undefined) query.set("roles_max_activities", String(options.roles_max_activities));

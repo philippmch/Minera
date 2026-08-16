@@ -48,6 +48,21 @@ int main() {
   assert(json.find("\"variant\":\"log\"") != std::string::npos);
   assert(json.find("\"role_count\":3") != std::string::npos);
 
+  EventLog custom{{Trace{"custom", {
+      Event{"custom", "ignored", "", "ignored", 0,
+            {{"team:activity", "A"}, {"team:resource", "r1"}}},
+      Event{"custom", "ignored", "", "ignored", 1,
+            {{"team:activity", "B"}, {"team:resource", "r2"}}},
+  }}}};
+  RoleDiscoveryOptions custom_options;
+  custom_options.activity_attribute = "team:activity";
+  custom_options.resource_attribute = "team:resource";
+  custom_options.threshold = 1.0;
+  const auto custom_result = discover_roles(custom, custom_options);
+  assert(custom_result.roles.size() == 2);
+  assert(custom_result.roles[0].resources[0].name == "r2" ||
+         custom_result.roles[1].resources[0].name == "r2");
+
   bool threw = false; try { RoleDiscoveryOptions bad; bad.threshold = 2; const auto bad_result = discover_roles(log, bad); (void)bad_result; } catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   threw = false; try { (void)parse_role_discovery_params([](std::string_view) { return std::string("nan"); }); } catch (const std::invalid_argument&) { threw = true; }

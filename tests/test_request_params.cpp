@@ -2642,11 +2642,15 @@ void organizational_sna_params_contract() {
       {"sna_beta", "0.25"},
       {"sna_n", "4"},
       {"sna_metric_normalization", "true"},
+      {"sna_activity_attribute", "team:activity"},
+      {"sna_resource_attribute", "team:resource"},
       {"sna_max_resources", "20"},
       {"sna_max_edges", "80"}}));
   assert(parsed.variant == minera::OrganizationalSnaVariant::kWorkingTogether);
   assert(parsed.beta == 0.25 && parsed.n == 4 && parsed.metric_normalization);
   assert(parsed.max_resources == 20 && parsed.max_edges == 80);
+  assert(parsed.activity_attribute == "team:activity" &&
+         parsed.resource_attribute == "team:resource");
   for (const auto& [wire, expected] : {
            std::pair{"handover_pandas", minera::OrganizationalSnaVariant::kHandoverPandas},
            std::pair{"working_together_pandas", minera::OrganizationalSnaVariant::kWorkingTogetherPandas},
@@ -2677,11 +2681,15 @@ void role_discovery_params_contract() {
   const auto parsed = minera::parse_role_discovery_params(fields({
       {"roles_variant", "pandas"},
       {"roles_threshold", "0.4"},
+      {"roles_activity_attribute", "team:activity"},
+      {"roles_resource_attribute", "team:resource"},
       {"roles_max_resources", "8"},
       {"roles_max_activities", "12"}}));
   assert(parsed.variant == minera::RoleDiscoveryVariant::kPandas);
   assert(parsed.threshold == 0.4 && parsed.max_resources == 8 &&
          parsed.max_activities == 12);
+  assert(parsed.activity_attribute == "team:activity" &&
+         parsed.resource_attribute == "team:resource");
   for (const auto& item : {std::pair{"roles_variant", "other"},
                            std::pair{"roles_threshold", "1.1"},
                            std::pair{"roles_threshold", "nan"},

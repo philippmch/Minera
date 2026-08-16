@@ -18,6 +18,10 @@ enum class RoleDiscoveryVariant {
 struct RoleDiscoveryOptions {
   double threshold = 0.65;
   RoleDiscoveryVariant variant = RoleDiscoveryVariant::kLog;
+  // Selectors follow the standard event attribute names by default.  Custom
+  // keys are resolved through Event::attributes for dataframe-style inputs.
+  std::string activity_attribute = "concept:name";
+  std::string resource_attribute = "org:resource";
   std::size_t max_resources = 256;
   std::size_t max_activities = 10000;
 };

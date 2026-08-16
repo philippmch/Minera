@@ -1808,7 +1808,8 @@ void handle_organizational_sna(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "sna_variant", "sna_beta", "sna_n", "sna_metric_normalization",
+        "sna_variant", "sna_activity_attribute", "sna_resource_attribute",
+        "sna_beta", "sna_n", "sna_metric_normalization",
         "sna_max_resources", "sna_max_edges"};
     for (const auto& [key, value] : request.params) {
       (void)value;
@@ -1897,7 +1898,7 @@ void handle_roles(const httplib::Request& request, httplib::Response& response) 
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
-    static const std::set<std::string> allowed = {"roles_variant", "roles_threshold", "roles_max_resources", "roles_max_activities"};
+    static const std::set<std::string> allowed = {"roles_variant", "roles_activity_attribute", "roles_resource_attribute", "roles_threshold", "roles_max_resources", "roles_max_activities"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown roles parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
