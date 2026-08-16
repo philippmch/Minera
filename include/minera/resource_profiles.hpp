@@ -38,6 +38,13 @@ enum class ResourceProfileMetric {
 
 struct ResourceProfilesOptions {
   ResourceProfileMetric metric = ResourceProfileMetric::kDistinctActivities;
+  // Standard selectors resolve first-class Event/Trace fields.  Custom keys
+  // are read from typed event or trace attributes.
+  std::string activity_attribute = "concept:name";
+  std::string resource_attribute = "org:resource";
+  std::string timestamp_attribute = "time:timestamp";
+  std::string start_timestamp_attribute;
+  std::string case_id_attribute = "case:concept:name";
   // Empty bounds are unbounded. Bounds are half-open [t1,t2).
   std::string t1;
   std::string t2;

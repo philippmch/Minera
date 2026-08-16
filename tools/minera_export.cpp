@@ -419,7 +419,7 @@ int usage(const char* program) {
                "  --roles-max-resources <n> Resource safety bound\n"
                "  --roles-max-activities <n> Activity safety bound\n"
                "  --resource-profiles      Emit resource profile JSON\n"
-               "  --resource-profile-* <v> Resource profile metric, slots, selectors, and bounds\n"
+               "  --resource-profile-* <v> Resource profile metric, attributes, slots, selectors, and bounds\n"
                "  --local-diagnostics      Emit bounded local diagnostics JSON\n"
                "  --local-diagnostics-* <v> Group attributes, explicit groups, and bounds\n"
                "  --clustering             Emit trace-attribute clustering JSON\n"
@@ -2039,7 +2039,7 @@ int main(int argc, char** argv) {
     if (arg.rfind("--resource-profile-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key("resource_profiles_"); key += std::string(arg.substr(19));
-      static const std::set<std::string> names = {"resource_profiles_metric", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows"};
+      static const std::set<std::string> names = {"resource_profiles_metric", "resource_profiles_activity_attribute", "resource_profiles_resource_attribute", "resource_profiles_timestamp_attribute", "resource_profiles_start_timestamp_attribute", "resource_profiles_case_id_attribute", "resource_profiles_t1", "resource_profiles_t2", "resource_profiles_resource", "resource_profiles_activity", "resource_profiles_resource2", "resource_profiles_max_resources", "resource_profiles_max_rows"};
       if (!names.contains(key)) throw std::invalid_argument("unknown resource profile option: " + key);
       resource_profiles_fields.insert_or_assign(key, value); resource_profiles_requested = true; continue;
     }

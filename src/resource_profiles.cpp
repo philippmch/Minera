@@ -58,8 +58,62 @@ const char* metric_name(ResourceProfileMetric m) {
 }
 
 bool selected(const Event& e, const ResourceProfilesOptions& o) {
-  return (o.resource.empty() || e.resource == o.resource) &&
-         (o.activity.empty() || e.activity == o.activity);
+  const auto resource = [&] {
+    if (o.resource_attribute.empty() || o.resource_attribute == "org:resource" ||
+        o.resource_attribute == "resource") return e.resource;
+    if (const auto* value = e.attribute(o.resource_attribute)) return *value;
+    return std::string{};
+  }();
+  const auto activity = [&] {
+    if (o.activity_attribute.empty() || o.activity_attribute == "concept:name" ||
+        o.activity_attribute == "activity") return e.activity;
+    if (const auto* value = e.attribute(o.activity_attribute)) return *value;
+    return std::string{};
+  }();
+  return (o.resource.empty() || resource == o.resource) &&
+         (o.activity.empty() || activity == o.activity);
+}
+
+std::string resource_of(const Event& e, const ResourceProfilesOptions& o) {
+  if (o.resource_attribute.empty() || o.resource_attribute == "org:resource" ||
+      o.resource_attribute == "resource") return e.resource;
+  if (const auto* value = e.attribute(o.resource_attribute)) return *value;
+  return {};
+}
+
+std::string activity_of(const Event& e, const ResourceProfilesOptions& o) {
+  if (o.activity_attribute.empty() || o.activity_attribute == "concept:name" ||
+      o.activity_attribute == "activity") return e.activity;
+  if (const auto* value = e.attribute(o.activity_attribute)) return *value;
+  return {};
+}
+
+std::string timestamp_of(const Event& e, const ResourceProfilesOptions& o) {
+  if (o.timestamp_attribute.empty() ||
+      o.timestamp_attribute == "time:timestamp" ||
+      o.timestamp_attribute == "timestamp") return e.timestamp;
+  if (const auto* value = e.attribute(o.timestamp_attribute)) return *value;
+  return {};
+}
+
+std::string case_id_of(const Trace& trace, const Event& e,
+                       const ResourceProfilesOptions& o) {
+  if (o.case_id_attribute.empty() || o.case_id_attribute == "case:concept:name" ||
+      o.case_id_attribute == "case:id" || o.case_id_attribute == "case_id")
+    return trace.case_id.empty() ? e.case_id : trace.case_id;
+  if (const auto* value = trace.attribute(o.case_id_attribute)) return *value;
+  if (const auto* value = e.attribute(o.case_id_attribute)) return *value;
+  return {};
+}
+
+std::optional<double> explicit_start_of(const Event& e,
+                                        const ResourceProfilesOptions& o) {
+  if (o.start_timestamp_attribute.empty()) return std::nullopt;
+  const auto* text = e.attribute(o.start_timestamp_attribute);
+  if (!text) return std::nullopt;
+  const auto start = parse_timestamp(*text);
+  if (!start || !std::isfinite(*start)) return std::nullopt;
+  return *start;
 }
 
 struct Interval {
@@ -67,59 +121,70 @@ struct Interval {
   double start = 0, end = 0;
 };
 
-std::vector<Interval> lifecycle_intervals(const Trace& trace) {
+std::vector<Interval> lifecycle_intervals(
+    const Trace& trace, const ResourceProfilesOptions& o) {
   std::vector<Interval> out;
   struct Pending { std::string resource, activity; double start; };
   std::map<std::pair<std::string, std::string>, std::vector<double>> pending;
   std::vector<const Event*> ordered;
   ordered.reserve(trace.events.size());
   for (const auto& e : trace.events) ordered.push_back(&e);
-  std::stable_sort(ordered.begin(), ordered.end(), [](const Event* a, const Event* b) {
-    const auto ta = parse_timestamp(a->timestamp), tb = parse_timestamp(b->timestamp);
+  std::stable_sort(ordered.begin(), ordered.end(), [&](const Event* a, const Event* b) {
+    const auto ta = parse_timestamp(timestamp_of(*a, o));
+    const auto tb = parse_timestamp(timestamp_of(*b, o));
     if (ta && tb && *ta != *tb) return *ta < *tb;
     return a->input_order < b->input_order;
   });
   bool saw_lifecycle = false;
   for (const auto* ep : ordered) {
     const auto& e = *ep;
-    const auto t = parse_timestamp(e.timestamp);
-    if (!t || !std::isfinite(*t) || e.resource.empty()) continue;
+    const auto t = parse_timestamp(timestamp_of(e, o));
+    const auto resource = resource_of(e, o);
+    const auto activity = activity_of(e, o);
+    if (!t || !std::isfinite(*t) || resource.empty()) continue;
+    if (const auto start = explicit_start_of(e, o); start && *t >= *start) {
+      out.push_back({resource, activity, *start, *t});
+      saw_lifecycle = true;
+      continue;
+    }
     const bool is_start = e.lifecycle == "start" || e.lifecycle == "START";
     const bool is_complete = e.lifecycle == "complete" || e.lifecycle == "COMPLETE";
     saw_lifecycle = saw_lifecycle || is_start || is_complete;
     if (is_start) {
-      pending[{e.resource, e.activity}].push_back(*t);
+      pending[{resource, activity}].push_back(*t);
     } else if (is_complete) {
-      auto& q = pending[{e.resource, e.activity}];
+      auto& q = pending[{resource, activity}];
       if (!q.empty()) {
         const double s = q.front(); q.erase(q.begin());
-        if (*t >= s) out.push_back({e.resource, e.activity, s, *t});
+        if (*t >= s) out.push_back({resource, activity, s, *t});
       }
     }
   }
   if (!saw_lifecycle) {
     std::vector<std::pair<double, const Event*>> es;
     for (const auto& e : trace.events) {
-      auto t = parse_timestamp(e.timestamp);
-      if (t && std::isfinite(*t) && !e.resource.empty()) es.push_back({*t, &e});
+      auto t = parse_timestamp(timestamp_of(e, o));
+      if (t && std::isfinite(*t) && !resource_of(e, o).empty()) es.push_back({*t, &e});
     }
     std::stable_sort(es.begin(), es.end(), [](auto& a, auto& b) { return a.first < b.first; });
     for (std::size_t i = 0; i < es.size(); ++i) {
       const double s = i ? es[i - 1].first : es[i].first;
-      if (es[i].first >= s) out.push_back({es[i].second->resource, es[i].second->activity, s, es[i].first});
+      if (es[i].first >= s) out.push_back({resource_of(*es[i].second, o), activity_of(*es[i].second, o), s, es[i].first});
     }
   } else {
     // Mixed logs retain unmarked atomic events; infer their interval from the
     // preceding completion (or a zero-length interval for the first event).
     std::vector<std::pair<double, const Event*>> es;
     for (const auto& e : trace.events) {
-      auto t = parse_timestamp(e.timestamp);
-      if (t && std::isfinite(*t) && !e.resource.empty() && e.lifecycle.empty()) es.push_back({*t, &e});
+      auto t = parse_timestamp(timestamp_of(e, o));
+      if (t && std::isfinite(*t) && !resource_of(e, o).empty() &&
+          e.lifecycle.empty() && !explicit_start_of(e, o))
+        es.push_back({*t, &e});
     }
     std::stable_sort(es.begin(), es.end(), [](auto& a, auto& b) { return a.first < b.first; });
     for (std::size_t i = 0; i < es.size(); ++i) {
       const double s = i ? es[i - 1].first : es[i].first;
-      out.push_back({es[i].second->resource, es[i].second->activity, s, es[i].first});
+      out.push_back({resource_of(*es[i].second, o), activity_of(*es[i].second, o), s, es[i].first});
     }
   }
   return out;
@@ -172,7 +237,7 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
   result.diagnostics.trace_count = log.trace_count(); result.diagnostics.event_count = log.event_count();
   std::set<std::string> names;
   for (const auto& tr : log.traces) for (const auto& e : tr.events)
-    if (!e.resource.empty()) names.insert(e.resource);
+    if (!resource_of(e, o).empty()) names.insert(resource_of(e, o));
   if (names.size() > o.max_resources) throw std::invalid_argument("resource_profiles resource bound exceeded");
   result.diagnostics.resource_count = names.size();
 
@@ -191,30 +256,34 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
   std::map<std::string, bool> case_intersects;
 
   for (const auto& tr : log.traces) {
+    const auto case_id = case_id_of(tr, tr.events.empty() ? Event{} : tr.events.front(), o);
     std::optional<double> first, last;
     std::set<std::string> tr_resources;
     for (const auto& e : tr.events) {
-      const auto t = parse_timestamp(e.timestamp);
+      const auto resource = resource_of(e, o);
+      const auto activity = activity_of(e, o);
+      const auto t = parse_timestamp(timestamp_of(e, o));
       if (t && std::isfinite(*t)) { if (!first || *t < *first) first = *t; if (!last || *t > *last) last = *t; }
-      if (!e.resource.empty()) tr_resources.insert(e.resource);
-      if (!e.resource.empty() && in_slot(t, b)) {
-        slot_cases.insert(tr.case_id);
-        slot_cases_by_resource[e.resource].insert(tr.case_id);
-        ++resource_events[e.resource];
+      if (!resource.empty()) tr_resources.insert(resource);
+      if (!resource.empty() && in_slot(t, b)) {
+        slot_cases.insert(case_id);
+        slot_cases_by_resource[resource].insert(case_id);
+        ++resource_events[resource];
         if (selected(e, o)) {
-          ++freq[{e.resource, e.activity}]; acts[e.resource].insert(e.activity);
-          ++completions[{e.resource, e.activity}];
+          ++freq[{resource, activity}]; acts[resource].insert(activity);
+          ++completions[{resource, activity}];
         }
       }
-      if (in_slot(t, b)) case_intersects[tr.case_id] = true;
+      if (in_slot(t, b)) case_intersects[case_id] = true;
     }
-    if (first && last) { case_start[tr.case_id] = *first; case_end[tr.case_id] = *last; }
-    case_resources[tr.case_id].insert(tr_resources.begin(), tr_resources.end());
+    if (first && last) { case_start[case_id] = *first; case_end[case_id] = *last; }
+    case_resources[case_id].insert(tr_resources.begin(), tr_resources.end());
     if (last && in_slot(last, b)) {
-      all_completed_cases.insert(tr.case_id);
-      for (const auto& rr : tr_resources) completed_cases[rr].insert(tr.case_id);
+      all_completed_cases.insert(case_id);
+      for (const auto& rr : tr_resources) completed_cases[rr].insert(case_id);
     }
-    auto ints = lifecycle_intervals(tr); intervals.insert(intervals.end(), ints.begin(), ints.end());
+    auto ints = lifecycle_intervals(tr, o);
+    intervals.insert(intervals.end(), ints.begin(), ints.end());
   }
 
   switch (o.metric) {

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 using namespace minera;
 
@@ -23,6 +24,35 @@ int main() {
   auto distinct = discover_resource_profiles(log, {});
   assert(distinct.rows.size() == 2);
   assert(distinct.rows[0].resource == "alice" && distinct.rows[0].value == 1.0);
+
+  EventLog custom;
+  Trace custom_trace;
+  custom_trace.case_id = "ignored-case";
+  custom_trace.attributes.push_back({"case:custom", "custom-case"});
+  custom_trace.events.push_back({
+      "ignored-case", "ignored", "not-a-timestamp", "ignored", 0,
+      {{"team:activity", "A"}, {"team:resource", "r-custom"},
+       {"observed_at", "2024-01-01T00:00:10Z"},
+       {"started_at", "2024-01-01T00:00:00Z"}},
+      "complete"});
+  custom.traces.push_back(std::move(custom_trace));
+  ResourceProfilesOptions custom_options;
+  custom_options.metric = ResourceProfileMetric::kAverageDurationActivity;
+  custom_options.activity_attribute = "team:activity";
+  custom_options.resource_attribute = "team:resource";
+  custom_options.timestamp_attribute = "observed_at";
+  custom_options.start_timestamp_attribute = "started_at";
+  custom_options.case_id_attribute = "case:custom";
+  custom_options.resource = "r-custom";
+  custom_options.activity = "A";
+  custom_options.t1 = "2024-01-01T00:00:00Z";
+  custom_options.t2 = "2024-01-01T00:00:20Z";
+  const auto custom_profiles =
+      discover_resource_profiles(custom, custom_options);
+  assert(custom_profiles.rows.size() == 1 &&
+         custom_profiles.rows.front().resource == "r-custom" &&
+         custom_profiles.rows.front().activity == "A" &&
+         custom_profiles.rows.front().value == 10.0);
 
   ResourceProfilesOptions f; f.metric = ResourceProfileMetric::kActivityFrequency; f.t1 = "2024-01-01T00:00:10Z"; f.t2 = "2024-01-01T00:00:20Z";
   auto freq = discover_resource_profiles(log, f);
