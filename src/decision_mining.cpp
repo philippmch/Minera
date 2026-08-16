@@ -1,8 +1,10 @@
 #include "minera/decision_mining.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -13,15 +15,6 @@
 
 namespace minera {
 namespace {
-
-// Tree-growing bounds: deep trees on process data mostly memorize noise, and
-// the rules are read by people, so the tree stays small.
-constexpr std::size_t kMaxDepth = 4;
-constexpr std::size_t kMinSplit = 10;   // observations a node needs to split
-constexpr std::size_t kMinLeaf = 5;     // observations each side must keep
-constexpr std::size_t kMaxCategories = 16;  // equality candidates per key
-constexpr std::size_t kMaxThresholds = 32;  // threshold candidates per key
-constexpr double kMinGain = 1e-9;
 
 // Parses a full numeric literal; partial parses ("12 kg") are not numbers.
 std::optional<double> parse_number(const std::string& text) {
@@ -80,7 +73,8 @@ struct SplitCandidate {
 std::optional<SplitCandidate> best_split(
     const std::vector<Row>& rows,
     const std::vector<std::size_t>& idx,
-    const std::vector<std::uint64_t>& node_counts) {
+    const std::vector<std::uint64_t>& node_counts,
+    const DecisionMiningOptions& options) {
   const auto total = static_cast<std::uint64_t>(idx.size());
   const double node_impurity = gini_impurity(node_counts, total);
   const std::size_t branches = node_counts.size();
@@ -90,7 +84,7 @@ std::optional<SplitCandidate> best_split(
                             const std::vector<std::uint64_t>& then_counts,
                             std::uint64_t then_total) {
     const std::uint64_t else_total = total - then_total;
-    if (then_total < kMinLeaf || else_total < kMinLeaf) return;
+    if (then_total < options.min_leaf || else_total < options.min_leaf) return;
     std::vector<std::uint64_t> else_counts(branches);
     for (std::size_t b = 0; b < branches; ++b) {
       else_counts[b] = node_counts[b] - then_counts[b];
@@ -100,7 +94,7 @@ std::optional<SplitCandidate> best_split(
          static_cast<double>(else_total) * gini_impurity(else_counts, else_total)) /
         static_cast<double>(total);
     const double gain = node_impurity - weighted;
-    if (gain <= kMinGain) return;
+    if (gain <= options.min_gain) return;
     if (!best || gain > best->gain) {
       best = SplitCandidate{gain, std::move(split)};
     }
@@ -148,8 +142,9 @@ std::optional<SplitCandidate> best_split(
         }
       }
       const std::size_t step =
-          boundaries.size() > kMaxThresholds
-              ? (boundaries.size() + kMaxThresholds - 1) / kMaxThresholds
+          boundaries.size() > options.max_thresholds
+              ? (boundaries.size() + options.max_thresholds - 1) /
+                    options.max_thresholds
               : 1;
       std::size_t next_boundary = 0;
       std::uint64_t then_total = 0;
@@ -196,7 +191,7 @@ std::optional<SplitCandidate> best_split(
     if (values.size() < 2 && present.size() == idx.size()) {
       continue;  // one value everywhere: nothing to separate
     }
-    const std::size_t listed = std::min(values.size(), kMaxCategories);
+    const std::size_t listed = std::min(values.size(), options.max_categories);
     for (std::size_t v = 0; v < listed; ++v) {
       consider(DecisionSplit{key, false, values[v]->first, 0.0},
                values[v]->second.counts, values[v]->second.total);
@@ -211,6 +206,7 @@ int build_node(const std::vector<Row>& rows,
                std::vector<std::size_t> idx,
                std::size_t branches,
                std::size_t depth,
+               const DecisionMiningOptions& options,
                std::vector<DecisionNode>* nodes) {
   auto counts = label_counts(rows, idx, branches);
   const auto total = static_cast<std::uint64_t>(idx.size());
@@ -220,9 +216,10 @@ int build_node(const std::vector<Row>& rows,
   const auto& node_counts = (*nodes)[static_cast<std::size_t>(index)].branch_counts;
   const bool pure =
       *std::max_element(node_counts.begin(), node_counts.end()) == total;
-  if (pure || depth >= kMaxDepth || idx.size() < kMinSplit) return index;
+  if (pure || depth >= options.max_depth || idx.size() < options.min_split)
+    return index;
 
-  auto split = best_split(rows, idx, node_counts);
+  auto split = best_split(rows, idx, node_counts, options);
   if (!split) return index;
 
   std::vector<std::size_t> then_idx;
@@ -234,9 +231,9 @@ int build_node(const std::vector<Row>& rows,
   idx.shrink_to_fit();
 
   const int then_child =
-      build_node(rows, std::move(then_idx), branches, depth + 1, nodes);
+      build_node(rows, std::move(then_idx), branches, depth + 1, options, nodes);
   const int else_child =
-      build_node(rows, std::move(else_idx), branches, depth + 1, nodes);
+      build_node(rows, std::move(else_idx), branches, depth + 1, options, nodes);
   auto& node = (*nodes)[static_cast<std::size_t>(index)];
   node.split = std::move(split->split);
   node.then_child = then_child;
@@ -315,7 +312,25 @@ std::string branch_label(const PetriNet& net, std::size_t transition) {
 
 }  // namespace
 
-DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net) {
+DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
+                                    const DecisionMiningOptions& options) {
+  if (options.max_depth > 64)
+    throw std::invalid_argument("decision mining max_depth exceeds 64");
+  if (options.min_split < 2)
+    throw std::invalid_argument("decision mining min_split must be at least 2");
+  if (options.min_leaf == 0)
+    throw std::invalid_argument("decision mining min_leaf must be positive");
+  if (options.max_categories == 0 || options.max_thresholds == 0)
+    throw std::invalid_argument("decision mining candidate limits must be positive");
+  if (!std::isfinite(options.min_gain) || options.min_gain < 0.0)
+    throw std::invalid_argument(
+        "decision mining min_gain must be finite and non-negative");
+  std::unordered_set<std::string> selected_attributes;
+  for (const auto& attribute : options.attributes) {
+    if (attribute.empty())
+      throw std::invalid_argument("decision mining attributes must be non-empty");
+    selected_attributes.insert(attribute);
+  }
   DecisionMiningResult result;
   result.trace_count = log.trace_count();
 
@@ -370,18 +385,30 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net) {
     // up front, then each consumed event merges its own — after the choices
     // its consumption triggered, so a decision only sees what preceded it.
     std::unordered_map<std::string, std::string> context;
-    for (const auto& attribute : trace.attributes) {
-      context[attribute.key] = attribute.value;
+    if (options.include_trace_attributes) {
+      for (const auto& attribute : trace.attributes) {
+        context[attribute.key] = attribute.value;
+      }
     }
     for (std::size_t step = 0; step < sequence->size(); ++step) {
       for (const std::size_t t : (*sequence)[step]) {
         for (const std::size_t place : net.transitions()[t].inputs) {
           const int d = decision_index[place];
           if (d < 0) continue;
-          const auto& options = outgoing[place];
+          const auto& choices = outgoing[place];
           const auto label = static_cast<std::size_t>(
-              std::find(options.begin(), options.end(), t) - options.begin());
-          rows[static_cast<std::size_t>(d)].push_back(Row{context, label});
+              std::find(choices.begin(), choices.end(), t) - choices.begin());
+          std::unordered_map<std::string, std::string> scoped = context;
+          if (!selected_attributes.empty()) {
+            for (auto it = scoped.begin(); it != scoped.end();) {
+              if (!selected_attributes.contains(it->first))
+                it = scoped.erase(it);
+              else
+                ++it;
+            }
+          }
+          rows[static_cast<std::size_t>(d)].push_back(
+              Row{std::move(scoped), label});
         }
       }
       if (step < trace.events.size()) {
@@ -405,7 +432,8 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net) {
 
     std::vector<std::size_t> idx(rows[d].size());
     for (std::size_t i = 0; i < idx.size(); ++i) idx[i] = i;
-    build_node(rows[d], std::move(idx), point.branches.size(), 0, &point.nodes);
+    build_node(rows[d], std::move(idx), point.branches.size(), 0, options,
+               &point.nodes);
 
     const auto& root = point.nodes.front().branch_counts;
     point.majority_share =

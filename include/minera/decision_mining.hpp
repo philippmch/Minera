@@ -47,6 +47,21 @@ struct DecisionPoint {
   double majority_share = 0.0;  // baseline: always guessing the top branch
 };
 
+// Bounds and feature-scope controls for the deterministic decision tree.
+// Empty attributes keeps every context key; otherwise only the named keys
+// participate in split selection. The context still records all values so a
+// selected key may arrive at any point before a later decision.
+struct DecisionMiningOptions {
+  std::size_t max_depth = 4;
+  std::size_t min_split = 10;
+  std::size_t min_leaf = 5;
+  std::size_t max_categories = 16;
+  std::size_t max_thresholds = 32;
+  double min_gain = 1e-9;
+  bool include_trace_attributes = true;
+  std::vector<std::string> attributes;
+};
+
 // Decision mining over a log and a model (Rozinat & van der Aalst): where the
 // net offers alternatives, learn from the event and case attributes which
 // branch a case takes.
@@ -70,6 +85,7 @@ struct DecisionMiningResult {
 // grown per decision point. On a model discovered from the log itself (the
 // Inductive Miner guarantees a perfect fit) every trace contributes.
 [[nodiscard]] DecisionMiningResult mine_decisions(const EventLog& log,
-                                                  const PetriNet& net);
+                                                  const PetriNet& net,
+                                                  const DecisionMiningOptions& options = {});
 
 }  // namespace minera

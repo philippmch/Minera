@@ -878,6 +878,14 @@ int usage(const char* program) {
                "                            model (inductive, alpha, heuristic,\n"
                "                            or powl); embedded under\n"
                "                            \"decision_tables\"\n"
+               "  --decision-max-depth <n> Decision tree depth (0..64)\n"
+               "  --decision-min-split <n> Minimum observations before a split\n"
+               "  --decision-min-leaf <n>  Minimum observations per child\n"
+               "  --decision-max-categories <n> Equality candidates per key\n"
+               "  --decision-max-thresholds <n> Numeric threshold candidates\n"
+               "  --decision-min-gain <f>  Minimum Gini gain\n"
+               "  --decision-no-trace-attributes Exclude case attributes\n"
+               "  --decision-attributes <a,b,...> Restrict context keys\n"
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
@@ -1062,6 +1070,8 @@ int main(int argc, char** argv) {
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   std::string decision_tables_miner;  // empty = no decision-table mining
+  minera::DecisionMiningOptions decision_options;
+  bool decision_option_used = false;
   bool no_alignments = false;
   bool align_process_tree = false;
   std::map<std::string, std::string> pt_alignment_fields;
@@ -2623,6 +2633,49 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       process_tree_playout_fields.insert_or_assign(std::move(key), value);
       process_tree_playout_options_used = true;
+    } else if (arg == "--decision-no-trace-attributes") {
+      decision_options.include_trace_attributes = false;
+      decision_option_used = true;
+    } else if (arg == "--decision-attributes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      decision_options.attributes = split_csv(value);
+      if (decision_options.attributes.empty() ||
+          std::any_of(decision_options.attributes.begin(),
+                      decision_options.attributes.end(),
+                      [](const std::string& item) { return item.empty(); })) {
+        throw std::invalid_argument(
+            "--decision-attributes expects non-empty names");
+      }
+      decision_option_used = true;
+    } else if (arg == "--decision-max-depth" ||
+               arg == "--decision-min-split" ||
+               arg == "--decision-min-leaf" ||
+               arg == "--decision-max-categories" ||
+               arg == "--decision-max-thresholds" ||
+               arg == "--decision-min-gain") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      decision_option_used = true;
+      if (arg == "--decision-max-depth") {
+        decision_options.max_depth = parse_nonnegative_size(value, arg);
+        if (decision_options.max_depth > 64)
+          throw std::invalid_argument(
+              "--decision-max-depth expects an integer from 0 through 64");
+      } else if (arg == "--decision-min-split") {
+        decision_options.min_split = parse_positive_size(value, arg);
+      } else if (arg == "--decision-min-leaf") {
+        decision_options.min_leaf = parse_positive_size(value, arg);
+      } else if (arg == "--decision-max-categories") {
+        decision_options.max_categories = parse_positive_size(value, arg);
+      } else if (arg == "--decision-max-thresholds") {
+        decision_options.max_thresholds = parse_positive_size(value, arg);
+      } else {
+        decision_options.min_gain = parse_finite_double(value, arg);
+        if (decision_options.min_gain < 0.0)
+          throw std::invalid_argument(
+              "--decision-min-gain expects a non-negative number");
+      }
     } else if (arg == "--decisions" || arg == "--decision-tables") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -3421,6 +3474,12 @@ int main(int argc, char** argv) {
   if (spectrum_option_used && !spectrum_requested) {
     std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
                  "--spectrum-sort-log/--spectrum-*-key require --spectrum\n";
+    return 2;
+  }
+  if (decision_option_used && decisions_miner.empty() &&
+      decision_tables_miner.empty()) {
+    std::cerr << "error: --decision-* options require --decisions or "
+                 "--decision-tables\n";
     return 2;
   }
   if (activity_split_option_used && filter.activity_split_activities.empty()) {
@@ -4724,7 +4783,7 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
       }
-      decisions = minera::mine_decisions(log, *selected);
+      decisions = minera::mine_decisions(log, *selected, decision_options);
       decisions->miner = decisions_miner;
     }
     const minera::DecisionMiningResult* decisions_ptr =
@@ -4739,7 +4798,13 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
       }
-      decision_tables = minera::mine_decision_tables(log, *selected);
+      minera::DecisionTableOptions table_options;
+      table_options.mining = decision_options;
+      table_options.include_trace_attributes =
+          decision_options.include_trace_attributes;
+      table_options.attributes = decision_options.attributes;
+      decision_tables =
+          minera::mine_decision_tables(log, *selected, table_options);
     }
     const auto* decision_tables_ptr =
         decision_tables ? &*decision_tables : nullptr;

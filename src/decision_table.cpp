@@ -225,7 +225,7 @@ DecisionTablesResult mine_decision_tables(const EventLog& log,
                                           const PetriNet& net,
                                           const DecisionTableOptions& options) {
   const auto raw = collect_rows(log, net, options);
-  const auto decisions = mine_decisions(log, net);
+  const auto decisions = mine_decisions(log, net, options.mining);
   DecisionTablesResult result;
   result.observed_traces = raw.observed_traces;
   result.trace_count = log.trace_count();
