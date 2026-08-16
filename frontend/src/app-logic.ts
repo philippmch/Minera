@@ -121,6 +121,9 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
     filters.topVariants ||
       filters.minVariantFrequency ||
       filters.variantCoverage ||
+      filters.variantMinCoverage !== undefined ||
+      filters.variantMaxCoverage !== undefined ||
+      filters.variantPercentage !== undefined ||
       filters.keepDirectlyFollows?.length ||
       filters.removeDirectlyFollows?.length ||
       filters.keepEventuallyFollows?.length ||
@@ -151,6 +154,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.keepLifecycles?.length ||
       filters.startActivities?.length ||
       filters.endActivities?.length ||
+      (filters.startActivities?.length && filters.startActivitiesPositive === false) ||
+      (filters.endActivities?.length && filters.endActivitiesPositive === false) ||
       filters.minLength ||
       filters.maxLength ||
       filters.timeFrom ||

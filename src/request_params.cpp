@@ -1391,11 +1391,31 @@ MineParams parse_mine_params(const FieldLookup& field,
             "timestamp_case_grouping_separator: must not be empty");
     }
   }
-  if (const auto value = field("start_activities"); !value.empty()) {
-    params.filter.start_activities = split_csv(value);
+  const bool start_activities_supplied =
+      supplied("start_activities") || supplied("start_activities_positive");
+  if (start_activities_supplied) {
+    if (!supplied("start_activities") || field("start_activities").empty()) {
+      throw std::invalid_argument(
+          "start_activities: required when endpoint polarity is supplied");
+    }
+    params.filter.start_activities = split_csv(field("start_activities"));
+    if (supplied("start_activities_positive")) {
+      params.filter.start_activities_positive = parse_boolean(
+          field("start_activities_positive"), "start_activities_positive");
+    }
   }
-  if (const auto value = field("end_activities"); !value.empty()) {
-    params.filter.end_activities = split_csv(value);
+  const bool end_activities_supplied =
+      supplied("end_activities") || supplied("end_activities_positive");
+  if (end_activities_supplied) {
+    if (!supplied("end_activities") || field("end_activities").empty()) {
+      throw std::invalid_argument(
+          "end_activities: required when endpoint polarity is supplied");
+    }
+    params.filter.end_activities = split_csv(field("end_activities"));
+    if (supplied("end_activities_positive")) {
+      params.filter.end_activities_positive = parse_boolean(
+          field("end_activities_positive"), "end_activities_positive");
+    }
   }
   if (supplied("min_length")) {
     params.filter.min_length =
@@ -1416,8 +1436,47 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("top_variants"); !value.empty()) {
     params.filter.top_variants = static_cast<std::size_t>(std::atoll(value.c_str()));
   }
-  if (const auto value = field("variant_coverage"); !value.empty()) {
-    params.filter.variant_coverage = std::atof(value.c_str());
+  if (supplied("variant_coverage")) {
+    params.filter.variant_coverage =
+        parse_finite_double(field("variant_coverage"), "variant_coverage");
+    if (params.filter.variant_coverage < 0.0 ||
+        params.filter.variant_coverage > 1.0)
+      throw std::invalid_argument(
+          "variant_coverage: expected a number in [0, 1]");
+  }
+  const bool variant_min_supplied = supplied("variant_min_coverage");
+  const bool variant_max_supplied = supplied("variant_max_coverage");
+  const bool variant_percentage_supplied = supplied("variant_percentage");
+  if (variant_min_supplied) {
+    params.filter.variant_min_coverage = parse_finite_double(
+        field("variant_min_coverage"), "variant_min_coverage");
+    if (*params.filter.variant_min_coverage < 0.0 ||
+        *params.filter.variant_min_coverage > 1.0)
+      throw std::invalid_argument(
+          "variant_min_coverage: expected a number in [0, 1]");
+  }
+  if (variant_max_supplied) {
+    params.filter.variant_max_coverage = parse_finite_double(
+        field("variant_max_coverage"), "variant_max_coverage");
+    if (*params.filter.variant_max_coverage < 0.0 ||
+        *params.filter.variant_max_coverage > 1.0)
+      throw std::invalid_argument(
+          "variant_max_coverage: expected a number in [0, 1]");
+  }
+  if (variant_percentage_supplied) {
+    params.filter.variant_percentage = parse_finite_double(
+        field("variant_percentage"), "variant_percentage");
+    if (*params.filter.variant_percentage < 0.0 ||
+        *params.filter.variant_percentage > 1.0)
+      throw std::invalid_argument(
+          "variant_percentage: expected a number in [0, 1]");
+  }
+  if (params.filter.variant_min_coverage &&
+      params.filter.variant_max_coverage &&
+      *params.filter.variant_min_coverage >
+          *params.filter.variant_max_coverage) {
+    throw std::invalid_argument(
+        "variant_min_coverage: must not exceed variant_max_coverage");
   }
   if (const auto value = field("noise_threshold"); !value.empty()) {
     params.inductive.noise_threshold = std::atof(value.c_str());

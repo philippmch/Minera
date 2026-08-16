@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage } from "./Filters";
+import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -99,5 +99,11 @@ describe("frequency filter validation", () => {
     expect(topActivitiesValidationMessage({ max: "1.5", attributeKey: "" })).toContain("integer");
     expect(relativeAttributeValidationMessage({ key: "channel", stake: "1.1", keepOncePerCase: true })).toContain("[0, 1]");
     expect(relativeAttributeValidationMessage({ key: "channel", stake: "nan", keepOncePerCase: true })).toContain("finite");
+  });
+
+  it("validates per-variant coverage and percentage targets", () => {
+    expect(variantCoverageValidationMessage({ min: "0", max: "100", percentage: "0" })).toBeNull();
+    expect(variantCoverageValidationMessage({ min: "60", max: "50", percentage: "" })).toContain("must not exceed");
+    expect(variantCoverageValidationMessage({ min: "", max: "101", percentage: "" })).toContain("[0, 100]");
   });
 });

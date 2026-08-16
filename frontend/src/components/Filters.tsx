@@ -191,6 +191,29 @@ export function relativeAttributeValidationMessage(input: {
   return null;
 }
 
+/** Variant share controls are entered as percentages in the UI. */
+export function variantCoverageValidationMessage(input: {
+  min: string;
+  max: string;
+  percentage: string;
+}): string | null {
+  const fields = [
+    ["Minimum variant coverage", input.min],
+    ["Maximum variant coverage", input.max],
+    ["Variant percentage", input.percentage],
+  ] as const;
+  for (const [label, raw] of fields) {
+    if (!raw.trim()) continue;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > 100)
+      return `${label} must be a finite percentage in [0, 100].`;
+  }
+  if (input.min.trim() && input.max.trim() &&
+      Number(input.min) > Number(input.max))
+    return "Minimum variant coverage must not exceed the maximum.";
+  return null;
+}
+
 /** Repetition bounds are inclusive and default to [2, +infinity]. */
 export function repetitionValidationMessage(input: {
   value: string;
@@ -237,6 +260,13 @@ export function Filters({
   const [maxActivities, setMaxActivities] = useState("");
   const [topActivitiesAttributeKey, setTopActivitiesAttributeKey] = useState("");
   const [minFrequency, setMinFrequency] = useState("");
+  const [variantMinCoverage, setVariantMinCoverage] = useState("");
+  const [variantMaxCoverage, setVariantMaxCoverage] = useState("");
+  const [variantPercentage, setVariantPercentage] = useState("");
+  const [startActivities, setStartActivities] = useState("");
+  const [endActivities, setEndActivities] = useState("");
+  const [startActivitiesPositive, setStartActivitiesPositive] = useState(true);
+  const [endActivitiesPositive, setEndActivitiesPositive] = useState(true);
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [timeMode, setTimeMode] = useState<TimeFilterMode>("events");
@@ -672,6 +702,11 @@ export function Filters({
     stake: relativeAttributeStake,
     keepOncePerCase: relativeAttributeKeepOncePerCase,
   });
+  const variantCoverageValidationError = variantCoverageValidationMessage({
+    min: variantMinCoverage,
+    max: variantMaxCoverage,
+    percentage: variantPercentage,
+  });
   const repetitionValidationError = repetitionValidationMessage({
     value: repetitionValue,
     min: repetitionMin,
@@ -688,7 +723,8 @@ export function Filters({
         caseSelectionValidationError ||
         numericAttributeValidationError || topActivitiesValidationError ||
         relativeAttributeValidationError ||
-        repetitionValidationError || caseGroupingValidationError) return;
+        variantCoverageValidationError || repetitionValidationError ||
+        caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -710,6 +746,12 @@ export function Filters({
       coveragePercent && coveragePercent > 0 && coveragePercent <= 100
         ? coveragePercent / 100
         : undefined;
+    const toCoverageFraction = (value: string) => {
+      if (!value.trim()) return undefined;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100
+        ? parsed / 100 : undefined;
+    };
     const successionPair =
       successionAction !== "off" && successionFrom && successionTo
         ? [`${successionFrom} -> ${successionTo}`]
@@ -727,6 +769,13 @@ export function Filters({
         ? topActivitiesAttributeKey.trim() || undefined : undefined,
       minVariantFrequency: toInt(minFrequency),
       variantCoverage: coverage,
+      variantMinCoverage: toCoverageFraction(variantMinCoverage),
+      variantMaxCoverage: toCoverageFraction(variantMaxCoverage),
+      variantPercentage: toCoverageFraction(variantPercentage),
+      startActivities: startActivities ? [startActivities] : undefined,
+      endActivities: endActivities ? [endActivities] : undefined,
+      startActivitiesPositive: startActivities ? startActivitiesPositive : undefined,
+      endActivitiesPositive: endActivities ? endActivitiesPositive : undefined,
       keepDirectlyFollows: succession("keep", "directly"),
       removeDirectlyFollows: succession("remove", "directly"),
       keepEventuallyFollows: succession("keep", "eventually"),
@@ -947,6 +996,13 @@ export function Filters({
     setMaxActivities("");
     setTopActivitiesAttributeKey("");
     setMinFrequency("");
+    setVariantMinCoverage("");
+    setVariantMaxCoverage("");
+    setVariantPercentage("");
+    setStartActivities("");
+    setEndActivities("");
+    setStartActivitiesPositive(true);
+    setEndActivitiesPositive(true);
     setTimeFrom("");
     setTimeTo("");
     setTimeMode("events");
@@ -1093,6 +1149,13 @@ export function Filters({
     topActivitiesAttributeKey !== "" ||
     minFrequency !== "" ||
     variantCoverage !== "" ||
+    variantMinCoverage !== "" ||
+    variantMaxCoverage !== "" ||
+    variantPercentage !== "" ||
+    startActivities !== "" ||
+    endActivities !== "" ||
+    (startActivities !== "" && !startActivitiesPositive) ||
+    (endActivities !== "" && !endActivitiesPositive) ||
     timeFrom !== "" ||
     timeTo !== "" ||
     caseDurationMin !== "" ||
@@ -1356,6 +1419,79 @@ export function Filters({
                 value={caseDurationMax}
                 onChange={(e) => setCaseDurationMax(e.target.value)}
               />
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Variant min share %</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+                placeholder="none"
+                value={variantMinCoverage}
+                onChange={(e) => setVariantMinCoverage(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Variant max share %</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+                placeholder="none"
+                value={variantMaxCoverage}
+                onChange={(e) => setVariantMaxCoverage(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Top-variant target %</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+                placeholder="none"
+                title="Keep enough top variants to reach this case share; ties at the boundary stay included"
+                value={variantPercentage}
+                onChange={(e) => setVariantPercentage(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Start activity</span>
+              <select value={startActivities} onChange={(e) => setStartActivities(e.target.value)}>
+                <option value="">any</option>
+                {activities.map((activity) => <option key={`start-${activity}`} value={activity}>{activity}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Start endpoint</span>
+              <select value={startActivitiesPositive ? "keep" : "exclude"} disabled={!startActivities}
+                onChange={(e) => setStartActivitiesPositive(e.target.value === "keep")}>
+                <option value="keep">keep listed</option>
+                <option value="exclude">exclude listed</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>End activity</span>
+              <select value={endActivities} onChange={(e) => setEndActivities(e.target.value)}>
+                <option value="">any</option>
+                {activities.map((activity) => <option key={`end-${activity}`} value={activity}>{activity}</option>)}
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>End endpoint</span>
+              <select value={endActivitiesPositive ? "keep" : "exclude"} disabled={!endActivities}
+                onChange={(e) => setEndActivitiesPositive(e.target.value === "keep")}>
+                <option value="keep">keep listed</option>
+                <option value="exclude">exclude listed</option>
+              </select>
             </label>
           </div>
 
@@ -2840,11 +2976,11 @@ export function Filters({
           {(temporalValidationError || ltlValidationError || segmentValidationError ||
             pathValidationError || caseDurationValidationError || caseSelectionValidationError ||
             numericAttributeValidationError || topActivitiesValidationError ||
-            relativeAttributeValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError}</p>
+            relativeAttributeValidationError || variantCoverageValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || variantCoverageValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || variantCoverageValidationError)}>
               Apply
             </button>
             <button
