@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+
+describe("isConceptDriftResult", () => {
+  const valid = {
+    family: "CONCEPT_DRIFT", activity_attribute: "event:type",
+    timestamp_attribute: "started_at", case_id_attribute: "case:order",
+    activities: ["A"], feature_vectors: [[1, 0, 0]],
+    sublogs: [{ trace_count: 1, event_count: 1 }],
+    cumulative_sublogs: [{ trace_count: 1, event_count: 1 }],
+    sublog_start_timestamps: [1], change_points: [{ sublog_index: 1, p_value: 0.25 }],
+    change_timestamps: [1],
+  };
+  it("accepts selector metadata and bounded numeric arrays", () => {
+    expect(isConceptDriftResult(valid)).toBe(true);
+  });
+  it("rejects malformed drift diagnostics", () => {
+    expect(isConceptDriftResult({ ...valid, change_points: [{ sublog_index: -1, p_value: 0.25 }] })).toBe(false);
+    expect(isConceptDriftResult({ ...valid, feature_vectors: [[Number.NaN]] })).toBe(false);
+    expect(isConceptDriftResult({ ...valid, activity_attribute: 7 })).toBe(false);
+  });
+});
 
 describe("isDfgPrecisionResult", () => {
   const valid = { family: "DFG_PRECISION", computed: true, precision: 0.75,

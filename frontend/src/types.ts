@@ -26,6 +26,9 @@ export interface ConceptDriftChangePoint {
 }
 export interface ConceptDriftResult {
   family: "CONCEPT_DRIFT";
+  activity_attribute?: string;
+  timestamp_attribute?: string;
+  case_id_attribute?: string;
   activities: string[];
   feature_vectors: number[][];
   sublogs: ConceptDriftSublogSummary[];
@@ -33,6 +36,36 @@ export interface ConceptDriftResult {
   sublog_start_timestamps: number[];
   change_points: ConceptDriftChangePoint[];
   change_timestamps: number[];
+}
+
+export function isConceptDriftResult(value: unknown): value is ConceptDriftResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Partial<ConceptDriftResult>;
+  if (candidate.family !== "CONCEPT_DRIFT" || !Array.isArray(candidate.activities) ||
+      !candidate.activities.every((x) => typeof x === "string") ||
+      !Array.isArray(candidate.feature_vectors) ||
+      !candidate.feature_vectors.every((row) => Array.isArray(row) &&
+        row.every((x) => typeof x === "number" && Number.isFinite(x))) ||
+      !Array.isArray(candidate.sublogs) ||
+      !candidate.sublogs.every((row) => !!row && typeof row === "object" &&
+        Number.isInteger(row.trace_count) && (row.trace_count as number) >= 0 &&
+        Number.isInteger(row.event_count) && (row.event_count as number) >= 0) ||
+      !Array.isArray(candidate.cumulative_sublogs) ||
+      !candidate.cumulative_sublogs.every((row) => !!row && typeof row === "object" &&
+        Number.isInteger(row.trace_count) && (row.trace_count as number) >= 0 &&
+        Number.isInteger(row.event_count) && (row.event_count as number) >= 0) ||
+      !Array.isArray(candidate.sublog_start_timestamps) ||
+      !candidate.sublog_start_timestamps.every((x) => typeof x === "number" && Number.isFinite(x)) ||
+      !Array.isArray(candidate.change_points) ||
+      !candidate.change_points.every((point) => !!point && typeof point === "object" &&
+        Number.isInteger(point.sublog_index) && (point.sublog_index as number) >= 0 &&
+        typeof point.p_value === "number" && Number.isFinite(point.p_value)) ||
+      !Array.isArray(candidate.change_timestamps) ||
+      !candidate.change_timestamps.every((x) => typeof x === "number" && Number.isFinite(x))) {
+    return false;
+  }
+  return [candidate.activity_attribute, candidate.timestamp_attribute,
+    candidate.case_id_attribute].every((x) => x === undefined || typeof x === "string");
 }
 
 export interface ILPMinerTransition {

@@ -67,6 +67,7 @@ import {
   type OrganizationalSnaOptions,
   type OrganizationalSnaResult,
   isLogToTargetResult,
+  isConceptDriftResult,
   isLogToFeaturesResult,
   isLogUtilityResult,
   isEmbeddingApiResult,
@@ -3225,6 +3226,9 @@ export interface ConceptDriftOptions {
   drift_max_no_change_points?: number;
   drift_seed?: number;
   drift_include_timestamps?: boolean;
+  drift_activity_attribute?: string;
+  drift_timestamp_attribute?: string;
+  drift_case_id_attribute?: string;
 }
 
 export function conceptDriftQuery(options: ConceptDriftOptions = {}): string {
@@ -3239,7 +3243,11 @@ export async function requestConceptDrift(options: ConceptDriftOptions = {}): Pr
   const query = conceptDriftQuery(options);
   const response = await fetch(`/api/concept-drift${query ? `?${query}` : ""}`, { method: "POST" });
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
-  return (await response.json()) as ConceptDriftResult;
+  const payload: unknown = await response.json();
+  if (!isConceptDriftResult(payload)) {
+    throw new Error("the backend returned an invalid concept-drift response");
+  }
+  return payload;
 }
 
 export interface LogToTargetOptions {

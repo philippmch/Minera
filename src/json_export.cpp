@@ -3605,7 +3605,13 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
 
 std::string concept_drift_json(const ConceptDriftResult& result) {
   std::ostringstream out;
-  out << "{\"family\":\"CONCEPT_DRIFT\",\"activities\":[";
+  out << "{\"family\":\"CONCEPT_DRIFT\",\"activity_attribute\":";
+  write_json_string(out, result.activity_attribute);
+  out << ",\"timestamp_attribute\":";
+  write_json_string(out, result.timestamp_attribute);
+  out << ",\"case_id_attribute\":";
+  write_json_string(out, result.case_id_attribute);
+  out << ",\"activities\":[";
   for (std::size_t i = 0; i < result.activities.size(); ++i) {
     if (i) out << ',';
     write_json_string(out, result.activities[i]);

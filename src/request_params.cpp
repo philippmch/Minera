@@ -2728,6 +2728,12 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
     params.seed = parse_nonnegative_u64(require("drift_seed"), "drift_seed");
   if (supplied("drift_include_timestamps"))
     params.include_timestamps = parse_boolean(require("drift_include_timestamps"), "drift_include_timestamps");
+  if (supplied("drift_activity_attribute"))
+    params.activity_attribute = require("drift_activity_attribute");
+  if (supplied("drift_timestamp_attribute"))
+    params.timestamp_attribute = require("drift_timestamp_attribute");
+  if (supplied("drift_case_id_attribute"))
+    params.case_id_attribute = require("drift_case_id_attribute");
   return params;
 }
 

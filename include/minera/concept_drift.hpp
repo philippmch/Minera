@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -20,6 +21,11 @@ struct ConceptDriftOptions {
   std::size_t max_no_change_points = 5;
   std::uint64_t seed = 0;
   bool include_timestamps = false;
+  // Event/trace selectors use the standard XES names by default and resolve
+  // non-standard keys from the generic attribute maps.
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
+  std::string case_id_attribute = "case:concept:name";
 };
 
 struct ConceptDriftChangePoint {
@@ -41,10 +47,16 @@ struct ConceptDriftResult {
   std::vector<double> sublog_start_timestamps;
   std::vector<ConceptDriftChangePoint> change_points;
   std::vector<double> change_timestamps;
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
+  std::string case_id_attribute = "case:concept:name";
 };
 
 [[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
     const EventLog& log);
+
+[[nodiscard]] std::vector<std::string> extract_concept_drift_activities(
+    const EventLog& log, std::string_view activity_attribute);
 
 // Extract the Bose relation-type-count feature vector for a set of traces.
 // For every target b and source a, traces containing a are classified by
@@ -52,6 +64,11 @@ struct ConceptDriftResult {
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const std::vector<Trace>& traces,
     const std::vector<std::string>& sorted_activities);
+
+[[nodiscard]] std::vector<double> extract_concept_drift_features(
+    const std::vector<Trace>& traces,
+    const std::vector<std::string>& sorted_activities,
+    std::string_view activity_attribute);
 
 [[nodiscard]] std::vector<double> extract_concept_drift_features(
     const EventLog& log);

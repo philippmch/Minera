@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "minera/concept_drift.hpp"
+#include "minera/json_export.hpp"
 
 namespace {
 
@@ -45,6 +46,38 @@ int main() {
   assert(features[3] == 0.0 && features[4] == 1.0 && features[5] == 2.0);
   assert(features[6] == 0.0 && features[7] == 1.0 && features[8] == 2.0);
 
+  minera::EventLog projected = log;
+  for (auto& current : projected.traces) {
+    current.attributes.push_back({"case:order", "batch-" + current.case_id});
+    for (auto& event : current.events) {
+      event.attributes.push_back({"event:type",
+                                  event.activity == "a" ? "Alpha" : "Beta"});
+      event.attributes.push_back({"started_at", event.timestamp});
+    }
+  }
+  minera::ConceptDriftOptions projected_options;
+  projected_options.sub_log_size = 2;
+  projected_options.window_size = 1;
+  projected_options.num_permutations = 5;
+  projected_options.threshold = 0.0;
+  projected_options.include_timestamps = true;
+  projected_options.activity_attribute = "event:type";
+  projected_options.timestamp_attribute = "started_at";
+  projected_options.case_id_attribute = "case:order";
+  const auto projected_result =
+      minera::detect_concept_drift(projected, projected_options);
+  assert((projected_result.activities ==
+          std::vector<std::string>{"Alpha", "Beta"}));
+  assert(projected_result.activity_attribute == "event:type");
+  assert(projected_result.timestamp_attribute == "started_at");
+  assert(projected_result.case_id_attribute == "case:order");
+  assert(projected_result.sublog_start_timestamps.size() == 2);
+  const auto projected_json = minera::concept_drift_json(projected_result);
+  assert(projected_json.find("\"activity_attribute\":\"event:type\"") !=
+         std::string::npos);
+  assert(projected_json.find("\"timestamp_attribute\":\"started_at\"") !=
+         std::string::npos);
+
   minera::ConceptDriftOptions options;
   options.sub_log_size = 2;
   options.window_size = 1;
@@ -72,6 +105,13 @@ int main() {
   assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
   options.num_permutations = 10;
   options.threshold = std::nan("");
+  assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
+
+  options.threshold = 0.5;
+  options.activity_attribute.clear();
+  assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
+  options.activity_attribute = "concept:name";
+  options.case_id_attribute = "missing_case_key";
   assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
 
   minera::EventLog bad_timestamp;
