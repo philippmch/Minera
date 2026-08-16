@@ -166,6 +166,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.relativeAttributeKey !== undefined ||
       filters.relativeAttributeStake !== undefined ||
       filters.relativeAttributeKeepOncePerCase === false ||
+      filters.attributeOccurrenceMin !== undefined ||
       (filters.numericAttributeKey &&
         (filters.numericAttributeMin !== undefined ||
           filters.numericAttributeMax !== undefined)) ||

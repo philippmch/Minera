@@ -1051,12 +1051,16 @@ describe("mineFormEntries", () => {
       relativeAttributeKey: "channel",
       relativeAttributeStake: 0.5,
       relativeAttributeKeepOncePerCase: false,
+      attributeOccurrenceKey: "channel",
+      attributeOccurrenceMin: 3,
     })).toEqual([
       ["max_activities", "2"],
       ["top_activities_attribute_key", "channel"],
       ["relative_attribute_key", "channel"],
       ["relative_attribute_stake", "0.5"],
       ["relative_attribute_keep_once_per_case", "false"],
+      ["attribute_occurrence_key", "channel"],
+      ["attribute_occurrence_min", "3"],
     ]);
     expect(() => mineFormEntries({ topActivitiesAttributeKey: "channel" })).toThrow(/maxActivities/);
     expect(() => mineFormEntries({ relativeAttributeStake: 1.1 })).toThrow(/\[0, 1\]/);
@@ -1064,6 +1068,9 @@ describe("mineFormEntries", () => {
     expect(hasActiveFilters({ topActivitiesAttributeKey: "channel" })).toBe(false);
     expect(hasActiveFilters({ relativeAttributeKey: "channel" })).toBe(true);
     expect(hasActiveFilters({ relativeAttributeKeepOncePerCase: true })).toBe(false);
+    expect(() => mineFormEntries({ attributeOccurrenceKey: "channel" })).toThrow(/required/);
+    expect(() => mineFormEntries({ attributeOccurrenceMin: 1.5 })).toThrow(/integer/);
+    expect(hasActiveFilters({ attributeOccurrenceMin: 0 })).toBe(true);
   });
 
   it("serializes variant coverage modes and endpoint polarity only with endpoints", () => {

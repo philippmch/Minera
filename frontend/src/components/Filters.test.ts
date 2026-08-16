@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "./Filters";
+import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -105,5 +105,11 @@ describe("frequency filter validation", () => {
     expect(variantCoverageValidationMessage({ min: "0", max: "100", percentage: "0" })).toBeNull();
     expect(variantCoverageValidationMessage({ min: "60", max: "50", percentage: "" })).toContain("must not exceed");
     expect(variantCoverageValidationMessage({ min: "", max: "101", percentage: "" })).toContain("[0, 100]");
+  });
+
+  it("validates absolute occurrence thresholds", () => {
+    expect(attributeOccurrenceValidationMessage({ key: "", min: "0" })).toBeNull();
+    expect(attributeOccurrenceValidationMessage({ key: "channel", min: "" })).toContain("minimum");
+    expect(attributeOccurrenceValidationMessage({ key: "", min: "1.5" })).toContain("integer");
   });
 });

@@ -799,6 +799,8 @@ void parse_mine_params_maps_filters() {
       {"relative_attribute_key", "channel"},
       {"relative_attribute_stake", "0.6"},
       {"relative_attribute_keep_once_per_case", "false"},
+      {"attribute_occurrence_key", "channel"},
+      {"attribute_occurrence_min", "3"},
       {"min_length", "2"},
       {"max_length", "10"},
       {"min_variant_frequency", "3"},
@@ -875,6 +877,9 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.relative_attribute_occurrence->attribute_key == "channel");
   assert(params.filter.relative_attribute_occurrence->min_relative_stake == 0.6);
   assert(!params.filter.relative_attribute_occurrence->keep_once_per_case);
+  assert(params.filter.attribute_occurrence_threshold.has_value());
+  assert(params.filter.attribute_occurrence_threshold->attribute_key == "channel");
+  assert(params.filter.attribute_occurrence_threshold->min_occurrences == 3);
   assert(params.filter.min_length == 2);
   assert(params.filter.max_length == 10);
   assert(params.filter.min_variant_frequency == 3);
@@ -983,6 +988,29 @@ void parse_mine_params_rejects_variant_and_endpoint_filter_errors() {
     threw = true;
   }
   assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_attribute_occurrence_thresholds() {
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"attribute_occurrence_key", "channel"},
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  for (const auto& value : {"-1", "1.5", "nan"}) {
+    threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({
+          {"attribute_occurrence_min", value},
+      }));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_invalid_case_duration_bounds() {
@@ -2644,6 +2672,7 @@ int main() {
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_variant_and_endpoint_filter_errors();
+  parse_mine_params_rejects_invalid_attribute_occurrence_thresholds();
   parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_case_selection_bounds();
   parse_mine_params_rejects_invalid_frequency_attribute_options();

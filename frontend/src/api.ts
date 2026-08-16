@@ -315,6 +315,9 @@ export interface FilterOptions extends LtlFilterOptions {
   relativeAttributeKey?: string;
   relativeAttributeStake?: number;
   relativeAttributeKeepOncePerCase?: boolean;
+  /** Keep events whose value occurs at least this absolute number of times. */
+  attributeOccurrenceKey?: string;
+  attributeOccurrenceMin?: number;
   /** Case-attribute filter: the key and its value constraints; always
    * keeps or drops whole cases. */
   caseAttributeKey?: string;
@@ -605,6 +608,17 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.relativeAttributeKeepOncePerCase !== undefined)
       add("relative_attribute_keep_once_per_case",
         String(options.relativeAttributeKeepOncePerCase));
+  }
+  const attributeOccurrenceConfigured =
+    options.attributeOccurrenceKey !== undefined ||
+    options.attributeOccurrenceMin !== undefined;
+  if (attributeOccurrenceConfigured) {
+    if (options.attributeOccurrenceMin === undefined)
+      throw new Error("attributeOccurrenceMin is required for threshold filtering");
+    validateNonnegativeInteger("attributeOccurrenceMin", options.attributeOccurrenceMin);
+    if (options.attributeOccurrenceKey !== undefined)
+      add("attribute_occurrence_key", options.attributeOccurrenceKey);
+    add("attribute_occurrence_min", String(options.attributeOccurrenceMin));
   }
   if (options.timeFrom) add("time_from", options.timeFrom);
   if (options.timeTo) add("time_to", options.timeTo);
