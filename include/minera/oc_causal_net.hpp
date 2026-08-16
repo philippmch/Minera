@@ -26,5 +26,7 @@ struct OcCausalNet {
 
 [[nodiscard]] std::string serialize_oc_causal_net_playout_json(
     const Ocel& log);
+[[nodiscard]] std::string serialize_oc_causal_net_playout_json(
+    const Ocel& log, OcpnEventBinding binding);
 
 }  // namespace minera

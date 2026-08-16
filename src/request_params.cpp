@@ -2835,6 +2835,25 @@ IntervalTreeParams parse_interval_tree_params(const FieldLookup& field,
           "interval_filter_activity_couple: expected two labels");
     params.filter_activity_couple = std::make_pair(parts[0], parts[1]);
   }
+  if (supplied("interval_query_point")) {
+    params.query_point = parse_finite_double(require("interval_query_point"),
+                                             "interval_query_point");
+  }
+  const bool query_start = supplied("interval_query_start");
+  const bool query_end = supplied("interval_query_end");
+  if (query_start != query_end)
+    throw std::invalid_argument(
+        "interval query range requires both start and end");
+  if (query_start) {
+    const double start = parse_finite_double(require("interval_query_start"),
+                                             "interval_query_start");
+    const double end = parse_finite_double(require("interval_query_end"),
+                                           "interval_query_end");
+    if (start > end)
+      throw std::invalid_argument(
+          "interval_query_start must not exceed interval_query_end");
+    params.query_range = std::make_pair(start, end);
+  }
   return params;
 }
 

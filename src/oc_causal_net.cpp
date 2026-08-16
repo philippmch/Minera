@@ -21,8 +21,15 @@ Ocel oc_causal_net_extensive_playout(const OcCausalNet& net,
 }
 
 std::string serialize_oc_causal_net_playout_json(const Ocel& log) {
+  return serialize_oc_causal_net_playout_json(log,
+                                              OcpnEventBinding::kIndependent);
+}
+
+std::string serialize_oc_causal_net_playout_json(const Ocel& log,
+                                                 OcpnEventBinding binding) {
   return std::string(
-             "{\"family\":\"OC_CAUSAL_NET_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"log\":") +
+             "{\"family\":\"OC_CAUSAL_NET_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"event_binding\":\"") +
+         ocpn_event_binding_name(binding) + "\",\"log\":" +
          serialize_ocel_json(log) + "}";
 }
 
