@@ -46,6 +46,12 @@ struct OcelO2oRelation {
   std::string qualifier;
 };
 
+struct OcelE2eRelation {
+  std::string source_id;
+  std::string target_id;
+  std::string qualifier;
+};
+
 struct OcelObjectChange {
   std::string object_id;
   std::string object_type;
@@ -59,6 +65,7 @@ struct Ocel {
   std::vector<OcelObject> objects;
   std::vector<OcelRelation> relations;
   std::vector<OcelO2oRelation> o2o;
+  std::vector<OcelE2eRelation> e2e;
   std::vector<OcelObjectChange> object_changes;
   std::map<std::string, OcelValue> globals;
 };

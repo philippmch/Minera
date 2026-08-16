@@ -112,6 +112,12 @@ Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
       result.o2o.push_back(relation);
     }
   }
+  for (const auto& relation : log.e2e) {
+    if (event_ids.contains(relation.source_id) &&
+        event_ids.contains(relation.target_id)) {
+      result.e2e.push_back(relation);
+    }
+  }
   for (const auto& change : log.object_changes) {
     if (selected.contains(change.object_id)) result.object_changes.push_back(change);
   }

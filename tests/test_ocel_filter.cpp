@@ -22,6 +22,7 @@ minera::Ocel sample() {
       {"e2", "o1", "owner"}, {"e3", "o3", "item"},
   };
   log.o2o = {{"o1", "o2", "contains"}, {"o1", "o3", "contains"}};
+  log.e2e = {{"e1", "e3", "precedes"}, {"e2", "e3", "precedes"}};
   log.object_changes = {
       {"o1", "Order", "2024-01-02T00:00:00Z", "status",
        std::string("paid")},
@@ -39,6 +40,7 @@ int main() {
   assert(web.events.size() == 2 && web.objects.size() == 3);
   assert(web.relations.size() == 3);
   assert(web.o2o.size() == 2 && web.object_changes.size() == 1);
+  assert(web.e2e.size() == 1 && web.e2e.front().source_id == "e1");
 
   const auto not_store = minera::filter_ocel_event_attribute(
       log, "channel", {std::string("store")}, false);
@@ -49,7 +51,7 @@ int main() {
       log, "color", {std::string("red")});
   assert(red.objects.size() == 1 && red.objects.front().id == "o2");
   assert(red.events.size() == 1 && red.events.front().id == "e1");
-  assert(red.relations.size() == 1 && red.o2o.empty());
+  assert(red.relations.size() == 1 && red.o2o.empty() && red.e2e.empty());
 
   const auto items = minera::filter_ocel_object_types(log, {"Item"});
   assert(items.objects.size() == 2 && items.events.size() == 2);
@@ -62,6 +64,7 @@ int main() {
   const auto shipped = minera::filter_ocel_events(log, {"e2"});
   assert(shipped.events.size() == 1 && shipped.objects.size() == 1);
   assert(shipped.relations.size() == 1 && shipped.relations.front().object_id == "o1");
+  assert(shipped.e2e.empty());
 
   const auto window = minera::filter_ocel_events_timestamp(
       log, "2024-01-02T00:00:00Z", "2024-01-03T00:00:00Z");

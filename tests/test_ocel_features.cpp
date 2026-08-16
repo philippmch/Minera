@@ -21,6 +21,7 @@ minera::Ocel sample() {
   log.relations = {
       {"e1", "o1", ""}, {"e1", "i1", ""}, {"e2", "o1", ""},
       {"e2", "i1", ""}, {"e3", "o1", ""}, {"e3", "i2", ""}};
+  log.e2e = {{"e1", "e2", "precedes"}, {"e2", "e3", "precedes"}};
   return log;
 }
 
@@ -41,6 +42,16 @@ int main() {
   assert(events.feature_names.front() == "@@event_act_Close");
   assert(events.feature_names.back() == "@@event_new_interactions");
   assert(events.values[0][events.feature_names.size() - 1] == 1.0);
+  const auto e2e_out = std::find(events.feature_names.begin(),
+                                 events.feature_names.end(),
+                                 "@@event_num_e2e_out");
+  const auto e2e_in = std::find(events.feature_names.begin(),
+                                events.feature_names.end(),
+                                "@@event_num_e2e_in");
+  assert(e2e_out != events.feature_names.end() &&
+         e2e_in != events.feature_names.end());
+  assert(events.values[0][static_cast<std::size_t>(e2e_out - events.feature_names.begin())] == 1.0);
+  assert(events.values[2][static_cast<std::size_t>(e2e_in - events.feature_names.begin())] == 1.0);
   const auto events_json = minera::serialize_ocel_features_json(events);
   assert(events_json.find("\"family\":\"OCEL_FEATURES\"") != std::string::npos);
   assert(events_json.find("\"variant\":\"EVENTS\"") != std::string::npos);

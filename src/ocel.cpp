@@ -178,6 +178,24 @@ Ocel parse_classic(const Json::Object& root) {
     for (const auto& oidj : omap->array()) { const auto oid = str(oidj, "ocel:omap"); if (!types.count(oid)) throw std::invalid_argument("relation references unknown object"); if (seen.insert(oid).second) log.relations.push_back({id, oid, ""}); }
     if (const auto* typed = optional(x, "ocel:typedOmap")) { if (!typed->is_array()) throw std::invalid_argument("ocel:typedOmap must be array"); for (const auto& r : typed->array()) { const auto& rr = obj(r, "ocel:typedOmap"); const auto oid = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(oid) || !seen.count(oid)) throw std::invalid_argument("typed relation references unknown object"); for (auto& rel : log.relations) if (rel.event_id == id && rel.object_id == oid) rel.qualifier = optional(rr, "ocel:qualifier") ? str(*optional(rr, "ocel:qualifier"), "ocel:qualifier") : ""; } }
   }
+  if (const auto* raw_e2e = optional(root, "ocel:e2e")) {
+    if (!raw_e2e->is_array())
+      throw std::invalid_argument("ocel:e2e must be array");
+    for (const auto& raw : raw_e2e->array()) {
+      const auto& relation = obj(raw, "ocel:e2e");
+      const auto* source = optional(relation, "ocel:eid");
+      const auto* target = optional(relation, "ocel:eid_2");
+      if (source == nullptr || target == nullptr)
+        throw std::invalid_argument("ocel:e2e requires source and target event ids");
+      const auto source_id = str(*source, "ocel:eid");
+      const auto target_id = str(*target, "ocel:eid_2");
+      if (!event_ids.count(source_id) || !event_ids.count(target_id))
+        throw std::invalid_argument("ocel:e2e references unknown event");
+      const auto* qualifier = optional(relation, "ocel:qualifier");
+      log.e2e.push_back({source_id, target_id,
+                         qualifier == nullptr ? std::string{} : str(*qualifier, "ocel:qualifier")});
+    }
+  }
   if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) throw std::invalid_argument("object change references unknown object"); c.object_type = optional(rr, "ocel:type") ? str(*optional(rr, "ocel:type"), "ocel:type") : types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
   for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) if (const auto* g = optional(root, category)) { for (const auto& [key, value] : obj(*g, category)) { if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key); } }
   for (const auto& r : log.o2o) if (!types.count(r.target_id)) throw std::invalid_argument("o2o relation references unknown object");
@@ -192,6 +210,26 @@ Ocel parse_standard(const Json::Object& root) {
   const auto& event_array = required(root, "events");
   if (!event_array.is_array()) throw std::invalid_argument("events must be array");
   for (const auto& raw : event_array.array()) { const auto& x = obj(raw, "events[]"); const auto id = str(required(x, "id"), "id"); if (!event_ids.insert(id).second) throw std::invalid_argument("duplicate event id"); OcelEvent e{id, str(required(x, "type"), "type"), str(required(x, "time"), "time"), {}}; if (const auto* aa = optional(x, "attributes")) { if (!aa->is_array()) throw std::invalid_argument("event attributes must be array"); for (const auto& ar : aa->array()) { const auto& a = obj(ar, "attributes[]"); e.attributes.push_back({str(required(a, "name"), "name"), scalar(required(a, "value"), "value")}); } } log.events.push_back(std::move(e)); const auto* rels = optional(x, "relationships"); if (!rels || !rels->is_array()) throw std::invalid_argument("event relationships must be array"); std::unordered_set<std::string> seen; for (const auto& r : rels->array()) { const auto& y = obj(r, "relationship"); const auto oid = str(required(y, "objectId"), "objectId"); if (!types.count(oid)) throw std::invalid_argument("relation references unknown object"); if (seen.insert(oid).second) log.relations.push_back({id, oid, optional(y, "qualifier") ? str(*optional(y, "qualifier"), "qualifier") : ""}); } }
+  const Json* raw_e2e = optional(root, "eventRelationships");
+  if (raw_e2e == nullptr) raw_e2e = optional(root, "e2e");
+  if (raw_e2e != nullptr) {
+    if (!raw_e2e->is_array())
+      throw std::invalid_argument("eventRelationships must be array");
+    for (const auto& raw : raw_e2e->array()) {
+      const auto& relation = obj(raw, "eventRelationships[]");
+      const auto* source = optional(relation, "sourceEventId");
+      const auto* target = optional(relation, "targetEventId");
+      if (source == nullptr || target == nullptr)
+        throw std::invalid_argument("eventRelationships requires sourceEventId and targetEventId");
+      const auto source_id = str(*source, "sourceEventId");
+      const auto target_id = str(*target, "targetEventId");
+      if (!event_ids.count(source_id) || !event_ids.count(target_id))
+        throw std::invalid_argument("eventRelationships references unknown event");
+      const auto* qualifier = optional(relation, "qualifier");
+      log.e2e.push_back({source_id, target_id,
+                         qualifier == nullptr ? std::string{} : str(*qualifier, "qualifier")});
+    }
+  }
   if (const auto* globals = optional(root, "globals")) {
     for (const auto& [key, value] : obj(*globals, "globals")) {
       log.globals[key] = scalar(value, key);
@@ -237,6 +275,41 @@ void write_o2o(std::ostringstream& out, const Ocel& log, std::string_view source
     out << ",\"ocel:qualifier\":";
     write_string(out, relation->qualifier);
     out << '}';
+  }
+  out << ']';
+}
+
+void write_e2e(std::ostringstream& out, const Ocel& log,
+               bool standard_names) {
+  std::vector<const OcelE2eRelation*> relations;
+  relations.reserve(log.e2e.size());
+  for (const auto& relation : log.e2e) relations.push_back(&relation);
+  std::sort(relations.begin(), relations.end(), [](const auto* left,
+                                                   const auto* right) {
+    return std::tie(left->source_id, left->target_id, left->qualifier) <
+           std::tie(right->source_id, right->target_id, right->qualifier);
+  });
+  out << '[';
+  for (std::size_t i = 0; i < relations.size(); ++i) {
+    if (i != 0) out << ',';
+    const auto& relation = *relations[i];
+    if (standard_names) {
+      out << "{\"sourceEventId\":";
+      write_string(out, relation.source_id);
+      out << ",\"targetEventId\":";
+      write_string(out, relation.target_id);
+      out << ",\"qualifier\":";
+      write_string(out, relation.qualifier);
+      out << '}';
+    } else {
+      out << "{\"ocel:eid\":";
+      write_string(out, relation.source_id);
+      out << ",\"ocel:eid_2\":";
+      write_string(out, relation.target_id);
+      out << ",\"ocel:qualifier\":";
+      write_string(out, relation.qualifier);
+      out << '}';
+    }
   }
   out << ']';
 }
@@ -452,6 +525,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       out << '}';
     }
     out << ']';
+    if (!log.e2e.empty()) {
+      out << ",\"eventRelationships\":";
+      write_e2e(out, log, true);
+    }
     if (!log.globals.empty()) {
       out << ",\"globals\":{";
       first = true;
@@ -501,7 +578,12 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     write_attrs(out, event->attributes);
     out << '}';
   }
-  out << "},\"ocel:objects\":{";
+  out << '}';
+  if (!log.e2e.empty()) {
+    out << ",\"ocel:e2e\":";
+    write_e2e(out, log, false);
+  }
+  out << ",\"ocel:objects\":{";
   first = true;
   for (const auto* object : objects) {
     if (!first) out << ',';

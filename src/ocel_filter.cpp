@@ -50,6 +50,7 @@ void clear_all_tables(Ocel& log) {
   log.objects.clear();
   log.relations.clear();
   log.o2o.clear();
+  log.e2e.clear();
   log.object_changes.clear();
 }
 
@@ -103,8 +104,15 @@ Ocel propagate_event_filter(Ocel log) {
                      [&](const OcelO2oRelation& relation) {
                        return !selected_objects.count(relation.source_id) ||
                               !selected_objects.count(relation.target_id);
-                     }),
+      }),
       log.o2o.end());
+  log.e2e.erase(
+      std::remove_if(log.e2e.begin(), log.e2e.end(),
+                     [&](const OcelE2eRelation& relation) {
+                       return !selected_events.count(relation.source_id) ||
+                              !selected_events.count(relation.target_id);
+                     }),
+      log.e2e.end());
   return log;
 }
 
@@ -144,8 +152,15 @@ Ocel propagate_object_filter(Ocel log) {
       std::remove_if(log.events.begin(), log.events.end(),
                      [&](const OcelEvent& event) {
                        return !selected_events.count(event.id);
-                     }),
+      }),
       log.events.end());
+  log.e2e.erase(
+      std::remove_if(log.e2e.begin(), log.e2e.end(),
+                     [&](const OcelE2eRelation& relation) {
+                       return !selected_events.count(relation.source_id) ||
+                              !selected_events.count(relation.target_id);
+                     }),
+      log.e2e.end());
   log.o2o.erase(
       std::remove_if(log.o2o.begin(), log.o2o.end(),
                      [&](const OcelO2oRelation& relation) {
@@ -212,8 +227,15 @@ Ocel propagate_relation_filter(Ocel log) {
                      [&](const OcelRelation& relation) {
                        return !selected_events.count(relation.event_id) ||
                               !selected_objects.count(relation.object_id);
-                     }),
+      }),
       log.relations.end());
+  log.e2e.erase(
+      std::remove_if(log.e2e.begin(), log.e2e.end(),
+                     [&](const OcelE2eRelation& relation) {
+                       return !selected_events.count(relation.source_id) ||
+                              !selected_events.count(relation.target_id);
+                     }),
+      log.e2e.end());
   log.o2o.erase(
       std::remove_if(log.o2o.begin(), log.o2o.end(),
                      [&](const OcelO2oRelation& relation) {
