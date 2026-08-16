@@ -424,11 +424,30 @@ std::unordered_set<std::string> relative_attribute_values(
   return allowed;
 }
 
+std::unordered_set<std::string> threshold_attribute_values(
+    const EventLog& event_log,
+    const AttributeOccurrenceThresholdFilterOptions& options) {
+  std::unordered_map<std::string, std::uint64_t> counts;
+  for (const auto& trace : event_log.traces) {
+    for (const auto& event : trace.events) {
+      const auto* value = frequency_attribute_value(event, options.attribute_key);
+      if (value != nullptr) ++counts[*value];
+    }
+  }
+  std::unordered_set<std::string> allowed;
+  for (const auto& entry : counts) {
+    if (entry.second >= options.min_occurrences) allowed.insert(entry.first);
+  }
+  return allowed;
+}
+
 Trace project_frequency_attributes(
     const Trace& trace, std::string_view top_key,
     const std::unordered_set<std::string>* top_allowed,
     std::string_view relative_key,
-    const std::unordered_set<std::string>* relative_allowed) {
+    const std::unordered_set<std::string>* relative_allowed,
+    std::string_view threshold_key,
+    const std::unordered_set<std::string>* threshold_allowed) {
   Trace result;
   result.case_id = trace.case_id;
   result.attributes = trace.attributes;
@@ -442,6 +461,12 @@ Trace project_frequency_attributes(
       const auto* value = frequency_attribute_value(event, relative_key);
       if (value == nullptr ||
           relative_allowed->find(*value) == relative_allowed->end())
+        continue;
+    }
+    if (threshold_allowed != nullptr) {
+      const auto* value = frequency_attribute_value(event, threshold_key);
+      if (value == nullptr ||
+          threshold_allowed->find(*value) == threshold_allowed->end())
         continue;
     }
     result.events.push_back(event);
@@ -695,7 +720,7 @@ EventLog filter_top_activities(
   result.attributes = event_log.attributes;
   for (const auto& trace : event_log.traces) {
     auto projected = project_frequency_attributes(
-        trace, options.attribute_key, &allowed, {}, nullptr);
+        trace, options.attribute_key, &allowed, {}, nullptr, {}, nullptr);
     if (!projected.events.empty()) result.traces.push_back(std::move(projected));
   }
   return result;
@@ -711,7 +736,21 @@ EventLog filter_relative_attribute_occurrence(
   result.attributes = event_log.attributes;
   for (const auto& trace : event_log.traces) {
     auto projected = project_frequency_attributes(
-        trace, {}, nullptr, options.attribute_key, &allowed);
+        trace, {}, nullptr, options.attribute_key, &allowed, {}, nullptr);
+    if (!projected.events.empty()) result.traces.push_back(std::move(projected));
+  }
+  return result;
+}
+
+EventLog filter_attribute_occurrence_threshold(
+    const EventLog& event_log,
+    const AttributeOccurrenceThresholdFilterOptions& options) {
+  const auto allowed = threshold_attribute_values(event_log, options);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    auto projected = project_frequency_attributes(
+        trace, {}, nullptr, {}, nullptr, options.attribute_key, &allowed);
     if (!projected.events.empty()) result.traces.push_back(std::move(projected));
   }
   return result;
@@ -863,6 +902,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     relative_allowed = relative_attribute_values(
         log, *options.relative_attribute_occurrence);
   }
+  std::unordered_set<std::string> threshold_allowed;
+  if (options.attribute_occurrence_threshold) {
+    threshold_allowed = threshold_attribute_values(
+        log, *options.attribute_occurrence_threshold);
+  }
 
   if (options.prefix_activity.empty() &&
       (!options.prefix_strict ||
@@ -1010,7 +1054,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     const auto* relative_filter = options.relative_attribute_occurrence
                                       ? &relative_allowed
                                       : nullptr;
-    if (top_filter != nullptr || relative_filter != nullptr) {
+    const auto* threshold_filter = options.attribute_occurrence_threshold
+                                       ? &threshold_allowed
+                                       : nullptr;
+    if (top_filter != nullptr || relative_filter != nullptr ||
+        threshold_filter != nullptr) {
       frequency_projected = project_frequency_attributes(
           *source,
           options.top_activities ? options.top_activities->attribute_key : "",
@@ -1018,7 +1066,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
           options.relative_attribute_occurrence
               ? options.relative_attribute_occurrence->attribute_key
               : "",
-          relative_filter);
+          relative_filter,
+          options.attribute_occurrence_threshold
+              ? options.attribute_occurrence_threshold->attribute_key
+              : "",
+          threshold_filter);
       if (frequency_projected.events.empty()) continue;
       source = &frequency_projected;
     }

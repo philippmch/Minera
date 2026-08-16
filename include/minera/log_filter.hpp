@@ -109,6 +109,14 @@ struct RelativeAttributeOccurrenceFilterOptions {
   bool keep_once_per_case = true;
 };
 
+// Retain events whose activity/attribute value occurs at least the requested
+// absolute number of times in the original log. Empty attribute_key means the
+// activity field; a generic key drops events that do not carry it.
+struct AttributeOccurrenceThresholdFilterOptions {
+  std::string attribute_key;
+  std::uint64_t min_occurrences = 1;
+};
+
 enum class FilterAnchorOccurrence { first, last };
 
 // Prefix/suffix anchor behavior. Strict cuts include the anchor event;
@@ -196,6 +204,8 @@ struct LogFilterOptions {
   std::optional<TopActivitiesFilterOptions> top_activities;
   std::optional<RelativeAttributeOccurrenceFilterOptions>
       relative_attribute_occurrence;
+  std::optional<AttributeOccurrenceThresholdFilterOptions>
+      attribute_occurrence_threshold;
 
   // Case-attribute filter on one trace-attribute key (a scalar XES trace
   // attribute, or a `case:` CSV column). Always trace-level: with
@@ -313,6 +323,7 @@ struct LogFilterOptions {
            numeric_attribute.has_value() ||
            top_activities.has_value() ||
            relative_attribute_occurrence.has_value() ||
+           attribute_occurrence_threshold.has_value() ||
            !case_attribute_key.empty() ||
            !keep_case_attribute_values.empty() ||
            !remove_case_attribute_values.empty() ||
@@ -383,6 +394,20 @@ struct LogFilterOptions {
     const EventLog& event_log,
     const RelativeAttributeOccurrenceFilterOptions& options);
 
+[[nodiscard]] EventLog filter_attribute_occurrence_threshold(
+    const EventLog& event_log,
+    const AttributeOccurrenceThresholdFilterOptions& options);
+
+// Compatibility spelling for the classic absolute attribute threshold helper.
+[[nodiscard]] inline EventLog filter_log_by_attribute_occurrence_threshold(
+    const EventLog& event_log, std::string attribute_key,
+    std::uint64_t min_occurrences) {
+  return filter_attribute_occurrence_threshold(
+      event_log,
+      AttributeOccurrenceThresholdFilterOptions{std::move(attribute_key),
+                                                min_occurrences});
+}
+
 // Endpoint filters preserve complete traces and metadata. Positive mode keeps
 // listed endpoints; negative mode drops them. Empty activity lists are a
 // no-op for positive mode and invalid for negative mode.
@@ -407,6 +432,13 @@ struct LogFilterOptions {
 
 [[nodiscard]] EventLog filter_log_variants_percentage(
     const EventLog& event_log, double percentage = 0.8);
+
+// The historical pluralized variant helper keeps the most frequent variants
+// until the requested cumulative case share is reached.
+[[nodiscard]] inline EventLog filter_variants_variants_percentage(
+    const EventLog& event_log, double percentage = 0.0) {
+  return filter_log_variants_percentage(event_log, percentage);
+}
 
 // Compatibility spellings used by the classic filtering surface.
 [[nodiscard]] inline EventLog filter_log_on_max_no_activities(

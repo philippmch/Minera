@@ -920,6 +920,9 @@ int usage(const char* program) {
                "                            Attribute for relative occurrence\n"
                "  --relative-attribute-keep-once-per-case <bool>\n"
                "                            Count each value once per case\n"
+               "  --attribute-occurrence-key <k>\n"
+               "                            Absolute-frequency attribute (blank = activity)\n"
+               "  --attribute-occurrence-min <n> Keep values seen at least n times\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
                "  --start-activities-positive <bool> Keep (or exclude) listed starts\n"
                "  --end-activities <a,b>    Keep traces ending with one of these\n"
@@ -1392,6 +1395,24 @@ int main(int argc, char** argv) {
               "--relative-attribute-stake expects a number in [0, 1]");
       } else {
         relative.keep_once_per_case = parse_boolean(value, arg);
+      }
+      continue;
+    }
+    if (arg == "--attribute-occurrence-key" ||
+        arg == "--attribute-occurrence-min" ||
+        arg == "--attribute-threshold-key" ||
+        arg == "--attribute-threshold") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (!filter.attribute_occurrence_threshold)
+        filter.attribute_occurrence_threshold =
+            minera::AttributeOccurrenceThresholdFilterOptions{};
+      auto& threshold = *filter.attribute_occurrence_threshold;
+      if (arg == "--attribute-occurrence-key" ||
+          arg == "--attribute-threshold-key") {
+        threshold.attribute_key = value;
+      } else {
+        threshold.min_occurrences = parse_nonnegative_size(value, arg);
       }
       continue;
     }

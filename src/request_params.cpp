@@ -1091,6 +1091,26 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
     params.filter.relative_attribute_occurrence = std::move(relative);
   }
+  const bool threshold_key_supplied =
+      supplied("attribute_occurrence_key") || supplied("attribute_threshold_key");
+  const bool threshold_min_supplied =
+      supplied("attribute_occurrence_min") || supplied("attribute_threshold");
+  if (threshold_key_supplied || threshold_min_supplied) {
+    const auto key_field = supplied("attribute_occurrence_key")
+                               ? std::string_view("attribute_occurrence_key")
+                               : std::string_view("attribute_threshold_key");
+    const auto min_field = supplied("attribute_occurrence_min")
+                               ? std::string_view("attribute_occurrence_min")
+                               : std::string_view("attribute_threshold");
+    if (!threshold_min_supplied)
+      throw std::invalid_argument(
+          "attribute_occurrence_min: required for threshold filtering");
+    AttributeOccurrenceThresholdFilterOptions threshold;
+    if (threshold_key_supplied) threshold.attribute_key = field(key_field);
+    threshold.min_occurrences = parse_nonnegative_size(
+        field(min_field), min_field);
+    params.filter.attribute_occurrence_threshold = std::move(threshold);
+  }
   if (const auto value = field("keep_activities"); !value.empty()) {
     params.filter.keep_activities = split_csv(value);
   }

@@ -191,6 +191,20 @@ export function relativeAttributeValidationMessage(input: {
   return null;
 }
 
+/** Absolute occurrence thresholds need a non-negative integer count. */
+export function attributeOccurrenceValidationMessage(input: {
+  key: string;
+  min: string;
+}): string | null {
+  if (!input.key.trim() && !input.min.trim()) return null;
+  if (!input.min.trim())
+    return "Attribute occurrence filtering needs a minimum count.";
+  const value = Number(input.min);
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0)
+    return "Attribute occurrence minimum must be a non-negative integer.";
+  return null;
+}
+
 /** Variant share controls are entered as percentages in the UI. */
 export function variantCoverageValidationMessage(input: {
   min: string;
@@ -351,6 +365,8 @@ export function Filters({
   const [relativeAttributeStake, setRelativeAttributeStake] = useState("");
   const [relativeAttributeKeepOncePerCase, setRelativeAttributeKeepOncePerCase] =
     useState(true);
+  const [attributeOccurrenceKey, setAttributeOccurrenceKey] = useState("");
+  const [attributeOccurrenceMin, setAttributeOccurrenceMin] = useState("");
   // Case-attribute filter: one key and its dropped values. Dropping a value
   // always removes the whole case — the attribute lives on the case itself.
   const [caseAttributeKey, setCaseAttributeKey] = useState("");
@@ -702,6 +718,10 @@ export function Filters({
     stake: relativeAttributeStake,
     keepOncePerCase: relativeAttributeKeepOncePerCase,
   });
+  const attributeOccurrenceValidationError = attributeOccurrenceValidationMessage({
+    key: attributeOccurrenceKey,
+    min: attributeOccurrenceMin,
+  });
   const variantCoverageValidationError = variantCoverageValidationMessage({
     min: variantMinCoverage,
     max: variantMaxCoverage,
@@ -722,7 +742,7 @@ export function Filters({
         pathValidationError || caseDurationValidationError ||
         caseSelectionValidationError ||
         numericAttributeValidationError || topActivitiesValidationError ||
-        relativeAttributeValidationError ||
+        relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
         caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
@@ -831,6 +851,9 @@ export function Filters({
         (relativeAttributeKey.trim() || relativeAttributeStake.trim() ||
          !relativeAttributeKeepOncePerCase)
           ? relativeAttributeKeepOncePerCase : undefined,
+      attributeOccurrenceKey: attributeOccurrenceKey.trim() || undefined,
+      attributeOccurrenceMin: attributeOccurrenceMin.trim()
+        ? Number(attributeOccurrenceMin) : undefined,
       reworkActivity: reworkActivity || undefined,
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
@@ -1055,6 +1078,8 @@ export function Filters({
     setRelativeAttributeKey("");
     setRelativeAttributeStake("");
     setRelativeAttributeKeepOncePerCase(true);
+    setAttributeOccurrenceKey("");
+    setAttributeOccurrenceMin("");
     setCaseAttributeKey("");
     setRemovedCaseValues(new Set());
     setNoiseThreshold("");
@@ -1202,6 +1227,8 @@ export function Filters({
     relativeAttributeKey !== "" ||
     relativeAttributeStake !== "" ||
     !relativeAttributeKeepOncePerCase ||
+    attributeOccurrenceKey !== "" ||
+    attributeOccurrenceMin !== "" ||
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
@@ -1544,10 +1571,31 @@ export function Filters({
               />
               <span>count once per case</span>
             </label>
+            <label className="filters-field">
+              <span>Absolute occurrence minimum</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="off"
+                value={attributeOccurrenceMin}
+                onChange={(e) => setAttributeOccurrenceMin(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Threshold attribute <small>(blank = activity)</small></span>
+              <input
+                type="text"
+                value={attributeOccurrenceKey}
+                onChange={(e) => setAttributeOccurrenceKey(e.target.value)}
+              />
+            </label>
           </div>
-          {(topActivitiesValidationError || relativeAttributeValidationError) && (
+          {(topActivitiesValidationError || relativeAttributeValidationError ||
+            attributeOccurrenceValidationError) && (
             <div className="filters-warning" role="alert">
-              {topActivitiesValidationError || relativeAttributeValidationError}
+              {topActivitiesValidationError || relativeAttributeValidationError ||
+                attributeOccurrenceValidationError}
             </div>
           )}
 
@@ -2976,11 +3024,12 @@ export function Filters({
           {(temporalValidationError || ltlValidationError || segmentValidationError ||
             pathValidationError || caseDurationValidationError || caseSelectionValidationError ||
             numericAttributeValidationError || topActivitiesValidationError ||
-            relativeAttributeValidationError || variantCoverageValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || variantCoverageValidationError}</p>
+            relativeAttributeValidationError || attributeOccurrenceValidationError ||
+            variantCoverageValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || variantCoverageValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError)}>
               Apply
             </button>
             <button

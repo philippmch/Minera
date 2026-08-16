@@ -3292,6 +3292,52 @@ void filter_frequency_attribute_variants_support_top_and_relative_occurrence() {
   }));
 }
 
+void filter_absolute_attribute_occurrence_thresholds() {
+  const auto log = log_from_variants({
+      {"A", "B", "A"}, {"A", "C"}, {"B", "C"},
+  });
+  minera::AttributeOccurrenceThresholdFilterOptions threshold;
+  threshold.min_occurrences = 2;
+  const auto frequent =
+      minera::filter_attribute_occurrence_threshold(log, threshold);
+  assert(frequent.trace_count() == 3);
+  assert((activity_names(frequent.traces[0]) ==
+          std::vector<std::string>{"A", "B", "A"}));
+  assert((activity_names(frequent.traces[1]) ==
+          std::vector<std::string>{"A", "C"}));
+  assert((activity_names(frequent.traces[2]) ==
+          std::vector<std::string>{"B", "C"}));
+
+  threshold.min_occurrences = 3;
+  assert(minera::filter_log_by_attribute_occurrence_threshold(
+             log, {}, 3)
+             .trace_count() == 2);
+
+  minera::LogFilterOptions integrated;
+  integrated.attribute_occurrence_threshold =
+      minera::AttributeOccurrenceThresholdFilterOptions{"", 3};
+  assert(integrated.any());
+  assert(minera::filter_event_log(log, integrated).trace_count() == 2);
+
+  minera::AttributeOccurrenceThresholdFilterOptions generic;
+  generic.attribute_key = "channel";
+  generic.min_occurrences = 2;
+  minera::EventLog attributed = log;
+  attributed.traces[0].events[0].attributes.push_back(
+      {"channel", "web", minera::AttributeKind::kString});
+  attributed.traces[0].events[1].attributes.push_back(
+      {"channel", "web", minera::AttributeKind::kString});
+  attributed.traces[1].events[0].attributes.push_back(
+      {"channel", "phone", minera::AttributeKind::kString});
+  const auto generic_filtered =
+      minera::filter_attribute_occurrence_threshold(attributed, generic);
+  assert(generic_filtered.trace_count() == 1);
+  assert(generic_filtered.traces[0].events.size() == 2);
+  assert(throws([&] {
+    (void)minera::filter_variants_variants_percentage(log, 1.5);
+  }));
+}
+
 void filter_prefix_suffix_support_strictness_and_occurrence() {
   const auto log = log_from_variants({{"a", "b", "a", "c"}, {"x", "y"}});
 
@@ -5451,6 +5497,7 @@ int main() {
   filter_case_selection_limits_cases_and_event_counts();
   filter_numeric_attributes_support_event_and_trace_ranges();
   filter_frequency_attribute_variants_support_top_and_relative_occurrence();
+  filter_absolute_attribute_occurrence_thresholds();
   filter_prefix_suffix_support_strictness_and_occurrence();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();
