@@ -454,10 +454,13 @@ diagnostic settings. The CLI emits a focused JSON document for any discovered
 or imported Petri model, the local server exposes `POST /api/petri-analysis`,
 and the frontend conformance tab provides the same controls with generation-safe
 on-demand caching. Native, request, frontend, CLI, and hidden-server smoke
-tests cover the current vertical. Karp–Miller-style coverability witnesses,
-positive normalized invariant/S-component diagnostics, and their JSON fields are
-included; a complete black-box edge matrix remains open before this row can
-claim full parity.
+tests cover the current vertical. Karp–Miller-style coverability witnesses now
+include a compact omega-marking graph, while bounded exploration exposes its
+deterministic reachability markings and transition edges. Positive invariant
+diagnostics expose the original, uniform-support, and relative-weight families
+separately, including coverage gaps for each family and for S-components. These
+projections are serialized by the CLI, local server, and frontend contracts; a
+complete black-box edge matrix remains open before this row can claim full parity.
 
 ## Extended Petri-arc evidence
 

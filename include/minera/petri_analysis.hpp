@@ -138,6 +138,22 @@ struct SoundnessResult {
   // coefficient in at least one vector.
   std::vector<std::vector<double>> place_invariant_basis;
   std::vector<std::size_t> uncovered_places;
+  // Uniform invariants keep only the support of each positive invariant.
+  // Weighted invariants retain relative positive coefficients, normalized so
+  // the smallest positive coefficient is one.  Both families are emitted in
+  // deterministic order and are useful for independent coverage diagnostics.
+  std::vector<std::vector<double>> uniform_place_invariants;
+  std::vector<std::size_t> uncovered_places_uniform;
+  std::vector<std::vector<double>> weighted_place_invariants;
+  std::vector<std::size_t> uncovered_places_weighted;
+  std::vector<std::size_t> uncovered_places_s_component;
+  // Compact graph projections used by soundness diagnostics.  Coverability
+  // markings use -1 for an omega coordinate; graph edges are
+  // [source_node, target_node, transition_id].
+  std::vector<Marking> coverability_markings;
+  std::vector<std::vector<std::size_t>> coverability_edges;
+  std::vector<Marking> reachability_markings;
+  std::vector<std::vector<std::size_t>> reachability_edges;
   // For workflow nets, supports of the positive P-invariants above.  The
   // optional is disengaged when the input is not a structurally valid
   // workflow net; an engaged empty value means no positive S-component was

@@ -217,7 +217,17 @@ void positive_invariant_diagnostics() {
   assert(sequential.s_components.has_value());
   assert(sequential.s_components->size() == 1);
   assert(sequential.s_components->front() == std::vector<std::size_t>({0, 1, 2}));
+  assert(sequential.uncovered_places_s_component.empty());
   assert(sequential.uncovered_places.empty());
+  assert(!sequential.uniform_place_invariants.empty());
+  assert(!sequential.weighted_place_invariants.empty());
+  assert(sequential.uncovered_places_uniform.empty());
+  assert(sequential.uncovered_places_weighted.empty());
+  assert(sequential.reachability_markings.size() == 3);
+  assert((sequential.reachability_edges ==
+          std::vector<std::vector<std::size_t>>{{0, 1, 0}, {1, 2, 1}}));
+  assert(!sequential.coverability_markings.empty());
+  assert(!sequential.coverability_edges.empty());
   for (const auto& invariant : sequential.place_invariant_basis) {
     assert(std::all_of(invariant.begin(), invariant.end(),
                        [](double value) { return value >= -1e-8; }));
@@ -228,6 +238,9 @@ void positive_invariant_diagnostics() {
   assert(serialized.find("\"s_components\"") != std::string::npos);
   assert(serialized.find("\"handled_pairs\"") != std::string::npos);
   assert(serialized.find("\"not_well_handled_pairs\"") != std::string::npos);
+  assert(serialized.find("\"uniform_place_invariants\"") != std::string::npos);
+  assert(serialized.find("\"weighted_place_invariants\"") != std::string::npos);
+  assert(serialized.find("\"reachability_edges\"") != std::string::npos);
   assert(sequential.handled_pairs.has_value());
   assert(sequential.handled_pairs->empty());
   assert(sequential.completion_witness == std::vector<std::size_t>({0, 1}));
@@ -322,6 +335,13 @@ void unsound_models() {
   assert(result.status == SoundnessStatus::UNSOUND && !result.bounded);
   assert(result.unbounded_witness == std::vector<std::size_t>({0, 1}));
   assert(result.coverability_node_count >= 2);
+  assert(!result.coverability_markings.empty());
+  assert(std::any_of(result.coverability_markings.begin(),
+                     result.coverability_markings.end(), [](const auto& marking) {
+                       return std::any_of(marking.begin(), marking.end(),
+                                          [](auto value) { return value == -1; });
+                     }));
+  assert(!result.coverability_edges.empty());
   assert(std::any_of(result.diagnostic_messages.begin(),
                      result.diagnostic_messages.end(), [](const auto& message) {
                        return message.find("coverability") != std::string::npos;

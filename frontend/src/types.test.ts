@@ -240,6 +240,39 @@ describe("isPetriAnalysisResult structural diagnostics", () => {
   });
 });
 
+describe("isPetriAnalysisResult soundness graph diagnostics", () => {
+  it("accepts invariant families and compact graph projections", () => {
+    expect(isPetriAnalysisResult({
+      family: "soundness",
+      uniform_place_invariants: [[1, 1, 0]],
+      weighted_place_invariants: [[1, 2, 0]],
+      uncovered_places_uniform: [],
+      coverability_markings: [[1, 0], [-1, 0]],
+      coverability_edges: [[0, 1, 0]],
+      reachability_markings: [[1, 0], [0, 1]],
+      reachability_edges: [[0, 1, 2]],
+    })).toBe(true);
+  });
+
+  it("rejects malformed invariant and graph diagnostics", () => {
+    expect(isPetriAnalysisResult({
+      family: "soundness", uniform_place_invariants: [[1, -1]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "soundness", coverability_markings: [[1, -2]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "soundness", reachability_markings: [[1, -1]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "soundness", reachability_edges: [[0, 1]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "soundness", weighted_place_invariants: [[1, Number.NaN]],
+    })).toBe(false);
+  });
+});
+
 describe("isOcelStatisticsResult", () => {
   it("accepts both deterministic summary variants", () => {
     expect(isOcelStatisticsResult({
