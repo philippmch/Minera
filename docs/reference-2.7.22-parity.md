@@ -650,8 +650,12 @@ the same relation key. Defaults use case boundaries, resource nodes,
 activity labels, and timestamp ordering; `_out`/`_in` edge references,
 custom selectors, frequency/performance output, weekly business-hour slots,
 and strict row/value bounds are available through the native API, CLI,
-cached-session server route, and typed frontend helper. Broader differential
-review of additional organizational variants remains partial.
+cached-session server route, and typed frontend helper. The catalog's
+`DATAFRAME` selector is explicit in request/query metadata and is validated at
+every adapter boundary. Role discovery likewise exposes both LOG and PANDAS
+selectors with deterministic role ordering and a tagged `ROLE_DISCOVERY`
+envelope. Broader differential review of additional organizational variants
+remains partial.
 
 The resource-profile vertical exposes the eleven scalar metrics through the
 `RESOURCE_PROFILES` JSON family, `--resource-profiles` CLI mode, cached

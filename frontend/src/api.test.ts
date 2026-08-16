@@ -766,8 +766,8 @@ describe("organizational SNA API", () => {
 
 describe("network analysis API", () => {
   it("serializes selectors and bounded options", () => {
-    expect(networkAnalysisQuery({ network_analysis_edge_reference: "_in", network_analysis_include_performance: true, network_analysis_max_rows: 3 }))
-      .toBe("network_analysis_edge_reference=_in&network_analysis_include_performance=true&network_analysis_max_rows=3");
+    expect(networkAnalysisQuery({ network_analysis_variant: "dataframe", network_analysis_edge_reference: "_in", network_analysis_include_performance: true, network_analysis_max_rows: 3 }))
+      .toBe("network_analysis_variant=dataframe&network_analysis_edge_reference=_in&network_analysis_include_performance=true&network_analysis_max_rows=3");
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "NETWORK_ANALYSIS", edges: [] }), { status: 200 })));
@@ -822,8 +822,8 @@ describe("profile clustering API", () => {
 
 describe("role discovery API", () => {
   it("serializes strict threshold and safety options", () => {
-    expect(roleDiscoveryQuery({ roles_threshold: 0.4, roles_max_resources: 8, roles_max_activities: 12 }))
-      .toBe("roles_threshold=0.4&roles_max_resources=8&roles_max_activities=12");
+    expect(roleDiscoveryQuery({ roles_variant: "pandas", roles_threshold: 0.4, roles_max_resources: 8, roles_max_activities: 12 }))
+      .toBe("roles_variant=pandas&roles_threshold=0.4&roles_max_resources=8&roles_max_activities=12");
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "ROLE_DISCOVERY" }), { status: 200 })));

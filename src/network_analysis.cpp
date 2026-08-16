@@ -112,6 +112,8 @@ struct Ref {
 }  // namespace
 
 NetworkAnalysisResult discover_network_analysis(const EventLog& log, const NetworkAnalysisOptions& o) {
+  if (o.variant != NetworkAnalysisVariant::kDataframe)
+    throw std::invalid_argument("network_analysis_variant must be dataframe");
   if (o.edge_reference != NetworkAnalysisEdgeReference::kOut &&
       o.edge_reference != NetworkAnalysisEdgeReference::kIn)
     throw std::invalid_argument("network analysis edge_reference must be _out or _in");
@@ -119,6 +121,7 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   if (o.max_values == 0 || o.max_values > 10000000) throw std::invalid_argument("network analysis max_values safety bound exceeded");
   const auto slots = o.business_hours ? normalized_slots(o) : std::vector<BusinessHourSlot>{};
   NetworkAnalysisResult result;
+  result.variant = o.variant;
   result.diagnostics.trace_count = log.trace_count();
   result.diagnostics.event_count = log.event_count();
   std::vector<Ref> refs;

@@ -105,7 +105,7 @@ void json_shape_is_stable() {
   const auto merged = merge_case_relations(base_log(), incoming_log(),
                                            {{"L1", "R1"}});
   const auto json = case_relations_json(merged);
-  assert(json.find(R"({"family":"MERGE_CASE_RELATIONS","log":)" ) !=
+  assert(json.find(R"({"family":"MERGE_CASE_RELATIONS","variant":"pandas","log":)" ) !=
          std::string::npos);
   assert(json.find(R"("case_id":"L1")") != std::string::npos);
   assert(json.find(R"("activity":"B")") != std::string::npos);

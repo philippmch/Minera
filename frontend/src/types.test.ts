@@ -427,7 +427,7 @@ describe("isOrganizationalSnaResult", () => {
 });
 describe("isRoleDiscoveryResult", () => {
   it("accepts deterministic roles and rejects malformed counts", () => {
-    const value = { family: "ROLE_DISCOVERY", roles: [{ activities: ["A"], resources: [{ name: "r", count: 2 }] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 1, activity_count: 1, resource_count: 1, role_count: 1, message: "ok" } };
+    const value = { family: "ROLE_DISCOVERY", variant: "pandas", roles: [{ activities: ["A"], resources: [{ name: "r", count: 2 }] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 1, activity_count: 1, resource_count: 1, role_count: 1, message: "ok" } };
     expect(isRoleDiscoveryResult(value)).toBe(true);
     expect(isRoleDiscoveryResult({ ...value, roles: [{ ...value.roles[0], resources: [{ name: "r", count: 0 }] }] })).toBe(false);
   });
@@ -456,8 +456,9 @@ describe("isLocalDiagnosticsResult", () => {
 });
 
 describe("isNetworkAnalysisResult", () => {
-  const valid = { family: "NETWORK_ANALYSIS", edges: [{ source: "alice", target: "bob", activity: "A", count: 1, performance: [2] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 2, link_count: 1, row_count: 1, performance_value_count: 1, message: "ok" } };
+  const valid = { family: "NETWORK_ANALYSIS", variant: "dataframe", edges: [{ source: "alice", target: "bob", activity: "A", count: 1, performance: [2] }], diagnostics: { computed: true, output_truncated: false, trace_count: 1, event_count: 2, link_count: 1, row_count: 1, performance_value_count: 1, message: "ok" } };
   it("accepts deterministic edge rows", () => expect(isNetworkAnalysisResult(valid)).toBe(true));
+  it("rejects an unknown adapter variant", () => expect(isNetworkAnalysisResult({ ...valid, variant: "log" })).toBe(false));
   it("rejects negative diagnostics", () => expect(isNetworkAnalysisResult({ ...valid, diagnostics: { ...valid.diagnostics, row_count: -1 } })).toBe(false));
 });
 

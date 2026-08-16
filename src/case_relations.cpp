@@ -130,6 +130,8 @@ std::vector<CaseRelation> parse_case_relations_csv(std::istream& input,
 EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
                               const std::vector<CaseRelation>& relations,
                               const CaseRelationsOptions& options) {
+  if (options.variant != CaseRelationsVariant::kPandas)
+    throw std::invalid_argument("case relations variant must be pandas");
   if (options.timestamp_key.empty())
     throw std::invalid_argument("case relations: timestamp key must not be empty");
 

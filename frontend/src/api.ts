@@ -1596,6 +1596,7 @@ export const discoverOrganizationalSna = requestOrganizationalSna;
 export function networkAnalysisQuery(options: NetworkAnalysisOptions = {}): string {
   const query = new URLSearchParams();
   const entries: Array<[string, unknown]> = [
+    ["network_analysis_variant", options.network_analysis_variant],
     ["network_analysis_sorting_attribute", options.network_analysis_sorting_attribute],
     ["network_analysis_timestamp_attribute", options.network_analysis_timestamp_attribute],
     ["network_analysis_source_node_attribute", options.network_analysis_source_node_attribute],
@@ -1620,6 +1621,7 @@ export function requestNetworkAnalysis(options: NetworkAnalysisOptions = {}): Pr
 export const discoverNetworkAnalysis = requestNetworkAnalysis;
 export function roleDiscoveryQuery(options: RoleDiscoveryOptions = {}): string {
   const query = new URLSearchParams();
+  if (options.roles_variant !== undefined) query.set("roles_variant", options.roles_variant);
   if (options.roles_threshold !== undefined) query.set("roles_threshold", String(options.roles_threshold));
   if (options.roles_max_resources !== undefined) query.set("roles_max_resources", String(options.roles_max_resources));
   if (options.roles_max_activities !== undefined) query.set("roles_max_activities", String(options.roles_max_activities));
@@ -3343,6 +3345,7 @@ export async function requestIntervalTree(options: IntervalTreeOptions = {}): Pr
 }
 
 export interface CaseRelationsOptions {
+  merge_variant?: "pandas";
   merge_timestamp_key?: string;
   merge_left_column?: string;
   merge_right_column?: string;
@@ -3350,6 +3353,7 @@ export interface CaseRelationsOptions {
 
 export function caseRelationsQuery(options: CaseRelationsOptions = {}): string {
   const query = new URLSearchParams();
+  if (options.merge_variant !== undefined) query.set("merge_variant", options.merge_variant);
   if (options.merge_timestamp_key !== undefined) query.set("merge_timestamp_key", options.merge_timestamp_key);
   if (options.merge_left_column !== undefined) query.set("merge_left_column", options.merge_left_column);
   if (options.merge_right_column !== undefined) query.set("merge_right_column", options.merge_right_column);

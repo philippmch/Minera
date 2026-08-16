@@ -30,6 +30,7 @@ static EventLog sample() {
 
 int main() {
   auto result = discover_network_analysis(sample());
+  assert(result.variant == NetworkAnalysisVariant::kDataframe);
   assert(result.edges.size() == 2);
   assert(result.edges[0].source == "alice" && result.edges[0].target == "bob");
   assert(result.edges[0].activity == "A" && result.edges[0].count == 1);
@@ -74,8 +75,13 @@ int main() {
   assert(discover_network_analysis(missing_sort).edges.size() <= 1);
   const auto json = network_analysis_json(p);
   assert(json.find("NETWORK_ANALYSIS") != std::string::npos);
+  assert(json.find("\"variant\":\"dataframe\"") != std::string::npos);
   const auto parsed = parse_network_analysis_params(
-      [](std::string_view n) { return n == "network_analysis_edge_reference" ? std::string("_in") : std::string{}; });
+      [](std::string_view n) {
+        if (n == "network_analysis_variant") return std::string("dataframe");
+        return n == "network_analysis_edge_reference" ? std::string("_in") : std::string{};
+      });
+  assert(parsed.variant == NetworkAnalysisVariant::kDataframe);
   assert(parsed.edge_reference == NetworkAnalysisEdgeReference::kIn);
   try {
     (void)parse_network_analysis_params([](std::string_view n) {

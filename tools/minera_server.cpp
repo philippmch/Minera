@@ -1589,7 +1589,7 @@ void handle_network_analysis(const httplib::Request& request, httplib::Response&
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
     static const std::set<std::string> allowed = {
-      "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
+      "network_analysis_variant", "network_analysis_sorting_attribute", "network_analysis_timestamp_attribute",
       "network_analysis_source_node_attribute", "network_analysis_target_node_attribute",
       "network_analysis_edge_attribute", "network_analysis_edge_reference",
       "network_analysis_out_relation_attribute", "network_analysis_in_relation_attribute",
@@ -1648,7 +1648,7 @@ void handle_roles(const httplib::Request& request, httplib::Response& response) 
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status = 409; response.set_content(error_json("no cached log; run /api/mine first"), "application/json"); return; }
-    static const std::set<std::string> allowed = {"roles_threshold", "roles_max_resources", "roles_max_activities"};
+    static const std::set<std::string> allowed = {"roles_variant", "roles_threshold", "roles_max_resources", "roles_max_activities"};
     for (const auto& [key, value] : request.params) { (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown roles parameter: " + key); }
     const auto lookup = [&](std::string_view n) { const auto k = std::string(n); return request.has_param(k) ? request.get_param_value(k) : std::string{}; };
     const auto present = [&](std::string_view n) { return request.has_param(std::string(n)); };
@@ -2913,7 +2913,7 @@ void handle_case_relations(const httplib::Request& request,
           "required multipart fields: base_log, incoming_log, case_relations");
     }
     static const std::set<std::string> allowed = {
-        "merge_timestamp_key", "merge_left_column", "merge_right_column"};
+        "merge_variant", "merge_timestamp_key", "merge_left_column", "merge_right_column"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2942,12 +2942,15 @@ void handle_case_relations(const httplib::Request& request,
     const auto left_column = value("merge_left_column", "case_id_LEFT");
     const auto right_column = value("merge_right_column", "case_id_RIGHT");
     minera::CaseRelationsOptions options;
+    const auto variant = value("merge_variant", "pandas");
+    if (variant != "pandas" && variant != "PANDAS")
+      throw std::invalid_argument("merge_variant: expected pandas");
     options.timestamp_key = timestamp_key;
     const auto relations = minera::parse_case_relations_csv(
         relation_input, left_column, right_column);
     response.set_content(
         minera::case_relations_json(minera::merge_case_relations(
-            base, incoming, relations, options)),
+            base, incoming, relations, options), options.variant),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
