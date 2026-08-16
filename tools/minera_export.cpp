@@ -937,6 +937,11 @@ int usage(const char* program) {
                "                            attribute has one of these values\n"
                "  --remove-case-attribute-values <a,b> Drop cases with these\n"
                "                            values\n"
+               "  --numeric-attribute-key <k> Numeric event attribute to range-filter\n"
+               "  --numeric-attribute-min <f> Inclusive numeric lower bound\n"
+               "  --numeric-attribute-max <f> Inclusive numeric upper bound\n"
+               "  --numeric-attribute-mode <mode> events (default) or traces\n"
+               "  --numeric-attribute-positive <bool> Keep in-range values/cases\n"
                "  --rework-activity <a>     Keep only traces where <a> repeats\n"
                "  --rework-min <n>          Repetitions that count as rework\n"
                "                            (default: 2)\n"
@@ -1297,6 +1302,35 @@ int main(int argc, char** argv) {
         filter.min_case_duration_seconds = parsed;
       else
         filter.max_case_duration_seconds = parsed;
+      continue;
+    }
+    if (arg == "--numeric-attribute-key" ||
+        arg == "--numeric-attribute-min" ||
+        arg == "--numeric-attribute-max" ||
+        arg == "--numeric-attribute-mode" ||
+        arg == "--numeric-attribute-positive") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (!filter.numeric_attribute)
+        filter.numeric_attribute = minera::NumericAttributeFilterOptions{};
+      auto& numeric = *filter.numeric_attribute;
+      if (arg == "--numeric-attribute-key") {
+        numeric.attribute_key = value;
+      } else if (arg == "--numeric-attribute-min") {
+        numeric.min_value = parse_finite_double(value, arg);
+      } else if (arg == "--numeric-attribute-max") {
+        numeric.max_value = parse_finite_double(value, arg);
+      } else if (arg == "--numeric-attribute-mode") {
+        if (std::string_view(value) == "events")
+          numeric.mode = minera::AttributeFilterMode::events;
+        else if (std::string_view(value) == "traces")
+          numeric.mode = minera::AttributeFilterMode::traces;
+        else
+          throw std::invalid_argument(
+              "--numeric-attribute-mode expects events or traces");
+      } else {
+        numeric.positive = parse_boolean(value, arg);
+      }
       continue;
     }
     if (arg == "--max-cases" || arg == "--max-no-cases" ||

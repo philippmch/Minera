@@ -76,6 +76,18 @@ struct CaseSizeFilterOptions {
   std::optional<std::size_t> max_length;
 };
 
+// Inclusive numeric range for one generic event attribute. Values are parsed
+// as finite numbers; missing or non-numeric values never match. In event mode
+// matching events survive as a projection; in trace mode the whole case is
+// kept or dropped based on whether any event matches the range.
+struct NumericAttributeFilterOptions {
+  std::string attribute_key;
+  std::optional<double> min_value;
+  std::optional<double> max_value;
+  AttributeFilterMode mode = AttributeFilterMode::events;
+  bool positive = true;
+};
+
 // Parses a comma-separated list of successions ("a -> b, c -> d") into
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
@@ -142,6 +154,9 @@ struct LogFilterOptions {
   std::vector<std::string> keep_attribute_values;
   std::vector<std::string> remove_attribute_values;
   AttributeFilterMode attribute_mode = AttributeFilterMode::events;
+  // Optional numeric range over one generic event attribute. This is
+  // independent of the string-valued attribute filter above.
+  std::optional<NumericAttributeFilterOptions> numeric_attribute;
 
   // Case-attribute filter on one trace-attribute key (a scalar XES trace
   // attribute, or a `case:` CSV column). Always trace-level: with
@@ -241,6 +256,7 @@ struct LogFilterOptions {
            !keep_lifecycles.empty() || !remove_lifecycles.empty() ||
            !attribute_key.empty() || !keep_attribute_values.empty() ||
            !remove_attribute_values.empty() ||
+           numeric_attribute.has_value() ||
            !case_attribute_key.empty() ||
            !keep_case_attribute_values.empty() ||
            !remove_case_attribute_values.empty() ||
@@ -294,6 +310,10 @@ struct LogFilterOptions {
 [[nodiscard]] EventLog filter_case_size(
     const EventLog& event_log, std::size_t min_length = 2,
     std::optional<std::size_t> max_length = std::nullopt);
+
+[[nodiscard]] EventLog filter_numeric_attribute(
+    const EventLog& event_log,
+    const NumericAttributeFilterOptions& options);
 
 [[nodiscard]] EventLog filter_ncases(const EventLog& event_log,
                                      std::size_t max_cases = 1000);

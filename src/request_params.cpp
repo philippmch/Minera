@@ -1078,6 +1078,50 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
     params.filter.attribute_mode = *mode;
   }
+  const bool numeric_attribute_supplied =
+      supplied("numeric_attribute_key") || supplied("numeric_attribute_min") ||
+      supplied("numeric_attribute_max") || supplied("numeric_attribute_mode") ||
+      supplied("numeric_attribute_positive");
+  if (numeric_attribute_supplied) {
+    NumericAttributeFilterOptions numeric;
+    if (!supplied("numeric_attribute_key") ||
+        field("numeric_attribute_key").empty()) {
+      throw std::invalid_argument(
+          "numeric_attribute_key: required when numeric filtering is enabled");
+    }
+    numeric.attribute_key = field("numeric_attribute_key");
+    if (supplied("numeric_attribute_min")) {
+      numeric.min_value = parse_finite_double(
+          field("numeric_attribute_min"), "numeric_attribute_min");
+    }
+    if (supplied("numeric_attribute_max")) {
+      numeric.max_value = parse_finite_double(
+          field("numeric_attribute_max"), "numeric_attribute_max");
+    }
+    if (!numeric.min_value && !numeric.max_value) {
+      throw std::invalid_argument(
+          "numeric_attribute_min/max: at least one bound is required");
+    }
+    if (numeric.max_value && numeric.min_value &&
+        *numeric.min_value > *numeric.max_value) {
+      throw std::invalid_argument(
+          "numeric_attribute_min: must not exceed numeric_attribute_max");
+    }
+    if (supplied("numeric_attribute_mode")) {
+      const auto mode = parse_attribute_filter_mode(
+          field("numeric_attribute_mode"));
+      if (!mode) {
+        throw std::invalid_argument(
+            "numeric_attribute_mode: expected events or traces");
+      }
+      numeric.mode = *mode;
+    }
+    if (supplied("numeric_attribute_positive")) {
+      numeric.positive = parse_boolean(field("numeric_attribute_positive"),
+                                       "numeric_attribute_positive");
+    }
+    params.filter.numeric_attribute = std::move(numeric);
+  }
   if (const auto value = field("rework_activity"); !value.empty()) {
     params.filter.rework_activity = value;
   }

@@ -503,6 +503,7 @@ describe("hasActiveFilters", () => {
       { minLength: 1 },
       { maxLength: 9 },
       { maxCases: 0 },
+      { numericAttributeKey: "amount", numericAttributeMin: 10 },
       { removeResources: ["Alice"] },
       { keepResources: ["Bob"] },
       { timeFrom: "2024-01-01T00:00" },
@@ -1009,6 +1010,20 @@ describe("mineFormEntries", () => {
     ]);
     expect(() => mineFormEntries({ minLength: 6, maxLength: 5 })).toThrow(/not exceed/);
     expect(hasActiveFilters({ maxCases: 0 })).toBe(true);
+    expect(mineFormEntries({
+      numericAttributeKey: "amount",
+      numericAttributeMin: -2,
+      numericAttributeMax: 10,
+      numericAttributeMode: "traces",
+      numericAttributePositive: false,
+    })).toEqual([
+      ["numeric_attribute_key", "amount"],
+      ["numeric_attribute_min", "-2"],
+      ["numeric_attribute_max", "10"],
+      ["numeric_attribute_mode", "traces"],
+      ["numeric_attribute_positive", "false"],
+    ]);
+    expect(() => mineFormEntries({ numericAttributeKey: "amount", numericAttributeMin: 3, numericAttributeMax: 2 })).toThrow(/not exceed/);
   });
 
   it("maps the succession, cut, and coverage filters", () => {

@@ -153,6 +153,9 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.timeTo ||
       filters.caseDurationMin !== undefined ||
       filters.caseDurationMax !== undefined ||
+      (filters.numericAttributeKey &&
+        (filters.numericAttributeMin !== undefined ||
+          filters.numericAttributeMax !== undefined)) ||
       filters.reworkActivity ||
       filters.attributeKey ||
       filters.caseAttributeKey ||
