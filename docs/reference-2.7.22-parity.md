@@ -648,8 +648,10 @@ for:
 Focused regressions cover ordered multi-activity redo behavior, different
 start/end boundary activities, prefix/suffix false positives, incomplete
 start- and end-side boundary reachability, split return components, single
-closed variants, strict filtering boundaries, and dynamic zero-threshold
-filtering. Recursive POWL JSON, request
+closed variants, strict transitive sequence grouping with skip repair,
+least-cost sequence projection, strict filtering boundaries, and dynamic
+zero-threshold filtering, and concurrency grouping with skippable-branch
+repair. Recursive POWL JSON, request
 validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless

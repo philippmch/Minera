@@ -151,85 +151,200 @@ std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
   const auto n = r.acts.size();
   if (n < 2) return std::nullopt;
 
-  // Condense the DFG into strongly connected components. Activities that can
-  // reach each other cannot form different strict-sequence stages.
-  std::vector<std::vector<bool>> reach(n, std::vector<bool>(n, false));
-  for (std::size_t i = 0; i < n; ++i) reach[i][i] = true;
-  for (std::size_t i = 0; i < n; ++i)
-    for (std::size_t j = 0; j < n; ++j)
-      if (i != j && has(r.dfg, r.acts[i], r.acts[j])) reach[i][j] = true;
-  for (std::size_t k = 0; k < n; ++k)
-    for (std::size_t i = 0; i < n; ++i)
-      if (reach[i][k])
-        for (std::size_t j = 0; j < n; ++j)
-          reach[i][j] = reach[i][j] || reach[k][j];
+  // Build the transitive predecessor/successor relation of the directly
+  // follows graph. Sequence groups are merged while a pair of groups has
+  // either evidence in both directions or no evidence in either direction.
+  // This preserves optional/skippable stages instead of forcing them into a
+  // topological level solely because their direct graph is acyclic.
+  std::map<std::string, std::set<std::string>> successors;
+  std::map<std::string, std::set<std::string>> predecessors;
+  for (const auto& activity : r.acts) {
+    successors[activity];
+    predecessors[activity];
+  }
+  for (const auto& [edge, count] : r.dfg) {
+    (void)count;
+    successors[edge.first].insert(edge.second);
+    predecessors[edge.second].insert(edge.first);
+  }
+  for (const auto& source : r.acts) {
+    std::vector<std::string> pending(successors[source].begin(),
+                                     successors[source].end());
+    std::set<std::string> visited;
+    while (!pending.empty()) {
+      const auto current = pending.back();
+      pending.pop_back();
+      if (!visited.insert(current).second) continue;
+      for (const auto& next : successors[current]) pending.push_back(next);
+    }
+    visited.erase(source);
+    successors[source] = std::move(visited);
+  }
+  for (const auto& target : r.acts) {
+    std::vector<std::string> pending(predecessors[target].begin(),
+                                     predecessors[target].end());
+    std::set<std::string> visited;
+    while (!pending.empty()) {
+      const auto current = pending.back();
+      pending.pop_back();
+      if (!visited.insert(current).second) continue;
+      for (const auto& previous : predecessors[current])
+        pending.push_back(previous);
+    }
+    visited.erase(target);
+    predecessors[target] = std::move(visited);
+  }
+  const auto reaches = [&](const std::string& source,
+                           const std::string& target) {
+    return successors.at(source).count(target) != 0;
+  };
 
-  std::vector<std::size_t> component(n, n);
-  std::vector<std::vector<std::size_t>> components;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (component[i] != n) continue;
-    const auto id = components.size();
-    components.push_back({});
-    for (std::size_t j = i; j < n; ++j) {
-      if (component[j] == n && reach[i][j] && reach[j][i]) {
-        component[j] = id;
-        components.back().push_back(j);
+  std::vector<std::set<std::string>> groups;
+  for (const auto& activity : r.acts) groups.push_back({activity});
+  while (true) {
+    bool merged = false;
+    for (std::size_t left = 0; left < groups.size() && !merged; ++left) {
+      for (std::size_t right = left + 1; right < groups.size(); ++right) {
+        bool merge = false;
+        for (const auto& a : groups[left]) {
+          for (const auto& b : groups[right]) {
+            const bool forward = reaches(a, b);
+            const bool reverse = reaches(b, a);
+            if ((forward && reverse) || (!forward && !reverse)) {
+              merge = true;
+              break;
+            }
+          }
+          if (merge) break;
+        }
+        if (!merge) continue;
+        groups[left].insert(groups[right].begin(), groups[right].end());
+        groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(right));
+        merged = true;
+        break;
       }
     }
+    if (!merged) break;
   }
-  if (components.size() < 2) return std::nullopt;
+  if (groups.size() < 2) return std::nullopt;
+  std::sort(groups.begin(), groups.end(), [&](const auto& left, const auto& right) {
+    const auto left_first = *left.begin();
+    const auto right_first = *right.begin();
+    const auto left_score = predecessors[left_first].size() +
+                            (n - successors[left_first].size());
+    const auto right_score = predecessors[right_first].size() +
+                             (n - successors[right_first].size());
+    if (left_score != right_score) return left_score < right_score;
+    return left_first < right_first;
+  });
 
-  std::vector<std::set<std::size_t>> outgoing(components.size());
-  std::vector<std::size_t> indegree(components.size(), 0);
-  for (std::size_t i = 0; i < n; ++i) {
-    for (std::size_t j = 0; j < n; ++j) {
-      if (component[i] == component[j] || !reach[i][j]) continue;
-      if (outgoing[component[i]].insert(component[j]).second)
-        ++indegree[component[j]];
+  // Strict sequence repair merges groups that can be skipped. The direct DFG
+  // is used for the repair while the transitive relation above determines the
+  // initial sequence ordering.
+  std::vector<std::ptrdiff_t> min_from(groups.size());
+  std::vector<std::ptrdiff_t> max_to(groups.size());
+  const auto group_has_start = [&](const std::set<std::string>& group) {
+    for (const auto& activity : group)
+      if (r.starts.count(activity) != 0) return true;
+    return false;
+  };
+  const auto group_has_end = [&](const std::set<std::string>& group) {
+    for (const auto& activity : group)
+      if (r.ends.count(activity) != 0) return true;
+    return false;
+  };
+  for (std::size_t index = 0; index < groups.size(); ++index) {
+    min_from[index] = group_has_start(groups[index])
+                          ? -1
+                          : static_cast<std::ptrdiff_t>(groups.size());
+    max_to[index] = group_has_end(groups[index])
+                        ? static_cast<std::ptrdiff_t>(groups.size())
+                        : -1;
+  }
+  std::map<std::string, std::size_t> group_of;
+  for (std::size_t index = 0; index < groups.size(); ++index)
+    for (const auto& activity : groups[index]) group_of[activity] = index;
+  for (const auto& [edge, count] : r.dfg) {
+    (void)count;
+    min_from[group_of.at(edge.second)] = std::min(
+        min_from[group_of.at(edge.second)],
+        static_cast<std::ptrdiff_t>(group_of.at(edge.first)));
+    max_to[group_of.at(edge.first)] = std::max(
+        max_to[group_of.at(edge.first)],
+        static_cast<std::ptrdiff_t>(group_of.at(edge.second)));
+  }
+  const auto skippable = [&](std::size_t pivot) {
+    for (std::size_t before = 0; before < pivot; ++before)
+      for (std::size_t after = pivot + 1; after < groups.size(); ++after)
+        for (const auto& a : groups[before])
+          for (const auto& b : groups[after])
+            if (has(r.dfg, a, b)) return true;
+    for (std::size_t after = pivot + 1; after < groups.size(); ++after)
+      if (group_has_start(groups[after])) return true;
+    for (std::size_t before = 0; before < pivot; ++before)
+      if (group_has_end(groups[before])) return true;
+    return false;
+  };
+  for (std::size_t pivot = 0; pivot < groups.size(); ++pivot) {
+    if (!skippable(pivot)) continue;
+    for (std::ptrdiff_t previous = static_cast<std::ptrdiff_t>(pivot) - 1;
+         previous >= 0 && max_to[static_cast<std::size_t>(previous)] <=
+                                static_cast<std::ptrdiff_t>(pivot);
+         --previous) {
+      groups[pivot].insert(groups[static_cast<std::size_t>(previous)].begin(),
+                           groups[static_cast<std::size_t>(previous)].end());
+      groups[static_cast<std::size_t>(previous)].clear();
+    }
+    for (std::size_t next = pivot + 1;
+         next < groups.size() && min_from[next] >=
+                                     static_cast<std::ptrdiff_t>(pivot);
+         ++next) {
+      groups[pivot].insert(groups[next].begin(), groups[next].end());
+      groups[next].clear();
     }
   }
+  groups.erase(std::remove_if(groups.begin(), groups.end(),
+                              [](const auto& group) { return group.empty(); }),
+               groups.end());
+  if (groups.size() < 2) return std::nullopt;
 
-  // Incomparable SCCs belong to the same sequence stage. Kahn levels give a
-  // deterministic total order of those stages without an invalid comparator.
-  std::vector<std::vector<std::size_t>> stages;
-  std::vector<bool> removed(components.size(), false);
-  std::size_t removed_count = 0;
-  while (removed_count < components.size()) {
-    std::vector<std::size_t> level;
-    for (std::size_t i = 0; i < components.size(); ++i)
-      if (!removed[i] && indegree[i] == 0) level.push_back(i);
-    if (level.empty()) return std::nullopt;
-    std::vector<std::size_t> stage;
-    for (const auto id : level) {
-      removed[id] = true;
-      ++removed_count;
-      stage.insert(stage.end(), components[id].begin(), components[id].end());
-    }
-    std::sort(stage.begin(), stage.end());
-    stages.push_back(std::move(stage));
-    for (const auto id : level)
-      for (const auto target : outgoing[id]) --indegree[target];
-  }
-  if (stages.size() < 2) return std::nullopt;
-  for (std::size_t earlier = 0; earlier < stages.size(); ++earlier) {
-    for (std::size_t later = earlier + 1; later < stages.size(); ++later) {
-      for (const auto source : stages[earlier]) {
-        for (const auto target : stages[later]) {
-          if (!has(r.efg, r.acts[source], r.acts[target]) ||
-              has(r.efg, r.acts[target], r.acts[source])) {
-            return std::nullopt;
-          }
+  // Split each trace at the same least-cost boundaries as the strict sequence
+  // projection: entering the current group reduces cost, while an event from
+  // a not-yet-seen group increases it. Empty projected traces are retained.
+  std::vector<UVCL> projected_logs(groups.size());
+  for (const auto& [sequence, count] : log) {
+    std::size_t split_point = 0;
+    std::set<std::string> ignored;
+    for (std::size_t index = 0; index < groups.size(); ++index) {
+      std::ptrdiff_t cost = 0;
+      std::ptrdiff_t least_cost = 0;
+      std::size_t new_split_point = split_point;
+      for (std::size_t position = split_point; position < sequence.size();
+           ++position) {
+        if (groups[index].count(sequence[position]) != 0) {
+          --cost;
+        } else if (ignored.count(sequence[position]) == 0) {
+          ++cost;
+        }
+        if (cost < least_cost) {
+          least_cost = cost;
+          new_split_point = position + 1;
         }
       }
+      Sequence child;
+      for (std::size_t position = split_point; position < new_split_point;
+           ++position)
+        if (groups[index].count(sequence[position]) != 0)
+          child.push_back(sequence[position]);
+      add_checked(projected_logs[index][child], count);
+      split_point = new_split_point;
+      ignored.insert(groups[index].begin(), groups[index].end());
     }
   }
-
   std::vector<PowlNode> children;
-  for (const auto& stage : stages) {
-    std::set<std::string> keep;
-    for (const auto index : stage) keep.insert(r.acts[index]);
-    children.push_back(recurse(project(log, keep), s));
-  }
+  children.reserve(projected_logs.size());
+  for (auto& child_log : projected_logs)
+    children.push_back(recurse(child_log, s));
   return PowlNode::sequence(std::move(children));
 }
 
@@ -237,48 +352,71 @@ std::optional<PowlNode> make_concurrency(const UVCL& log, State& s) {
   const auto r = compute_relations(log);
   const auto n = r.acts.size();
   if (n < 2) return std::nullopt;
-  // Components of the "not parallel" graph are the concurrent branches.
-  // Two activities are parallel only when the DFG contains both directions.
-  std::vector<std::vector<std::size_t>> components;
-  std::vector<bool> seen(n, false);
-  for (std::size_t root = 0; root < n; ++root) {
-    if (seen[root]) continue;
-    std::vector<std::size_t> component{root};
-    seen[root] = true;
-    for (std::size_t p = 0; p < component.size(); ++p) {
-      const auto current = component[p];
-      for (std::size_t other = 0; other < n; ++other) {
-        if (seen[other]) continue;
-        const bool parallel =
-            has(r.dfg, r.acts[current], r.acts[other]) &&
-            has(r.dfg, r.acts[other], r.acts[current]);
-        if (!parallel) {
-          seen[other] = true;
-          component.push_back(other);
+
+  // Start with one group per activity. Groups are merged whenever any pair
+  // lacks the two-way DFG evidence required for concurrency. Repeating the
+  // pass computes the connected components of that incompatibility relation,
+  // while preserving the reference cut's pairwise merge semantics.
+  std::vector<std::set<std::string>> groups;
+  groups.reserve(n);
+  for (const auto& activity : r.acts) groups.push_back({activity});
+  bool merged = true;
+  while (merged) {
+    merged = false;
+    for (std::size_t left = 0; left < groups.size() && !merged; ++left) {
+      for (std::size_t right = left + 1; right < groups.size(); ++right) {
+        bool incompatible = false;
+        for (const auto& a : groups[left]) {
+          for (const auto& b : groups[right]) {
+            const bool parallel = has(r.dfg, a, b) && has(r.dfg, b, a);
+            if (!parallel) {
+              incompatible = true;
+              break;
+            }
+          }
+          if (incompatible) break;
         }
+        if (!incompatible) continue;
+        groups[left].insert(groups[right].begin(), groups[right].end());
+        groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(right));
+        merged = true;
+        break;
       }
     }
-    components.push_back(std::move(component));
   }
-  if (components.size() < 2) return std::nullopt;
+  std::sort(groups.begin(), groups.end(), [](const auto& left, const auto& right) {
+    if (left.size() != right.size()) return left.size() < right.size();
+    return *left.begin() < *right.begin();
+  });
+  if (groups.size() < 2) return std::nullopt;
 
-  // Every parallel branch must be able to start and finish a trace.
-  for (const auto& component : components) {
+  // A branch that cannot both start and finish is a skippable fragment. The
+  // strict cut absorbs it into its adjacent branch, retaining a valid
+  // concurrent partition instead of rejecting the cut outright.
+  std::size_t index = 0;
+  while (index < groups.size() && groups.size() > 1) {
     bool contains_start = false;
     bool contains_end = false;
-    for (const auto index : component) {
-      contains_start =
-          contains_start || r.starts.count(r.acts[index]) != 0;
-      contains_end = contains_end || r.ends.count(r.acts[index]) != 0;
+    for (const auto& activity : groups[index]) {
+      contains_start = contains_start || r.starts.count(activity) != 0;
+      contains_end = contains_end || r.ends.count(activity) != 0;
     }
-    if (!contains_start || !contains_end) return std::nullopt;
+    if (contains_start && contains_end) {
+      ++index;
+      continue;
+    }
+    auto fragment = std::move(groups[index]);
+    groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
+    if (index == 0)
+      groups.front().insert(fragment.begin(), fragment.end());
+    else
+      groups[index - 1].insert(fragment.begin(), fragment.end());
   }
+  if (groups.size() < 2) return std::nullopt;
+
   std::vector<PowlNode> children;
-  for (const auto& component : components) {
-    std::set<std::string> keep;
-    for (const auto index : component) keep.insert(r.acts[index]);
-    children.push_back(recurse(project(log, keep), s));
-  }
+  children.reserve(groups.size());
+  for (const auto& group : groups) children.push_back(recurse(project(log, group), s));
   return PowlNode::concurrency(std::move(children));
 }
 
