@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -161,6 +162,124 @@ void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view fiel
 }
 const Json::Object& obj(const Json& j, std::string_view field) { if (!j.is_object()) throw std::invalid_argument("OCEL field must be object: " + std::string(field)); return j.object(); }
 
+using StandardAttributeTypes =
+    std::map<std::string, std::map<std::string, std::string>>;
+
+std::string lowercase(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return value;
+}
+
+void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
+                               std::string_view field) {
+  if (!raw) return;
+  if (!raw->is_array())
+    throw std::invalid_argument("OCEL " + std::string(field) +
+                                " must be an array");
+  for (const auto& entry : raw->array()) {
+    const auto& descriptor = obj(entry, field);
+    const auto name = str(required(descriptor, "name"), "type name");
+    if (name.empty() || types.contains(name))
+      throw std::invalid_argument("duplicate or empty OCEL type name");
+    std::map<std::string, std::string> attributes;
+    if (const auto* raw_attributes = optional(descriptor, "attributes")) {
+      if (!raw_attributes->is_array())
+        throw std::invalid_argument("OCEL type attributes must be an array");
+      for (const auto& raw_attribute : raw_attributes->array()) {
+        const auto& attribute = obj(raw_attribute, "type attributes[]");
+        const auto attribute_name =
+            str(required(attribute, "name"), "attribute name");
+        const auto attribute_type =
+            str(required(attribute, "type"), "attribute type");
+        if (attribute_name.empty() || attribute_type.empty() ||
+            !attributes.emplace(attribute_name, attribute_type).second)
+          throw std::invalid_argument("duplicate or empty OCEL attribute type");
+      }
+    }
+    types.emplace(name, std::move(attributes));
+  }
+}
+
+const std::string* standard_attribute_type(const StandardAttributeTypes& types,
+                                            std::string_view owner,
+                                            std::string_view attribute) {
+  const auto owner_it = types.find(std::string(owner));
+  if (owner_it == types.end()) return nullptr;
+  const auto attribute_it = owner_it->second.find(std::string(attribute));
+  return attribute_it == owner_it->second.end() ? nullptr : &attribute_it->second;
+}
+
+OcelValue standard_scalar(const Json& value, std::string_view field,
+                          const std::string* declared_type) {
+  if (declared_type == nullptr || declared_type->empty())
+    return scalar(value, field);
+  const auto type = lowercase(*declared_type);
+  if (value.is_null()) return nullptr;
+  if (type.find("bool") != std::string::npos) {
+    if (value.is_bool()) return std::get<bool>(value.value);
+    if (value.is_string()) {
+      const auto text = lowercase(value.string());
+      if (text == "true" || text == "1") return true;
+      if (text == "false" || text == "0") return false;
+    }
+    throw std::invalid_argument("OCEL boolean attribute has invalid value: " +
+                                std::string(field));
+  }
+  if (type.find("int") != std::string::npos ||
+      type.find("long") != std::string::npos) {
+    if (value.is_int()) return std::get<std::int64_t>(value.value);
+    if (value.is_string()) {
+      std::int64_t result = 0;
+      const auto text = value.string();
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(),
+                                          result);
+      if (parsed.ec == std::errc() &&
+          parsed.ptr == text.data() + text.size())
+        return result;
+    }
+    if (std::holds_alternative<double>(value.value)) {
+      const double number = std::get<double>(value.value);
+      if (std::isfinite(number) && std::floor(number) == number &&
+          number >= static_cast<double>(std::numeric_limits<std::int64_t>::min()) &&
+          number <= static_cast<double>(std::numeric_limits<std::int64_t>::max()))
+        return static_cast<std::int64_t>(number);
+    }
+    throw std::invalid_argument("OCEL integer attribute has invalid value: " +
+                                std::string(field));
+  }
+  if (type.find("float") != std::string::npos ||
+      type.find("double") != std::string::npos ||
+      type == "number") {
+    if (std::holds_alternative<double>(value.value))
+      return std::get<double>(value.value);
+    if (value.is_int())
+      return static_cast<double>(std::get<std::int64_t>(value.value));
+    if (value.is_string()) {
+      const auto text = value.string();
+      char* end = nullptr;
+      const double number = std::strtod(text.c_str(), &end);
+      if (end == text.c_str() + text.size() && std::isfinite(number))
+        return number;
+    }
+    throw std::invalid_argument("OCEL floating attribute has invalid value: " +
+                                std::string(field));
+  }
+  if (type.find("date") != std::string::npos ||
+      type.find("time") != std::string::npos || type == "string" ||
+      type == "str") {
+    if (value.is_string()) return value.string();
+    throw std::invalid_argument("OCEL textual attribute has invalid value: " +
+                                std::string(field));
+  }
+  return scalar(value, field);
+}
+
+bool is_standard_epoch(std::string_view value) {
+  return value == "0" || value == "1970-01-01T00:00:00Z" ||
+         value == "1970-01-01T00:00:00.000Z";
+}
+
 Ocel parse_classic(const Json::Object& root) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
   const auto& objects = obj(required(root, "ocel:objects"), "ocel:objects");
@@ -203,13 +322,117 @@ Ocel parse_classic(const Json::Object& root) {
 }
 
 Ocel parse_standard(const Json::Object& root) {
-  Ocel log; std::unordered_map<std::string, std::string> types; std::unordered_set<std::string> event_ids;
+  Ocel log;
+  std::unordered_map<std::string, std::string> types;
+  std::unordered_set<std::string> event_ids;
+  StandardAttributeTypes object_attribute_types;
+  StandardAttributeTypes event_attribute_types;
+  parse_standard_type_table(optional(root, "objectTypes"), object_attribute_types,
+                            "objectTypes");
+  parse_standard_type_table(optional(root, "eventTypes"), event_attribute_types,
+                            "eventTypes");
   const auto& object_array = required(root, "objects");
-  if (!object_array.is_array()) throw std::invalid_argument("objects must be array");
-  for (const auto& raw : object_array.array()) { const auto& x = obj(raw, "objects[]"); const auto id = str(required(x, "id"), "id"); if (types.count(id)) throw std::invalid_argument("duplicate object id"); const auto type = str(required(x, "type"), "type"); types.emplace(id, type); OcelObject o{id, type, {}}; if (const auto* aa = optional(x, "attributes")) { if (!aa->is_array()) throw std::invalid_argument("object attributes must be array"); for (const auto& ar : aa->array()) { const auto& a = obj(ar, "attributes[]"); const auto name = str(required(a, "name"), "name"); const auto val = scalar(required(a, "value"), "value"); if (!optional(a, "time")) o.attributes.push_back({name, val}); else { OcelObjectChange c{id, type, str(*optional(a, "time"), "time"), name, val}; log.object_changes.push_back(std::move(c)); } } } log.objects.push_back(std::move(o)); if (const auto* rr = optional(x, "relationships")) { if (!rr->is_array()) throw std::invalid_argument("object relationships must be array"); for (const auto& r : rr->array()) { const auto& y = obj(r, "relationship"); log.o2o.push_back({id, str(required(y, "objectId"), "objectId"), optional(y, "qualifier") ? str(*optional(y, "qualifier"), "qualifier") : ""}); } } }
+  if (!object_array.is_array())
+    throw std::invalid_argument("objects must be array");
+  struct StandardAttribute {
+    std::string name;
+    OcelValue value;
+    bool has_time = false;
+    std::string time;
+  };
+  for (const auto& raw : object_array.array()) {
+    const auto& x = obj(raw, "objects[]");
+    const auto id = str(required(x, "id"), "id");
+    if (id.empty() || types.count(id))
+      throw std::invalid_argument("duplicate or empty object id");
+    const auto type = str(required(x, "type"), "type");
+    types.emplace(id, type);
+    OcelObject object{id, type, {}};
+    if (const auto* aa = optional(x, "attributes")) {
+      if (!aa->is_array())
+        throw std::invalid_argument("object attributes must be array");
+      std::map<std::string, std::vector<StandardAttribute>> grouped;
+      for (const auto& ar : aa->array()) {
+        const auto& a = obj(ar, "attributes[]");
+        const auto name = str(required(a, "name"), "name");
+        if (name.empty())
+          throw std::invalid_argument("OCEL object attribute name is empty");
+        StandardAttribute entry{name,
+                                standard_scalar(
+                                    required(a, "value"), "value",
+                                    standard_attribute_type(object_attribute_types,
+                                                            type, name))};
+        if (const auto* time = optional(a, "time")) {
+          entry.has_time = true;
+          entry.time = str(*time, "time");
+        }
+        grouped[name].push_back(std::move(entry));
+      }
+      for (auto& [name, entries] : grouped) {
+        if (entries.empty()) continue;
+        object.attributes.push_back({name, entries.front().value});
+        for (std::size_t i = 1; i < entries.size(); ++i) {
+          if (!entries[i].has_time || is_standard_epoch(entries[i].time))
+            throw std::invalid_argument(
+                "OCEL object attribute has duplicate static value");
+          log.object_changes.push_back(
+              {id, type, entries[i].time, name, entries[i].value});
+        }
+      }
+    }
+    log.objects.push_back(std::move(object));
+    if (const auto* rr = optional(x, "relationships")) {
+      if (!rr->is_array())
+        throw std::invalid_argument("object relationships must be array");
+      for (const auto& r : rr->array()) {
+        const auto& y = obj(r, "relationship");
+        log.o2o.push_back(
+            {id, str(required(y, "objectId"), "objectId"),
+             optional(y, "qualifier")
+                 ? str(*optional(y, "qualifier"), "qualifier")
+                 : ""});
+      }
+    }
+  }
   const auto& event_array = required(root, "events");
-  if (!event_array.is_array()) throw std::invalid_argument("events must be array");
-  for (const auto& raw : event_array.array()) { const auto& x = obj(raw, "events[]"); const auto id = str(required(x, "id"), "id"); if (!event_ids.insert(id).second) throw std::invalid_argument("duplicate event id"); OcelEvent e{id, str(required(x, "type"), "type"), str(required(x, "time"), "time"), {}}; if (const auto* aa = optional(x, "attributes")) { if (!aa->is_array()) throw std::invalid_argument("event attributes must be array"); for (const auto& ar : aa->array()) { const auto& a = obj(ar, "attributes[]"); e.attributes.push_back({str(required(a, "name"), "name"), scalar(required(a, "value"), "value")}); } } log.events.push_back(std::move(e)); const auto* rels = optional(x, "relationships"); if (!rels || !rels->is_array()) throw std::invalid_argument("event relationships must be array"); std::unordered_set<std::string> seen; for (const auto& r : rels->array()) { const auto& y = obj(r, "relationship"); const auto oid = str(required(y, "objectId"), "objectId"); if (!types.count(oid)) throw std::invalid_argument("relation references unknown object"); if (seen.insert(oid).second) log.relations.push_back({id, oid, optional(y, "qualifier") ? str(*optional(y, "qualifier"), "qualifier") : ""}); } }
+  if (!event_array.is_array())
+    throw std::invalid_argument("events must be array");
+  for (const auto& raw : event_array.array()) {
+    const auto& x = obj(raw, "events[]");
+    const auto id = str(required(x, "id"), "id");
+    if (id.empty() || !event_ids.insert(id).second)
+      throw std::invalid_argument("duplicate or empty event id");
+    const auto activity = str(required(x, "type"), "type");
+    OcelEvent event{id, activity, str(required(x, "time"), "time"), {}};
+    if (const auto* aa = optional(x, "attributes")) {
+      if (!aa->is_array())
+        throw std::invalid_argument("event attributes must be array");
+      for (const auto& ar : aa->array()) {
+        const auto& a = obj(ar, "attributes[]");
+        const auto name = str(required(a, "name"), "name");
+        event.attributes.push_back(
+            {name, standard_scalar(
+                       required(a, "value"), "value",
+                       standard_attribute_type(event_attribute_types, activity,
+                                               name))});
+      }
+    }
+    log.events.push_back(std::move(event));
+    if (const auto* rels = optional(x, "relationships")) {
+      if (!rels->is_array())
+        throw std::invalid_argument("event relationships must be array");
+      for (const auto& r : rels->array()) {
+        const auto& y = obj(r, "relationship");
+        const auto oid = str(required(y, "objectId"), "objectId");
+        if (!types.count(oid))
+          throw std::invalid_argument("relation references unknown object");
+        log.relations.push_back(
+            {id, oid, optional(y, "qualifier")
+                         ? str(*optional(y, "qualifier"), "qualifier")
+                         : ""});
+      }
+    }
+  }
   const Json* raw_e2e = optional(root, "eventRelationships");
   if (raw_e2e == nullptr) raw_e2e = optional(root, "e2e");
   if (raw_e2e != nullptr) {
@@ -218,7 +441,9 @@ Ocel parse_standard(const Json::Object& root) {
     for (const auto& raw : raw_e2e->array()) {
       const auto& relation = obj(raw, "eventRelationships[]");
       const auto* source = optional(relation, "sourceEventId");
+      if (source == nullptr) source = optional(relation, "source");
       const auto* target = optional(relation, "targetEventId");
+      if (target == nullptr) target = optional(relation, "target");
       if (source == nullptr || target == nullptr)
         throw std::invalid_argument("eventRelationships requires sourceEventId and targetEventId");
       const auto source_id = str(*source, "sourceEventId");
@@ -255,6 +480,71 @@ void write_value(std::ostringstream& out, const OcelValue& value) {
   }
 }
 void write_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs) { std::map<std::string, const OcelValue*> sorted; for (const auto& a : attrs) sorted[a.key] = &a.value; out << '{'; bool first = true; for (const auto& [k, v] : sorted) { if (!first) out << ','; first = false; write_string(out, k); out << ':'; write_value(out, *v); } out << '}'; }
+
+std::string standard_value_type(const OcelValue& value) {
+  if (std::holds_alternative<bool>(value)) return "boolean";
+  if (std::holds_alternative<std::int64_t>(value)) return "int";
+  if (std::holds_alternative<double>(value)) return "float";
+  return "string";
+}
+
+void merge_standard_type(std::string& current, const OcelValue& value) {
+  const auto next = standard_value_type(value);
+  if (current.empty() || current == next) {
+    current = next;
+  } else if ((current == "int" && next == "float") ||
+             (current == "float" && next == "int")) {
+    current = "float";
+  } else {
+    current = "string";
+  }
+}
+
+using StandardTypeTable =
+    std::map<std::string, std::map<std::string, std::string>>;
+
+void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
+                            StandardTypeTable& event_types) {
+  for (const auto& object : log.objects) {
+    auto& attributes = object_types[object.type];
+    for (const auto& attribute : object.attributes)
+      merge_standard_type(attributes[attribute.key], attribute.value);
+  }
+  for (const auto& change : log.object_changes)
+    merge_standard_type(object_types[change.object_type][change.field],
+                        change.value);
+  for (const auto& event : log.events) {
+    auto& attributes = event_types[event.activity];
+    for (const auto& attribute : event.attributes)
+      merge_standard_type(attributes[attribute.key], attribute.value);
+  }
+}
+
+void write_standard_type_table(std::ostringstream& out,
+                               const StandardTypeTable& types) {
+  out << '[';
+  bool first_type = true;
+  for (const auto& [type, attributes] : types) {
+    if (!first_type) out << ',';
+    first_type = false;
+    out << "{\"name\":";
+    write_string(out, type);
+    out << ",\"attributes\":[";
+    bool first_attribute = true;
+    for (const auto& [name, declared_type] : attributes) {
+      if (!first_attribute) out << ',';
+      first_attribute = false;
+      out << "{\"name\":";
+      write_string(out, name);
+      out << ",\"type\":";
+      write_string(out, declared_type.empty() ? "string" : declared_type);
+      out << '}';
+    }
+    out << "]}";
+  }
+  out << ']';
+}
+
 void write_o2o(std::ostringstream& out, const Ocel& log, std::string_view source) {
   std::vector<const OcelO2oRelation*> relations;
   for (const auto& relation : log.o2o) {
@@ -444,18 +734,15 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   };
 
   if (format == OcelJsonFormat::kStandard) {
-    out << "{\"ocelVersion\":\"2.0\",\"objectTypes\":[";
-    std::set<std::string> object_types;
-    for (const auto& object : log.objects) object_types.insert(object.type);
+    StandardTypeTable object_types;
+    StandardTypeTable event_types;
+    collect_standard_types(log, object_types, event_types);
+    out << "{\"ocelVersion\":\"2.0\",\"objectTypes\":";
+    write_standard_type_table(out, object_types);
+    out << ",\"eventTypes\":";
+    write_standard_type_table(out, event_types);
+    out << ",\"events\":[";
     bool first = true;
-    for (const auto& type : object_types) {
-      if (!first) out << ',';
-      first = false;
-      out << "{\"name\":";
-      write_string(out, type);
-      out << ",\"attributes\":[]}";
-    }
-    out << "],\"eventTypes\":[],\"events\":[";
     first = true;
     for (const auto* event : events) {
       if (!first) out << ',';
@@ -492,13 +779,23 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       write_string(out, object->type);
       out << ",\"attributes\":[";
       bool attribute_first = true;
-      for (const auto& attribute : object->attributes) {
+      std::vector<const OcelAttribute*> static_attributes;
+      for (const auto& attribute : object->attributes)
+        static_attributes.push_back(&attribute);
+      std::sort(static_attributes.begin(), static_attributes.end(),
+                [](const auto* left, const auto* right) {
+                  return left->key < right->key;
+                });
+      std::set<std::string> static_fields;
+      for (const auto* attribute : static_attributes) {
         if (!attribute_first) out << ',';
         attribute_first = false;
+        static_fields.insert(attribute->key);
         out << "{\"name\":";
-        write_string(out, attribute.key);
+        write_string(out, attribute->key);
+        out << ",\"time\":\"1970-01-01T00:00:00Z\"";
         out << ",\"value\":";
-        write_value(out, attribute.value);
+        write_value(out, attribute->value);
         out << '}';
       }
       std::vector<const OcelObjectChange*> changes;
@@ -509,7 +806,16 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
         return std::tie(left->timestamp, left->field, left->object_type) <
                std::tie(right->timestamp, right->field, right->object_type);
       });
+      std::set<std::string> seeded_fields;
       for (const auto* change : changes) {
+        if (!static_fields.count(change->field) &&
+            seeded_fields.insert(change->field).second) {
+          if (!attribute_first) out << ',';
+          attribute_first = false;
+          out << "{\"name\":";
+          write_string(out, change->field);
+          out << ",\"time\":\"1970-01-01T00:00:00Z\",\"value\":null}";
+        }
         if (!attribute_first) out << ',';
         attribute_first = false;
         out << "{\"name\":";

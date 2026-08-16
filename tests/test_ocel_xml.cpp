@@ -27,8 +27,12 @@ int main() {
   minera::OcelXmlExportOptions standard;
   standard.format = minera::OcelXmlFormat::kStandard;
   const auto xml2 = minera::serialize_ocel_xml(log, standard);
+  assert(xml2.find("<event-type name=\"create\">") != std::string::npos);
+  assert(xml2.find("time=\"1970-01-01T00:00:00Z\"") !=
+         std::string::npos);
   const auto parsed2 = minera::parse_ocel_xml(xml2);
-  assert(parsed2.events.size() == 2 && parsed2.relations.size() == 1);
+  assert(parsed2.events.size() == 2 && parsed2.relations.size() == 1 &&
+         parsed2.object_changes.size() == log.object_changes.size());
 
   std::istringstream input(classic);
   assert(minera::import_ocel_xml(input).objects.size() == 2);
@@ -93,5 +97,38 @@ int main() {
          standard_fixture.e2e.front().qualifier == "self");
   assert(standard_fixture.relations.size() == 1);
   assert(std::get<std::int64_t>(standard_fixture.events.front().attributes.front().value) == 2);
+
+  const std::string typed_standard = R"xml(
+<log ocelVersion="2.0">
+  <object-types>
+    <object-type name="Order"><attributes>
+      <attribute name="amount" type="int"/>
+      <attribute name="status" type="string"/>
+    </attributes></object-type>
+  </object-types>
+  <event-types>
+    <event-type name="Create"><attributes>
+      <attribute name="approved" type="boolean"/>
+    </attributes></event-type>
+  </event-types>
+  <objects>
+    <object id="o1" type="Order"><attributes>
+      <attribute name="amount" time="1970-01-01T00:00:00Z" value="7"/>
+      <attribute name="status" time="1970-01-01T00:00:00Z" value="new"/>
+      <attribute name="status" time="2024-01-02T00:00:00Z" value="paid"/>
+    </attributes></object>
+  </objects>
+  <events><event id="e1" type="Create" time="2024-01-01T00:00:00Z">
+    <attributes><attribute name="approved" value="true"/></attributes>
+    <objects><relationship object-id="o1" qualifier="created"/></objects>
+  </event></events>
+</log>
+)xml";
+  const auto typed = minera::parse_ocel_xml(typed_standard);
+  assert(std::get<std::int64_t>(typed.objects.front().attributes.front().value) ==
+         7);
+  assert(std::get<bool>(typed.events.front().attributes.front().value));
+  assert(typed.object_changes.size() == 1 &&
+         std::get<std::string>(typed.object_changes.front().value) == "paid");
   return 0;
 }

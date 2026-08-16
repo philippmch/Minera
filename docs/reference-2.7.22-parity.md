@@ -161,13 +161,17 @@ relation-id validation is shared by `minera_ocel --features`, multipart local
 
 OCEL interchange evidence: the native core now parses and writes deterministic
 extended-table CSV (with an optional object table), typed OCEL 2 relational
-SQLite, and bounded classic/standard XML. CSV import validates headers,
-object-list cells, timestamps, ids, and cross-type references; SQLite
+SQLite, and bounded classic/standard XML and JSON. Standard JSON/XML emit
+deterministic object/event type catalogs with scalar attribute declarations;
+typed values are coerced on import, static object attributes use the epoch
+baseline, and later timed values remain object changes. CSV import validates
+headers, object-list cells, timestamps, ids, and cross-type references; SQLite
 round-trips the core relational tables plus typed attributes, event-to-event
 links, object changes, and globals, and writes/imports standard type-specific
-attribute columns and object-change rows; XML import/export preserves scalar
-attributes, qualifiers, object-to-object links, object changes, globals, and
-deterministic ordering where the selected format carries them. `minera_ocel`
+attribute columns and object-change rows; XML/JSON import/export preserves
+scalar attributes, qualifiers, object-to-object links, object changes,
+globals, and deterministic ordering where the selected format carries them.
+`minera_ocel`
 detects `.csv`, `.sqlite`/`.sqlite3`/`.db`, and `.xml`/`.xmlocel` inputs and can
 emit classic or standard XML or a SQLite file. The local server's multipart
 `POST /api/ocel/sqlite` imports SQLite files, while the same route accepts
@@ -228,7 +232,7 @@ this traditional-log vertical.
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; equation-based diagnostics explicitly report the nonlinear arc limitation, while object-centric, trie, and stochastic model families remain |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
-| Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML plus typed OCEL 2 relational SQLite round-trip event-to-event and object relations, import standard type-specific attributes and object changes, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction; remaining schema-specific adapters remain |
+| Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, case-duration, case-count, and case-size filtering, exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters, and complete native/CLI/server/frontend OCEL filters; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, numeric/date KDE, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, numeric/date attribute KDE grids, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
