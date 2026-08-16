@@ -1316,7 +1316,7 @@ void handle_ocel_playout(const httplib::Request& request,
   try {
     static const std::set<std::string> allowed = {
         "model", "variant", "max_bindings_per_activity", "max_traces", "max_states",
-        "objects", "objects_unique_per_trace", "start", "case_interval",
+        "objects", "objects_unique_per_trace", "event_binding", "start", "case_interval",
         "event_interval", "ocpn_variant", "double_arc_threshold",
         "noise_threshold", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
@@ -1343,6 +1343,17 @@ void handle_ocel_playout(const httplib::Request& request,
     options.objects = parse_ocel_playout_objects(request);
     options.objects_unique_per_trace = ocel_query_bool(
         request, "objects_unique_per_trace", options.objects_unique_per_trace);
+    if (request.has_param("event_binding")) {
+      const auto binding = request.get_param_value("event_binding");
+      if (binding == "independent") {
+        options.event_binding = minera::OcpnEventBinding::kIndependent;
+      } else if (binding == "shared_activity") {
+        options.event_binding = minera::OcpnEventBinding::kSharedActivity;
+      } else {
+        throw std::invalid_argument(
+            "event_binding expects independent or shared_activity");
+      }
+    }
     options.start = ocel_query_number(request, "start", options.start);
     options.case_interval =
         ocel_query_number(request, "case_interval", options.case_interval);

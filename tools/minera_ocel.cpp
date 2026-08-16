@@ -27,7 +27,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples] [--features events|objects|events_objects] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity] [--oc-causal-net --ocpn-max-bindings N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity] [--conformance etot|ocdfg|otg --normative MODEL.json]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, split, conformance,
@@ -49,6 +49,7 @@ int main(int argc, char** argv) {
     bool ocpn_playout = false;
     bool oc_causal_net_playout = false;
     bool ocpn_unique_objects = false;
+    bool ocpn_event_binding_used = false;
     minera::OcpnPlayoutOptions ocpn_playout_options;
     minera::OcelFeatureOptions feature_options;
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
@@ -333,6 +334,19 @@ int main(int argc, char** argv) {
         oc_causal_net_playout = true;
       } else if (option == "--ocpn-unique-objects") {
         ocpn_unique_objects = true;
+      } else if (option == "--ocpn-event-binding" && i + 1 < argc) {
+        ocpn_event_binding_used = true;
+        const auto binding = std::string(argv[++i]);
+        if (binding == "independent") {
+          ocpn_playout_options.event_binding =
+              minera::OcpnEventBinding::kIndependent;
+        } else if (binding == "shared_activity") {
+          ocpn_playout_options.event_binding =
+              minera::OcpnEventBinding::kSharedActivity;
+        } else {
+          throw std::invalid_argument(
+              "--ocpn-event-binding expects independent or shared_activity");
+        }
       } else if ((option == "--ocpn-max-bindings" ||
                   option == "--ocpn-max-traces" ||
                   option == "--ocpn-max-states") && i + 1 < argc) {
@@ -483,6 +497,9 @@ int main(int argc, char** argv) {
         (!discover.empty() || !split.empty()))
       throw std::invalid_argument(
           "object-centric playout cannot be combined with discovery or split");
+    if (ocpn_event_binding_used && !ocpn_playout && !oc_causal_net_playout)
+      throw std::invalid_argument(
+          "--ocpn-event-binding requires --ocpn-playout or --oc-causal-net");
     if (ocpn_playout && oc_causal_net_playout)
       throw std::invalid_argument(
           "--ocpn-playout and --oc-causal-net are mutually exclusive");
