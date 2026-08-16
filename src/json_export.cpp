@@ -1444,6 +1444,12 @@ void write_performance_spectrum(std::ostream& out,
     switch (spectrum.variant) {
       case PerformanceSpectrumVariant::kConnected: return "connected";
       case PerformanceSpectrumVariant::kDisconnected: return "disconnected";
+      case PerformanceSpectrumVariant::kDataframe: return "dataframe";
+      case PerformanceSpectrumVariant::kLog: return "log";
+      case PerformanceSpectrumVariant::kDataframeDisconnected:
+        return "dataframe_disconnected";
+      case PerformanceSpectrumVariant::kLogDisconnected:
+        return "log_disconnected";
     }
     throw std::invalid_argument("performance spectrum has unknown variant");
   }();
@@ -1454,7 +1460,13 @@ void write_performance_spectrum(std::ostream& out,
     write_json_string(out, spectrum.activities[i]);
     out << (i + 1 < spectrum.activities.size() ? ", " : "");
   }
-  out << "], \"observations\": [";
+  out << "], \"activity_attribute\": ";
+  write_json_string(out, spectrum.activity_attribute);
+  out << ", \"timestamp_attribute\": ";
+  write_json_string(out, spectrum.timestamp_attribute);
+  out << ", \"case_id_attribute\": ";
+  write_json_string(out, spectrum.case_id_attribute);
+  out << ", \"observations\": [";
   for (std::size_t i = 0; i < spectrum.observations.size(); ++i) {
     const auto& observation = spectrum.observations[i];
     out << "{\"case_id\": ";
@@ -1670,13 +1682,32 @@ void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
   if (spectrum.activities.size() < 2) {
     throw std::invalid_argument("performance spectrum pattern must have at least two activities");
   }
-  for (const auto& activity : spectrum.activities) {
-    if (!graph.activity_id(activity)) {
-      throw std::invalid_argument("performance spectrum activity is not registered: " + activity);
+  if (spectrum.activity_attribute.empty() ||
+      spectrum.timestamp_attribute.empty() ||
+      spectrum.case_id_attribute.empty()) {
+    throw std::invalid_argument(
+        "performance spectrum attribute names must not be empty");
+  }
+  const bool built_in_activity = spectrum.activity_attribute == "activity" ||
+                                 spectrum.activity_attribute == "concept:name";
+  if (built_in_activity) {
+    for (const auto& activity : spectrum.activities) {
+      if (!graph.activity_id(activity)) {
+        throw std::invalid_argument("performance spectrum activity is not registered: " + activity);
+      }
     }
   }
+  const auto is_disconnected = [](PerformanceSpectrumVariant variant) {
+    return variant == PerformanceSpectrumVariant::kDisconnected ||
+           variant == PerformanceSpectrumVariant::kDataframeDisconnected ||
+           variant == PerformanceSpectrumVariant::kLogDisconnected;
+  };
   if (spectrum.variant != PerformanceSpectrumVariant::kConnected &&
-      spectrum.variant != PerformanceSpectrumVariant::kDisconnected) {
+      spectrum.variant != PerformanceSpectrumVariant::kDisconnected &&
+      spectrum.variant != PerformanceSpectrumVariant::kDataframe &&
+      spectrum.variant != PerformanceSpectrumVariant::kLog &&
+      spectrum.variant != PerformanceSpectrumVariant::kDataframeDisconnected &&
+      spectrum.variant != PerformanceSpectrumVariant::kLogDisconnected) {
     throw std::invalid_argument("performance spectrum has unknown variant");
   }
   for (const auto& observation : spectrum.observations) {
@@ -1691,11 +1722,11 @@ void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
             spectrum.activities.size() - observation.pattern_offset) {
       throw std::invalid_argument("performance spectrum observation exceeds pattern bounds");
     }
-    if (spectrum.variant == PerformanceSpectrumVariant::kConnected &&
+    if (!is_disconnected(spectrum.variant) &&
         observation.pattern_offset != 0) {
       throw std::invalid_argument("connected performance spectrum observation must have offset zero");
     }
-    if (spectrum.variant == PerformanceSpectrumVariant::kDisconnected &&
+    if (is_disconnected(spectrum.variant) &&
         observation.activities.size() < 2) {
       throw std::invalid_argument("disconnected performance spectrum observation must have at least two activities");
     }
@@ -1710,7 +1741,7 @@ void validate_performance_spectrum(const PerformanceSpectrum& spectrum,
         throw std::invalid_argument("performance spectrum contains a non-finite instant");
       }
     }
-    if (spectrum.variant == PerformanceSpectrumVariant::kConnected) {
+    if (!is_disconnected(spectrum.variant)) {
       if (observation.activities != spectrum.activities) {
         throw std::invalid_argument("connected performance spectrum observation does not match pattern");
       }

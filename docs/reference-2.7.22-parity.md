@@ -76,7 +76,7 @@ are reconciled.
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
-| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected; batches | **Complete (core)** — temporal profiles, both performance-spectrum variants, and all five batch classifications are available; dataframe/lazyframe paths are adapters |
+| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
@@ -1056,14 +1056,22 @@ matrices, deterministic ties, and balanced transportation marginals.
 
 ## Performance-spectrum and batch parity evidence
 
-Performance spectra expose CONNECTED and DISCONNECTED as distinct native
-variants. Both require at least two requested activities, strictly validate
-selected timestamps, optionally preserve input order, and otherwise use stable
-timestamp ordering. Connected discovery projects each case onto the requested
-activities and emits every overlapping full-pattern window. Disconnected
-discovery emits labeled contiguous subpatterns longest-first, removing matched
-events except the endpoint before considering shorter subpatterns so a full
-match is not rediscovered as all of its subsets.
+Performance spectra expose CONNECTED, DISCONNECTED, DATAFRAME, LOG,
+DATAFRAME_DISCONNECTED, and LOG_DISCONNECTED as distinct selectable variants.
+The log/dataframe names select the corresponding native projection while
+sharing the deterministic event-log implementation. All variants require at
+least two requested activities, strictly validate selected timestamps,
+optionally preserve input order, and otherwise use stable timestamp ordering.
+Connected discovery projects each case onto the requested activities and emits
+every overlapping full-pattern window. Disconnected discovery emits labeled
+contiguous subpatterns longest-first, removing matched events except the
+endpoint before considering shorter subpatterns so a full match is not
+rediscovered as all of its subsets.
+
+Activity, timestamp, and case-id attributes are configurable. Built-in event
+fields and generic event/trace attributes are resolved consistently by the
+native API, request parser, CLI, and frontend controls; the selected attribute
+names are retained in JSON metadata.
 
 Observations are globally stable-sorted by their first instant. The default
 sample size is 10,000 and uses the pinned deterministic midpoint selector,
@@ -1085,9 +1093,10 @@ group count is the number of detected batches; Minera additionally reports the
 number of member events and retains trace/event identities so duplicate
 timestamp/case tuples are not collapsed.
 
-Spectrum variant, sampling, sorting, batch enablement, merge distance, minimum
-size, and start attribute are available through strict request parsing, CLI,
-local server, deterministic prevalidated JSON, and frontend controls.
+Spectrum variant, sampling, sorting, selected activity/timestamp/case-id
+attributes, batch enablement, merge distance, minimum size, and start attribute
+are available through strict request parsing, CLI, local server, deterministic
+prevalidated JSON, and frontend controls.
 Disconnected observations retain their per-point labels and explicit requested
 pattern offset in the JSON/UI, including when activity labels repeat. Batch
 JSON/UI exposes all five categories, group batch/event counts, resources,

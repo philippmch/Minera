@@ -507,9 +507,15 @@ export function Filters({
   const correlationSplitOptionsActive =
     correlationVariants.has("classic_split");
   const [spectrumActivities, setSpectrumActivities] = useState("");
-  const [spectrumVariant, setSpectrumVariant] = useState<"connected" | "disconnected">("connected");
+  const [spectrumVariant, setSpectrumVariant] = useState<
+    "connected" | "disconnected" | "dataframe" | "log" |
+    "dataframe_disconnected" | "log_disconnected"
+  >("connected");
   const [spectrumSampleSize, setSpectrumSampleSize] = useState("10000");
   const [spectrumSortLog, setSpectrumSortLog] = useState(true);
+  const [spectrumActivityKey, setSpectrumActivityKey] = useState("");
+  const [spectrumTimestampKey, setSpectrumTimestampKey] = useState("");
+  const [spectrumCaseIdKey, setSpectrumCaseIdKey] = useState("");
   const [batches, setBatches] = useState(false);
   const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
   const [batchMinSize, setBatchMinSize] = useState("2");
@@ -997,6 +1003,12 @@ export function Filters({
         : undefined,
       spectrumSortLog: spectrumConfigured && !spectrumSortLog
         ? false : undefined,
+      spectrumActivityKey: spectrumConfigured
+        ? spectrumActivityKey.trim() || undefined : undefined,
+      spectrumTimestampKey: spectrumConfigured
+        ? spectrumTimestampKey.trim() || undefined : undefined,
+      spectrumCaseIdKey: spectrumConfigured
+        ? spectrumCaseIdKey.trim() || undefined : undefined,
       batches: batches || undefined,
       batchMergeDistanceSeconds: batches
         ? (() => { const n = Number(batchMergeDistanceSeconds); return Number.isFinite(n) && n >= 0 ? n : undefined; })()
@@ -1135,6 +1147,9 @@ export function Filters({
     setSpectrumVariant("connected");
     setSpectrumSampleSize("10000");
     setSpectrumSortLog(true);
+    setSpectrumActivityKey("");
+    setSpectrumTimestampKey("");
+    setSpectrumCaseIdKey("");
     setBatches(false);
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
@@ -2929,10 +2944,14 @@ export function Filters({
               <select
                 value={spectrumVariant}
                 disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
-                onChange={(e) => setSpectrumVariant(e.target.value as "connected" | "disconnected")}
+                onChange={(e) => setSpectrumVariant(e.target.value as typeof spectrumVariant)}
               >
                 <option value="connected">connected (default)</option>
                 <option value="disconnected">disconnected</option>
+                <option value="log">log</option>
+                <option value="dataframe">dataframe</option>
+                <option value="log_disconnected">log disconnected</option>
+                <option value="dataframe_disconnected">dataframe disconnected</option>
               </select>
             </label>
             <label className="filters-field">
@@ -2954,6 +2973,36 @@ export function Filters({
                 onChange={(e) => setSpectrumSortLog(e.target.checked)}
               />
               <span>Sort spectrum log (default)</span>
+              </label>
+            <label className="filters-field">
+              <span>Spectrum activity attribute</span>
+              <input
+                type="text"
+                placeholder="activity"
+                value={spectrumActivityKey}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Spectrum timestamp attribute</span>
+              <input
+                type="text"
+                placeholder="timestamp"
+                value={spectrumTimestampKey}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumTimestampKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Spectrum case-id attribute</span>
+              <input
+                type="text"
+                placeholder="case_id"
+                value={spectrumCaseIdKey}
+                disabled={spectrumActivities.split(",").map((name) => name.trim()).filter(Boolean).length < 2}
+                onChange={(e) => setSpectrumCaseIdKey(e.target.value)}
+              />
             </label>
           </div>
           <div className="filters-row">

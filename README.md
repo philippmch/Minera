@@ -187,9 +187,11 @@ and tracks every family as complete, partial, or missing.
 - **Performance spectrum**: pick two or more activities as a pattern, and
   every case that performs them as an uninterrupted run (other activities in
   between are ignored) contributes one observation — the instants at which
-  each step happened. Plotted as lines between the steps' time axes, the
-  observations show how flow times evolve over the log's lifetime, where
-  cases batch up, and which ones overtake others — detail a mean waiting
+  each step happened. Connected, disconnected, log, dataframe, and the two
+  disconnected projection variants are selectable, with custom activity,
+  timestamp, and case-id attributes. Plotted as lines between the steps' time
+  axes, the observations show how flow times evolve over the log's lifetime,
+  where cases batch up, and which ones overtake others — detail a mean waiting
   time averages away. CLI `--spectrum "a,b,c"` embeds it in the JSON export;
   the frontend computes and draws it live on the **Events over Time** tab,
   with lines graded by flow-time tercile.
