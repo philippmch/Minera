@@ -56,7 +56,7 @@ are reconciled.
 
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
-| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
+| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics plus strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic seeded profile clustering now has bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
@@ -430,7 +430,10 @@ not replace semantic tests.
 
 The native analysis surface now exposes the classic integer marking equation,
 the split-aware extended marking equation, structural workflow-net validation,
-and bounded soundness diagnostics. The extended equation keeps trace events in
+and bounded soundness diagnostics. Structural pair diagnostics use a deterministic
+node-split unit-capacity flow graph and report both directions whose maximum flow
+exceeds one, preserving the duplicated-node coordinates in the JSON contract.
+The extended equation keeps trace events in
 ordered segments, assigns each event to a synchronous or log move, constrains
 segment-boundary markings, and solves the resulting integer state equation with
 caller-controlled costs and deterministic node limits. Recovery separately

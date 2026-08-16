@@ -2655,6 +2655,8 @@ export interface PetriAnalysisResult {
   objective?: number;
   lower_bound?: number;
   status?: "sound" | "unsound" | "unknown";
+  handled_pairs?: number[][] | null;
+  not_well_handled_pairs?: number[][] | null;
   error?: string;
   [key: string]: unknown;
 }
@@ -2662,8 +2664,14 @@ export interface PetriAnalysisResult {
 export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisResult {
   if (!value || typeof value !== "object") return false;
   const family = (value as { family?: unknown }).family;
-  return family === "marking_equation" || family === "extended_marking_equation" ||
-    family === "workflow_net" || family === "soundness";
+  if (family !== "marking_equation" && family !== "extended_marking_equation" &&
+      family !== "workflow_net" && family !== "soundness") return false;
+  if (family !== "soundness") return true;
+  const result = value as { handled_pairs?: unknown; not_well_handled_pairs?: unknown };
+  const validPairs = (pairs: unknown) => pairs === undefined || pairs === null ||
+    (Array.isArray(pairs) && pairs.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+      pair.every((item) => Number.isSafeInteger(item) && item >= 0)));
+  return validPairs(result.handled_pairs) && validPairs(result.not_well_handled_pairs);
 }
 
 type EvaluationMetric = number | null;

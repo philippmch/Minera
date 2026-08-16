@@ -133,6 +133,9 @@ struct SoundnessResult {
   // workflow net; an engaged empty value means no positive S-component was
   // found.
   std::optional<std::vector<std::vector<std::size_t>>> s_components;
+  // Each pair is [source_node, target_node] in a deterministic node-split
+  // graph: element n has input node 2*n and output node 2*n+1. The vector is
+  // engaged for a structurally valid workflow net, including when empty.
   std::optional<std::vector<std::vector<std::size_t>>> handled_pairs;
   std::string error;
 };

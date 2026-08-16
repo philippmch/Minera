@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, type MineraExport } from "./types";
 
 describe("isDfgPrecisionResult", () => {
   const valid = { family: "DFG_PRECISION", computed: true, precision: 0.75,
@@ -217,6 +217,21 @@ describe("isProcessCubeTable", () => {
     expect(isProcessCubeTable({
       case_ids: ["a", "b"], columns: { x: [1, 2] }, categorical_columns: { x: ["a", "b"] },
     })).toBe(false);
+  });
+});
+
+describe("isPetriAnalysisResult structural diagnostics", () => {
+  it("accepts soundness pair diagnostics and null optional fields", () => {
+    expect(isPetriAnalysisResult({
+      family: "soundness", status: "unsound",
+      handled_pairs: [[1, 12]], not_well_handled_pairs: null,
+    })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "soundness", status: "sound", handled_pairs: null })).toBe(true);
+  });
+  it("rejects malformed structural pair diagnostics", () => {
+    expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1]] })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "soundness", not_well_handled_pairs: [[1, -1]] })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1, 2.5]] })).toBe(false);
   });
 });
 

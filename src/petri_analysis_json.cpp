@@ -183,6 +183,8 @@ std::string petri_analysis_json(const SoundnessResult& result) {
   out << "]"
       << ",\"s_components\":" << optional_index_vectors(result.s_components)
       << ",\"handled_pairs\":" << optional_index_vectors(result.handled_pairs)
+      << ",\"not_well_handled_pairs\":"
+      << optional_index_vectors(result.handled_pairs)
       << ",\"error\":" << quote(result.error) << '}';
   return out.str();
 }
