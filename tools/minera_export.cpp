@@ -2150,13 +2150,31 @@ int main(int argc, char** argv) {
           "features_window_seconds", "features_default_not_present",
           "features_event_string_attributes", "features_event_numeric_attributes",
           "features_case_string_attributes", "features_case_numeric_attributes",
-          "features_event_attributes", "features_case_attributes", "features_feature_names",
+          "features_event_attributes", "features_case_attributes", "features_event_successor_attributes",
+          "features_feature_names", "features_enable_activity_def_representation",
+          "features_enable_succ_def_representation", "features_enable_all_extra_features",
+          "features_enable_case_duration", "features_add_case_identifier_column",
+          "features_enable_times_from_first_occurrence", "features_enable_times_from_last_occurrence",
+          "features_enable_direct_paths_times_last_occ", "features_enable_indirect_paths_times_last_occ",
+          "features_enable_work_in_progress", "features_enable_resource_workload",
+          "features_enable_first_last_activity_index", "features_enable_max_concurrent_events",
+          "features_enable_max_concurrent_events_per_activity", "features_epsilon",
+          "features_min_num_different_string_values", "features_max_num_different_string_values",
           "feature_variant", "feature_activity_key", "feature_timestamp_key",
           "feature_start_timestamp_key", "feature_resource_key", "feature_window_seconds",
           "feature_default_not_present", "feature_event_string_attributes",
           "feature_event_numeric_attributes", "feature_case_string_attributes",
           "feature_case_numeric_attributes", "feature_event_attributes",
-          "feature_case_attributes", "feature_feature_names"};
+          "feature_case_attributes", "feature_event_successor_attributes", "feature_feature_names",
+          "feature_enable_activity_def_representation", "feature_enable_succ_def_representation",
+          "feature_enable_all_extra_features", "feature_enable_case_duration",
+          "feature_add_case_identifier_column", "feature_enable_times_from_first_occurrence",
+          "feature_enable_times_from_last_occurrence", "feature_enable_direct_paths_times_last_occ",
+          "feature_enable_indirect_paths_times_last_occ", "feature_enable_work_in_progress",
+          "feature_enable_resource_workload", "feature_enable_first_last_activity_index",
+          "feature_enable_max_concurrent_events", "feature_enable_max_concurrent_events_per_activity",
+          "feature_epsilon", "feature_min_num_different_string_values",
+          "feature_max_num_different_string_values"};
       if (!feature_option_names.contains(key)) return usage(argv[0]);
       features_fields.insert_or_assign(std::move(key), value);
       features_requested = true;

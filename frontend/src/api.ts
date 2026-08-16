@@ -3353,9 +3353,40 @@ export interface LogToFeaturesOptions {
   features_case_numeric_attributes?: string[];
   features_event_attributes?: string[];
   features_case_attributes?: string[];
+  features_event_successor_attributes?: string[];
   features_feature_names?: string[];
+  features_enable_activity_def_representation?: boolean;
+  features_enable_succ_def_representation?: boolean;
+  features_enable_all_extra_features?: boolean;
+  features_enable_case_duration?: boolean;
+  features_add_case_identifier_column?: boolean;
+  features_enable_times_from_first_occurrence?: boolean;
+  features_enable_times_from_last_occurrence?: boolean;
+  features_enable_direct_paths_times_last_occ?: boolean;
+  features_enable_indirect_paths_times_last_occ?: boolean;
+  features_enable_work_in_progress?: boolean;
+  features_enable_resource_workload?: boolean;
+  features_enable_first_last_activity_index?: boolean;
+  features_enable_max_concurrent_events?: boolean;
+  features_enable_max_concurrent_events_per_activity?: boolean;
+  features_epsilon?: number;
+  features_min_num_different_string_values?: number;
+  features_max_num_different_string_values?: number;
 }
 export function logToFeaturesQuery(options: LogToFeaturesOptions = {}): string {
+  if (options.features_epsilon !== undefined &&
+      (!Number.isFinite(options.features_epsilon) || options.features_epsilon < 0))
+    throw new Error("features_epsilon must be finite and non-negative");
+  if (options.features_min_num_different_string_values !== undefined &&
+      (!Number.isSafeInteger(options.features_min_num_different_string_values) || options.features_min_num_different_string_values < 0))
+    throw new Error("features_min_num_different_string_values must be a non-negative integer");
+  if (options.features_max_num_different_string_values !== undefined &&
+      (!Number.isSafeInteger(options.features_max_num_different_string_values) || options.features_max_num_different_string_values < 0))
+    throw new Error("features_max_num_different_string_values must be a non-negative integer");
+  if (options.features_min_num_different_string_values !== undefined &&
+      options.features_max_num_different_string_values !== undefined &&
+      options.features_min_num_different_string_values > options.features_max_num_different_string_values)
+    throw new Error("features string cardinality bounds are inverted");
   const query = new URLSearchParams();
   const encode = (s: string) => s.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
   for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
