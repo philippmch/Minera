@@ -100,6 +100,8 @@ const char* variant_name(LogUtilityVariant variant) {
     case LogUtilityVariant::kFixedPrefixes: return "FIXED_PREFIXES";
     case LogUtilityVariant::kAllPrefixes: return "ALL_PREFIXES";
     case LogUtilityVariant::kUntilActivity: return "UNTIL_ACTIVITY";
+    case LogUtilityVariant::kToActivities: return "TO_ACTIVITIES";
+    case LogUtilityVariant::kFeatureSelection: return "FEATURE_SELECTION";
   }
   return "SPLIT_TRAIN_TEST";
 }
@@ -164,6 +166,40 @@ std::string log_until_activity_json(const LogUntilActivityResult& result) {
   for (std::size_t i = 0; i < result.elapsed_seconds.size(); ++i) {
     if (i != 0) out << ',';
     out << result.elapsed_seconds[i];
+  }
+  out << "]}";
+  return out.str();
+}
+
+std::string log_activity_targets_json(const LogActivityTargetResult& result) {
+  if (result.activities.size() != result.logs.size())
+    throw std::invalid_argument("activity target names do not match sublogs");
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_UTIL\",\"variant\":\"TO_ACTIVITIES\",\"activities\":[";
+  for (std::size_t i = 0; i < result.activities.size(); ++i) {
+    if (i != 0) out << ',';
+    write_json_string(out, result.activities[i]);
+  }
+  out << "],\"logs\":[";
+  for (std::size_t i = 0; i < result.logs.size(); ++i) {
+    if (i != 0) out << ',';
+    write_event_log(out, result.logs[i]);
+  }
+  out << "]}";
+  return out.str();
+}
+
+std::string log_feature_selection_json(const LogFeatureSelectionResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_UTIL\",\"variant\":\"FEATURE_SELECTION\",\"event_attributes\":[";
+  for (std::size_t i = 0; i < result.event_attributes.size(); ++i) {
+    if (i != 0) out << ',';
+    write_json_string(out, result.event_attributes[i]);
+  }
+  out << "],\"case_attributes\":[";
+  for (std::size_t i = 0; i < result.case_attributes.size(); ++i) {
+    if (i != 0) out << ',';
+    write_json_string(out, result.case_attributes[i]);
   }
   out << "]}";
   return out.str();

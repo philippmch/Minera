@@ -17,11 +17,15 @@ enum class LogUtilityVariant {
   kFixedPrefixes,
   kAllPrefixes,
   kUntilActivity,
+  kToActivities,
+  kFeatureSelection,
 
   SPLIT_TRAIN_TEST = kSplitTrainTest,
   FIXED_PREFIXES = kFixedPrefixes,
   ALL_PREFIXES = kAllPrefixes,
   UNTIL_ACTIVITY = kUntilActivity,
+  TO_ACTIVITIES = kToActivities,
+  FEATURE_SELECTION = kFeatureSelection,
 };
 
 struct LogUtilityOptions {
@@ -55,6 +59,25 @@ struct LogUntilActivityResult {
   std::vector<double> elapsed_seconds;
 };
 
+struct LogActivityTargetResult {
+  // Only activities that produced at least one non-empty sublog are included;
+  // order follows the caller's requested activity list.
+  std::vector<std::string> activities;
+  std::vector<EventLog> logs;
+};
+
+struct LogFeatureSelectionOptions {
+  std::size_t min_different_values = 5;
+  std::size_t max_different_values = 50;
+  bool consider_all_attributes = true;
+  std::vector<std::string> mandatory_attributes;
+};
+
+struct LogFeatureSelectionResult {
+  std::vector<std::string> event_attributes;
+  std::vector<std::string> case_attributes;
+};
+
 [[nodiscard]] LogTrainTestSplit split_log_train_test(
     const EventLog& log, double train_percentage = 0.8,
     std::uint64_t seed = 0);
@@ -67,6 +90,13 @@ struct LogUntilActivityResult {
 [[nodiscard]] LogUntilActivityResult get_log_traces_until_activity(
     const EventLog& log, const std::string& activity,
     const LogUtilityOptions& options = {});
+
+[[nodiscard]] LogActivityTargetResult get_log_traces_to_activities(
+    const EventLog& log, const std::vector<std::string>& activities,
+    const LogUtilityOptions& options = {});
+
+[[nodiscard]] LogFeatureSelectionResult select_log_features(
+    const EventLog& log, const LogFeatureSelectionOptions& options = {});
 
 [[nodiscard]] inline LogTrainTestSplit split_train_test(
     const EventLog& log, double train_percentage = 0.8,

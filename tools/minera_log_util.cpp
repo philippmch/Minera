@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/log_util.hpp"
@@ -36,6 +37,35 @@ std::uint64_t parse_seed(std::string_view text) {
   return value;
 }
 
+std::vector<std::string> split_escaped(std::string_view text,
+                                       std::string_view option) {
+  std::vector<std::string> values;
+  std::string current;
+  bool escaped = false;
+  for (const char ch : text) {
+    if (escaped) {
+      if (ch != '\\' && ch != ',')
+        throw std::invalid_argument(std::string(option) +
+                                    " supports only comma and backslash escapes");
+      current.push_back(ch);
+      escaped = false;
+    } else if (ch == '\\') {
+      escaped = true;
+    } else if (ch == ',') {
+      if (current.empty())
+        throw std::invalid_argument(std::string(option) + " contains an empty item");
+      values.push_back(std::move(current));
+      current.clear();
+    } else {
+      current.push_back(ch);
+    }
+  }
+  if (escaped || current.empty())
+    throw std::invalid_argument(std::string(option) + " contains an invalid item");
+  values.push_back(std::move(current));
+  return values;
+}
+
 double parse_percentage(std::string_view text) {
   const std::string value(text);
   char* end = nullptr;
@@ -49,8 +79,11 @@ double parse_percentage(std::string_view text) {
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " INPUT.csv|INPUT.xes (--train-percentage P | --prefix-length N |"
-               " --all-prefixes | --until-activity ACTIVITY)"
-               " [--seed N] [--activity-key NAME] [--timestamp-key NAME]\n";
+               " --all-prefixes | --until-activity ACTIVITY | --to-activities A,B |"
+               " --feature-selection) [--seed N] [--activity-key NAME]"
+               " [--timestamp-key NAME] [--feature-min-different N]"
+               " [--feature-max-different N] [--feature-consider-all BOOL]"
+               " [--feature-mandatory A,B]\n";
   return 2;
 }
 
@@ -82,11 +115,16 @@ int main(int argc, char** argv) {
     std::string activity;
     std::string activity_key = "activity";
     std::string timestamp_key = "timestamp";
+    std::vector<std::string> activities;
+    minera::LogFeatureSelectionOptions feature_options;
 
     for (int i = 2; i < argc; ++i) {
       const std::string option = argv[i];
       if (option == "--all-prefixes") {
         variant = minera::LogUtilityVariant::kAllPrefixes;
+        ++operation_count;
+      } else if (option == "--feature-selection") {
+        variant = minera::LogUtilityVariant::kFeatureSelection;
         ++operation_count;
       } else {
         if (i + 1 >= argc) return usage(argv[0]);
@@ -103,12 +141,26 @@ int main(int argc, char** argv) {
           variant = minera::LogUtilityVariant::kUntilActivity;
           activity = value;
           ++operation_count;
+        } else if (option == "--to-activities") {
+          variant = minera::LogUtilityVariant::kToActivities;
+          activities = split_escaped(value, option);
+          ++operation_count;
         } else if (option == "--seed") {
           seed = parse_seed(value);
         } else if (option == "--activity-key") {
           activity_key = value;
         } else if (option == "--timestamp-key") {
           timestamp_key = value;
+        } else if (option == "--feature-min-different") {
+          feature_options.min_different_values = parse_size(value, option);
+        } else if (option == "--feature-max-different") {
+          feature_options.max_different_values = parse_size(value, option);
+        } else if (option == "--feature-consider-all") {
+          if (value == "true" || value == "1") feature_options.consider_all_attributes = true;
+          else if (value == "false" || value == "0") feature_options.consider_all_attributes = false;
+          else throw std::invalid_argument(option + " expects true or false");
+        } else if (option == "--feature-mandatory") {
+          feature_options.mandatory_attributes = split_escaped(value, option);
         } else {
           return usage(argv[0]);
         }
@@ -130,13 +182,25 @@ int main(int argc, char** argv) {
       std::cout << minera::log_prefix_json(result.log, variant,
                                            result.change_indexes)
                 << '\n';
-    } else {
+    } else if (variant == minera::LogUtilityVariant::kUntilActivity) {
       minera::LogUtilityOptions options;
       options.activity_key = activity_key;
       options.timestamp_key = timestamp_key;
       std::cout << minera::log_until_activity_json(
                        minera::get_log_traces_until_activity(log, activity,
                                                               options))
+                << '\n';
+    } else if (variant == minera::LogUtilityVariant::kToActivities) {
+      minera::LogUtilityOptions options;
+      options.activity_key = activity_key;
+      options.timestamp_key = timestamp_key;
+      std::cout << minera::log_activity_targets_json(
+                       minera::get_log_traces_to_activities(log, activities,
+                                                            options))
+                << '\n';
+    } else {
+      std::cout << minera::log_feature_selection_json(
+                       minera::select_log_features(log, feature_options))
                 << '\n';
     }
     return 0;

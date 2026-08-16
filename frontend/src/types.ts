@@ -493,7 +493,7 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
 }
 
-export type LogUtilityVariant = "SPLIT_TRAIN_TEST" | "FIXED_PREFIXES" | "ALL_PREFIXES" | "UNTIL_ACTIVITY";
+export type LogUtilityVariant = "SPLIT_TRAIN_TEST" | "FIXED_PREFIXES" | "ALL_PREFIXES" | "UNTIL_ACTIVITY" | "TO_ACTIVITIES" | "FEATURE_SELECTION";
 export interface LogUtilityAttribute { key: string; value: string; kind: string; }
 export interface LogUtilityEvent {
   case_id: string; activity: string; timestamp: string; resource: string;
@@ -509,6 +509,10 @@ export interface LogUtilityResult {
   log?: LogUtilityLog;
   change_indexes?: number[][];
   elapsed_seconds?: number[];
+  activities?: string[];
+  logs?: LogUtilityLog[];
+  event_attributes?: string[];
+  case_attributes?: string[];
 }
 function isLogUtilityAttribute(value: unknown): value is LogUtilityAttribute {
   return !!value && typeof value === "object" && typeof (value as LogUtilityAttribute).key === "string" &&
@@ -528,8 +532,10 @@ function isLogUtilityLog(value: unknown): value is LogUtilityLog {
 export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<LogUtilityResult>;
-  if (candidate.family !== "LOG_UTIL" || !["SPLIT_TRAIN_TEST", "FIXED_PREFIXES", "ALL_PREFIXES", "UNTIL_ACTIVITY"].includes(candidate.variant as string)) return false;
+  if (candidate.family !== "LOG_UTIL" || !["SPLIT_TRAIN_TEST", "FIXED_PREFIXES", "ALL_PREFIXES", "UNTIL_ACTIVITY", "TO_ACTIVITIES", "FEATURE_SELECTION"].includes(candidate.variant as string)) return false;
   if (candidate.variant === "SPLIT_TRAIN_TEST") return isLogUtilityLog(candidate.training) && isLogUtilityLog(candidate.testing);
+  if (candidate.variant === "FEATURE_SELECTION") return Array.isArray(candidate.event_attributes) && candidate.event_attributes.every((key) => typeof key === "string") && Array.isArray(candidate.case_attributes) && candidate.case_attributes.every((key) => typeof key === "string");
+  if (candidate.variant === "TO_ACTIVITIES") return Array.isArray(candidate.activities) && candidate.activities.every((activity) => typeof activity === "string") && Array.isArray(candidate.logs) && candidate.logs.length === candidate.activities.length && candidate.logs.every(isLogUtilityLog);
   if (!isLogUtilityLog(candidate.log)) return false;
   if (candidate.variant === "ALL_PREFIXES") return Array.isArray(candidate.change_indexes) && candidate.change_indexes.every((row) => Array.isArray(row) && row.every((index) => Number.isSafeInteger(index) && index >= 0));
   if (candidate.variant === "UNTIL_ACTIVITY") return Array.isArray(candidate.elapsed_seconds) && candidate.elapsed_seconds.length === candidate.log.traces.length && candidate.elapsed_seconds.every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0);
