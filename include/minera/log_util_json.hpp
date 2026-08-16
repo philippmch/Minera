@@ -15,4 +15,10 @@ namespace minera {
 [[nodiscard]] std::string log_until_activity_json(
     const LogUntilActivityResult& result);
 
+[[nodiscard]] std::string log_activity_targets_json(
+    const LogActivityTargetResult& result);
+
+[[nodiscard]] std::string log_feature_selection_json(
+    const LogFeatureSelectionResult& result);
+
 }  // namespace minera

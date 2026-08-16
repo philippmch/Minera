@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 using namespace minera;
 
@@ -95,11 +96,96 @@ void until_activity_returns_prefix_and_duration() {
   assert(split_json.find("\"testing\"") != std::string::npos);
 }
 
+void activity_targets_exclude_competing_targets() {
+  auto log = source_log();
+  Trace third;
+  third.case_id = "c3";
+  third.events = {event("c3", "A", "20", 5),
+                  event("c3", "D", "21", 6),
+                  event("c3", "C", "22", 7)};
+  log.traces.push_back(third);
+
+  LogUtilityOptions options;
+  options.activity_key = "activity";
+  options.timestamp_key = "timestamp";
+  const auto result = get_log_traces_to_activities(
+      log, std::vector<std::string>{"C", "B"}, options);
+  assert((result.activities == std::vector<std::string>{"C", "B"}));
+  assert(result.logs.size() == 2);
+  assert(result.logs[0].traces.size() == 1);
+  assert(result.logs[0].traces[0].case_id == "c3");
+  assert(result.logs[0].traces[0].events.size() == 2);
+  assert(result.logs[1].traces.size() == 1);
+  assert(result.logs[1].traces[0].case_id == "c2");
+  assert(result.logs[1].traces[0].events.size() == 1);
+  const auto json = log_activity_targets_json(result);
+  assert(json.find("\"variant\":\"TO_ACTIVITIES\"") !=
+         std::string::npos);
+  assert(json.find("\"activities\":[\"C\",\"B\"]") !=
+         std::string::npos);
+
+  bool rejected = false;
+  try {
+    (void)get_log_traces_to_activities(
+        log, std::vector<std::string>{"B", "B"}, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
+void feature_selection_keeps_useful_typed_attributes() {
+  auto log = source_log();
+  for (std::size_t trace_index = 0; trace_index < log.traces.size();
+       ++trace_index) {
+    auto& trace = log.traces[trace_index];
+    trace.attributes.push_back({"region", trace_index == 0 ? "north" : "south",
+                                AttributeKind::kString});
+    for (std::size_t event_index = 0; event_index < trace.events.size();
+         ++event_index) {
+      auto& current = trace.events[event_index];
+      current.attributes.push_back({
+          "score", std::to_string(trace_index * 10 + event_index),
+          AttributeKind::kInt});
+      current.attributes.push_back({
+          "category", event_index % 2 == 0 ? "x" : "y",
+          AttributeKind::kString});
+      current.attributes.push_back({"ignored_date", "2024-01-01",
+                                    AttributeKind::kDate});
+    }
+  }
+  LogFeatureSelectionOptions options;
+  options.min_different_values = 2;
+  options.max_different_values = 3;
+  const auto result = select_log_features(log, options);
+  assert((result.event_attributes ==
+          std::vector<std::string>{"activity", "category", "score",
+                                   "timestamp"}));
+  assert((result.case_attributes == std::vector<std::string>{"region"}));
+  const auto json = log_feature_selection_json(result);
+  assert(json.find("\"variant\":\"FEATURE_SELECTION\"") !=
+         std::string::npos);
+  assert(json.find("\"case_attributes\":[\"region\"]") !=
+         std::string::npos);
+
+  options.min_different_values = 4;
+  options.max_different_values = 2;
+  bool rejected = false;
+  try {
+    (void)select_log_features(log, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
   split_is_seeded_and_preserves_metadata();
   fixed_and_all_prefixes_match_contract();
   until_activity_returns_prefix_and_duration();
+  activity_targets_exclude_competing_targets();
+  feature_selection_keeps_useful_typed_attributes();
   std::cout << "Log utility tests passed\n";
 }

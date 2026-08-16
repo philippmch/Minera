@@ -3030,26 +3030,39 @@ export async function requestLogToTarget(options: LogToTargetOptions = {}): Prom
 }
 
 export interface LogUtilityOptions {
-  variant?: "split_train_test" | "fixed_prefixes" | "all_prefixes" | "until_activity";
+  variant?: "split_train_test" | "fixed_prefixes" | "all_prefixes" | "until_activity" | "to_activities" | "feature_selection";
   train_percentage?: number;
   seed?: number;
   prefix_length?: number;
   activity?: string;
   activity_key?: string;
   timestamp_key?: string;
+  activities?: string[];
+  feature_min_different_values?: number;
+  feature_max_different_values?: number;
+  feature_consider_all_attributes?: boolean;
+  feature_mandatory_attributes?: string[];
 }
 
 export function logUtilityQuery(options: LogUtilityOptions = {}): string {
   const variant = options.variant ?? "split_train_test";
-  if (!["split_train_test", "fixed_prefixes", "all_prefixes", "until_activity"].includes(variant)) throw new Error("log utility variant is not supported");
+  if (!["split_train_test", "fixed_prefixes", "all_prefixes", "until_activity", "to_activities", "feature_selection"].includes(variant)) throw new Error("log utility variant is not supported");
   if (options.train_percentage !== undefined && (!Number.isFinite(options.train_percentage) || options.train_percentage < 0 || options.train_percentage > 1)) throw new Error("train_percentage must be in [0,1]");
   if (options.seed !== undefined && (!Number.isSafeInteger(options.seed) || options.seed < 0)) throw new Error("seed must be a non-negative integer");
   if (options.prefix_length !== undefined && (!Number.isSafeInteger(options.prefix_length) || options.prefix_length < 0 || options.prefix_length > 100000)) throw new Error("prefix_length exceeds the safety limit");
   if (variant === "fixed_prefixes" && options.prefix_length === undefined) throw new Error("prefix_length is required for fixed_prefixes");
   if (variant === "until_activity" && !options.activity) throw new Error("activity is required for until_activity");
+  if (variant === "to_activities" && (!options.activities || options.activities.length === 0 || options.activities.some((activity) => !activity))) throw new Error("activities are required for to_activities");
+  for (const [key, value] of [["feature_min_different_values", options.feature_min_different_values], ["feature_max_different_values", options.feature_max_different_values]] as const) if (value !== undefined && (!Number.isSafeInteger(value) || value < 0 || value > 100000)) throw new Error(`${key} must be a non-negative integer`);
+  if (options.feature_min_different_values !== undefined && options.feature_max_different_values !== undefined && options.feature_min_different_values > options.feature_max_different_values) throw new Error("feature minimum exceeds maximum");
   const values: Record<string, string | undefined> = {
     activity: options.activity,
     activity_key: options.activity_key,
+    activities: options.activities?.map((activity) => activity.replaceAll("\\", "\\\\").replaceAll(",", "\\,")).join(","),
+    feature_consider_all_attributes: options.feature_consider_all_attributes === undefined ? undefined : String(options.feature_consider_all_attributes),
+    feature_mandatory_attributes: options.feature_mandatory_attributes?.map((attribute) => attribute.replaceAll("\\", "\\\\").replaceAll(",", "\\,")).join(","),
+    feature_max_different_values: options.feature_max_different_values === undefined ? undefined : String(options.feature_max_different_values),
+    feature_min_different_values: options.feature_min_different_values === undefined ? undefined : String(options.feature_min_different_values),
     prefix_length: options.prefix_length === undefined ? undefined : String(options.prefix_length),
     seed: options.seed === undefined ? undefined : String(options.seed),
     timestamp_key: options.timestamp_key,

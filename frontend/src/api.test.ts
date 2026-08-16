@@ -38,6 +38,17 @@ describe("log utility API", () => {
       .toBe("prefix_length=2&variant=fixed_prefixes");
     expect(() => logUtilityQuery({ variant: "fixed_prefixes" })).toThrow(/prefix_length/);
     expect(() => logUtilityQuery({ variant: "until_activity" })).toThrow(/activity/);
+    expect(logUtilityQuery({ variant: "to_activities", activities: ["C", "B"] }))
+      .toBe("activities=C%2CB&variant=to_activities");
+    expect(logUtilityQuery({
+      variant: "feature_selection", feature_min_different_values: 2,
+      feature_max_different_values: 3, feature_consider_all_attributes: false,
+      feature_mandatory_attributes: ["score", "region"],
+    })).toBe("feature_consider_all_attributes=false&feature_mandatory_attributes=score%2Cregion&feature_max_different_values=3&feature_min_different_values=2&variant=feature_selection");
+    expect(() => logUtilityQuery({
+      variant: "feature_selection", feature_min_different_values: 4,
+      feature_max_different_values: 2,
+    })).toThrow(/minimum/);
   });
   it("posts and validates transformed logs", async () => {
     const payload = { family: "LOG_UTIL", variant: "UNTIL_ACTIVITY", log, elapsed_seconds: [1] };

@@ -2439,7 +2439,9 @@ void handle_log_util(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "variant", "train_percentage", "seed", "prefix_length",
-        "activity", "activity_key", "timestamp_key"};
+        "activity", "activity_key", "timestamp_key", "activities",
+        "feature_min_different_values", "feature_max_different_values",
+        "feature_consider_all_attributes", "feature_mandatory_attributes"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -2462,6 +2464,34 @@ void handle_log_util(const httplib::Request& request,
           parsed > limit)
         throw std::invalid_argument(std::string(name) + " exceeds the safety limit");
       return parsed;
+    };
+    const auto split_escaped = [&](std::string_view text,
+                                   std::string_view name) {
+      std::vector<std::string> values;
+      std::string current;
+      bool escaped = false;
+      for (const char ch : text) {
+        if (escaped) {
+          if (ch != '\\' && ch != ',')
+            throw std::invalid_argument(std::string(name) +
+                                        " supports only comma and backslash escapes");
+          current.push_back(ch);
+          escaped = false;
+        } else if (ch == '\\') {
+          escaped = true;
+        } else if (ch == ',') {
+          if (current.empty())
+            throw std::invalid_argument(std::string(name) + " contains an empty item");
+          values.push_back(std::move(current));
+          current.clear();
+        } else {
+          current.push_back(ch);
+        }
+      }
+      if (escaped || current.empty())
+        throw std::invalid_argument(std::string(name) + " contains an invalid item");
+      values.push_back(std::move(current));
+      return values;
     };
     const auto variant_text = request.has_param("variant")
                                   ? value("variant")
@@ -2515,9 +2545,52 @@ void handle_log_util(const httplib::Request& request,
           session->log, options.activity, options);
       response.set_content(minera::log_until_activity_json(result),
                            "application/json");
+    } else if (variant_text == "to_activities") {
+      if (!request.has_param("activities"))
+        throw std::invalid_argument("activities is required for to_activities");
+      options.variant = minera::LogUtilityVariant::kToActivities;
+      options.activity_key = request.has_param("activity_key")
+                                 ? value("activity_key")
+                                 : "activity";
+      options.timestamp_key = request.has_param("timestamp_key")
+                                  ? value("timestamp_key")
+                                  : "timestamp";
+      const auto result = minera::get_log_traces_to_activities(
+          session->log, split_escaped(value("activities"), "activities"), options);
+      response.set_content(minera::log_activity_targets_json(result),
+                           "application/json");
+    } else if (variant_text == "feature_selection") {
+      minera::LogFeatureSelectionOptions feature_options;
+      if (request.has_param("feature_min_different_values"))
+        feature_options.min_different_values =
+            parse_size("feature_min_different_values", 100000);
+      if (request.has_param("feature_max_different_values"))
+        feature_options.max_different_values =
+            parse_size("feature_max_different_values", 100000);
+      if (feature_options.min_different_values >
+          feature_options.max_different_values)
+        throw std::invalid_argument("feature minimum exceeds maximum");
+      if (request.has_param("feature_consider_all_attributes")) {
+        const auto text = value("feature_consider_all_attributes");
+        if (text == "true" || text == "1")
+          feature_options.consider_all_attributes = true;
+        else if (text == "false" || text == "0")
+          feature_options.consider_all_attributes = false;
+        else
+          throw std::invalid_argument(
+              "feature_consider_all_attributes expects true or false");
+      }
+      if (request.has_param("feature_mandatory_attributes"))
+        feature_options.mandatory_attributes =
+            split_escaped(value("feature_mandatory_attributes"),
+                          "feature_mandatory_attributes");
+      response.set_content(minera::log_feature_selection_json(
+                               minera::select_log_features(session->log,
+                                                           feature_options)),
+                           "application/json");
     } else {
       throw std::invalid_argument(
-          "variant expects split_train_test, fixed_prefixes, all_prefixes, or until_activity");
+          "variant expects split_train_test, fixed_prefixes, all_prefixes, until_activity, to_activities, or feature_selection");
     }
   } catch (const std::exception& error) {
     response.status = 400;

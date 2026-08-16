@@ -8,10 +8,14 @@ describe("isLogUtilityResult", () => {
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "SPLIT_TRAIN_TEST", training: log, testing: log })).toBe(true);
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "ALL_PREFIXES", log, change_indexes: [[0]] })).toBe(true);
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "UNTIL_ACTIVITY", log, elapsed_seconds: [1] })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "TO_ACTIVITIES", activities: ["C"], logs: [log] })).toBe(true);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FEATURE_SELECTION", event_attributes: ["activity"], case_attributes: ["region"] })).toBe(true);
   });
   it("rejects malformed durations and event indexes", () => {
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "UNTIL_ACTIVITY", log, elapsed_seconds: [-1] })).toBe(false);
     expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FIXED_PREFIXES", log: { ...log, traces: [{ ...log.traces[0], events: [{ ...event, input_order: -1 }] }] } })).toBe(false);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "TO_ACTIVITIES", activities: ["C", "B"], logs: [log] })).toBe(false);
+    expect(isLogUtilityResult({ family: "LOG_UTIL", variant: "FEATURE_SELECTION", event_attributes: ["activity"], case_attributes: "region" })).toBe(false);
   });
 });
 
