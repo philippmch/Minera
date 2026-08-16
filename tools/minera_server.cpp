@@ -83,12 +83,14 @@
 #include "minera/monte_carlo.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/ocel.hpp"
+#include "minera/ocel_csv.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/ocel_filter.hpp"
 #include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_statistics.hpp"
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
+#include "minera/ocel_xml.hpp"
 #include "minera/saw_nets.hpp"
 #include "minera/performance.hpp"
 #include "minera/passed_time.hpp"
@@ -1095,6 +1097,113 @@ void handle_ocel_sqlite(const httplib::Request& request,
       std::error_code ignored;
       std::filesystem::remove(temporary, ignored);
     }
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_ocel_exchange(const httplib::Request& request,
+                          httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "mode", "format", "reject_unsupported", "include_declaration"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL exchange parameter: " + key);
+    }
+
+    const auto mode = lower_ascii(request.has_param("mode")
+                                      ? request.get_param_value("mode")
+                                      : std::string("import"));
+    const auto format = lower_ascii(request.has_param("format")
+                                        ? request.get_param_value("format")
+                                        : std::string("json"));
+    if (mode != "import" && mode != "export")
+      throw std::invalid_argument("OCEL exchange mode expects import or export");
+    if (format != "json" && format != "json_standard" && format != "xml" &&
+        format != "xml_standard" && format != "csv" &&
+        format != "csv_objects") {
+      throw std::invalid_argument(
+          "OCEL exchange format expects json, json_standard, xml, xml_standard, csv, or csv_objects");
+    }
+
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL exchange body");
+
+    if (mode == "export") {
+      const auto log = minera::parse_ocel_json(body);
+      std::string payload;
+      std::string content_type;
+      std::string filename;
+      if (format == "json" || format == "json_standard") {
+        payload = minera::serialize_ocel_json(
+            log, format == "json_standard" ? minera::OcelJsonFormat::kStandard
+                                             : minera::OcelJsonFormat::kClassic);
+        content_type = "application/json";
+        filename = "ocel.json";
+      } else if (format == "xml" || format == "xml_standard") {
+        minera::OcelXmlExportOptions options;
+        options.format = format == "xml_standard"
+                             ? minera::OcelXmlFormat::kStandard
+                             : minera::OcelXmlFormat::kClassic;
+        if (request.has_param("include_declaration")) {
+          options.include_declaration = ocel_query_bool(
+              request, "include_declaration", true);
+        }
+        payload = minera::serialize_ocel_xml(log, options);
+        content_type = "application/xml";
+        filename = "ocel.xml";
+      } else if (format == "csv") {
+        payload = minera::serialize_ocel_csv(log);
+        content_type = "text/csv";
+        filename = "ocel.csv";
+      } else {
+        payload = minera::serialize_ocel_objects_csv(log);
+        content_type = "text/csv";
+        filename = "ocel_objects.csv";
+      }
+      constexpr std::size_t kMaxExchangeResponseBytes = 32u * 1024u * 1024u;
+      if (payload.size() > kMaxExchangeResponseBytes)
+        throw std::invalid_argument("OCEL exchange export exceeds the response limit");
+      response.set_header("Content-Disposition",
+                          "attachment; filename=\"" + filename + "\"");
+      response.set_content(std::move(payload), content_type);
+      return;
+    }
+
+    minera::Ocel log;
+    if (format == "json" || format == "json_standard") {
+      log = minera::parse_ocel_json(body);
+    } else if (format == "xml" || format == "xml_standard") {
+      minera::OcelXmlImportOptions options;
+      if (request.has_param("reject_unsupported")) {
+        options.reject_unsupported = ocel_query_bool(
+            request, "reject_unsupported", false);
+      }
+      log = minera::parse_ocel_xml(body, options);
+    } else if (format == "csv") {
+      const auto object_body = request.is_multipart_form_data()
+                                   ? form_field(request, "objects")
+                                   : std::string{};
+      log = object_body.empty()
+                ? minera::parse_ocel_csv(body)
+                : minera::parse_ocel_csv(body, object_body);
+    } else {
+      throw std::invalid_argument(
+          "csv_objects is an export-only format; upload csv event data");
+    }
+    std::string variant;
+    if (format == "json") variant = "IMPORT_JSON";
+    else if (format == "json_standard") variant = "IMPORT_JSON_STANDARD";
+    else if (format == "xml") variant = "IMPORT_XML";
+    else if (format == "xml_standard") variant = "IMPORT_XML_STANDARD";
+    else variant = "IMPORT_CSV";
+    response.set_content(
+        std::string("{\"family\":\"OCEL_IO\",\"variant\":\"") +
+            variant + "\",\"log\":" + minera::serialize_ocel_json(log) + "}",
+        "application/json");
+  } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
@@ -4619,6 +4728,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/statistics", preflight);
   server.Options("/api/ocel/filter", preflight);
   server.Options("/api/ocel/sqlite", preflight);
+  server.Options("/api/ocel/io", preflight);
   server.Options("/api/ocel/conformance", preflight);
   server.Options("/api/ilp-mine", preflight);
   server.Options("/api/mine-ilp", preflight);
@@ -4698,6 +4808,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/statistics", handle_ocel_statistics);
   server.Post("/api/ocel/filter", handle_ocel_filter);
   server.Post("/api/ocel/sqlite", handle_ocel_sqlite);
+  server.Post("/api/ocel/io", handle_ocel_exchange);
   server.Post("/api/ocel/conformance", handle_ocel_conformance);
   server.Post("/api/ilp-mine", handle_ilp_mine);
   server.Post("/api/mine-ilp", handle_ilp_mine);

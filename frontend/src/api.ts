@@ -41,6 +41,8 @@ import {
   type OcelConformanceResult,
   type OcelFilterResult,
   type OcelSqliteResult,
+  type OcelExchangeFormat,
+  type OcelExchangeResult,
   type OcelSplitResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
@@ -77,6 +79,7 @@ import {
   isOcelConformanceResult,
   isOcelFilterResult,
   isOcelSqliteResult,
+  isOcelExchangeResult,
   isOcelSplitResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
@@ -3582,6 +3585,82 @@ export async function requestOcelSqliteExport(
   );
   if (signature !== "SQLite format 3\0")
     throw new Error("the Minera backend returned an invalid SQLite export");
+  return payload;
+}
+
+export function ocelExchangeQuery(
+  format: OcelExchangeFormat,
+  mode: "import" | "export",
+): string {
+  const query = new URLSearchParams();
+  query.set("format", format);
+  query.set("mode", mode);
+  return query.toString();
+}
+
+/** Imports classic or standard OCEL JSON/XML through the local backend. */
+export async function requestOcelExchangeImport(
+  log: Blob,
+  format: OcelExchangeFormat = "json",
+  objects?: Blob,
+): Promise<OcelExchangeResult> {
+  const form = new FormData();
+  if (format === "csv_objects")
+    throw new Error("OCEL csv_objects is an export-only format");
+  const extension = format.startsWith("xml") ? "xml" : format === "csv" ? "csv" : "json";
+  const logName = typeof File !== "undefined" && log instanceof File
+    ? log.name
+    : `ocel.${extension}`;
+  form.append("log", log, logName);
+  if (objects !== undefined) {
+    if (format !== "csv") throw new Error("OCEL object-table uploads require csv format");
+    const objectName = typeof File !== "undefined" && objects instanceof File
+      ? objects.name
+      : "ocel_objects.csv";
+    form.append("objects", objects, objectName);
+  }
+  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "import")}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelExchangeResult(payload))
+    throw new Error("the Minera backend returned an invalid OCEL exchange import");
+  return payload;
+}
+
+/** Exports an OCEL JSON document as classic or standard JSON/XML. */
+export async function requestOcelExchangeExport(
+  log: Record<string, unknown>,
+  format: OcelExchangeFormat = "json",
+): Promise<Blob> {
+  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "export")}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(log),
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload = await response.blob();
+  const text = await payload.text();
+  if (format.startsWith("json")) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(text); } catch { throw new Error("the Minera backend returned invalid OCEL JSON"); }
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      !!value && typeof value === "object" && !Array.isArray(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+        !isRecord((parsed as Record<string, unknown>)["ocel:events"]) ||
+        !isRecord((parsed as Record<string, unknown>)["ocel:objects"])) {
+      throw new Error("the Minera backend returned invalid OCEL JSON");
+    }
+  } else if (format.startsWith("xml")) {
+    if (!text.trimStart().startsWith("<"))
+      throw new Error("the Minera backend returned invalid OCEL XML");
+  } else if (!text.trim()) {
+    throw new Error("the Minera backend returned empty OCEL CSV");
+  } else if (format !== "csv" && format !== "csv_objects") {
+    throw new Error("the Minera backend returned invalid OCEL XML");
+  }
   return payload;
 }
 

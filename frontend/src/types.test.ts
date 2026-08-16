@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelSqliteResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isLogUtilityResult", () => {
   const event = { case_id: "c1", activity: "A", timestamp: "1", resource: "", lifecycle: "", input_order: 0, attributes: [] };
@@ -136,6 +136,26 @@ describe("isOcelSqliteResult", () => {
   it("rejects a malformed imported log", () => expect(isOcelSqliteResult({
     family: "OCEL_SQLITE", variant: "IMPORT", log: [],
   })).toBe(false));
+});
+
+describe("isOcelExchangeResult", () => {
+  it("accepts every JSON/XML import variant", () => {
+    for (const variant of ["IMPORT_JSON", "IMPORT_JSON_STANDARD", "IMPORT_XML", "IMPORT_XML_STANDARD", "IMPORT_CSV"]) {
+      expect(isOcelExchangeResult({
+        family: "OCEL_IO", variant,
+        log: { "ocel:events": {}, "ocel:objects": {} },
+      })).toBe(true);
+    }
+  });
+  it("rejects unknown formats and incomplete logs", () => {
+    expect(isOcelExchangeResult({
+      family: "OCEL_IO", variant: "IMPORT_DFG",
+      log: { "ocel:events": {}, "ocel:objects": {} },
+    })).toBe(false);
+    expect(isOcelExchangeResult({
+      family: "OCEL_IO", variant: "IMPORT_XML", log: {},
+    })).toBe(false);
+  });
 });
 
 describe("isOcelFeatureResult", () => {
