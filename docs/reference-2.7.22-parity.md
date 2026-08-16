@@ -227,7 +227,7 @@ this traditional-log vertical.
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, Declare, footprints, token, and temporal conformance are present; persistent stores remain |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules, deterministic encoded numeric/one-hot tables, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; richer classifier/table parameter parity remains |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
-| ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Missing** |
+| ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Partial** — deterministic seeded train/test trace splits, fixed and all-prefix projections, and until-activity target prefixes now have native, standalone CLI, cached-log server, and typed frontend adapters; model training and columnar dataframe integrations remain |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
 | Connectors | Outlook, Windows events, browsers, GitHub, Camunda, SAP O2C/accounting | **Missing / Integration** |
 
@@ -507,6 +507,23 @@ standalone CLI JSON (`--transform-target`), local-server
 `POST /api/transform-target`, and the frontend query/result adapters. Empty
 logs, explicit class lists, unknown classes, invalid timestamps, and padding
 bounds have focused native, request, and frontend coverage.
+
+## Log-utility and ML-preparation evidence
+
+The native log-utility layer provides deterministic seeded trace splitting,
+fixed-length prefixes, the complete ordered prefix expansion (including the
+empty prefix and per-case change indexes), and prefixes ending immediately
+before the first occurrence of a selected activity with elapsed-time targets.
+All projections copy log, trace, event, and typed attribute metadata. Timestamp
+targets accept ISO timestamps and finite numeric values, and invalid or reversed
+intervals are rejected.
+
+`minera_log_util` emits one stable `LOG_UTIL` JSON envelope for CSV/XES input;
+the cached-session `POST /api/log-util` route applies the same four variants
+with bounded output, and the frontend exposes sorted query serialization and
+strict recursive response validation. Focused native and frontend tests cover
+seed reproducibility, metadata preservation, empty/full prefixes, change-index
+alignment, target durations, option validation, and malformed response guards.
 
 ## Trie-transformation evidence
 

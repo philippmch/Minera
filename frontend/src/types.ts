@@ -493,6 +493,49 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
 }
 
+export type LogUtilityVariant = "SPLIT_TRAIN_TEST" | "FIXED_PREFIXES" | "ALL_PREFIXES" | "UNTIL_ACTIVITY";
+export interface LogUtilityAttribute { key: string; value: string; kind: string; }
+export interface LogUtilityEvent {
+  case_id: string; activity: string; timestamp: string; resource: string;
+  lifecycle: string; input_order: number; attributes: LogUtilityAttribute[];
+}
+export interface LogUtilityTrace { case_id: string; attributes: LogUtilityAttribute[]; events: LogUtilityEvent[]; }
+export interface LogUtilityLog { attributes: LogUtilityAttribute[]; traces: LogUtilityTrace[]; }
+export interface LogUtilityResult {
+  family: "LOG_UTIL";
+  variant: LogUtilityVariant;
+  training?: LogUtilityLog;
+  testing?: LogUtilityLog;
+  log?: LogUtilityLog;
+  change_indexes?: number[][];
+  elapsed_seconds?: number[];
+}
+function isLogUtilityAttribute(value: unknown): value is LogUtilityAttribute {
+  return !!value && typeof value === "object" && typeof (value as LogUtilityAttribute).key === "string" &&
+    typeof (value as LogUtilityAttribute).value === "string" && typeof (value as LogUtilityAttribute).kind === "string";
+}
+function isLogUtilityLog(value: unknown): value is LogUtilityLog {
+  if (!value || typeof value !== "object") return false;
+  const log = value as Partial<LogUtilityLog>;
+  if (!Array.isArray(log.attributes) || !log.attributes.every(isLogUtilityAttribute) || !Array.isArray(log.traces)) return false;
+  return log.traces.every((trace) => !!trace && typeof trace === "object" && typeof trace.case_id === "string" &&
+    Array.isArray(trace.attributes) && trace.attributes.every(isLogUtilityAttribute) && Array.isArray(trace.events) &&
+    trace.events.every((event) => !!event && typeof event === "object" && typeof event.case_id === "string" &&
+      typeof event.activity === "string" && typeof event.timestamp === "string" && typeof event.resource === "string" &&
+      typeof event.lifecycle === "string" && Number.isSafeInteger(event.input_order) && event.input_order >= 0 &&
+      Array.isArray(event.attributes) && event.attributes.every(isLogUtilityAttribute)));
+}
+export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LogUtilityResult>;
+  if (candidate.family !== "LOG_UTIL" || !["SPLIT_TRAIN_TEST", "FIXED_PREFIXES", "ALL_PREFIXES", "UNTIL_ACTIVITY"].includes(candidate.variant as string)) return false;
+  if (candidate.variant === "SPLIT_TRAIN_TEST") return isLogUtilityLog(candidate.training) && isLogUtilityLog(candidate.testing);
+  if (!isLogUtilityLog(candidate.log)) return false;
+  if (candidate.variant === "ALL_PREFIXES") return Array.isArray(candidate.change_indexes) && candidate.change_indexes.every((row) => Array.isArray(row) && row.every((index) => Number.isSafeInteger(index) && index >= 0));
+  if (candidate.variant === "UNTIL_ACTIVITY") return Array.isArray(candidate.elapsed_seconds) && candidate.elapsed_seconds.length === candidate.log.traces.length && candidate.elapsed_seconds.every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  return true;
+}
+
 export type EmbeddingVariant = "cases_transformers" | "events_transformers";
 export interface EmbeddingItem { id: string; embedding: number[]; }
 export interface EmbeddingResult {

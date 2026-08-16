@@ -65,6 +65,8 @@
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/log_util.hpp"
+#include "minera/log_util_json.hpp"
 #include "minera/embeddings.hpp"
 #include "minera/label_splitting.hpp"
 #include "minera/link_analysis.hpp"
@@ -2424,6 +2426,105 @@ void handle_log_to_features(const httplib::Request& request,
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+void handle_log_util(const httplib::Request& request,
+                     httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+    static const std::set<std::string> allowed = {
+        "variant", "train_percentage", "seed", "prefix_length",
+        "activity", "activity_key", "timestamp_key"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown log utility parameter: " + key);
+    }
+    const auto value = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto parse_size = [&](std::string_view name, std::size_t limit) {
+      const auto text = value(name);
+      if (text.empty() || text.front() == '-')
+        throw std::invalid_argument(std::string(name) +
+                                    " expects a non-negative integer");
+      std::size_t parsed = 0;
+      const auto result = std::from_chars(text.data(), text.data() + text.size(),
+                                          parsed);
+      if (result.ec != std::errc{} || result.ptr != text.data() + text.size() ||
+          parsed > limit)
+        throw std::invalid_argument(std::string(name) + " exceeds the safety limit");
+      return parsed;
+    };
+    const auto variant_text = request.has_param("variant")
+                                  ? value("variant")
+                                  : std::string("split_train_test");
+    minera::LogUtilityOptions options;
+    if (variant_text == "split_train_test") {
+      options.variant = minera::LogUtilityVariant::kSplitTrainTest;
+      if (request.has_param("train_percentage")) {
+        const auto text = value("train_percentage");
+        char* end = nullptr;
+        const double parsed = std::strtod(text.c_str(), &end);
+        if (end != text.c_str() + text.size() || !std::isfinite(parsed) ||
+            parsed < 0.0 || parsed > 1.0)
+          throw std::invalid_argument(
+              "train_percentage expects a finite number in [0,1]");
+        options.train_percentage = parsed;
+      }
+      if (request.has_param("seed")) options.seed = parse_size("seed", std::numeric_limits<std::size_t>::max());
+      const auto result = minera::split_log_train_test(
+          session->log, options.train_percentage, options.seed);
+      response.set_content(minera::log_train_test_json(result),
+                           "application/json");
+    } else if (variant_text == "fixed_prefixes") {
+      options.variant = minera::LogUtilityVariant::kFixedPrefixes;
+      options.prefix_length = parse_size("prefix_length", 100000);
+      response.set_content(minera::log_prefix_json(
+                               minera::get_log_prefixes(session->log,
+                                                        options.prefix_length),
+                               options.variant),
+                           "application/json");
+    } else if (variant_text == "all_prefixes") {
+      if (session->log.event_count() > 50000)
+        throw std::invalid_argument("all_prefixes input exceeds the safety limit");
+      const auto result = minera::get_log_with_prefixes(session->log);
+      if (result.log.traces.size() > 100000)
+        throw std::invalid_argument("all_prefixes output exceeds the safety limit");
+      response.set_content(minera::log_prefix_json(
+                               result.log, minera::LogUtilityVariant::kAllPrefixes,
+                               result.change_indexes),
+                           "application/json");
+    } else if (variant_text == "until_activity") {
+      options.variant = minera::LogUtilityVariant::kUntilActivity;
+      options.activity = value("activity");
+      options.activity_key = request.has_param("activity_key")
+                                 ? value("activity_key")
+                                 : "activity";
+      options.timestamp_key = request.has_param("timestamp_key")
+                                  ? value("timestamp_key")
+                                  : "timestamp";
+      const auto result = minera::get_log_traces_until_activity(
+          session->log, options.activity, options);
+      response.set_content(minera::log_until_activity_json(result),
+                           "application/json");
+    } else {
+      throw std::invalid_argument(
+          "variant expects split_train_test, fixed_prefixes, all_prefixes, or until_activity");
+    }
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_embeddings(const httplib::Request& request,
                        httplib::Response& response) {
   try {
@@ -4286,6 +4387,7 @@ int main(int argc, char** argv) {
   server.Options("/api/log-to-features", preflight);
   server.Options("/api/features", preflight);
   server.Options("/api/transform-features", preflight);
+  server.Options("/api/log-util", preflight);
   server.Options("/api/embeddings", preflight);
   server.Options("/api/to-embeddings", preflight);
   server.Options("/api/label-splitting", preflight);
@@ -4361,6 +4463,7 @@ int main(int argc, char** argv) {
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);
   server.Post("/api/transform-features", handle_log_to_features);
+  server.Post("/api/log-util", handle_log_util);
   server.Post("/api/embeddings", handle_embeddings);
   server.Post("/api/to-embeddings", handle_embeddings);
   server.Post("/api/label-splitting", handle_label_splitting);

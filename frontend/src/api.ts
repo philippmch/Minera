@@ -25,6 +25,7 @@ import {
   type ConceptDriftResult,
   type LogToTargetResult,
   type LogToFeaturesResult,
+  type LogUtilityResult,
   type EmbeddingVariant,
   type EmbeddingApiResult,
   type LabelSplittingResult,
@@ -62,6 +63,7 @@ import {
   type OrganizationalSnaResult,
   isLogToTargetResult,
   isLogToFeaturesResult,
+  isLogUtilityResult,
   isEmbeddingApiResult,
   isLabelSplittingResult,
   isTrieResult,
@@ -3024,6 +3026,47 @@ export async function requestLogToTarget(options: LogToTargetOptions = {}): Prom
   if (!isLogToTargetResult(payload)) {
     throw new Error("the Minera backend returned an invalid target transformation");
   }
+  return payload;
+}
+
+export interface LogUtilityOptions {
+  variant?: "split_train_test" | "fixed_prefixes" | "all_prefixes" | "until_activity";
+  train_percentage?: number;
+  seed?: number;
+  prefix_length?: number;
+  activity?: string;
+  activity_key?: string;
+  timestamp_key?: string;
+}
+
+export function logUtilityQuery(options: LogUtilityOptions = {}): string {
+  const variant = options.variant ?? "split_train_test";
+  if (!["split_train_test", "fixed_prefixes", "all_prefixes", "until_activity"].includes(variant)) throw new Error("log utility variant is not supported");
+  if (options.train_percentage !== undefined && (!Number.isFinite(options.train_percentage) || options.train_percentage < 0 || options.train_percentage > 1)) throw new Error("train_percentage must be in [0,1]");
+  if (options.seed !== undefined && (!Number.isSafeInteger(options.seed) || options.seed < 0)) throw new Error("seed must be a non-negative integer");
+  if (options.prefix_length !== undefined && (!Number.isSafeInteger(options.prefix_length) || options.prefix_length < 0 || options.prefix_length > 100000)) throw new Error("prefix_length exceeds the safety limit");
+  if (variant === "fixed_prefixes" && options.prefix_length === undefined) throw new Error("prefix_length is required for fixed_prefixes");
+  if (variant === "until_activity" && !options.activity) throw new Error("activity is required for until_activity");
+  const values: Record<string, string | undefined> = {
+    activity: options.activity,
+    activity_key: options.activity_key,
+    prefix_length: options.prefix_length === undefined ? undefined : String(options.prefix_length),
+    seed: options.seed === undefined ? undefined : String(options.seed),
+    timestamp_key: options.timestamp_key,
+    train_percentage: options.train_percentage === undefined ? undefined : String(options.train_percentage),
+    variant,
+  };
+  const query = new URLSearchParams();
+  for (const key of Object.keys(values).sort()) if (values[key] !== undefined) query.set(key, values[key] as string);
+  return query.toString();
+}
+
+export async function requestLogUtility(options: LogUtilityOptions = {}): Promise<LogUtilityResult> {
+  const query = logUtilityQuery(options);
+  const response = await fetch(`/api/log-util${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isLogUtilityResult(payload)) throw new Error("the Minera backend returned an invalid log utility result");
   return payload;
 }
 
