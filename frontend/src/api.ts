@@ -3461,6 +3461,9 @@ export interface IntervalTreeOptions {
   interval_timestamp_key?: string;
   interval_epsilon?: number;
   interval_filter_activity_couple?: [string, string];
+  interval_query_point?: number;
+  interval_query_start?: number;
+  interval_query_end?: number;
 }
 
 export function intervalTreeQuery(options: IntervalTreeOptions = {}): string {
@@ -3472,6 +3475,23 @@ export function intervalTreeQuery(options: IntervalTreeOptions = {}): string {
   if (options.interval_filter_activity_couple !== undefined) {
     const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
     query.set("interval_filter_activity_couple", options.interval_filter_activity_couple.map(escape).join(","));
+  }
+  if (options.interval_query_point !== undefined) {
+    if (!Number.isFinite(options.interval_query_point))
+      throw new Error("interval_query_point must be finite");
+    query.set("interval_query_point", String(options.interval_query_point));
+  }
+  const queryStart = options.interval_query_start;
+  const queryEnd = options.interval_query_end;
+  if ((queryStart === undefined) !== (queryEnd === undefined))
+    throw new Error("interval query range requires both start and end");
+  if (queryStart !== undefined && queryEnd !== undefined) {
+    if (!Number.isFinite(queryStart) || !Number.isFinite(queryEnd))
+      throw new Error("interval query range must be finite");
+    if (queryStart > queryEnd)
+      throw new Error("interval query start must not exceed end");
+    query.set("interval_query_start", String(queryStart));
+    query.set("interval_query_end", String(queryEnd));
   }
   return query.toString();
 }

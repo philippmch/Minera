@@ -630,6 +630,9 @@ void interval_tree_params_contract() {
       {"interval_timestamp_key", "completed_at"},
       {"interval_epsilon", "0.25"},
       {"interval_filter_activity_couple", R"(Review\, senior,A\\B)"},
+      {"interval_query_point", "12.5"},
+      {"interval_query_start", "10"},
+      {"interval_query_end", "20"},
   }));
   assert(p.activity_key == "phase");
   assert(p.start_timestamp_key == "started_at");
@@ -638,6 +641,9 @@ void interval_tree_params_contract() {
   assert(p.filter_activity_couple);
   assert(p.filter_activity_couple->first == "Review, senior");
   assert(p.filter_activity_couple->second == "A\\B");
+  assert(p.query_point && *p.query_point == 12.5);
+  assert(p.query_range && p.query_range->first == 10.0 &&
+         p.query_range->second == 20.0);
 
   bool threw = false;
   try {
@@ -651,6 +657,23 @@ void interval_tree_params_contract() {
   try {
     (void)minera::parse_interval_tree_params(
         fields({{"interval_epsilon", "-0.1"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_interval_tree_params(
+        fields({{"interval_query_start", "2"},
+                {"interval_query_end", "1"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_interval_tree_params(
+        fields({{"interval_query_point", "NaN"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }

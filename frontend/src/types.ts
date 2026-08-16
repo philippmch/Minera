@@ -736,12 +736,16 @@ export interface OpenPathInterval {
 export interface IntervalTreeResult {
   family: "LOG_TO_INTERVAL_TREE";
   intervals: OpenPathInterval[];
+  point_query?: number;
+  point_matches?: number[];
+  range_query?: [number, number];
+  range_matches?: number[];
 }
 export function isIntervalTreeResult(value: unknown): value is IntervalTreeResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<IntervalTreeResult>;
-  return candidate.family === "LOG_TO_INTERVAL_TREE" && Array.isArray(candidate.intervals)
-    && candidate.intervals.every((interval) => !!interval && typeof interval === "object"
+  if (candidate.family !== "LOG_TO_INTERVAL_TREE" || !Array.isArray(candidate.intervals)
+    || !candidate.intervals.every((interval) => !!interval && typeof interval === "object"
       && Number.isFinite((interval as OpenPathInterval).start)
       && Number.isFinite((interval as OpenPathInterval).end)
       && typeof (interval as OpenPathInterval).case_id === "string"
@@ -749,7 +753,19 @@ export function isIntervalTreeResult(value: unknown): value is IntervalTreeResul
       && typeof (interval as OpenPathInterval).target_activity === "string"
       && Number.isInteger((interval as OpenPathInterval).trace_index)
       && Number.isInteger((interval as OpenPathInterval).source_event_index)
-      && Number.isInteger((interval as OpenPathInterval).target_event_index));
+      && Number.isInteger((interval as OpenPathInterval).target_event_index))) return false;
+  const validMatches = (matches: unknown): matches is number[] =>
+    Array.isArray(matches) && matches.every((item) => Number.isInteger(item) && item >= 0);
+  if (candidate.point_query !== undefined) {
+    if (!Number.isFinite(candidate.point_query) || !validMatches(candidate.point_matches)) return false;
+  } else if (candidate.point_matches !== undefined) return false;
+  if (candidate.range_query !== undefined) {
+    if (!Array.isArray(candidate.range_query) || candidate.range_query.length !== 2
+      || !candidate.range_query.every((item) => typeof item === "number" && Number.isFinite(item))
+      || candidate.range_query[0] > candidate.range_query[1]
+      || !validMatches(candidate.range_matches)) return false;
+  } else if (candidate.range_matches !== undefined) return false;
+  return true;
 }
 
 export interface CaseRelationsEvent {
@@ -964,11 +980,13 @@ export type OcelPlayoutVariant = "EXTENSIVE";
 export interface OcelPetriPlayoutResult {
   family: "OCEL_PLAYOUT";
   variant: OcelPlayoutVariant;
+  event_binding?: "independent" | "shared_activity";
   log: Record<string, unknown>;
 }
 export interface OcelCausalNetPlayoutResult {
   family: "OC_CAUSAL_NET_PLAYOUT";
   variant: OcelPlayoutVariant;
+  event_binding?: "independent" | "shared_activity";
   log: Record<string, unknown>;
 }
 export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutResult;
@@ -1019,6 +1037,9 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
   if (!isOcelRecord(value) ||
       (value.family !== "OCEL_PLAYOUT" && value.family !== "OC_CAUSAL_NET_PLAYOUT") ||
       value.variant !== "EXTENSIVE") return false;
+  if (value.event_binding !== undefined &&
+      value.event_binding !== "independent" &&
+      value.event_binding !== "shared_activity") return false;
   return isOcelRecord(value.log);
 }
 export type OcelFeatureVariant = "EVENTS" | "OBJECTS" | "EVENTS_OBJECTS";

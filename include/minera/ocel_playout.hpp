@@ -22,6 +22,8 @@ enum class OcpnEventBinding {
   SHARED_ACTIVITY = kSharedActivity,
 };
 
+[[nodiscard]] const char* ocpn_event_binding_name(OcpnEventBinding binding);
+
 struct OcpnPlayoutOptions {
   // Maximum number of firings of any visible activity in one object trace.
   // The extensive search is bounded by this value and by max_states.
@@ -46,5 +48,7 @@ struct OcpnPlayoutOptions {
     const OcpnGraph& graph, const OcpnPlayoutOptions& options = {});
 
 [[nodiscard]] std::string serialize_ocpn_playout_json(const Ocel& log);
+[[nodiscard]] std::string serialize_ocpn_playout_json(
+    const Ocel& log, OcpnEventBinding binding);
 
 }  // namespace minera

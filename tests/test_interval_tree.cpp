@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -95,6 +96,41 @@ void json_shape_is_stable() {
   assert(json.find(R"("source_event_index":0)") != std::string::npos);
 }
 
+void query_diagnostics_are_inclusive_and_indexed() {
+  const auto intervals = discover_open_path_intervals(sample());
+  const auto epoch = *parse_timestamp("2024-01-01T00:00:00Z");
+  IntervalTreeQueryOptions options;
+  options.point = epoch + 2.0;
+  options.range = std::pair{epoch + 0.5, epoch + 1.5};
+  const auto result = query_open_path_intervals(intervals, options);
+  assert(result.intervals == intervals);
+  assert(result.point && *result.point == epoch + 2.0);
+  assert(result.point_matches == std::vector<std::size_t>{1});
+  assert(result.range_matches == std::vector<std::size_t>({0, 1}));
+  const auto json = interval_tree_json(result);
+  assert(json.find(R"("point_query":)") != std::string::npos);
+  assert(json.find(R"("point_matches":[1])") != std::string::npos);
+  assert(json.find(R"("range_matches":[0,1])") != std::string::npos);
+
+  bool threw = false;
+  try {
+    options.point = std::numeric_limits<double>::quiet_NaN();
+    (void)query_open_path_intervals(intervals, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    options.point.reset();
+    options.range = std::pair{2.0, 1.0};
+    (void)query_open_path_intervals(intervals, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -102,4 +138,5 @@ int main() {
   filter_and_custom_attributes();
   invalid_and_empty();
   json_shape_is_stable();
+  query_diagnostics_are_inclusive_and_indexed();
 }

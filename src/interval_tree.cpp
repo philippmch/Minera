@@ -34,6 +34,47 @@ double require_timestamp(const Event& event, const std::string& key) {
 
 }  // namespace
 
+IntervalTreeQueryResult query_open_path_intervals(
+    const std::vector<OpenPathInterval>& intervals,
+    const IntervalTreeQueryOptions& options) {
+  if (options.point && !std::isfinite(*options.point))
+    throw std::invalid_argument("interval tree: query point must be finite");
+  if (options.range) {
+    const auto [lower, upper] = *options.range;
+    if (!std::isfinite(lower) || !std::isfinite(upper))
+      throw std::invalid_argument("interval tree: query range must be finite");
+    if (lower > upper)
+      throw std::invalid_argument(
+          "interval tree: query range start must not exceed end");
+  }
+
+  IntervalTreeQueryResult result;
+  result.point = options.point;
+  result.range = options.range;
+  result.intervals = intervals;
+  if (options.point) {
+    for (std::size_t index = 0; index < intervals.size(); ++index) {
+      const auto& interval = intervals[index];
+      if (interval.start <= *options.point && *options.point <= interval.end)
+        result.point_matches.push_back(index);
+    }
+  }
+  if (options.range) {
+    const auto [lower, upper] = *options.range;
+    for (std::size_t index = 0; index < intervals.size(); ++index) {
+      const auto& interval = intervals[index];
+      if (interval.end >= lower && interval.start <= upper)
+        result.range_matches.push_back(index);
+    }
+  }
+  return result;
+}
+
+IntervalTreeQueryOptions interval_tree_query_options(
+    const OpenPathIntervalOptions& options) {
+  return {options.query_point, options.query_range};
+}
+
 std::vector<OpenPathInterval> discover_open_path_intervals(
     const EventLog& log, const OpenPathIntervalOptions& options) {
   if (options.activity_key.empty() || options.start_timestamp_key.empty() ||

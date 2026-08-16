@@ -55,6 +55,10 @@ void extensive_contract() {
   const auto json = minera::serialize_ocpn_playout_json(log);
   assert(json.find("\"family\":\"OCEL_PLAYOUT\"") != std::string::npos);
   assert(json.find("EXTENSIVE") != std::string::npos);
+  const auto shared_json = minera::serialize_ocpn_playout_json(
+      log, minera::OcpnEventBinding::kSharedActivity);
+  assert(shared_json.find("\"event_binding\":\"shared_activity\"") !=
+         std::string::npos);
 }
 
 void unique_objects_and_validation() {

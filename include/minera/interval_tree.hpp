@@ -16,6 +16,8 @@ struct OpenPathIntervalOptions {
   std::string timestamp_key = "time:timestamp";
   double epsilon = 0.00001;
   std::optional<std::pair<std::string, std::string>> filter_activity_couple;
+  std::optional<double> query_point;
+  std::optional<std::pair<double, double>> query_range;
 };
 
 struct OpenPathInterval {
@@ -37,11 +39,33 @@ struct IntervalTreeModel {
       default;
 };
 
+struct IntervalTreeQueryOptions {
+  std::optional<double> point;
+  std::optional<std::pair<double, double>> range;
+};
+
+struct IntervalTreeQueryResult {
+  std::optional<double> point;
+  std::optional<std::pair<double, double>> range;
+  std::vector<OpenPathInterval> intervals;
+  std::vector<std::size_t> point_matches;
+  std::vector<std::size_t> range_matches;
+  friend bool operator==(const IntervalTreeQueryResult&,
+                         const IntervalTreeQueryResult&) = default;
+};
+
 using IntervalTree = IntervalTreeModel;
 using IntervalTreeOptions = OpenPathIntervalOptions;
 
 [[nodiscard]] std::vector<OpenPathInterval> discover_open_path_intervals(
     const EventLog& log, const OpenPathIntervalOptions& options = {});
+
+[[nodiscard]] IntervalTreeQueryResult query_open_path_intervals(
+    const std::vector<OpenPathInterval>& intervals,
+    const IntervalTreeQueryOptions& options = {});
+
+[[nodiscard]] IntervalTreeQueryOptions interval_tree_query_options(
+    const OpenPathIntervalOptions& options);
 
 [[nodiscard]] inline IntervalTreeModel log_to_interval_tree(
     const EventLog& log, const OpenPathIntervalOptions& options = {}) {

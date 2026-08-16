@@ -672,7 +672,8 @@ int main(int argc, char** argv) {
       ocpn_playout_options.objects_unique_per_trace = ocpn_unique_objects;
       std::cout << minera::serialize_ocpn_playout_json(
                        minera::ocpn_extensive_playout(
-                           minera::discover_ocpn(log), ocpn_playout_options))
+                           minera::discover_ocpn(log), ocpn_playout_options),
+                       ocpn_playout_options.event_binding)
                 << '\n';
       return 0;
     }
@@ -681,7 +682,8 @@ int main(int argc, char** argv) {
       const auto model = minera::discover_oc_causal_net(log, ocpn_options);
       std::cout << minera::serialize_oc_causal_net_playout_json(
                        minera::oc_causal_net_extensive_playout(
-                           model, ocpn_playout_options))
+                           model, ocpn_playout_options),
+                       ocpn_playout_options.event_binding)
                 << '\n';
       return 0;
     }

@@ -136,6 +136,10 @@ describe("isTriePetriConversionResult", () => {
 describe("isOcelPlayoutResult", () => {
   const valid = { family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} } };
   it("accepts the recursive OCEL log envelope", () => expect(isOcelPlayoutResult(valid)).toBe(true));
+  it("accepts shared binding metadata and rejects unknown modes", () => {
+    expect(isOcelPlayoutResult({ ...valid, event_binding: "shared_activity" })).toBe(true);
+    expect(isOcelPlayoutResult({ ...valid, event_binding: "unknown" })).toBe(false);
+  });
   it("accepts the causal-net envelope", () => expect(isOcelPlayoutResult({ ...valid, family: "OC_CAUSAL_NET_PLAYOUT" })).toBe(true));
   it("rejects an incomplete envelope", () => expect(isOcelPlayoutResult({ ...valid, log: [] })).toBe(false));
 });

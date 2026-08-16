@@ -84,6 +84,14 @@ void write_json_string(std::ostringstream& out, const std::string& value) {
 
 }  // namespace
 
+const char* ocpn_event_binding_name(OcpnEventBinding binding) {
+  switch (binding) {
+    case OcpnEventBinding::kIndependent: return "independent";
+    case OcpnEventBinding::kSharedActivity: return "shared_activity";
+  }
+  throw std::invalid_argument("OCPN event binding is invalid");
+}
+
 Ocel ocpn_extensive_playout(const OcpnGraph& graph,
                             const OcpnPlayoutOptions& options) {
   if (options.max_bindings_per_activity == 0)
@@ -234,7 +242,13 @@ Ocel ocpn_extensive_playout(const OcpnGraph& graph,
 }
 
 std::string serialize_ocpn_playout_json(const Ocel& log) {
-  return std::string("{\"family\":\"OCEL_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"log\":") +
+  return serialize_ocpn_playout_json(log, OcpnEventBinding::kIndependent);
+}
+
+std::string serialize_ocpn_playout_json(const Ocel& log,
+                                        OcpnEventBinding binding) {
+  return std::string("{\"family\":\"OCEL_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"event_binding\":\"") +
+         ocpn_event_binding_name(binding) + "\",\"log\":" +
          serialize_ocel_json(log) + "}";
 }
 

@@ -3783,9 +3783,9 @@ std::string trie_json(const TrieModel& result) {
   return out.str();
 }
 
-std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
-  std::ostringstream out;
-  out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"intervals\":[";
+namespace {
+void write_interval_tree_intervals(std::ostream& out,
+                                   const std::vector<OpenPathInterval>& result) {
   for (std::size_t i = 0; i < result.size(); ++i) {
     if (i) out << ',';
     const auto& interval = result[i];
@@ -3801,7 +3801,40 @@ std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
         << ",\"target_event_index\":" << interval.target_event_index
         << '}';
   }
-  out << "]}";
+}
+
+void write_index_array(std::ostream& out, const std::vector<std::size_t>& values) {
+  out << '[';
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if (i) out << ',';
+    out << values[i];
+  }
+  out << ']';
+}
+}  // namespace
+
+std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
+  IntervalTreeQueryResult query_result;
+  query_result.intervals = result;
+  return interval_tree_json(query_result);
+}
+
+std::string interval_tree_json(const IntervalTreeQueryResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"intervals\":[";
+  write_interval_tree_intervals(out, result.intervals);
+  out << ']';
+  if (result.point) {
+    out << ",\"point_query\":" << *result.point
+        << ",\"point_matches\":";
+    write_index_array(out, result.point_matches);
+  }
+  if (result.range) {
+    out << ",\"range_query\":[" << result.range->first << ','
+        << result.range->second << "],\"range_matches\":";
+    write_index_array(out, result.range_matches);
+  }
+  out << '}';
   return out.str();
 }
 

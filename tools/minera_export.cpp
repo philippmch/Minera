@@ -614,6 +614,9 @@ int usage(const char* program) {
                "  --interval-timestamp-key <name> Completion-time attribute\n"
                "  --interval-epsilon <f>   Non-negative boundary epsilon\n"
                "  --interval-filter-activity-couple <a,b> Optional pair filter\n"
+               "  --interval-query-point <f> Point diagnostic query\n"
+               "  --interval-query-start <f> Range diagnostic lower bound\n"
+               "  --interval-query-end <f> Range diagnostic upper bound\n"
                "  --merge-case-relations <file> Merge incoming CSV/XES log\n"
                "  --case-relations <file>       Relation CSV for merge\n"
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
@@ -2229,7 +2232,8 @@ int main(int argc, char** argv) {
       static const std::set<std::string> interval_option_names = {
           "interval_activity_key", "interval_start_timestamp_key",
           "interval_timestamp_key", "interval_epsilon",
-          "interval_filter_activity_couple"};
+          "interval_filter_activity_couple", "interval_query_point",
+          "interval_query_start", "interval_query_end"};
       if (!interval_option_names.contains(key)) return usage(argv[0]);
       interval_fields.insert_or_assign(std::move(key), value);
       interval_requested = true;
@@ -4484,8 +4488,11 @@ int main(int argc, char** argv) {
         return interval_fields.contains(std::string(name));
       };
       const auto params = minera::parse_interval_tree_params(lookup, present);
-      std::cout << minera::interval_tree_json(
-          minera::discover_open_path_intervals(log, params)) << '\n';
+      const auto intervals =
+          minera::discover_open_path_intervals(log, params);
+      const auto query = minera::query_open_path_intervals(
+          intervals, minera::interval_tree_query_options(params));
+      std::cout << minera::interval_tree_json(query) << '\n';
       return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);

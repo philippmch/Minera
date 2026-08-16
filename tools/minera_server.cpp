@@ -1406,12 +1406,14 @@ void handle_ocel_playout(const httplib::Request& request,
       const auto causal = minera::discover_oc_causal_net(log, discovery);
       response.set_content(minera::serialize_oc_causal_net_playout_json(
                                minera::oc_causal_net_extensive_playout(causal,
-                                                                       options)),
+                                                                       options),
+                           options.event_binding),
                            "application/json");
     } else {
       const auto graph = minera::discover_ocpn(log, discovery);
       response.set_content(minera::serialize_ocpn_playout_json(
-                               minera::ocpn_extensive_playout(graph, options)),
+                               minera::ocpn_extensive_playout(graph, options),
+                               options.event_binding),
                            "application/json");
     }
   } catch (const std::exception& error) {
@@ -3083,7 +3085,8 @@ void handle_interval_tree(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "interval_activity_key", "interval_start_timestamp_key",
         "interval_timestamp_key", "interval_epsilon",
-        "interval_filter_activity_couple"};
+        "interval_filter_activity_couple", "interval_query_point",
+        "interval_query_start", "interval_query_end"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -3097,10 +3100,11 @@ void handle_interval_tree(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto options = minera::parse_interval_tree_params(lookup, present);
-    response.set_content(minera::interval_tree_json(
-                             minera::discover_open_path_intervals(session->log,
-                                                                   options)),
-                         "application/json");
+    const auto intervals =
+        minera::discover_open_path_intervals(session->log, options);
+    const auto query = minera::query_open_path_intervals(
+        intervals, minera::interval_tree_query_options(options));
+    response.set_content(minera::interval_tree_json(query), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

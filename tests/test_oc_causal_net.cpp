@@ -26,5 +26,9 @@ int main() {
   assert(!log.events.empty());
   const auto json = minera::serialize_oc_causal_net_playout_json(log);
   assert(json.find("\"family\":\"OC_CAUSAL_NET_PLAYOUT\"") != std::string::npos);
+  const auto bound_json = minera::serialize_oc_causal_net_playout_json(
+      log, minera::OcpnEventBinding::kSharedActivity);
+  assert(bound_json.find("\"event_binding\":\"shared_activity\"") !=
+         std::string::npos);
   std::cout << "OC causal-net tests passed\n";
 }

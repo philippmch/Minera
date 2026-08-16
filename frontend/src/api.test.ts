@@ -1098,7 +1098,8 @@ describe("OCEL API", () => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
       expect(init.body).toBeInstanceOf(FormData);
       return { ok: true, json: async () => ({
-        family: "OCEL_PLAYOUT", variant: "EXTENSIVE", log: { "ocel:events": {} },
+        family: "OCEL_PLAYOUT", variant: "EXTENSIVE", event_binding: "shared_activity",
+        log: { "ocel:events": {} },
       }) };
     }));
     await expect(requestOcelPlayout(new File(["{}"], "log.json"), {
