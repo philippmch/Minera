@@ -116,9 +116,19 @@ struct SoundnessResult {
   bool option_to_complete = false;
   bool proper_completion = false;
   std::vector<std::size_t> dead_transitions;
+  // Alias used by structural soundness diagnostics: transition ids that are
+  // never enabled from the resolved initial marking.
+  std::vector<std::size_t> dead_tasks;
   std::vector<Marking> deadlocks;
+  std::vector<std::vector<std::size_t>> deadlock_witnesses;
   std::vector<Marking> improper_markings;
+  std::vector<std::vector<std::size_t>> improper_witnesses;
+  std::vector<std::size_t> completion_witness;
   std::vector<std::size_t> locking_witness;
+  // Deterministic shortest firing paths to bounded markings that cannot reach
+  // the resolved final marking. The single locking_witness is retained as a
+  // compact compatibility field containing the first such path.
+  std::vector<std::vector<std::size_t>> locking_scenarios;
   std::vector<std::size_t> unbounded_witness;
   std::size_t reachable_marking_count = 0;
   std::size_t coverability_node_count = 0;
@@ -137,6 +147,8 @@ struct SoundnessResult {
   // graph: element n has input node 2*n and output node 2*n+1. The vector is
   // engaged for a structurally valid workflow net, including when empty.
   std::optional<std::vector<std::vector<std::size_t>>> handled_pairs;
+  // Human-readable labels for the node coordinates used by handled_pairs.
+  std::vector<std::string> structural_node_labels;
   std::string error;
 };
 

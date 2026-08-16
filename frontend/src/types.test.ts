@@ -227,11 +227,16 @@ describe("isPetriAnalysisResult structural diagnostics", () => {
       handled_pairs: [[1, 12]], not_well_handled_pairs: null,
     })).toBe(true);
     expect(isPetriAnalysisResult({ family: "soundness", status: "sound", handled_pairs: null })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "soundness", dead_tasks: [0, 2], locking_scenarios: [[1], [0, 2]] })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "soundness", structural_node_labels: ["place:0:in", "transition:0:A:in"] })).toBe(true);
   });
   it("rejects malformed structural pair diagnostics", () => {
     expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1]] })).toBe(false);
     expect(isPetriAnalysisResult({ family: "soundness", not_well_handled_pairs: [[1, -1]] })).toBe(false);
     expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1, 2.5]] })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "soundness", dead_tasks: [-1] })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "soundness", locking_scenarios: [[0], [1, 2.5]] })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "soundness", structural_node_labels: ["ok", 2] })).toBe(false);
   });
 });
 

@@ -41,6 +41,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
   const structuralPairs = result?.family === "soundness"
     ? (result.not_well_handled_pairs ?? result.handled_pairs)
     : undefined;
+  const lockingScenarios = result?.family === "soundness" ? result.locking_scenarios : undefined;
 
   const run = async () => {
     if (!onRequest || !miner) return;
@@ -99,7 +100,17 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
     {structuralPairs && <div className="conf-inline-note">
       <strong>Structural pair diagnostics: {structuralPairs.length}</strong>
       {structuralPairs.length > 0 && <ul>{structuralPairs.map((pair, index) =>
-        <li key={`${pair[0]}-${pair[1]}-${index}`}>node {pair[0]} → node {pair[1]}</li>)}</ul>}
+        <li key={`${pair[0]}-${pair[1]}-${index}`}>
+          {result?.structural_node_labels?.[pair[0]] ?? `node ${pair[0]}`} → {result?.structural_node_labels?.[pair[1]] ?? `node ${pair[1]}`}
+        </li>)}</ul>}
+    </div>}
+    {result?.family === "soundness" && (result.dead_tasks || lockingScenarios) && <div className="conf-inline-note">
+      <strong>Soundness witnesses</strong>
+      {result.dead_tasks && <div>Dead tasks: {result.dead_tasks.length}</div>}
+      {result.deadlock_witnesses && <div>Deadlock witnesses: {result.deadlock_witnesses.length}</div>}
+      {result.improper_witnesses && <div>Improper-marking witnesses: {result.improper_witnesses.length}</div>}
+      {result.completion_witness && <div>Completion path length: {result.completion_witness.length}</div>}
+      {lockingScenarios && <div>Locking scenarios: {lockingScenarios.length}</div>}
     </div>}
     {result && <pre className="analysis-json">{JSON.stringify(result, null, 2)}</pre>}
   </section>;
