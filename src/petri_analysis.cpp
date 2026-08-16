@@ -526,6 +526,84 @@ std::vector<std::vector<std::size_t>> invariant_supports(
   return supports;
 }
 
+bool same_vector(const std::vector<double>& lhs,
+                 const std::vector<double>& rhs) {
+  if (lhs.size() != rhs.size()) return false;
+  return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
+                    [](double a, double b) { return std::abs(a - b) <= 1e-6; });
+}
+
+std::vector<std::vector<double>> uniform_invariants(
+    const std::vector<std::vector<double>>& basis) {
+  std::vector<std::vector<double>> result;
+  for (const auto& invariant : basis) {
+    std::vector<double> uniform(invariant.size(), 0.0);
+    for (std::size_t p = 0; p < invariant.size(); ++p)
+      if (invariant[p] > kEps) uniform[p] = 1.0;
+    if (std::none_of(uniform.begin(), uniform.end(),
+                     [](double value) { return value > kEps; }))
+      continue;
+    if (std::none_of(result.begin(), result.end(),
+                     [&](const auto& existing) {
+                       return same_vector(existing, uniform);
+                     }))
+      result.push_back(std::move(uniform));
+  }
+  return result;
+}
+
+std::vector<std::vector<double>> weighted_invariants(
+    const std::vector<std::vector<double>>& basis) {
+  std::vector<std::vector<double>> result;
+  for (const auto& invariant : basis) {
+    double minimum = std::numeric_limits<double>::infinity();
+    for (const auto value : invariant)
+      if (value > kEps) minimum = std::min(minimum, value);
+    if (!std::isfinite(minimum)) continue;
+    std::vector<double> weighted(invariant.size(), 0.0);
+    for (std::size_t p = 0; p < invariant.size(); ++p) {
+      if (invariant[p] <= kEps) continue;
+      weighted[p] = invariant[p] / minimum;
+      const auto nearest = std::round(weighted[p]);
+      if (std::abs(weighted[p] - nearest) <= 1e-6) weighted[p] = nearest;
+    }
+    if (std::none_of(result.begin(), result.end(),
+                     [&](const auto& existing) {
+                       return same_vector(existing, weighted);
+                     }))
+      result.push_back(std::move(weighted));
+  }
+  return result;
+}
+
+std::vector<std::size_t> uncovered_from_vectors(
+    const std::vector<std::vector<double>>& vectors, std::size_t places) {
+  std::vector<std::size_t> uncovered;
+  for (std::size_t p = 0; p < places; ++p) {
+    bool covered = false;
+    for (const auto& vector : vectors)
+      if (p < vector.size() && vector[p] > kEps) {
+        covered = true;
+        break;
+      }
+    if (!covered) uncovered.push_back(p);
+  }
+  return uncovered;
+}
+
+std::vector<std::size_t> uncovered_from_supports(
+    const std::vector<std::vector<std::size_t>>& supports,
+    std::size_t places) {
+  std::vector<bool> covered(places, false);
+  for (const auto& support : supports)
+    for (const auto place : support)
+      if (place < places) covered[place] = true;
+  std::vector<std::size_t> uncovered;
+  for (std::size_t p = 0; p < places; ++p)
+    if (!covered[p]) uncovered.push_back(p);
+  return uncovered;
+}
+
 // A compact Karp--Miller style coverability search.  -1 denotes omega.  The
 // search is used only as an unboundedness certificate; the exact reachability
 // graph below still supplies the soundness conditions whenever no certificate
@@ -537,6 +615,8 @@ struct CoverabilityResult {
   std::size_t node_count = 0;
   std::vector<std::size_t> witness;
   std::vector<std::size_t> omega_places;
+  std::vector<Marking> markings;
+  std::vector<std::vector<std::size_t>> edges;
 };
 
 constexpr std::int64_t kOmega = -1;
@@ -566,6 +646,16 @@ CoverabilityResult coverability_search(const PetriNet& net,
   std::vector<Node> nodes;
   nodes.push_back({initial, std::numeric_limits<std::size_t>::max(),
                    std::numeric_limits<std::size_t>::max()});
+  std::vector<std::vector<std::vector<std::size_t>>> edges;
+  edges.emplace_back();
+  const auto snapshot = [&]() {
+    result.markings.clear();
+    result.markings.reserve(nodes.size());
+    for (const auto& node : nodes) result.markings.push_back(node.marking);
+    result.edges.clear();
+    for (std::size_t from = 0; from < edges.size(); ++from)
+      for (const auto& edge : edges[from]) result.edges.push_back(edge);
+  };
   std::queue<std::size_t> queue;
   queue.push(0);
   const auto path_to = [&](std::size_t id) {
@@ -615,6 +705,10 @@ CoverabilityResult coverability_search(const PetriNet& net,
         accelerated = accelerated || strict;
       }
       if (accelerated) {
+        const auto accelerated_id = nodes.size();
+        nodes.push_back({next, id, t});
+        edges.emplace_back();
+        edges[id].push_back({id, accelerated_id, t});
         result.unbounded = true;
         result.witness = path_to(id);
         result.witness.push_back(t);
@@ -624,30 +718,38 @@ CoverabilityResult coverability_search(const PetriNet& net,
         result.omega_places.erase(
             std::unique(result.omega_places.begin(), result.omega_places.end()),
             result.omega_places.end());
-        result.node_count = nodes.size() + 1;
+        result.node_count = nodes.size();
+        snapshot();
         return result;
       }
 
-      bool covered = false;
+      std::optional<std::size_t> covered_by;
       // A newly reached marking can be subsumed only when it is no larger
       // than an already explored coverability node.  Reversing this test
       // would discard the larger state that may contain the unbounded branch.
-      for (const auto& existing : nodes)
-        if (cover_leq(next, existing.marking)) {
-          covered = true;
+      for (std::size_t existing = 0; existing < nodes.size(); ++existing)
+        if (cover_leq(next, nodes[existing].marking)) {
+          covered_by = existing;
           break;
         }
-      if (covered) continue;
+      if (covered_by) {
+        edges[id].push_back({id, *covered_by, t});
+        continue;
+      }
       if (nodes.size() >= max_nodes) {
         result.exhausted = true;
         result.node_count = nodes.size();
+        snapshot();
         return result;
       }
       nodes.push_back({std::move(next), id, t});
+      edges.emplace_back();
+      edges[id].push_back({id, nodes.size() - 1, t});
       queue.push(nodes.size() - 1);
     }
   }
   result.node_count = nodes.size();
+  snapshot();
   return result;
 }
 
@@ -1003,14 +1105,21 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   const auto validation_error = validate_net(net);
   if (validation_error.empty()) {
     result.place_invariant_basis = invariant_basis(net);
-    for (std::size_t p = 0; p < net.place_count(); ++p) {
-      bool covered = false;
-      for (const auto& invariant : result.place_invariant_basis)
-        if (invariant[p] > kEps) { covered = true; break; }
-      if (!covered) result.uncovered_places.push_back(p);
+    result.uncovered_places = uncovered_from_vectors(
+        result.place_invariant_basis, net.place_count());
+    result.uniform_place_invariants =
+        uniform_invariants(result.place_invariant_basis);
+    result.uncovered_places_uniform = uncovered_from_vectors(
+        result.uniform_place_invariants, net.place_count());
+    result.weighted_place_invariants =
+        weighted_invariants(result.place_invariant_basis);
+    result.uncovered_places_weighted = uncovered_from_vectors(
+        result.weighted_place_invariants, net.place_count());
+    if (result.workflow.valid) {
+      result.s_components = invariant_supports(result.uniform_place_invariants);
+      result.uncovered_places_s_component = uncovered_from_supports(
+          *result.s_components, net.place_count());
     }
-    if (result.workflow.valid)
-      result.s_components = invariant_supports(result.place_invariant_basis);
   }
   if (!result.workflow.valid) {
     result.status = SoundnessStatus::UNSOUND; result.computed = true;
@@ -1031,6 +1140,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     throw std::invalid_argument("max_states must be positive");
   const auto markings = resolved_markings(net, options.initial_marking, options.final_marking);
   const auto coverability = coverability_search(net, markings.initial, options.max_states);
+  result.coverability_markings = coverability.markings;
+  result.coverability_edges = coverability.edges;
   if (coverability.unbounded) {
     result.bounded = false;
     result.computed = true;
@@ -1050,6 +1161,12 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       if (!result.uncovered_places.empty())
         result.diagnostic_messages.push_back(
             "positive place-invariant coverage is missing for one or more places");
+      if (!result.uncovered_places_uniform.empty())
+        result.diagnostic_messages.push_back(
+            "uniform invariant coverage is missing for one or more places");
+      if (!result.uncovered_places_weighted.empty())
+        result.diagnostic_messages.push_back(
+            "weighted invariant coverage is missing for one or more places");
       if (result.s_components)
         result.diagnostic_messages.push_back(
             "positive place-invariant S-components found: " +
@@ -1062,6 +1179,15 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   std::map<Marking, std::size_t> ids{{markings.initial, 0}};
   std::queue<std::size_t> queue; queue.push(0);
   std::vector<std::vector<std::pair<std::size_t, std::size_t>>> edges(1);
+  const auto store_reachability_graph = [&]() {
+    result.reachability_markings.clear();
+    result.reachability_markings.reserve(nodes.size());
+    for (const auto& node : nodes) result.reachability_markings.push_back(node.marking);
+    result.reachability_edges.clear();
+    for (std::size_t from = 0; from < edges.size(); ++from)
+      for (const auto [to, transition] : edges[from])
+        result.reachability_edges.push_back({from, to, transition});
+  };
   std::vector<bool> fired(net.transitions().size(), false);
   const auto path_to = [&](std::size_t id) {
     std::vector<std::size_t> path;
@@ -1088,6 +1214,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
           result.unbounded_witness = path_to(id); result.unbounded_witness.push_back(t);
           result.coverability_node_count = nodes.size() + 1;
           result.reachable_marking_count = nodes.size();
+          store_reachability_graph();
           if (options.diagnostics) result.diagnostic_messages.push_back("ancestor dominance proves unbounded token growth");
           return result;
         }
@@ -1098,6 +1225,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
           result.status = SoundnessStatus::UNKNOWN; result.computed = false; result.exhausted = true;
           result.reachable_marking_count = nodes.size(); result.coverability_node_count = nodes.size();
           result.error = "reachability state limit reached";
+          store_reachability_graph();
           if (options.diagnostics) result.diagnostic_messages.push_back(result.error);
           return result;
         }
@@ -1123,6 +1251,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   result.bounded = true;
   result.reachable_marking_count = result.coverability_node_count = nodes.size();
+  store_reachability_graph();
   const auto final_it = ids.find(markings.final);
   result.final_reachable = final_it != ids.end();
   if (final_it != ids.end()) result.completion_witness = path_to(final_it->second);
@@ -1164,6 +1293,15 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (!result.uncovered_places.empty())
       result.diagnostic_messages.push_back(
           "positive place-invariant coverage is missing for one or more places");
+    if (!result.uncovered_places_uniform.empty())
+      result.diagnostic_messages.push_back(
+          "uniform invariant coverage is missing for one or more places");
+    if (!result.uncovered_places_weighted.empty())
+      result.diagnostic_messages.push_back(
+          "weighted invariant coverage is missing for one or more places");
+    if (!result.uncovered_places_s_component.empty())
+      result.diagnostic_messages.push_back(
+          "S-component coverage is missing for one or more places");
     if (!result.dead_transitions.empty())
       result.diagnostic_messages.push_back("the net contains dead transitions");
     if (!result.dead_tasks.empty())

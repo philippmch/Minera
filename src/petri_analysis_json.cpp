@@ -65,6 +65,18 @@ std::string optional_index_vectors(
   return out.str();
 }
 
+std::string index_vectors(
+    const std::vector<std::vector<std::size_t>>& values) {
+  std::ostringstream out;
+  out << '[';
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if (i != 0) out << ',';
+    out << numbers(values[i]);
+  }
+  out << ']';
+  return out.str();
+}
+
 std::string doubles(const std::vector<double>& values) {
   std::ostringstream out;
   out << std::setprecision(17) << '[';
@@ -204,6 +216,32 @@ std::string petri_analysis_json(const SoundnessResult& result) {
     out << doubles(result.place_invariant_basis[i]);
   }
   out << "]"
+      << ",\"uniform_place_invariants\":[";
+  for (std::size_t i = 0; i < result.uniform_place_invariants.size(); ++i) {
+    if (i != 0) out << ',';
+    out << doubles(result.uniform_place_invariants[i]);
+  }
+  out << "]"
+      << ",\"weighted_place_invariants\":[";
+  for (std::size_t i = 0; i < result.weighted_place_invariants.size(); ++i) {
+    if (i != 0) out << ',';
+    out << doubles(result.weighted_place_invariants[i]);
+  }
+  out << "]"
+      << ",\"uncovered_places_uniform\":"
+      << numbers(result.uncovered_places_uniform)
+      << ",\"uncovered_places_weighted\":"
+      << numbers(result.uncovered_places_weighted)
+      << ",\"uncovered_places_s_component\":"
+      << numbers(result.uncovered_places_s_component)
+      << ",\"coverability_markings\":"
+      << markings(result.coverability_markings)
+      << ",\"coverability_edges\":"
+      << index_vectors(result.coverability_edges)
+      << ",\"reachability_markings\":"
+      << markings(result.reachability_markings)
+      << ",\"reachability_edges\":"
+      << index_vectors(result.reachability_edges)
       << ",\"s_components\":" << optional_index_vectors(result.s_components)
       << ",\"handled_pairs\":" << optional_index_vectors(result.handled_pairs)
       << ",\"not_well_handled_pairs\":"

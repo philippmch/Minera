@@ -2665,6 +2665,17 @@ export interface PetriAnalysisResult {
   handled_pairs?: number[][] | null;
   not_well_handled_pairs?: number[][] | null;
   structural_node_labels?: string[];
+  place_invariant_basis?: number[][];
+  uniform_place_invariants?: number[][];
+  weighted_place_invariants?: number[][];
+  uncovered_places?: number[];
+  uncovered_places_uniform?: number[];
+  uncovered_places_weighted?: number[];
+  uncovered_places_s_component?: number[];
+  coverability_markings?: number[][];
+  coverability_edges?: number[][];
+  reachability_markings?: number[][];
+  reachability_edges?: number[][];
   error?: string;
   [key: string]: unknown;
 }
@@ -2682,6 +2693,12 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     deadlock_witnesses?: unknown; improper_witnesses?: unknown;
     completion_witness?: unknown;
     locking_witness?: unknown; locking_scenarios?: unknown;
+    place_invariant_basis?: unknown; uniform_place_invariants?: unknown;
+    weighted_place_invariants?: unknown;
+    uncovered_places?: unknown; uncovered_places_uniform?: unknown;
+    uncovered_places_weighted?: unknown; uncovered_places_s_component?: unknown;
+    coverability_markings?: unknown; coverability_edges?: unknown;
+    reachability_markings?: unknown; reachability_edges?: unknown;
   };
   const validIndices = (indices: unknown) => indices === undefined ||
     (Array.isArray(indices) && indices.every((item) => Number.isSafeInteger(item) && item >= 0));
@@ -2692,6 +2709,16 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     (Array.isArray(result.locking_scenarios) && result.locking_scenarios.every(validIndices));
   const validWitnesses = (witnesses: unknown) => witnesses === undefined ||
     (Array.isArray(witnesses) && witnesses.every(validIndices));
+  const validInvariantFamily = (family: unknown) => family === undefined ||
+    (Array.isArray(family) && family.every((vector) => Array.isArray(vector) &&
+      vector.every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0)));
+  const validPlaces = (places: unknown) => validIndices(places);
+  const validMarkings = (markings: unknown, omega: boolean) => markings === undefined ||
+    (Array.isArray(markings) && markings.every((marking) => Array.isArray(marking) &&
+      marking.every((item) => Number.isSafeInteger(item) && (omega ? item >= -1 : item >= 0))));
+  const validGraphEdges = (edges: unknown) => edges === undefined ||
+    (Array.isArray(edges) && edges.every((edge) => Array.isArray(edge) && edge.length === 3 &&
+      edge.every((item) => Number.isSafeInteger(item) && item >= 0)));
   const validLabels = result.structural_node_labels === undefined ||
     (Array.isArray(result.structural_node_labels) &&
       result.structural_node_labels.every((label) => typeof label === "string"));
@@ -2699,7 +2726,18 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     validIndices(result.completion_witness) && validIndices(result.locking_witness) &&
     validWitnesses(result.deadlock_witnesses) && validWitnesses(result.improper_witnesses) &&
     validScenarios &&
-    validPairs(result.handled_pairs) && validPairs(result.not_well_handled_pairs) && validLabels;
+    validPairs(result.handled_pairs) && validPairs(result.not_well_handled_pairs) && validLabels &&
+    validInvariantFamily(result.place_invariant_basis) &&
+    validInvariantFamily(result.uniform_place_invariants) &&
+    validInvariantFamily(result.weighted_place_invariants) &&
+    validPlaces(result.uncovered_places) &&
+    validPlaces(result.uncovered_places_uniform) &&
+    validPlaces(result.uncovered_places_weighted) &&
+    validPlaces(result.uncovered_places_s_component) &&
+    validMarkings(result.coverability_markings, true) &&
+    validMarkings(result.reachability_markings, false) &&
+    validGraphEdges(result.coverability_edges) &&
+    validGraphEdges(result.reachability_edges);
 }
 
 type EvaluationMetric = number | null;
