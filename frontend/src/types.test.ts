@@ -609,6 +609,18 @@ describe("isMineraExport", () => {
     ).toBe(true);
   });
 
+  it("validates the minimum self-distance adapter selector", () => {
+    expect(isMineraExport({
+      ...valid,
+      minimum_self_distance_variant: "polars",
+      minimum_self_distances: [],
+    })).toBe(true);
+    expect(isMineraExport({
+      ...valid,
+      minimum_self_distance_variant: "other",
+    })).toBe(false);
+  });
+
   it("accepts a transition-system export with multiset payloads", () => {
     expect(isMineraExport({
       ...valid,

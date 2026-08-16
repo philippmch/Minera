@@ -521,6 +521,8 @@ export function Filters({
   const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
   const [batchMinSize, setBatchMinSize] = useState("2");
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
+  const [minimumSelfDistanceVariant, setMinimumSelfDistanceVariant] =
+    useState<"log" | "pandas" | "polars">("log");
   const [overlap, setOverlap] = useState(false);
   const [overlapActivityAttribute, setOverlapActivityAttribute] = useState("");
   const [overlapStartAttribute, setOverlapStartAttribute] = useState("");
@@ -1019,6 +1021,8 @@ export function Filters({
         ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 2 ? n : undefined; })()
         : undefined,
       batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
+      minimumSelfDistanceVariant: minimumSelfDistanceVariant !== "log"
+        ? minimumSelfDistanceVariant : undefined,
       overlap: overlap || undefined,
       overlapActivityAttribute: overlap ? overlapActivityAttribute.trim() || undefined : undefined,
       overlapStartAttribute: overlap ? overlapStartAttribute.trim() || undefined : undefined,
@@ -1157,6 +1161,7 @@ export function Filters({
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
     setBatchStartTimestampAttribute("");
+    setMinimumSelfDistanceVariant("log");
     setOverlap(false);
     setOverlapActivityAttribute("");
     setOverlapStartAttribute("");
@@ -1294,7 +1299,7 @@ export function Filters({
   const correlationDirty = correlationVariants.size > 0;
   const spectrumActive = spectrumActivities.trim() !== "";
   const temporalDirty =
-    spectrumActive || batches || overlap;
+    spectrumActive || batches || minimumSelfDistanceVariant !== "log" || overlap;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
     declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
@@ -3019,6 +3024,17 @@ export function Filters({
                 value={batchVariant}
                 disabled={!batches}
                 onChange={(e) => setBatchVariant(e.target.value as typeof batchVariant)}
+              >
+                <option value="log">log (default)</option>
+                <option value="pandas">pandas</option>
+                <option value="polars">polars</option>
+              </select>
+            </label>
+            <label className="filters-field">
+              <span>Minimum self-distance variant</span>
+              <select
+                value={minimumSelfDistanceVariant}
+                onChange={(e) => setMinimumSelfDistanceVariant(e.target.value as typeof minimumSelfDistanceVariant)}
               >
                 <option value="log">log (default)</option>
                 <option value="pandas">pandas</option>

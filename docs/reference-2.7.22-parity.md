@@ -1102,6 +1102,12 @@ group count is the number of detected batches; Minera additionally reports the
 number of member events and retains trace/event identities so duplicate
 timestamp/case tuples are not collapsed.
 
+Minimum self-distance discovery exposes LOG, PANDAS, and POLARS selectors
+through the same deterministic witness calculation. The selector is carried
+through strict request parsing, CLI, local server, JSON metadata, and the
+frontend controls; all three adapters preserve the activity, distance, and
+witness contract.
+
 Spectrum variant, sampling, sorting, selected activity/timestamp/case-id
 attributes, batch variant/enablement, merge distance, minimum size, and start
 attribute are available through strict request parsing, CLI, local server,

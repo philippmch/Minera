@@ -2118,6 +2118,22 @@ MineParams parse_mine_params(const FieldLookup& field,
     // fallback in the batch miner.
     params.batch_options.start_timestamp_attribute = value;
   }
+  if (const auto value = field("minimum_self_distance_variant");
+      present ? present("minimum_self_distance_variant") : !value.empty()) {
+    if (value == "log" || value == "LOG") {
+      params.minimum_self_distance.variant =
+          MinimumSelfDistanceVariant::kLog;
+    } else if (value == "pandas" || value == "PANDAS") {
+      params.minimum_self_distance.variant =
+          MinimumSelfDistanceVariant::kPandas;
+    } else if (value == "polars" || value == "POLARS") {
+      params.minimum_self_distance.variant =
+          MinimumSelfDistanceVariant::kPolars;
+    } else {
+      throw std::invalid_argument(
+          "minimum_self_distance_variant: expected log, pandas, or polars");
+    }
+  }
   const auto batches_supplied = present ? present("batches") : !field("batches").empty();
   for (const auto name : {std::string_view{"batch_variant"},
                           std::string_view{"batch_merge_distance_seconds"},

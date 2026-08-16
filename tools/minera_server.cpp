@@ -423,7 +423,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
-        minera::discover_minimum_self_distances(log);
+        minera::discover_minimum_self_distances(
+            log, params.minimum_self_distance);
     const auto transition_system =
         minera::discover_transition_system(log, params.transition_system);
     const auto tree = minera::discover_process_tree(log, params.inductive);
@@ -531,7 +532,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         overlap_interval_events ? &*overlap_interval_events : nullptr,
         overlap_cases ? &*overlap_cases : nullptr,
         overlap_concurrent_activities ? &*overlap_concurrent_activities
-                                      : nullptr);
+                                      : nullptr,
+        /* decision_tables */ nullptr,
+        params.minimum_self_distance.variant);
 
     // Cache this analysis so alignments can be served on demand for the model
     // the user actually opens, rather than computed for all models up front.

@@ -161,7 +161,9 @@ void write_analysis_json(std::ostream& out,
                          const CaseOverlapCounts* case_overlap_counts = nullptr,
                          const ConcurrentActivityOverlapResult*
                              concurrent_activity_overlap = nullptr,
-                         const DecisionTablesResult* decision_tables = nullptr);
+                         const DecisionTablesResult* decision_tables = nullptr,
+                         MinimumSelfDistanceVariant minimum_self_distance_variant =
+                             MinimumSelfDistanceVariant::kLog);
 
 [[nodiscard]] std::string analysis_json(
     std::string_view dataset,
@@ -214,7 +216,9 @@ void write_analysis_json(std::ostream& out,
     const IntervalEventOverlapCounts* interval_event_overlap_counts = nullptr,
     const CaseOverlapCounts* case_overlap_counts = nullptr,
     const ConcurrentActivityOverlapResult* concurrent_activity_overlap = nullptr,
-    const DecisionTablesResult* decision_tables = nullptr);
+    const DecisionTablesResult* decision_tables = nullptr,
+    MinimumSelfDistanceVariant minimum_self_distance_variant =
+        MinimumSelfDistanceVariant::kLog);
 
 [[nodiscard]] std::string replay_fitness_json(
     const ReplayFitnessResult& result,

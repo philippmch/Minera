@@ -644,6 +644,7 @@ int usage(const char* program) {
                "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
                "  --batch-variant <id>      log (default), pandas, or polars\n"
+               "  --minimum-self-distance-variant <id> log (default), pandas, or polars\n"
                "  --overlap                 Compute interval/case/concurrent overlap statistics\n"
                "  --overlap-activity-attribute <name> Optional concurrent activity attribute\n"
                "  --overlap-start-attribute <name> Optional interval start timestamp attribute\n"
@@ -1110,6 +1111,7 @@ int main(int argc, char** argv) {
   bool batches = false;
   bool batch_option_used = false;
   minera::BatchDiscoveryOptions batch_options;
+  minera::MinimumSelfDistanceOptions minimum_self_distance_options;
   bool overlap_requested = false;
   bool chaotic_activities_requested = false;
   bool passed_time_requested = false;
@@ -1410,6 +1412,25 @@ int main(int argc, char** argv) {
         return 2;
       }
       batch_option_used = true;
+      continue;
+    }
+    if (arg == "--minimum-self-distance-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto variant = std::string_view(value);
+      if (variant == "log") {
+        minimum_self_distance_options.variant =
+            minera::MinimumSelfDistanceVariant::kLog;
+      } else if (variant == "pandas") {
+        minimum_self_distance_options.variant =
+            minera::MinimumSelfDistanceVariant::kPandas;
+      } else if (variant == "polars") {
+        minimum_self_distance_options.variant =
+            minera::MinimumSelfDistanceVariant::kPolars;
+      } else {
+        std::cerr << "error: --minimum-self-distance-variant expects log, pandas, or polars\n";
+        return 2;
+      }
       continue;
     }
     if (arg == "--trace-patterns" || arg == "--trace-pattern") {
@@ -4453,7 +4474,8 @@ int main(int argc, char** argv) {
     }
     const auto temporal_profile = minera::discover_temporal_profile(log);
     const auto minimum_self_distances =
-        minera::discover_minimum_self_distances(log);
+        minera::discover_minimum_self_distances(
+            log, minimum_self_distance_options);
     const auto transition_system =
         minera::discover_transition_system(log, transition_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
@@ -4820,7 +4842,7 @@ int main(int argc, char** argv) {
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
                                         : nullptr,
-          decision_tables_ptr);
+          decision_tables_ptr, minimum_self_distance_options.variant);
     } else {
       std::ofstream file(output);
       if (!file) {
@@ -4857,7 +4879,7 @@ int main(int argc, char** argv) {
           overlap_cases ? &*overlap_cases : nullptr,
           overlap_concurrent_activities ? &*overlap_concurrent_activities
                                         : nullptr,
-          decision_tables_ptr);
+          decision_tables_ptr, minimum_self_distance_options.variant);
     }
 
     // Optionally emit one discovered model as standard PNML.

@@ -72,6 +72,7 @@
 #include "minera/passed_time.hpp"
 #include "minera/service_time.hpp"
 #include "minera/rework.hpp"
+#include "minera/minimum_self_distance.hpp"
 
 // Pure request-parsing helpers shared by the local server (tools/minera_server)
 // and its tests. Nothing here depends on the HTTP layer: form fields arrive
@@ -137,6 +138,7 @@ struct MineParams {
   // Optional overlap statistics, computed after all log filters.
   bool overlap = false;
   OverlapOptions overlap_options;
+  MinimumSelfDistanceOptions minimum_self_distance;
 };
 
 using ConceptDriftParams = ConceptDriftOptions;

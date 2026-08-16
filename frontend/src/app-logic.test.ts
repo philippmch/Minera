@@ -733,7 +733,7 @@ describe("mineFormEntries", () => {
       spectrumActivityKey: "phase", spectrumTimestampKey: "occurred_at",
       spectrumCaseIdKey: "case_ref",
       batches: true, batchVariant: "polars", batchMergeDistanceSeconds: 12, batchMinSize: 4,
-      batchStartTimestampAttribute: "started_at",
+      batchStartTimestampAttribute: "started_at", minimumSelfDistanceVariant: "polars",
     })).toEqual([
       ["spectrum_activities", "A,B"], ["spectrum_variant", "disconnected"],
       ["spectrum_sample_size", "3"], ["spectrum_sort_log", "false"],
@@ -741,8 +741,10 @@ describe("mineFormEntries", () => {
       ["spectrum_case_id_key", "case_ref"],
       ["batches", "true"], ["batch_variant", "polars"], ["batch_merge_distance_seconds", "12"],
       ["batch_min_size", "4"], ["batch_start_timestamp_attribute", "started_at"],
+      ["minimum_self_distance_variant", "polars"],
     ]);
     expect(mineFormEntries({ spectrumActivities: ["A"], spectrumSampleSize: 10000, spectrumSortLog: true, batches: true, batchMergeDistanceSeconds: 900, batchMinSize: 2 })).toEqual([["batches", "true"]]);
+    expect(hasActiveMinerOptions({ minimumSelfDistanceVariant: "pandas" })).toBe(true);
   });
 
   it("maps non-default transition-system settings", () => {
