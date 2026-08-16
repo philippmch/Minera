@@ -94,6 +94,11 @@ int main() {
     invalid.relations.push_back({"e1", "o1", ""});
     (void)minera::serialize_ocel_csv(invalid);
   });
+  throws([&] {
+    auto invalid = log;
+    invalid.e2e.push_back({"e1", "e2", "precedes"});
+    (void)minera::serialize_ocel_csv(invalid);
+  });
 
   return 0;
 }

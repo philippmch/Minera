@@ -24,7 +24,7 @@ struct OcelCsvImportOptions {
   bool has_header = true;
   bool trim_fields = true;
   // The tabular format has no representation for qualified relations,
-  // object-to-object links, object changes, or globals.  Rejecting those
+  // object-to-object/event-to-event links, object changes, or globals.  Rejecting those
   // during a combined import prevents accidental loss of information.
   bool reject_unsupported = true;
   // Reference extended tables are chronologically ordered after import.
@@ -41,7 +41,7 @@ struct OcelCsvExportOptions {
   char delimiter = ',';
   bool emit_objects = true;
   // Set this only when the caller intentionally accepts fields that the
-  // extended table cannot carry (qualifiers, O2O links, changes, globals).
+  // extended table cannot carry (qualifiers, O2O/E2E links, changes, globals).
   bool allow_lossy = false;
 };
 

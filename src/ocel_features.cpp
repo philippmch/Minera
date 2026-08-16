@@ -235,6 +235,21 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
           if (object_types_by_index[object] == type) values[row] += 1.0;
       builder.add("@@event_num_rel_objs_type_" + type, std::move(values));
     }
+    std::map<std::string, std::size_t> event_index;
+    for (std::size_t row = 0; row < log.events.size(); ++row)
+      event_index.emplace(log.events[row].id, row);
+    std::vector<double> outgoing(log.events.size(), 0.0);
+    std::vector<double> incoming(log.events.size(), 0.0);
+    for (const auto& relation : log.e2e) {
+      const auto source = event_index.find(relation.source_id);
+      const auto target = event_index.find(relation.target_id);
+      if (source == event_index.end() || target == event_index.end())
+        throw std::invalid_argument("OCEL feature E2E relation references an unknown id");
+      outgoing[source->second] += 1.0;
+      incoming[target->second] += 1.0;
+    }
+    builder.add("@@event_num_e2e_out", std::move(outgoing));
+    builder.add("@@event_num_e2e_in", std::move(incoming));
   }
   if (options.include_endpoint_features) {
     for (const auto& type : object_types) {

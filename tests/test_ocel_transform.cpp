@@ -22,6 +22,7 @@ minera::Ocel sample() {
                     {"e3", "o2", ""}, {"e3", "i2", ""},
                     {"e4", "i3", ""}, {"e4", "i4", ""} };
   log.o2o = { {"o1", "o2", "contains"} };
+  log.e2e = { {"e1", "e2", "precedes"} };
   log.object_changes = { {"o1", "order", "2026-01-04T00:00:00Z",
                           "state", std::string("done")} };
   return log;
@@ -54,6 +55,8 @@ void ancestors_descendants_contract() {
   assert(result.central_objects[0] == "o1");
   assert(result.logs[0].objects.size() == 4);
   assert(result.logs[0].o2o.size() == 1);
+  assert(result.logs[0].e2e.size() == 1 &&
+         result.logs[0].e2e.front().qualifier == "precedes");
   assert(result.logs[0].object_changes.size() == 1);
   const auto json = minera::serialize_ocel_split_json(result);
   assert(json.find("ANCESTORS_DESCENDANTS") != std::string::npos);

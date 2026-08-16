@@ -8,16 +8,19 @@ int main() {
   log.objects.push_back({"o2", "Item", {{"price", std::int64_t(7)}}});
   log.objects.push_back({"o1", "Order", {}});
   log.events.push_back({"e1", "create", "2024-01-01T00:00:00Z", {{"ok", true}}});
+  log.events.push_back({"e2", "ship", "2024-01-02T00:00:00Z", {}});
   log.relations.push_back({"e1", "o1", "owner"});
   log.o2o.push_back({"o1", "o2", "contains"});
+  log.e2e.push_back({"e1", "e2", "precedes"});
   log.object_changes.push_back({"o1", "Order", "2024-01-02T00:00:00Z", "status", std::string("paid")});
   log.globals["ocel:global-event.version"] = std::string("1");
 
   const auto classic = minera::serialize_ocel_xml(log);
   const auto parsed = minera::parse_ocel_xml(classic);
-  assert(parsed.events.size() == 1 && parsed.objects.size() == 2);
+  assert(parsed.events.size() == 2 && parsed.objects.size() == 2);
   assert(parsed.relations.front().qualifier == "owner");
   assert(parsed.o2o.front().qualifier == "contains");
+  assert(parsed.e2e.size() == 1 && parsed.e2e.front().qualifier == "precedes");
   assert(parsed.object_changes.size() == 1);
   assert(classic == minera::serialize_ocel_xml(log));
 
@@ -25,7 +28,7 @@ int main() {
   standard.format = minera::OcelXmlFormat::kStandard;
   const auto xml2 = minera::serialize_ocel_xml(log, standard);
   const auto parsed2 = minera::parse_ocel_xml(xml2);
-  assert(parsed2.events.size() == 1 && parsed2.relations.size() == 1);
+  assert(parsed2.events.size() == 2 && parsed2.relations.size() == 1);
 
   std::istringstream input(classic);
   assert(minera::import_ocel_xml(input).objects.size() == 2);
@@ -80,11 +83,14 @@ int main() {
       <objects><relationship object-id="o1" qualifier="ships"/></objects>
     </event>
   </events>
+  <e2e><relationship source-event-id="e1" target-event-id="e1" qualifier="self"/></e2e>
 </log>
 )xml";
   const auto standard_fixture = minera::parse_ocel_xml(standard_links);
   assert(standard_fixture.o2o.size() == 1);
   assert(standard_fixture.o2o.front().qualifier == "contains");
+  assert(standard_fixture.e2e.size() == 1 &&
+         standard_fixture.e2e.front().qualifier == "self");
   assert(standard_fixture.relations.size() == 1);
   assert(std::get<std::int64_t>(standard_fixture.events.front().attributes.front().value) == 2);
   return 0;

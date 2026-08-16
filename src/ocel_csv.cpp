@@ -391,9 +391,10 @@ std::map<std::string, const OcelEvent*> validate_events(const Ocel& log) {
 void check_lossy_fields(const Ocel& log, const OcelCsvExportOptions& options,
                         bool has_object_table) {
   if (options.allow_lossy) return;
-  if (!log.o2o.empty() || !log.object_changes.empty() || !log.globals.empty()) {
+  if (!log.o2o.empty() || !log.e2e.empty() || !log.object_changes.empty() ||
+      !log.globals.empty()) {
     throw std::invalid_argument(
-        "OCEL extended CSV cannot represent O2O links, object changes, or globals");
+        "OCEL extended CSV cannot represent O2O/E2E links, object changes, or globals");
   }
   for (const auto& relation : log.relations) {
     if (!relation.qualifier.empty()) {

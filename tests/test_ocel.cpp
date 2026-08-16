@@ -14,6 +14,7 @@ int main() {
   assert(std::get<double>(log.objects[0].attributes[0].value) == 12.5);
 
   log.o2o.push_back({"o1", "o2", "contains"});
+  log.e2e.push_back({"e1", "e2", "precedes"});
   log.object_changes.push_back(
       {"o1", "order", "2024-01-03T00:00:00Z", "status",
        std::string("shipped")});
@@ -43,9 +44,13 @@ int main() {
   assert(round.events.size() == log.events.size() &&
          round.relations.size() == log.relations.size() &&
          round.o2o.size() == log.o2o.size() &&
+         round.e2e.size() == log.e2e.size() &&
          round.object_changes.size() == log.object_changes.size() &&
          round.globals == log.globals);
   assert(round.o2o.back().qualifier == "contains");
+  assert(round.e2e.front().source_id == "e1" &&
+         round.e2e.front().target_id == "e2" &&
+         round.e2e.front().qualifier == "precedes");
   assert(std::get<std::string>(round.object_changes.front().value) ==
          "shipped");
 
@@ -56,6 +61,7 @@ int main() {
          standard_round.events.size() == 2 &&
          standard_round.relations.size() == log.relations.size() &&
          standard_round.o2o.size() == log.o2o.size() &&
+         standard_round.e2e.size() == log.e2e.size() &&
          standard_round.object_changes.size() == log.object_changes.size() &&
          standard_round.globals == log.globals);
 
@@ -98,6 +104,14 @@ int main() {
     bad_o2o = true;
   }
   assert(bad_o2o);
+  bool bad_e2e = false;
+  try {
+    (void)minera::parse_ocel_json(
+        R"({"ocel:objects":{},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"t","ocel:omap":[]}},"ocel:e2e":[{"ocel:eid":"e","ocel:eid_2":"missing"}]})");
+  } catch (...) {
+    bad_e2e = true;
+  }
+  assert(bad_e2e);
   assert(minera::etot_json(etot).find("\"frequency\":1") !=
          std::string::npos);
   assert(minera::otg_json(otg).find("\"object_interaction\"") !=

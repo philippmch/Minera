@@ -266,6 +266,12 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
                         attr_or(*rel, "target-id", attr_or(*rel, "target")),
                         attr_or(*rel, "qualifier")});
     }
+  for (const auto* links : children(root, "e2e"))
+    for (const auto* rel : children(*links, "relation")) {
+      log.e2e.push_back({attr_or(*rel, "source-id", attr_or(*rel, "source")),
+                        attr_or(*rel, "target-id", attr_or(*rel, "target")),
+                        attr_or(*rel, "qualifier")});
+    }
   for (const auto* changes : children(root, "objectChanges"))
     for (const auto* cn : children(*changes, "change")) {
     OcelObjectChange c{attr_or(*cn, "object-id", attr_or(*cn, "objectId")), attr_or(*cn, "object-type", attr_or(*cn, "type")), attr_or(*cn, "timestamp", attr_or(*cn, "time")), attr_or(*cn, "field"), nullptr};
@@ -318,6 +324,12 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         }
     }
   if (const auto* globals = child(root, "globals")) { std::vector<OcelAttribute> vals; append_values(*globals, vals, reject_lists); for (auto& a : vals) log.globals[a.key] = std::move(a.value); }
+  for (const auto* links : children(root, "e2e"))
+    for (const auto* rel : children(*links, "relationship")) {
+      log.e2e.push_back({attr_or(*rel, "source-event-id", attr_or(*rel, "source-id")),
+                        attr_or(*rel, "target-event-id", attr_or(*rel, "target-id")),
+                        attr_or(*rel, "qualifier")});
+    }
 }
 
 void validate_references(const Ocel& log) {
@@ -335,6 +347,12 @@ void validate_references(const Ocel& log) {
     if (!object_ids.count(relation.source_id) ||
         !object_ids.count(relation.target_id)) {
       throw std::invalid_argument("OCEL XML O2O relation references unknown id");
+    }
+  }
+  for (const auto& relation : log.e2e) {
+    if (!event_ids.count(relation.source_id) ||
+        !event_ids.count(relation.target_id)) {
+      throw std::invalid_argument("OCEL XML E2E relation references unknown id");
     }
   }
   for (const auto& change : log.object_changes) {
@@ -371,6 +389,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& log, const OcelXmlExportOptio
     for (const auto& e : log.events) event_ids.insert(e.id);
     for (const auto& r : log.relations) if (!event_ids.count(r.event_id) || !object_ids.count(r.object_id)) throw std::invalid_argument("OCEL XML relation references unknown id");
     for (const auto& r : log.o2o) if (!object_ids.count(r.source_id) || !object_ids.count(r.target_id)) throw std::invalid_argument("OCEL XML O2O relation references unknown id");
+    for (const auto& r : log.e2e) if (!event_ids.count(r.source_id) || !event_ids.count(r.target_id)) throw std::invalid_argument("OCEL XML E2E relation references unknown id");
     for (const auto& c : log.object_changes) if (!object_ids.count(c.object_id)) throw std::invalid_argument("OCEL XML object change references unknown id");
   }
   if (options.include_declaration) out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -382,10 +401,12 @@ void write_ocel_xml(std::ostream& out, const Ocel& log, const OcelXmlExportOptio
     out << "  <object-types>\n"; std::set<std::string> types; for (auto* o : objects) types.insert(o->type); for (const auto& t : types) out << "    <object-type name=\"" << esc(t) << "\"/>\n"; out << "  </object-types>\n  <event-types/>\n";
     out << "  <objects>\n"; for (auto* o : objects) { out << "    <object id=\"" << esc(o->id) << "\" type=\"" << esc(o->type) << "\">\n      <attributes>\n"; for (auto* a : sorted_attrs(o->attributes)) write_value(out, a->value, a->key, "        ", true); for (const auto& c : log.object_changes) if (c.object_id == o->id) write_value(out, c.value, c.field, "        ", true, c.timestamp); out << "      </attributes>\n"; std::vector<const OcelO2oRelation*> rs; for (const auto& r : log.o2o) if (r.source_id == o->id) rs.push_back(&r); if (!rs.empty()) { out << "      <relationships>\n"; std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->target_id,a->qualifier) < std::tie(b->target_id,b->qualifier); }); for (auto* r : rs) out << "        <relationship object-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </relationships>\n"; } out << "    </object>\n"; } out << "  </objects>\n  <events>\n";
     for (auto* e : events) { out << "    <event id=\"" << esc(e->id) << "\" type=\"" << esc(e->activity) << "\" time=\"" << esc(e->timestamp) << "\">\n      <attributes>\n"; for (auto* a : sorted_attrs(e->attributes)) write_value(out, a->value, a->key, "        ", true); out << "      </attributes>\n      <objects>\n"; std::vector<const OcelRelation*> rs; for (const auto& r : log.relations) if (r.event_id == e->id) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->object_id,a->qualifier) < std::tie(b->object_id,b->qualifier); }); for (auto* r : rs) out << "        <relationship object-id=\"" << esc(r->object_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </objects>\n    </event>\n"; } out << "  </events>\n";
+    if (!log.e2e.empty()) { out << "  <e2e>\n"; std::vector<const OcelE2eRelation*> rs; for (const auto& r : log.e2e) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relationship source-event-id=\"" << esc(r->source_id) << "\" target-event-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </e2e>\n"; }
     if (!log.globals.empty()) { out << "  <globals>\n"; for (const auto& [k,v] : log.globals) write_value(out,v,k,"    ",true); out << "  </globals>\n"; }
   } else {
     out << "  <objects>\n"; for (auto* o : objects) { out << "    <object id=\"" << esc(o->id) << "\" type=\"" << esc(o->type) << "\">\n"; for (auto* a : sorted_attrs(o->attributes)) write_value(out,a->value,a->key,"      "); out << "    </object>\n"; } out << "  </objects>\n  <events>\n"; for (auto* e : events) { out << "    <event id=\"" << esc(e->id) << "\" activity=\"" << esc(e->activity) << "\" timestamp=\"" << esc(e->timestamp) << "\">\n      <vmap>\n"; for (auto* a : sorted_attrs(e->attributes)) write_value(out,a->value,a->key,"        "); out << "      </vmap>\n      <omap>\n"; std::vector<const OcelRelation*> rs; for (const auto& r : log.relations) if (r.event_id == e->id) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->object_id,a->qualifier) < std::tie(b->object_id,b->qualifier); }); for (auto* r : rs) out << "        <object object-id=\"" << esc(r->object_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </omap>\n    </event>\n"; } out << "  </events>\n";
     if (!log.o2o.empty()) { out << "  <o2o>\n"; std::vector<const OcelO2oRelation*> rs; for (const auto& r : log.o2o) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a,auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relation source-id=\"" << esc(r->source_id) << "\" target-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </o2o>\n"; }
+    if (!log.e2e.empty()) { out << "  <e2e>\n"; std::vector<const OcelE2eRelation*> rs; for (const auto& r : log.e2e) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a,auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relation source-id=\"" << esc(r->source_id) << "\" target-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </e2e>\n"; }
     if (!log.object_changes.empty()) { out << "  <objectChanges>\n"; for (const auto& c : log.object_changes) { out << "    <change object-id=\"" << esc(c.object_id) << "\" object-type=\"" << esc(c.object_type) << "\" timestamp=\"" << esc(c.timestamp) << "\" field=\"" << esc(c.field) << "\">\n"; write_value(out,c.value,c.field,"      "); out << "    </change>\n"; } out << "  </objectChanges>\n"; }
     std::map<std::string, std::vector<std::pair<std::string, const OcelValue*>>> globals;
     for (const auto& [key, value] : log.globals) {
