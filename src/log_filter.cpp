@@ -309,6 +309,20 @@ bool case_duration_matches(const Trace& trace,
   return true;
 }
 
+void validate_case_size_options(const CaseSizeFilterOptions& options) {
+  if (options.max_length && options.min_length > *options.max_length) {
+    throw std::invalid_argument(
+        "case size minimum must not exceed the maximum");
+  }
+}
+
+bool case_size_matches(const Trace& trace, const CaseSizeFilterOptions& options) {
+  const auto length = trace.events.size();
+  if (length < options.min_length) return false;
+  if (options.max_length && length > *options.max_length) return false;
+  return true;
+}
+
 }  // namespace
 
 std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
@@ -417,6 +431,32 @@ EventLog filter_case_performance(
   return result;
 }
 
+EventLog filter_case_size(const EventLog& event_log,
+                          const CaseSizeFilterOptions& options) {
+  validate_case_size_options(options);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    if (case_size_matches(trace, options)) result.traces.push_back(trace);
+  }
+  return result;
+}
+
+EventLog filter_case_size(const EventLog& event_log, std::size_t min_length,
+                          std::optional<std::size_t> max_length) {
+  return filter_case_size(
+      event_log, CaseSizeFilterOptions{min_length, max_length});
+}
+
+EventLog filter_ncases(const EventLog& event_log, std::size_t max_cases) {
+  EventLog result;
+  result.attributes = event_log.attributes;
+  const auto count = std::min(max_cases, event_log.traces.size());
+  result.traces.insert(result.traces.end(), event_log.traces.begin(),
+                       event_log.traces.begin() + count);
+  return result;
+}
+
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
@@ -474,6 +514,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   const bool by_case_performance =
       case_performance.min_duration_seconds.has_value() ||
       case_performance.max_duration_seconds.has_value();
+
+  if (options.max_length != 0 && options.min_length > options.max_length) {
+    throw std::invalid_argument(
+        "min_length must not exceed max_length");
+  }
 
   if (!options.activity_split_activities.empty() &&
       options.activity_split_separator.empty()) {
@@ -661,6 +706,8 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     EventLog result;
     result.traces = std::move(kept);
     result.attributes = log.attributes;
+    if (options.max_cases && result.traces.size() > *options.max_cases)
+      result.traces.resize(*options.max_cases);
     return result;
   }
 
@@ -712,6 +759,8 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       result.traces.push_back(std::move(trace));
     }
   }
+  if (options.max_cases && result.traces.size() > *options.max_cases)
+    result.traces.resize(*options.max_cases);
   return result;
 }
 

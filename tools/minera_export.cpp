@@ -907,7 +907,10 @@ int usage(const char* program) {
                 "                            traces_contained, or traces_intersecting\n"
                 "  --case-duration-min <s>  Inclusive lower complete-case duration\n"
                 "  --case-duration-max <s>  Inclusive upper complete-case duration\n"
-                "  --keep-activities <a,b>   Keep only these activities\n"
+               "  --max-cases <n>           Keep the first n surviving cases\n"
+               "  --min-length <n>          Drop traces shorter than n events\n"
+               "  --max-length <n>          Drop traces longer than n events\n"
+               "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
                "  --keep-resources <a,b>    Keep only events by these resources\n"
                "  --remove-resources <a,b>  Drop events by these resources\n"
@@ -960,8 +963,6 @@ int usage(const char* program) {
                "                            to <b>, endpoints included\n"
                "  --start-activities <a,b>  Keep traces starting with one of these\n"
                "  --end-activities <a,b>    Keep traces ending with one of these\n"
-               "  --min-length <n>          Drop traces shorter than n events\n"
-               "  --max-length <n>          Drop traces longer than n events\n"
                "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
                "  --top-variants <n>        Keep only the n most frequent variants\n"
                "  --variant-coverage <f>    Keep the most frequent variants\n"
@@ -1296,6 +1297,22 @@ int main(int argc, char** argv) {
         filter.min_case_duration_seconds = parsed;
       else
         filter.max_case_duration_seconds = parsed;
+      continue;
+    }
+    if (arg == "--max-cases" || arg == "--max-no-cases" ||
+        arg == "--case-limit" || arg == "--min-length" ||
+        arg == "--max-length") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto parsed = parse_nonnegative_size(value, arg);
+      if (arg == "--max-cases" || arg == "--max-no-cases" ||
+          arg == "--case-limit") {
+        filter.max_cases = parsed;
+      } else if (arg == "--min-length") {
+        filter.min_length = parsed;
+      } else {
+        filter.max_length = parsed;
+      }
       continue;
     }
     if (arg == "--segment-prefix-activity" ||

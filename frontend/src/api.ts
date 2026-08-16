@@ -274,6 +274,9 @@ export interface FilterOptions extends LtlFilterOptions {
   pathMinPerformance?: number;
   pathMaxPerformance?: number;
   pathPositive?: boolean;
+  /** Keep only the first maxCases surviving cases; zero keeps none. */
+  maxCases?: number;
+  /** Inclusive event-count bounds for each surviving case; zero max is open. */
   minLength?: number;
   maxLength?: number;
   /** ISO-8601 bounds, both inclusive; either side may be open. */
@@ -415,6 +418,10 @@ export type MineOptions = CsvOptions & FilterOptions & MinerOptions;
 export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
   const add = (name: string, value: string) => entries.push([name, value]);
+  const validateNonnegativeInteger = (name: string, value: number) => {
+    if (!Number.isInteger(value) || value < 0)
+      throw new Error(`${name} must be a non-negative integer`);
+  };
 
   if (options.caseColumn) add("case_column", options.caseColumn);
   if (options.activityColumn) add("activity_column", options.activityColumn);
@@ -496,8 +503,21 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.timestampGroupingSeparator)
       add("timestamp_case_grouping_separator", options.timestampGroupingSeparator);
   }
-  if (options.minLength) add("min_length", String(options.minLength));
-  if (options.maxLength) add("max_length", String(options.maxLength));
+  if (options.maxCases !== undefined) {
+    validateNonnegativeInteger("maxCases", options.maxCases);
+    add("max_cases", String(options.maxCases));
+  }
+  if (options.minLength !== undefined) {
+    validateNonnegativeInteger("minLength", options.minLength);
+    add("min_length", String(options.minLength));
+  }
+  if (options.maxLength !== undefined) {
+    validateNonnegativeInteger("maxLength", options.maxLength);
+    add("max_length", String(options.maxLength));
+  }
+  if (options.maxLength !== undefined && options.maxLength !== 0 &&
+      options.minLength !== undefined && options.minLength > options.maxLength)
+    throw new Error("minLength must not exceed maxLength");
   if (options.timeFrom) add("time_from", options.timeFrom);
   if (options.timeTo) add("time_to", options.timeTo);
   if (options.timeMode && (options.timeFrom || options.timeTo))

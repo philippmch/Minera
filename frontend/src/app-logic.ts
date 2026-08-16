@@ -138,6 +138,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
           filters.segmentSuffixOccurrence === "last")) ||
       filters.segmentBetweenStarts?.length && filters.segmentBetweenEnds?.length ||
       (filters.pathPredecessor && filters.pathSuccessor) ||
+      filters.maxCases !== undefined ||
       filters.removeActivities?.length ||
       filters.keepActivities?.length ||
       filters.removeResources?.length ||

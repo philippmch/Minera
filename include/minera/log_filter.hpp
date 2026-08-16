@@ -68,6 +68,14 @@ struct CasePerformanceFilterOptions {
   std::optional<double> max_duration_seconds;
 };
 
+// Inclusive event-count bounds for complete traces. The standalone case-size
+// filter defaults to the conventional two-event lower bound; integrated
+// LogFilterOptions fields keep zero as "unbounded" for compatibility.
+struct CaseSizeFilterOptions {
+  std::size_t min_length = 2;
+  std::optional<std::size_t> max_length;
+};
+
 // Parses a comma-separated list of successions ("a -> b, c -> d") into
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
@@ -81,7 +89,8 @@ struct CasePerformanceFilterOptions {
 // case-level event-attribute filter, then rework, then the succession
 // (directly-/eventually-follows) filters, then the prefix/suffix cuts, then
 // between-extraction, then trace length, then endpoints, then the variant
-// filters (frequency, rank, coverage).
+// filters (frequency, rank, coverage), and finally the optional case-count
+// limit.
 struct LogFilterOptions {
   // Time-range bounds as ISO-8601 timestamps (a bare date reads as midnight
   // UTC); an empty string leaves that side unbounded. Both bounds are
@@ -190,6 +199,9 @@ struct LogFilterOptions {
   // Trace-length bounds on the projected traces (0 = unbounded).
   std::size_t min_length = 0;
   std::size_t max_length = 0;
+  // Keep only the first max_cases surviving traces, preserving input order.
+  // An engaged zero intentionally drops every case.
+  std::optional<std::size_t> max_cases;
 
   // Endpoint constraints: keep only traces that start (respectively end) with
   // one of the listed activities. Empty means "any".
@@ -243,7 +255,8 @@ struct LogFilterOptions {
            !prefix_activity.empty() || !suffix_activity.empty() ||
            !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
-           !end_activities.empty() || min_variant_frequency > 1 ||
+           !end_activities.empty() || max_cases.has_value() ||
+           min_variant_frequency > 1 ||
            top_variants != 0 || variant_coverage != 0.0 ||
            !activity_split_activities.empty() ||
            attribute_value_repetition.has_value() ||
@@ -274,6 +287,27 @@ struct LogFilterOptions {
 
 [[nodiscard]] EventLog filter_case_performance(
     const EventLog& event_log, const CasePerformanceFilterOptions& options);
+
+[[nodiscard]] EventLog filter_case_size(
+    const EventLog& event_log, const CaseSizeFilterOptions& options);
+
+[[nodiscard]] EventLog filter_case_size(
+    const EventLog& event_log, std::size_t min_length = 2,
+    std::optional<std::size_t> max_length = std::nullopt);
+
+[[nodiscard]] EventLog filter_ncases(const EventLog& event_log,
+                                     std::size_t max_cases = 1000);
+
+inline EventLog filter_on_case_size(
+    const EventLog& event_log, std::size_t min_length = 2,
+    std::optional<std::size_t> max_length = std::nullopt) {
+  return filter_case_size(event_log, min_length, max_length);
+}
+
+inline EventLog filter_on_ncases(const EventLog& event_log,
+                                 std::size_t max_cases = 1000) {
+  return filter_ncases(event_log, max_cases);
+}
 
 [[nodiscard]] inline EventLog trace_filter(
     const EventLog& event_log, const TracePatternFilterOptions& options) {

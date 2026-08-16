@@ -502,6 +502,7 @@ describe("hasActiveFilters", () => {
       { endActivities: ["z"] },
       { minLength: 1 },
       { maxLength: 9 },
+      { maxCases: 0 },
       { removeResources: ["Alice"] },
       { keepResources: ["Bob"] },
       { timeFrom: "2024-01-01T00:00" },
@@ -1001,6 +1002,13 @@ describe("mineFormEntries", () => {
       ["case_duration_max", "120.5"],
     ]);
     expect(hasActiveFilters({ caseDurationMax: 30 })).toBe(true);
+    expect(mineFormEntries({ maxCases: 0, minLength: 2, maxLength: 5 })).toEqual([
+      ["max_cases", "0"],
+      ["min_length", "2"],
+      ["max_length", "5"],
+    ]);
+    expect(() => mineFormEntries({ minLength: 6, maxLength: 5 })).toThrow(/not exceed/);
+    expect(hasActiveFilters({ maxCases: 0 })).toBe(true);
   });
 
   it("maps the succession, cut, and coverage filters", () => {

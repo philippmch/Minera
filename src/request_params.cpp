@@ -1022,6 +1022,18 @@ MineParams parse_mine_params(const FieldLookup& field,
           "case_duration_min: must not exceed case_duration_max");
     }
   }
+  const bool max_cases_supplied = supplied("max_cases") ||
+                                  supplied("max_no_cases") ||
+                                  supplied("case_limit");
+  if (max_cases_supplied) {
+    const auto max_cases_field = supplied("max_cases")
+                                     ? std::string_view("max_cases")
+                                     : supplied("max_no_cases")
+                                           ? std::string_view("max_no_cases")
+                                           : std::string_view("case_limit");
+    params.filter.max_cases = parse_nonnegative_size(
+        field(max_cases_field), max_cases_field);
+  }
   if (const auto value = field("keep_activities"); !value.empty()) {
     params.filter.keep_activities = split_csv(value);
   }
@@ -1254,11 +1266,17 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("end_activities"); !value.empty()) {
     params.filter.end_activities = split_csv(value);
   }
-  if (const auto value = field("min_length"); !value.empty()) {
-    params.filter.min_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+  if (supplied("min_length")) {
+    params.filter.min_length =
+        parse_nonnegative_size(field("min_length"), "min_length");
   }
-  if (const auto value = field("max_length"); !value.empty()) {
-    params.filter.max_length = static_cast<std::size_t>(std::atoll(value.c_str()));
+  if (supplied("max_length")) {
+    params.filter.max_length =
+        parse_nonnegative_size(field("max_length"), "max_length");
+  }
+  if (params.filter.max_length != 0 &&
+      params.filter.min_length > params.filter.max_length) {
+    throw std::invalid_argument("min_length: must not exceed max_length");
   }
   if (const auto value = field("min_variant_frequency"); !value.empty()) {
     params.filter.min_variant_frequency =
