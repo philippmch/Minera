@@ -908,6 +908,18 @@ int usage(const char* program) {
                 "  --case-duration-min <s>  Inclusive lower complete-case duration\n"
                 "  --case-duration-max <s>  Inclusive upper complete-case duration\n"
                "  --max-cases <n>           Keep the first n surviving cases\n"
+               "  --max-activities <n>     Keep events from the n most frequent\n"
+               "                            activities (0 drops all events)\n"
+               "  --top-activities <n>     Alias for --max-activities\n"
+               "  --top-activities-attribute-key <k>\n"
+               "                            Rank a generic event attribute\n"
+               "  --relative-attribute-stake <f>\n"
+               "                            Keep values in at least this share\n"
+               "                            of cases (or events)\n"
+               "  --relative-attribute-key <k>\n"
+               "                            Attribute for relative occurrence\n"
+               "  --relative-attribute-keep-once-per-case <bool>\n"
+               "                            Count each value once per case\n"
                "  --min-length <n>          Drop traces shorter than n events\n"
                "  --max-length <n>          Drop traces longer than n events\n"
                "  --keep-activities <a,b>   Keep only these activities\n"
@@ -1334,6 +1346,44 @@ int main(int argc, char** argv) {
               "--numeric-attribute-mode expects events or traces");
       } else {
         numeric.positive = parse_boolean(value, arg);
+      }
+      continue;
+    }
+    if (arg == "--max-activities" || arg == "--max-no-activities" ||
+        arg == "--top-activities" ||
+        arg == "--top-activities-attribute-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (!filter.top_activities)
+        filter.top_activities = minera::TopActivitiesFilterOptions{};
+      auto& top = *filter.top_activities;
+      if (arg == "--top-activities-attribute-key") {
+        top.attribute_key = value;
+      } else {
+        top.max_activities = parse_nonnegative_size(value, arg);
+      }
+      continue;
+    }
+    if (arg == "--relative-attribute-key" ||
+        arg == "--relative-attribute-stake" ||
+        arg == "--relative-attribute-keep-once-per-case" ||
+        arg == "--relative-attribute-keep-once") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (!filter.relative_attribute_occurrence)
+        filter.relative_attribute_occurrence =
+            minera::RelativeAttributeOccurrenceFilterOptions{};
+      auto& relative = *filter.relative_attribute_occurrence;
+      if (arg == "--relative-attribute-key") {
+        relative.attribute_key = value;
+      } else if (arg == "--relative-attribute-stake") {
+        relative.min_relative_stake = parse_finite_double(value, arg);
+        if (relative.min_relative_stake < 0.0 ||
+            relative.min_relative_stake > 1.0)
+          throw std::invalid_argument(
+              "--relative-attribute-stake expects a number in [0, 1]");
+      } else {
+        relative.keep_once_per_case = parse_boolean(value, arg);
       }
       continue;
     }

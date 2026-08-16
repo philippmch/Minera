@@ -163,6 +163,34 @@ export function numericAttributeValidationMessage(input: {
   return null;
 }
 
+/** Top-activity limits are optional, but their limit must be an integer. */
+export function topActivitiesValidationMessage(input: {
+  max: string;
+  attributeKey: string;
+}): string | null {
+  if (!input.max.trim() && !input.attributeKey.trim()) return null;
+  if (!input.max.trim()) return "Top-activity filtering needs a maximum count.";
+  const value = Number(input.max);
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0)
+    return "Top activities must be a non-negative integer.";
+  return null;
+}
+
+/** Relative occurrence stakes are inclusive fractions in [0, 1]. */
+export function relativeAttributeValidationMessage(input: {
+  key: string;
+  stake: string;
+  keepOncePerCase: boolean;
+}): string | null {
+  const configured = input.key.trim() || input.stake.trim() || !input.keepOncePerCase;
+  if (!configured) return null;
+  if (!input.stake.trim()) return null;
+  const value = Number(input.stake);
+  if (!Number.isFinite(value) || value < 0 || value > 1)
+    return "Relative occurrence stake must be finite and in [0, 1].";
+  return null;
+}
+
 /** Repetition bounds are inclusive and default to [2, +infinity]. */
 export function repetitionValidationMessage(input: {
   value: string;
@@ -206,6 +234,8 @@ export function Filters({
 }: FiltersProps) {
   const [open, setOpen] = useState(false);
   const [topVariants, setTopVariants] = useState("");
+  const [maxActivities, setMaxActivities] = useState("");
+  const [topActivitiesAttributeKey, setTopActivitiesAttributeKey] = useState("");
   const [minFrequency, setMinFrequency] = useState("");
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
@@ -286,6 +316,10 @@ export function Filters({
   const [numericAttributeMode, setNumericAttributeMode] =
     useState<AttributeFilterMode>("events");
   const [numericAttributePositive, setNumericAttributePositive] =
+    useState(true);
+  const [relativeAttributeKey, setRelativeAttributeKey] = useState("");
+  const [relativeAttributeStake, setRelativeAttributeStake] = useState("");
+  const [relativeAttributeKeepOncePerCase, setRelativeAttributeKeepOncePerCase] =
     useState(true);
   // Case-attribute filter: one key and its dropped values. Dropping a value
   // always removes the whole case — the attribute lives on the case itself.
@@ -629,6 +663,15 @@ export function Filters({
     min: numericAttributeMin,
     max: numericAttributeMax,
   });
+  const topActivitiesValidationError = topActivitiesValidationMessage({
+    max: maxActivities,
+    attributeKey: topActivitiesAttributeKey,
+  });
+  const relativeAttributeValidationError = relativeAttributeValidationMessage({
+    key: relativeAttributeKey,
+    stake: relativeAttributeStake,
+    keepOncePerCase: relativeAttributeKeepOncePerCase,
+  });
   const repetitionValidationError = repetitionValidationMessage({
     value: repetitionValue,
     min: repetitionMin,
@@ -643,7 +686,8 @@ export function Filters({
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
         pathValidationError || caseDurationValidationError ||
         caseSelectionValidationError ||
-        numericAttributeValidationError ||
+        numericAttributeValidationError || topActivitiesValidationError ||
+        relativeAttributeValidationError ||
         repetitionValidationError || caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
@@ -678,6 +722,9 @@ export function Filters({
       declareMinSupportRatio.trim() === "" && declareMinConfidenceRatio.trim() === "";
     onApply({
       topVariants: toInt(topVariants),
+      maxActivities: maxActivities.trim() ? Number(maxActivities) : undefined,
+      topActivitiesAttributeKey: maxActivities.trim()
+        ? topActivitiesAttributeKey.trim() || undefined : undefined,
       minVariantFrequency: toInt(minFrequency),
       variantCoverage: coverage,
       keepDirectlyFollows: succession("keep", "directly"),
@@ -728,6 +775,13 @@ export function Filters({
       numericAttributeMode: numericAttributeKey ? numericAttributeMode : undefined,
       numericAttributePositive: numericAttributeKey
         ? numericAttributePositive : undefined,
+      relativeAttributeKey: relativeAttributeKey.trim() || undefined,
+      relativeAttributeStake: relativeAttributeStake.trim()
+        ? Number(relativeAttributeStake) : undefined,
+      relativeAttributeKeepOncePerCase:
+        (relativeAttributeKey.trim() || relativeAttributeStake.trim() ||
+         !relativeAttributeKeepOncePerCase)
+          ? relativeAttributeKeepOncePerCase : undefined,
       reworkActivity: reworkActivity || undefined,
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
@@ -890,6 +944,8 @@ export function Filters({
 
   const reset = () => {
     setTopVariants("");
+    setMaxActivities("");
+    setTopActivitiesAttributeKey("");
     setMinFrequency("");
     setTimeFrom("");
     setTimeTo("");
@@ -940,6 +996,9 @@ export function Filters({
     setNumericAttributeMax("");
     setNumericAttributeMode("events");
     setNumericAttributePositive(true);
+    setRelativeAttributeKey("");
+    setRelativeAttributeStake("");
+    setRelativeAttributeKeepOncePerCase(true);
     setCaseAttributeKey("");
     setRemovedCaseValues(new Set());
     setNoiseThreshold("");
@@ -1030,6 +1089,8 @@ export function Filters({
 
   const dirty =
     topVariants !== "" ||
+    maxActivities !== "" ||
+    topActivitiesAttributeKey !== "" ||
     minFrequency !== "" ||
     variantCoverage !== "" ||
     timeFrom !== "" ||
@@ -1075,6 +1136,9 @@ export function Filters({
     numericAttributeMax !== "" ||
     (numericAttributeKey !== "" && numericAttributeMode !== "events") ||
     (numericAttributeKey !== "" && !numericAttributePositive) ||
+    relativeAttributeKey !== "" ||
+    relativeAttributeStake !== "" ||
+    !relativeAttributeKeepOncePerCase ||
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
@@ -1294,6 +1358,62 @@ export function Filters({
               />
             </label>
           </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Top activities</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="all"
+                value={maxActivities}
+                onChange={(e) => setMaxActivities(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Ranking attribute <small>(blank = activity)</small></span>
+              <input
+                type="text"
+                value={topActivitiesAttributeKey}
+                disabled={maxActivities === ""}
+                onChange={(e) => setTopActivitiesAttributeKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Relative occurrence stake</span>
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step="any"
+                placeholder="off"
+                value={relativeAttributeStake}
+                onChange={(e) => setRelativeAttributeStake(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Occurrence attribute <small>(blank = activity)</small></span>
+              <input
+                type="text"
+                value={relativeAttributeKey}
+                onChange={(e) => setRelativeAttributeKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field filters-check">
+              <input
+                type="checkbox"
+                checked={relativeAttributeKeepOncePerCase}
+                onChange={(e) => setRelativeAttributeKeepOncePerCase(e.target.checked)}
+              />
+              <span>count once per case</span>
+            </label>
+          </div>
+          {(topActivitiesValidationError || relativeAttributeValidationError) && (
+            <div className="filters-warning" role="alert">
+              {topActivitiesValidationError || relativeAttributeValidationError}
+            </div>
+          )}
 
           <div className="filters-row">
             <label className="filters-field">
@@ -2718,11 +2838,13 @@ export function Filters({
           </div>
 
           {(temporalValidationError || ltlValidationError || segmentValidationError ||
-            pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError}</p>
+            pathValidationError || caseDurationValidationError || caseSelectionValidationError ||
+            numericAttributeValidationError || topActivitiesValidationError ||
+            relativeAttributeValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError)}>
               Apply
             </button>
             <button

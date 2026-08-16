@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, segmentValidationMessage, temporalValidationMessage } from "./Filters";
+import { caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage } from "./Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -83,5 +83,21 @@ describe("case grouping validation", () => {
     expect(caseGroupingValidationMessage({ timestampGrouping: "first", timestampGroupingSeparator: "" })).toBeNull();
     expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: " & " })).toBeNull();
     expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: "" })).toContain("separator");
+  });
+});
+
+describe("frequency filter validation", () => {
+  it("accepts non-negative top limits and relative fractions", () => {
+    expect(topActivitiesValidationMessage({ max: "0", attributeKey: "" })).toBeNull();
+    expect(topActivitiesValidationMessage({ max: "3", attributeKey: "channel" })).toBeNull();
+    expect(relativeAttributeValidationMessage({ key: "", stake: "0.5", keepOncePerCase: true })).toBeNull();
+    expect(relativeAttributeValidationMessage({ key: "channel", stake: "", keepOncePerCase: false })).toBeNull();
+  });
+
+  it("rejects a missing top limit and out-of-range stakes", () => {
+    expect(topActivitiesValidationMessage({ max: "", attributeKey: "channel" })).toContain("maximum");
+    expect(topActivitiesValidationMessage({ max: "1.5", attributeKey: "" })).toContain("integer");
+    expect(relativeAttributeValidationMessage({ key: "channel", stake: "1.1", keepOncePerCase: true })).toContain("[0, 1]");
+    expect(relativeAttributeValidationMessage({ key: "channel", stake: "nan", keepOncePerCase: true })).toContain("finite");
   });
 });

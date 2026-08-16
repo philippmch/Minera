@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "minera/timestamp.hpp"
@@ -339,6 +340,102 @@ std::optional<double> numeric_attribute_value(const Event& event,
   return value;
 }
 
+const std::string* frequency_attribute_value(const Event& event,
+                                             std::string_view key) {
+  return key.empty() ? &event.activity : event.attribute(key);
+}
+
+void validate_relative_attribute_occurrence_options(
+    const RelativeAttributeOccurrenceFilterOptions& options) {
+  if (!std::isfinite(options.min_relative_stake) ||
+      options.min_relative_stake < 0.0 || options.min_relative_stake > 1.0) {
+    throw std::invalid_argument(
+        "relative attribute occurrence: stake must be finite and in [0, 1]");
+  }
+}
+
+std::unordered_set<std::string> top_activity_values(
+    const EventLog& event_log, const TopActivitiesFilterOptions& options,
+    bool* projection_needed) {
+  std::unordered_map<std::string, std::size_t> counts;
+  for (const auto& trace : event_log.traces) {
+    for (const auto& event : trace.events) {
+      const auto* value = frequency_attribute_value(event, options.attribute_key);
+      if (value != nullptr) ++counts[*value];
+    }
+  }
+
+  std::vector<std::pair<std::string, std::size_t>> ranked;
+  ranked.reserve(counts.size());
+  for (const auto& entry : counts) ranked.push_back(entry);
+  std::sort(ranked.begin(), ranked.end(),
+            [](const auto& left, const auto& right) {
+              if (left.second != right.second) return left.second > right.second;
+              return left.first < right.first;
+            });
+
+  const std::size_t limit = std::min(options.max_activities, ranked.size());
+  std::unordered_set<std::string> allowed;
+  allowed.reserve(limit);
+  for (std::size_t i = 0; i < limit; ++i) allowed.insert(ranked[i].first);
+  *projection_needed = limit < ranked.size();
+  return allowed;
+}
+
+std::unordered_set<std::string> relative_attribute_values(
+    const EventLog& event_log,
+    const RelativeAttributeOccurrenceFilterOptions& options) {
+  std::unordered_map<std::string, std::size_t> counts;
+  for (const auto& trace : event_log.traces) {
+    std::unordered_set<std::string> seen;
+    if (options.keep_once_per_case) seen.reserve(trace.events.size());
+    for (const auto& event : trace.events) {
+      const auto* value = frequency_attribute_value(event, options.attribute_key);
+      if (value == nullptr) continue;
+      if (options.keep_once_per_case && !seen.insert(*value).second) continue;
+      ++counts[*value];
+    }
+  }
+
+  const double denominator = options.keep_once_per_case
+                                 ? static_cast<double>(event_log.traces.size())
+                                 : static_cast<double>(event_log.event_count());
+  std::unordered_set<std::string> allowed;
+  if (denominator == 0.0) return allowed;
+  for (const auto& entry : counts) {
+    if (static_cast<double>(entry.second) >=
+        options.min_relative_stake * denominator) {
+      allowed.insert(entry.first);
+    }
+  }
+  return allowed;
+}
+
+Trace project_frequency_attributes(
+    const Trace& trace, std::string_view top_key,
+    const std::unordered_set<std::string>* top_allowed,
+    std::string_view relative_key,
+    const std::unordered_set<std::string>* relative_allowed) {
+  Trace result;
+  result.case_id = trace.case_id;
+  result.attributes = trace.attributes;
+  for (const auto& event : trace.events) {
+    if (top_allowed != nullptr) {
+      const auto* value = frequency_attribute_value(event, top_key);
+      if (value == nullptr || top_allowed->find(*value) == top_allowed->end())
+        continue;
+    }
+    if (relative_allowed != nullptr) {
+      const auto* value = frequency_attribute_value(event, relative_key);
+      if (value == nullptr ||
+          relative_allowed->find(*value) == relative_allowed->end())
+        continue;
+    }
+    result.events.push_back(event);
+  }
+  return result;
+}
+
 void validate_numeric_attribute_options(
     const NumericAttributeFilterOptions& options) {
   if (options.attribute_key.empty()) {
@@ -574,6 +671,39 @@ EventLog filter_numeric_attribute(
   return result;
 }
 
+EventLog filter_top_activities(
+    const EventLog& event_log, const TopActivitiesFilterOptions& options) {
+  bool projection_needed = false;
+  const auto allowed =
+      top_activity_values(event_log, options, &projection_needed);
+  if (!projection_needed) return event_log;
+
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    auto projected = project_frequency_attributes(
+        trace, options.attribute_key, &allowed, {}, nullptr);
+    if (!projected.events.empty()) result.traces.push_back(std::move(projected));
+  }
+  return result;
+}
+
+EventLog filter_relative_attribute_occurrence(
+    const EventLog& event_log,
+    const RelativeAttributeOccurrenceFilterOptions& options) {
+  validate_relative_attribute_occurrence_options(options);
+  const auto allowed = relative_attribute_values(event_log, options);
+
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    auto projected = project_frequency_attributes(
+        trace, {}, nullptr, options.attribute_key, &allowed);
+    if (!projected.events.empty()) result.traces.push_back(std::move(projected));
+  }
+  return result;
+}
+
 EventLog filter_prefix(const EventLog& event_log,
                        const PrefixSuffixFilterOptions& options) {
   validate_prefix_suffix_options(options);
@@ -632,6 +762,21 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
 
   if (options.numeric_attribute)
     validate_numeric_attribute_options(*options.numeric_attribute);
+  if (options.relative_attribute_occurrence)
+    validate_relative_attribute_occurrence_options(
+        *options.relative_attribute_occurrence);
+
+  bool top_projection_needed = false;
+  std::unordered_set<std::string> top_allowed;
+  if (options.top_activities) {
+    top_allowed = top_activity_values(log, *options.top_activities,
+                                      &top_projection_needed);
+  }
+  std::unordered_set<std::string> relative_allowed;
+  if (options.relative_attribute_occurrence) {
+    relative_allowed = relative_attribute_values(
+        log, *options.relative_attribute_occurrence);
+  }
 
   if (options.prefix_activity.empty() &&
       (!options.prefix_strict ||
@@ -754,6 +899,25 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
         if (numeric_projected.events.empty()) continue;
         source = &numeric_projected;
       }
+    }
+
+    Trace frequency_projected;
+    const auto* top_filter =
+        options.top_activities && top_projection_needed ? &top_allowed : nullptr;
+    const auto* relative_filter = options.relative_attribute_occurrence
+                                      ? &relative_allowed
+                                      : nullptr;
+    if (top_filter != nullptr || relative_filter != nullptr) {
+      frequency_projected = project_frequency_attributes(
+          *source,
+          options.top_activities ? options.top_activities->attribute_key : "",
+          top_filter,
+          options.relative_attribute_occurrence
+              ? options.relative_attribute_occurrence->attribute_key
+              : "",
+          relative_filter);
+      if (frequency_projected.events.empty()) continue;
+      source = &frequency_projected;
     }
 
     Trace projected = project_events(*source, keep, remove, keep_res,

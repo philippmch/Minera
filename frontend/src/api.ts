@@ -302,6 +302,13 @@ export interface FilterOptions extends LtlFilterOptions {
   numericAttributeMax?: number;
   numericAttributeMode?: AttributeFilterMode;
   numericAttributePositive?: boolean;
+  /** Keep events carrying the most frequent activity/attribute values. */
+  maxActivities?: number;
+  topActivitiesAttributeKey?: string;
+  /** Keep values occurring in at least a fraction of cases or events. */
+  relativeAttributeKey?: string;
+  relativeAttributeStake?: number;
+  relativeAttributeKeepOncePerCase?: boolean;
   /** Case-attribute filter: the key and its value constraints; always
    * keeps or drops whole cases. */
   caseAttributeKey?: string;
@@ -540,6 +547,33 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.maxLength !== undefined && options.maxLength !== 0 &&
       options.minLength !== undefined && options.minLength > options.maxLength)
     throw new Error("minLength must not exceed maxLength");
+  if (options.maxActivities !== undefined ||
+      options.topActivitiesAttributeKey !== undefined) {
+    if (options.maxActivities === undefined)
+      throw new Error("maxActivities is required for top-activity filtering");
+    validateNonnegativeInteger("maxActivities", options.maxActivities);
+    add("max_activities", String(options.maxActivities));
+    if (options.topActivitiesAttributeKey !== undefined)
+      add("top_activities_attribute_key", options.topActivitiesAttributeKey);
+  }
+  const relativeAttributeConfigured =
+    options.relativeAttributeKey !== undefined ||
+    options.relativeAttributeStake !== undefined ||
+    options.relativeAttributeKeepOncePerCase !== undefined;
+  if (relativeAttributeConfigured) {
+    if (options.relativeAttributeKey !== undefined)
+      add("relative_attribute_key", options.relativeAttributeKey);
+    if (options.relativeAttributeStake !== undefined) {
+      if (!Number.isFinite(options.relativeAttributeStake) ||
+          options.relativeAttributeStake < 0 ||
+          options.relativeAttributeStake > 1)
+        throw new Error("relativeAttributeStake must be finite and in [0, 1]");
+      add("relative_attribute_stake", String(options.relativeAttributeStake));
+    }
+    if (options.relativeAttributeKeepOncePerCase !== undefined)
+      add("relative_attribute_keep_once_per_case",
+        String(options.relativeAttributeKeepOncePerCase));
+  }
   if (options.timeFrom) add("time_from", options.timeFrom);
   if (options.timeTo) add("time_to", options.timeTo);
   if (options.timeMode && (options.timeFrom || options.timeTo))

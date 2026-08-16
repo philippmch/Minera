@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "minera/activity_split.hpp"
@@ -88,6 +89,26 @@ struct NumericAttributeFilterOptions {
   bool positive = true;
 };
 
+// Retain events whose activity (or optional generic event attribute) belongs
+// to the most frequent values in the input log. A zero limit intentionally
+// produces an empty log; the default is the conventional top-25 limit.
+struct TopActivitiesFilterOptions {
+  std::size_t max_activities = 25;
+  // Empty means the event's activity field. A non-empty key reads a generic
+  // event attribute and drops events that do not carry that key.
+  std::string attribute_key;
+};
+
+// Retain events whose activity/attribute value occurs in at least the given
+// fraction of cases or events. With keep_once_per_case enabled, each value is
+// counted at most once in any trace; otherwise every event occurrence counts.
+// The threshold is inclusive and must be finite in [0, 1].
+struct RelativeAttributeOccurrenceFilterOptions {
+  std::string attribute_key;
+  double min_relative_stake = 0.0;
+  bool keep_once_per_case = true;
+};
+
 enum class FilterAnchorOccurrence { first, last };
 
 // Prefix/suffix anchor behavior. Strict cuts include the anchor event;
@@ -168,6 +189,13 @@ struct LogFilterOptions {
   // Optional numeric range over one generic event attribute. This is
   // independent of the string-valued attribute filter above.
   std::optional<NumericAttributeFilterOptions> numeric_attribute;
+
+  // Optional frequency-based event projections. Counts are derived from the
+  // original input log before the ordinary per-trace projection so combining
+  // these options remains deterministic.
+  std::optional<TopActivitiesFilterOptions> top_activities;
+  std::optional<RelativeAttributeOccurrenceFilterOptions>
+      relative_attribute_occurrence;
 
   // Case-attribute filter on one trace-attribute key (a scalar XES trace
   // attribute, or a `case:` CSV column). Always trace-level: with
@@ -272,6 +300,8 @@ struct LogFilterOptions {
            !attribute_key.empty() || !keep_attribute_values.empty() ||
            !remove_attribute_values.empty() ||
            numeric_attribute.has_value() ||
+           top_activities.has_value() ||
+           relative_attribute_occurrence.has_value() ||
            !case_attribute_key.empty() ||
            !keep_case_attribute_values.empty() ||
            !remove_case_attribute_values.empty() ||
@@ -332,6 +362,30 @@ struct LogFilterOptions {
 [[nodiscard]] EventLog filter_numeric_attribute(
     const EventLog& event_log,
     const NumericAttributeFilterOptions& options);
+
+[[nodiscard]] EventLog filter_top_activities(
+    const EventLog& event_log, const TopActivitiesFilterOptions& options);
+
+[[nodiscard]] EventLog filter_relative_attribute_occurrence(
+    const EventLog& event_log,
+    const RelativeAttributeOccurrenceFilterOptions& options);
+
+// Compatibility spellings used by the classic filtering surface.
+[[nodiscard]] inline EventLog filter_log_on_max_no_activities(
+    const EventLog& event_log, std::size_t max_no_activities = 25) {
+  return filter_top_activities(
+      event_log, TopActivitiesFilterOptions{max_no_activities, {}});
+}
+
+[[nodiscard]] inline EventLog filter_log_relative_occurrence_event_attribute(
+    const EventLog& event_log, double min_relative_stake,
+    std::string attribute_key = {}, bool keep_once_per_case = true) {
+  return filter_relative_attribute_occurrence(
+      event_log,
+      RelativeAttributeOccurrenceFilterOptions{std::move(attribute_key),
+                                               min_relative_stake,
+                                               keep_once_per_case});
+}
 
 [[nodiscard]] EventLog filter_prefix(
     const EventLog& event_log, const PrefixSuffixFilterOptions& options);
