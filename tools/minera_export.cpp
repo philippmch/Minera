@@ -302,6 +302,12 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("entire_event_log")) {
     analysis.entire_event_log = log_fp;
   }
+  if (options.discovery_variants.contains("entire_dataframe")) {
+    analysis.entire_dataframe = log_fp;
+  }
+  if (options.discovery_variants.contains("polars_lazyframes")) {
+    analysis.polars_lazyframes = log_fp;
+  }
   if (options.discovery_variants.contains("trace_by_trace")) {
     analysis.trace_by_trace = traces();
   }
@@ -392,7 +398,7 @@ int usage(const char* program) {
                "  --genetic-max-activities <n> Activity safety bound\n"
                "  --genetic-max-states <n> Candidate safety bound\n"
                "  --organizational-sna   Emit organizational SNA JSON\n"
-               "  --sna-variant <id>     handover, working_together, subcontracting, or jointactivities\n"
+               "  --sna-variant <id>     four log variants or their _pandas variants\n"
                "  --sna-beta <f>         Handover beta in [0,1]\n"
                "  --sna-n <n>            Subcontracting distance\n"
                "  --sna-metric-normalization <bool> Normalize edge weights\n"
@@ -634,6 +640,7 @@ int usage(const char* program) {
                "  --random-tree-seed <n>      Random seed\n"
                "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
+               "  --batch-variant <id>      log (default), pandas, or polars\n"
                "  --overlap                 Compute interval/case/concurrent overlap statistics\n"
                "  --overlap-activity-attribute <name> Optional concurrent activity attribute\n"
                "  --overlap-start-attribute <name> Optional interval start timestamp attribute\n"
@@ -827,7 +834,8 @@ int usage(const char* program) {
                "  --declare-min-confidence-ratio <f> Declare confidence ratio in [0,1]\n"
                "  --declare-auto-selection-multiplier <f> Declare auto-selection multiplier in [0,1]\n"
                "  --footprints-discovery-variants <a,b,...> Footprint discovery:\n"
-               "                            entire_event_log, trace_by_trace, dfg,\n"
+               "                            entire_event_log, entire_dataframe,\n"
+               "                            polars_lazyframes, trace_by_trace, dfg,\n"
                "                            process_tree, powl, petri_reach_graph\n"
                "  --footprints-model <id>  process_tree (default), powl,\n"
                "                            inductive, alpha, heuristic, or dfg\n"
@@ -1382,6 +1390,23 @@ int main(int argc, char** argv) {
         else
           spectrum_options.case_id_attribute = value;
       }
+      continue;
+    }
+    if (arg == "--batch-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto variant = std::string_view(value);
+      if (variant == "log")
+        batch_options.variant = minera::BatchDiscoveryVariant::kLog;
+      else if (variant == "pandas")
+        batch_options.variant = minera::BatchDiscoveryVariant::kPandas;
+      else if (variant == "polars")
+        batch_options.variant = minera::BatchDiscoveryVariant::kPolars;
+      else {
+        std::cerr << "error: --batch-variant expects log, pandas, or polars\n";
+        return 2;
+      }
+      batch_option_used = true;
       continue;
     }
     if (arg == "--trace-patterns" || arg == "--trace-pattern") {
@@ -2795,7 +2820,8 @@ int main(int argc, char** argv) {
       }
       const std::set<std::string> allowed =
           arg == "--footprints-discovery-variants"
-              ? std::set<std::string>{"entire_event_log", "trace_by_trace",
+              ? std::set<std::string>{"entire_event_log", "entire_dataframe",
+                                      "polars_lazyframes", "trace_by_trace",
                                       "dfg", "process_tree", "powl",
                                       "petri_reach_graph"}
               : std::set<std::string>{"log_model", "log_extensive",

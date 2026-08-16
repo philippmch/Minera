@@ -1499,7 +1499,7 @@ void parse_mine_params_rejects_invalid_declare_fields() {
 void parse_mine_params_maps_footprints_options() {
   const auto params = minera::parse_mine_params(fields({
       {"footprints_discovery_variants",
-       "trace_by_trace, dfg,trace_by_trace,petri_reach_graph"},
+       "trace_by_trace, dfg,trace_by_trace,petri_reach_graph,entire_dataframe,polars_lazyframes"},
       {"footprints_model", "alpha"},
       {"footprints_conformance_variants",
        "trace_extensive,log_model,trace_extensive"},
@@ -1507,7 +1507,8 @@ void parse_mine_params_maps_footprints_options() {
       {"footprints_enable_act_always_executed", "false"},
   }));
   assert((params.footprints.discovery_variants ==
-          std::set<std::string>{"dfg", "petri_reach_graph",
+          std::set<std::string>{"dfg", "entire_dataframe",
+                                "petri_reach_graph", "polars_lazyframes",
                                 "trace_by_trace"}));
   assert(params.footprints.model == "alpha");
   assert((params.footprints.conformance_variants ==
@@ -2092,6 +2093,7 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"spectrum_timestamp_key", "occurred_at"},
       {"spectrum_case_id_key", "case_ref"},
       {"batches", "true"},
+      {"batch_variant", "polars"},
       {"batch_merge_distance_seconds", "12.5"},
       {"batch_min_size", "3"},
       {"batch_start_timestamp_attribute", "started_at"},
@@ -2104,6 +2106,7 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.spectrum.timestamp_attribute == "occurred_at");
   assert(params.spectrum.case_id_attribute == "case_ref");
   assert(params.batches);
+  assert(params.batch_options.variant == minera::BatchDiscoveryVariant::kPolars);
   assert(params.batch_options.merge_distance_seconds == 12.5);
   assert(params.batch_options.min_batch_size == 3);
   assert(params.batch_options.start_timestamp_attribute == "started_at");
@@ -2144,6 +2147,7 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
            std::pair{"spectrum_sample_size", "0"},
            std::pair{"spectrum_sort_log", "yes"},
            std::pair{"batches", "on"},
+           std::pair{"batch_variant", "other"},
            std::pair{"batch_merge_distance_seconds", "nan"},
            std::pair{"batch_merge_distance_seconds", "-1"},
            std::pair{"batch_min_size", "1"},
@@ -2179,6 +2183,7 @@ void parse_mine_params_rejects_dependent_options_without_opt_in() {
            std::pair{"spectrum_variant", "connected"},
            std::pair{"spectrum_sample_size", "10"},
            std::pair{"spectrum_sort_log", "true"},
+           std::pair{"batch_variant", "log"},
            std::pair{"batch_merge_distance_seconds", "1"},
            std::pair{"batch_min_size", "2"}}) {
     bool threw = false;
@@ -2605,6 +2610,15 @@ void organizational_sna_params_contract() {
   assert(parsed.variant == minera::OrganizationalSnaVariant::kWorkingTogether);
   assert(parsed.beta == 0.25 && parsed.n == 4 && parsed.metric_normalization);
   assert(parsed.max_resources == 20 && parsed.max_edges == 80);
+  for (const auto& [wire, expected] : {
+           std::pair{"handover_pandas", minera::OrganizationalSnaVariant::kHandoverPandas},
+           std::pair{"working_together_pandas", minera::OrganizationalSnaVariant::kWorkingTogetherPandas},
+           std::pair{"subcontracting_pandas", minera::OrganizationalSnaVariant::kSubcontractingPandas},
+           std::pair{"jointactivities_pandas", minera::OrganizationalSnaVariant::kJointActivitiesPandas}}) {
+    const auto variant = minera::parse_organizational_sna_params(
+        fields({{"sna_variant", wire}}));
+    assert(variant.variant == expected);
+  }
   for (const auto& item : {std::pair{"sna_variant", "bad"},
                            std::pair{"sna_beta", "1.1"},
                            std::pair{"sna_beta", "nan"},

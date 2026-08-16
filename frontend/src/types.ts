@@ -182,7 +182,10 @@ export function isGeneticMinerResult(value: unknown): value is GeneticMinerResul
 }
 export const isGeneticMiner = isGeneticMinerResult;
 
-export type OrganizationalSnaVariant = "handover" | "working_together" | "subcontracting" | "jointactivities";
+export type OrganizationalSnaVariant =
+  | "handover" | "working_together" | "subcontracting" | "jointactivities"
+  | "handover_pandas" | "working_together_pandas"
+  | "subcontracting_pandas" | "jointactivities_pandas";
 export interface OrganizationalSnaEdge { source: number; target: number; weight: number; }
 export interface OrganizationalSnaDiagnostics {
   computed: boolean; output_truncated: boolean; trace_count: number;
@@ -222,7 +225,9 @@ export function isOrganizationalSnaResult(value: unknown): value is Organization
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<OrganizationalSnaResult>;
   if (c.family !== "ORGANIZATIONAL_SNA" || typeof c.directed !== "boolean" ||
-      !(["handover", "working_together", "subcontracting", "jointactivities"] as unknown[]).includes(c.variant) ||
+      !(["handover", "working_together", "subcontracting", "jointactivities",
+         "handover_pandas", "working_together_pandas", "subcontracting_pandas",
+         "jointactivities_pandas"] as unknown[]).includes(c.variant) ||
       !Array.isArray(c.resources) || !c.resources.every((x) => typeof x === "string") ||
       !Array.isArray(c.edges) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
   const resourceCount = (c.resources as string[]).length;
@@ -2225,7 +2230,8 @@ export function isProcessTreeReductionResult(value: unknown): value is ProcessTr
 }
 
 export const FOOTPRINTS_DISCOVERY_VARIANTS = [
-  "entire_event_log", "trace_by_trace", "dfg", "petri_reach_graph",
+  "entire_event_log", "entire_dataframe", "polars_lazyframes",
+  "trace_by_trace", "dfg", "petri_reach_graph",
   "process_tree", "powl",
 ] as const;
 export type FootprintsDiscoveryVariant = (typeof FOOTPRINTS_DISCOVERY_VARIANTS)[number];
@@ -2277,6 +2283,8 @@ export interface FootprintsTraceDiscovery {
 }
 export interface AggregateFootprintsDiscovery {
   entire_event_log?: AggregateFootprint;
+  entire_dataframe?: AggregateFootprint;
+  polars_lazyframes?: AggregateFootprint;
   trace_by_trace?: FootprintsTraceDiscovery[];
   dfg?: AggregateFootprint;
   petri_reach_graph?: AggregateFootprint;
@@ -2757,6 +2765,7 @@ export interface BatchGroup {
   batches: BatchInstance[];
 }
 export interface BatchDiscoveryExport {
+  variant?: "log" | "pandas" | "polars";
   groups: BatchGroup[];
 }
 

@@ -517,6 +517,7 @@ export function Filters({
   const [spectrumTimestampKey, setSpectrumTimestampKey] = useState("");
   const [spectrumCaseIdKey, setSpectrumCaseIdKey] = useState("");
   const [batches, setBatches] = useState(false);
+  const [batchVariant, setBatchVariant] = useState<"log" | "pandas" | "polars">("log");
   const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
   const [batchMinSize, setBatchMinSize] = useState("2");
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
@@ -1010,6 +1011,7 @@ export function Filters({
       spectrumCaseIdKey: spectrumConfigured
         ? spectrumCaseIdKey.trim() || undefined : undefined,
       batches: batches || undefined,
+      batchVariant: batches && batchVariant !== "log" ? batchVariant : undefined,
       batchMergeDistanceSeconds: batches
         ? (() => { const n = Number(batchMergeDistanceSeconds); return Number.isFinite(n) && n >= 0 ? n : undefined; })()
         : undefined,
@@ -1151,6 +1153,7 @@ export function Filters({
     setSpectrumTimestampKey("");
     setSpectrumCaseIdKey("");
     setBatches(false);
+    setBatchVariant("log");
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
     setBatchStartTimestampAttribute("");
@@ -3009,6 +3012,18 @@ export function Filters({
             <label className="filters-field filters-check">
               <input type="checkbox" checked={batches} onChange={(e) => setBatches(e.target.checked)} />
               <span>Discover batches</span>
+            </label>
+            <label className="filters-field">
+              <span>Batch variant</span>
+              <select
+                value={batchVariant}
+                disabled={!batches}
+                onChange={(e) => setBatchVariant(e.target.value as typeof batchVariant)}
+              >
+                <option value="log">log (default)</option>
+                <option value="pandas">pandas</option>
+                <option value="polars">polars</option>
+              </select>
             </label>
             <label className="filters-field">
               <span>Batch merge distance (seconds)</span>

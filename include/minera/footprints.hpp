@@ -120,6 +120,8 @@ struct FootprintsOptions {
 // rule. `model_footprint` is retained for validation and metric provenance.
 struct FootprintsAnalysis {
   std::optional<Footprint> entire_event_log;
+  std::optional<Footprint> entire_dataframe;
+  std::optional<Footprint> polars_lazyframes;
   std::optional<std::vector<Footprint>> trace_by_trace;
   std::optional<Footprint> dfg;
   std::optional<Footprint> process_tree;

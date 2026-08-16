@@ -569,6 +569,12 @@ void validate_footprints_analysis(const FootprintsAnalysis& analysis,
   if (analysis.entire_event_log) {
     validate_footprint(*analysis.entire_event_log, graph);
   }
+  if (analysis.entire_dataframe) {
+    validate_footprint(*analysis.entire_dataframe, graph);
+  }
+  if (analysis.polars_lazyframes) {
+    validate_footprint(*analysis.polars_lazyframes, graph);
+  }
   if (analysis.trace_by_trace) {
     if (analysis.trace_by_trace->size() != log.traces.size()) {
       throw std::invalid_argument(
@@ -781,6 +787,12 @@ void write_footprints_analysis(std::ostream& out,
   };
   if (analysis.entire_event_log) {
     discovery("entire_event_log", *analysis.entire_event_log);
+  }
+  if (analysis.entire_dataframe) {
+    discovery("entire_dataframe", *analysis.entire_dataframe);
+  }
+  if (analysis.polars_lazyframes) {
+    discovery("polars_lazyframes", *analysis.polars_lazyframes);
   }
   if (analysis.trace_by_trace) {
     if (emitted) out << ", ";
@@ -1776,6 +1788,15 @@ std::string_view batch_type_name(BatchType type) {
   throw std::invalid_argument("batch discovery contains an unknown batch type");
 }
 
+std::string_view batch_variant_name(BatchDiscoveryVariant variant) {
+  switch (variant) {
+    case BatchDiscoveryVariant::kLog: return "log";
+    case BatchDiscoveryVariant::kPandas: return "pandas";
+    case BatchDiscoveryVariant::kPolars: return "polars";
+  }
+  throw std::invalid_argument("batch discovery contains an unknown variant");
+}
+
 BatchType classify_batch_events(const std::vector<BatchEvent>& events) {
   const double first_start = events.front().start;
   const double first_complete = events.front().complete;
@@ -1802,6 +1823,11 @@ BatchType classify_batch_events(const std::vector<BatchEvent>& events) {
 void validate_batch_discovery(const BatchDiscovery& discovery,
                               const EventLog& log,
                               const DirectlyFollowsGraph& graph) {
+  if (discovery.variant != BatchDiscoveryVariant::kLog &&
+      discovery.variant != BatchDiscoveryVariant::kPandas &&
+      discovery.variant != BatchDiscoveryVariant::kPolars) {
+    throw std::invalid_argument("batch discovery has an unknown variant");
+  }
   if (!std::isfinite(discovery.options.merge_distance_seconds) ||
       discovery.options.merge_distance_seconds < 0.0 ||
       discovery.options.min_batch_size < 2) {
@@ -1911,7 +1937,9 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
     }
     out << "]}" << (i + 1 < discovery.groups.size() ? ", " : "");
   }
-  out << "]}";
+  out << "], \"variant\": ";
+  write_json_string(out, batch_variant_name(discovery.variant));
+  out << "}";
 }
 
 void write_performance(std::ostream& out, const PerformanceMetrics& performance) {
@@ -4299,6 +4327,10 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
     case OrganizationalSnaVariant::kSubcontracting: variant = "subcontracting"; break;
     case OrganizationalSnaVariant::kJointActivities: variant = "jointactivities"; break;
     case OrganizationalSnaVariant::kHandover: break;
+    case OrganizationalSnaVariant::kHandoverPandas: variant = "handover_pandas"; break;
+    case OrganizationalSnaVariant::kWorkingTogetherPandas: variant = "working_together_pandas"; break;
+    case OrganizationalSnaVariant::kSubcontractingPandas: variant = "subcontracting_pandas"; break;
+    case OrganizationalSnaVariant::kJointActivitiesPandas: variant = "jointactivities_pandas"; break;
   }
   std::ostringstream out;
   out << "{\"family\":\"ORGANIZATIONAL_SNA\",\"variant\":";

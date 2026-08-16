@@ -14,10 +14,18 @@ enum class OrganizationalSnaVariant {
   kWorkingTogether,
   kSubcontracting,
   kJointActivities,
+  kHandoverPandas,
+  kWorkingTogetherPandas,
+  kSubcontractingPandas,
+  kJointActivitiesPandas,
   HANDOVER = kHandover,
   WORKING_TOGETHER = kWorkingTogether,
   SUBCONTRACTING = kSubcontracting,
   JOINTACTIVITIES = kJointActivities,
+  HANDOVER_PANDAS = kHandoverPandas,
+  WORKING_TOGETHER_PANDAS = kWorkingTogetherPandas,
+  SUBCONTRACTING_PANDAS = kSubcontractingPandas,
+  JOINTACTIVITIES_PANDAS = kJointActivitiesPandas,
 };
 
 struct OrganizationalSnaOptions {

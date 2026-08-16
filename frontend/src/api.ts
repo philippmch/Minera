@@ -434,6 +434,7 @@ export interface MinerOptions {
   spectrumCaseIdKey?: string;
   /** Batch discovery (opt-in). */
   batches?: boolean;
+  batchVariant?: "log" | "pandas" | "polars";
   batchMergeDistanceSeconds?: number;
   batchMinSize?: number;
   batchStartTimestampAttribute?: string;
@@ -1003,6 +1004,8 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   }
   if (options.batches) {
     add("batches", "true");
+    if (options.batchVariant && options.batchVariant !== "log")
+      add("batch_variant", options.batchVariant);
     if (options.batchMergeDistanceSeconds !== undefined && Number.isFinite(options.batchMergeDistanceSeconds) && options.batchMergeDistanceSeconds >= 0 && options.batchMergeDistanceSeconds !== 900)
       add("batch_merge_distance_seconds", String(options.batchMergeDistanceSeconds));
     if (options.batchMinSize !== undefined && Number.isInteger(options.batchMinSize) && options.batchMinSize >= 2 && options.batchMinSize !== 2)

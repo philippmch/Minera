@@ -1815,7 +1815,8 @@ MineParams parse_mine_params(const FieldLookup& field,
       };
   parse_footprints_set(
       "footprints_discovery_variants",
-      {"entire_event_log", "trace_by_trace", "dfg", "process_tree", "powl",
+      {"entire_event_log", "entire_dataframe", "polars_lazyframes",
+       "trace_by_trace", "dfg", "process_tree", "powl",
        "petri_reach_graph"},
       params.footprints.discovery_variants);
   if (const auto value = field("footprints_model");
@@ -2081,6 +2082,19 @@ MineParams parse_mine_params(const FieldLookup& field,
       present ? present("batches") : !value.empty()) {
     params.batches = parse_boolean(value, "batches");
   }
+  if (const auto value = field("batch_variant");
+      present ? present("batch_variant") : !value.empty()) {
+    if (value == "log" || value == "LOG") {
+      params.batch_options.variant = BatchDiscoveryVariant::kLog;
+    } else if (value == "pandas" || value == "PANDAS") {
+      params.batch_options.variant = BatchDiscoveryVariant::kPandas;
+    } else if (value == "polars" || value == "POLARS") {
+      params.batch_options.variant = BatchDiscoveryVariant::kPolars;
+    } else {
+      throw std::invalid_argument(
+          "batch_variant: expected log, pandas, or polars, got '" + value + "'");
+    }
+  }
   if (const auto value = field("batch_merge_distance_seconds");
       present ? present("batch_merge_distance_seconds") : !value.empty()) {
     params.batch_options.merge_distance_seconds =
@@ -2105,7 +2119,8 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.batch_options.start_timestamp_attribute = value;
   }
   const auto batches_supplied = present ? present("batches") : !field("batches").empty();
-  for (const auto name : {std::string_view{"batch_merge_distance_seconds"},
+  for (const auto name : {std::string_view{"batch_variant"},
+                          std::string_view{"batch_merge_distance_seconds"},
                           std::string_view{"batch_min_size"},
                           std::string_view{"batch_start_timestamp_attribute"}}) {
     const bool supplied = present ? present(name) : !field(name).empty();
@@ -3341,16 +3356,24 @@ OrganizationalSnaOptions parse_organizational_sna_params(
   if (supplied("sna_variant")) {
     const auto value = require("sna_variant");
     if (value == "handover") options.variant = OrganizationalSnaVariant::kHandover;
+    else if (value == "handover_pandas")
+      options.variant = OrganizationalSnaVariant::kHandoverPandas;
     else if (value == "working_together" || value == "working-together")
       options.variant = OrganizationalSnaVariant::kWorkingTogether;
+    else if (value == "working_together_pandas")
+      options.variant = OrganizationalSnaVariant::kWorkingTogetherPandas;
     else if (value == "subcontracting")
       options.variant = OrganizationalSnaVariant::kSubcontracting;
+    else if (value == "subcontracting_pandas")
+      options.variant = OrganizationalSnaVariant::kSubcontractingPandas;
     else if (value == "jointactivities" || value == "joint_activities" ||
              value == "joint-activities")
       options.variant = OrganizationalSnaVariant::kJointActivities;
+    else if (value == "jointactivities_pandas")
+      options.variant = OrganizationalSnaVariant::kJointActivitiesPandas;
     else
       throw std::invalid_argument(
-          "sna_variant: expected handover, working_together, subcontracting, or jointactivities");
+          "sna_variant: expected the four log variants or their _pandas variants");
   }
   if (supplied("sna_beta")) {
     options.beta = parse_finite_double(require("sna_beta"), "sna_beta");

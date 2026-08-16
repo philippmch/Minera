@@ -2161,6 +2161,7 @@ void temporal_behavioral_json_validates_and_serializes_batches() {
                                           nullptr, nullptr, nullptr, nullptr,
                                           nullptr, nullptr, &discovery);
   assert(json.find("\"batch_discovery\": {\"groups\"") != std::string::npos);
+  assert(json.find("\"variant\": \"log\"") != std::string::npos);
   for (const auto type : {"simultaneous", "batching_on_start",
                           "batching_on_end", "sequential", "concurrent"}) {
     assert(json.find(std::string("\"type\": \"") + type + "\"") !=
@@ -4655,6 +4656,8 @@ void json_export_carries_footprints_contract() {
 
   minera::FootprintsAnalysis analysis;
   analysis.entire_event_log = minera::discover_footprints(log);
+  analysis.entire_dataframe = *analysis.entire_event_log;
+  analysis.polars_lazyframes = *analysis.entire_event_log;
   analysis.trace_by_trace = minera::discover_trace_footprints(log);
   analysis.dfg = minera::discover_dfg_footprints(graph);
   analysis.process_tree = minera::discover_footprints(tree);
@@ -4695,7 +4698,8 @@ void json_export_carries_footprints_contract() {
       &analysis);
   for (const char* fragment :
        {"\"footprints\"", "\"discovery\"",
-        "\"entire_event_log\"", "\"trace_by_trace\"", "\"dfg\"",
+        "\"entire_event_log\"", "\"entire_dataframe\"",
+        "\"polars_lazyframes\"", "\"trace_by_trace\"", "\"dfg\"",
         "\"process_tree\"", "\"powl\"", "\"petri_reach_graph\"",
         "\"sequence\":", "\"parallel\":", "\"source\": 0",
         "\"target\": 1", "\"conformance\": {\"model\": \"process_tree\"",
