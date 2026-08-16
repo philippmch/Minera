@@ -781,6 +781,8 @@ void parse_mine_params_maps_filters() {
       {"time_from", "2024-01-01"},
       {"time_to", "2024-01-31T23:59:59"},
       {"time_mode", "traces_intersecting"},
+      {"case_duration_min", "10"},
+      {"case_duration_max", "120.5"},
       {"keep_activities", "a, b ,c"},
       {"remove_activities", "x"},
       {"keep_resources", "Alice, Bob"},
@@ -829,6 +831,8 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.time_to == "2024-01-31T23:59:59");
   assert(params.filter.time_mode ==
          minera::TimeFilterMode::traces_intersecting);
+  assert(params.filter.min_case_duration_seconds == 10.0);
+  assert(params.filter.max_case_duration_seconds == 120.5);
   assert((params.filter.keep_activities ==
           std::vector<std::string>{"a", "b", "c"}));
   assert((params.filter.remove_activities == std::vector<std::string>{"x"}));
@@ -897,6 +901,29 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.suffix_activity == "a");
   assert(params.filter.variant_coverage == 0.8);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_invalid_case_duration_bounds() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"case_duration_min", "nan"},
+           std::pair<std::string, std::string>{"case_duration_max", "-1"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"case_duration_min", "10"}, {"case_duration_max", "9"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_invalid_trace_patterns() {
@@ -2424,6 +2451,7 @@ int main() {
   parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
+  parse_mine_params_rejects_invalid_case_duration_bounds();
   parse_mine_params_rejects_invalid_trace_patterns();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();

@@ -506,6 +506,7 @@ describe("hasActiveFilters", () => {
       { keepResources: ["Bob"] },
       { timeFrom: "2024-01-01T00:00" },
       { timeTo: "2024-01-31T23:59" },
+      { caseDurationMin: 10 },
       { reworkActivity: "a" },
       { betweenStart: "a", betweenEnd: "b" },
       { attributeKey: "channel" },
@@ -992,6 +993,14 @@ describe("mineFormEntries", () => {
   it("drops a time mode without bounds and a rework minimum without activity", () => {
     expect(mineFormEntries({ timeMode: "traces_contained" })).toEqual([]);
     expect(mineFormEntries({ reworkMin: 3 })).toEqual([]);
+  });
+
+  it("serializes inclusive complete-case duration bounds", () => {
+    expect(mineFormEntries({ caseDurationMin: 10, caseDurationMax: 120.5 })).toEqual([
+      ["case_duration_min", "10"],
+      ["case_duration_max", "120.5"],
+    ]);
+    expect(hasActiveFilters({ caseDurationMax: 30 })).toBe(true);
   });
 
   it("maps the succession, cut, and coverage filters", () => {
