@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isBoundaryActivitiesResult, isVariantStatisticsResult, type MineraExport } from "./types";
 
 describe("isLogUtilityResult", () => {
   const event = { case_id: "c1", activity: "A", timestamp: "1", resource: "", lifecycle: "", input_order: 0, attributes: [] };
@@ -463,6 +463,20 @@ describe("isClusteringResult", () => {
   it("accepts recursive trees", () => expect(isClusteringResult(valid)).toBe(true));
   it("rejects an internal node without children", () => expect(isClusteringResult({ ...valid, tree: { ...valid.tree, children: [] } })).toBe(false));
   it("rejects non-finite distances", () => expect(isClusteringResult({ ...valid, tree: { ...valid.tree, distance: NaN } })).toBe(false));
+});
+
+describe("isProfileClusteringResult", () => {
+  const valid = {
+    family: "PROFILE_CLUSTERING", labels: [0, 1], clusters: [[0], [1]],
+    feature_names: ["event:concept:name@A"], inertia: 0,
+    diagnostics: { computed: true, converged: true, trace_count: 2,
+      feature_count: 1, cluster_count: 2, iterations: 1, message: "converged" },
+  };
+  it("accepts deterministic labels and diagnostics", () => expect(isProfileClusteringResult(valid)).toBe(true));
+  it("rejects negative or non-finite metrics", () => {
+    expect(isProfileClusteringResult({ ...valid, inertia: -1 })).toBe(false);
+    expect(isProfileClusteringResult({ ...valid, diagnostics: { ...valid.diagnostics, iterations: -1 } })).toBe(false);
+  });
 });
 
 describe("isLogToFeaturesResult", () => {

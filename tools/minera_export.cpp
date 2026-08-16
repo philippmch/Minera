@@ -411,6 +411,8 @@ int usage(const char* program) {
                "  --local-diagnostics-* <v> Group attributes, explicit groups, and bounds\n"
                "  --clustering             Emit trace-attribute clustering JSON\n"
                "  --clustering-* <v>       Attribute, variant, alpha, percent, and bounds\n"
+               "  --profile-clustering      Emit profile-based clustering JSON\n"
+               "  --profile-clustering-* <v>  K-means bounds, seed, representations, and attributes\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -1196,6 +1198,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> local_diagnostics_fields;
   bool clustering_requested = false;
   std::map<std::string, std::string> clustering_fields;
+  bool profile_clustering_requested = false;
+  std::map<std::string, std::string> profile_clustering_fields;
   bool trace_variant_query_requested = false;
   std::map<std::string, std::string> trace_variant_query_fields;
   bool pripel_requested = false;
@@ -1847,6 +1851,28 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {"clustering_trace_attribute", "clustering_variant", "clustering_alpha", "clustering_percent", "clustering_max_groups", "clustering_max_output_nodes"};
       if (!names.contains(key)) return usage(argv[0]); clustering_fields.insert_or_assign(std::move(key), value); clustering_requested = true; continue;
+    }
+    if (arg == "--profile-clustering") {
+      profile_clustering_requested = true;
+      continue;
+    }
+    if (arg.rfind("--profile-clustering-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      if (key.rfind("profile_clustering_", 0) == 0)
+        key = "profile_" + key.substr(std::string("profile_clustering_").size());
+      static const std::set<std::string> names = {
+          "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
+          "profile_max_features", "profile_seed", "profile_tolerance",
+          "profile_include_activity", "profile_include_succession",
+          "profile_trace_string_attributes", "profile_event_string_attributes",
+          "profile_trace_numeric_attributes", "profile_event_numeric_attributes",
+          "profile_feature_names"};
+      if (!names.contains(key)) return usage(argv[0]);
+      profile_clustering_fields.insert_or_assign(std::move(key), value);
+      profile_clustering_requested = true;
+      continue;
     }
     if (arg.rfind("--local-diagnostics-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
@@ -4107,6 +4133,21 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) { return clustering_fields.contains(std::string(name)); };
       const auto params = minera::parse_clustering_params(lookup, present);
       const auto body = minera::trace_attribute_clustering_json(minera::discover_trace_attribute_clustering(log, params));
+      if (output.empty()) std::cout << body << '\n';
+      else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
+      return 0;
+    }
+    if (profile_clustering_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = profile_clustering_fields.find(std::string(name));
+        return it == profile_clustering_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return profile_clustering_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_profile_clustering_params(lookup, present);
+      const auto body = minera::profile_clustering_json(
+          minera::discover_profile_clustering(log, params));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;
