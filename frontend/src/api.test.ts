@@ -739,7 +739,7 @@ describe("embedding API", () => {
 
 describe("resource profiles API", () => {
   it("encodes strict fields", () => {
-    expect(resourceProfilesQuery({ resource_profiles_metric: "social_position", resource_profiles_t1: "2024-01-01", resource_profiles_max_rows: 4 })).toBe("resource_profiles_metric=social_position&resource_profiles_t1=2024-01-01&resource_profiles_max_rows=4");
+    expect(resourceProfilesQuery({ resource_profiles_metric: "social_position", resource_profiles_activity_attribute: "team:activity", resource_profiles_resource_attribute: "team:resource", resource_profiles_timestamp_attribute: "observed_at", resource_profiles_start_timestamp_attribute: "started_at", resource_profiles_case_id_attribute: "case:custom", resource_profiles_t1: "2024-01-01", resource_profiles_max_rows: 4 })).toBe("resource_profiles_metric=social_position&resource_profiles_activity_attribute=team%3Aactivity&resource_profiles_resource_attribute=team%3Aresource&resource_profiles_timestamp_attribute=observed_at&resource_profiles_start_timestamp_attribute=started_at&resource_profiles_case_id_attribute=case%3Acustom&resource_profiles_t1=2024-01-01&resource_profiles_max_rows=4");
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "RESOURCE_PROFILES", rows: [] }) })));

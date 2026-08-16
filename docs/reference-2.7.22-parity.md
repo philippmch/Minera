@@ -710,6 +710,8 @@ The resource-profile vertical exposes the eleven scalar metrics through the
 `RESOURCE_PROFILES` JSON family, `--resource-profiles` CLI mode, cached
 `POST /api/resource-profiles`, and typed frontend query/response helpers.
 Metrics use deterministic resource/activity rows, half-open timestamp slots,
+configurable activity/resource/timestamp/start-timestamp/case-id selectors
+(including typed custom event and trace attributes),
 FIFO lifecycle pairing with atomic-event fallback, and explicit zero-safe
 diagnostics for empty denominators. Workload and multitasking preserve the
 reference interval policies; safety limits reject unbounded resource or row

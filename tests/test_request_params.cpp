@@ -219,11 +219,21 @@ void ltl_filter_params_contract() {
 void resource_profiles_params_contract() {
   const auto p = minera::parse_resource_profiles_params(fields({
       {"resource_profiles_metric", "social_position"},
+      {"resource_profiles_activity_attribute", "team:activity"},
+      {"resource_profiles_resource_attribute", "team:resource"},
+      {"resource_profiles_timestamp_attribute", "observed_at"},
+      {"resource_profiles_start_timestamp_attribute", "started_at"},
+      {"resource_profiles_case_id_attribute", "case:custom"},
       {"resource_profiles_t1", "2024-01-01"},
       {"resource_profiles_t2", "2024-01-02"},
       {"resource_profiles_resource", "alice"},
       {"resource_profiles_max_rows", "12"}}));
   assert(p.metric == minera::ResourceProfileMetric::kSocialPosition && p.resource == "alice" && p.max_rows == 12);
+  assert(p.activity_attribute == "team:activity" &&
+         p.resource_attribute == "team:resource" &&
+         p.timestamp_attribute == "observed_at" &&
+         p.start_timestamp_attribute == "started_at" &&
+         p.case_id_attribute == "case:custom");
   try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "bogus"}})); assert(false); } catch (const std::invalid_argument&) {}
   try { (void)minera::parse_resource_profiles_params(fields({{"resource_profiles_metric", "interaction_two_resources"}, {"resource_profiles_resource", "a"}})); assert(false); } catch (const std::invalid_argument&) {}
 }

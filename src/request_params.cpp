@@ -3519,6 +3519,11 @@ ResourceProfilesOptions parse_resource_profiles_params(const FieldLookup& field,
   const auto supplied = [&](std::string_view n) { return present ? present(n) : !field(n).empty(); };
   const auto require = [&](std::string_view n) { const auto v = field(n); if (v.empty()) throw std::invalid_argument(std::string(n) + ": expected a value"); return v; };
   if (supplied("resource_profiles_metric")) options.metric = resource_profile_metric_from_string(require("resource_profiles_metric"));
+  if (supplied("resource_profiles_activity_attribute")) options.activity_attribute = require("resource_profiles_activity_attribute");
+  if (supplied("resource_profiles_resource_attribute")) options.resource_attribute = require("resource_profiles_resource_attribute");
+  if (supplied("resource_profiles_timestamp_attribute")) options.timestamp_attribute = require("resource_profiles_timestamp_attribute");
+  if (supplied("resource_profiles_start_timestamp_attribute")) options.start_timestamp_attribute = require("resource_profiles_start_timestamp_attribute");
+  if (supplied("resource_profiles_case_id_attribute")) options.case_id_attribute = require("resource_profiles_case_id_attribute");
   if (supplied("resource_profiles_t1")) options.t1 = require("resource_profiles_t1");
   if (supplied("resource_profiles_t2")) options.t2 = require("resource_profiles_t2");
   if (supplied("resource_profiles_resource")) options.resource = require("resource_profiles_resource");
