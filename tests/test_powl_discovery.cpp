@@ -191,12 +191,18 @@ int main() {
       tree);
   assert(concurrent_fall_through.kind() ==
          PowlNodeKind::kStrictPartialOrder);
-  assert(concurrent_fall_through.order().empty());
+  // Strict sequence repair preserves the end-only C stage instead of
+  // flattening it into the concurrency fall-through.
+  assert(!concurrent_fall_through.order().empty());
   assert(concurrent_fall_through.children().size() == 2);
   assert(concurrent_fall_through.children()[0].kind() ==
-         PowlNodeKind::kLoop);
+         PowlNodeKind::kStrictPartialOrder);
   assert(concurrent_fall_through.children()[1].kind() ==
          PowlNodeKind::kXor);
+  assert(concurrent_fall_through.children()[1].children().size() == 2);
+  assert(concurrent_fall_through.children()[1].children()[0].kind() ==
+         PowlNodeKind::kSilent);
+  assert(concurrent_fall_through.children()[1].children()[1].label() == "C");
 
   // Brute-force starts at k=n-1, uses EFG (not merely adjacent DFG), and is deterministic.
   PowlDiscoveryOptions brute; brute.variant = PowlDiscoveryVariant::kBruteForce;
@@ -256,19 +262,19 @@ int main() {
   const auto chained = discover_powl(filtering_log, filtered).serialize();
   assert(chained.find("T(\"C\")") != std::string::npos);
 
-  // Dynamic filtering removes every minimum-frequency variant only after
-  // normal cuts fail.
+  // Dynamic filtering is only reached after the normal strict-sequence cut;
+  // this log therefore retains C in the exact sequence projection.
   filtered.filtering_type = PowlFilteringType::kDynamic;
   filtered.filtering_threshold = 0.2;
   const auto dynamically_filtered =
       discover_powl(filtering_log, filtered).serialize();
-  assert(dynamically_filtered.find("T(\"C\")") == std::string::npos);
+  assert(dynamically_filtered.find("T(\"C\")") != std::string::npos);
   // Dynamic filtering ignores the decreasing-factor threshold, including
   // its zero default, and removes every least-frequent variant.
   filtered.filtering_threshold = 0.0;
   const auto dynamic_default_threshold =
       discover_powl(filtering_log, filtered).serialize();
-  assert(dynamic_default_threshold.find("T(\"C\")") == std::string::npos);
+  assert(dynamic_default_threshold.find("T(\"C\")") != std::string::npos);
 
   // Decreasing-factor retention is strict: a variant exactly equal to the
   // threshold boundary is not retained.
@@ -279,7 +285,7 @@ int main() {
   auto strict_filter = tree;
   strict_filter.filtering_threshold = 0.5;
   const auto strict_boundary = discover_powl(equality_log, strict_filter).serialize();
-  assert(strict_boundary.find("T(\"C\")") == std::string::npos);
+  assert(strict_boundary.find("T(\"C\")") != std::string::npos);
   throws([&] { auto o = filtered; o.filtering_threshold = 1.0; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_threshold = -0.1; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_type = static_cast<PowlFilteringType>(99); discover_powl(log({{"A"}}), o); });
