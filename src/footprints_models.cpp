@@ -205,14 +205,11 @@ bool dominates(const Marking& a, const Marking& b) {
 ReachGraph build_reachability(const PetriNet& net) {
   const std::size_t places = net.place_count();
   auto enabled = [places](const Marking& marking, const PetriTransition& transition) {
-    std::vector<std::uint64_t> required(places);
-    for (const auto place : transition.inputs) if (place < places) ++required[place];
-    for (std::size_t place = 0; place < places; ++place)
-      if (marking[place] < required[place]) return false;
-    return true;
+    return places == marking.size() && petri_transition_enabled(transition, marking);
   };
   auto fire = [places](Marking marking, const PetriTransition& transition) {
     for (const auto place : transition.inputs) if (place < places) --marking[place];
+    for (const auto place : transition.reset_inputs) if (place < places) marking[place] = 0;
     for (const auto place : transition.outputs) {
       if (place >= places || marking[place] == std::numeric_limits<std::uint64_t>::max())
         throw std::runtime_error("Petri reachability marking overflow");

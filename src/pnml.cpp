@@ -78,14 +78,29 @@ void write_pnml(std::ostream& out,
   }
 
   // Arcs: every input place -> transition, then transition -> every output
-  // place. Arc ids are unique across the whole net.
+  // place. Extended input arcs carry a compact type annotation. Arc ids are
+  // unique across the whole net.
   std::size_t arc_id = 0;
+  const auto write_input_arc = [&](std::size_t place, std::size_t t,
+                                   PetriArcType type) {
+    out << "      <arc id=\"a" << arc_id++ << "\" source=\"p" << place
+        << "\" target=\"t" << t << "\"";
+    if (type == PetriArcType::kNormal) {
+      out << "/>\n";
+    } else {
+      out << "><type><text>"
+          << (type == PetriArcType::kReset ? "reset" : "inhibitor")
+          << "</text></type></arc>\n";
+    }
+  };
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    for (const auto place : transition.inputs) {
-      out << "      <arc id=\"a" << arc_id++ << "\" source=\"p" << place
-          << "\" target=\"t" << t << "\"/>\n";
-    }
+    for (const auto place : transition.inputs)
+      write_input_arc(place, t, PetriArcType::kNormal);
+    for (const auto place : transition.reset_inputs)
+      write_input_arc(place, t, PetriArcType::kReset);
+    for (const auto place : transition.inhibitor_inputs)
+      write_input_arc(place, t, PetriArcType::kInhibitor);
     for (const auto place : transition.outputs) {
       out << "      <arc id=\"a" << arc_id++ << "\" source=\"t" << t
           << "\" target=\"p" << place << "\"/>\n";
@@ -130,6 +145,7 @@ struct ParsedTransition {
 struct ParsedArc {
   std::string source;
   std::string target;
+  PetriArcType type = PetriArcType::kNormal;
 };
 
 std::uint64_t parse_token_count(const std::string& text) {
@@ -213,7 +229,7 @@ PetriNet parse_pnml(std::string_view xml) {
       if (!source || !target) {
         throw std::runtime_error("PNML arc is missing its source or target");
       }
-      arcs.push_back({*source, *target});
+      arcs.push_back({*source, *target, PetriArcType::kNormal});
     } else if (token.name == "toolspecific" &&
                stack_ends_with(stack, {"transition"})) {
       const auto* activity = detail::attribute(token.attributes, "activity");
@@ -235,6 +251,12 @@ PetriNet parse_pnml(std::string_view xml) {
     } else if (stack_ends_with(stack, {"transition", "name", "text"}) &&
                !transitions.empty()) {
       transitions.back().label = value;
+    } else if (stack_ends_with(stack, {"arc", "type", "text"}) &&
+               !arcs.empty()) {
+      if (value == "reset") arcs.back().type = PetriArcType::kReset;
+      else if (value == "inhibitor") arcs.back().type = PetriArcType::kInhibitor;
+      else if (value == "normal" || value == "") arcs.back().type = PetriArcType::kNormal;
+      else throw std::runtime_error("PNML arc has an unknown type '" + value + "'");
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&
                markings_seen == 1 && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
@@ -288,6 +310,8 @@ PetriNet parse_pnml(std::string_view xml) {
   std::unordered_map<std::string, std::size_t> activity_ids;
   std::vector<std::vector<std::size_t>> inputs(transitions.size());
   std::vector<std::vector<std::size_t>> outputs(transitions.size());
+  std::vector<std::vector<std::size_t>> reset_inputs(transitions.size());
+  std::vector<std::vector<std::size_t>> inhibitor_inputs(transitions.size());
   std::vector<bool> place_has_in(places.size(), false);
   std::vector<bool> place_has_out(places.size(), false);
 
@@ -298,10 +322,17 @@ PetriNet parse_pnml(std::string_view xml) {
     const auto to_transition = transition_index.find(arc.target);
     if (from_place != place_index.end() &&
         to_transition != transition_index.end()) {
-      inputs[to_transition->second].push_back(from_place->second);
+      if (arc.type == PetriArcType::kNormal)
+        inputs[to_transition->second].push_back(from_place->second);
+      else if (arc.type == PetriArcType::kReset)
+        reset_inputs[to_transition->second].push_back(from_place->second);
+      else
+        inhibitor_inputs[to_transition->second].push_back(from_place->second);
       place_has_out[from_place->second] = true;
     } else if (from_transition != transition_index.end() &&
                to_place != place_index.end()) {
+      if (arc.type != PetriArcType::kNormal)
+        throw std::runtime_error("PNML extended arc must enter a transition");
       outputs[from_transition->second].push_back(to_place->second);
       place_has_in[to_place->second] = true;
     } else {
@@ -321,6 +352,8 @@ PetriNet parse_pnml(std::string_view xml) {
       activity = it->second;
     }
     net.add_transition(activity, std::move(inputs[t]), std::move(outputs[t]));
+    for (const auto place : reset_inputs[t]) net.add_reset_arc(t, place);
+    for (const auto place : inhibitor_inputs[t]) net.add_inhibitor_arc(t, place);
   }
   net.set_activities(std::move(activities));
 
