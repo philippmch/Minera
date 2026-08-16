@@ -52,6 +52,7 @@ add_library(minera_core
   src/dfg_filter.cpp
   src/dfg_conversion.cpp
   src/dfg_io.cpp
+  src/dfg_precision.cpp
   src/decomposed_alignment.cpp
   src/dfg_variants.cpp
   src/directly_follows_graph.cpp
@@ -197,6 +198,12 @@ add_executable(minera_dfg
 )
 target_link_libraries(minera_dfg PRIVATE minera::core)
 target_compile_features(minera_dfg PRIVATE cxx_std_20)
+
+add_executable(minera_dfg_precision
+  tools/minera_dfg_precision.cpp
+)
+target_link_libraries(minera_dfg_precision PRIVATE minera::core)
+target_compile_features(minera_dfg_precision PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_dfg
   tools/minera_streaming_dfg.cpp
@@ -811,6 +818,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dfg_io_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_io_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_io_tests COMMAND minera_dfg_io_tests)
+
+  add_executable(minera_dfg_precision_tests tests/test_dfg_precision.cpp)
+  target_link_libraries(minera_dfg_precision_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_precision_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_precision_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_precision_tests COMMAND minera_dfg_precision_tests)
 
   add_executable(minera_temporal_behavioral_tests
     tests/test_temporal_behavioral.cpp

@@ -13,6 +13,7 @@ import {
   type ModelConformance,
   type DfgAlignmentOptions,
   type DfgAlignmentResult,
+  type DfgPrecisionResult,
   type DfgPetriConversionOptions,
   type DfgPetriConversionResult,
   type EditDistanceOptions,
@@ -93,6 +94,7 @@ import {
   isDecisionTablesResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
+  isDfgPrecisionResult,
   isILPMinerResult,
   isGeneticMinerResult,
   isTraceVariantQueryResult,
@@ -2367,6 +2369,43 @@ export async function importDfg(document: Blob): Promise<string> {
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+export interface DfgPrecisionOptions {
+  activity_attribute?: string;
+}
+
+export function dfgPrecisionQuery(options: DfgPrecisionOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.activity_attribute !== undefined) {
+    const attribute = options.activity_attribute.trim();
+    if (!attribute) throw new Error("activity_attribute must not be empty");
+    if (attribute !== "activity") query.set("activity_attribute", attribute);
+  }
+  return query.toString();
+}
+
+export async function requestDfgPrecision(
+  document: Blob, options: DfgPrecisionOptions = {},
+): Promise<DfgPrecisionResult> {
+  const query = dfgPrecisionQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/dfg-precision${query ? `?${query}` : ""}`, {
+      method: "POST", headers: { "Content-Type": "text/plain" }, body: document,
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload &&
+      typeof (payload as { error: unknown }).error === "string" &&
+      (payload as { error: string }).error.length > 0)
+    throw new Error((payload as { error: string }).error);
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isDfgPrecisionResult(payload))
+    throw new Error("the Minera backend returned an invalid DFG precision result");
+  return payload;
 }
 
 export function dfgPetriConversionQuery(options: DfgPetriConversionOptions = {}): string {

@@ -78,7 +78,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
@@ -832,6 +832,14 @@ request fields, CLI, and local server. Deterministic JSON resolves all
 activities against the shared registry and preserves alias names; the frontend
 exposes all settings and renders frequency, triple, performance,
 case-attribute, clean-time, and causal artifacts.
+
+DFG precision evidence: `evaluate_dfg_precision` builds weighted observed
+prefix observations, admits only prefixes reachable through the supplied start
+and directly-follows maps, and computes escaping versus activated transitions
+with deterministic counters. The standalone `minera_dfg_precision` command,
+cached-log `POST /api/dfg-precision`, and typed frontend request/response guard
+share the `DFG_PRECISION` envelope; custom activity attributes and malformed
+model/log inputs are validated by focused tests.
 
 ## Connected DFG filtering evidence
 
