@@ -170,6 +170,29 @@ std::vector<std::string> merged(const std::vector<std::string>& a,
   return x;
 }
 
+bool is_numeric_kind(AttributeKind k);
+
+std::vector<std::string> inferred_event_attributes(const EventLog& log,
+                                                   bool numeric) {
+  std::map<std::string, std::size_t> occurrences;
+  const auto event_count = log.event_count();
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      std::set<std::string> seen;
+      for (const auto& attribute : event.attributes) {
+        if (is_numeric_kind(attribute.kind) != numeric ||
+            !seen.insert(attribute.key).second)
+          continue;
+        ++occurrences[attribute.key];
+      }
+    }
+  }
+  std::vector<std::string> result;
+  for (const auto& [key, count] : occurrences)
+    if (!numeric || count == event_count) result.push_back(key);
+  return result;
+}
+
 struct TimedEvent {
   const Event* event = nullptr;
   double finish = 0.0;
@@ -235,28 +258,35 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
   append_unique(event_strings, {}); append_unique(event_numbers, {});
   append_unique(case_strings, {}); append_unique(case_numbers, {});
+  if (options.event_string_attributes.empty() && options.event_attributes.empty())
+    event_strings = inferred_event_attributes(log, false);
+  if (options.event_numeric_attributes.empty() && options.event_attributes.empty())
+    event_numbers = inferred_event_attributes(log, true);
 
   if (options.variant == LogToFeaturesVariant::EVENT_BASED) {
     std::vector<std::string> names;
     const auto activities = categories_for_events(log, options.activity_key);
     for (const auto& x : activities) names.push_back("activity:" + x);
     for (const auto& n : event_strings) {
-      const auto values = distinct_event_values(log, n);
+      const auto values = categories_for_attr(log, n, false);
       if (!within_cardinality(values, options)) continue;
-      for (const auto& x : values) names.push_back("event:" + n + "=" + x);
+      for (const auto& x : values) names.push_back("event:" + n + "@" + x);
     }
     for (const auto& n : case_strings) {
-      const auto values = distinct_trace_values(log, n);
+      const auto values = categories_for_attr(log, n, true);
       if (!within_cardinality(values, options)) continue;
       for (const auto& x : values) names.push_back("case:" + n + "=" + x);
     }
     for (const auto& n : event_numbers) names.push_back("event:" + n);
     for (const auto& n : case_numbers) names.push_back("case:" + n);
     names.push_back("timestamp");
+    std::sort(names.begin(), names.end());
     if (options.feature_names.empty()) out.feature_names = names;
     else validate_names(out.feature_names, "feature_names");
     std::unordered_map<std::string, std::size_t> index;
     for (std::size_t i = 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
+    std::size_t max_events = 0;
+    for (const auto& trace : log.traces) max_events = std::max(max_events, trace.events.size());
     for (const auto& t : log.traces) {
       std::vector<std::vector<double>> rows;
       for (const auto& e : t.events) {
@@ -264,14 +294,16 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         auto set = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
         set("activity:" + value_for(e, options.activity_key), 1.0);
         for (const auto& n : event_strings) {
-          const auto values = distinct_event_values(log, n);
+          const auto values = categories_for_attr(log, n, false);
           if (within_cardinality(values, options))
-            set("event:" + n + "=" + event_attribute_value(e, n), 1.0);
+            if (const auto* attribute = attr_for(e, n))
+              set("event:" + n + "@" + attribute->value, 1.0);
         }
         for (const auto& n : case_strings) {
-          const auto values = distinct_trace_values(log, n);
+          const auto values = categories_for_attr(log, n, true);
           if (within_cardinality(values, options))
-            set("case:" + n + "=" + trace_attribute_value(t, n), 1.0);
+            if (const auto* attribute = attr_for(t, n))
+              set("case:" + n + "=" + attribute->value, 1.0);
         }
         for (const auto& n : event_numbers) if (const auto* a = attr_for(e, n)) set("event:" + n, checked_number(a->value, options.default_not_present));
         for (const auto& n : case_numbers) if (const auto* a = attr_for(t, n)) set("case:" + n, checked_number(a->value, options.default_not_present));
@@ -279,6 +311,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         else if (!value_for(e, options.timestamp_key).empty()) throw std::invalid_argument("log_to_features: invalid timestamp");
         rows.push_back(std::move(row));
       }
+      // Event-based consumers receive a rectangular trace/event tensor.  The
+      // trailing rows are neutral zero vectors and never represent events.
+      while (rows.size() < max_events)
+        rows.emplace_back(out.feature_names.size(), 0.0);
       out.event_rows.push_back(std::move(rows));
     }
     return out;

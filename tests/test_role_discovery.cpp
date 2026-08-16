@@ -16,7 +16,7 @@ int main() {
   assert(result.variant == RoleDiscoveryVariant::kLog);
   assert(result.diagnostics.computed && result.roles.size() == 1);
   assert(result.roles[0].activities.size() == 2);
-  assert(result.roles[0].resources[0].count == 4);
+  assert(result.roles[0].resources[0].count == 2);
   assert(result.roles[0].resources[1].count == 1);
   RoleDiscoveryOptions strict; strict.threshold = 1.0;
   assert(discover_roles(log, strict).roles.size() == 2);

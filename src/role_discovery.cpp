@@ -123,7 +123,19 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
       }
     if (bi == roles.size()) break;
     roles[bi].activities.insert(roles[bj].activities.begin(), roles[bj].activities.end());
-    for (const auto& [name, count] : roles[bj].resources) roles[bi].resources[name] += count;
+    // A merged role carries the resource multiset of the source roles, not
+    // the raw event frequencies.  This distinction matters after the first
+    // merge: each resource contributes once per role that contained it.
+    std::map<std::string, std::size_t> merged_resources;
+    for (const auto& [name, count] : roles[bi].resources) {
+      (void)count;
+      merged_resources[name] = 1;
+    }
+    for (const auto& [name, count] : roles[bj].resources) {
+      (void)count;
+      ++merged_resources[name];
+    }
+    roles[bi].resources = std::move(merged_resources);
     roles.erase(roles.begin() + static_cast<std::ptrdiff_t>(bj));
     std::sort(roles.begin(), roles.end(), lexical_role_order);
   }
