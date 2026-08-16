@@ -2079,6 +2079,17 @@ void write_minimum_self_distances(
   out << ']';
 }
 
+std::string_view minimum_self_distance_variant_name(
+    MinimumSelfDistanceVariant variant) {
+  switch (variant) {
+    case MinimumSelfDistanceVariant::kLog: return "log";
+    case MinimumSelfDistanceVariant::kPandas: return "pandas";
+    case MinimumSelfDistanceVariant::kPolars: return "polars";
+  }
+  throw std::invalid_argument(
+      "minimum self-distance JSON contains an unknown variant");
+}
+
 std::vector<ResolvedTemporalProfileEntry> resolve_temporal_profile(
     const TemporalProfile& profile, const DirectlyFollowsGraph& graph) {
   std::vector<ResolvedTemporalProfileEntry> resolved;
@@ -2920,7 +2931,8 @@ void write_analysis_json(std::ostream& out,
                          const CaseOverlapCounts* case_overlap_counts,
                          const ConcurrentActivityOverlapResult*
                              concurrent_activity_overlap,
-                         const DecisionTablesResult* decision_tables) {
+                         const DecisionTablesResult* decision_tables,
+                         MinimumSelfDistanceVariant minimum_self_distance_variant) {
   // Resolve and validate the optional profile before writing any document
   // bytes, so a bad manually assembled profile cannot leave partial JSON in
   // the caller's stream.
@@ -2932,6 +2944,9 @@ void write_analysis_json(std::ostream& out,
       minimum_self_distances != nullptr
           ? resolve_minimum_self_distances(*minimum_self_distances, graph)
           : std::vector<ResolvedMinimumSelfDistance>{};
+  if (minimum_self_distances != nullptr) {
+    (void)minimum_self_distance_variant_name(minimum_self_distance_variant);
+  }
   const auto resolved_transition_system =
       transition_system != nullptr
           ? resolve_transition_system(*transition_system, log, graph)
@@ -3062,7 +3077,9 @@ void write_analysis_json(std::ostream& out,
     write_temporal_profile(out, resolved_temporal_profile);
   }
   if (minimum_self_distances != nullptr) {
-    out << ",\n  \"minimum_self_distances\": ";
+    out << ",\n  \"minimum_self_distance_variant\": \""
+        << minimum_self_distance_variant_name(minimum_self_distance_variant)
+        << "\",\n  \"minimum_self_distances\": ";
     write_minimum_self_distances(out, resolved_minimum_self_distances);
   }
   if (transition_system != nullptr) {
@@ -3288,7 +3305,8 @@ std::string analysis_json(std::string_view dataset,
                           const CaseOverlapCounts* case_overlap_counts,
                           const ConcurrentActivityOverlapResult*
                               concurrent_activity_overlap,
-                          const DecisionTablesResult* decision_tables) {
+                          const DecisionTablesResult* decision_tables,
+                          MinimumSelfDistanceVariant minimum_self_distance_variant) {
   std::ostringstream out;
   write_analysis_json(out, dataset, log, graph, tree, net, heuristics,
                       conformance, performance, resources, variant_durations,
@@ -3306,7 +3324,7 @@ std::string analysis_json(std::string_view dataset,
                       reduced_process_tree, reduced_trace_index, evaluation,
                       earth_movers_distance, interval_event_overlap_counts,
                       case_overlap_counts, concurrent_activity_overlap,
-                      decision_tables);
+                      decision_tables, minimum_self_distance_variant);
   return out.str();
 }
 

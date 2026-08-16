@@ -111,6 +111,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       dfgStatisticalActive || dfgCausalActive || correlationActive
       || spectrumActive
       || (options.batches === true)
+      || (options.minimumSelfDistanceVariant && options.minimumSelfDistanceVariant !== "log")
       || (options.overlap === true)
   );
 }

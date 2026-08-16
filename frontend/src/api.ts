@@ -438,6 +438,8 @@ export interface MinerOptions {
   batchMergeDistanceSeconds?: number;
   batchMinSize?: number;
   batchStartTimestampAttribute?: string;
+  /** Minimum self-distance adapter selector included in the analysis export. */
+  minimumSelfDistanceVariant?: "log" | "pandas" | "polars";
   /** Optional overlap statistics (interval events, cases, concurrent activities). */
   overlap?: boolean;
   overlapActivityAttribute?: string;
@@ -1012,6 +1014,10 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("batch_min_size", String(options.batchMinSize));
     if (options.batchStartTimestampAttribute?.trim())
       add("batch_start_timestamp_attribute", options.batchStartTimestampAttribute.trim());
+  }
+  if (options.minimumSelfDistanceVariant &&
+      options.minimumSelfDistanceVariant !== "log") {
+    add("minimum_self_distance_variant", options.minimumSelfDistanceVariant);
   }
   if (options.overlap) {
     add("overlap", "true");

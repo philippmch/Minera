@@ -8,6 +8,19 @@
 
 namespace minera {
 
+enum class MinimumSelfDistanceVariant {
+  kLog,
+  kPandas,
+  kPolars,
+  LOG = kLog,
+  PANDAS = kPandas,
+  POLARS = kPolars,
+};
+
+struct MinimumSelfDistanceOptions {
+  MinimumSelfDistanceVariant variant = MinimumSelfDistanceVariant::kLog;
+};
+
 struct MinimumSelfDistance {
   std::string activity;
   std::uint64_t distance = 0;
@@ -21,6 +34,7 @@ using MinimumSelfDistances = std::vector<MinimumSelfDistance>;
 // occur at most once in every trace are omitted. Witnesses are the sorted
 // union of activities occurring in every minimum-distance segment.
 [[nodiscard]] MinimumSelfDistances discover_minimum_self_distances(
-    const EventLog& log);
+    const EventLog& log,
+    const MinimumSelfDistanceOptions& options = {});
 
 }  // namespace minera

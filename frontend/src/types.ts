@@ -3495,6 +3495,7 @@ export interface MineraExport {
   /** Temporal-profile timing statistics; absent in exports from older versions. */
   temporal_profile?: TemporalProfileEntry[];
   /** Minimum self-distance and witness activities; absent in older exports. */
+  minimum_self_distance_variant?: "log" | "pandas" | "polars";
   minimum_self_distances?: MinimumSelfDistanceEntry[];
   /** View-based transition system; absent in older exports. */
   transition_system?: TransitionSystemExport;
@@ -3525,6 +3526,10 @@ export function isMineraExport(value: unknown): value is MineraExport {
     Array.isArray(data.edges) &&
     Array.isArray(data.variants) &&
     Number.isFinite(data.trace_count) &&
+    (data.minimum_self_distance_variant === undefined ||
+      data.minimum_self_distance_variant === "log" ||
+      data.minimum_self_distance_variant === "pandas" ||
+      data.minimum_self_distance_variant === "polars") &&
     (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
     (overlap === undefined || (

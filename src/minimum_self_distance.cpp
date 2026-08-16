@@ -22,7 +22,13 @@ struct Segment {
 
 }  // namespace
 
-MinimumSelfDistances discover_minimum_self_distances(const EventLog& log) {
+MinimumSelfDistances discover_minimum_self_distances(
+    const EventLog& log, const MinimumSelfDistanceOptions& options) {
+  if (options.variant != MinimumSelfDistanceVariant::kLog &&
+      options.variant != MinimumSelfDistanceVariant::kPandas &&
+      options.variant != MinimumSelfDistanceVariant::kPolars)
+    throw std::invalid_argument(
+        "minimum_self_distance_variant must be log, pandas, or polars");
   std::vector<Segment> segments;
   std::map<std::string, std::uint64_t> minima;
   segments.reserve(log.event_count());

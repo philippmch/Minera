@@ -202,6 +202,16 @@ void minimum_self_distance_discovers_distances_and_witnesses() {
                {"", "R", "", "", 2}, {"", "Q", "", "", 3}}},
   };
   const auto result = minera::discover_minimum_self_distances(log);
+  minera::MinimumSelfDistanceOptions pandas_options;
+  pandas_options.variant = minera::MinimumSelfDistanceVariant::kPandas;
+  const auto pandas_result =
+      minera::discover_minimum_self_distances(log, pandas_options);
+  minera::MinimumSelfDistanceOptions polars_options;
+  polars_options.variant = minera::MinimumSelfDistanceVariant::kPolars;
+  const auto polars_result =
+      minera::discover_minimum_self_distances(log, polars_options);
+  assert(pandas_result.size() == result.size() &&
+         polars_result.size() == result.size());
   assert(result.size() == 6);
   assert(result[0].activity.empty() && result[0].distance == 1);
   assert((result[0].witnesses == std::vector<std::string>{"ü"}));
@@ -230,6 +240,8 @@ void minimum_self_distance_json_resolves_ids_and_validates_before_writing() {
                                           nullptr, nullptr, nullptr, nullptr,
                                           nullptr, nullptr, &distances);
   assert(json.find("\"minimum_self_distances\": [{\"activity\": 0, \"distance\": 1, \"witnesses\": [1]}]") !=
+         std::string::npos);
+  assert(json.find("\"minimum_self_distance_variant\": \"log\"") !=
          std::string::npos);
   assert(minera::analysis_json("test", log, graph).find(
              "minimum_self_distances") == std::string::npos);

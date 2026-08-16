@@ -2097,6 +2097,7 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"batch_merge_distance_seconds", "12.5"},
       {"batch_min_size", "3"},
       {"batch_start_timestamp_attribute", "started_at"},
+      {"minimum_self_distance_variant", "polars"},
   }));
   assert((params.spectrum_activities == std::vector<std::string>{"A", "B"}));
   assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kDisconnected);
@@ -2110,6 +2111,8 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.batch_options.merge_distance_seconds == 12.5);
   assert(params.batch_options.min_batch_size == 3);
   assert(params.batch_options.start_timestamp_attribute == "started_at");
+  assert(params.minimum_self_distance.variant ==
+         minera::MinimumSelfDistanceVariant::kPolars);
 }
 
 void parse_mine_params_maps_overlap_options() {
@@ -2151,7 +2154,8 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
            std::pair{"batch_merge_distance_seconds", "nan"},
            std::pair{"batch_merge_distance_seconds", "-1"},
            std::pair{"batch_min_size", "1"},
-           std::pair{"batch_min_size", "no"}}) {
+           std::pair{"batch_min_size", "no"},
+           std::pair{"minimum_self_distance_variant", "other"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));
