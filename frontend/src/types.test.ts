@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, type MineraExport } from "./types";
 
 describe("isDfgPrecisionResult", () => {
   const valid = { family: "DFG_PRECISION", computed: true, precision: 0.75,
@@ -311,6 +311,32 @@ describe("isOcelStatisticsResult", () => {
     expect(isOcelStatisticsResult({
       family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
       associations: { Create: [["e1"]] },
+    })).toBe(false);
+  });
+});
+
+describe("isOcelDescriptionResult", () => {
+  it("accepts textual and tuple envelopes", () => {
+    expect(isOcelDescriptionResult({
+      family: "OCEL_DESCRIPTION", variant: "VARIANT1",
+      includes_timestamps: true, text: "events:",
+    })).toBe(true);
+    expect(isOcelDescriptionResult({
+      family: "OCEL_DESCRIPTION", variant: "VARIANT2",
+      includes_timestamps: true,
+      events: [["Create", "o1", "2024-01-01T00:00:00Z"]],
+      objects: [["o1", "order", "2024-01-01T00:00:00Z",
+        "2024-01-02T00:00:00Z", 86400]],
+    })).toBe(true);
+  });
+  it("rejects malformed tuple fields", () => {
+    expect(isOcelDescriptionResult({
+      family: "OCEL_DESCRIPTION", variant: "VARIANT2",
+      includes_timestamps: true, events: [["Create"]], objects: [["o1", "order"]],
+    })).toBe(false);
+    expect(isOcelDescriptionResult({
+      family: "OCEL_DESCRIPTION", variant: "VARIANT1",
+      includes_timestamps: true, text: 2,
     })).toBe(false);
   });
 });

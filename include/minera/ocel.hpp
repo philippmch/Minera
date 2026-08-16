@@ -251,6 +251,11 @@ struct OcelDescriptionOptions {
   bool include_timestamps = true;
 };
 
+enum class OcelDescriptionVariant { kVariant1, kVariant2 };
+
+[[nodiscard]] const char* ocel_description_variant_name(
+    OcelDescriptionVariant variant);
+
 struct OcelTupleEventDescription {
   std::string activity;
   std::vector<std::string> related_objects;
@@ -277,5 +282,8 @@ OcelTupleDescription describe_ocel_tuples(
 std::string describe_ocel_text(const Ocel& log,
                                const OcelDescriptionOptions& options = {});
 std::string serialize_ocel_description_json(const OcelTupleDescription& description);
+std::string serialize_ocel_description_json(
+    const Ocel& log, OcelDescriptionVariant variant,
+    const OcelDescriptionOptions& options = {});
 
 }  // namespace minera
