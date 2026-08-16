@@ -996,6 +996,32 @@ MineParams parse_mine_params(const FieldLookup& field,
     }
     params.filter.time_mode = *mode;
   }
+  const bool case_duration_min_supplied =
+      supplied("case_duration_min") || supplied("min_case_performance");
+  const bool case_duration_max_supplied =
+      supplied("case_duration_max") || supplied("max_case_performance");
+  if (case_duration_min_supplied || case_duration_max_supplied) {
+    const auto duration_field = [&](std::string_view primary,
+                                    std::string_view alias) {
+      return supplied(primary) ? primary : alias;
+    };
+    if (case_duration_min_supplied) {
+      const auto name = duration_field("case_duration_min", "min_case_performance");
+      params.filter.min_case_duration_seconds =
+          parse_finite_double(field(name), name);
+    }
+    if (case_duration_max_supplied) {
+      const auto name = duration_field("case_duration_max", "max_case_performance");
+      params.filter.max_case_duration_seconds =
+          parse_finite_double(field(name), name);
+    }
+    if (params.filter.max_case_duration_seconds &&
+        params.filter.min_case_duration_seconds.value_or(0.0) >
+            *params.filter.max_case_duration_seconds) {
+      throw std::invalid_argument(
+          "case_duration_min: must not exceed case_duration_max");
+    }
+  }
   if (const auto value = field("keep_activities"); !value.empty()) {
     params.filter.keep_activities = split_csv(value);
   }

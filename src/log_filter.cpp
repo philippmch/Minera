@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -269,6 +270,45 @@ bool trace_matches_any_pattern(const Trace& trace,
   return false;
 }
 
+std::optional<double> case_duration_seconds(const Trace& trace) {
+  if (trace.events.empty()) return std::nullopt;
+  const auto first = parse_timestamp(trace.events.front().timestamp);
+  const auto last = parse_timestamp(trace.events.back().timestamp);
+  if (!first || !last) return std::nullopt;
+  return *last - *first;
+}
+
+void validate_case_performance_options(
+    const CasePerformanceFilterOptions& options) {
+  if (options.min_duration_seconds &&
+      !std::isfinite(*options.min_duration_seconds)) {
+    throw std::invalid_argument("case duration minimum must be finite");
+  }
+  if (options.max_duration_seconds &&
+      !std::isfinite(*options.max_duration_seconds)) {
+    throw std::invalid_argument("case duration maximum must be finite");
+  }
+  if (options.max_duration_seconds &&
+      options.min_duration_seconds.value_or(0.0) >
+          *options.max_duration_seconds) {
+    throw std::invalid_argument(
+        "case duration minimum must not exceed the maximum");
+  }
+}
+
+bool case_duration_matches(const Trace& trace,
+                           const CasePerformanceFilterOptions& options) {
+  const auto duration = case_duration_seconds(trace);
+  if (!duration) return false;
+  if (options.min_duration_seconds &&
+      *duration < *options.min_duration_seconds)
+    return false;
+  if (options.max_duration_seconds &&
+      *duration > *options.max_duration_seconds)
+    return false;
+  return true;
+}
+
 }  // namespace
 
 std::optional<TimeFilterMode> parse_time_filter_mode(std::string_view name) {
@@ -364,6 +404,19 @@ EventLog filter_trace_patterns(const EventLog& event_log,
   return result;
 }
 
+EventLog filter_case_performance(
+    const EventLog& event_log, const CasePerformanceFilterOptions& options) {
+  validate_case_performance_options(options);
+  if (!options.min_duration_seconds && !options.max_duration_seconds)
+    return event_log;
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    if (case_duration_matches(trace, options)) result.traces.push_back(trace);
+  }
+  return result;
+}
+
 EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) {
   const auto keep = to_set(options.keep_activities);
   const auto remove = to_set(options.remove_activities);
@@ -415,6 +468,12 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       options.time_from, -std::numeric_limits<double>::infinity());
   const double time_to = parse_time_bound(
       options.time_to, std::numeric_limits<double>::infinity());
+  const CasePerformanceFilterOptions case_performance{
+      options.min_case_duration_seconds, options.max_case_duration_seconds};
+  validate_case_performance_options(case_performance);
+  const bool by_case_performance =
+      case_performance.min_duration_seconds.has_value() ||
+      case_performance.max_duration_seconds.has_value();
 
   if (!options.activity_split_activities.empty() &&
       options.activity_split_separator.empty()) {
@@ -462,6 +521,11 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
           break;
         }
       }
+    }
+
+    if (by_case_performance &&
+        !case_duration_matches(trace, case_performance)) {
+      continue;
     }
 
     Trace projected = project_events(*source, keep, remove, keep_res,

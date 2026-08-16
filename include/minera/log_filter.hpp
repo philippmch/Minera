@@ -61,6 +61,13 @@ struct TracePatternFilterOptions {
   bool positive = true;
 };
 
+// Inclusive duration bounds for a complete trace, measured from its first
+// event timestamp to its last event timestamp in input order.
+struct CasePerformanceFilterOptions {
+  std::optional<double> min_duration_seconds;
+  std::optional<double> max_duration_seconds;
+};
+
 // Parses a comma-separated list of successions ("a -> b, c -> d") into
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
@@ -84,6 +91,11 @@ struct LogFilterOptions {
   std::string time_from;
   std::string time_to;
   TimeFilterMode time_mode = TimeFilterMode::events;
+  // Optional complete-case duration bounds, applied before event projection.
+  // Traces with an empty or unparseable first/last timestamp are excluded
+  // whenever either bound is active.
+  std::optional<double> min_case_duration_seconds;
+  std::optional<double> max_case_duration_seconds;
   // Activity projection. When `keep_activities` is non-empty, only events whose
   // activity appears in it survive; `remove_activities` then drops any listed
   // activity. An empty list means "no constraint" for that field.
@@ -226,6 +238,8 @@ struct LogFilterOptions {
            !keep_eventually_follows.empty() ||
            !remove_eventually_follows.empty() ||
            !trace_patterns.empty() ||
+           min_case_duration_seconds.has_value() ||
+           max_case_duration_seconds.has_value() ||
            !prefix_activity.empty() || !suffix_activity.empty() ||
            !between_start.empty() || !between_end.empty() ||
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
@@ -257,6 +271,9 @@ struct LogFilterOptions {
 // Standalone trace-pattern filter preserving log- and trace-level metadata.
 [[nodiscard]] EventLog filter_trace_patterns(
     const EventLog& event_log, const TracePatternFilterOptions& options);
+
+[[nodiscard]] EventLog filter_case_performance(
+    const EventLog& event_log, const CasePerformanceFilterOptions& options);
 
 [[nodiscard]] inline EventLog trace_filter(
     const EventLog& event_log, const TracePatternFilterOptions& options) {

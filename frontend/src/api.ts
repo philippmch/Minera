@@ -280,6 +280,9 @@ export interface FilterOptions extends LtlFilterOptions {
   timeFrom?: string;
   timeTo?: string;
   timeMode?: TimeFilterMode;
+  /** Inclusive complete-case duration bounds, in seconds. */
+  caseDurationMin?: number;
+  caseDurationMax?: number;
   /** Generic event-attribute filter: the key, its value constraints, and
    * whether it filters events or whole cases. */
   attributeKey?: string;
@@ -499,6 +502,10 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.timeTo) add("time_to", options.timeTo);
   if (options.timeMode && (options.timeFrom || options.timeTo))
     add("time_mode", options.timeMode);
+  if (options.caseDurationMin !== undefined)
+    add("case_duration_min", String(options.caseDurationMin));
+  if (options.caseDurationMax !== undefined)
+    add("case_duration_max", String(options.caseDurationMax));
   if (options.attributeKey) {
     add("attribute_key", options.attributeKey);
     if (options.keepAttributeValues?.length)

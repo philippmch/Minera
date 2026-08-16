@@ -902,10 +902,12 @@ int usage(const char* program) {
                "\n  Log filtering (applied before discovery):\n"
                "  --time-from <iso8601>     Keep only behaviour at/after this instant\n"
                "  --time-to <iso8601>       Keep only behaviour at/before this instant\n"
-               "  --time-mode <mode>        How the time range reads a trace:\n"
-               "                            events (default: keep events in range),\n"
-               "                            traces_contained, or traces_intersecting\n"
-               "  --keep-activities <a,b>   Keep only these activities\n"
+                "  --time-mode <mode>        How the time range reads a trace:\n"
+                "                            events (default: keep events in range),\n"
+                "                            traces_contained, or traces_intersecting\n"
+                "  --case-duration-min <s>  Inclusive lower complete-case duration\n"
+                "  --case-duration-max <s>  Inclusive upper complete-case duration\n"
+                "  --keep-activities <a,b>   Keep only these activities\n"
                "  --remove-activities <a,b> Drop these activities\n"
                "  --keep-resources <a,b>    Keep only events by these resources\n"
                "  --remove-resources <a,b>  Drop events by these resources\n"
@@ -1204,6 +1206,16 @@ int main(int argc, char** argv) {
     throw std::invalid_argument(std::string(option) +
                                 " expects true, false, 1, or 0");
   };
+  const auto parse_finite_double = [](const char* value,
+                                      std::string_view option) {
+    char* end = nullptr;
+    const double parsed = std::strtod(value, &end);
+    if (end != value + std::strlen(value) || !std::isfinite(parsed)) {
+      throw std::invalid_argument(std::string(option) +
+                                  " expects a finite number");
+    }
+    return parsed;
+  };
   const auto parse_dfg_cost = [](const char* value, std::string_view option) {
     const std::string text = value; const auto sep = text.rfind('=');
     if (sep == std::string::npos || sep == 0 || sep + 1 >= text.size()) throw std::invalid_argument(std::string(option)+" expects activity=value");
@@ -1274,6 +1286,16 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.trace_pattern_positive = parse_boolean(value, arg);
+      continue;
+    }
+    if (arg == "--case-duration-min" || arg == "--case-duration-max") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const double parsed = parse_finite_double(value, arg);
+      if (arg == "--case-duration-min")
+        filter.min_case_duration_seconds = parsed;
+      else
+        filter.max_case_duration_seconds = parsed;
       continue;
     }
     if (arg == "--segment-prefix-activity" ||

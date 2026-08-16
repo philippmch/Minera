@@ -103,6 +103,21 @@ export function pathValidationMessage(input: {
   return null;
 }
 
+/** Complete-case duration bounds use zero as the implicit lower bound. */
+export function caseDurationValidationMessage(input: {
+  min: string;
+  max: string;
+}): string | null {
+  if (!input.min.trim() && !input.max.trim()) return null;
+  const min = input.min.trim() ? Number(input.min) : 0;
+  const max = input.max.trim() ? Number(input.max) : undefined;
+  if (!Number.isFinite(min) || (max !== undefined && !Number.isFinite(max)))
+    return "Case duration bounds must be finite numbers.";
+  if (max !== undefined && (min > max || max < 0))
+    return "Case duration minimum must not exceed a non-negative maximum.";
+  return null;
+}
+
 /** Repetition bounds are inclusive and default to [2, +infinity]. */
 export function repetitionValidationMessage(input: {
   value: string;
@@ -150,6 +165,8 @@ export function Filters({
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [timeMode, setTimeMode] = useState<TimeFilterMode>("events");
+  const [caseDurationMin, setCaseDurationMin] = useState("");
+  const [caseDurationMax, setCaseDurationMax] = useState("");
   const [reworkActivity, setReworkActivity] = useState("");
   const [reworkMin, setReworkMin] = useState("");
   const [betweenStart, setBetweenStart] = useState("");
@@ -537,6 +554,10 @@ export function Filters({
     maxPerformance: pathMaxPerformance,
     positive: pathPositive,
   });
+  const caseDurationValidationError = caseDurationValidationMessage({
+    min: caseDurationMin,
+    max: caseDurationMax,
+  });
   const repetitionValidationError = repetitionValidationMessage({
     value: repetitionValue,
     min: repetitionMin,
@@ -549,7 +570,8 @@ export function Filters({
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
-        pathValidationError || repetitionValidationError || caseGroupingValidationError) return;
+        pathValidationError || caseDurationValidationError ||
+        repetitionValidationError || caseGroupingValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -616,6 +638,8 @@ export function Filters({
       timeFrom: timeFrom || undefined,
       timeTo: timeTo || undefined,
       timeMode: timeFrom || timeTo ? timeMode : undefined,
+      caseDurationMin: caseDurationMin.trim() ? Number(caseDurationMin) : undefined,
+      caseDurationMax: caseDurationMax.trim() ? Number(caseDurationMax) : undefined,
       reworkActivity: reworkActivity || undefined,
       reworkMin: reworkActivity ? toInt(reworkMin) : undefined,
       betweenStart: betweenStart && betweenEnd ? betweenStart : undefined,
@@ -782,6 +806,8 @@ export function Filters({
     setTimeFrom("");
     setTimeTo("");
     setTimeMode("events");
+    setCaseDurationMin("");
+    setCaseDurationMax("");
     setReworkActivity("");
     setReworkMin("");
     setBetweenStart("");
@@ -908,6 +934,8 @@ export function Filters({
     variantCoverage !== "" ||
     timeFrom !== "" ||
     timeTo !== "" ||
+    caseDurationMin !== "" ||
+    caseDurationMax !== "" ||
     reworkActivity !== "" ||
     betweenStart !== "" ||
     betweenEnd !== "" ||
@@ -1129,6 +1157,31 @@ export function Filters({
                 <option value="continue">continue replay (default)</option>
                 <option value="stop">stop the trace immediately</option>
               </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>Case duration min (seconds)</span>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="0"
+                value={caseDurationMin}
+                onChange={(e) => setCaseDurationMin(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Case duration max (seconds)</span>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="unbounded"
+                value={caseDurationMax}
+                onChange={(e) => setCaseDurationMax(e.target.value)}
+              />
             </label>
           </div>
 
@@ -2406,11 +2459,12 @@ export function Filters({
             </label>
           </div>
 
-          {(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError}</p>
+          {(temporalValidationError || ltlValidationError || segmentValidationError ||
+            pathValidationError || caseDurationValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError)}>
               Apply
             </button>
             <button

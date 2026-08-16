@@ -150,6 +150,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.maxLength ||
       filters.timeFrom ||
       filters.timeTo ||
+      filters.caseDurationMin !== undefined ||
+      filters.caseDurationMax !== undefined ||
       filters.reworkActivity ||
       filters.attributeKey ||
       filters.caseAttributeKey ||
