@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <unordered_set>
 
@@ -10,6 +11,36 @@
 
 namespace minera {
 namespace {
+
+const std::string* event_attribute(const Event& event, std::string_view key) {
+  if (key == "activity" || key == "concept:name") return &event.activity;
+  if (key == "timestamp" || key == "time:timestamp") return &event.timestamp;
+  if (key == "resource" || key == "org:resource") return &event.resource;
+  if (key == "lifecycle" || key == "lifecycle:transition")
+    return &event.lifecycle;
+  return event.attribute(key);
+}
+
+const std::string* trace_attribute(const Trace& trace, std::string_view key) {
+  if (key == "case_id" || key == "concept:name" ||
+      key == "case:concept:name") return &trace.case_id;
+  return trace.attribute(key);
+}
+
+bool disconnected_variant(PerformanceSpectrumVariant variant) {
+  return variant == PerformanceSpectrumVariant::kDisconnected ||
+         variant == PerformanceSpectrumVariant::kDataframeDisconnected ||
+         variant == PerformanceSpectrumVariant::kLogDisconnected;
+}
+
+bool supported_variant(PerformanceSpectrumVariant variant) {
+  return variant == PerformanceSpectrumVariant::kConnected ||
+         variant == PerformanceSpectrumVariant::kDisconnected ||
+         variant == PerformanceSpectrumVariant::kDataframe ||
+         variant == PerformanceSpectrumVariant::kLog ||
+         variant == PerformanceSpectrumVariant::kDataframeDisconnected ||
+         variant == PerformanceSpectrumVariant::kLogDisconnected;
+}
 
 struct TimedEvent {
   std::string activity;
@@ -58,14 +89,21 @@ PerformanceSpectrum compute_performance_spectrum(
   if (options.sample_size == 0) {
     throw std::invalid_argument("performance spectrum: sample_size must be positive");
   }
-  if (options.variant != PerformanceSpectrumVariant::kConnected &&
-      options.variant != PerformanceSpectrumVariant::kDisconnected) {
+  if (!supported_variant(options.variant)) {
     throw std::invalid_argument("performance spectrum: unknown variant");
+  }
+  if (options.activity_attribute.empty() || options.timestamp_attribute.empty() ||
+      options.case_id_attribute.empty()) {
+    throw std::invalid_argument(
+        "performance spectrum: activity, timestamp, and case-id attributes must not be empty");
   }
 
   PerformanceSpectrum spectrum;
   spectrum.activities = std::move(activities);
   spectrum.variant = options.variant;
+  spectrum.activity_attribute = options.activity_attribute;
+  spectrum.timestamp_attribute = options.timestamp_attribute;
+  spectrum.case_id_attribute = options.case_id_attribute;
   const auto& pattern = spectrum.activities;
   const std::unordered_set<std::string> requested(pattern.begin(), pattern.end());
 
@@ -75,14 +113,20 @@ PerformanceSpectrum compute_performance_spectrum(
     std::vector<TimedEvent> projected;
     for (std::size_t pos = 0; pos < trace.events.size(); ++pos) {
       const auto& event = trace.events[pos];
-      if (requested.find(event.activity) == requested.end()) continue;
-      const auto parsed = parse_timestamp(event.timestamp);
+      const auto* activity = event_attribute(event, options.activity_attribute);
+      if (!activity || requested.find(*activity) == requested.end()) continue;
+      const auto* timestamp = event_attribute(event, options.timestamp_attribute);
+      if (!timestamp || timestamp->empty()) {
+        throw std::invalid_argument(
+            "performance spectrum: selected event has a missing timestamp");
+      }
+      const auto parsed = parse_timestamp(*timestamp);
       if (!parsed) {
         throw std::invalid_argument(
             "performance spectrum: selected event has an invalid timestamp");
       }
       projected.push_back(
-          TimedEvent{event.activity, *parsed, pos, event.input_order});
+          TimedEvent{*activity, *parsed, pos, event.input_order});
     }
     if (options.sort_log) {
       std::stable_sort(projected.begin(), projected.end(),
@@ -95,7 +139,9 @@ PerformanceSpectrum compute_performance_spectrum(
                        });
     }
 
-    if (options.variant == PerformanceSpectrumVariant::kConnected) {
+    const auto* case_id = trace_attribute(trace, options.case_id_attribute);
+    const std::string case_identifier = case_id ? *case_id : std::string{};
+    if (!disconnected_variant(options.variant)) {
       for (std::size_t start = 0; start + pattern.size() <= projected.size();
            ++start) {
         bool matches = true;
@@ -107,7 +153,7 @@ PerformanceSpectrum compute_performance_spectrum(
         }
         if (!matches) continue;
         SpectrumObservation observation;
-        observation.case_id = trace.case_id;
+        observation.case_id = case_identifier;
         observation.pattern_offset = 0;
         observation.activities = pattern;
         observation.instants.reserve(pattern.size());
@@ -152,7 +198,7 @@ PerformanceSpectrum compute_performance_spectrum(
         }
         for (const auto match : matches) {
           SpectrumObservation observation;
-          observation.case_id = trace.case_id;
+          observation.case_id = case_identifier;
           observation.pattern_offset = match.offset;
           observation.activities.assign(pattern.begin() + match.offset,
                                         pattern.begin() + match.offset + length);

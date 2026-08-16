@@ -8,12 +8,34 @@
 
 namespace minera {
 
-enum class PerformanceSpectrumVariant { kConnected, kDisconnected };
+enum class PerformanceSpectrumVariant {
+  // Connected/disconnected are the historical native names and remain the
+  // default aliases for the log-based implementations.
+  kConnected,
+  kDisconnected,
+  kDataframe,
+  kLog,
+  kDataframeDisconnected,
+  kLogDisconnected,
+
+  CONNECTED = kConnected,
+  DISCONNECTED = kDisconnected,
+  DATAFRAME = kDataframe,
+  LOG = kLog,
+  DATAFRAME_DISCONNECTED = kDataframeDisconnected,
+  LOG_DISCONNECTED = kLogDisconnected,
+};
 
 struct PerformanceSpectrumOptions {
   PerformanceSpectrumVariant variant = PerformanceSpectrumVariant::kConnected;
   std::size_t sample_size = 10000;
   bool sort_log = true;
+  // Event/trace attributes used by the selected implementation. Built-in
+  // aliases are activity, timestamp, and case_id; generic attributes are
+  // resolved from the event or trace attribute maps.
+  std::string activity_attribute = "activity";
+  std::string timestamp_attribute = "timestamp";
+  std::string case_id_attribute = "case_id";
 };
 
 // One observed occurrence of the spectrum's activity pattern in one case: the
@@ -39,14 +61,18 @@ struct PerformanceSpectrum {
   std::vector<std::string> activities;  // the pattern, at least two steps
   std::vector<SpectrumObservation> observations;  // in log order
   PerformanceSpectrumVariant variant = PerformanceSpectrumVariant::kConnected;
+  std::string activity_attribute = "activity";
+  std::string timestamp_attribute = "timestamp";
+  std::string case_id_attribute = "case_id";
 };
 
 // Computes the spectrum after projecting each trace onto the pattern's
 // activities. Every selected event must have a parseable timestamp. Connected
 // mode emits full exact-pattern windows; disconnected mode emits labeled
-// contiguous subpatterns. Windows may overlap. Invalid options, a pattern
-// shorter than two activities, or an invalid selected timestamp throw
-// std::invalid_argument.
+// contiguous subpatterns. The explicit LOG/DATAFRAME names select equivalent
+// native projections while preserving the four public variation names.
+// Windows may overlap. Invalid options, a pattern shorter than two activities,
+// or an invalid selected timestamp throw std::invalid_argument.
 [[nodiscard]] PerformanceSpectrum compute_performance_spectrum(
     const EventLog& log,
     std::vector<std::string> activities,

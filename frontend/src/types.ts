@@ -2720,8 +2720,13 @@ export interface PerformanceSpectrumObservation {
   pattern_offset: number;
 }
 export interface PerformanceSpectrumExport {
-  variant: "connected" | "disconnected";
+  variant:
+    | "connected" | "disconnected" | "dataframe" | "log"
+    | "dataframe_disconnected" | "log_disconnected";
   activities: string[];
+  activity_attribute?: string;
+  timestamp_attribute?: string;
+  case_id_attribute?: string;
   observations: PerformanceSpectrumObservation[];
 }
 

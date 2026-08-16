@@ -2088,6 +2088,9 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"spectrum_variant", "disconnected"},
       {"spectrum_sample_size", "17"},
       {"spectrum_sort_log", "false"},
+      {"spectrum_activity_key", "phase"},
+      {"spectrum_timestamp_key", "occurred_at"},
+      {"spectrum_case_id_key", "case_ref"},
       {"batches", "true"},
       {"batch_merge_distance_seconds", "12.5"},
       {"batch_min_size", "3"},
@@ -2097,6 +2100,9 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kDisconnected);
   assert(params.spectrum.sample_size == 17);
   assert(!params.spectrum.sort_log);
+  assert(params.spectrum.activity_attribute == "phase");
+  assert(params.spectrum.timestamp_attribute == "occurred_at");
+  assert(params.spectrum.case_id_attribute == "case_ref");
   assert(params.batches);
   assert(params.batch_options.merge_distance_seconds == 12.5);
   assert(params.batch_options.min_batch_size == 3);

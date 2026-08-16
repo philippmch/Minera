@@ -26,7 +26,9 @@ export interface Spectrum {
   /** Earliest and latest instant across all lines (epoch ms); 0 when empty. */
   minTime: number;
   maxTime: number;
-  variant?: "connected" | "disconnected";
+  variant?:
+    | "connected" | "disconnected" | "dataframe" | "log"
+    | "dataframe_disconnected" | "log_disconnected";
   activities?: string[];
 }
 

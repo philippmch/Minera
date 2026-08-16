@@ -2013,6 +2013,18 @@ void performance_spectrum_finds_pattern_occurrences() {
          std::string::npos);
   assert(disconnected_json.find("\"activities\": [\"a\", \"b\"]") !=
          std::string::npos);
+
+  minera::PerformanceSpectrumOptions dataframe_options;
+  dataframe_options.variant = minera::PerformanceSpectrumVariant::kDataframe;
+  const auto dataframe = minera::compute_performance_spectrum(
+      log, {"a", "b"}, dataframe_options);
+  const auto dataframe_json = minera::analysis_json(
+      "t", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &dataframe);
+  assert(dataframe_json.find("\"variant\": \"dataframe\"") !=
+         std::string::npos);
+  assert(dataframe_json.find("\"activity_attribute\": \"activity\"") !=
+         std::string::npos);
 }
 
 void json_export_carries_the_eventually_follows_contract() {

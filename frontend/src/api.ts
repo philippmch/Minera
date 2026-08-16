@@ -424,9 +424,14 @@ export interface MinerOptions {
   correlationSampleSize?: number;
   /** Performance spectrum (opt-in when activities are supplied). */
   spectrumActivities?: string[];
-  spectrumVariant?: "connected" | "disconnected";
+  spectrumVariant?:
+    | "connected" | "disconnected" | "dataframe" | "log"
+    | "dataframe_disconnected" | "log_disconnected";
   spectrumSampleSize?: number;
   spectrumSortLog?: boolean;
+  spectrumActivityKey?: string;
+  spectrumTimestampKey?: string;
+  spectrumCaseIdKey?: string;
   /** Batch discovery (opt-in). */
   batches?: boolean;
   batchMergeDistanceSeconds?: number;
@@ -989,6 +994,12 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (options.spectrumSampleSize !== undefined && Number.isInteger(options.spectrumSampleSize) && options.spectrumSampleSize > 0 && options.spectrumSampleSize !== 10000)
       add("spectrum_sample_size", String(options.spectrumSampleSize));
     if (options.spectrumSortLog === false) add("spectrum_sort_log", "false");
+    if (options.spectrumActivityKey?.trim())
+      add("spectrum_activity_key", options.spectrumActivityKey.trim());
+    if (options.spectrumTimestampKey?.trim())
+      add("spectrum_timestamp_key", options.spectrumTimestampKey.trim());
+    if (options.spectrumCaseIdKey?.trim())
+      add("spectrum_case_id_key", options.spectrumCaseIdKey.trim());
   }
   if (options.batches) {
     add("batches", "true");

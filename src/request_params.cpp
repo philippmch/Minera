@@ -2023,7 +2023,10 @@ MineParams parse_mine_params(const FieldLookup& field,
   };
   for (const auto name : {std::string_view{"spectrum_variant"},
                           std::string_view{"spectrum_sample_size"},
-                          std::string_view{"spectrum_sort_log"}}) {
+                          std::string_view{"spectrum_sort_log"},
+                          std::string_view{"spectrum_activity_key"},
+                          std::string_view{"spectrum_timestamp_key"},
+                          std::string_view{"spectrum_case_id_key"}}) {
     if (spectrum_option_supplied(name) && !spectrum_supplied()) {
       throw std::invalid_argument(std::string(name) +
                                   ": requires spectrum_activities");
@@ -2031,13 +2034,23 @@ MineParams parse_mine_params(const FieldLookup& field,
   }
   if (const auto value = field("spectrum_variant");
       present ? present("spectrum_variant") : !value.empty()) {
-    if (value == "connected") {
+    if (value == "connected" || value == "CONNECTED") {
       params.spectrum.variant = PerformanceSpectrumVariant::kConnected;
-    } else if (value == "disconnected") {
+    } else if (value == "disconnected" || value == "DISCONNECTED") {
       params.spectrum.variant = PerformanceSpectrumVariant::kDisconnected;
+    } else if (value == "dataframe" || value == "DATAFRAME") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kDataframe;
+    } else if (value == "log" || value == "LOG") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kLog;
+    } else if (value == "dataframe_disconnected" ||
+               value == "DATAFRAME_DISCONNECTED") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kDataframeDisconnected;
+    } else if (value == "log_disconnected" ||
+               value == "LOG_DISCONNECTED") {
+      params.spectrum.variant = PerformanceSpectrumVariant::kLogDisconnected;
     } else {
       throw std::invalid_argument(
-          "spectrum_variant: expected connected or disconnected, got '" +
+          "spectrum_variant: expected connected, disconnected, dataframe, log, dataframe_disconnected, or log_disconnected, got '" +
           value + "'");
     }
   }
@@ -2049,6 +2062,20 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("spectrum_sort_log");
       present ? present("spectrum_sort_log") : !value.empty()) {
     params.spectrum.sort_log = parse_boolean(value, "spectrum_sort_log");
+  }
+  for (const auto [name, target] : {
+           std::pair<std::string_view, std::string*>{"spectrum_activity_key",
+                                                     &params.spectrum.activity_attribute},
+           std::pair<std::string_view, std::string*>{"spectrum_timestamp_key",
+                                                     &params.spectrum.timestamp_attribute},
+           std::pair<std::string_view, std::string*>{"spectrum_case_id_key",
+                                                     &params.spectrum.case_id_attribute}}) {
+    if (spectrum_option_supplied(name)) {
+      const auto value = field(name);
+      if (value.empty())
+        throw std::invalid_argument(std::string(name) + ": expected a value");
+      *target = value;
+    }
   }
   if (const auto value = field("batches");
       present ? present("batches") : !value.empty()) {

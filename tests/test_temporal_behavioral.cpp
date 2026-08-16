@@ -25,6 +25,36 @@ int main() {
   auto spectrum = minera::compute_performance_spectrum(log, {"a", "b"});
   assert(spectrum.observations.size() == 1);
   assert(spectrum.observations.front().activities.size() == 2);
+  minera::EventLog custom;
+  minera::Trace custom_trace;
+  custom_trace.case_id = "ignored-case-id";
+  custom_trace.attributes.push_back({"case_ref", "custom-case"});
+  custom_trace.events = {
+      {"ignored-case-id", "ignored-a", "ignored-time", "", 0,
+       {{"phase", "a"}, {"occurred_at", "2024-01-01T00:00:00Z"}}, ""},
+      {"ignored-case-id", "ignored-b", "ignored-time", "", 1,
+       {{"phase", "b"}, {"occurred_at", "2024-01-01T00:01:00Z"}}, ""}};
+  custom.traces.push_back(custom_trace);
+  minera::PerformanceSpectrumOptions custom_options;
+  custom_options.variant = minera::PerformanceSpectrumVariant::kDataframe;
+  custom_options.activity_attribute = "phase";
+  custom_options.timestamp_attribute = "occurred_at";
+  custom_options.case_id_attribute = "case_ref";
+  const auto custom_result =
+      minera::compute_performance_spectrum(custom, {"a", "b"}, custom_options);
+  assert(custom_result.observations.size() == 1);
+  assert(custom_result.observations.front().case_id == "custom-case");
+  assert(custom_result.activity_attribute == "phase");
+  for (const auto variant : {
+           minera::PerformanceSpectrumVariant::kLog,
+           minera::PerformanceSpectrumVariant::kDataframeDisconnected,
+           minera::PerformanceSpectrumVariant::kLogDisconnected}) {
+    auto alias_options = custom_options;
+    alias_options.variant = variant;
+    assert(minera::compute_performance_spectrum(custom, {"a", "b"},
+                                                alias_options)
+               .observations.size() == 1);
+  }
   minera::PerformanceSpectrumOptions bad_variant;
   bad_variant.variant = static_cast<minera::PerformanceSpectrumVariant>(99);
   assert(throws([&] {

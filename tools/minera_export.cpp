@@ -550,9 +550,12 @@ int usage(const char* program) {
                "                            steps): per occurrence, when each\n"
                "                            step happened; embedded under\n"
                "                            \"performance_spectrum\"\n"
-               "  --spectrum-variant <id>  connected (default) or disconnected\n"
+               "  --spectrum-variant <id>  connected, disconnected, log/dataframe, or *_disconnected\n"
                "  --spectrum-sample-size <n> Positive spectrum sample size\n"
                "  --spectrum-sort-log <bool> Sort log before spectrum mining\n"
+               "  --spectrum-activity-key <name> Activity attribute\n"
+               "  --spectrum-timestamp-key <name> Timestamp attribute\n"
+               "  --spectrum-case-id-key <name> Case identifier attribute\n"
                "  --concept-drift          Emit standalone concept-drift JSON\n"
                "  --drift-sub-log-size <n> Positive raw sub-log size\n"
                "  --drift-window-size <n> Positive comparison window size\n"
@@ -1318,6 +1321,67 @@ int main(int argc, char** argv) {
           arg == "--ltl-timestamp-diff-boundaries"
               ? "ltl_timestamp_diff_boundaries" : "ltl_resource_key";
       ltl_fields[key] = value;
+      continue;
+    }
+    if (arg == "--spectrum" || arg == "--spectrum-variant" ||
+        arg == "--spectrum-sample-size" || arg == "--spectrum-sort-log" ||
+        arg == "--spectrum-activity-key" ||
+        arg == "--spectrum-timestamp-key" ||
+        arg == "--spectrum-case-id-key") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--spectrum") {
+        spectrum_activities = split_csv(value);
+        spectrum_requested = true;
+        if (spectrum_activities.size() < 2) {
+          std::cerr << "error: --spectrum expects at least two activities\n";
+          return 2;
+        }
+      } else if (arg == "--spectrum-variant") {
+        spectrum_option_used = true;
+        const auto variant = std::string_view(value);
+        if (variant == "connected")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kConnected;
+        else if (variant == "disconnected")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kDisconnected;
+        else if (variant == "dataframe")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kDataframe;
+        else if (variant == "log")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kLog;
+        else if (variant == "dataframe_disconnected")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kDataframeDisconnected;
+        else if (variant == "log_disconnected")
+          spectrum_options.variant = minera::PerformanceSpectrumVariant::kLogDisconnected;
+        else {
+          std::cerr << "error: --spectrum-variant expects connected, disconnected, dataframe, log, dataframe_disconnected, or log_disconnected\n";
+          return 2;
+        }
+      } else if (arg == "--spectrum-sample-size") {
+        spectrum_option_used = true;
+        try {
+          spectrum_options.sample_size = parse_positive_size(value, arg);
+        } catch (const std::invalid_argument& error) {
+          std::cerr << "error: " << error.what() << '\n';
+          return 2;
+        }
+      } else if (arg == "--spectrum-sort-log") {
+        spectrum_option_used = true;
+        try {
+          spectrum_options.sort_log = parse_boolean(value, arg);
+        } catch (const std::invalid_argument& error) {
+          std::cerr << "error: " << error.what() << '\n';
+          return 2;
+        }
+      } else {
+        spectrum_option_used = true;
+        if (std::string_view(value).empty()) return usage(argv[0]);
+        if (arg == "--spectrum-activity-key")
+          spectrum_options.activity_attribute = value;
+        else if (arg == "--spectrum-timestamp-key")
+          spectrum_options.timestamp_attribute = value;
+        else
+          spectrum_options.case_id_attribute = value;
+      }
       continue;
     }
     if (arg == "--trace-patterns" || arg == "--trace-pattern") {
@@ -2906,47 +2970,6 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
-    } else if (arg == "--spectrum") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      spectrum_activities = split_csv(value);
-      spectrum_requested = true;
-      if (spectrum_activities.size() < 2) {
-        std::cerr << "error: --spectrum expects at least two activities\n";
-        return 2;
-      }
-    } else if (arg == "--spectrum-variant") {
-      spectrum_option_used = true;
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      if (std::string_view(value) == "connected")
-        spectrum_options.variant = minera::PerformanceSpectrumVariant::kConnected;
-      else if (std::string_view(value) == "disconnected")
-        spectrum_options.variant = minera::PerformanceSpectrumVariant::kDisconnected;
-      else {
-        std::cerr << "error: --spectrum-variant expects connected or disconnected\n";
-        return 2;
-      }
-    } else if (arg == "--spectrum-sample-size") {
-      spectrum_option_used = true;
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      try {
-        spectrum_options.sample_size = parse_positive_size(value, arg);
-      } catch (const std::invalid_argument& error) {
-        std::cerr << "error: " << error.what() << '\n';
-        return 2;
-      }
-    } else if (arg == "--spectrum-sort-log") {
-      spectrum_option_used = true;
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      try {
-        spectrum_options.sort_log = parse_boolean(value, arg);
-      } catch (const std::invalid_argument& error) {
-        std::cerr << "error: " << error.what() << '\n';
-        return 2;
-      }
     } else if (arg == "--batches") {
       batches = true;
     } else if (arg == "--batch-merge-distance-seconds") {
@@ -3347,7 +3370,7 @@ int main(int argc, char** argv) {
 
   if (spectrum_option_used && !spectrum_requested) {
     std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
-                 "--spectrum-sort-log require --spectrum\n";
+                 "--spectrum-sort-log/--spectrum-*-key require --spectrum\n";
     return 2;
   }
   if (activity_split_option_used && filter.activity_split_activities.empty()) {
