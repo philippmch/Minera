@@ -3087,6 +3087,38 @@ void filter_case_performance_uses_inclusive_trace_duration() {
   }));
 }
 
+void filter_case_selection_limits_cases_and_event_counts() {
+  const auto log = log_from_variants({{"a"}, {"a", "b"}, {"a", "b", "c"}});
+
+  const auto default_size = minera::filter_on_case_size(log);
+  assert(default_size.trace_count() == 2);
+  assert(default_size.traces.front().case_id == "1");
+
+  const auto bounded_size = minera::filter_case_size(log, 2, 2);
+  assert(bounded_size.trace_count() == 1);
+  assert(bounded_size.traces.front().case_id == "1");
+
+  assert(minera::filter_on_ncases(log, 1).trace_count() == 1);
+  assert(minera::filter_on_ncases(log, 0).trace_count() == 0);
+
+  minera::LogFilterOptions integrated;
+  integrated.min_length = 2;
+  integrated.max_length = 3;
+  integrated.max_cases = 1;
+  assert(integrated.any());
+  const auto filtered = minera::filter_event_log(log, integrated);
+  assert(filtered.trace_count() == 1);
+  assert(filtered.traces.front().case_id == "1");
+
+  assert(throws([&] { (void)minera::filter_case_size(log, 4, 3); }));
+  assert(throws([&] {
+    minera::LogFilterOptions invalid;
+    invalid.min_length = 4;
+    invalid.max_length = 3;
+    (void)minera::filter_event_log(log, invalid);
+  }));
+}
+
 void importer_rejects_malformed_rows() {
   // Too few fields for the declared header.
   assert(throws([] {
@@ -5186,6 +5218,7 @@ int main() {
   filter_time_range_bounds_are_inclusive_and_one_sided();
   filter_time_range_rejects_a_malformed_bound();
   filter_case_performance_uses_inclusive_trace_duration();
+  filter_case_selection_limits_cases_and_event_counts();
   csv_importer_captures_extra_columns_as_attributes();
   xes_importer_captures_generic_event_attributes();
   xes_export_round_trips_generic_attributes();

@@ -791,6 +791,7 @@ void parse_mine_params_maps_filters() {
       {"remove_lifecycles", "schedule, suspend"},
       {"start_activities", "a"},
       {"end_activities", "c"},
+      {"max_cases", "4"},
       {"min_length", "2"},
       {"max_length", "10"},
       {"min_variant_frequency", "3"},
@@ -845,6 +846,7 @@ void parse_mine_params_maps_filters() {
           std::vector<std::string>{"schedule", "suspend"}));
   assert((params.filter.start_activities == std::vector<std::string>{"a"}));
   assert((params.filter.end_activities == std::vector<std::string>{"c"}));
+  assert(params.filter.max_cases && *params.filter.max_cases == 4);
   assert(params.filter.min_length == 2);
   assert(params.filter.max_length == 10);
   assert(params.filter.min_variant_frequency == 3);
@@ -920,6 +922,30 @@ void parse_mine_params_rejects_invalid_case_duration_bounds() {
   try {
     (void)minera::parse_mine_params(fields({
         {"case_duration_min", "10"}, {"case_duration_max", "9"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void parse_mine_params_rejects_invalid_case_selection_bounds() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"max_cases", "-1"},
+           std::pair<std::string, std::string>{"min_length", "-1"},
+           std::pair<std::string, std::string>{"max_length", "not-an-int"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"min_length", "5"}, {"max_length", "4"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -2452,6 +2478,7 @@ int main() {
   parse_mine_params_maps_csv_and_inductive_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_invalid_case_duration_bounds();
+  parse_mine_params_rejects_invalid_case_selection_bounds();
   parse_mine_params_rejects_invalid_trace_patterns();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();
