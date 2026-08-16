@@ -155,7 +155,7 @@ target_include_directories(minera_core
 )
 
 if(WIN32)
-  target_link_libraries(minera_core PRIVATE bcrypt winsqlite3)
+  target_link_libraries(minera_core PRIVATE bcrypt winsqlite3 PUBLIC ws2_32)
   target_compile_definitions(minera_core PUBLIC MINERA_HAS_SQLITE=1)
 else()
   find_package(SQLite3 QUIET)
@@ -210,6 +210,12 @@ add_executable(minera_streaming_dfg
 )
 target_link_libraries(minera_streaming_dfg PRIVATE minera::core)
 target_compile_features(minera_streaming_dfg PRIVATE cxx_std_20)
+
+add_executable(minera_streaming_store
+  tools/minera_streaming_store.cpp
+)
+target_link_libraries(minera_streaming_store PRIVATE minera::core)
+target_compile_features(minera_streaming_store PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_footprints
   tools/minera_streaming_footprints.cpp
