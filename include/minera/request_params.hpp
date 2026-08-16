@@ -194,6 +194,7 @@ struct PetriAnalysisParams {
   bool full_bootstrap_required = true;
   std::size_t max_states = 200000;
   bool diagnostics = false;
+  bool return_asap_when_unsound = false;
 };
 
 // Strict wire contract for process-tree simulation. Fields use the

@@ -230,12 +230,16 @@ describe("evaluation adapters", () => {
     expect(query.get("petri_analysis_full_bootstrap")).toBe("false");
     expect(new URLSearchParams(petriAnalysisQuery({ family: "woflan" }))
       .get("petri_analysis_family")).toBe("woflan");
+    expect(new URLSearchParams(petriAnalysisQuery({
+      family: "woflan", return_asap_when_unsound: true,
+    })).get("petri_analysis_return_asap_when_unsound")).toBe("true");
     expect(() => petriAnalysisQuery({ max_states: 0 })).toThrow(/valid/);
     expect(() => petriAnalysisQuery({ model_costs: [-1] })).toThrow(/costs/);
     expect(isPetriAnalysisResult({ family: "soundness", status: "sound" })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", status: "sound", returned_asap: true })).toBe(true);
     expect(isPetriAnalysisResult({ family: "woflan", variant: "soundness", status: "sound" })).toBe(true);
     expect(isPetriAnalysisResult({ family: "woflan", variant: "other" })).toBe(false);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", returned_asap: "true" })).toBe(false);
     expect(isPetriAnalysisResult({ family: "unknown" })).toBe(false);
   });
 

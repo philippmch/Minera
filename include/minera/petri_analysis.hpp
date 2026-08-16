@@ -107,6 +107,9 @@ struct SoundnessOptions {
   Marking final_marking;
   std::size_t max_states = 200000;
   bool diagnostics = false;
+  // Stop once a reachable non-final deadlock or improper marking proves the
+  // workflow unsound. The partial graph and witness are still returned.
+  bool return_asap_when_unsound = false;
 };
 
 struct SoundnessResult {
@@ -114,6 +117,7 @@ struct SoundnessResult {
   SoundnessStatus status = SoundnessStatus::UNKNOWN;
   bool computed = false;
   bool exhausted = false;
+  bool returned_asap = false;
   WorkflowNetResult workflow;
   bool bounded = false;
   bool final_reachable = false;

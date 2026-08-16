@@ -3526,6 +3526,7 @@ void handle_petri_analysis(const httplib::Request& request,
         options.final_marking = params.final_marking;
         options.max_states = params.max_states;
         options.diagnostics = params.diagnostics;
+        options.return_asap_when_unsound = params.return_asap_when_unsound;
         response.set_content(
             minera::petri_analysis_json(minera::analyze_soundness(net, options)),
             "application/json");
