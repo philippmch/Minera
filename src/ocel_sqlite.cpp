@@ -303,6 +303,181 @@ void read_attributes(sqlite3* db, std::string_view table,
   }
 }
 
+struct TableColumn {
+  std::string name;
+  std::string declared_type;
+};
+
+std::vector<TableColumn> table_columns(sqlite3* db, std::string_view table) {
+  std::vector<TableColumn> result;
+  if (!table_exists(db, table)) return result;
+  Statement statement(db, "PRAGMA table_info(" + quote_identifier(table) + ")");
+  while (true) {
+    const auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) break;
+    if (status != SQLITE_ROW)
+      throw std::runtime_error("SQLite table-info query failed");
+    result.push_back({column_string(statement.get(), 1),
+                      column_string(statement.get(), 2)});
+  }
+  return result;
+}
+
+OcelValue read_sqlite_cell(sqlite3_stmt* statement, int column,
+                           std::string_view declared_type = {}) {
+  std::string type(declared_type);
+  std::transform(type.begin(), type.end(), type.begin(),
+                 [](const unsigned char value) {
+                   return static_cast<char>(std::toupper(value));
+                 });
+  const bool boolean_type = type.find("BOOL") != std::string::npos;
+  const auto sqlite_type = sqlite3_column_type(statement, column);
+  if (boolean_type && sqlite_type == SQLITE_INTEGER) {
+    return sqlite3_column_int(statement, column) != 0;
+  }
+  if (boolean_type && sqlite_type == SQLITE_TEXT) {
+    auto text = column_string(statement, column);
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](const unsigned char value) {
+                     return static_cast<char>(std::tolower(value));
+                   });
+    if (text == "true" || text == "1") return true;
+    if (text == "false" || text == "0") return false;
+    throw std::invalid_argument("OCEL SQLite boolean attribute is invalid");
+  }
+  switch (sqlite_type) {
+    case SQLITE_NULL:
+      return nullptr;
+    case SQLITE_INTEGER:
+      return static_cast<std::int64_t>(sqlite3_column_int64(statement, column));
+    case SQLITE_FLOAT:
+      return sqlite3_column_double(statement, column);
+    case SQLITE_TEXT:
+      return column_string(statement, column);
+    default:
+      throw std::invalid_argument("OCEL SQLite attributes cannot contain BLOB values");
+  }
+}
+
+std::vector<OcelAttribute> read_type_table_attributes(
+    sqlite3* db, std::string_view table, const std::string& id) {
+  const auto columns = table_columns(db, table);
+  if (columns.empty()) return {};
+  const auto changed = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "ocel_changed_field";
+      });
+  const auto cumulative = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "@@cumcount";
+      });
+  std::string query = "SELECT * FROM " + quote_identifier(table) +
+                      " WHERE ocel_id=?1";
+  if (changed == columns.end()) {
+    query += " ORDER BY rowid LIMIT 1";
+  } else {
+    query += " ORDER BY CASE WHEN ocel_changed_field IS NULL THEN 0";
+    if (cumulative != columns.end()) {
+      query += " WHEN " + quote_identifier("@@cumcount") + "=0 THEN 1";
+    }
+    query += " ELSE 2 END, rowid LIMIT 1";
+  }
+  Statement statement(db, query);
+  bind_text(statement.get(), 1, id);
+  const auto status = sqlite3_step(statement.get());
+  if (status == SQLITE_DONE) return {};
+  if (status != SQLITE_ROW)
+    throw std::runtime_error("SQLite type-table attribute query failed");
+  std::vector<OcelAttribute> result;
+  for (std::size_t index = 0; index < columns.size(); ++index) {
+    const auto& column = columns[index];
+    if (column.name == "ocel_id" || column.name == "ocel_time" ||
+        column.name == "ocel_changed_field" || column.name == "@@cumcount")
+      continue;
+    if (sqlite3_column_type(statement.get(), static_cast<int>(index)) == SQLITE_NULL)
+      continue;
+    result.push_back({column.name,
+                      read_sqlite_cell(statement.get(), static_cast<int>(index),
+                                       column.declared_type)});
+  }
+  return result;
+}
+
+void read_type_table_changes(sqlite3* db, std::string_view table,
+                             std::string_view object_type, Ocel& log,
+                             const std::set<std::string>& object_ids,
+                             bool validate_references) {
+  const auto columns = table_columns(db, table);
+  const auto changed = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "ocel_changed_field";
+      });
+  const auto timestamp = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "ocel_time";
+      });
+  const auto id = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "ocel_id";
+      });
+  if (changed == columns.end() || timestamp == columns.end() ||
+      id == columns.end()) return;
+  bool has_null_change_marker = false;
+  {
+    Statement base(db, "SELECT 1 FROM " + quote_identifier(table) +
+                           " WHERE ocel_changed_field IS NULL LIMIT 1");
+    const auto status = sqlite3_step(base.get());
+    if (status == SQLITE_ROW) {
+      has_null_change_marker = true;
+    } else if (status != SQLITE_DONE) {
+      throw std::runtime_error("SQLite object base-row query failed");
+    }
+  }
+  Statement statement(db, "SELECT * FROM " + quote_identifier(table) +
+                             " ORDER BY rowid");
+  const auto id_index = static_cast<int>(id - columns.begin());
+  const auto changed_index = static_cast<int>(changed - columns.begin());
+  const auto timestamp_index = static_cast<int>(timestamp - columns.begin());
+  const auto cumulative = std::find_if(
+      columns.begin(), columns.end(), [](const auto& column) {
+        return column.name == "@@cumcount";
+      });
+  const auto cumulative_index = cumulative == columns.end()
+                                    ? -1
+                                    : static_cast<int>(cumulative - columns.begin());
+  while (true) {
+    const auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) break;
+    if (status != SQLITE_ROW)
+      throw std::runtime_error("SQLite object-change query failed");
+    if (sqlite3_column_type(statement.get(), changed_index) == SQLITE_NULL)
+      continue;
+    if (!has_null_change_marker && cumulative_index >= 0 &&
+        sqlite3_column_int64(statement.get(), cumulative_index) == 0)
+      continue;
+    const auto field = column_string(statement.get(), changed_index);
+    if (field.empty()) continue;
+    const auto object_id = column_string(statement.get(), id_index);
+    if (validate_references && !object_ids.contains(object_id))
+      throw std::invalid_argument("OCEL SQLite object change references an unknown id");
+    const auto value_column = std::find_if(
+        columns.begin(), columns.end(), [&](const auto& column) {
+          return column.name == field;
+        });
+    if (value_column == columns.end())
+      throw std::invalid_argument("OCEL SQLite object change value column is missing");
+    OcelObjectChange change;
+    change.object_id = object_id;
+    change.object_type = std::string(object_type);
+    change.timestamp = column_string(statement.get(), timestamp_index);
+    change.field = field;
+    change.value = read_sqlite_cell(
+        statement.get(), static_cast<int>(value_column - columns.begin()),
+        value_column->declared_type);
+    log.object_changes.push_back(std::move(change));
+  }
+}
+
 std::string table_timestamp(sqlite3* db, std::string_view table,
                             const std::string& id) {
   Statement statement(db, "SELECT ocel_time FROM " + quote_identifier(table) +
@@ -460,7 +635,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   for (const auto& [id, activity] : event_types) {
     auto mapped = event_map.find(activity);
     const auto table = mapped == event_map.end()
-                           ? type_table_token(activity, options)
+                           ? "event_" + type_table_token(activity, options)
                            : "event_" + mapped->second;
     OcelEvent event;
     event.id = id;
@@ -469,6 +644,8 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     if (const auto attributes = event_attributes.find(id);
         attributes != event_attributes.end()) {
       event.attributes = attributes->second;
+    } else if (table_exists(db, table)) {
+      event.attributes = read_type_table_attributes(db, table, id);
     }
     log.events.push_back(std::move(event));
   }
@@ -476,9 +653,15 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     OcelObject object;
     object.id = id;
     object.type = type;
+    const auto mapped = object_map.find(type);
+    const auto table = mapped == object_map.end()
+                           ? type_table_token(type, options)
+                           : "object_" + mapped->second;
     if (const auto attributes = object_attributes.find(id);
         attributes != object_attributes.end()) {
       object.attributes = attributes->second;
+    } else if (table_exists(db, table)) {
+      object.attributes = read_type_table_attributes(db, table, id);
     }
     log.objects.push_back(std::move(object));
   }
@@ -502,6 +685,20 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (options.validate_references && !object_types.contains(change.object_id))
         throw std::invalid_argument("OCEL SQLite object change references an unknown id");
       log.object_changes.push_back(std::move(change));
+    }
+  } else {
+    std::set<std::string> visited_tables;
+    std::set<std::string> object_ids;
+    for (const auto& [id, type] : object_types) object_ids.insert(id);
+    for (const auto& [id, type] : object_types) {
+      const auto mapped = object_map.find(type);
+      const auto table = mapped == object_map.end()
+                             ? "object_" + type_table_token(type, options)
+                             : "object_" + mapped->second;
+      if (visited_tables.insert(table).second && table_exists(db, table)) {
+        read_type_table_changes(db, table, type, log, object_ids,
+                                options.validate_references);
+      }
     }
   }
   if (table_exists(db, "ocel_globals")) {
