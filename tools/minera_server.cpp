@@ -46,6 +46,7 @@
 #include "minera/dfg_conversion.hpp"
 #include "minera/dfg_filter.hpp"
 #include "minera/dfg_io.hpp"
+#include "minera/dfg_precision.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/edit_distance_alignment.hpp"
@@ -4288,6 +4289,43 @@ void handle_dfg_import(const httplib::Request& request,
   }
 }
 
+void handle_dfg_precision(const httplib::Request& request,
+                          httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "activity_attribute")
+        throw std::invalid_argument("unknown DFG precision parameter: " + key);
+    }
+    minera::DfgPrecisionOptions options;
+    if (request.has_param("activity_attribute"))
+      options.activity_attribute = request.get_param_value("activity_attribute");
+    if (options.activity_attribute.empty())
+      throw std::invalid_argument("activity_attribute must not be empty");
+    const auto body = ocel_request_body(request, "dfg");
+    if (body.empty()) throw std::invalid_argument("missing DFG text body");
+    response.set_content(
+        minera::serialize_dfg_precision_json(
+            minera::evaluate_dfg_precision(
+                session->log, minera::parse_dfg(body), options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_dfg_conversion(const httplib::Request& request,
                            httplib::Response& response) {
   try {
@@ -4793,6 +4831,7 @@ int main(int argc, char** argv) {
   server.Options("/api/check-model", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
+  server.Options("/api/dfg-precision", preflight);
   server.Options("/api/dfg-to-petri", preflight);
   server.Options("/api/process-cube", preflight);
   server.Options("/api/streaming-dfg", preflight);
@@ -4877,6 +4916,7 @@ int main(int argc, char** argv) {
   server.Get("/api/xes", handle_xes);
   server.Get("/api/dfg", handle_dfg);
   server.Post("/api/dfg", handle_dfg_import);
+  server.Post("/api/dfg-precision", handle_dfg_precision);
   server.Post("/api/dfg-to-petri", handle_dfg_conversion);
   server.Post("/api/process-cube", handle_process_cube);
   server.Post("/api/streaming-dfg", handle_streaming_dfg);

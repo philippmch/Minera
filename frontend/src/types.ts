@@ -1848,6 +1848,17 @@ export interface DfgAlignmentResult {
   projected_log?: unknown;
 }
 
+export interface DfgPrecisionResult {
+  family: "DFG_PRECISION";
+  computed: boolean;
+  precision: number;
+  prefix_occurrences: number;
+  allowed_prefix_occurrences: number;
+  activated_transitions: number;
+  escaping_transitions: number;
+  error: string;
+}
+
 export type DfgPetriConversionVariant =
   | "ACTIVITY_DEFINES_PLACE"
   | "INVISIBLES_NO_DUPLICATES";
@@ -2116,6 +2127,14 @@ export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResul
       !Number.isInteger(value.unique_variants) || !Array.isArray(value.alignments)) return false;
   return value.alignments.every((a) => isRecord(a) && finite(a.cost) && finite(a.internal_cost) &&
     finite(a.fitness) && Array.isArray(a.moves) && a.moves.every((m) => isRecord(m) && typeof m.log === "string" && typeof m.model === "string"));
+}
+export function isDfgPrecisionResult(value: unknown): value is DfgPrecisionResult {
+  if (!isRecord(value) || value.family !== "DFG_PRECISION" ||
+      typeof value.computed !== "boolean" || !finite(value.precision) ||
+      value.precision < 0 || value.precision > 1 || typeof value.error !== "string") return false;
+  return ["prefix_occurrences", "allowed_prefix_occurrences",
+    "activated_transitions", "escaping_transitions"].every((key) =>
+    Number.isSafeInteger(value[key]) && (value[key] as number) >= 0);
 }
 const nonNegativeIntArray = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every((item) => Number.isInteger(item) && (item as number) >= 0);
