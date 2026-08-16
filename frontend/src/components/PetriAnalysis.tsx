@@ -38,6 +38,9 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
   const [result, setResult] = useState<PetriAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const structuralPairs = result?.family === "soundness"
+    ? (result.not_well_handled_pairs ?? result.handled_pairs)
+    : undefined;
 
   const run = async () => {
     if (!onRequest || !miner) return;
@@ -93,6 +96,11 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
     {models.length === 0 && <p className="conf-inline-note">No Petri model is available in this analysis.</p>}
     <button type="button" className="button" disabled={!onRequest || !miner || loading} onClick={() => void run()}>{loading ? "Analyzing…" : "Run Petri analysis"}</button>
     {error && <p className="error-inline">{error}</p>}
+    {structuralPairs && <div className="conf-inline-note">
+      <strong>Structural pair diagnostics: {structuralPairs.length}</strong>
+      {structuralPairs.length > 0 && <ul>{structuralPairs.map((pair, index) =>
+        <li key={`${pair[0]}-${pair[1]}-${index}`}>node {pair[0]} → node {pair[1]}</li>)}</ul>}
+    </div>}
     {result && <pre className="analysis-json">{JSON.stringify(result, null, 2)}</pre>}
   </section>;
 }

@@ -43,6 +43,36 @@ PetriNet parallel_net() {
   return net;
 }
 
+PetriNet branching_pair_net() {
+  PetriNet net;
+  net.set_activities({"left", "right", "join"});
+  const auto source = net.add_place();
+  const auto left = net.add_place();
+  const auto right = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source}, {left});
+  net.add_transition(1, {source}, {right});
+  net.add_transition(2, {left, right}, {sink});
+  return net;
+}
+
+PetriNet splitting_pair_net() {
+  PetriNet net;
+  net.set_activities({"left", "right"});
+  const auto source = net.add_place();
+  const auto left = net.add_place();
+  const auto right = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {left, right});
+  net.add_transition(0, {left}, {sink});
+  net.add_transition(1, {right}, {sink});
+  return net;
+}
+
 void classic_equation() {
   const auto net = chain();
   auto result = solve_marking_equation(net);
@@ -197,6 +227,9 @@ void positive_invariant_diagnostics() {
   const auto serialized = petri_analysis_json(sequential);
   assert(serialized.find("\"s_components\"") != std::string::npos);
   assert(serialized.find("\"handled_pairs\"") != std::string::npos);
+  assert(serialized.find("\"not_well_handled_pairs\"") != std::string::npos);
+  assert(sequential.handled_pairs.has_value());
+  assert(sequential.handled_pairs->empty());
 
   const auto parallel = analyze_soundness(parallel_net());
   assert(parallel.s_components.has_value());
@@ -212,6 +245,29 @@ void positive_invariant_diagnostics() {
       assert(std::abs(consumed - produced) < 1e-7);
     }
   }
+}
+
+void structural_pair_diagnostics() {
+  const auto result = analyze_soundness(branching_pair_net(), {.diagnostics = true});
+  assert(result.workflow.valid);
+  assert(result.handled_pairs.has_value());
+  const auto& pairs = *result.handled_pairs;
+  assert(std::find(pairs.begin(), pairs.end(),
+                   std::vector<std::size_t>({1, 12})) != pairs.end());
+  assert(std::any_of(result.diagnostic_messages.begin(),
+                     result.diagnostic_messages.end(), [](const auto& message) {
+                       return message.find("structural pair diagnostics") !=
+                              std::string::npos;
+                     }));
+  const auto serialized = petri_analysis_json(result);
+  assert(serialized.find("\"not_well_handled_pairs\":[[") !=
+         std::string::npos);
+
+  const auto split = analyze_soundness(splitting_pair_net());
+  assert(split.handled_pairs.has_value());
+  assert(std::find(split.handled_pairs->begin(), split.handled_pairs->end(),
+                   std::vector<std::size_t>({9, 6})) !=
+         split.handled_pairs->end());
 }
 
 void unsound_models() {
@@ -312,6 +368,7 @@ int main() {
   workflow_structure();
   sound_models();
   positive_invariant_diagnostics();
+  structural_pair_diagnostics();
   unsound_models();
   caps_markings_determinism_and_weights();
 }

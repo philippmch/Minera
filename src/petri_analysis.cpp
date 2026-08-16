@@ -39,6 +39,122 @@ std::string validate_net(const PetriNet& net) {
   return {};
 }
 
+struct FlowEdge {
+  std::size_t target;
+  std::size_t reverse;
+  int capacity;
+};
+
+class LimitedMaxFlow {
+ public:
+  explicit LimitedMaxFlow(std::size_t node_count) : graph_(node_count) {}
+
+  void add_edge(std::size_t from, std::size_t to, int capacity) {
+    FlowEdge forward{to, graph_[to].size(), capacity};
+    FlowEdge reverse{from, graph_[from].size(), 0};
+    graph_[from].push_back(forward);
+    graph_[to].push_back(reverse);
+  }
+
+  int up_to_two(std::size_t source, std::size_t sink) {
+    if (source == sink) return 2;
+    int flow = 0;
+    while (flow < 2) {
+      level_.assign(graph_.size(), -1);
+      std::queue<std::size_t> queue;
+      level_[source] = 0;
+      queue.push(source);
+      while (!queue.empty()) {
+        const auto node = queue.front();
+        queue.pop();
+        for (const auto& edge : graph_[node]) {
+          if (edge.capacity <= 0 || level_[edge.target] >= 0) continue;
+          level_[edge.target] = level_[node] + 1;
+          queue.push(edge.target);
+        }
+      }
+      if (level_[sink] < 0) break;
+      next_edge_.assign(graph_.size(), 0);
+      while (flow < 2) {
+        const auto pushed = send(source, sink, 2 - flow);
+        if (pushed == 0) break;
+        flow += pushed;
+      }
+    }
+    return flow;
+  }
+
+ private:
+  int send(std::size_t node, std::size_t sink, int requested) {
+    if (node == sink) return requested;
+    for (auto& cursor = next_edge_[node]; cursor < graph_[node].size(); ++cursor) {
+      auto& edge = graph_[node][cursor];
+      if (edge.capacity <= 0 || level_[edge.target] != level_[node] + 1) continue;
+      const auto pushed = send(edge.target, sink, std::min(requested, edge.capacity));
+      if (pushed == 0) continue;
+      edge.capacity -= pushed;
+      graph_[edge.target][edge.reverse].capacity += pushed;
+      return pushed;
+    }
+    return 0;
+  }
+
+  std::vector<std::vector<FlowEdge>> graph_;
+  std::vector<int> level_;
+  std::vector<std::size_t> next_edge_;
+};
+
+std::vector<std::vector<std::size_t>> structural_pair_diagnostics(
+    const PetriNet& net) {
+  const auto place_count = net.place_count();
+  const auto transition_count = net.transitions().size();
+  const auto element_count = place_count + transition_count;
+  const auto node_count = element_count * 2;
+  if (place_count == 0 || transition_count == 0) return {};
+
+  // A node-split graph gives every model element unit capacity. A flow of two
+  // is therefore two internally distinct structural routes in that direction.
+  std::set<std::pair<std::size_t, std::size_t>> structural_edges;
+  const auto place_in = [](std::size_t place) { return place * 2; };
+  const auto transition_in = [place_count](std::size_t transition) {
+    return (place_count + transition) * 2;
+  };
+  for (std::size_t transition = 0; transition < transition_count; ++transition) {
+    const auto& model_transition = net.transitions()[transition];
+    const auto transition_node = transition_in(transition);
+    const auto add_input = [&](const auto& places) {
+      for (const auto place : places)
+        structural_edges.emplace(place_in(place) + 1, transition_node);
+    };
+    add_input(model_transition.inputs);
+    add_input(model_transition.reset_inputs);
+    add_input(model_transition.inhibitor_inputs);
+    for (const auto place : model_transition.outputs)
+      structural_edges.emplace(transition_node + 1, place_in(place));
+  }
+
+  const auto flow = [&](std::size_t source, std::size_t sink) {
+    LimitedMaxFlow graph(node_count);
+    for (std::size_t element = 0; element < element_count; ++element)
+      graph.add_edge(element * 2, element * 2 + 1, 1);
+    for (const auto [from, to] : structural_edges) graph.add_edge(from, to, 1);
+    return graph.up_to_two(source, sink);
+  };
+
+  std::vector<std::vector<std::size_t>> result;
+  for (std::size_t place = 0; place < place_count; ++place) {
+    const auto place_node = place_in(place);
+    for (std::size_t transition = 0; transition < transition_count; ++transition) {
+      const auto transition_node = transition_in(transition);
+      if (flow(place_node + 1, transition_node) > 1)
+        result.push_back({place_node + 1, transition_node});
+      if (flow(transition_node + 1, place_node) > 1)
+        result.push_back({transition_node + 1, place_node});
+    }
+  }
+  return result;
+}
+
 void validate_marking(const Marking& marking, std::size_t places,
                       const char* name) {
   if (marking.size() != places)
@@ -887,6 +1003,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     return result;
   }
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
+  result.handled_pairs = structural_pair_diagnostics(net);
   if (options.max_states == 0)
     throw std::invalid_argument("max_states must be positive");
   const auto markings = resolved_markings(net, options.initial_marking, options.final_marking);
@@ -1005,6 +1122,10 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       result.diagnostic_messages.push_back(
           "positive place-invariant S-components found: " +
           std::to_string(result.s_components->size()));
+    if (result.handled_pairs && !result.handled_pairs->empty())
+      result.diagnostic_messages.push_back(
+          "structural pair diagnostics found: " +
+          std::to_string(result.handled_pairs->size()));
     if (!result.uncovered_places.empty())
       result.diagnostic_messages.push_back(
           "positive place-invariant coverage is missing for one or more places");
