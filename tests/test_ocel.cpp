@@ -56,6 +56,10 @@ int main() {
 
   const auto standard =
       minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
+  assert(standard.find("\"eventTypes\":[{\"name\":\"Create\"") !=
+         std::string::npos);
+  assert(standard.find("\"time\":\"1970-01-01T00:00:00Z\"") !=
+         std::string::npos);
   const auto standard_round = minera::parse_ocel_json(standard);
   assert(standard_round.objects.size() == 2 &&
          standard_round.events.size() == 2 &&
@@ -64,6 +68,45 @@ int main() {
          standard_round.e2e.size() == log.e2e.size() &&
          standard_round.object_changes.size() == log.object_changes.size() &&
          standard_round.globals == log.globals);
+
+  const std::string standard_fixture = R"json({
+    "ocelVersion":"2.0",
+    "objectTypes":[{"name":"Order","attributes":[
+      {"name":"amount","type":"int"},
+      {"name":"status","type":"string"}]}],
+    "eventTypes":[{"name":"Create","attributes":[
+      {"name":"approved","type":"boolean"},
+      {"name":"score","type":"float"}]}],
+    "objects":[{"id":"o1","type":"Order","attributes":[
+      {"name":"amount","time":"1970-01-01T00:00:00Z","value":"7"},
+      {"name":"status","time":"1970-01-01T00:00:00Z","value":"new"},
+      {"name":"status","time":"2024-01-02T00:00:00Z","value":"paid"}],
+      "relationships":[{"objectId":"o1","qualifier":"self"}]}],
+    "events":[{"id":"e1","type":"Create","time":"2024-01-01T00:00:00Z",
+      "attributes":[{"name":"approved","value":"true"},{"name":"score","value":"2.5"}],
+      "relationships":[{"objectId":"o1","qualifier":"created"}]}],
+    "eventRelationships":[{"sourceEventId":"e1","targetEventId":"e1","qualifier":"self"}],
+    "globals":{"version":2}
+  })json";
+  const auto typed_standard = minera::parse_ocel_json(standard_fixture);
+  assert(std::get<std::int64_t>(typed_standard.objects.front().attributes[0].value) == 7);
+  assert(std::get<bool>(typed_standard.events.front().attributes[0].value));
+  assert(std::get<double>(typed_standard.events.front().attributes[1].value) == 2.5);
+  assert(typed_standard.object_changes.size() == 1 &&
+         typed_standard.object_changes.front().field == "status" &&
+         std::get<std::string>(typed_standard.object_changes.front().value) ==
+             "paid");
+  assert(typed_standard.e2e.size() == 1 &&
+         typed_standard.e2e.front().qualifier == "self");
+
+  bool duplicate_type = false;
+  try {
+    (void)minera::parse_ocel_json(
+        R"json({"objectTypes":[{"name":"Order"},{"name":"Order"}],"objects":[],"events":[]})json");
+  } catch (...) {
+    duplicate_type = true;
+  }
+  assert(duplicate_type);
 
   minera::Ocel escaped;
   escaped.objects.push_back(
