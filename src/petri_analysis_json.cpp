@@ -178,6 +178,8 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << status(result.status)
       << "\",\"computed\":" << (result.computed ? "true" : "false")
       << ",\"exhausted\":" << (result.exhausted ? "true" : "false")
+      << ",\"returned_asap\":"
+      << (result.returned_asap ? "true" : "false")
       << ",\"workflow\":" << workflow(result.workflow)
       << ",\"bounded\":" << (result.bounded ? "true" : "false")
       << ",\"final_reachable\":"

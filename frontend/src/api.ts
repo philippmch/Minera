@@ -1320,7 +1320,7 @@ export async function evaluateModel(miner: string, options: EvaluationOptions = 
   return postChecked(`/api/evaluate?${query.toString()}`, isModelEvaluation, "model evaluation");
 }
 
-/** Stable query serialization for the four native Petri-analysis families. */
+/** Stable query serialization for the native Petri-analysis families. */
 export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   const family = options.family ?? "marking_equation";
   if (!["marking_equation", "extended_marking_equation", "workflow_net", "soundness", "woflan"].includes(family)) {
@@ -1347,6 +1347,7 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   }
   if (options.full_bootstrap !== undefined && typeof options.full_bootstrap !== "boolean") throw new Error("full_bootstrap must be boolean");
   if (options.diagnostics !== undefined && typeof options.diagnostics !== "boolean") throw new Error("diagnostics must be boolean");
+  if (options.return_asap_when_unsound !== undefined && typeof options.return_asap_when_unsound !== "boolean") throw new Error("return_asap_when_unsound must be boolean");
   const query = new URLSearchParams();
   const add = (name: string, value: unknown) => { if (value !== undefined) query.set(`petri_analysis_${name}`, Array.isArray(value) ? value.join(",") : String(value)); };
   add("family", family);
@@ -1363,6 +1364,7 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   add("max_states", options.max_states);
   add("full_bootstrap", options.full_bootstrap);
   add("diagnostics", options.diagnostics);
+  add("return_asap_when_unsound", options.return_asap_when_unsound);
   return query.toString();
 }
 

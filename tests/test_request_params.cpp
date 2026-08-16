@@ -2261,7 +2261,8 @@ void parse_petri_analysis_params_maps_all_families_and_settings() {
       {"petri_analysis_max_k", "2"},
       {"petri_analysis_max_states", "42"},
       {"petri_analysis_full_bootstrap", "false"},
-      {"petri_analysis_diagnostics", "true"}}));
+      {"petri_analysis_diagnostics", "true"},
+      {"petri_analysis_return_asap_when_unsound", "true"}}));
   assert(parsed.family == minera::PetriAnalysisFamily::kExtendedMarkingEquation);
   assert(parsed.miner == "powl" && parsed.trace_index == 3);
   assert(parsed.initial_marking == minera::Marking({1, 0}));
@@ -2271,14 +2272,16 @@ void parse_petri_analysis_params_maps_all_families_and_settings() {
   assert(parsed.log_move_costs == std::vector<double>({9, 10}));
   assert(parsed.split_indices == std::vector<std::size_t>({1, 3}));
   assert(parsed.max_k_value == 2 && parsed.max_states == 42);
-  assert(!parsed.full_bootstrap_required && parsed.diagnostics);
+  assert(!parsed.full_bootstrap_required && parsed.diagnostics &&
+         parsed.return_asap_when_unsound);
 }
 
 void parse_petri_analysis_params_rejects_bad_values() {
   for (const auto& item : {
            std::pair{"petri_analysis_family", "bad"},
            std::pair{"petri_analysis_max_states", "0"},
-           std::pair{"petri_analysis_model_costs", "1,-1"}}) {
+           std::pair{"petri_analysis_model_costs", "1,-1"},
+           std::pair{"petri_analysis_return_asap_when_unsound", "maybe"}}) {
     bool threw = false;
     try {
       (void)minera::parse_petri_analysis_params(fields({item}));

@@ -336,6 +336,23 @@ void unsound_models() {
   assert(locking_json.find("\"deadlock_witnesses\":[[0]]") !=
          std::string::npos);
 
+  SoundnessOptions early;
+  early.variant = SoundnessVariant::kWoflan;
+  early.diagnostics = true;
+  early.return_asap_when_unsound = true;
+  const auto early_locking = analyze_soundness(locking, early);
+  assert(early_locking.returned_asap && early_locking.computed &&
+         early_locking.status == SoundnessStatus::UNSOUND);
+  assert(early_locking.deadlock_witnesses ==
+         std::vector<std::vector<std::size_t>>{{0}});
+  assert(early_locking.reachability_markings.size() == 2);
+  const auto early_json = petri_analysis_json(early_locking);
+  assert(early_json.find("\"returned_asap\":true") !=
+         std::string::npos);
+  const auto early_sound = analyze_soundness(chain(), early);
+  assert(!early_sound.returned_asap &&
+         early_sound.status == SoundnessStatus::SOUND);
+
   PetriNet growing; growing.set_activities({"start", "grow", "finish"});
   const auto gs = growing.add_place(), gp = growing.add_place(), gk = growing.add_place();
   growing.set_source(gs); growing.set_sink(gk);

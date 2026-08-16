@@ -2589,6 +2589,7 @@ export interface PetriAnalysisOptions {
   max_states?: number;
   full_bootstrap?: boolean;
   diagnostics?: boolean;
+  return_asap_when_unsound?: boolean;
 }
 
 export type ProcessTreePlayoutVariant = "BASIC_PLAYOUT" | "EXTENSIVE" | "TOPBOTTOM";
@@ -2702,6 +2703,7 @@ export interface PetriAnalysisResult {
   computed?: boolean;
   feasible?: boolean;
   exhausted?: boolean;
+  returned_asap?: boolean;
   objective?: number;
   lower_bound?: number;
   status?: "sound" | "unsound" | "unknown";
@@ -2738,6 +2740,8 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if (family !== "soundness" && family !== "woflan") return true;
   if ("variant" in value && value.variant !== undefined &&
       value.variant !== "soundness" && value.variant !== "woflan") return false;
+  if ("returned_asap" in value && value.returned_asap !== undefined &&
+      typeof value.returned_asap !== "boolean") return false;
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;

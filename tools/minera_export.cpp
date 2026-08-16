@@ -761,6 +761,7 @@ int usage(const char* program) {
                "  --petri-analysis-max-states <n> Solver state bound\n"
                "  --petri-analysis-full-bootstrap <bool> Require bootstrap\n"
                "  --petri-analysis-diagnostics <bool> Include diagnostics\n"
+               "  --petri-analysis-return-asap-when-unsound <bool> Stop at first unsound witness\n"
                "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
@@ -4735,6 +4736,7 @@ int main(int argc, char** argv) {
           options.final_marking = request.final_marking;
           options.max_states = request.max_states;
           options.diagnostics = request.diagnostics;
+          options.return_asap_when_unsound = request.return_asap_when_unsound;
           result_json = minera::petri_analysis_json(
               minera::analyze_soundness(*model_it->second, options));
           break;

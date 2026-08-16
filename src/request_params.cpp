@@ -2246,6 +2246,10 @@ PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field,
   if (supplied("petri_analysis_diagnostics"))
     params.diagnostics = parse_boolean(require("petri_analysis_diagnostics"),
                                        "petri_analysis_diagnostics");
+  if (supplied("petri_analysis_return_asap_when_unsound"))
+    params.return_asap_when_unsound = parse_boolean(
+        require("petri_analysis_return_asap_when_unsound"),
+        "petri_analysis_return_asap_when_unsound");
   return params;
 }
 

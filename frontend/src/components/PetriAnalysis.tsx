@@ -35,6 +35,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
   const [maxStates, setMaxStates] = useState("200000");
   const [fullBootstrap, setFullBootstrap] = useState(true);
   const [diagnostics, setDiagnostics] = useState(true);
+  const [returnAsapWhenUnsound, setReturnAsapWhenUnsound] = useState(false);
   const [result, setResult] = useState<PetriAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +64,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
         max_states: Number(maxStates || 1),
         full_bootstrap: fullBootstrap,
         diagnostics,
+        return_asap_when_unsound: returnAsapWhenUnsound,
       };
       setResult(await onRequest(options));
     } catch (cause) {
@@ -93,6 +95,7 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
       </>}
       {(family === "extended_marking_equation" || family === "soundness" || family === "woflan" || family === "marking_equation") && <label>State limit<input type="number" min={1} value={maxStates} onChange={(event) => setMaxStates(event.target.value)} /></label>}
       {(family === "soundness" || family === "woflan") && <label>Diagnostics<select value={String(diagnostics)} onChange={(event) => setDiagnostics(event.target.value === "true")}><option value="true">On</option><option value="false">Off</option></select></label>}
+      {(family === "soundness" || family === "woflan") && <label>Return early<select value={String(returnAsapWhenUnsound)} onChange={(event) => setReturnAsapWhenUnsound(event.target.value === "true")}><option value="false">Off</option><option value="true">On</option></select></label>}
     </div>
     {models.length === 0 && <p className="conf-inline-note">No Petri model is available in this analysis.</p>}
     <button type="button" className="button" disabled={!onRequest || !miner || loading} onClick={() => void run()}>{loading ? "Analyzing…" : "Run Petri analysis"}</button>

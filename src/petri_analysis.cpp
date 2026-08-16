@@ -1124,6 +1124,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   if (!result.workflow.valid) {
     result.status = SoundnessStatus::UNSOUND; result.computed = true;
+    result.returned_asap = options.return_asap_when_unsound;
     result.error = result.workflow.reason.empty() ? validation_error
                                                   : result.workflow.reason;
     if (options.diagnostics) {
@@ -1147,6 +1148,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     result.bounded = false;
     result.computed = true;
     result.status = SoundnessStatus::UNSOUND;
+    result.returned_asap = options.return_asap_when_unsound;
     result.unbounded_witness = coverability.witness;
     result.coverability_node_count = coverability.node_count;
     result.reachable_marking_count = coverability.node_count - 1;
@@ -1197,6 +1199,19 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     }
     std::reverse(path.begin(), path.end()); return path;
   };
+  const auto return_asap = [&](std::string message) {
+    result.bounded = true;
+    result.computed = true;
+    result.status = SoundnessStatus::UNSOUND;
+    result.returned_asap = true;
+    result.reachable_marking_count = nodes.size();
+    result.coverability_node_count = nodes.size();
+    result.error = std::move(message);
+    store_reachability_graph();
+    if (options.diagnostics)
+      result.diagnostic_messages.push_back(result.error);
+    return result;
+  };
   while (!queue.empty()) {
     const auto id = queue.front(); queue.pop();
     bool any = false;
@@ -1212,6 +1227,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
         }
         if (dominates && strict) {
           result.bounded = false; result.computed = true; result.status = SoundnessStatus::UNSOUND;
+          result.returned_asap = options.return_asap_when_unsound;
           result.unbounded_witness = path_to(id); result.unbounded_witness.push_back(t);
           result.coverability_node_count = nodes.size() + 1;
           result.reachable_marking_count = nodes.size();
@@ -1237,6 +1253,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (!any && nodes[id].marking != markings.final) {
       result.deadlocks.push_back(nodes[id].marking);
       result.deadlock_witnesses.push_back(path_to(id));
+      if (options.return_asap_when_unsound)
+        return return_asap("reachable non-final deadlock found");
     }
     bool covers_final = true;
     for (std::size_t p = 0; p < markings.final.size(); ++p) {
@@ -1248,6 +1266,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (covers_final && nodes[id].marking != markings.final) {
       result.improper_markings.push_back(nodes[id].marking);
       result.improper_witnesses.push_back(path_to(id));
+      if (options.return_asap_when_unsound)
+        return return_asap("reachable improper completion marking found");
     }
   }
   result.bounded = true;
