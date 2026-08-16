@@ -943,8 +943,11 @@ int usage(const char* program) {
                "  --keep-eventually-follows <a->b,...>  Like the directly-\n"
                "                            follows pair, but the partner may\n"
                "                            occur anywhere later in the case\n"
-               "  --remove-eventually-follows <a->b,...>  Drop such cases\n"
-               "  --prefix-activity <a>     Keep each case's head up to (and\n"
+                "  --remove-eventually-follows <a->b,...>  Drop such cases\n"
+                "  --trace-patterns <p1;p2> Keep traces matching an exact/prefix/\n"
+                "                            suffix/infix pattern; use ... as a wildcard\n"
+                "  --trace-pattern-positive <bool> Keep matching (default: true)\n"
+                "  --prefix-activity <a>     Keep each case's head up to (and\n"
                "                            including) the first <a>; cases\n"
                "                            without <a> are dropped\n"
                "  --suffix-activity <a>     Keep each case's tail from the\n"
@@ -1258,6 +1261,19 @@ int main(int argc, char** argv) {
           arg == "--ltl-timestamp-diff-boundaries"
               ? "ltl_timestamp_diff_boundaries" : "ltl_resource_key";
       ltl_fields[key] = value;
+      continue;
+    }
+    if (arg == "--trace-patterns" || arg == "--trace-pattern") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.trace_patterns = minera::parse_trace_patterns(value);
+      if (filter.trace_patterns.empty()) return usage(argv[0]);
+      continue;
+    }
+    if (arg == "--trace-pattern-positive") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      filter.trace_pattern_positive = parse_boolean(value, arg);
       continue;
     }
     if (arg == "--segment-prefix-activity" ||

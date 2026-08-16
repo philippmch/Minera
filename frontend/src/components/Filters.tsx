@@ -193,6 +193,8 @@ export function Filters({
   >("directly");
   const [successionFrom, setSuccessionFrom] = useState("");
   const [successionTo, setSuccessionTo] = useState("");
+  const [tracePattern, setTracePattern] = useState("");
+  const [tracePatternPositive, setTracePatternPositive] = useState(true);
   // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [removedResources, setRemovedResources] = useState<Set<string>>(
@@ -587,6 +589,10 @@ export function Filters({
       removeDirectlyFollows: succession("remove", "directly"),
       keepEventuallyFollows: succession("keep", "eventually"),
       removeEventuallyFollows: succession("remove", "eventually"),
+      tracePatterns: tracePattern.trim() ? [tracePattern.trim()] : undefined,
+      tracePatternPositive: tracePattern.trim() && !tracePatternPositive
+        ? false
+        : undefined,
       prefixActivity: prefixActivity || undefined,
       suffixActivity: suffixActivity || undefined,
       segmentPrefixActivity: segmentPrefixActivity || undefined,
@@ -800,6 +806,8 @@ export function Filters({
     setSuccessionRelation("directly");
     setSuccessionFrom("");
     setSuccessionTo("");
+    setTracePattern("");
+    setTracePatternPositive(true);
     setRemoved(new Set());
     setRemovedResources(new Set());
     setRemovedLifecycles(new Set());
@@ -924,6 +932,7 @@ export function Filters({
     pathMaxPerformance !== "" ||
     !pathPositive ||
     successionAction !== "off" ||
+    tracePattern.trim() !== "" ||
     removed.size > 0 ||
     removedResources.size > 0 ||
     removedLifecycles.size > 0 ||
@@ -1366,6 +1375,30 @@ export function Filters({
                 checked={dfgReturnNodeAttributes}
                 disabled={!dfgCaseAttributeOptionsActive}
                 onChange={(event) => setDfgReturnNodeAttributes(event.target.checked)} /> return node attributes</label>
+            </label>
+          </div>
+
+          <div className="filters-subhead">Trace-pattern filter</div>
+          <div className="filters-row">
+            <label className="filters-field filters-field-wide">
+              <span>Admitted pattern <small>(comma-separated; ... is a wildcard)</small></span>
+              <input
+                type="text"
+                placeholder="..., A, B, ..."
+                value={tracePattern}
+                onChange={(e) => setTracePattern(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Match polarity</span>
+              <select
+                value={tracePatternPositive ? "positive" : "negative"}
+                disabled={!tracePattern.trim()}
+                onChange={(e) => setTracePatternPositive(e.target.value === "positive")}
+              >
+                <option value="positive">positive (keep matches)</option>
+                <option value="negative">negative (drop matches)</option>
+              </select>
             </label>
           </div>
 

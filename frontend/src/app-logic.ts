@@ -125,6 +125,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.removeDirectlyFollows?.length ||
       filters.keepEventuallyFollows?.length ||
       filters.removeEventuallyFollows?.length ||
+      filters.tracePatterns?.length ||
       filters.prefixActivity ||
       filters.suffixActivity ||
       filters.segmentPrefixActivity ||
