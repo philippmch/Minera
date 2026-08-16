@@ -44,6 +44,9 @@ int main() {
   e.variant = LogToFeaturesVariant::TEMPORAL; e.window_seconds = 3600;
   const auto tm = log_to_features(log, e);
   assert(tm.temporal_rows.size() == 2 && tm.temporal_rows[0].values.size() == tm.feature_names.size());
+  assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "average_service_time") != tm.feature_names.end());
+  assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "number_of_cases") != tm.feature_names.end());
+  assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "unique_resources") != tm.feature_names.end());
   assert(log_to_features_json(tm).find("\"temporal_rows\"") != std::string::npos);
   bool threw = false; try { e.window_seconds = 0; (void)log_to_features(log, e); } catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
