@@ -3566,6 +3566,25 @@ export async function requestOcelSqlite(log: Blob): Promise<OcelSqliteResult> {
   return payload;
 }
 
+/** Exports an OCEL JSON document as a standard SQLite download. */
+export async function requestOcelSqliteExport(
+  log: Record<string, unknown>,
+): Promise<Blob> {
+  const response = await fetch("/api/ocel/sqlite?mode=export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(log),
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload = await response.blob();
+  const signature = new TextDecoder().decode(
+    await payload.slice(0, 16).arrayBuffer(),
+  );
+  if (signature !== "SQLite format 3\0")
+    throw new Error("the Minera backend returned an invalid SQLite export");
+  return payload;
+}
+
 export type OcelFilterSelector =
   | "event_attribute" | "object_attribute" | "object_types" | "objects"
   | "events" | "timestamp" | "activity_type_matching" | "object_count"

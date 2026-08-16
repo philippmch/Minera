@@ -1027,22 +1027,60 @@ void handle_ocel_sqlite(const httplib::Request& request,
                         httplib::Response& response) {
   std::filesystem::path temporary;
   try {
-    if (!request.is_multipart_form_data() || !request.has_file("log"))
-      throw std::invalid_argument("OCEL SQLite import requires multipart field log");
-    const auto file = request.get_file_value("log");
-    if (file.content.empty()) throw std::invalid_argument("empty SQLite upload");
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "mode")
+        throw std::invalid_argument("unknown OCEL SQLite parameter: " + key);
+    }
+    const auto mode = request.has_param("mode")
+                          ? request.get_param_value("mode")
+                          : std::string("import");
+    if (mode != "import" && mode != "export")
+      throw std::invalid_argument("OCEL SQLite mode expects import or export");
+    std::string body;
+    if (mode == "export") {
+      body = ocel_request_body(request, "log");
+      if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    } else {
+      if (!request.is_multipart_form_data() || !request.has_file("log"))
+        throw std::invalid_argument(
+            "OCEL SQLite import requires multipart field log");
+      const auto file = request.get_file_value("log");
+      body = file.content;
+      if (body.empty()) throw std::invalid_argument("empty SQLite upload");
+    }
     const auto stamp = std::chrono::high_resolution_clock::now()
                            .time_since_epoch().count();
     const auto thread = std::hash<std::thread::id>{}(std::this_thread::get_id());
     temporary = std::filesystem::temp_directory_path() /
                 ("minera_ocel_" + std::to_string(stamp) + "_" +
                  std::to_string(thread) + ".sqlite");
-    {
+    if (mode == "import") {
       std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
       if (!output) throw std::runtime_error("cannot create temporary SQLite upload");
-      output.write(file.content.data(),
-                   static_cast<std::streamsize>(file.content.size()));
+      output.write(body.data(),
+                   static_cast<std::streamsize>(body.size()));
       if (!output) throw std::runtime_error("cannot write temporary SQLite upload");
+    }
+    if (mode == "export") {
+      minera::export_ocel_sqlite(minera::parse_ocel_json(body), temporary);
+      std::ifstream input(temporary, std::ios::binary | std::ios::ate);
+      if (!input) throw std::runtime_error("cannot read temporary SQLite output");
+      const auto size = input.tellg();
+      constexpr std::streamoff kMaxSqliteResponseBytes = 64 * 1024 * 1024;
+      if (size < 16 || size > kMaxSqliteResponseBytes)
+        throw std::invalid_argument("SQLite export exceeds the server response limit");
+      std::string sqlite(static_cast<std::size_t>(size), '\0');
+      input.seekg(0);
+      input.read(sqlite.data(), static_cast<std::streamsize>(sqlite.size()));
+      if (!input) throw std::runtime_error("cannot read temporary SQLite output");
+      std::error_code ignored;
+      std::filesystem::remove(temporary, ignored);
+      temporary.clear();
+      response.set_header("Content-Disposition",
+                          "attachment; filename=\"ocel.sqlite\"");
+      response.set_content(std::move(sqlite), "application/vnd.sqlite3");
+      return;
     }
     const auto log = minera::import_ocel_sqlite(temporary);
     std::error_code ignored;

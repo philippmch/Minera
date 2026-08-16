@@ -170,8 +170,9 @@ attributes, qualifiers, object-to-object links, object changes, globals, and
 deterministic ordering where the selected format carries them. `minera_ocel`
 detects `.csv`, `.sqlite`/`.sqlite3`/`.db`, and `.xml`/`.xmlocel` inputs and can
 emit classic or standard XML or a SQLite file. The local server's multipart
-`POST /api/ocel/sqlite` and typed frontend upload adapter use the same guarded
-JSON envelope for SQLite imports.
+`POST /api/ocel/sqlite` imports SQLite files, while the same route accepts
+`mode=export` JSON and returns a bounded SQLite download; typed frontend upload
+and export adapters cover both directions.
 
 Embedding evidence: `to_embeddings` exposes both case-level and event-level
 variants through a deterministic bounded token-hash encoder. The native API
