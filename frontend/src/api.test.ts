@@ -714,8 +714,30 @@ describe("log-to-features API", () => {
       .toBe("features_event_attributes=a%5C%2Cb%2Cx&features_variant=event_based");
   });
 
+  it("serializes trace representation and extra feature controls", () => {
+    expect(logToFeaturesQuery({
+      features_enable_all_extra_features: true,
+      features_event_successor_attributes: ["concept:name"],
+      features_epsilon: 0.25,
+      features_min_num_different_string_values: 1,
+      features_max_num_different_string_values: 8,
+    })).toBe("features_enable_all_extra_features=true&features_epsilon=0.25&features_event_successor_attributes=concept%3Aname&features_max_num_different_string_values=8&features_min_num_different_string_values=1");
+    expect(() => logToFeaturesQuery({ features_epsilon: -1 })).toThrow(/epsilon/);
+    expect(() => logToFeaturesQuery({ features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
+  });
+
   it("rejects malformed backend payloads", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: [], trace_rows: [["bad"]] }) })));
+    await expect(requestLogToFeatures()).rejects.toThrow(/invalid feature extraction/);
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts typed case identifiers and rejects malformed identifiers", async () => {
+    const result = { family: "LOG_TO_FEATURES", variant: "trace_based", feature_names: [], case_ids: ["c1"], trace_rows: [[]] };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => result })));
+    await expect(requestLogToFeatures()).resolves.toEqual(result);
+    vi.unstubAllGlobals();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ...result, case_ids: [1] }) })));
     await expect(requestLogToFeatures()).rejects.toThrow(/invalid feature extraction/);
     vi.unstubAllGlobals();
   });

@@ -1,5 +1,6 @@
 #include "minera/log_to_features.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
@@ -22,7 +23,7 @@ static EventLog fixture() {
 
 int main() {
   const auto log = fixture();
-  LogToFeaturesOptions e; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
+  LogToFeaturesOptions e; e.variant = LogToFeaturesVariant::EVENT_BASED; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
   const auto er = log_to_features(log, e);
   assert(er.event_rows.size() == 1 && er.event_rows[0].size() == 2);
   assert(!er.feature_names.empty());
@@ -32,6 +33,14 @@ int main() {
   e.variant = LogToFeaturesVariant::TRACE_BASED;
   const auto tr = log_to_features(log, e);
   assert(tr.trace_rows.size() == 1 && tr.trace_rows[0].size() == tr.feature_names.size());
+  assert(std::find(tr.feature_names.begin(), tr.feature_names.end(), "activity:A") != tr.feature_names.end());
+  e.enable_all_extra_features = true;
+  e.add_case_identifier_column = true;
+  const auto rich = log_to_features(log, e);
+  assert(rich.case_ids.size() == 1 && rich.case_ids[0] == "c1");
+  assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@caseDuration") != rich.feature_names.end());
+  assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@max_concurrent_activities_general") != rich.feature_names.end());
+  assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "succession:activity@A#B") != rich.feature_names.end());
   e.variant = LogToFeaturesVariant::TEMPORAL; e.window_seconds = 3600;
   const auto tm = log_to_features(log, e);
   assert(tm.temporal_rows.size() == 2 && tm.temporal_rows[0].values.size() == tm.feature_names.size());

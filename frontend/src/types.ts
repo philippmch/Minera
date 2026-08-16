@@ -569,6 +569,7 @@ export interface LogToFeaturesResult {
   family: "LOG_TO_FEATURES";
   variant: LogToFeaturesVariant;
   feature_names: string[];
+  case_ids?: string[];
   event_rows?: number[][][];
   trace_rows?: number[][];
   temporal_rows?: LogToFeaturesTemporalRow[];
@@ -578,6 +579,7 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   const c = value as Partial<LogToFeaturesResult>;
   if (c.family !== "LOG_TO_FEATURES" || !(["event_based", "trace_based", "temporal"] as const).includes(c.variant as LogToFeaturesVariant)) return false;
   if (!Array.isArray(c.feature_names) || !c.feature_names.every((x) => typeof x === "string")) return false;
+  if (c.case_ids !== undefined && (!Array.isArray(c.case_ids) || !c.case_ids.every((x) => typeof x === "string"))) return false;
   const rows = (r: unknown): r is number[] => Array.isArray(r) && r.every((x) => typeof x === "number" && Number.isFinite(x));
   if (c.variant === "event_based") return Array.isArray(c.event_rows) && c.event_rows.every((t) => Array.isArray(t) && t.every(rows));
   if (c.variant === "trace_based") return Array.isArray(c.trace_rows) && c.trace_rows.every(rows);

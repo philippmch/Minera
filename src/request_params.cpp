@@ -3106,6 +3106,34 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   parse_list("event_attributes", params.event_attributes);
   parse_list("case_attributes", params.case_attributes);
   parse_list("feature_names", params.feature_names);
+  parse_list("event_successor_attributes", params.event_successor_attributes);
+  auto assign_bool = [&](std::string_view suffix, bool& out) {
+    if (supplied(suffix)) out = parse_boolean(require(suffix), key_for(suffix));
+  };
+  assign_bool("enable_activity_def_representation", params.enable_activity_def_representation);
+  assign_bool("enable_succ_def_representation", params.enable_succ_def_representation);
+  assign_bool("enable_all_extra_features", params.enable_all_extra_features);
+  assign_bool("enable_case_duration", params.enable_case_duration);
+  assign_bool("add_case_identifier_column", params.add_case_identifier_column);
+  assign_bool("enable_times_from_first_occurrence", params.enable_times_from_first_occurrence);
+  assign_bool("enable_times_from_last_occurrence", params.enable_times_from_last_occurrence);
+  assign_bool("enable_direct_paths_times_last_occ", params.enable_direct_paths_times_last_occ);
+  assign_bool("enable_indirect_paths_times_last_occ", params.enable_indirect_paths_times_last_occ);
+  assign_bool("enable_work_in_progress", params.enable_work_in_progress);
+  assign_bool("enable_resource_workload", params.enable_resource_workload);
+  assign_bool("enable_first_last_activity_index", params.enable_first_last_activity_index);
+  assign_bool("enable_max_concurrent_events", params.enable_max_concurrent_events);
+  assign_bool("enable_max_concurrent_events_per_activity", params.enable_max_concurrent_events_per_activity);
+  if (supplied("epsilon")) {
+    params.epsilon = parse_finite_double(require("epsilon"), key_for("epsilon"));
+    if (params.epsilon < 0.0) throw std::invalid_argument("features_epsilon must be non-negative");
+  }
+  if (supplied("min_num_different_string_values"))
+    params.min_num_different_string_values = parse_nonnegative_size(require("min_num_different_string_values"), key_for("min_num_different_string_values"));
+  if (supplied("max_num_different_string_values"))
+    params.max_num_different_string_values = parse_nonnegative_size(require("max_num_different_string_values"), key_for("max_num_different_string_values"));
+  if (params.min_num_different_string_values > params.max_num_different_string_values)
+    throw std::invalid_argument("features string cardinality bounds are inverted");
   return params;
 }
 

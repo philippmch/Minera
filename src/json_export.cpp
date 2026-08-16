@@ -3712,6 +3712,14 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
     write_json_string(out, result.feature_names[i]);
   }
   out << "]";
+  if (!result.case_ids.empty()) {
+    out << ",\"case_ids\":[";
+    for (std::size_t i = 0; i < result.case_ids.size(); ++i) {
+      if (i) out << ',';
+      write_json_string(out, result.case_ids[i]);
+    }
+    out << ']';
+  }
   if (result.variant == LogToFeaturesVariant::EVENT_BASED) {
     out << ",\"event_rows\":[";
     for (std::size_t i = 0; i < result.event_rows.size(); ++i) {
