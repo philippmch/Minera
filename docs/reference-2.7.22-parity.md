@@ -81,7 +81,7 @@ are reconciled.
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Partial** — deterministic native contextual splitting with strict options, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity edge-contract review remains |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
-| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; broader differential review remains |
+| Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN and causal-net extensive playout projections now support both independent object-local events and an explicit shared-activity binding mode through native, CLI, multipart local-server, and frontend adapters; richer marker-binding semantics remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
@@ -679,7 +679,8 @@ log path and explicit `_pandas` adapter selectors, with the same validated
 semantics and deterministic output. Resource names and edge records are sorted
 for stable JSON; blank resources are excluded from the resource alphabet while
 empty or resource-less traces remain part of trace-count denominators. Handover
-beta, subcontracting distance, optional metric normalization, and output safety
+beta, subcontracting distance, optional metric normalization, custom
+`sna_activity_attribute`/`sna_resource_attribute` selectors, and output safety
 caps are strictly validated.
 
 Native tests cover repeated resources, normalized boundaries, symmetric output,
@@ -687,8 +688,10 @@ degenerate correlations, truncation, and parser rejection across the four
 `_pandas` selectors as well as their log counterparts. Standalone JSON, CLI
 flags, cached-session server routes, and frontend query/result guards cover all
 eight selectable variant names. Deterministic role discovery is also exposed via
-the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; local diagnostics
-and network analysis are documented below.
+the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; both verticals
+accept `*_activity_attribute` and `*_resource_attribute` selectors, resolving
+standard keys from first-class event fields and custom keys from typed event
+attributes; local diagnostics and network analysis are documented below.
 
 The organizational network-analysis vertical emits deterministic flat rows
 (`NETWORK_ANALYSIS`) by linking each event to the earliest later event with
@@ -1482,7 +1485,9 @@ role per activity and counts only events having both a non-empty activity and
 resource. Role similarity is the overlap of normalized resource-count vectors
 (sum of component-wise minima divided by sum of maxima). The highest-scoring
 pair is merged only when its score is strictly greater than
-`roles_threshold` (default `0.65`); ties and final role ordering are lexical
+`roles_threshold` (default `0.65`); `roles_activity_attribute` and
+`roles_resource_attribute` select standard or custom event fields; ties and
+final role ordering are lexical
 and deterministic. Final roles are sorted by descending activity/resource
 cardinality before the activity-name tie break. `roles_max_resources` and
 `roles_max_activities` are strict safety bounds. Empty activities and

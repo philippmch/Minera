@@ -399,6 +399,8 @@ int usage(const char* program) {
                "  --genetic-max-states <n> Candidate safety bound\n"
                "  --organizational-sna   Emit organizational SNA JSON\n"
                "  --sna-variant <id>     four log variants or their _pandas variants\n"
+               "  --sna-activity-attribute <key> Activity selector\n"
+               "  --sna-resource-attribute <key> Resource selector\n"
                "  --sna-beta <f>         Handover beta in [0,1]\n"
                "  --sna-n <n>            Subcontracting distance\n"
                "  --sna-metric-normalization <bool> Normalize edge weights\n"
@@ -411,6 +413,8 @@ int usage(const char* program) {
                "  --link-analysis-* <v> Relation columns, ordering, propagation, and bounds\n"
                "  --roles                Emit deterministic role discovery JSON\n"
                "  --roles-variant <id>   log (default) or pandas\n"
+               "  --roles-activity-attribute <key> Activity selector\n"
+               "  --roles-resource-attribute <key> Resource selector\n"
                "  --roles-threshold <f>  Merge threshold in [0,1]\n"
                "  --roles-max-resources <n> Resource safety bound\n"
                "  --roles-max-activities <n> Activity safety bound\n"
@@ -2042,7 +2046,7 @@ int main(int argc, char** argv) {
     if (arg.rfind("--roles-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
-      static const std::set<std::string> names = {"roles_variant", "roles_threshold", "roles_max_resources", "roles_max_activities"};
+      static const std::set<std::string> names = {"roles_variant", "roles_activity_attribute", "roles_resource_attribute", "roles_threshold", "roles_max_resources", "roles_max_activities"};
       if (!names.contains(key)) return usage(argv[0]);
       roles_fields.insert_or_assign(std::move(key), value); roles_requested = true; continue;
     }
@@ -2052,7 +2056,8 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
-          "sna_variant", "sna_beta", "sna_n", "sna_metric_normalization",
+          "sna_variant", "sna_activity_attribute", "sna_resource_attribute",
+          "sna_beta", "sna_n", "sna_metric_normalization",
           "sna_max_resources", "sna_max_edges"};
       if (!names.contains(key)) return usage(argv[0]);
       organizational_sna_fields.insert_or_assign(std::move(key), value);

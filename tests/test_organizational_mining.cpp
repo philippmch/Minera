@@ -79,5 +79,22 @@ int main() {
   options.max_edges = 1;
   const auto truncated = minera::discover_organizational_sna(sample(), options);
   assert(truncated.diagnostics.output_truncated && truncated.edges.size() == 1);
+
+  minera::EventLog custom;
+  custom.traces.push_back({"custom", {
+      {"custom", "ignored", "", "ignored", 0,
+       {{"team:activity", "A"}, {"team:resource", "r1"}}, ""},
+      {"custom", "ignored", "", "ignored", 1,
+       {{"team:activity", "B"}, {"team:resource", "r2"}}, ""},
+  }});
+  minera::OrganizationalSnaOptions custom_options;
+  custom_options.activity_attribute = "team:activity";
+  custom_options.resource_attribute = "team:resource";
+  const auto custom_sna =
+      minera::discover_organizational_sna(custom, custom_options);
+  assert((custom_sna.resources == std::vector<std::string>{"r1", "r2"}));
+  assert(custom_sna.edges.size() == 1);
+  assert(custom_sna.edges.front().source == 0 &&
+         custom_sna.edges.front().target == 1);
   return 0;
 }

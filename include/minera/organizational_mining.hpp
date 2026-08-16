@@ -30,6 +30,11 @@ enum class OrganizationalSnaVariant {
 
 struct OrganizationalSnaOptions {
   OrganizationalSnaVariant variant = OrganizationalSnaVariant::kHandover;
+  // Selectors follow the standard event attribute names by default.  A
+  // non-standard key is read from Event::attributes, which keeps the log and
+  // dataframe-style variants on one typed surface.
+  std::string activity_attribute = "concept:name";
+  std::string resource_attribute = "org:resource";
   double beta = 0.0;          // distance decay for handover weights
   std::size_t n = 2;          // maximum subcontracting gap
   bool metric_normalization = false;

@@ -787,8 +787,8 @@ describe("genetic miner API", () => {
 
 describe("organizational SNA API", () => {
   it("serializes bounded metric options", () => {
-    expect(organizationalSnaQuery({ sna_variant: "working_together", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
-      .toBe("sna_variant=working_together&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
+    expect(organizationalSnaQuery({ sna_variant: "working_together", sna_activity_attribute: "team:activity", sna_resource_attribute: "team:resource", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
+      .toBe("sna_variant=working_together&sna_activity_attribute=team%3Aactivity&sna_resource_attribute=team%3Aresource&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
     expect(organizationalSnaQuery({ sna_variant: "jointactivities_pandas", sna_beta: 0.25 }))
       .toBe("sna_variant=jointactivities_pandas&sna_beta=0.25");
   });
@@ -857,8 +857,8 @@ describe("profile clustering API", () => {
 
 describe("role discovery API", () => {
   it("serializes strict threshold and safety options", () => {
-    expect(roleDiscoveryQuery({ roles_variant: "pandas", roles_threshold: 0.4, roles_max_resources: 8, roles_max_activities: 12 }))
-      .toBe("roles_variant=pandas&roles_threshold=0.4&roles_max_resources=8&roles_max_activities=12");
+    expect(roleDiscoveryQuery({ roles_variant: "pandas", roles_activity_attribute: "team:activity", roles_resource_attribute: "team:resource", roles_threshold: 0.4, roles_max_resources: 8, roles_max_activities: 12 }))
+      .toBe("roles_variant=pandas&roles_activity_attribute=team%3Aactivity&roles_resource_attribute=team%3Aresource&roles_threshold=0.4&roles_max_resources=8&roles_max_activities=12");
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "ROLE_DISCOVERY" }), { status: 200 })));

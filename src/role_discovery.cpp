@@ -8,6 +8,16 @@
 
 namespace minera {
 namespace {
+std::string selected_value(const Event& event, const std::string& key,
+                           bool resource) {
+  if (resource && (key.empty() || key == "org:resource" || key == "resource"))
+    return event.resource;
+  if (!resource && (key.empty() || key == "concept:name" || key == "activity"))
+    return event.activity;
+  if (const auto* value = event.attribute(key)) return *value;
+  return {};
+}
+
 struct WorkingRole {
   std::set<std::string> activities;
   std::map<std::string, std::size_t> resources;
@@ -77,9 +87,11 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
   std::map<std::string, std::map<std::string, std::size_t>> activity_resources;
   std::set<std::string> resources;
   for (const auto& trace : log.traces) for (const auto& event : trace.events) {
-    if (event.activity.empty() || event.resource.empty()) continue;
-    ++activity_resources[event.activity][event.resource];
-    resources.insert(event.resource);
+    const auto activity = selected_value(event, options.activity_attribute, false);
+    const auto resource = selected_value(event, options.resource_attribute, true);
+    if (activity.empty() || resource.empty()) continue;
+    ++activity_resources[activity][resource];
+    resources.insert(resource);
   }
   if (resources.size() > options.max_resources)
     throw std::invalid_argument("roles_max_resources safety bound exceeded");

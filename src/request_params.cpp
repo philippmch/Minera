@@ -3422,6 +3422,10 @@ OrganizationalSnaOptions parse_organizational_sna_params(
       throw std::invalid_argument(
           "sna_variant: expected the four log variants or their _pandas variants");
   }
+  if (supplied("sna_activity_attribute"))
+    options.activity_attribute = require("sna_activity_attribute");
+  if (supplied("sna_resource_attribute"))
+    options.resource_attribute = require("sna_resource_attribute");
   if (supplied("sna_beta")) {
     options.beta = parse_finite_double(require("sna_beta"), "sna_beta");
     if (options.beta < 0.0 || options.beta > 1.0)
@@ -3492,6 +3496,10 @@ RoleDiscoveryOptions parse_role_discovery_params(const FieldLookup& field,
     else if (value == "pandas" || value == "PANDAS") options.variant = RoleDiscoveryVariant::kPandas;
     else throw std::invalid_argument("roles_variant: expected log or pandas");
   }
+  if (supplied("roles_activity_attribute"))
+    options.activity_attribute = require("roles_activity_attribute");
+  if (supplied("roles_resource_attribute"))
+    options.resource_attribute = require("roles_resource_attribute");
   if (supplied("roles_threshold")) {
     options.threshold = parse_finite_double(require("roles_threshold"), "roles_threshold");
     if (options.threshold < 0 || options.threshold > 1) throw std::invalid_argument("roles_threshold must be in [0,1]");
