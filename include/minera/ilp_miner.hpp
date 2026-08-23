@@ -17,11 +17,11 @@ namespace minera {
 // attribute.  Missing custom attributes fall back to Event::activity.
 struct ILPMinerOptions {
   std::string activity_key;
-  // Optional synthetic boundary labels.  Empty values retain the native
-  // source/sink wiring; when supplied, the labels are added as silent
-  // boundary transitions around every normalized trace.
-  std::string artificial_start_activity;
-  std::string artificial_end_activity;
+  // Synthetic boundary labels.  The reference defaults are represented as
+  // silent transitions around every normalized trace; an explicitly empty
+  // value retains the native source/sink wiring for compatibility.
+  std::string artificial_start_activity = "▶";
+  std::string artificial_end_activity = "■";
   // Sequence-encoding retention: 1 keeps every observed continuation, while
   // 0 keeps only continuations tied for the strongest predecessor support.
   double alpha = 1.0;

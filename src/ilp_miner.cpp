@@ -21,11 +21,18 @@ struct NormalizedLog {
   struct Trace {
     std::vector<std::size_t> sequence;
     std::size_t frequency = 1;
+    // Number of cumulative sequence-encoding rows retained for this variant
+    // after alpha filtering; a shorter prefix means the remaining suffix is
+    // intentionally absent from region feasibility constraints.
+    std::size_t retained_prefix = 0;
   };
   std::vector<Trace> traces;
   std::vector<std::pair<std::size_t, std::size_t>> causal_relation;
+  bool causal_relation_supplied = false;
   std::set<std::pair<std::size_t, std::size_t>> sequence_edges;
 };
+
+using SequenceVector = std::vector<std::int64_t>;
 
 struct Region {
   // One bit per activity.  A place may both consume and produce an activity
@@ -131,39 +138,87 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
     std::vector<std::size_t> encoded;
     encoded.reserve(variants[i].size());
     for (const auto& value : variants[i]) encoded.push_back(ids.at(value));
-    out.traces.push_back({std::move(encoded), frequencies[i]});
+    const auto encoded_size = encoded.size();
+    out.traces.push_back({std::move(encoded), frequencies[i], encoded_size});
   }
   if (out.traces.empty()) throw std::invalid_argument("ILP miner found no retained variants");
 
-  // Apply the sequence-encoding threshold to predecessor continuations.  A
-  // low-support continuation filters the sequence-encoding candidates, but
-  // the complete variants and activity alphabet remain intact for region
-  // feasibility and final-marking checks.
-  std::vector<std::map<std::size_t, std::size_t>> support(out.names.size());
+  // Build the cumulative occurrence-vector sequence encoding.  Each event is
+  // represented by the complete prefix count vector, while the predecessor
+  // vector is negated to distinguish the source prefix from the current
+  // prefix.  The alpha threshold is applied to continuations sharing the
+  // same predecessor encoding, and a rejected continuation cuts the rest of
+  // that variant just as the bounded sequence-encoding search does.
+  struct EncodingStep {
+    SequenceVector previous;
+    SequenceVector current;
+  };
+  std::map<SequenceVector, std::map<SequenceVector, std::uint64_t>> support;
+  std::vector<std::vector<EncodingStep>> encoding_steps;
+  encoding_steps.reserve(out.traces.size());
   for (const auto& trace : out.traces) {
-    for (std::size_t i = 1; i < trace.sequence.size(); ++i)
-      support[trace.sequence[i - 1]][trace.sequence[i]] += trace.frequency;
+    SequenceVector cumulative(out.names.size(), 0);
+    std::vector<EncodingStep> steps;
+    steps.reserve(trace.sequence.size());
+    for (std::size_t i = 0; i < trace.sequence.size(); ++i) {
+      SequenceVector previous = cumulative;
+      if (i != 0) {
+        for (auto& value : previous) value = -value;
+      }
+      ++cumulative[trace.sequence[i]];
+      SequenceVector current = cumulative;
+      support[previous][current] += static_cast<std::uint64_t>(trace.frequency);
+      steps.push_back({std::move(previous), std::move(current)});
+    }
+    encoding_steps.push_back(std::move(steps));
   }
-  for (const auto& trace : out.traces) {
-    for (std::size_t i = 1; i < trace.sequence.size(); ++i) {
-      const auto from = trace.sequence[i - 1];
-      const auto to = trace.sequence[i];
-      std::size_t strongest = 0;
-      for (const auto& [_, count] : support[from])
+  for (std::size_t trace_index = 0; trace_index < out.traces.size(); ++trace_index) {
+    auto& trace = out.traces[trace_index];
+    const auto& steps = encoding_steps[trace_index];
+    trace.retained_prefix = 0;
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+      const auto support_it = support.find(steps[i].previous);
+      if (support_it == support.end()) break;
+      std::uint64_t strongest = 0;
+      for (const auto& [_, count] : support_it->second)
         strongest = std::max(strongest, count);
-      const auto count = support[from].at(to);
-      if (options.alpha >= 1.0 ||
-          static_cast<double>(count) + 1e-12 >=
-              (1.0 - options.alpha) * static_cast<double>(strongest))
-        out.sequence_edges.emplace(from, to);
+      const auto continuation_it = support_it->second.find(steps[i].current);
+      if (continuation_it == support_it->second.end()) break;
+      const auto count = continuation_it->second;
+      const bool keep_step = options.alpha >= 1.0 ||
+                             static_cast<long double>(count) >=
+                                 (1.0L - static_cast<long double>(options.alpha)) *
+                                     static_cast<long double>(strongest);
+      if (!keep_step) break;
+      trace.retained_prefix = i + 1;
+      if (i > 0)
+        out.sequence_edges.emplace(trace.sequence[i - 1], trace.sequence[i]);
     }
   }
-  for (const auto& [from, to] : options.causal_relation) {
-    const auto from_it = ids.find(from);
-    const auto to_it = ids.find(to);
-    if (from_it == ids.end() || to_it == ids.end())
-      throw std::invalid_argument("ILP miner causal relation names an unknown activity");
-    out.causal_relation.emplace_back(from_it->second, to_it->second);
+
+  out.causal_relation_supplied = !options.causal_relation.empty();
+  if (options.causal_relation.empty()) {
+    // The default causal relation is the one-way portion of the normalized
+    // directly-follows graph.  Reverse edges are excluded so loops and
+    // concurrency do not turn every observed transition into a causal pair.
+    std::map<std::pair<std::size_t, std::size_t>, std::uint64_t> dfg;
+    for (const auto& trace : out.traces) {
+      for (std::size_t i = 1; i < trace.sequence.size(); ++i)
+        dfg[{trace.sequence[i - 1], trace.sequence[i]}] +=
+            static_cast<std::uint64_t>(trace.frequency);
+    }
+    for (const auto& [edge, count] : dfg) {
+      if (count == 0 || dfg.contains({edge.second, edge.first})) continue;
+      out.causal_relation.push_back(edge);
+    }
+  } else {
+    for (const auto& [from, to] : options.causal_relation) {
+      const auto from_it = ids.find(from);
+      const auto to_it = ids.find(to);
+      if (from_it == ids.end() || to_it == ids.end())
+        throw std::invalid_argument("ILP miner causal relation names an unknown activity");
+      out.causal_relation.emplace_back(from_it->second, to_it->second);
+    }
   }
   return out;
 }
@@ -179,11 +234,16 @@ bool solve_region(std::uint64_t input, std::uint64_t output,
   for (std::size_t initial = 0; initial <= max_tokens; ++initial) {
     bool valid = true;
     std::size_t common_final = 0;
-    bool have_final = false;
+    bool have_complete_final = false;
+    bool have_observed_prefix = false;
     for (const auto& trace_entry : traces) {
       const auto& trace = trace_entry.sequence;
+      const auto retained_prefix =
+          std::min(trace_entry.retained_prefix, trace.size());
+      if (retained_prefix != 0) have_observed_prefix = true;
       std::size_t marking = initial;
-      for (const auto activity : trace) {
+      for (std::size_t i = 0; i < retained_prefix; ++i) {
+        const auto activity = trace[i];
         const bool consumes = (input & (std::uint64_t{1} << activity)) != 0;
         const bool produces = (output & (std::uint64_t{1} << activity)) != 0;
         // Pre-fire non-negativity is essential for input/output self-loops.
@@ -195,15 +255,20 @@ bool solve_region(std::uint64_t input, std::uint64_t output,
         if (produces) ++marking;
       }
       if (!valid) break;
-      if (!have_final) {
-        common_final = marking;
-        have_final = true;
-      } else if (common_final != marking) {
-        valid = false;
-        break;
+      // A fully retained variant contributes the final-marking equality.  If
+      // alpha cut its suffix, the reference LP has no later equality row for
+      // that variant, so its partial marking must not reject the region.
+      if (retained_prefix == trace.size()) {
+        if (!have_complete_final) {
+          common_final = marking;
+          have_complete_final = true;
+        } else if (common_final != marking) {
+          valid = false;
+          break;
+        }
       }
     }
-    if (valid) {
+    if (valid && have_observed_prefix) {
       out = Region{input, output, initial, common_final};
       return true;
     }
@@ -227,7 +292,8 @@ std::vector<Region> discover_regions(
     const std::vector<NormalizedLog::Trace>& traces, std::size_t n,
     const std::vector<std::pair<std::size_t, std::size_t>>& causal_relation,
     const std::set<std::pair<std::size_t, std::size_t>>& sequence_edges,
-    ILPMinerDiagnostics& diagnostics, std::size_t max_nodes) {
+    bool causal_relation_supplied, ILPMinerDiagnostics& diagnostics,
+    std::size_t max_nodes) {
   const std::size_t max_tokens = [&] {
     std::size_t longest = 0;
     for (const auto& trace : traces)
@@ -245,6 +311,50 @@ std::vector<Region> discover_regions(
     const auto code = (std::uint64_t{1} << to) |
                       (std::uint64_t{1} << (n + from));
     if (seen.insert(code).second) candidates.push_back(code);
+  }
+  // Self-loop regions are not part of the one-way causal relation because an
+  // activity is its own reverse edge.  They still have to be considered for
+  // repeated occurrences, so add the bounded one-activity loop signatures
+  // explicitly; non-repeating loops are discarded by the region policy below.
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    const auto code = (std::uint64_t{1} << activity) |
+                      (std::uint64_t{1} << (n + activity));
+    if (seen.insert(code).second) candidates.push_back(code);
+  }
+  if (!causal_relation.empty()) {
+    const std::set<std::pair<std::size_t, std::size_t>> causal_pairs(
+        causal_relation.begin(), causal_relation.end());
+    // A causal pair fixes one producer/consumer bit in the reference LP, but
+    // the resulting place may contain additional compatible activities.  Add
+    // those bounded combinations after the deterministic singleton order so
+    // choice and repeated-activity places remain discoverable without falling
+    // back to an unbounded signature sweep.
+    for (std::uint64_t code = 1; code < combinations; ++code) {
+      if (seen.count(code) != 0) continue;
+      const std::uint64_t input = code & ((std::uint64_t{1} << n) - 1);
+      const std::uint64_t output = code >> n;
+      if (input == 0 || output == 0) continue;
+      bool compatible = true;
+      for (std::size_t from = 0; from < n && compatible; ++from) {
+        if ((output & (std::uint64_t{1} << from)) == 0) continue;
+        for (std::size_t to = 0; to < n; ++to) {
+          if ((input & (std::uint64_t{1} << to)) == 0) continue;
+          if (causal_pairs.count({from, to}) == 0) {
+            // Self-loops are absent from the one-way causal relation but are
+            // valid when their cumulative continuation was retained.
+            if (from != to || !sequence_edges.count({from, to})) {
+              compatible = false;
+              break;
+            }
+          }
+          if (!causal_relation_supplied && !sequence_edges.count({from, to})) {
+            compatible = false;
+            break;
+          }
+        }
+      }
+      if (compatible && seen.insert(code).second) candidates.push_back(code);
+    }
   }
   if (causal_relation.empty()) {
     for (std::uint64_t code = 1; code < combinations; ++code)
@@ -265,10 +375,7 @@ std::vector<Region> discover_regions(
     if (std::popcount(input) == 1 && std::popcount(output) == 1) {
       const auto from = static_cast<std::size_t>(std::countr_zero(output));
       const auto to = static_cast<std::size_t>(std::countr_zero(input));
-      const bool explicit_causal = std::find(causal_relation.begin(),
-                                             causal_relation.end(),
-                                             std::pair{from, to}) != causal_relation.end();
-      if (!explicit_causal && sequence_edges.count({from, to}) == 0) continue;
+      if (!causal_relation_supplied && sequence_edges.count({from, to}) == 0) continue;
     }
     Region region;
     if (solve_region(input, output, traces, max_tokens, region))
@@ -342,8 +449,9 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
   result.net.set_sink(sink);
 
   const auto regions = discover_regions(log.traces, n, log.causal_relation,
-                                        log.sequence_edges, result.diagnostics,
-                                        options.max_nodes);
+                                        log.sequence_edges,
+                                        log.causal_relation_supplied,
+                                        result.diagnostics, options.max_nodes);
   std::vector<std::vector<std::size_t>> inputs(n), outputs(n);
   std::vector<bool> persistent_output(n, false);
   std::vector<std::size_t> initial_places;
