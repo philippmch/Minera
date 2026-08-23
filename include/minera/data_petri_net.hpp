@@ -17,6 +17,9 @@ struct DataPetriNetOptions {
   // Reuse the decision-mining controls for both guards and their encoded
   // diagnostics so every projection sees the same feature scope and bounds.
   DecisionMiningOptions decision_options;
+  // The nested encoded tables use the same context history as a direct table
+  // request; the decision-tree diagnostics remain a single pre-choice row.
+  std::size_t decision_table_lookback = 1;
 };
 
 struct DataPetriNetTransition {

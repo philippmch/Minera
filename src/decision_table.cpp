@@ -82,6 +82,8 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
                        const DecisionTableOptions& options) {
   if (options.lookback == 0)
     throw std::invalid_argument("decision table lookback must be positive");
+  if (options.lookback > kMaxDecisionLookback)
+    throw std::invalid_argument("decision table lookback exceeds safety limit");
 
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t transition = 0; transition < net.transitions().size();
@@ -119,11 +121,38 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
     if (!firing[variant_index]) continue;
     ++observed;
 
-    std::map<std::string, std::string> context;
+    std::map<std::string, std::string> trace_context;
     if (options.include_trace_attributes) {
       for (const auto& attribute : trace.attributes)
-        context[attribute.key] = attribute.value;
+        trace_context[attribute.key] = attribute.value;
     }
+    std::vector<std::optional<std::map<std::string, std::string>>> context_slots(
+        options.lookback);
+    std::size_t event_index = 0;
+    const auto remember_event = [&](const Event& event) {
+      std::map<std::string, std::string> snapshot;
+      for (const auto& [key, value] : trace_context) {
+        if (!options.attributes.empty() &&
+            std::find(options.attributes.begin(), options.attributes.end(), key) ==
+                options.attributes.end())
+          continue;
+        snapshot.emplace(key, value);
+      }
+      if (!event.resource.empty() &&
+          (options.attributes.empty() ||
+           std::find(options.attributes.begin(), options.attributes.end(),
+                     "resource") != options.attributes.end()))
+        snapshot["resource"] = event.resource;
+      for (const auto& attribute : event.attributes) {
+        if (options.attributes.empty() ||
+            std::find(options.attributes.begin(), options.attributes.end(),
+                      attribute.key) != options.attributes.end())
+          snapshot[attribute.key] = attribute.value;
+      }
+      const auto slot = event_index % options.lookback;
+      context_slots[slot] = std::move(snapshot);
+      ++event_index;
+    };
     for (std::size_t step = 0; step < firing[variant_index]->size(); ++step) {
       for (const std::size_t transition : (*firing[variant_index])[step]) {
         for (const std::size_t place : net.transitions()[transition].inputs) {
@@ -133,18 +162,19 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
           const auto choice = std::find(choices.begin(), choices.end(), transition);
           if (choice == choices.end())
             throw std::logic_error("decision table transition is not outgoing");
-          RawRow row;
-          row.features = context;
-          row.target = static_cast<std::size_t>(
+          const auto target = static_cast<std::size_t>(
               std::distance(choices.begin(), choice));
-          rows[static_cast<std::size_t>(decision)].push_back(std::move(row));
+          for (const auto& snapshot : context_slots) {
+            if (!snapshot) continue;
+            RawRow row;
+            row.features = *snapshot;
+            row.target = target;
+            rows[static_cast<std::size_t>(decision)].push_back(std::move(row));
+          }
         }
       }
       if (step < trace.events.size()) {
-        const auto& event = trace.events[step];
-        if (!event.resource.empty()) context["resource"] = event.resource;
-        for (const auto& attribute : event.attributes)
-          context[attribute.key] = attribute.value;
+        remember_event(trace.events[step]);
       }
     }
   }

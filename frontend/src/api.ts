@@ -2177,6 +2177,8 @@ export interface DecisionMiningOptions {
 
 export interface DecisionTablesRequestOptions extends DecisionMiningOptions {
   miner?: string;
+  /** Number of preceding event-context snapshots encoded per choice. */
+  lookback?: number;
 }
 
 export function decisionMiningQuery(options: DecisionMiningOptions = {}): string {
@@ -2207,6 +2209,18 @@ export function decisionMiningQuery(options: DecisionMiningOptions = {}): string
           !attribute.trim() || attribute.includes(",")))
       throw new Error("decision_attributes must contain non-empty comma-free names");
     query.set("decision_attributes", options.attributes.map((attribute) => attribute.trim()).join(","));
+  }
+  return query.toString();
+}
+
+/** Query string for encoded tables and guarded data-Petri projections. */
+export function decisionTablesQuery(options: DecisionTablesRequestOptions = {}): string {
+  const query = new URLSearchParams(decisionMiningQuery(options));
+  if (options.lookback !== undefined) {
+    if (!Number.isSafeInteger(options.lookback) ||
+        options.lookback < 1 || options.lookback > 64)
+      throw new Error("decision_lookback must be a safe integer from 1 through 64");
+    query.set("decision_lookback", String(options.lookback));
   }
   return query.toString();
 }
@@ -2374,14 +2388,14 @@ export async function fetchXes(): Promise<string> {
 /** Requests the encoded decision tables for one cached model. */
 export function requestDecisionTables(
   miner?: string,
-  options?: DecisionMiningOptions,
+  options?: DecisionTablesRequestOptions,
 ): Promise<DecisionTablesResult>;
 export function requestDecisionTables(
   options?: DecisionTablesRequestOptions,
 ): Promise<DecisionTablesResult>;
 export function requestDecisionTables(
   minerOrOptions: string | DecisionTablesRequestOptions = "inductive",
-  legacyOptions: DecisionMiningOptions = {},
+  legacyOptions: DecisionTablesRequestOptions = {},
 ): Promise<DecisionTablesResult> {
   const options = typeof minerOrOptions === "string"
     ? { ...legacyOptions, miner: minerOrOptions }
@@ -2390,7 +2404,7 @@ export function requestDecisionTables(
   if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
   const query = new URLSearchParams({ miner });
   try {
-    for (const [key, value] of new URLSearchParams(decisionMiningQuery(options)))
+    for (const [key, value] of new URLSearchParams(decisionTablesQuery(options)))
       query.append(key, value);
   } catch (error) {
     return Promise.reject(error);
@@ -2405,14 +2419,14 @@ export function requestDecisionTables(
 /** Requests a guarded data-Petri-net projection of the latest cached model. */
 export function requestDataPetriNet(
   miner?: string,
-  options?: DecisionMiningOptions,
+  options?: DecisionTablesRequestOptions,
 ): Promise<DataPetriNetResult>;
 export function requestDataPetriNet(
   options?: DecisionTablesRequestOptions,
 ): Promise<DataPetriNetResult>;
 export function requestDataPetriNet(
   minerOrOptions: string | DecisionTablesRequestOptions = "inductive",
-  legacyOptions: DecisionMiningOptions = {},
+  legacyOptions: DecisionTablesRequestOptions = {},
 ): Promise<DataPetriNetResult> {
   const options = typeof minerOrOptions === "string"
     ? { ...legacyOptions, miner: minerOrOptions }
@@ -2421,7 +2435,7 @@ export function requestDataPetriNet(
   if (!miner.trim()) return Promise.reject(new Error("miner must not be empty"));
   const query = new URLSearchParams({ miner });
   try {
-    for (const [key, value] of new URLSearchParams(decisionMiningQuery(options)))
+    for (const [key, value] of new URLSearchParams(decisionTablesQuery(options)))
       query.append(key, value);
   } catch (error) {
     return Promise.reject(error);
