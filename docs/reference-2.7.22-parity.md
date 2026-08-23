@@ -539,22 +539,28 @@ fixtures and the reference implementation's dataframe/lazyframe adapters.
 ## Trace-variant query anonymization evidence
 
 The native trace-variant query surface supports both Laplace and SaCoFa
-variants. It builds bounded prefix distributions, applies deterministic
-seeded non-negative integer noise, prunes by the configured minimum frequency,
-and expands released frequencies into timestamp-neutral event traces with
-stable case identifiers. SaCoFa additionally filters prefixes by observed
-first-event and all-order predecessor/follower relations. The deterministic
-seed is an explicit testing/reproducibility extension. Both privacy surfaces
-also accept an explicit secure-random switch that draws one key from the host
-operating system entropy provider per release call; the effective key is not
-returned in diagnostics.
+variants. It builds a bounded prefix tree with an explicit completion marker,
+first-seen activity expansion, independent depth-wise noise, and immediate
+pruning, so a removed parent cannot reappear through a later Cartesian
+expansion. The completion marker also preserves empty trace variants. Completed
+variants are emitted as soon as they survive; prefixes
+that reach the configured depth are released only at that boundary. SaCoFa
+classifies predecessor/follower relations as Always, Sometimes, or Never and
+uses behavioral-appropriateness violations in its bounded exponential
+selection before applying the same non-negative integer release noise. The
+deterministic seed is an explicit testing/reproducibility extension. Both
+privacy surfaces also accept an explicit secure-random switch that draws one
+key from the host operating system entropy provider per release call; the
+effective key is not returned in diagnostics.
 
 Strict `tvq_*` request parsing, standalone JSON, CLI
 (`--trace-variant-query`), cached-session server endpoints, frontend query
 serialization, response guards, output caps, secure-random parsing, and focused
 Release tests cover
-both variants, empty prefix bounds, malformed privacy settings, pruning,
-reproducibility, and non-negative release counts. The PRIPEL-style adapter
+both variants, explicit completion boundaries, intermediate pruning,
+behavioral-appropriateness regressions, malformed privacy settings, pruning,
+reproducibility, empty-trace completion, open-interval noise boundaries, and
+non-negative release counts. The PRIPEL-style adapter
 matches exact and bounded nearest variants, removes identity/blocklisted
 attributes, preserves monotonic event time, and applies deterministic bounded
 categorical/numeric release noise, with the same transformations optionally
