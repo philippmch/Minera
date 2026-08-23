@@ -3835,7 +3835,7 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
 }
 
 minera::DecisionMiningOptions decision_mining_options(
-    const httplib::Request& request) {
+    const httplib::Request& request, bool allow_table_lookback = false) {
   static const std::set<std::string> allowed = {
       "miner", "decision_max_depth", "decision_min_split",
       "decision_min_leaf", "decision_max_categories",
@@ -3843,7 +3843,8 @@ minera::DecisionMiningOptions decision_mining_options(
       "decision_include_trace_attributes", "decision_attributes"};
   for (const auto& [key, value] : request.params) {
     (void)value;
-    if (!allowed.contains(key))
+    if (!allowed.contains(key) &&
+        !(allow_table_lookback && key == "decision_lookback"))
       throw std::invalid_argument("unknown decision parameter: " + key);
   }
   minera::DecisionMiningOptions options;
@@ -3867,6 +3868,14 @@ minera::DecisionMiningOptions decision_mining_options(
   if (request.has_param("decision_attributes"))
     options.attributes = ocel_query_list(request, "decision_attributes");
   return options;
+}
+
+std::size_t decision_table_lookback(const httplib::Request& request) {
+  const auto lookback = ocel_query_size(request, "decision_lookback", 1);
+  if (lookback == 0 || lookback > minera::kMaxDecisionLookback)
+    throw std::invalid_argument(
+        "decision_lookback must be an integer from 1 through 64");
+  return lookback;
 }
 
 // On-demand decision mining of one model from the most recent mine: which
@@ -4098,11 +4107,12 @@ void handle_decision_tables(const httplib::Request& request,
     return;
   }
   try {
-    const auto mining = decision_mining_options(request);
+    const auto mining = decision_mining_options(request, true);
     minera::DecisionTableOptions options;
     options.mining = mining;
     options.include_trace_attributes = mining.include_trace_attributes;
     options.attributes = mining.attributes;
+    options.lookback = decision_table_lookback(request);
     const auto result =
         minera::mine_decision_tables(session->log, it->second, options);
     response.set_content(minera::serialize_decision_tables_json(result),
@@ -4141,7 +4151,8 @@ void handle_data_petri_net(const httplib::Request& request,
   }
   try {
     minera::DataPetriNetOptions options;
-    options.decision_options = decision_mining_options(request);
+    options.decision_options = decision_mining_options(request, true);
+    options.decision_table_lookback = decision_table_lookback(request);
     const auto result =
         minera::mine_data_petri_net(session->log, it->second, options);
     response.set_content(minera::serialize_data_petri_net_json(result, miner),

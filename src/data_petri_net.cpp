@@ -142,6 +142,7 @@ DataPetriNet mine_data_petri_net(const EventLog& log, const PetriNet& net,
   table_options.include_trace_attributes =
       options.decision_options.include_trace_attributes;
   table_options.attributes = options.decision_options.attributes;
+  table_options.lookback = options.decision_table_lookback;
   result.decision_tables = mine_decision_tables(log, net, table_options);
 
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());

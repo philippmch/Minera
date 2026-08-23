@@ -158,6 +158,21 @@ describe("data Petri net API", () => {
     })).resolves.toMatchObject({ family: "DATA_PETRI_NET" });
     vi.unstubAllGlobals();
   });
+  it("serializes bounded table lookback without sending it to decisions", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe(
+        "/api/data-petri-net?miner=alpha&decision_lookback=2",
+      );
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestDataPetriNet({ miner: "alpha", lookback: 2 }))
+      .resolves.toMatchObject({ family: "DATA_PETRI_NET" });
+    vi.unstubAllGlobals();
+  });
+  it("rejects zero and oversized table lookback", async () => {
+    await expect(requestDataPetriNet({ lookback: 0 })).rejects.toThrow(/lookback/);
+    await expect(requestDataPetriNet({ lookback: 65 })).rejects.toThrow(/lookback/);
+  });
 });
 
 describe("process cube API", () => {

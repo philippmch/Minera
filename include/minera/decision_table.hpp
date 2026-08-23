@@ -12,6 +12,10 @@
 
 namespace minera {
 
+// Bound retained history so a malformed request cannot multiply rows without
+// limit.  The value is deliberately shared by native and adapter validation.
+inline constexpr std::size_t kMaxDecisionLookback = 64;
+
 // Controls the deterministic table extracted from the observations that are
 // available immediately before a model choice.
 struct DecisionTableOptions {
@@ -21,9 +25,9 @@ struct DecisionTableOptions {
   // The reference table uses event attributes by default. Case attributes can
   // be included explicitly without changing the source log.
   bool include_trace_attributes = false;
-  // A positive look-back is accepted for API compatibility. The compact native
-  // representation keeps the latest value of every selected attribute, which
-  // is the k=1 table used by the guarded model projection.
+  // Number of preceding visible-event context snapshots retained before each
+  // choice. k=1 keeps the latest context and is the default used by guarded
+  // models; an empty feature map still occupies its event snapshot slot.
   std::size_t lookback = 1;
   // Empty means all attributes observed in the decision contexts. When set,
   // only these event/context keys are encoded, in lexical order.

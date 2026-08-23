@@ -266,7 +266,7 @@ this traditional-log vertical.
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, numeric/date KDE, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, numeric/date attribute KDE grids, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, a file-backed restartable streaming DFG store, deterministic classic and mutex-protected dictionaries, a bounded RESP remote dictionary, Declare, footprints, token, and temporal conformance are present; richer distributed lifecycle orchestration remains |
-| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls and selected context attributes, deterministic encoded numeric/one-hot tables, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; richer classifier backends and columnar training integrations remain |
+| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls and selected context attributes, deterministic encoded numeric/one-hot tables with bounded pre-choice lookback, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; richer classifier backends and columnar training integrations remain |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Partial** — deterministic seeded train/test trace splits, fixed and all-prefix projections, until-activity targets, activity-targeted sublogs, automatic event/case feature selection, and typed process-cube tables now have native, standalone CLI, cached-log server, and typed frontend adapters; model training and columnar dataframe integrations remain |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
@@ -890,8 +890,16 @@ encoded-table envelope. Decision depth, split/leaf minimums, candidate caps,
 gain threshold, trace-attribute inclusion, and selected context attributes are
 validated and shared by the native, CLI, server, and frontend decision paths.
 The same controls flow into guarded data-Petri projections and their nested
-tables. Richer classifier backends and columnar training integrations remain
-open.
+tables. Encoded tables retain a deterministic rolling window of the last
+visible-event context snapshots before each choice (bounded to 64; the
+default k=1 behavior remains the latest snapshot). The window advances only
+after visible events, and an empty feature map still occupies its event slot;
+each snapshot is captured before the choice is consumed so post-choice
+attributes cannot leak into its row. `--decision-lookback`, `decision_lookback` on the table and
+data-Petri endpoints, and the typed frontend table options share the same
+strict 1..64 validation; the ordinary decision endpoint intentionally does
+not send or accept this table-only parameter. Richer classifier backends and
+columnar training integrations remain open.
 
 ## Contextual label-splitting evidence
 

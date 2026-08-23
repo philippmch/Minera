@@ -914,6 +914,7 @@ int usage(const char* program) {
                "  --decision-min-gain <f>  Minimum Gini gain\n"
                "  --decision-no-trace-attributes Exclude case attributes\n"
                "  --decision-attributes <a,b,...> Restrict context keys\n"
+               "  --decision-lookback <n>  Prior context snapshots for tables (1..64)\n"
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
                "                            (default), alpha, heuristic, powl,\n"
@@ -1104,6 +1105,8 @@ int main(int argc, char** argv) {
   std::string decisions_miner;  // empty = no decision mining
   std::string decision_tables_miner;  // empty = no decision-table mining
   minera::DecisionMiningOptions decision_options;
+  std::size_t decision_lookback = 1;
+  bool decision_lookback_used = false;
   bool decision_option_used = false;
   bool no_alignments = false;
   bool align_process_tree = false;
@@ -2770,11 +2773,18 @@ int main(int argc, char** argv) {
                arg == "--decision-min-leaf" ||
                arg == "--decision-max-categories" ||
                arg == "--decision-max-thresholds" ||
-               arg == "--decision-min-gain") {
+               arg == "--decision-min-gain" ||
+               arg == "--decision-lookback") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       decision_option_used = true;
-      if (arg == "--decision-max-depth") {
+      if (arg == "--decision-lookback") {
+        decision_lookback = parse_positive_size(value, arg);
+        if (decision_lookback > minera::kMaxDecisionLookback)
+          throw std::invalid_argument(
+              "--decision-lookback expects an integer from 1 through 64");
+        decision_lookback_used = true;
+      } else if (arg == "--decision-max-depth") {
         decision_options.max_depth = parse_nonnegative_size(value, arg);
         if (decision_options.max_depth > 64)
           throw std::invalid_argument(
@@ -3597,6 +3607,10 @@ int main(int argc, char** argv) {
       decision_tables_miner.empty()) {
     std::cerr << "error: --decision-* options require --decisions or "
                  "--decision-tables\n";
+    return 2;
+  }
+  if (decision_lookback_used && decision_tables_miner.empty()) {
+    std::cerr << "error: --decision-lookback requires --decision-tables\n";
     return 2;
   }
   if (activity_split_option_used && filter.activity_split_activities.empty()) {
@@ -4966,6 +4980,7 @@ int main(int argc, char** argv) {
       table_options.include_trace_attributes =
           decision_options.include_trace_attributes;
       table_options.attributes = decision_options.attributes;
+      table_options.lookback = decision_lookback;
       decision_tables =
           minera::mine_decision_tables(log, *selected, table_options);
     }
