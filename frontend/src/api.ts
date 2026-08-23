@@ -1555,7 +1555,20 @@ export function processTreeReductionQuery(options: ProcessTreeReductionOptions =
 /** Query string for the hidden cached-session ILP miner endpoint. */
 export function ilpMinerQuery(options: ILPMinerOptions = {}): string {
   const query = new URLSearchParams();
+  const addText = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    if (value.length === 0) throw new Error(`${name} must not be empty`);
+    query.set(name, value);
+  };
   if (options.activity_key !== undefined) query.set("ilp_activity_key", options.activity_key);
+  addText("ilp_artificial_start_activity", options.artificial_start_activity);
+  addText("ilp_artificial_end_activity", options.artificial_end_activity);
+  if (options.alpha !== undefined) {
+    if (!Number.isFinite(options.alpha) || options.alpha < 0 || options.alpha > 1)
+      throw new Error("alpha must be a finite number in [0,1]");
+    query.set("ilp_alpha", String(options.alpha));
+  }
+  addText("ilp_causal_relation", options.causal_relation);
   if (options.noise_threshold !== undefined) query.set("ilp_noise_threshold", String(options.noise_threshold));
   if (options.max_nodes !== undefined) query.set("ilp_max_nodes", String(options.max_nodes));
   return query.toString();

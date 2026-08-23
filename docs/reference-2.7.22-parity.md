@@ -71,7 +71,7 @@ are reconciled.
 | Discovery: Alpha | classic and Alpha+ | **Complete** |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, and graph-recursive `dfg` selectors share the validated native/request/CLI/frontend surface |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
-| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; differential edge-contract review remains |
+| Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP now supports one-trace-per-variant normalization, artificial boundaries, alpha sequence encoding, optional causal edges, and frequency-based noise filtering, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
@@ -716,6 +716,27 @@ partial orders and extended arcs are rejected. The headless export CLI accepts
 `--pnml-to-ptml` and `--bpmn-to-ptml` without an event log, and `/api/ptml`
 accepts a miner selector so the frontend can request PTML for any selected
 workflow net when the strict conversion succeeds.
+
+## ILP discovery parity evidence
+
+The bounded ILP discovery adapter now normalizes event attributes through the
+selected activity key, folds duplicate variants while retaining their support,
+and optionally inserts synthetic start/end labels as silent transitions. The
+alpha sequence-encoding threshold retains strong predecessor continuations;
+the complete variants and activity alphabet remain intact while weak
+sequence-encoding candidates are excluded. Frequency-based noise filtering can
+remove low-support variants and their activities before region search. Callers may
+provide deterministic causal edges using `A=>B` comma-separated entries; when
+present, those edges define the bounded candidate set. The dependency-free
+integer-region search reports visited candidates, LP-feasibility attempts,
+branch counts, and exhaustion instead of claiming an unbounded optimum.
+
+Strict request parsing, standalone CLI flags, the cached-session local-server
+endpoint, and typed frontend query serialization cover activity/boundary keys,
+alpha, causal edges, noise threshold, and safety bounds. Focused tests cover
+duplicate-variant support, custom boundaries, alpha filtering, causal priority,
+activity removal, deterministic bounds, and malformed settings. Full numerical
+solver differential review remains open, so this row stays partial.
 
 ## Genetic discovery parity evidence
 

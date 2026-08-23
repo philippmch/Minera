@@ -1823,7 +1823,9 @@ void handle_ilp_mine(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "ilp_activity_key", "ilp_noise_threshold", "ilp_max_nodes"};
+        "ilp_activity_key", "ilp_artificial_start_activity",
+        "ilp_artificial_end_activity", "ilp_alpha", "ilp_causal_relation",
+        "ilp_noise_threshold", "ilp_max_nodes"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) {

@@ -99,6 +99,10 @@ export interface ILPMinerResult {
 }
 export interface ILPMinerOptions {
   activity_key?: string;
+  artificial_start_activity?: string;
+  artificial_end_activity?: string;
+  alpha?: number;
+  causal_relation?: string;
   noise_threshold?: number;
   max_nodes?: number;
 }

@@ -2616,13 +2616,23 @@ void label_splitting_params_contract() {
 void ilp_params_contract() {
   const auto parsed = minera::parse_ilp_miner_params(fields({
       {"ilp_activity_key", "concept:name"},
+      {"ilp_artificial_start_activity", "<begin>"},
+      {"ilp_artificial_end_activity", "<finish>"},
+      {"ilp_alpha", "0.75"},
+      {"ilp_causal_relation", "<begin>=>A,A=>B,B=><finish>"},
       {"ilp_noise_threshold", "0.25"},
       {"ilp_max_nodes", "17"}}));
   assert(parsed.activity_key == "concept:name");
+  assert(parsed.artificial_start_activity == "<begin>");
+  assert(parsed.artificial_end_activity == "<finish>");
+  assert(parsed.alpha == 0.75);
+  assert(parsed.causal_relation.size() == 3);
   assert(parsed.noise_threshold == 0.25);
   assert(parsed.max_nodes == 17);
   for (const auto& item : {std::pair{"ilp_noise_threshold", "-0.1"},
                            std::pair{"ilp_noise_threshold", "1.1"},
+                           std::pair{"ilp_alpha", "-0.1"},
+                           std::pair{"ilp_causal_relation", "A"},
                            std::pair{"ilp_max_nodes", "0"},
                            std::pair{"ilp_activity_key", ""}}) {
     bool threw = false;
