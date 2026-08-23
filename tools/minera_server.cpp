@@ -5,6 +5,7 @@
 #include <charconv>
 #include <chrono>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -90,6 +91,7 @@
 #include "minera/ocel_sqlite.hpp"
 #include "minera/ocel_statistics.hpp"
 #include "minera/ocel_playout.hpp"
+#include "minera/ocel_query.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/ocel_xml.hpp"
 #include "minera/saw_nets.hpp"
@@ -587,9 +589,11 @@ std::size_t ocel_query_size(const httplib::Request& request,
   const auto value = request.get_param_value(std::string(name));
   if (value.empty() || value.front() == '-')
     throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
+  errno = 0;
   char* end = nullptr;
   const auto parsed = std::strtoull(value.c_str(), &end, 10);
   if (end != value.c_str() + value.size() ||
+      errno == ERANGE ||
       parsed > std::numeric_limits<std::size_t>::max()) {
     throw std::invalid_argument(std::string(name) + ": expected a non-negative integer");
   }
@@ -615,29 +619,9 @@ std::string ocel_request_body(const httplib::Request& request,
 }
 
 std::vector<std::string> split_ocel_playout_value(std::string_view value,
-                                                  char delimiter) {
-  std::vector<std::string> parts;
-  std::string current;
-  bool escaped = false;
-  for (const char c : value) {
-    if (escaped) {
-      if (c != '\\' && c != ',' && c != ';' && c != ':')
-        throw std::invalid_argument(
-            "objects: unsupported escape (use \\\\, \\\\; \\\\: or \\\\\\)");
-      current.push_back(c);
-      escaped = false;
-    } else if (c == '\\') {
-      escaped = true;
-    } else if (c == delimiter) {
-      parts.push_back(std::move(current));
-      current.clear();
-    } else {
-      current.push_back(c);
-    }
-  }
-  if (escaped) throw std::invalid_argument("objects: dangling escape");
-  parts.push_back(std::move(current));
-  return parts;
+                                                  char delimiter,
+                                                  bool final_level = true) {
+  return minera::split_ocel_query_value(value, delimiter, final_level);
 }
 
 std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
@@ -645,15 +629,15 @@ std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
   std::map<std::string, std::vector<std::string>> result;
   if (!request.has_param("objects")) return result;
   const auto entries = split_ocel_playout_value(
-      request.get_param_value("objects"), ';');
+      request.get_param_value("objects"), ';', false);
   for (const auto& entry : entries) {
     if (entry.empty()) throw std::invalid_argument("objects: empty entry");
-    const auto fields = split_ocel_playout_value(entry, ':');
+    const auto fields = split_ocel_playout_value(entry, ':', false);
     if (fields.size() != 2 || fields.front().empty())
       throw std::invalid_argument(
           "objects: expected TYPE:ID1,ID2 entries");
     std::vector<std::string> ids;
-    for (const auto& id : split_ocel_playout_value(fields[1], ',')) {
+    for (const auto& id : split_ocel_playout_value(fields[1], ',', true)) {
       if (id.empty()) throw std::invalid_argument(
           "objects: expected non-empty comma-separated ids");
       ids.push_back(id);
@@ -665,7 +649,8 @@ std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
 }
 
 std::vector<std::string> split_ocel_filter_value(std::string_view value,
-                                                 char delimiter);
+                                                 char delimiter,
+                                                 bool final_level = true);
 
 std::vector<std::string> ocel_query_list(const httplib::Request& request,
                                          std::string_view name) {
@@ -768,31 +753,9 @@ std::string lower_ascii(std::string value) {
 }
 
 std::vector<std::string> split_ocel_filter_value(std::string_view value,
-                                                 char delimiter) {
-  std::vector<std::string> result;
-  std::string current;
-  bool escaped = false;
-  for (const char character : value) {
-    if (escaped) {
-      if (character != '\\' && character != ',' && character != ':' &&
-          character != ';' && character != '|') {
-        throw std::invalid_argument(
-            "OCEL filter values use \\\\, \\\\: , \\\\; , or \\\\| escapes");
-      }
-      current.push_back(character);
-      escaped = false;
-    } else if (character == '\\') {
-      escaped = true;
-    } else if (character == delimiter) {
-      result.push_back(std::move(current));
-      current.clear();
-    } else {
-      current.push_back(character);
-    }
-  }
-  if (escaped) throw std::invalid_argument("OCEL filter value has dangling escape");
-  result.push_back(std::move(current));
-  return result;
+                                                 char delimiter,
+                                                 bool final_level) {
+  return minera::split_ocel_query_value(value, delimiter, final_level);
 }
 
 std::vector<minera::OcelValue> parse_ocel_filter_values(
@@ -800,8 +763,8 @@ std::vector<minera::OcelValue> parse_ocel_filter_values(
   std::vector<minera::OcelValue> result;
   if (!request.has_param("attribute_values")) return result;
   for (const auto& encoded : split_ocel_filter_value(
-           request.get_param_value("attribute_values"), ',')) {
-    const auto fields = split_ocel_filter_value(encoded, ':');
+           request.get_param_value("attribute_values"), ',', false)) {
+    const auto fields = split_ocel_filter_value(encoded, ':', true);
     if (fields.size() == 1) {
       result.emplace_back(fields.front());
       continue;
@@ -817,9 +780,10 @@ std::vector<minera::OcelValue> parse_ocel_filter_values(
     } else if (type == "i") {
       if (value.empty() || value.front() == '+')
         throw std::invalid_argument("attribute_values has an invalid integer");
+      errno = 0;
       char* end = nullptr;
       const auto parsed = std::strtoll(value.c_str(), &end, 10);
-      if (end != value.c_str() + value.size())
+      if (end != value.c_str() + value.size() || errno == ERANGE)
         throw std::invalid_argument("attribute_values has an invalid integer");
       result.emplace_back(static_cast<std::int64_t>(parsed));
     } else if (type == "d") {
@@ -850,8 +814,8 @@ std::map<std::string, std::size_t> parse_ocel_filter_counts(
   std::map<std::string, std::size_t> result;
   if (!request.has_param("minimum_counts")) return result;
   const auto raw = request.get_param_value("minimum_counts");
-  for (const auto& item : split_ocel_filter_value(raw, ',')) {
-    const auto fields = split_ocel_filter_value(item, ':');
+  for (const auto& item : split_ocel_filter_value(raw, ',', false)) {
+    const auto fields = split_ocel_filter_value(item, ':', true);
     if (fields.size() != 2 || fields[0].empty() || fields[1].empty()) {
       throw std::invalid_argument(
           "minimum_counts expects TYPE:COUNT entries");
@@ -862,9 +826,11 @@ std::map<std::string, std::size_t> parse_ocel_filter_counts(
       throw std::invalid_argument(
           "minimum_counts expects non-negative integer counts");
     }
+    errno = 0;
     char* end_pointer = nullptr;
     const auto parsed = std::strtoull(count.c_str(), &end_pointer, 10);
     if (end_pointer != count.c_str() + count.size() ||
+        errno == ERANGE ||
         parsed > std::numeric_limits<std::size_t>::max()) {
       throw std::invalid_argument(
           "minimum_counts expects non-negative integer counts");
@@ -881,14 +847,14 @@ std::map<std::string, std::vector<std::string>> parse_ocel_filter_allowed(
   std::map<std::string, std::vector<std::string>> result;
   if (!request.has_param("allowed")) return result;
   const auto raw = request.get_param_value("allowed");
-  for (const auto& item : split_ocel_filter_value(raw, ';')) {
-    const auto fields = split_ocel_filter_value(item, ':');
+  for (const auto& item : split_ocel_filter_value(raw, ';', false)) {
+    const auto fields = split_ocel_filter_value(item, ':', false);
     if (fields.size() != 2 || fields[0].empty() || fields[1].empty()) {
       throw std::invalid_argument(
           "allowed expects TYPE:ACTIVITY|ACTIVITY entries");
     }
     const auto& type = fields[0];
-    for (const auto& activity : split_ocel_filter_value(fields[1], '|')) {
+    for (const auto& activity : split_ocel_filter_value(fields[1], '|', true)) {
       if (activity.empty()) {
         throw std::invalid_argument("allowed contains an empty activity");
       }

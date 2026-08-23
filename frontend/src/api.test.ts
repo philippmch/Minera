@@ -970,6 +970,18 @@ describe("OCEL API", () => {
       variant: "event_attribute", attribute_key: "label",
       attribute_values: ["a,b", 2, true, null], ids: ["id,1", "sales:2"],
     })).toBe("variant=event_attribute&attribute_key=label&attribute_values=s%3Aa%5C%2Cb%2Ci%3A2%2Cb%3Atrue%2Cn%3A&ids=id%5C%2C1%2Csales%5C%3A2");
+    const delimiterQuery = new URLSearchParams(ocelFilterQuery({
+      variant: "event_attribute", attribute_key: "label",
+      attribute_values: ["a:b;c|d\\e"], ids: ["id:1;2|3\\4"],
+      allowed: { "sales:order": ["Approve|Reject", "Pack;Back", "Slash\\Name"] },
+    }));
+    expect(delimiterQuery.get("attribute_values")).toBe("s:a\\:b\\;c\\|d\\\\e");
+    expect(delimiterQuery.get("ids")).toBe("id\\:1\\;2\\|3\\\\4");
+    expect(delimiterQuery.get("allowed")).toBe("sales\\:order:Approve\\|Reject|Pack\\;Back|Slash\\\\Name");
+    const playoutDelimiterQuery = new URLSearchParams(ocelPlayoutQuery({
+      objects: { "sales:order": ["id:1;2|3\\4"] },
+    }));
+    expect(playoutDelimiterQuery.get("objects")).toBe("sales\\:order:id\\:1\\;2|3\\\\4");
     expect(ocelPlayoutQuery({
       model: "ocpn", event_binding: "shared_activity", objects_unique_per_trace: true,
     })).toBe("model=ocpn&objects_unique_per_trace=true&event_binding=shared_activity");
