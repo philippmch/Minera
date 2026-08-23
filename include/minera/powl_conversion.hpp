@@ -17,6 +17,12 @@ namespace minera {
 // represented by the closest block-structured approximation.
 [[nodiscard]] ProcessTree to_process_tree(const PowlNode& node);
 
+// Converts an ordinary source/sink workflow net to a block-structured process
+// tree. The net is validated through the reverse workflow-net translator and
+// residual partial orders are rejected when they cannot be reduced exactly to
+// sequence, exclusive, parallel, or loop blocks.
+[[nodiscard]] ProcessTree to_process_tree(const PetriNet& net);
+
 // Converts a POWL model to a sound source/sink workflow net. POWL transition
 // labels are registered deterministically in first-encounter order; an empty
 // label is a visible activity and only PowlNode::silent() is tau.

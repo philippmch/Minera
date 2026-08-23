@@ -517,6 +517,10 @@ int usage(const char* program) {
                "                            tree as PTML to <path>\n"
                "  --powl-ptml <path>        Convert the discovered POWL model\n"
                "                            to a process tree and write PTML\n"
+               "  --pnml-to-ptml <path>    Convert an imported PNML workflow\n"
+               "                            net to PTML without an event log\n"
+               "  --bpmn-to-ptml <path>    Convert an imported BPMN process\n"
+               "                            to PTML without an event log\n"
                "  --check-ptml <path>       Also check the log against the\n"
                "                            process tree in this PTML file\n"
                "                            (conformance id: imported)\n"
@@ -1075,6 +1079,8 @@ int main(int argc, char** argv) {
   std::filesystem::path bpmn_output;
   std::filesystem::path ptml_output;
   std::filesystem::path powl_ptml_output;
+  std::filesystem::path pnml_to_ptml_input;
+  std::filesystem::path bpmn_to_ptml_input;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
   std::filesystem::path dfg_output;
@@ -1342,6 +1348,13 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--pnml-to-ptml" || arg == "--bpmn-to-ptml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--pnml-to-ptml") pnml_to_ptml_input = value;
+      else bpmn_to_ptml_input = value;
+      continue;
+    }
     if (arg == "--ltl-variant" || arg == "--ltl-attribute-key" ||
         arg == "--ltl-attribute-values" || arg == "--ltl-positive" ||
         arg == "--ltl-enable-timestamp" ||
@@ -3764,7 +3777,19 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
-  if (input.empty() && !random_tree_requested) {
+  const int reverse_tree_inputs = (pnml_to_ptml_input.empty() ? 0 : 1) +
+                                  (bpmn_to_ptml_input.empty() ? 0 : 1);
+  if (reverse_tree_inputs > 1) {
+    std::cerr << "error: pass only one of --pnml-to-ptml and "
+                 "--bpmn-to-ptml\n";
+    return 2;
+  }
+  if (reverse_tree_inputs != 0 && (!input.empty() || random_tree_requested)) {
+    std::cerr << "error: workflow-net-to-PTML conversion cannot be combined "
+                 "with an event-log input or random-tree generation\n";
+    return 2;
+  }
+  if (input.empty() && !random_tree_requested && reverse_tree_inputs == 0) {
     return usage(argv[0]);
   }
   if (timestamp_interleavings_requested) {
@@ -3790,6 +3815,25 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (reverse_tree_inputs != 0) {
+      const auto net = !pnml_to_ptml_input.empty()
+                           ? minera::import_pnml(pnml_to_ptml_input)
+                           : minera::import_bpmn(bpmn_to_ptml_input);
+      const auto tree = minera::to_process_tree(net);
+      const auto body = minera::to_ptml(tree, "workflow net");
+      if (output.empty()) {
+        std::cout << body;
+      } else {
+        std::ofstream file(output, std::ios::binary);
+        if (!file) {
+          std::cerr << "error: cannot open PTML output file " << output
+                    << '\n';
+          return 1;
+        }
+        file << body;
+      }
+      return 0;
+    }
     if (random_tree_requested) {
       const auto lookup = [&](std::string_view name) {
         const auto it = random_tree_fields.find(std::string(name));

@@ -269,6 +269,64 @@ void petri_conversion_sound_and_deterministic() {
   assert(first.transitions().size() == second.transitions().size());
 }
 
+void workflow_net_to_process_tree_is_strict() {
+  const std::vector<PowlNode> models{
+      PowlNode::silent(),
+      PowlNode::transition("A"),
+      PowlNode::transition("A", {0, 1}),
+      PowlNode::transition("A", {1, std::nullopt}),
+      PowlNode::xor_node(
+          {PowlNode::transition("A"), PowlNode::transition("B")}),
+      PowlNode::sequence(
+          {PowlNode::transition("A"),
+           PowlNode::concurrency({PowlNode::transition("B"),
+                                  PowlNode::transition("C")}),
+           PowlNode::transition("D")}),
+      PowlNode::loop(PowlNode::sequence({PowlNode::transition("A"),
+                                         PowlNode::transition("B")}),
+                     PowlNode::transition("C")),
+  };
+
+  for (const auto& model : models) {
+    const auto source = minera::to_petri_net(model);
+    const auto tree = minera::to_process_tree(source);
+    const auto recovered = minera::to_petri_net(tree);
+    assert(enumerate_language(recovered, 6, 160).traces ==
+           enumerate_language(source, 6, 160).traces);
+    assert(minera::final_marking_reachable(recovered));
+  }
+
+  // The N-shaped order is not series-parallel and therefore has no exact
+  // block-structured process-tree representation.
+  const auto non_block = PowlNode::strict_partial_order(
+      {PowlNode::transition("A"), PowlNode::transition("B"),
+       PowlNode::transition("C"), PowlNode::transition("D")},
+      {{0, 2}, {1, 2}, {1, 3}});
+  bool rejected = false;
+  try {
+    (void)minera::to_process_tree(minera::to_petri_net(non_block));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+
+  bool rejected_extended = false;
+  try {
+    minera::PetriNet extended;
+    const auto source = extended.add_place();
+    const auto sink = extended.add_place();
+    const auto transition = extended.add_transition(0, {source}, {sink});
+    extended.set_activities({"A"});
+    extended.set_source(source);
+    extended.set_sink(sink);
+    extended.add_inhibitor_arc(transition, source);
+    (void)minera::to_process_tree(extended);
+  } catch (const std::invalid_argument&) {
+    rejected_extended = true;
+  }
+  assert(rejected_extended);
+}
+
 void petri_to_powl_round_trips_structured_nets() {
   const std::vector<PowlNode> models{
       PowlNode::silent(),
@@ -387,6 +445,7 @@ int main() {
   process_tree_to_powl_variations();
   powl_to_process_tree_preserves_blocks_and_frequencies();
   petri_conversion_sound_and_deterministic();
+  workflow_net_to_process_tree_is_strict();
   petri_to_powl_round_trips_structured_nets();
   std::cout << "POWL conversion tests passed\n";
 }

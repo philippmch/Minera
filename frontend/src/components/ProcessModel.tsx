@@ -182,15 +182,13 @@ function ModelResult({
   const [asNet, setAsNet] = useState(false);
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
-  // inductive tree or from the net's token semantics (converted server-side).
-  // The inductive tree additionally exports as PTML, the process-tree format.
+  // inductive tree or from the net's token semantics (converted server-side),
+  // and PTML when the selected workflow net is exactly block structured.
   const actions = canExportPnml ? (
     <>
       <PnmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
       <BpmnButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
-      {variant.artifact === "process-tree" && (
-        <PtmlButton groupName={groupName} dataset={data.dataset} />
-      )}
+      <PtmlButton minerId={minerId} groupName={groupName} dataset={data.dataset} />
       <PlayoutButton minerId={minerId} dataset={data.dataset} />
     </>
   ) : null;
@@ -468,9 +466,11 @@ function BpmnButton({
 // Downloads the inductive miner's process tree as PTML, the block-structured
 // tree interchange format other process-mining tools read.
 function PtmlButton({
+  minerId,
   groupName,
   dataset,
 }: {
+  minerId: string;
   groupName: string;
   dataset: string;
 }) {
@@ -480,14 +480,14 @@ function PtmlButton({
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchPtml()
+    fetchPtml(minerId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
         anchor.href = url;
-        anchor.download = `${base}-inductive.ptml`;
+        anchor.download = `${base}-${minerId}.ptml`;
         anchor.click();
         URL.revokeObjectURL(url);
       })
