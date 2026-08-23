@@ -179,6 +179,60 @@ int main() {
   assert(causal_result.diagnostics.lp_solved == 1);
   assert(has_arc(causal_result.net, 0, 1));
 
+  // Explicit causal pairs constrain a region without making the pair list
+  // exhaustive.  The only place that fits both variants must add c as an
+  // additional consumer of the token produced by a.
+  ILPMinerOptions sparse_causal;
+  sparse_causal.causal_relation = {{"a", "b"}};
+  const auto sparse = mine_ilp(log_of({{"a", "b"}, {"a", "c"}}),
+                               sparse_causal);
+  assert(sparse.net.activities() == std::vector<std::string>({"a", "b", "c"}));
+  assert(has_arc(sparse.net, 0, 1));
+  assert(has_arc(sparse.net, 0, 2));
+  assert(check_workflow_net(sparse.net).valid);
+  const auto sparse_replay = check_conformance(
+      log_of({{"a", "b"}, {"a", "c"}}), sparse.net);
+  assert(sparse_replay.fitting_traces == sparse_replay.trace_count);
+  const auto sparse_repeat = mine_ilp(
+      log_of({{"a", "b"}, {"a", "c"}}), sparse_causal);
+  assert(sparse.net.place_count() == sparse_repeat.net.place_count());
+  assert(sparse.net.transitions().size() == sparse_repeat.net.transitions().size());
+  assert(sparse.diagnostics.visited_nodes == sparse_repeat.diagnostics.visited_nodes);
+  sparse_causal.max_nodes = 1;
+  const auto sparse_limited = mine_ilp(
+      log_of({{"a", "b"}, {"a", "c"}}), sparse_causal);
+  assert(sparse_limited.diagnostics.exhausted);
+  assert(sparse_limited.diagnostics.visited_nodes <= 1);
+
+  // A reversed observed order must not select the smaller region that needs
+  // an initial/final token; explicit causal places are required to be
+  // zero-marking internal regions so the assembled workflow net retains them.
+  ILPMinerOptions reversed_causal;
+  reversed_causal.causal_relation = {{"a", "b"}};
+  const auto reversed = mine_ilp(log_of({{"b", "a"}}), reversed_causal);
+  assert(has_arc(reversed.net, 0, 1));
+  assert(check_workflow_net(reversed.net).valid);
+
+  // Overlapping requested pairs still receive independent best regions.  The
+  // two variants make a=>b and a=>d share a feasible composite, while a=>b
+  // also has a smaller singleton optimum; the composite's c=>b arc must not
+  // be lost when the pair results are merged.
+  ILPMinerOptions overlapping_causal;
+  overlapping_causal.artificial_start_activity.clear();
+  overlapping_causal.artificial_end_activity.clear();
+  overlapping_causal.causal_relation = {{"a", "b"}, {"a", "d"}};
+  const auto overlapping = mine_ilp(
+      log_of({{"a", "b"}, {"c", "d"}}), overlapping_causal);
+  assert(overlapping.net.activities() ==
+         std::vector<std::string>({"a", "b", "c", "d"}));
+  assert(has_arc(overlapping.net, 2, 1));
+  assert(has_arc(overlapping.net, 0, 3));
+  assert(check_workflow_net(overlapping.net).valid);
+  const auto overlapping_replay = check_conformance(
+      log_of({{"a", "b"}, {"c", "d"}}), overlapping.net);
+  assert(overlapping_replay.fitting_traces == overlapping_replay.trace_count);
+  assert(!overlapping.diagnostics.exhausted);
+
   bool invalid_alpha = false;
   try {
     ILPMinerOptions invalid;

@@ -753,7 +753,12 @@ deterministic `A=>B` comma-separated entries. Frequency-based noise filtering
 can remove low-support variants and their activities before region search. The
 dependency-free integer-region search reports visited candidates, LP-feasibility
 attempts, branch counts, and exhaustion instead of claiming an unbounded
-optimum.
+optimum. Supplied causal pairs are required producer/consumer constraints, not
+an exhaustive arc list: the bounded search may add compatible producer or
+consumer arcs when a composite region is needed to satisfy all retained trace
+markings. Each supplied pair is optimized independently, with exact duplicate
+regions removed after selection; explicit pair places use zero initial/final
+markings so they survive workflow-net assembly.
 
 Strict request parsing, standalone CLI flags, the cached-session local-server
 endpoint, and typed frontend query serialization cover activity/boundary keys,
