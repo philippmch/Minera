@@ -84,10 +84,50 @@ void validation_contract() {
   assert(threw);
 }
 
+void enrichment_contract() {
+  const auto result = minera::enrich_ocel(sample());
+  // Existing O2O records are preserved; each selected graph contributes its
+  // deterministic relation family without duplicate triples.
+  assert(result.o2o.size() == 22);
+  bool interaction = false, descendant = false, inheritance = false;
+  bool cobirth = false, codeath = false;
+  for (const auto& relation : result.o2o) {
+    interaction = interaction || relation.qualifier == "object_interaction_graph";
+    descendant = descendant || relation.qualifier == "object_descendants_graph";
+    inheritance = inheritance || relation.qualifier == "object_inheritance_graph";
+    cobirth = cobirth || relation.qualifier == "object_cobirth_graph";
+    codeath = codeath || relation.qualifier == "object_codeath_graph";
+  }
+  assert(interaction && descendant && inheritance && cobirth && codeath);
+  assert(result.relations[0].qualifier == "creation");
+  assert(result.relations[1].qualifier == "creation");
+  assert(result.relations[2].qualifier == "termination");
+  assert(result.relations[4].qualifier == "termination");
+  assert(result.relations[6].qualifier == "creation");
+  const auto json = minera::serialize_ocel_enrichment_json(result);
+  assert(json.find("\"family\":\"OCEL_ENRICHMENT\"") != std::string::npos);
+  assert(json.find("object_codeath_graph") != std::string::npos);
+  assert(json.find("\"lifecycle_qualifiers\":true") != std::string::npos);
+  assert(json.find("\"ocel:o2o\"") != std::string::npos);
+
+  minera::OcelEnrichmentOptions limited;
+  limited.include_interaction = false;
+  limited.include_descendants = false;
+  limited.include_inheritance = false;
+  limited.include_cobirth = false;
+  limited.include_codeath = false;
+  limited.include_lifecycle_qualifiers = false;
+  const auto unchanged = minera::enrich_ocel(sample(), limited);
+  assert(unchanged.o2o.size() == 1 && unchanged.relations[0].qualifier.empty());
+  assert(minera::serialize_ocel_enrichment_json(unchanged, limited).find(
+             "\"graphs\":[]") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
   connected_components_contract();
   ancestors_descendants_contract();
   validation_contract();
+  enrichment_contract();
 }

@@ -114,7 +114,8 @@ when the source log overload is used.
 Object-centric Petri-net simulation evidence: the bounded native adapter
 enumerates per-object-type workflow-net traces, combines object choices into
 deterministic OCEL event/object/relation records, supports explicit object ids,
-per-trace object suffixing, and strict trace/state/firing/timestamp bounds. The
+per-trace object suffixing, variable object-type bindings, and strict
+trace/state/firing/timestamp bounds. The
 standalone `minera_ocel --ocpn-playout` command, multipart local
 `POST /api/ocel/playout`, and typed frontend request/response guard expose the
 same `OCEL_PLAYOUT` envelope; the endpoint also selects the log/DFG OCPN
@@ -124,12 +125,21 @@ relations; the default `independent` mode preserves one event per object-local
 firing. The new `synchronized` mode retains an activity-to-object-type slot map
 from discovery, fires enabled transitions for one deterministic binding in a
 single global event, supports transition/binding branching caps, and can return
-reachability or binding sequences. The selected mode and optional diagnostics
-are echoed in the JSON envelope. Object-centric causal-net playout uses the
+reachability or binding sequences. Variable slots enumerate every enabled
+non-empty subset of an object type deterministically. The selected mode and
+optional diagnostics are echoed in the JSON envelope. Object-centric causal-net playout uses the
 same synchronized workflow projection through `OcCausalNet`, with a separate
 `OC_CAUSAL_NET_PLAYOUT` envelope, `--oc-causal-net` CLI selector, and
 `model=causal_net` server/frontend selector. Full arbitrary marker production,
 custom final predicates, and stochastic branching remain open.
+
+Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
+the interaction, descendants, inheritance, cobirth, and codeath object graphs as
+qualified O2O relations, and can qualify every E2O relation as creation, other,
+or termination. Existing relations and qualifiers are preserved when a selected
+graph does not add a new edge. The standalone `minera_ocel --enrich` mode,
+multipart local `POST /api/ocel/enrich`, and typed frontend adapter expose the
+same bounded selection and `OCEL_ENRICHMENT` envelope.
 
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics

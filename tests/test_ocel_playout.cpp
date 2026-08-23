@@ -146,6 +146,29 @@ void synchronized_exists_trace_reports_reachability() {
   assert(json.find("\"exists_trace\":true") != std::string::npos);
 }
 
+void synchronized_variable_slots_bind_multiple_objects() {
+  auto variable_graph = shared_graph();
+  variable_graph.activity_object_types["Create"] = {"order"};
+  variable_graph.activity_object_types["Ship"] = {"order"};
+  variable_graph.activity_variable_object_types["Create"] = {"item"};
+  variable_graph.activity_variable_object_types["Ship"] = {"item"};
+
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.max_states = 1000;
+  options.objects["order"] = {"o1"};
+  options.objects["item"] = {"i1", "i2"};
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  options.return_sequences = true;
+  const auto result = minera::ocpn_extensive_playout_result(variable_graph, options);
+  assert(result.trace_exists);
+  assert(result.log.events.size() == 2);
+  assert(result.log.relations.size() == 6);
+  assert(result.sequences.size() == 1);
+  assert(result.sequences[0][0].objects.size() == 3);
+}
+
 }  // namespace
 
 int main() {
@@ -154,4 +177,5 @@ int main() {
   shared_activity_binding_coalesces_relations();
   synchronized_binding_fires_one_global_activity();
   synchronized_exists_trace_reports_reachability();
+  synchronized_variable_slots_bind_multiple_objects();
 }

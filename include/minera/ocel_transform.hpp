@@ -15,6 +15,38 @@ enum class OcelSplitVariant {
   kAncestorsDescendants,
 };
 
+enum class OcelEnrichmentGraph {
+  kInteraction,
+  kDescendants,
+  kInheritance,
+  kCobirth,
+  kCodeath,
+  INTERACTION = kInteraction,
+  DESCENDANTS = kDescendants,
+  INHERITANCE = kInheritance,
+  COBIRTH = kCobirth,
+  CODEATH = kCodeath,
+};
+
+struct OcelEnrichmentOptions {
+  // Each selected graph is materialized as deterministic O2O qualifiers.
+  // Defaults enable the complete graph family.
+  bool include_interaction = true;
+  bool include_descendants = true;
+  bool include_inheritance = true;
+  bool include_cobirth = true;
+  bool include_codeath = true;
+  // Qualify every related event with creation, other, or termination while
+  // preserving the original qualifier when no lifecycle position exists.
+  bool include_lifecycle_qualifiers = true;
+};
+
+[[nodiscard]] Ocel enrich_ocel(
+    const Ocel& log, const OcelEnrichmentOptions& options = {});
+
+[[nodiscard]] std::string serialize_ocel_enrichment_json(
+    const Ocel& log, const OcelEnrichmentOptions& options = {});
+
 struct OcelSplitOptions {
   OcelSplitVariant variant = OcelSplitVariant::kConnectedComponents;
   // Required for the ancestors/descendants variant. Objects of this type are
