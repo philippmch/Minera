@@ -327,6 +327,32 @@ void workflow_net_to_process_tree_is_strict() {
   assert(rejected_extended);
 }
 
+void powl_ptml_uses_strict_workflow_semantics() {
+  const auto block = PowlNode::loop(
+      PowlNode::sequence(
+          {PowlNode::transition("A"), PowlNode::transition("B")}),
+      PowlNode::transition("C"));
+  const auto direct = minera::to_process_tree(block);
+  const auto strict = minera::to_process_tree(minera::to_petri_net(block));
+  assert(enumerate_language(minera::to_petri_net(direct), 6, 160).traces ==
+         enumerate_language(minera::to_petri_net(strict), 6, 160).traces);
+
+  // Direct POWL conversion intentionally has a deterministic approximation
+  // for residual partial orders; exported PTML takes the strict net route.
+  const auto non_block = PowlNode::strict_partial_order(
+      {PowlNode::transition("A"), PowlNode::transition("B"),
+       PowlNode::transition("C"), PowlNode::transition("D")},
+      {{0, 2}, {1, 2}, {1, 3}});
+  (void)minera::to_process_tree(non_block);
+  bool rejected = false;
+  try {
+    (void)minera::to_process_tree(minera::to_petri_net(non_block));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void petri_to_powl_round_trips_structured_nets() {
   const std::vector<PowlNode> models{
       PowlNode::silent(),
@@ -446,6 +472,7 @@ int main() {
   powl_to_process_tree_preserves_blocks_and_frequencies();
   petri_conversion_sound_and_deterministic();
   workflow_net_to_process_tree_is_strict();
+  powl_ptml_uses_strict_workflow_semantics();
   petri_to_powl_round_trips_structured_nets();
   std::cout << "POWL conversion tests passed\n";
 }
