@@ -96,6 +96,12 @@ struct ExtensivePlayoutOptions {
   // initial or final marking is not the designated workflow boundary.
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::uint32_t> final_marking;
+  // Optional per-state transition branching cap. Zero preserves exhaustive
+  // breadth-first ordering; fractional values are stochastically rounded.
+  // These fields are appended to preserve existing positional aggregate
+  // initializers for the original option members.
+  double branching_factor_transitions = 0.0;
+  std::uint64_t seed = 1;
 };
 
 // Enumerates the model's language instead of sampling it: every distinct
