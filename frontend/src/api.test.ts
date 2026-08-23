@@ -1034,6 +1034,12 @@ describe("OCEL API", () => {
       branching_factor_bindings: 4, exists_trace: true, return_sequences: true,
     })).toBe("branching_factor_transitions=3&branching_factor_bindings=4&event_binding=synchronized&exists_trace=true&return_sequences=true");
     expect(ocelPlayoutQuery({
+      event_binding: "synchronized", branching_factor_transitions: 1.5,
+      branching_factor_bindings: 0.5, seed: 42,
+    })).toBe("branching_factor_transitions=1.5&branching_factor_bindings=0.5&seed=42&event_binding=synchronized");
+    expect(() => ocelPlayoutQuery({ branching_factor_bindings: -0.1 }))
+      .toThrow(/finite non-negative/);
+    expect(ocelPlayoutQuery({
       initial_marking: { order: [0, 1, 0], item: [1, 0, 0, 0] },
       final_marking: { order: [0, 0, 1], item: [0, 0, 0, 1] },
     })).toBe("initial_marking=item%3A1%2C0%2C0%2C0%3Border%3A0%2C1%2C0&final_marking=item%3A0%2C0%2C0%2C1%3Border%3A0%2C0%2C1");

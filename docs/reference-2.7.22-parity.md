@@ -83,7 +83,7 @@ are reconciled.
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN and causal-net extensive playout projections now support independent object-local events, shared-activity coalescing, and synchronized multi-object bindings with deterministic transition/binding branching caps, reachability-only mode, and binding-sequence diagnostics through native, CLI, multipart local-server, and frontend adapters; richer marker/production semantics remain |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN and causal-net extensive playout projections now support independent object-local events, shared-activity coalescing, synchronized multi-object bindings, seeded stochastic transition/binding branching caps, reachability-only mode, and binding-sequence diagnostics through native, CLI, multipart local-server, and frontend adapters; richer marker/production semantics remain |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; event rows infer typed attributes with bounded categorical cardinality, use canonical `event:key@value` names, and are rectangular across traces; trace extraction now defaults to trace-based rows and exposes selectable activity/succession representations, categorical cardinality bounds, case identifiers, duration/timing/path/workload/concurrency extras, and epsilon controls through native, JSON, CLI, server, and typed frontend adapters; temporal rows now provide arrival/finish-rate, service/waiting/sojourn, rework, case/resource, and legacy compact projections with explicit feature schemas; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -125,9 +125,10 @@ coalesces same-activity local firings into one event with all selected object
 relations; the default `independent` mode preserves one event per object-local
 firing. The new `synchronized` mode retains an activity-to-object-type slot map
 from discovery, fires enabled transitions for one deterministic binding in a
-single global event, supports transition/binding branching caps, and can return
-reachability or binding sequences. Variable slots enumerate every enabled
-non-empty subset of an object type deterministically. The selected mode and
+single global event, supports seeded transition/binding branching caps
+(including fractional stochastic rounding), and can return reachability or
+binding sequences. Variable slots enumerate every enabled non-empty subset of
+an object type deterministically before seeded sampling. The selected mode and
 optional diagnostics are echoed in the JSON envelope. The CLI and local-server
 query use escaped `TYPE:T0,T1,...` marker entries and reject unknown types or
 vectors whose lengths do not match the selected net. Traditional exhaustive
@@ -135,7 +136,7 @@ Petri-net playout accepts the same marker-vector contract. Object-centric causal
 same synchronized workflow projection through `OcCausalNet`, with a separate
 `OC_CAUSAL_NET_PLAYOUT` envelope, `--oc-causal-net` CLI selector, and
 `model=causal_net` server/frontend selector. Custom final predicates and
-stochastic branching remain open.
+richer production semantics remain open.
 
 Traditional Petri playout now applies explicit marker vectors consistently to
 the basic sampler and weighted stochastic sampler as well as exhaustive

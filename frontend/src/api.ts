@@ -4080,6 +4080,7 @@ export interface OcelPlayoutOptions {
   max_bindings_per_activity?: number;
   branching_factor_transitions?: number;
   branching_factor_bindings?: number;
+  seed?: number;
   max_traces?: number;
   max_states?: number;
   objects?: Record<string, string[]>;
@@ -4113,9 +4114,16 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
     if (value !== undefined && Number.isInteger(value) && value >= 0)
       query.set(name, String(value));
   };
+  const addBranching = (name: string, value: number | undefined) => {
+    if (value === undefined) return;
+    if (!Number.isFinite(value) || value < 0)
+      throw new Error(`${name} must be a finite non-negative number`);
+    query.set(name, String(value));
+  };
   addInteger("max_bindings_per_activity", options.max_bindings_per_activity);
-  addInteger("branching_factor_transitions", options.branching_factor_transitions);
-  addInteger("branching_factor_bindings", options.branching_factor_bindings);
+  addBranching("branching_factor_transitions", options.branching_factor_transitions);
+  addBranching("branching_factor_bindings", options.branching_factor_bindings);
+  addInteger("seed", options.seed);
   addInteger("max_traces", options.max_traces);
   addInteger("max_states", options.max_states);
   if (options.objects !== undefined) {

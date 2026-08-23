@@ -40,6 +40,21 @@ minera::OcpnGraph shared_graph() {
   return result;
 }
 
+minera::OcpnGraph branching_graph() {
+  minera::OcpnGraph result;
+  result.object_types = {"order"};
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {sink});
+  net.add_transition(1, {source}, {sink});
+  result.petri_nets.emplace("order", std::move(net));
+  return result;
+}
+
 void extensive_contract() {
   minera::OcpnPlayoutOptions options;
   options.max_bindings_per_activity = 1;
@@ -203,6 +218,45 @@ void explicit_type_markers_drive_both_bindings() {
   assert(rejected);
 }
 
+void synchronized_branching_is_seeded_and_fractional() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.max_states = 100;
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  options.return_sequences = true;
+  options.branching_factor_transitions = 1.0;
+  options.seed = 42;
+  const auto first = minera::ocpn_extensive_playout_result(branching_graph(), options);
+  const auto second = minera::ocpn_extensive_playout_result(branching_graph(), options);
+  assert(first.trace_exists);
+  assert(first.log.events.size() == 1);
+  assert(first.log.events.front().activity == "A" ||
+         first.log.events.front().activity == "B");
+  assert(minera::serialize_ocpn_playout_json(first, options.event_binding) ==
+         minera::serialize_ocpn_playout_json(second, options.event_binding));
+
+  options.branching_factor_transitions = 0.5;
+  const auto fractional_first =
+      minera::ocpn_extensive_playout_result(branching_graph(), options);
+  const auto fractional_second =
+      minera::ocpn_extensive_playout_result(branching_graph(), options);
+  assert(fractional_first.trace_exists == fractional_second.trace_exists);
+  assert(minera::serialize_ocpn_playout_json(
+             fractional_first, options.event_binding) ==
+         minera::serialize_ocpn_playout_json(
+             fractional_second, options.event_binding));
+
+  options.branching_factor_transitions = -1.0;
+  bool rejected = false;
+  try {
+    (void)minera::ocpn_extensive_playout_result(branching_graph(), options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -213,4 +267,5 @@ int main() {
   synchronized_exists_trace_reports_reachability();
   synchronized_variable_slots_bind_multiple_objects();
   explicit_type_markers_drive_both_bindings();
+  synchronized_branching_is_seeded_and_fractional();
 }
