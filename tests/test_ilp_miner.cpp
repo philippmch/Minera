@@ -53,6 +53,9 @@ int main() {
   assert(sequence.markings.initial.size() == sequence.net.place_count());
   assert(sequence.net.activities() == std::vector<std::string>({"a", "b", "c"}));
   assert(has_arc(sequence.net, 0, 1) && has_arc(sequence.net, 1, 2));
+  assert(std::count_if(sequence.net.transitions().begin(), sequence.net.transitions().end(),
+                       [](const PetriTransition& transition) { return transition.silent(); }) >=
+         2);
   assert(check_workflow_net(sequence.net).valid);
 
   const auto choice = mine_ilp(log_of({{"a", "b"}, {"a", "c"}}));
@@ -149,6 +152,22 @@ int main() {
   assert(std::find(filtered_sequences.net.activities().begin(),
                    filtered_sequences.net.activities().end(), "c") !=
          filtered_sequences.net.activities().end());
+
+  // Cumulative occurrence vectors compare continuations after the complete
+  // multiset prefix: the rare d continuation shares the {a,b} prefix with a
+  // frequent c continuation even though those events reached it in another
+  // order.  The rejected suffix is not allowed to constrain the discovered
+  // regions either.
+  std::vector<std::vector<std::string>> cumulative_rows;
+  for (int i = 0; i < 20; ++i) cumulative_rows.push_back({"a", "b", "c"});
+  for (int i = 0; i < 20; ++i) cumulative_rows.push_back({"b", "a", "c"});
+  cumulative_rows.push_back({"b", "a", "d", "e"});
+  ILPMinerOptions cumulative_alpha;
+  cumulative_alpha.alpha = 0.5;
+  const auto cumulative_result = mine_ilp(log_of(cumulative_rows), cumulative_alpha);
+  assert(!has_arc(cumulative_result.net, 0, 3));
+  assert(!has_arc(cumulative_result.net, 3, 4));
+  assert(check_workflow_net(cumulative_result.net).valid);
 
   // A supplied causal relation is deterministic and receives priority under
   // a tight node budget, so the requested directed region is discoverable.
