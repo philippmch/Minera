@@ -14,6 +14,11 @@ namespace minera {
 // discovery algorithm.  `seed` is an explicit reproducibility extension.
 struct GeneticMinerOptions {
   std::string activity_key;
+  // Optional event timestamp and case-id selectors. Standard keys (timestamp,
+  // time:timestamp, case_id, case:concept:name) and generic attributes are
+  // resolved strictly when supplied.
+  std::string timestamp_key;
+  std::string case_id_key;
   std::uint64_t seed = 0;
   std::size_t population_size = 32;
   std::size_t generations = 20;

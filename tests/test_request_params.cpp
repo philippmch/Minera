@@ -2649,6 +2649,8 @@ void ilp_params_contract() {
 void genetic_params_contract() {
   const auto parsed = minera::parse_genetic_miner_params(fields({
       {"genetic_activity_key", "concept:name"},
+      {"genetic_timestamp_key", "occurred_at"},
+      {"genetic_case_id_key", "case_ref"},
       {"genetic_seed", "19"},
       {"genetic_population_size", "12"},
       {"genetic_generations", "7"},
@@ -2659,6 +2661,7 @@ void genetic_params_contract() {
       {"genetic_max_activities", "9"},
       {"genetic_max_states", "77"}}));
   assert(parsed.activity_key == "concept:name" && parsed.seed == 19);
+  assert(parsed.timestamp_key == "occurred_at" && parsed.case_id_key == "case_ref");
   assert(parsed.population_size == 12 && parsed.generations == 7);
   assert(parsed.elitism_rate == 0.2 && parsed.crossover_rate == 0.8);
   assert(parsed.mutation_rate == 0.05 && parsed.elitism_min_sample == 4);
@@ -2673,6 +2676,17 @@ void genetic_params_contract() {
            std::pair{"genetic_max_activities", "0"},
            std::pair{"genetic_max_states", "0"},
            std::pair{"genetic_seed", "-1"}}) {
+    bool threw = false;
+    const auto lookup = fields({item});
+    const auto present = [name = item.first](std::string_view key) {
+      return key == name;
+    };
+    try { (void)minera::parse_genetic_miner_params(lookup, present); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+  }
+  for (const auto& item : {std::pair{"genetic_timestamp_key", ""},
+                           std::pair{"genetic_case_id_key", ""}}) {
     bool threw = false;
     const auto lookup = fields({item});
     const auto present = [name = item.first](std::string_view key) {

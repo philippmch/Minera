@@ -1584,8 +1584,14 @@ export const requestILPMine = requestIlpMine;
 /** Query string for the hidden cached-session classic genetic miner. */
 export function geneticMinerQuery(options: GeneticMinerOptions = {}): string {
   const query = new URLSearchParams();
+  for (const [name, value] of [["genetic_timestamp_key", options.timestamp_key],
+                               ["genetic_case_id_key", options.case_id_key]] as const) {
+    if (value !== undefined && value.length === 0) throw new Error(`${name} must not be empty`);
+  }
   const entries: Array<[string, string | undefined]> = [
     ["genetic_activity_key", options.activity_key],
+    ["genetic_timestamp_key", options.timestamp_key],
+    ["genetic_case_id_key", options.case_id_key],
     ["genetic_seed", options.seed === undefined ? undefined : String(options.seed)],
     ["genetic_population_size", options.population_size === undefined ? undefined : String(options.population_size)],
     ["genetic_generations", options.generations === undefined ? undefined : String(options.generations)],

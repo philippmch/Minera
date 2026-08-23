@@ -394,6 +394,8 @@ int usage(const char* program) {
                "  --ilp-max-nodes <n>       Positive ILP search bound\n"
                "  --genetic-mine            Emit standalone classic genetic JSON\n"
                "  --genetic-activity-key <name> Event attribute used as activity\n"
+               "  --genetic-timestamp-key <name> Event timestamp attribute\n"
+               "  --genetic-case-id-key <name> Case id or event/trace attribute\n"
                "  --genetic-seed <n>        Deterministic search seed\n"
                "  --genetic-population-size <n> Population bound (>=2)\n"
                "  --genetic-generations <n> Generation bound\n"
@@ -2005,7 +2007,8 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> genetic_option_names = {
-          "genetic_activity_key", "genetic_seed", "genetic_population_size",
+          "genetic_activity_key", "genetic_timestamp_key", "genetic_case_id_key",
+          "genetic_seed", "genetic_population_size",
           "genetic_generations", "genetic_elitism_rate",
           "genetic_crossover_rate", "genetic_mutation_rate",
           "genetic_elitism_min_sample", "genetic_max_activities",

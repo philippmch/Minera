@@ -168,6 +168,8 @@ export interface GeneticMinerResult {
 }
 export interface GeneticMinerOptions {
   activity_key?: string;
+  timestamp_key?: string;
+  case_id_key?: string;
   seed?: number;
   population_size?: number;
   generations?: number;

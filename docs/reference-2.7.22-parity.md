@@ -745,14 +745,22 @@ matrix search with explicit population, generation, crossover, mutation,
 elitism, activity, and candidate-state limits. Seeded evolution repairs
 disconnected and inverse matrix projections, preserves partition grouping, and
 converts compatible places plus silent routing hubs into a replayable workflow
-net with canonical initial/final markings. Fitness combines weighted token
-replay and fitting-trace coverage; diagnostics report the search bound and
-best candidate without fabricating an optimum after exhaustion.
+net with canonical initial/final markings. Each mating step retains reciprocal
+offspring with deterministic inverse repair. Fitness is explicitly 0.4 token-
+replay fitness plus 0.6 fitting-trace coverage over the normalized log;
+diagnostics report the search bound and best candidate without fabricating an
+optimum after exhaustion. Optional strict timestamp and case-id selectors
+resolve standard fields plus generic event/trace attributes, including stable
+duplicate-timestamp ordering and deterministic regrouping by selected case.
 
 The native result has a standalone JSON contract and strict request parsing,
 CLI flags, cached-session server endpoints, and frontend types/query helpers.
 Focused tests cover deterministic output, chain fitness, disconnected repair,
-parameter rejection, candidate caps, and malformed frontend responses.
+custom event/trace selectors, duplicate timestamp ordering, parameter
+rejection, candidate caps, and malformed frontend responses. The bounded
+adapter intentionally does not expose a separate fitness-log artifact in the
+standalone JSON contract; diagnostics remain scalar and the normalized log is
+used internally for scoring.
 
 ## Organizational SNA parity evidence
 
