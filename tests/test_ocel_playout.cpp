@@ -169,6 +169,40 @@ void synchronized_variable_slots_bind_multiple_objects() {
   assert(result.sequences[0][0].objects.size() == 3);
 }
 
+void explicit_type_markers_drive_both_bindings() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.objects["order"] = {"o1"};
+  options.initial_markings["order"] = {0, 1, 0};
+  options.final_markings["order"] = {0, 0, 1};
+  options.return_sequences = true;
+
+  const auto legacy = minera::ocpn_extensive_playout_result(graph(), options);
+  assert(legacy.trace_exists);
+  assert(legacy.log.events.size() == 1);
+  assert(legacy.log.events.front().activity == "Ship");
+  assert(legacy.sequences.size() == 1 && legacy.sequences.front().size() == 1);
+
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  const auto synchronized =
+      minera::ocpn_extensive_playout_result(graph(), options);
+  assert(synchronized.trace_exists);
+  assert(synchronized.log.events.size() == 1);
+  assert(synchronized.log.events.front().activity == "Ship");
+  assert(synchronized.sequences.size() == 1 &&
+         synchronized.sequences.front().size() == 1);
+
+  options.final_markings["unknown"] = {0, 0, 1};
+  bool rejected = false;
+  try {
+    (void)minera::ocpn_extensive_playout(graph(), options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -178,4 +212,5 @@ int main() {
   synchronized_binding_fires_one_global_activity();
   synchronized_exists_trace_reports_reachability();
   synchronized_variable_slots_bind_multiple_objects();
+  explicit_type_markers_drive_both_bindings();
 }

@@ -41,6 +41,11 @@ struct OcpnPlayoutOptions {
   // Optional object ids per object type. Missing types receive one synthetic
   // id named <type>_1.
   std::map<std::string, std::vector<std::string>> objects;
+  // Optional explicit per-type markers. Each vector is applied to every
+  // selected object of that type and must match that net's place count.
+  // Omitted types use the net's designated source/sink workflow markers.
+  std::map<std::string, std::vector<std::uint32_t>> initial_markings;
+  std::map<std::string, std::vector<std::uint32_t>> final_markings;
   bool objects_unique_per_trace = false;
   OcpnEventBinding event_binding = OcpnEventBinding::kIndependent;
   // Return only reachability metadata or include binding sequences in the

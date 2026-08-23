@@ -4055,6 +4055,8 @@ export interface OcelPlayoutOptions {
   max_traces?: number;
   max_states?: number;
   objects?: Record<string, string[]>;
+  initial_marking?: Record<string, number[]>;
+  final_marking?: Record<string, number[]>;
   objects_unique_per_trace?: boolean;
   event_binding?: "independent" | "shared_activity" | "synchronized";
   exists_trace?: boolean;
@@ -4098,6 +4100,22 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
       });
     if (entries.length) query.set("objects", entries.join(";"));
   }
+  const addMarkings = (name: string, markings: Record<string, number[]> | undefined) => {
+    if (markings === undefined) return;
+    const entries = Object.entries(markings)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([type, values]) => {
+        if (!type || !Array.isArray(values) || values.length === 0 ||
+            values.some((value) => !Number.isInteger(value) || value < 0 ||
+              value > 0xffffffff)) {
+          throw new Error("OCEL playout markings require non-empty uint32 vectors");
+        }
+        return `${escapeOcelPlayoutPart(type)}:${values.join(",")}`;
+      });
+    if (entries.length) query.set(name, entries.join(";"));
+  };
+  addMarkings("initial_marking", options.initial_marking);
+  addMarkings("final_marking", options.final_marking);
   if (options.objects_unique_per_trace !== undefined)
     query.set("objects_unique_per_trace", options.objects_unique_per_trace ? "true" : "false");
   if (options.event_binding !== undefined &&

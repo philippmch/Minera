@@ -109,6 +109,36 @@ void uniform_playout_honors_weighted_input_arcs() {
   assert(log.traces[0].events.size() == 1);
 }
 
+void extensive_playout_accepts_explicit_markers() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto initial = net.add_place();
+  const auto final = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a"});
+  net.add_transition(0, {initial}, {final});
+
+  minera::ExtensivePlayoutOptions options;
+  options.max_traces = 4;
+  options.initial_marking = {0, 1, 0, 0};
+  options.final_marking = {0, 0, 1, 0};
+  const auto generated = minera::extensive_playout(net, options);
+  assert(generated.trace_count() == 1);
+  assert(generated.traces.front().events.size() == 1);
+  assert(generated.traces.front().events.front().activity == "a");
+
+  options.final_marking = {0, 0, 1};
+  bool rejected = false;
+  try {
+    (void)minera::extensive_playout(net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -117,4 +147,5 @@ int main() {
   invalid_weights_are_rejected();
   huge_weights_are_scaled_without_overflow();
   uniform_playout_honors_weighted_input_arcs();
+  extensive_playout_accepts_explicit_markers();
 }

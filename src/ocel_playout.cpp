@@ -40,6 +40,7 @@ struct SynchronizedObject {
   std::string id;
   const PetriNet* net = nullptr;
   std::vector<std::uint32_t> marking;
+  std::vector<std::uint32_t> final_marking;
 };
 
 struct SynchronizedState {
@@ -76,6 +77,42 @@ void validate_net(const PetriNet& net, const std::string& type) {
     if (transition.activity && *transition.activity >= net.activities().size())
       throw std::invalid_argument("OCPN playout transition activity is invalid");
   }
+}
+
+void validate_marker_map(
+    const OcpnGraph& graph,
+    const std::map<std::string, std::vector<std::uint32_t>>& markers,
+    const char* label) {
+  for (const auto& [type, marking] : markers) {
+    const auto net = graph.petri_nets.find(type);
+    if (net == graph.petri_nets.end()) {
+      throw std::invalid_argument(std::string("OCPN playout ") + label +
+                                  " marking names an unknown object type: " +
+                                  type);
+    }
+    if (marking.size() != net->second.place_count()) {
+      throw std::invalid_argument(std::string("OCPN playout ") + label +
+                                  " marking for object type " + type +
+                                  " must match the place count");
+    }
+  }
+}
+
+void validate_marker_maps(const OcpnGraph& graph,
+                          const OcpnPlayoutOptions& options) {
+  validate_marker_map(graph, options.initial_markings, "initial");
+  validate_marker_map(graph, options.final_markings, "final");
+}
+
+std::vector<std::uint32_t> marker_for(
+    const PetriNet& net,
+    const std::map<std::string, std::vector<std::uint32_t>>& markers,
+    const std::string& type, std::size_t boundary) {
+  const auto found = markers.find(type);
+  if (found != markers.end()) return found->second;
+  std::vector<std::uint32_t> result(net.place_count(), 0);
+  result[boundary] = 1;
+  return result;
 }
 
 std::size_t visible_bound(const PetriNet& net,
@@ -142,11 +179,7 @@ std::string synchronized_state_key(const SynchronizedState& state) {
 
 bool at_final_marking(const SynchronizedObject& object,
                      const std::vector<std::uint32_t>& marking) {
-  if (marking.size() != object.net->place_count()) return false;
-  for (std::size_t place = 0; place < marking.size(); ++place) {
-    if (marking[place] != (place == object.net->sink() ? 1U : 0U)) return false;
-  }
-  return true;
+  return marking == object.final_marking;
 }
 
 bool has_visible_activity(const PetriNet& net, const std::string& activity) {
@@ -366,6 +399,7 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+  validate_marker_maps(graph, options);
 
   for (const auto& [type, object_ids] : options.objects) {
     if (!graph.petri_nets.contains(type))
@@ -400,8 +434,10 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
       object.type = type;
       object.id = id;
       object.net = &net;
-      object.marking.assign(net.place_count(), 0);
-      object.marking[net.source()] = 1;
+      object.marking = marker_for(net, options.initial_markings, type,
+                                  net.source());
+      object.final_marking = marker_for(net, options.final_markings, type,
+                                        net.sink());
       objects.push_back(std::move(object));
     }
   }
@@ -529,6 +565,7 @@ Ocel legacy_ocpn_extensive_playout(
       options.event_interval < 0.0) {
     throw std::invalid_argument("OCPN playout timestamps must be finite and non-negative");
   }
+  validate_marker_maps(graph, options);
   for (const auto& [type, object_ids] : options.objects) {
     if (!graph.petri_nets.contains(type))
       throw std::invalid_argument("OCPN playout object type is not in the model: " +
@@ -560,6 +597,10 @@ Ocel legacy_ocpn_extensive_playout(
     trace_options.start = 0.0;
     trace_options.case_interval = 0.0;
     trace_options.event_interval = 1.0;
+    trace_options.initial_marking =
+        marker_for(net, options.initial_markings, type, net.source());
+    trace_options.final_marking =
+        marker_for(net, options.final_markings, type, net.sink());
     const auto traces_log = extensive_playout(net, trace_options);
     if (traces_log.traces.empty()) return {};
     for (const auto& object_id : object_ids) {

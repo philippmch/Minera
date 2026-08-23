@@ -114,8 +114,9 @@ when the source log overload is used.
 Object-centric Petri-net simulation evidence: the bounded native adapter
 enumerates per-object-type workflow-net traces, combines object choices into
 deterministic OCEL event/object/relation records, supports explicit object ids,
-per-trace object suffixing, variable object-type bindings, and strict
-trace/state/firing/timestamp bounds. The
+per-trace object suffixing, variable object-type bindings, explicit per-type
+initial and final marker vectors, and strict trace/state/firing/timestamp
+bounds. The
 standalone `minera_ocel --ocpn-playout` command, multipart local
 `POST /api/ocel/playout`, and typed frontend request/response guard expose the
 same `OCEL_PLAYOUT` envelope; the endpoint also selects the log/DFG OCPN
@@ -127,11 +128,14 @@ from discovery, fires enabled transitions for one deterministic binding in a
 single global event, supports transition/binding branching caps, and can return
 reachability or binding sequences. Variable slots enumerate every enabled
 non-empty subset of an object type deterministically. The selected mode and
-optional diagnostics are echoed in the JSON envelope. Object-centric causal-net playout uses the
+optional diagnostics are echoed in the JSON envelope. The CLI and local-server
+query use escaped `TYPE:T0,T1,...` marker entries and reject unknown types or
+vectors whose lengths do not match the selected net. Traditional exhaustive
+Petri-net playout accepts the same marker-vector contract. Object-centric causal-net playout uses the
 same synchronized workflow projection through `OcCausalNet`, with a separate
 `OC_CAUSAL_NET_PLAYOUT` envelope, `--oc-causal-net` CLI selector, and
-`model=causal_net` server/frontend selector. Full arbitrary marker production,
-custom final predicates, and stochastic branching remain open.
+`model=causal_net` server/frontend selector. Custom final predicates and
+stochastic branching remain open.
 
 Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
 the interaction, descendants, inheritance, cobirth, and codeath object graphs as
