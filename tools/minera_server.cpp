@@ -1871,6 +1871,7 @@ void handle_genetic_mine(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "genetic_activity_key", "genetic_seed", "genetic_population_size",
+        "genetic_timestamp_key", "genetic_case_id_key",
         "genetic_generations", "genetic_elitism_rate",
         "genetic_crossover_rate", "genetic_mutation_rate",
         "genetic_elitism_min_sample", "genetic_max_activities",

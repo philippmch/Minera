@@ -5,6 +5,7 @@
 #include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <set>
 #include <stdexcept>
@@ -12,6 +13,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
@@ -31,6 +33,7 @@ struct Individual {
 struct NormalizedLog {
   std::vector<std::string> names;
   std::vector<std::vector<std::size_t>> traces;
+  EventLog conformance_log;
 };
 
 struct Scored {
@@ -170,32 +173,103 @@ void repair(Individual& individual, const std::vector<std::vector<std::size_t>>&
   normalize_individual(individual);
 }
 
+std::string event_value(const Event& event, std::string_view key) {
+  if (key == "activity" || key == "concept:name") return event.activity;
+  if (key == "case_id" || key == "case:concept:name") return event.case_id;
+  if (key == "timestamp" || key == "time:timestamp") return event.timestamp;
+  if (key == "resource" || key == "org:resource") return event.resource;
+  if (const auto* value = event.attribute(key)) return *value;
+  return {};
+}
+
+std::string trace_value(const Trace& trace, std::string_view key) {
+  if (key == "case_id" || key == "case:concept:name" || key == "concept:name")
+    return trace.case_id;
+  if (const auto* value = trace.attribute(key)) return *value;
+  return {};
+}
+
 NormalizedLog normalize(const EventLog& log, const GeneticMinerOptions& options) {
   if (log.traces.empty() || log.event_count() == 0)
     throw std::invalid_argument("genetic miner requires a non-empty event log");
   std::set<std::string> names;
-  std::vector<std::vector<std::string>> raw;
+  struct RawTrace { std::string case_id; std::vector<Event> events; };
+  std::vector<RawTrace> raw;
+  std::map<std::string, std::size_t> case_indexes;
   for (const auto& source_trace : log.traces) {
-    Trace trace = source_trace;
-    order_events_by_time(trace.events);
-    std::vector<std::string> sequence;
-    for (const auto& event : trace.events) {
-      std::string label = event.activity;
-      if (!options.activity_key.empty() && options.activity_key != "activity" &&
-          options.activity_key != "concept:name") {
-        if (options.activity_key == "resource" ||
-            options.activity_key == "org:resource") {
-          label = event.resource;
-        } else if (const auto* value = event.attribute(options.activity_key)) {
-          label = *value;
-        }
+    const bool standard_case_key =
+        options.case_id_key == "case_id" ||
+        options.case_id_key == "case:concept:name" ||
+        options.case_id_key == "concept:name";
+    const bool has_trace_case_value =
+        options.case_id_key.empty() || standard_case_key ||
+        source_trace.attribute(options.case_id_key) != nullptr;
+    if (has_trace_case_value) {
+      const std::string selected_case = options.case_id_key.empty()
+                                            ? source_trace.case_id
+                                            : trace_value(source_trace,
+                                                          options.case_id_key);
+      if (!options.case_id_key.empty() && selected_case.empty())
+        throw std::invalid_argument("genetic miner case_id_key missing value");
+      auto [case_it, inserted] = case_indexes.emplace(selected_case, raw.size());
+      if (inserted) raw.push_back({selected_case, {}});
+      auto& target = raw[case_it->second].events;
+      target.insert(target.end(), source_trace.events.begin(),
+                    source_trace.events.end());
+      continue;
+    }
+    // Without a trace-level value, a generic selector is an event-level case
+    // key. Split a source trace as events arrive so interleaved cases never
+    // become one artificial variant.
+    for (const auto& event : source_trace.events) {
+      const std::string selected_case = event_value(event, options.case_id_key);
+      if (selected_case.empty())
+        throw std::invalid_argument("genetic miner case_id_key missing value");
+      auto [case_it, inserted] = case_indexes.emplace(selected_case, raw.size());
+      if (inserted) raw.push_back({selected_case, {}});
+      raw[case_it->second].events.push_back(event);
+    }
+  }
+  for (auto& raw_trace : raw) {
+    if (!options.timestamp_key.empty()) {
+      std::vector<std::optional<double>> instants;
+      instants.reserve(raw_trace.events.size());
+      for (const auto& event : raw_trace.events) {
+        const auto value = event_value(event, options.timestamp_key);
+        const auto instant = parse_timestamp(value);
+        if (value.empty() || !instant)
+          throw std::invalid_argument("genetic miner timestamp_key missing or invalid value");
+        instants.push_back(instant);
       }
+      std::vector<std::size_t> order(raw_trace.events.size());
+      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t lhs, std::size_t rhs) {
+        if (*instants[lhs] != *instants[rhs]) return *instants[lhs] < *instants[rhs];
+        return raw_trace.events[lhs].input_order < raw_trace.events[rhs].input_order;
+      });
+      std::vector<Event> sorted;
+      sorted.reserve(order.size());
+      for (const auto index : order) sorted.push_back(std::move(raw_trace.events[index]));
+      raw_trace.events = std::move(sorted);
+    } else {
+      order_events_by_time(raw_trace.events);
+    }
+    std::vector<std::string> sequence;
+    for (const auto& event : raw_trace.events) {
+      std::string label = options.activity_key.empty()
+                              ? event.activity
+                              : event_value(event, options.activity_key);
+      if (!options.activity_key.empty() &&
+          options.activity_key != "activity" &&
+          options.activity_key != "concept:name" &&
+          options.activity_key != "resource" &&
+          options.activity_key != "org:resource" &&
+          event.attribute(options.activity_key) == nullptr)
+        label = event.activity;
       if (!label.empty()) {
         names.insert(label);
-        sequence.push_back(std::move(label));
       }
     }
-    if (!sequence.empty()) raw.push_back(std::move(sequence));
   }
   if (raw.empty() || names.empty())
     throw std::invalid_argument("genetic miner found no activities");
@@ -206,11 +280,38 @@ NormalizedLog normalize(const EventLog& log, const GeneticMinerOptions& options)
   std::map<std::string, std::size_t> ids;
   for (std::size_t i = 0; i < normalized.names.size(); ++i)
     ids.emplace(normalized.names[i], i);
-  for (const auto& sequence : raw) {
+  for (const auto& raw_trace : raw) {
+    std::vector<std::string> sequence;
+    for (const auto& event : raw_trace.events) {
+      std::string label = options.activity_key.empty()
+                              ? event.activity
+                              : event_value(event, options.activity_key);
+      if (!options.activity_key.empty() &&
+          options.activity_key != "activity" &&
+          options.activity_key != "concept:name" &&
+          options.activity_key != "resource" &&
+          options.activity_key != "org:resource" &&
+          event.attribute(options.activity_key) == nullptr)
+        label = event.activity;
+      if (!label.empty()) sequence.push_back(std::move(label));
+    }
+    if (sequence.empty()) continue;
     std::vector<std::size_t> encoded;
     for (const auto& label : sequence) encoded.push_back(ids.at(label));
     normalized.traces.push_back(std::move(encoded));
+    Trace conformance_trace;
+    conformance_trace.case_id = raw_trace.case_id;
+    for (std::size_t i = 0; i < sequence.size(); ++i) {
+      Event event;
+      event.case_id = raw_trace.case_id;
+      event.activity = sequence[i];
+      event.input_order = i;
+      conformance_trace.events.push_back(std::move(event));
+    }
+    normalized.conformance_log.traces.push_back(std::move(conformance_trace));
   }
+  if (normalized.traces.empty())
+    throw std::invalid_argument("genetic miner found no activities");
   return normalized;
 }
 
@@ -371,6 +472,15 @@ Individual crossover(Individual first, const Individual& second,
   return first;
 }
 
+std::pair<Individual, Individual> crossover_pair(
+    const Individual& first, const Individual& second, std::mt19937_64& rng,
+    const std::vector<std::vector<std::uint64_t>>& causal) {
+  // Keep both reciprocal offspring: the second child inherits the opposite
+  // parent order, while each repair pass restores the inverse matrix.
+  return {crossover(first, second, rng, causal),
+          crossover(second, first, rng, causal)};
+}
+
 void mutate(Individual& individual, double rate, std::mt19937_64& rng,
             const std::vector<std::vector<std::uint64_t>>& causal) {
   std::bernoulli_distribution mutate_draw(rate);
@@ -429,7 +539,8 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
         result.diagnostics.exhausted = true;
         break;
       }
-      candidate.fitness = fitness(event_log, to_petri_net(candidate.individual, log.names));
+      candidate.fitness = fitness(log.conformance_log,
+                                  to_petri_net(candidate.individual, log.names));
       ++result.diagnostics.candidates_evaluated;
     }
     std::sort(candidates.begin(), candidates.end(), [](const Scored& a, const Scored& b) {
@@ -468,11 +579,16 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
       for (std::size_t i = 0; i < std::min(options.elitism_min_sample, indices.size()); ++i)
         if (indices[i] != parent1 && population[indices[i]].fitness > population[parent2].fitness)
           parent2 = indices[i];
-      Individual child = population[parent1].individual;
+      std::pair<Individual, Individual> children{
+          population[parent1].individual, population[parent2].individual};
       if (std::bernoulli_distribution(options.crossover_rate)(rng))
-        child = crossover(std::move(child), population[parent2].individual, rng, causal);
-      mutate(child, options.mutation_rate, rng, causal);
-      next.push_back({std::move(child), 0.0});
+        children = crossover_pair(population[parent1].individual,
+                                  population[parent2].individual, rng, causal);
+      for (Individual* child : {&children.first, &children.second}) {
+        if (next.size() == options.population_size) break;
+        mutate(*child, options.mutation_rate, rng, causal);
+        next.push_back({std::move(*child), 0.0});
+      }
     }
     evaluate(next);
     if (!next.empty() && next.front().fitness > best_fitness) {

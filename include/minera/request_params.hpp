@@ -219,8 +219,8 @@ using FieldPresence = std::function<bool(std::string_view)>;
     const FieldLookup& field, const FieldPresence& present);
 
 // Strict request/CLI adapter for the bounded classic genetic miner. Wire
-// names use the `genetic_` prefix and include the reproducibility seed and
-// evolutionary safety bounds.
+// names use the `genetic_` prefix and include activity, timestamp, and case
+// selectors, reproducibility seed, and evolutionary safety bounds.
 [[nodiscard]] GeneticMinerOptions parse_genetic_miner_params(
     const FieldLookup& field);
 [[nodiscard]] GeneticMinerOptions parse_genetic_miner_params(

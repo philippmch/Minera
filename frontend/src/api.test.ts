@@ -848,6 +848,12 @@ describe("genetic miner API", () => {
     expect(geneticMinerQuery({ activity_key: "concept:name", seed: 7, population_size: 8, generations: 3, elitism_rate: 0.2, crossover_rate: 0.8, mutation_rate: 0.1, elitism_min_sample: 2, max_activities: 9, max_states: 64 }))
       .toBe("genetic_activity_key=concept%3Aname&genetic_seed=7&genetic_population_size=8&genetic_generations=3&genetic_elitism_rate=0.2&genetic_crossover_rate=0.8&genetic_mutation_rate=0.1&genetic_elitism_min_sample=2&genetic_max_activities=9&genetic_max_states=64");
   });
+  it("encodes strict timestamp and case selectors", () => {
+    expect(geneticMinerQuery({ timestamp_key: "occurred_at", case_id_key: "case:ref" }))
+      .toBe("genetic_timestamp_key=occurred_at&genetic_case_id_key=case%3Aref");
+    expect(() => geneticMinerQuery({ timestamp_key: "" })).toThrow(/must not be empty/);
+    expect(() => geneticMinerQuery({ case_id_key: "" })).toThrow(/must not be empty/);
+  });
   it("rejects malformed genetic responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "GENETIC" }) })));
     await expect(requestGeneticMine()).rejects.toThrow(/invalid genetic miner/);

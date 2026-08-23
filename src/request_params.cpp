@@ -3338,6 +3338,10 @@ GeneticMinerOptions parse_genetic_miner_params(
   };
   if (supplied("genetic_activity_key"))
     options.activity_key = require("genetic_activity_key");
+  if (supplied("genetic_timestamp_key"))
+    options.timestamp_key = require("genetic_timestamp_key");
+  if (supplied("genetic_case_id_key"))
+    options.case_id_key = require("genetic_case_id_key");
   if (supplied("genetic_seed"))
     options.seed = parse_nonnegative_u64(require("genetic_seed"),
                                          "genetic_seed");
