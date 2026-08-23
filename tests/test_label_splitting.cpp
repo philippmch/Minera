@@ -65,6 +65,106 @@ static EventLog edge_threshold_fixture() {
   return log;
 }
 
+static EventLog weighted_gain_fixture() {
+  EventLog log;
+  const std::vector<std::vector<std::string>> prefixes = {
+      {"a", "b", "c"}, {"a", "b", "d"}, {"a", "e", "f"},
+      {"g", "h", "i"}};
+  for (std::size_t i = 0; i < prefixes.size(); ++i) {
+    Trace trace;
+    std::size_t timestamp = i * 4;
+    for (const auto& activity : prefixes[i])
+      trace.events.emplace_back("c" + std::to_string(i), activity, "", "",
+                                timestamp++);
+    trace.events.emplace_back("c" + std::to_string(i), "A", "", "",
+                              timestamp);
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+static EventLog zero_edge_fixture() {
+  EventLog log;
+  Trace first;
+  first.events = {Event{"c1", "a", "", "", 0},
+                  Event{"c1", "b", "", "", 1},
+                  Event{"c1", "A", "", "", 2}};
+  Trace second;
+  second.events = {Event{"c2", "x", "", "", 3},
+                   Event{"c2", "y", "", "", 4},
+                   Event{"c2", "A", "", "", 5}};
+  log.traces = {first, second};
+  return log;
+}
+
+static EventLog tied_edges_fixture() {
+  EventLog log;
+  const std::vector<std::vector<std::string>> prefixes = {
+      {"a", "a"}, {"a", "b"}, {"x", "x"}, {"x", "y"}};
+  for (std::size_t i = 0; i < prefixes.size(); ++i) {
+    Trace trace;
+    trace.events.emplace_back("c" + std::to_string(i), prefixes[i][0], "", "",
+                              i * 3);
+    trace.events.emplace_back("c" + std::to_string(i), prefixes[i][1], "", "",
+                              i * 3 + 1);
+    trace.events.emplace_back("c" + std::to_string(i), "A", "", "",
+                              i * 3 + 2);
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+static EventLog global_modularity_fixture() {
+  EventLog log;
+  const std::vector<std::pair<std::string, std::string>> a_contexts = {
+      {"la", "la"}, {"la", "lb"}, {"la", "lc"},
+      {"ra", "lb"}, {"ra", "rb"}, {"ra", "rc"}};
+  const std::vector<std::pair<std::string, std::string>> b_contexts = {
+      {"ba", "b0"}, {"ba", "b1"}, {"ba", "b2"}, {"ba", "b3"},
+      {"ba", "b4"}, {"ba", "b5"}, {"ba", "b6"}, {"ba", "b7"}};
+  std::size_t case_index = 0;
+  for (const auto& [left, right] : a_contexts) {
+    Trace trace;
+    const auto case_id = "a" + std::to_string(case_index++);
+    trace.events = {Event{case_id, left, "", "", 0},
+                    Event{case_id, right, "", "", 1},
+                    Event{case_id, "A", "", "", 2}};
+    log.traces.push_back(std::move(trace));
+  }
+  for (const auto& [left, right] : b_contexts) {
+    Trace trace;
+    const auto case_id = "b" + std::to_string(case_index++);
+    trace.events = {Event{case_id, left, "", "", 0},
+                    Event{case_id, right, "", "", 1},
+                    Event{case_id, "B", "", "", 2}};
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+static EventLog cross_activity_context_fixture() {
+  EventLog log;
+  const std::vector<std::pair<std::string, std::string>> a_contexts = {
+      {"same", "left"}, {"same", "right"}, {"same", "third"}};
+  const std::vector<std::pair<std::string, std::string>> b_contexts = {
+      {"same", "right"}, {"same", "third"}, {"same", "left"}};
+  std::size_t case_index = 0;
+  for (const auto& [label, contexts] :
+       {std::pair<std::string, std::vector<std::pair<std::string, std::string>>>{
+           "A", a_contexts},
+        {"B", b_contexts}}) {
+    for (const auto& [left, right] : contexts) {
+      Trace trace;
+      const auto case_id = "x" + std::to_string(case_index++);
+      trace.events = {Event{case_id, left, "", "", 0},
+                      Event{case_id, right, "", "", 1},
+                      Event{case_id, label, "", "", 2}};
+      log.traces.push_back(std::move(trace));
+    }
+  }
+  return log;
+}
+
 int main() {
   const auto log = fixture();
   LabelSplittingOptions options;
@@ -131,4 +231,86 @@ int main() {
       split_activity_labels(edge_threshold_fixture(), threshold_options);
   assert(relaxed_result.log.traces[0].events.back().activity == "A");
   assert(relaxed_result.log.traces[1].events.back().activity == "A");
+
+  // Weighted modularity chooses the strong first edge and then evaluates the
+  // merged community using the summed inter-community weight. The first three
+  // contexts consequently form one community, while the isolated context
+  // remains separate.
+  LabelSplittingOptions weighted_options;
+  weighted_options.prefix_length = 3;
+  weighted_options.suffix_length = 0;
+  const auto weighted_result =
+      split_activity_labels(weighted_gain_fixture(), weighted_options);
+  const auto weighted_first =
+      weighted_result.log.traces[0].events.back().activity;
+  assert(weighted_first ==
+         weighted_result.log.traces[1].events.back().activity);
+  assert(weighted_first ==
+         weighted_result.log.traces[2].events.back().activity);
+  assert(weighted_first !=
+         weighted_result.log.traces[3].events.back().activity);
+
+  // A graph without edges must leave every context as a singleton. This is
+  // also a regression for the empty-edge path before modularity clustering.
+  LabelSplittingOptions zero_edge_options;
+  zero_edge_options.prefix_length = 2;
+  zero_edge_options.suffix_length = 0;
+  const auto zero_edge_result =
+      split_activity_labels(zero_edge_fixture(), zero_edge_options);
+  assert(zero_edge_result.log.traces[0].events.back().activity !=
+         zero_edge_result.log.traces[1].events.back().activity);
+
+  // Equal modularity gains use the context/node ordering as a stable tie
+  // break. Repeating the same input must reproduce both assignments exactly.
+  LabelSplittingOptions tie_options;
+  tie_options.prefix_length = 2;
+  tie_options.suffix_length = 0;
+  const auto tied_result =
+      split_activity_labels(tied_edges_fixture(), tie_options);
+  const auto tied_repeat =
+      split_activity_labels(tied_edges_fixture(), tie_options);
+  for (std::size_t i = 0; i < tied_result.log.traces.size(); ++i)
+    assert(tied_result.log.traces[i].events.back().activity ==
+           tied_repeat.log.traces[i].events.back().activity);
+  assert(tied_result.log.traces[0].events.back().activity == "A_1");
+  assert(tied_result.log.traces[1].events.back().activity == "A_1");
+  assert(tied_result.log.traces[2].events.back().activity == "A_0");
+  assert(tied_result.log.traces[3].events.back().activity == "A_0");
+
+  // Modularity is optimized on one graph containing all selected activities.
+  // The A component has two dense groups joined by a weak bridge; it stays
+  // split when selected alone, but the heavy B component changes the global
+  // expected-edge term and makes that bridge merge.
+  const auto global_log = global_modularity_fixture();
+  LabelSplittingOptions local_modularity_options;
+  local_modularity_options.prefix_length = 2;
+  local_modularity_options.suffix_length = 0;
+  local_modularity_options.target_activities = {"A"};
+  const auto local_modularity =
+      split_activity_labels(global_log, local_modularity_options);
+  assert(local_modularity.log.traces[0].events.back().activity !=
+         local_modularity.log.traces[3].events.back().activity);
+  assert(local_modularity.log.traces[0].events.back().activity != "A");
+
+  local_modularity_options.target_activities = {"A", "B"};
+  const auto global_modularity =
+      split_activity_labels(global_log, local_modularity_options);
+  for (std::size_t i = 0; i < 6; ++i)
+    assert(global_modularity.log.traces[i].events.back().activity == "A");
+
+  // Similar contexts belonging to different activities are not graph edges.
+  // With a strict threshold, each activity is edgeless even though the
+  // context pairs are identical across activities; the assignments therefore
+  // follow each activity's own insertion order.
+  LabelSplittingOptions cross_activity_options;
+  cross_activity_options.prefix_length = 2;
+  cross_activity_options.suffix_length = 0;
+  cross_activity_options.min_edge_weight = 0.75;
+  cross_activity_options.target_activities = {"A", "B"};
+  const auto cross_activity =
+      split_activity_labels(cross_activity_context_fixture(),
+                             cross_activity_options);
+  assert(cross_activity.log.traces[0].events.back().activity == "A_2");
+  assert(cross_activity.log.traces[1].events.back().activity == "A_1");
+  assert(cross_activity.log.traces[2].events.back().activity == "A_0");
 }
