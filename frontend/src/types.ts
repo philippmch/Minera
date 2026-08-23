@@ -2701,6 +2701,7 @@ export interface StochasticPlayoutOptions {
   max_steps?: number;
   seed?: number;
   transition_weights?: number[];
+  fit_from_log?: boolean;
   stop_at_final?: boolean;
   initial_marking?: number[];
   final_marking?: number[];

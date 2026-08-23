@@ -498,6 +498,7 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
         <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
         <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
         <label>Transition weights<input type="text" value={options.transition_weights?.join(",") ?? ""} onChange={e => setOptions({ ...options, transition_weights: e.target.value.trim() ? e.target.value.split(",").map(Number) : undefined })} placeholder="1,1,0.5 (optional)" /></label>
+        <label><input type="checkbox" checked={Boolean(options.fit_from_log)} onChange={e => setOptions({ ...options, fit_from_log: e.target.checked })} /> Fit weights from cached log</label>
         <label>Case interval (s)<input type="number" min={0} step={0.1} value={options.case_interval ?? ""} onChange={e => number("case_interval", e.target.value)} /></label>
         <label>Event interval (s)<input type="number" min={0} step={0.1} value={options.event_interval ?? ""} onChange={e => number("event_interval", e.target.value)} /></label>
         <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>

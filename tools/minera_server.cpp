@@ -188,6 +188,21 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   }
 }
 
+void reject_unknown_stochastic_params(const httplib::Request& request) {
+  static const std::set<std::string> allowed = {
+      "miner", "mode", "stochastic_traces", "stochastic_max_steps",
+      "stochastic_seed", "stochastic_transition_weights",
+      "stochastic_fit_from_log", "stochastic_stop_at_final",
+      "stochastic_start", "stochastic_case_interval",
+      "stochastic_event_interval", "stochastic_initial_marking",
+      "stochastic_final_marking"};
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (!allowed.contains(key))
+      throw std::invalid_argument("unknown stochastic parameter: " + key);
+  }
+}
+
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
   return request.has_file(name) ? request.get_file_value(name).content
@@ -4172,7 +4187,8 @@ void handle_data_petri_net(const httplib::Request& request,
 // traces, max_steps, seed, min_length, max_length, max_loop_occurrences and
 // max_trace_cap; mode=stochastic selects weighted Petri playout and accepts
 // stochastic_traces, stochastic_max_steps, stochastic_seed,
-// stochastic_transition_weights, and timing controls; mode=monte_carlo selects
+// stochastic_transition_weights, stochastic_fit_from_log, and timing controls;
+// mode=monte_carlo selects
 // the bounded virtual-time simulator and accepts monte_carlo_* controls.
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
@@ -4258,6 +4274,7 @@ void handle_playout(const httplib::Request& request,
       response.set_content(error_json(message), "application/json");
     };
     try {
+      reject_unknown_stochastic_params(request);
       const auto lookup = [&](std::string_view name) {
         const std::string key(name);
         return request.has_param(key) ? request.get_param_value(key) : std::string{};
@@ -4277,7 +4294,10 @@ void handle_playout(const httplib::Request& request,
                "safety limit");
         return;
       }
-      const auto log = minera::stochastic_playout(it->second, options);
+      const auto log = options.fit_from_log
+                           ? minera::stochastic_playout(it->second,
+                                                       session->log, options)
+                           : minera::stochastic_playout(it->second, options);
       response.set_content(minera::to_xes(log, selected_miner + " stochastic playout"),
                            "application/xml");
     } catch (const std::exception& error) {

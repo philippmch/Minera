@@ -257,9 +257,13 @@ and stops at the exact workflow final marking unless configured otherwise.
 The seeded options are available through `--playout-variant stochastic`, the
 local server's `mode=stochastic` route, and the frontend controls, with strict
 trace/step/event-budget limits at adapter boundaries. The supported native
-contract takes an explicit transition-weight vector; source-log-derived
-activation estimates and object-centric stochastic simulators remain outside
-this traditional-log vertical.
+contract also provides deterministic source-log fitting: reachable enabled
+transitions receive activation ratios, stable duplicate-label and silent
+routing replay is supported, unknown source labels and partial traces are
+tolerated, and never-reached transitions retain neutral weight. Explicit
+transition weights take precedence over fitted values in the source-log
+overload; the native replay API is wired through strict request parsing, the
+export CLI, the cached local server route, and typed frontend controls.
 
 ## Data, object, conversion, and integration checklist
 

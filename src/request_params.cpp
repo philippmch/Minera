@@ -2485,6 +2485,9 @@ StochasticPlayoutParams parse_stochastic_playout_params(
       throw std::invalid_argument(
           "stochastic_transition_weights: expected a non-empty list");
   }
+  if (supplied("stochastic_fit_from_log"))
+    params.fit_from_log = parse_boolean(require("stochastic_fit_from_log"),
+                                        "stochastic_fit_from_log");
   if (supplied("stochastic_stop_at_final"))
     params.stop_at_final = parse_boolean(require("stochastic_stop_at_final"),
                                          "stochastic_stop_at_final");

@@ -3035,6 +3035,10 @@ export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): 
     }
     params.set("stochastic_transition_weights", options.transition_weights.join(","));
   }
+  if (options.fit_from_log !== undefined) {
+    if (typeof options.fit_from_log !== "boolean") throw new Error("fit_from_log must be boolean");
+    params.set("stochastic_fit_from_log", options.fit_from_log ? "true" : "false");
+  }
   if (options.stop_at_final !== undefined) {
     if (typeof options.stop_at_final !== "boolean") throw new Error("stop_at_final must be boolean");
     params.set("stochastic_stop_at_final", options.stop_at_final ? "true" : "false");
@@ -3209,7 +3213,7 @@ export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOpt
   const monteCarlo = miner === "monte_carlo" || "simulations" in options ||
     "default_duration_seconds" in options || "transition_durations" in options ||
     "resources_per_place" in options;
-  const stochastic = miner === "stochastic" || "transition_weights" in options || "stop_at_final" in options || "initial_marking" in options || "final_marking" in options || "case_interval" in options || "event_interval" in options || "start" in options;
+  const stochastic = miner === "stochastic" || "transition_weights" in options || "fit_from_log" in options || "stop_at_final" in options || "initial_marking" in options || "final_marking" in options || "case_interval" in options || "event_interval" in options || "start" in options;
   let query: string;
   if (monteCarlo) {
     const controls = monteCarloQuery(options as MonteCarloOptions);

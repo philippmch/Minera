@@ -94,6 +94,127 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
   return log;
 }
 
+namespace {
+
+void validate_stochastic_net(const PetriNet& net) {
+  const auto places = net.place_count();
+  if (places == 0 || net.source() >= places || net.sink() >= places)
+    throw std::invalid_argument("stochastic playout net has invalid workflow places");
+  for (const auto& transition : net.transitions()) {
+    for (const auto place : transition.inputs)
+      if (place >= places) throw std::invalid_argument("stochastic playout input place is invalid");
+    for (const auto place : transition.outputs)
+      if (place >= places) throw std::invalid_argument("stochastic playout output place is invalid");
+    for (const auto place : transition.reset_inputs)
+      if (place >= places) throw std::invalid_argument("stochastic playout reset place is invalid");
+    for (const auto place : transition.inhibitor_inputs)
+      if (place >= places) throw std::invalid_argument("stochastic playout inhibitor place is invalid");
+    if (transition.activity && *transition.activity >= net.activities().size())
+      throw std::invalid_argument("stochastic playout transition activity is invalid");
+  }
+}
+
+std::vector<std::uint32_t> stochastic_marking(
+    const PetriNet& net, const std::vector<std::uint32_t>& requested,
+    std::size_t boundary, const char* label) {
+  if (!requested.empty() && requested.size() != net.place_count())
+    throw std::invalid_argument(std::string("stochastic playout ") + label +
+                                " marking must match the place count");
+  std::vector<std::uint32_t> marking(net.place_count(), 0);
+  if (requested.empty()) marking[boundary] = 1;
+  else marking = requested;
+  return marking;
+}
+
+struct ReplayState {
+  std::vector<std::uint32_t> marking;
+  std::size_t event_index = 0;
+  std::vector<std::size_t> path;
+};
+
+struct ReplayResult {
+  std::vector<std::size_t> path;
+  std::vector<std::size_t> touched;
+  bool complete = false;
+};
+
+std::string replay_state_key(const ReplayState& state) {
+  std::string key = std::to_string(state.event_index) + '|';
+  for (const auto token : state.marking) {
+    key += std::to_string(token);
+    key += ',';
+  }
+  return key;
+}
+
+ReplayResult replay_trace(
+    const PetriNet& net, const Trace& trace,
+    const std::vector<std::uint32_t>& initial,
+    const std::vector<std::uint32_t>& final, std::size_t max_states) {
+  std::deque<ReplayState> queue;
+  std::unordered_set<std::string> visited;
+  std::vector<std::size_t> selected_path;
+  bool complete = false;
+  queue.push_back({initial, 0, {}});
+  visited.insert(replay_state_key(queue.front()));
+  ReplayState best = queue.front();
+  while (!queue.empty() && visited.size() <= max_states) {
+    auto state = std::move(queue.front());
+    queue.pop_front();
+    if (state.event_index > best.event_index ||
+        (state.event_index == best.event_index &&
+         state.path.size() > best.path.size())) {
+      best = state;
+    }
+    if (state.event_index == trace.events.size() && state.marking == final) {
+      selected_path = std::move(state.path);
+      complete = true;
+      break;
+    }
+    for (std::size_t transition_index = 0;
+         transition_index < net.transitions().size(); ++transition_index) {
+      const auto& transition = net.transitions()[transition_index];
+      if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
+      if (!petri_transition_enabled(transition, state.marking)) continue;
+      ReplayState next = state;
+      if (!transition.silent()) {
+        if (state.event_index >= trace.events.size()) continue;
+        const auto activity = *transition.activity;
+        if (activity >= net.activities().size() ||
+            net.activities()[activity] != trace.events[state.event_index].activity)
+          continue;
+        ++next.event_index;
+      }
+      fire_petri_transition(transition, next.marking);
+      next.path.push_back(transition_index);
+      if (visited.insert(replay_state_key(next)).second)
+        queue.push_back(std::move(next));
+    }
+  }
+
+  // Re-run only the selected deterministic path. This deliberately excludes
+  // transitions enabled in discarded BFS branches from the fitted rates.
+  ReplayResult result;
+  result.path = complete ? std::move(selected_path) : std::move(best.path);
+  result.complete = complete;
+  std::vector<std::uint32_t> marking = initial;
+  for (const auto transition_index : result.path) {
+    for (std::size_t i = 0; i < net.transitions().size(); ++i) {
+      const auto& candidate = net.transitions()[i];
+      if (!(candidate.inputs.empty() && !candidate.has_extended_arcs()) &&
+          petri_transition_enabled(candidate, marking)) {
+        result.touched.push_back(i);
+      }
+    }
+    const auto& transition = net.transitions()[transition_index];
+    if (!petri_transition_enabled(transition, marking)) break;
+    fire_petri_transition(transition, marking);
+  }
+  return result;
+}
+
+}  // namespace
+
 EventLog stochastic_playout(const PetriNet& net,
                             const StochasticPlayoutOptions& options) {
   const auto& transitions = net.transitions();
@@ -227,6 +348,77 @@ EventLog stochastic_playout(const PetriNet& net,
     log.traces.push_back(std::move(trace));
   }
   return log;
+}
+
+std::vector<double> fit_stochastic_transition_weights(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options) {
+  validate_stochastic_net(net);
+  if (source_log.traces.empty())
+    return std::vector<double>(net.transitions().size(), 1.0);
+  if (options.fitting_max_states == 0)
+    throw std::invalid_argument(
+        "source-log fitting state bound must be positive");
+
+  const auto initial = stochastic_marking(
+      net, options.initial_marking, net.source(), "initial");
+  const auto final = stochastic_marking(
+      net, options.final_marking, net.sink(), "final");
+  std::vector<std::size_t> enabled_count(net.transitions().size(), 0);
+  std::vector<std::size_t> activated_count(net.transitions().size(), 0);
+
+  for (const auto& source_trace : source_log.traces) {
+    // Logs can contain labels from a larger model. They are ignored for the
+    // native fit, while valid labels retain their original ordering.
+    Trace trace;
+    trace.case_id = source_trace.case_id;
+    trace.events.reserve(source_trace.events.size());
+    for (const auto& event : source_trace.events) {
+      if (std::find(net.activities().begin(), net.activities().end(),
+                    event.activity) != net.activities().end()) {
+        trace.events.push_back(event);
+      }
+    }
+
+    const auto replay = replay_trace(net, trace, initial, final,
+                                     options.fitting_max_states);
+    for (const auto transition : replay.touched)
+      ++enabled_count[transition];
+    for (const auto transition : replay.path)
+      ++activated_count[transition];
+  }
+
+  std::vector<double> weights(net.transitions().size(), 1.0);
+  for (std::size_t i = 0; i < weights.size(); ++i) {
+    if (enabled_count[i] != 0) {
+      weights[i] = static_cast<double>(activated_count[i]) /
+                   static_cast<double>(enabled_count[i]);
+    }
+  }
+  return weights;
+}
+
+std::vector<double> fit_stochastic_transition_weights(
+    const PetriNet& net, const EventLog& source_log) {
+  return fit_stochastic_transition_weights(net, source_log,
+                                            StochasticPlayoutOptions{});
+}
+
+EventLog stochastic_playout_fitted(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options) {
+  auto fitted = options;
+  if (fitted.transition_weights.empty()) {
+    fitted.transition_weights =
+        fit_stochastic_transition_weights(net, source_log, options);
+  }
+  return stochastic_playout(net, fitted);
+}
+
+EventLog stochastic_playout(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options) {
+  return stochastic_playout_fitted(net, source_log, options);
 }
 
 namespace {
