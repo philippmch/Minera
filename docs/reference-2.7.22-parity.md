@@ -658,12 +658,14 @@ selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
 
 POWL-to-process-tree conversion is available through the native conversion API
-and the headless `--powl-ptml` export. Transition frequency bounds map to
-optional or silent-redo loop blocks; connected partial-order components are
-layered by deterministic topological levels and disconnected components become
-parallel branches. Sparse adjacent levels remain representable as a stable
-block-structured approximation, while ordinary sequence, choice, parallel, and
-loop models round-trip through the existing tree-to-POWL conversion.
+and the headless `--powl-ptml` export. Direct native conversion retains its
+deterministic approximation for residual partial orders; exported PTML uses the
+workflow-net route shared with the server and rejects non-block structures.
+Transition frequency bounds map to optional or silent-redo loop blocks;
+connected partial-order components are layered by deterministic topological
+levels and disconnected components become parallel branches. Ordinary sequence,
+choice, parallel, and loop models round-trip through the existing tree-to-POWL
+conversion.
 
 The reverse workflow-net conversion is also available through the native
 `to_powl(const PetriNet&)` API. It validates designated source/sink reachability

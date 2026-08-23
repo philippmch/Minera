@@ -515,8 +515,9 @@ int usage(const char* program) {
                "                            or powl\n"
                "  --ptml <path>             Also write the inductive process\n"
                "                            tree as PTML to <path>\n"
-               "  --powl-ptml <path>        Convert the discovered POWL model\n"
-               "                            to a process tree and write PTML\n"
+               "  --powl-ptml <path>        Convert the discovered POWL workflow\n"
+               "                            net strictly to PTML; reject\n"
+               "                            non-block-structured models\n"
                "  --pnml-to-ptml <path>    Convert an imported PNML workflow\n"
                "                            net to PTML without an event log\n"
                "  --bpmn-to-ptml <path>    Convert an imported BPMN process\n"
@@ -5094,8 +5095,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Optionally emit the inductive process tree as PTML — the only miner
-    // that produces a block-structured tree.
+    // Optionally emit the inductive process tree as PTML.
     if (!ptml_output.empty()) {
       std::ofstream ptml_file(ptml_output);
       if (!ptml_file) {
@@ -5113,7 +5113,11 @@ int main(int argc, char** argv) {
                   << powl_ptml_output << '\n';
         return 1;
       }
-      minera::write_ptml(ptml_file, minera::to_process_tree(powl), dataset);
+      // Keep CLI semantics aligned with the server: POWL is first materialized
+      // as its workflow net, then reduced only when the structure is exactly
+      // block structured. Non-block partial orders fail instead of being
+      // silently approximated.
+      minera::write_ptml(ptml_file, minera::to_process_tree(powl_net), dataset);
     }
 
     // Optionally emit the (filtered) event log as standard XES, making the
