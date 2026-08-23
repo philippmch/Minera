@@ -334,25 +334,34 @@ std::vector<Region> discover_regions(
       const std::uint64_t input = code & ((std::uint64_t{1} << n) - 1);
       const std::uint64_t output = code >> n;
       if (input == 0 || output == 0) continue;
+      bool contains_requested_pair = false;
       bool compatible = true;
       for (std::size_t from = 0; from < n && compatible; ++from) {
         if ((output & (std::uint64_t{1} << from)) == 0) continue;
         for (std::size_t to = 0; to < n; ++to) {
           if ((input & (std::uint64_t{1} << to)) == 0) continue;
-          if (causal_pairs.count({from, to}) == 0) {
-            // Self-loops are absent from the one-way causal relation but are
-            // valid when their cumulative continuation was retained.
-            if (from != to || !sequence_edges.count({from, to})) {
+          if (causal_pairs.count({from, to}) != 0)
+            contains_requested_pair = true;
+          if (!causal_relation_supplied) {
+            if (causal_pairs.count({from, to}) == 0) {
+              // Self-loops are absent from the one-way causal relation but
+              // are valid when their cumulative continuation was retained.
+              if (from != to || !sequence_edges.count({from, to})) {
+                compatible = false;
+                break;
+              }
+            }
+            if (!sequence_edges.count({from, to})) {
               compatible = false;
               break;
             }
           }
-          if (!causal_relation_supplied && !sequence_edges.count({from, to})) {
-            compatible = false;
-            break;
-          }
         }
       }
+      // Explicit pairs are required constraints, not an exhaustive list:
+      // permit additional producer/consumer arcs once one requested pair is
+      // present so a composite region can fit all observed variants.
+      if (causal_relation_supplied && !contains_requested_pair) compatible = false;
       if (compatible && seen.insert(code).second) candidates.push_back(code);
     }
   }
@@ -360,11 +369,7 @@ std::vector<Region> discover_regions(
     for (std::uint64_t code = 1; code < combinations; ++code)
       if (seen.insert(code).second) candidates.push_back(code);
   }
-  for (const auto code : candidates) {
-    if (diagnostics.visited_nodes >= max_nodes) {
-      diagnostics.exhausted = true;
-      break;
-    }
+  const auto visit_candidate = [&](std::uint64_t code, Region& region) {
     ++diagnostics.visited_nodes;
     ++diagnostics.lp_solved;
     // Each candidate is a tiny integer feasibility problem.  Count its
@@ -375,11 +380,55 @@ std::vector<Region> discover_regions(
     if (std::popcount(input) == 1 && std::popcount(output) == 1) {
       const auto from = static_cast<std::size_t>(std::countr_zero(output));
       const auto to = static_cast<std::size_t>(std::countr_zero(input));
-      if (!causal_relation_supplied && sequence_edges.count({from, to}) == 0) continue;
+      if (!causal_relation_supplied && sequence_edges.count({from, to}) == 0)
+        return false;
     }
-    Region region;
-    if (solve_region(input, output, traces, max_tokens, region))
-      regions.push_back(region);
+    return solve_region(input, output, traces, max_tokens, region);
+  };
+  if (!causal_relation_supplied) {
+    for (const auto code : candidates) {
+      if (diagnostics.visited_nodes >= max_nodes) {
+        diagnostics.exhausted = true;
+        break;
+      }
+      Region region;
+      if (visit_candidate(code, region)) regions.push_back(region);
+    }
+  } else {
+    // Solve each supplied pair independently.  A composite region may satisfy
+    // several pairs, but each pair still receives its own best feasible
+    // region; only exact duplicate regions are removed below.
+    std::set<std::pair<std::size_t, std::size_t>> solved_pairs;
+    for (const auto& target : causal_relation) {
+      if (!solved_pairs.insert(target).second) continue;
+      const auto [from, to] = target;
+      const auto from_bit = std::uint64_t{1} << from;
+      const auto to_bit = std::uint64_t{1} << to;
+      bool found = false;
+      Region best;
+      for (const auto code : candidates) {
+        const std::uint64_t input = code & ((std::uint64_t{1} << n) - 1);
+        const std::uint64_t output = code >> n;
+        if ((output & from_bit) == 0 || (input & to_bit) == 0) continue;
+        if (diagnostics.visited_nodes >= max_nodes) {
+          diagnostics.exhausted = true;
+          break;
+        }
+        Region candidate;
+        if (!visit_candidate(code, candidate)) continue;
+        // Explicit causal places are internal workflow regions.  Boundary
+        // tokens are routed separately through the source/sink, so a
+        // nonzero-marking candidate would be discarded during net assembly
+        // after winning the per-pair objective.
+        if (candidate.initial != 0 || candidate.final != 0) continue;
+        if (!found || region_less(candidate, best)) {
+          best = candidate;
+          found = true;
+        }
+      }
+      if (found) regions.push_back(best);
+      if (diagnostics.exhausted) break;
+    }
   }
   std::sort(regions.begin(), regions.end(), region_less);
   regions.erase(std::unique(regions.begin(), regions.end(), [](const Region& a,
