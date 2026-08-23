@@ -1,5 +1,7 @@
 #include "minera/powl_conversion.hpp"
 
+#include "minera/conformance.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <map>
@@ -365,6 +367,555 @@ class PowlBuilder {
   }
 };
 
+class PetriToPowlBuilder {
+  using IdSet = std::set<std::size_t>;
+
+  struct Fragment {
+    IdSet starts;
+    IdSet ends;
+    IdSet transitions;
+  };
+
+ public:
+  explicit PetriToPowlBuilder(const PetriNet& net) : net_(net) {
+    place_out_.resize(net_.place_count());
+    for (std::size_t index = 0; index < net_.transitions().size(); ++index) {
+      const auto& transition = net_.transitions()[index];
+      transition_inputs_.push_back(to_set(transition.inputs));
+      transition_outputs_.push_back(to_set(transition.outputs));
+      for (const auto place : transition.inputs) {
+        if (place < place_out_.size()) place_out_[place].push_back(index);
+      }
+    }
+    for (auto& transitions : place_out_) {
+      std::sort(transitions.begin(), transitions.end());
+      transitions.erase(std::unique(transitions.begin(), transitions.end()),
+                        transitions.end());
+    }
+  }
+
+  PowlNode run() const {
+    if (net_.has_extended_arcs()) {
+      throw std::invalid_argument(
+          "workflow-net to POWL conversion requires ordinary arcs");
+    }
+    if (net_.transitions().empty()) {
+      throw std::invalid_argument(
+          "workflow-net to POWL conversion requires a transition");
+    }
+    for (const auto& transition : net_.transitions()) {
+      if (transition.inputs.empty() || transition.outputs.empty()) {
+        throw std::invalid_argument(
+            "workflow-net transitions require an input and an output place");
+      }
+    }
+
+    const auto boundary = validate_boundaries();
+
+    IdSet transitions;
+    for (std::size_t index = 0; index < net_.transitions().size(); ++index)
+      transitions.insert(index);
+    return convert(Fragment{{boundary.first},
+                            {boundary.second},
+                            std::move(transitions)});
+  }
+
+ private:
+  const PetriNet& net_;
+  std::vector<IdSet> transition_inputs_;
+  std::vector<IdSet> transition_outputs_;
+  std::vector<std::vector<std::size_t>> place_out_;
+
+  static IdSet to_set(const std::vector<std::size_t>& values) {
+    return IdSet(values.begin(), values.end());
+  }
+
+  static bool equal(const std::vector<std::size_t>& values,
+                    const IdSet& expected) {
+    return to_set(values) == expected;
+  }
+
+  static bool subset(const IdSet& values, const IdSet& containing) {
+    return std::includes(containing.begin(), containing.end(), values.begin(),
+                          values.end());
+  }
+
+  static bool intersects(const IdSet& lhs, const IdSet& rhs) {
+    auto first = lhs.begin();
+    auto second = rhs.begin();
+    while (first != lhs.end() && second != rhs.end()) {
+      if (*first == *second) return true;
+      if (*first < *second) ++first;
+      else ++second;
+    }
+    return false;
+  }
+
+  std::pair<std::size_t, std::size_t> validate_boundaries() const {
+    const auto source = net_.source();
+    const auto sink = net_.sink();
+    if (source >= net_.place_count() || sink >= net_.place_count() ||
+        source == sink) {
+      throw std::invalid_argument(
+          "workflow-net conversion requires distinct source and sink places");
+    }
+
+    const std::size_t node_count =
+        net_.place_count() + net_.transitions().size();
+    std::vector<std::vector<std::size_t>> outgoing(node_count);
+    std::vector<std::vector<std::size_t>> incoming(node_count);
+    for (std::size_t transition = 0;
+         transition < net_.transitions().size(); ++transition) {
+      const auto node = net_.place_count() + transition;
+      const auto& model_transition = net_.transitions()[transition];
+      if (model_transition.activity &&
+          *model_transition.activity >= net_.activities().size()) {
+        throw std::invalid_argument(
+            "workflow-net transition has an invalid activity reference");
+      }
+      for (const auto place : model_transition.inputs) {
+        if (place >= net_.place_count()) {
+          throw std::invalid_argument(
+              "workflow-net transition has an invalid input place");
+        }
+        outgoing[place].push_back(node);
+        incoming[node].push_back(place);
+      }
+      for (const auto place : model_transition.outputs) {
+        if (place >= net_.place_count()) {
+          throw std::invalid_argument(
+              "workflow-net transition has an invalid output place");
+        }
+        outgoing[node].push_back(place);
+        incoming[place].push_back(node);
+      }
+    }
+
+    for (const auto& transition : net_.transitions()) {
+      if (std::find(transition.outputs.begin(), transition.outputs.end(),
+                    sink) != transition.outputs.end()) {
+        continue;
+      }
+      if (std::find(transition.inputs.begin(), transition.inputs.end(), sink) !=
+          transition.inputs.end()) {
+        throw std::invalid_argument(
+            "workflow-net conversion rejects transitions leaving the sink");
+      }
+      if (!transition.silent() &&
+          std::find(transition.outputs.begin(), transition.outputs.end(),
+                    source) != transition.outputs.end()) {
+        throw std::invalid_argument(
+            "workflow-net conversion rejects visible returns into the source");
+      }
+    }
+
+    const auto visit = [](std::size_t start,
+                          const std::vector<std::vector<std::size_t>>& graph) {
+      std::vector<bool> seen(graph.size(), false);
+      std::queue<std::size_t> pending;
+      seen[start] = true;
+      pending.push(start);
+      while (!pending.empty()) {
+        const auto current = pending.front();
+        pending.pop();
+        for (const auto next : graph[current]) {
+          if (seen[next]) continue;
+          seen[next] = true;
+          pending.push(next);
+        }
+      }
+      return seen;
+    };
+    const auto from_source = visit(source, outgoing);
+    const auto to_sink = visit(sink, incoming);
+    for (std::size_t node = 0; node < node_count; ++node) {
+      if (!from_source[node] || !to_sink[node]) {
+        throw std::invalid_argument(
+            "workflow-net conversion found a node outside the source-to-sink region");
+      }
+    }
+    if (!final_marking_reachable(net_)) {
+      throw std::invalid_argument(
+          "workflow-net conversion requires a reachable final marking");
+    }
+    return {source, sink};
+  }
+
+  bool all_inputs_available(std::size_t transition,
+                            const IdSet& available) const {
+    return subset(transition_inputs_[transition], available);
+  }
+
+  IdSet viable_transitions(const IdSet& ends,
+                           const IdSet& allowed) const {
+    IdSet viable_places = ends;
+    IdSet viable;
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      for (const auto transition : allowed) {
+        if (viable.contains(transition)) continue;
+        if (!intersects(transition_outputs_[transition], viable_places))
+          continue;
+        viable.insert(transition);
+        for (const auto place : transition_inputs_[transition])
+          changed = viable_places.insert(place).second || changed;
+      }
+    }
+    return viable;
+  }
+
+  IdSet collect_to(const IdSet& starts, const IdSet& ends,
+                   const IdSet& allowed) const {
+    const auto viable = viable_transitions(ends, allowed);
+    IdSet available = starts;
+    IdSet result;
+    std::queue<std::size_t> places;
+    for (const auto place : starts) places.push(place);
+
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      if (place >= place_out_.size()) continue;
+      for (const auto transition : place_out_[place]) {
+        if (!allowed.contains(transition) || !viable.contains(transition) ||
+            result.contains(transition) ||
+            !all_inputs_available(transition, available)) {
+          continue;
+        }
+        result.insert(transition);
+        for (const auto output : transition_outputs_[transition]) {
+          if (ends.contains(output) || starts.contains(output)) continue;
+          if (available.insert(output).second) places.push(output);
+        }
+      }
+    }
+    return result;
+  }
+
+  IdSet collect_seed(std::size_t seed, const IdSet& starts,
+                     const IdSet& ends, const IdSet& allowed) const {
+    if (!allowed.contains(seed) ||
+        !all_inputs_available(seed, starts)) {
+      return {};
+    }
+    const auto viable = viable_transitions(ends, allowed);
+    if (!viable.contains(seed)) return {};
+
+    IdSet available = starts;
+    IdSet result{seed};
+    std::queue<std::size_t> places;
+    for (const auto output : transition_outputs_[seed]) {
+      if (ends.contains(output) || starts.contains(output)) continue;
+      if (available.insert(output).second) places.push(output);
+    }
+
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      if (place >= place_out_.size()) continue;
+      for (const auto transition : place_out_[place]) {
+        if (!allowed.contains(transition) || !viable.contains(transition) ||
+            result.contains(transition) ||
+            !all_inputs_available(transition, available)) {
+          continue;
+        }
+        result.insert(transition);
+        for (const auto output : transition_outputs_[transition]) {
+          if (ends.contains(output) || starts.contains(output)) continue;
+          if (available.insert(output).second) places.push(output);
+        }
+      }
+    }
+    return result;
+  }
+
+  bool reaches(const IdSet& starts, const IdSet& ends,
+               const IdSet& allowed,
+               std::optional<std::size_t> blocked_place = std::nullopt) const {
+    if (intersects(starts, ends)) return true;
+    IdSet available = starts;
+    IdSet seen_transitions;
+    std::queue<std::size_t> places;
+    for (const auto place : starts) {
+      if (blocked_place && *blocked_place == place) return false;
+      places.push(place);
+    }
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      if (place >= place_out_.size()) continue;
+      for (const auto transition : place_out_[place]) {
+        if (!allowed.contains(transition) || seen_transitions.contains(transition) ||
+            !all_inputs_available(transition, available)) {
+          continue;
+        }
+        if (blocked_place &&
+            (transition_inputs_[transition].contains(*blocked_place) ||
+             transition_outputs_[transition].contains(*blocked_place))) {
+          continue;
+        }
+        seen_transitions.insert(transition);
+        for (const auto output : transition_outputs_[transition]) {
+          if (blocked_place && output == *blocked_place) continue;
+          if (ends.contains(output)) return true;
+          if (starts.contains(output)) continue;
+          if (available.insert(output).second) places.push(output);
+        }
+      }
+    }
+    return false;
+  }
+
+  bool transition_reaches(std::size_t source, std::size_t target,
+                          const IdSet& allowed) const {
+    if (source == target) return false;
+    IdSet visited_places;
+    std::queue<std::size_t> places;
+    for (const auto place : transition_outputs_[source]) {
+      if (visited_places.insert(place).second) places.push(place);
+    }
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      if (place >= place_out_.size()) continue;
+      for (const auto transition : place_out_[place]) {
+        if (!allowed.contains(transition)) continue;
+        if (transition == target) return true;
+        for (const auto output : transition_outputs_[transition])
+          if (visited_places.insert(output).second) places.push(output);
+      }
+    }
+    return false;
+  }
+
+  bool transition_has_cycle(std::size_t source, const IdSet& allowed) const {
+    IdSet visited_places;
+    std::queue<std::size_t> places;
+    for (const auto place : transition_outputs_[source]) {
+      if (visited_places.insert(place).second) places.push(place);
+    }
+    while (!places.empty()) {
+      const auto place = places.front();
+      places.pop();
+      if (place >= place_out_.size()) continue;
+      for (const auto transition : place_out_[place]) {
+        if (!allowed.contains(transition)) continue;
+        if (transition == source) return true;
+        for (const auto output : transition_outputs_[transition])
+          if (visited_places.insert(output).second) places.push(output);
+      }
+    }
+    return false;
+  }
+
+  void normalize(Fragment& fragment) const {
+    for (;;) {
+      if (fragment.transitions.size() <= 1) return;
+
+      std::size_t entry = net_.transitions().size();
+      std::size_t entry_count = 0;
+      bool has_return_to_start = false;
+      for (const auto transition : fragment.transitions) {
+        if (intersects(transition_outputs_[transition], fragment.starts))
+          has_return_to_start = true;
+        if (!net_.transitions()[transition].silent() ||
+            !equal(net_.transitions()[transition].inputs, fragment.starts)) {
+          continue;
+        }
+        ++entry_count;
+        entry = transition;
+      }
+      std::size_t boundary_entry_count = 0;
+      for (const auto transition : fragment.transitions) {
+        if (subset(transition_inputs_[transition], fragment.starts))
+          ++boundary_entry_count;
+      }
+      if (!has_return_to_start && entry_count == 1 &&
+          boundary_entry_count == 1) {
+        fragment.transitions.erase(entry);
+        fragment.starts = transition_outputs_[entry];
+        continue;
+      }
+
+      std::size_t exit = net_.transitions().size();
+      std::size_t exit_count = 0;
+      bool has_continuation_from_end = false;
+      for (const auto transition : fragment.transitions) {
+        if (intersects(transition_inputs_[transition], fragment.ends))
+          has_continuation_from_end = true;
+        if (!net_.transitions()[transition].silent() ||
+            !equal(net_.transitions()[transition].outputs, fragment.ends)) {
+          continue;
+        }
+        ++exit_count;
+        exit = transition;
+      }
+      std::size_t boundary_exit_count = 0;
+      for (const auto transition : fragment.transitions) {
+        if (subset(transition_outputs_[transition], fragment.ends))
+          ++boundary_exit_count;
+      }
+      if (!has_continuation_from_end && exit_count == 1 &&
+          boundary_exit_count == 1) {
+        fragment.transitions.erase(exit);
+        fragment.ends = transition_inputs_[exit];
+        continue;
+      }
+      return;
+    }
+  }
+
+  static PowlNode sequence_nodes(PowlNode first, PowlNode second) {
+    if (first.kind() == PowlNodeKind::kSilent) return second;
+    if (second.kind() == PowlNodeKind::kSilent) return first;
+    return PowlNode::sequence({std::move(first), std::move(second)});
+  }
+
+  std::optional<std::size_t> sequence_cut(const Fragment& fragment) const {
+    for (std::size_t place = 0; place < net_.place_count(); ++place) {
+      if (fragment.starts.contains(place) || fragment.ends.contains(place))
+        continue;
+      const IdSet singleton{place};
+      if (!reaches(fragment.starts, singleton, fragment.transitions) ||
+          !reaches(singleton, fragment.ends, fragment.transitions) ||
+          reaches(fragment.starts, fragment.ends, fragment.transitions, place)) {
+        continue;
+      }
+      const auto prefix = collect_to(fragment.starts, singleton,
+                                     fragment.transitions);
+      const auto suffix = collect_to(singleton, fragment.ends,
+                                     fragment.transitions);
+      if (prefix.empty() || suffix.empty() || intersects(prefix, suffix))
+        continue;
+      IdSet union_set = prefix;
+      union_set.insert(suffix.begin(), suffix.end());
+      if (union_set == fragment.transitions) return place;
+    }
+    return std::nullopt;
+  }
+
+  std::optional<std::vector<IdSet>> xor_cut(const Fragment& fragment) const {
+    if (fragment.starts.size() != 1) return std::nullopt;
+    std::vector<std::size_t> entries;
+    for (const auto transition : fragment.transitions) {
+      if (equal(net_.transitions()[transition].inputs, fragment.starts))
+        entries.push_back(transition);
+    }
+    std::sort(entries.begin(), entries.end());
+    if (entries.size() < 2) return std::nullopt;
+
+    std::vector<IdSet> branches;
+    IdSet union_set;
+    for (const auto entry : entries) {
+      auto branch = collect_seed(entry, fragment.starts, fragment.ends,
+                                 fragment.transitions);
+      if (branch.empty()) return std::nullopt;
+      for (const auto& other : branches)
+        if (intersects(branch, other)) return std::nullopt;
+      union_set.insert(branch.begin(), branch.end());
+      branches.push_back(std::move(branch));
+    }
+    if (union_set != fragment.transitions) return std::nullopt;
+    return branches;
+  }
+
+  PowlNode transition_node(std::size_t transition) const {
+    const auto& model_transition = net_.transitions()[transition];
+    if (model_transition.silent()) return PowlNode::silent();
+    if (!model_transition.activity ||
+        *model_transition.activity >= net_.activities().size()) {
+      throw std::invalid_argument(
+          "workflow-net transition has an invalid activity reference");
+    }
+    return PowlNode::transition(net_.activities()[*model_transition.activity]);
+  }
+
+  PowlNode partial_order(const Fragment& fragment) const {
+    std::vector<std::size_t> visible;
+    for (const auto transition : fragment.transitions)
+      if (!net_.transitions()[transition].silent()) visible.push_back(transition);
+    if (visible.empty()) return PowlNode::silent();
+    for (const auto transition : visible) {
+      if (transition_has_cycle(transition, fragment.transitions)) {
+        throw std::invalid_argument(
+            "workflow-net conversion found an unresolved transition cycle");
+      }
+    }
+    std::vector<PowlNode> children;
+    children.reserve(visible.size());
+    for (const auto transition : visible)
+      children.push_back(transition_node(transition));
+    if (children.size() == 1) return std::move(children.front());
+
+    std::vector<std::pair<std::size_t, std::size_t>> order;
+    for (std::size_t source = 0; source < visible.size(); ++source) {
+      for (std::size_t target = 0; target < visible.size(); ++target) {
+        if (source == target) continue;
+        const bool forward =
+            transition_reaches(visible[source], visible[target],
+                               fragment.transitions);
+        const bool backward =
+            transition_reaches(visible[target], visible[source],
+                               fragment.transitions);
+        if (forward && backward) {
+          throw std::invalid_argument(
+              "workflow-net conversion found an unresolved transition cycle");
+        }
+        if (forward) order.emplace_back(source, target);
+      }
+    }
+    return PowlNode::strict_partial_order(std::move(children), order);
+  }
+
+  PowlNode convert(Fragment fragment) const {
+    normalize(fragment);
+    if (fragment.transitions.empty()) return PowlNode::silent();
+
+    if (fragment.transitions.size() == 1) {
+      return transition_node(*fragment.transitions.begin());
+    }
+
+    const auto do_part = collect_to(fragment.starts, fragment.ends,
+                                    fragment.transitions);
+    const auto redo_part = collect_to(fragment.ends, fragment.starts,
+                                      fragment.transitions);
+    if (!do_part.empty() && !redo_part.empty() &&
+        !intersects(do_part, redo_part)) {
+      IdSet union_set = do_part;
+      union_set.insert(redo_part.begin(), redo_part.end());
+      if (union_set == fragment.transitions) {
+        return PowlNode::loop(
+            convert(Fragment{fragment.starts, fragment.ends, do_part}),
+            convert(Fragment{fragment.ends, fragment.starts, redo_part}));
+      }
+    }
+
+    if (const auto cut = sequence_cut(fragment)) {
+      const IdSet cut_set{*cut};
+      const auto prefix = collect_to(fragment.starts, cut_set,
+                                     fragment.transitions);
+      const auto suffix = collect_to(cut_set, fragment.ends,
+                                     fragment.transitions);
+      return sequence_nodes(
+          convert(Fragment{fragment.starts, cut_set, prefix}),
+          convert(Fragment{cut_set, fragment.ends, suffix}));
+    }
+
+    if (const auto branches = xor_cut(fragment)) {
+      std::vector<PowlNode> children;
+      children.reserve(branches->size());
+      for (const auto& branch : *branches) {
+        children.push_back(convert(
+            Fragment{fragment.starts, fragment.ends, branch}));
+      }
+      return PowlNode::xor_node(std::move(children));
+    }
+
+    return partial_order(fragment);
+  }
+};
+
 }  // namespace
 
 PowlNode to_powl(const ProcessTree& tree) {
@@ -376,5 +927,7 @@ ProcessTree to_process_tree(const PowlNode& node) {
 }
 
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }
+
+PowlNode to_powl(const PetriNet& net) { return PetriToPowlBuilder(net).run(); }
 
 }  // namespace minera

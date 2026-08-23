@@ -269,11 +269,124 @@ void petri_conversion_sound_and_deterministic() {
   assert(first.transitions().size() == second.transitions().size());
 }
 
+void petri_to_powl_round_trips_structured_nets() {
+  const std::vector<PowlNode> models{
+      PowlNode::silent(),
+      PowlNode::transition("A"),
+      PowlNode::transition("A", {0, 1}),
+      PowlNode::transition("A", {1, std::nullopt}),
+      PowlNode::xor_node(
+          {PowlNode::transition("A"), PowlNode::transition("B")}),
+      PowlNode::loop(PowlNode::transition("A"), PowlNode::transition("B")),
+      PowlNode::sequence(
+          {PowlNode::transition("A"), PowlNode::transition("B")}),
+      PowlNode::sequence(
+          {PowlNode::xor_node({PowlNode::transition("A"),
+                               PowlNode::transition("B")}),
+           PowlNode::transition("C")}),
+      PowlNode::loop(
+          PowlNode::sequence(
+              {PowlNode::transition("A"), PowlNode::transition("B")}),
+          PowlNode::transition("C")),
+      PowlNode::concurrency(
+          {PowlNode::transition("A"), PowlNode::transition("B")}),
+      PowlNode::strict_partial_order(
+          {PowlNode::transition("A"), PowlNode::transition("B"),
+           PowlNode::transition("C"), PowlNode::transition("D")},
+          {{0, 1}, {0, 2}, {1, 3}, {2, 3}}),
+  };
+
+  for (const auto& model : models) {
+    const auto source_net = minera::to_petri_net(model);
+    const auto recovered = minera::to_powl(source_net);
+    const auto recovered_net = minera::to_petri_net(recovered);
+    const auto expected = enumerate_language(source_net, 6, 160).traces;
+    const auto actual = enumerate_language(recovered_net, 6, 160).traces;
+    assert(actual == expected);
+    assert(minera::final_marking_reachable(recovered_net));
+    if (model.kind() == minera::PowlNodeKind::kTransition &&
+        model.self_loop()) {
+      assert(recovered.kind() == minera::PowlNodeKind::kLoop);
+    }
+    if (model.kind() == minera::PowlNodeKind::kTransition &&
+        model.skippable() && !model.self_loop()) {
+      assert(recovered.kind() == minera::PowlNodeKind::kXor);
+    }
+  }
+
+  bool rejected_extended = false;
+  try {
+    minera::PetriNet extended;
+    const auto source = extended.add_place();
+    const auto sink = extended.add_place();
+    const auto transition = extended.add_transition(0, {source}, {sink});
+    extended.set_activities({"A"});
+    extended.set_source(source);
+    extended.set_sink(sink);
+    extended.add_reset_arc(transition, source);
+    (void)minera::to_powl(extended);
+  } catch (const std::invalid_argument&) {
+    rejected_extended = true;
+  }
+  assert(rejected_extended);
+
+  bool rejected_non_workflow = false;
+  try {
+    minera::PetriNet malformed;
+    const auto first_source = malformed.add_place();
+    const auto second_source = malformed.add_place();
+    const auto sink = malformed.add_place();
+    malformed.add_transition(std::nullopt, {first_source}, {sink});
+    malformed.add_transition(std::nullopt, {second_source}, {sink});
+    (void)minera::to_powl(malformed);
+  } catch (const std::invalid_argument&) {
+    rejected_non_workflow = true;
+  }
+  assert(rejected_non_workflow);
+
+  bool rejected_unsound = false;
+  try {
+    minera::PetriNet unsound;
+    const auto source = unsound.add_place();
+    const auto first = unsound.add_place();
+    const auto second = unsound.add_place();
+    const auto sink = unsound.add_place();
+    unsound.set_activities({"A", "B", "C"});
+    unsound.add_transition(0, {source}, {first});
+    unsound.add_transition(1, {source}, {second});
+    unsound.add_transition(2, {first, second}, {sink});
+    unsound.set_source(source);
+    unsound.set_sink(sink);
+    (void)minera::to_powl(unsound);
+  } catch (const std::invalid_argument&) {
+    rejected_unsound = true;
+  }
+  assert(rejected_unsound);
+
+  bool rejected_sink_escape = false;
+  try {
+    minera::PetriNet malformed;
+    const auto source = malformed.add_place();
+    const auto sink = malformed.add_place();
+    const auto tail = malformed.add_place();
+    malformed.set_activities({"A"});
+    malformed.add_transition(0, {source}, {sink});
+    malformed.add_transition(std::nullopt, {sink}, {tail});
+    malformed.set_source(source);
+    malformed.set_sink(sink);
+    (void)minera::to_powl(malformed);
+  } catch (const std::invalid_argument&) {
+    rejected_sink_escape = true;
+  }
+  assert(rejected_sink_escape);
+}
+
 }  // namespace
 
 int main() {
   process_tree_to_powl_variations();
   powl_to_process_tree_preserves_blocks_and_frequencies();
   petri_conversion_sound_and_deterministic();
+  petri_to_powl_round_trips_structured_nets();
   std::cout << "POWL conversion tests passed\n";
 }
