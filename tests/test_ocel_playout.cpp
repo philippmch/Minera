@@ -1,6 +1,8 @@
 #include "minera/ocel_playout.hpp"
 
 #include <cassert>
+#include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -52,6 +54,77 @@ minera::OcpnGraph branching_graph() {
   net.add_transition(0, {source}, {sink});
   net.add_transition(1, {source}, {sink});
   result.petri_nets.emplace("order", std::move(net));
+  return result;
+}
+
+minera::OcpnGraph shared_branching_graph() {
+  auto result = branching_graph();
+  minera::PetriNet item;
+  const auto source = item.add_place();
+  const auto sink = item.add_place();
+  item.set_source(source);
+  item.set_sink(sink);
+  item.set_activities({"A", "B"});
+  item.add_transition(0, {source}, {sink});
+  item.add_transition(1, {source}, {sink});
+  result.object_types.push_back("item");
+  result.petri_nets.emplace("item", std::move(item));
+  return result;
+}
+
+minera::OcpnGraph dead_branching_graph() {
+  minera::OcpnGraph result;
+  result.object_types = {"order"};
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  const auto dead = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {sink});
+  net.add_transition(1, {source}, {dead});
+  result.petri_nets.emplace("order", std::move(net));
+  return result;
+}
+
+std::string activity_signature(const minera::Ocel& log) {
+  std::string result;
+  for (const auto& event : log.events) result += event.activity + ",";
+  return result;
+}
+
+std::map<std::string, std::string> per_object_activities(
+    const minera::Ocel& log) {
+  std::map<std::string, std::string> activities;
+  std::map<std::string, std::string> event_activities;
+  for (const auto& event : log.events) event_activities[event.id] = event.activity;
+  for (const auto& relation : log.relations)
+    activities[relation.object_id] = event_activities[relation.event_id];
+  return activities;
+}
+
+std::string per_object_activity_signature(const minera::Ocel& log) {
+  const auto activities = per_object_activities(log);
+  std::string result;
+  for (const auto& [object_id, activity] : activities)
+    result += object_id + '=' + activity + ';';
+  return result;
+}
+
+std::string sequence_signature(
+    const std::vector<std::vector<minera::OcpnBinding>>& sequences) {
+  std::string result;
+  for (const auto& sequence : sequences) {
+    result += '[';
+    for (const auto& binding : sequence) {
+      result += binding.activity + ':';
+      for (const auto& [type, id] : binding.objects)
+        result += type + '=' + id + ',';
+      result += ';';
+    }
+    result += ']';
+  }
   return result;
 }
 
@@ -257,6 +330,113 @@ void synchronized_branching_is_seeded_and_fractional() {
   assert(rejected);
 }
 
+void legacy_branching_is_seeded_for_independent_and_shared_modes() {
+  for (const auto binding : {minera::OcpnEventBinding::kIndependent,
+                             minera::OcpnEventBinding::kSharedActivity}) {
+    const auto graph = binding == minera::OcpnEventBinding::kIndependent
+                           ? branching_graph()
+                           : shared_branching_graph();
+    minera::OcpnPlayoutOptions options;
+    options.max_bindings_per_activity = 1;
+    options.max_traces = 4;
+    options.event_binding = binding;
+    options.branching_factor_transitions = 1.0;
+    options.return_sequences = true;
+    options.seed = 19;
+    const auto first = minera::ocpn_extensive_playout_result(graph, options);
+    const auto second = minera::ocpn_extensive_playout_result(graph, options);
+    assert(first.trace_exists);
+    assert(activity_signature(first.log) == activity_signature(second.log));
+    assert(sequence_signature(first.sequences) ==
+           sequence_signature(second.sequences));
+
+    std::set<std::string> transition_choices;
+    for (std::uint64_t seed = 1; seed <= 64; ++seed) {
+      options.seed = seed;
+      transition_choices.insert(activity_signature(
+          minera::ocpn_extensive_playout_result(graph, options).log));
+    }
+    assert(transition_choices.size() >= 2);
+
+    // A binding cap samples the per-object trace choices after exhaustive
+    // transition expansion; it is independently seeded for each object.
+    options.seed = 19;
+    options.branching_factor_transitions = 0.0;
+    options.branching_factor_bindings = 1.0;
+    const auto bound_first =
+        minera::ocpn_extensive_playout_result(graph, options);
+    const auto bound_second =
+        minera::ocpn_extensive_playout_result(graph, options);
+    assert(activity_signature(bound_first.log) ==
+           activity_signature(bound_second.log));
+    assert(sequence_signature(bound_first.sequences) ==
+           sequence_signature(bound_second.sequences));
+
+    options.branching_factor_transitions = 0.5;
+    options.branching_factor_bindings = 0.5;
+    const auto fractional_first =
+        minera::ocpn_extensive_playout_result(graph, options);
+    const auto fractional_second =
+        minera::ocpn_extensive_playout_result(graph, options);
+    assert(activity_signature(fractional_first.log) ==
+           activity_signature(fractional_second.log));
+  }
+}
+
+void legacy_transition_sampling_is_per_object() {
+  auto graph = branching_graph();
+  minera::OcpnPlayoutOptions options;
+  options.objects["order"] = {"o1", "o2"};
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.branching_factor_transitions = 1.0;
+  options.seed = 1;
+
+  std::set<std::string> per_seed_choices;
+  bool saw_different_object_choices = false;
+  for (std::uint64_t seed = 1; seed <= 64; ++seed) {
+    options.seed = seed;
+    const auto log = minera::ocpn_extensive_playout(graph, options);
+    per_seed_choices.insert(per_object_activity_signature(log));
+    const auto activities = per_object_activities(log);
+    if (activities.size() == 2 && activities.at("o1") != activities.at("o2"))
+      saw_different_object_choices = true;
+  }
+  assert(per_seed_choices.size() >= 2);
+  assert(saw_different_object_choices);
+
+  options.seed = 17;
+  const auto first = minera::ocpn_extensive_playout(graph, options);
+  const auto second = minera::ocpn_extensive_playout(graph, options);
+  assert(per_object_activity_signature(first) ==
+         per_object_activity_signature(second));
+}
+
+void legacy_branching_rejects_incomplete_object_products() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.branching_factor_transitions = 1.0;
+
+  bool found_mixed_feasibility = false;
+  for (std::uint64_t seed = 1; seed <= 128; ++seed) {
+    options.seed = seed;
+    options.objects["order"] = {"o1"};
+    const auto first = minera::ocpn_extensive_playout(dead_branching_graph(), options);
+    options.objects["order"] = {"o2"};
+    const auto second = minera::ocpn_extensive_playout(dead_branching_graph(), options);
+    if (first.events.empty() == second.events.empty()) continue;
+
+    options.objects["order"] = {"o1", "o2"};
+    const auto combined =
+        minera::ocpn_extensive_playout(dead_branching_graph(), options);
+    assert(combined.events.empty());
+    found_mixed_feasibility = true;
+    break;
+  }
+  assert(found_mixed_feasibility);
+}
+
 }  // namespace
 
 int main() {
@@ -268,4 +448,7 @@ int main() {
   synchronized_variable_slots_bind_multiple_objects();
   explicit_type_markers_drive_both_bindings();
   synchronized_branching_is_seeded_and_fractional();
+  legacy_branching_is_seeded_for_independent_and_shared_modes();
+  legacy_transition_sampling_is_per_object();
+  legacy_branching_rejects_incomplete_object_products();
 }

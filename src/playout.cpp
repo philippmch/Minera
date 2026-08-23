@@ -253,6 +253,29 @@ std::string state_key(const EnumerationState& state) {
   return key;
 }
 
+std::size_t rounded_branching_limit(double cap, std::mt19937_64& rng) {
+  if (cap <= 0.0) return 0;
+  const auto integral = std::floor(cap);
+  auto limit = integral >=
+                       static_cast<double>(std::numeric_limits<std::size_t>::max())
+                   ? std::numeric_limits<std::size_t>::max()
+                   : static_cast<std::size_t>(integral);
+  if (cap - integral > 0.0 &&
+      std::uniform_real_distribution<double>(0.0, 1.0)(rng) < cap - integral &&
+      limit != std::numeric_limits<std::size_t>::max())
+    ++limit;
+  return limit;
+}
+
+void sample_enabled(std::vector<std::size_t>& enabled, double cap,
+                    std::mt19937_64& rng) {
+  if (cap <= 0.0 || enabled.empty()) return;
+  const auto limit = rounded_branching_limit(cap, rng);
+  if (limit >= enabled.size()) return;
+  std::shuffle(enabled.begin(), enabled.end(), rng);
+  enabled.resize(limit);
+}
+
 }  // namespace
 
 EventLog extensive_playout(const PetriNet& net,
@@ -282,6 +305,12 @@ EventLog extensive_playout(const PetriNet& net,
       resolve_marking(options.initial_marking, net.source(), "initial");
   const auto final_marking =
       resolve_marking(options.final_marking, net.sink(), "final");
+  if (!std::isfinite(options.branching_factor_transitions) ||
+      options.branching_factor_transitions < 0.0) {
+    throw std::invalid_argument(
+        "extensive playout branching factor must be finite and non-negative");
+  }
+  std::mt19937_64 rng(options.seed);
 
   const auto is_final = [&](const std::vector<std::uint32_t>& marking) {
     return marking == final_marking;
@@ -328,6 +357,7 @@ EventLog extensive_playout(const PetriNet& net,
     const auto state = std::move(queue.front());
     queue.pop_front();
 
+    std::vector<std::size_t> enabled;
     for (std::size_t t = 0; t < transitions.size(); ++t) {
       const auto& transition = transitions[t];
       if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
@@ -335,6 +365,11 @@ EventLog extensive_playout(const PetriNet& net,
         continue;  // would exceed the visible-length bound
       }
       if (!petri_transition_enabled(transition, state.marking)) continue;
+      enabled.push_back(t);
+    }
+    sample_enabled(enabled, options.branching_factor_transitions, rng);
+    for (const auto t : enabled) {
+      const auto& transition = transitions[t];
 
       EnumerationState next;
       next.marking = state.marking;

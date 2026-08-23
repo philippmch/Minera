@@ -156,6 +156,17 @@ void sample_branch(std::vector<Value>& values, double cap,
   values.resize(limit);
 }
 
+std::uint64_t derived_seed(std::uint64_t seed, const std::string& type,
+                           const std::string& object_id,
+                           const std::string& purpose) {
+  std::uint64_t value = seed ^ 1469598103934665603ULL;
+  for (const unsigned char c : type + '\n' + object_id + '\n' + purpose) {
+    value ^= c;
+    value *= 1099511628211ULL;
+  }
+  return value;
+}
+
 void write_json_string(std::ostringstream& out, const std::string& value) {
   out << '"';
   for (const unsigned char c : value) {
@@ -625,27 +636,36 @@ Ocel legacy_ocpn_extensive_playout(
     }
     if (object_ids.empty()) continue;
 
-    ExtensivePlayoutOptions trace_options;
-    trace_options.max_length = visible_bound(
-        net, options.max_bindings_per_activity);
-    trace_options.max_traces = options.max_traces;
-    trace_options.max_states = options.max_states;
-    trace_options.start = 0.0;
-    trace_options.case_interval = 0.0;
-    trace_options.event_interval = 1.0;
-    trace_options.initial_marking =
-        marker_for(net, options.initial_markings, type, net.source());
-    trace_options.final_marking =
-        marker_for(net, options.final_markings, type, net.sink());
-    const auto traces_log = extensive_playout(net, trace_options);
-    if (traces_log.traces.empty()) return {};
     for (const auto& object_id : object_ids) {
       const auto old_type = supplied_object_types.find(object_id);
       if (old_type != supplied_object_types.end())
         throw std::invalid_argument(
             "OCPN playout object ids must be unique across object types");
       supplied_object_types[object_id] = type;
-      choices.push_back({type, object_id, traces_log.traces});
+      ExtensivePlayoutOptions trace_options;
+      trace_options.max_length = visible_bound(
+          net, options.max_bindings_per_activity);
+      trace_options.max_traces = options.max_traces;
+      trace_options.max_states = options.max_states;
+      trace_options.branching_factor_transitions =
+          options.branching_factor_transitions;
+      trace_options.seed = derived_seed(options.seed, type, object_id,
+                                        "trace-expansion");
+      trace_options.start = 0.0;
+      trace_options.case_interval = 0.0;
+      trace_options.event_interval = 1.0;
+      trace_options.initial_marking =
+          marker_for(net, options.initial_markings, type, net.source());
+      trace_options.final_marking =
+          marker_for(net, options.final_markings, type, net.sink());
+      const auto traces_log = extensive_playout(net, trace_options);
+      if (traces_log.traces.empty()) return {};
+      auto object_traces = traces_log.traces;
+      auto binding_rng = std::mt19937_64(
+          derived_seed(options.seed, type, object_id, "binding-selection"));
+      sample_branch(object_traces, options.branching_factor_bindings,
+                    binding_rng);
+      choices.push_back({type, object_id, std::move(object_traces)});
     }
   }
 

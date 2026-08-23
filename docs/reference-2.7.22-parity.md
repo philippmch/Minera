@@ -127,7 +127,10 @@ firing. The new `synchronized` mode retains an activity-to-object-type slot map
 from discovery, fires enabled transitions for one deterministic binding in a
 single global event, supports seeded transition/binding branching caps
 (including fractional stochastic rounding), and can return reachability or
-binding sequences. Variable slots enumerate every enabled non-empty subset of
+binding sequences. Legacy independent/shared modes apply the transition cap
+during each per-object language expansion and the binding cap while selecting
+per-object traces, using stable seeds derived from the requested seed and
+object identity. Variable slots enumerate every enabled non-empty subset of
 an object type deterministically before seeded sampling. The selected mode and
 optional diagnostics are echoed in the JSON envelope. The CLI and local-server
 query use escaped `TYPE:T0,T1,...` marker entries and reject unknown types or

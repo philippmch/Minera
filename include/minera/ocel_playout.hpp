@@ -33,9 +33,10 @@ struct OcpnPlayoutOptions {
   // Maximum number of firings of any visible activity in one object trace.
   // The extensive search is bounded by this value and by max_states.
   std::size_t max_bindings_per_activity = 2;
-  // Optional branching caps for synchronized search.  Zero means unlimited;
-  // fractional caps are stochastically rounded for each state, matching the
-  // reference extensive-search contract.
+  // Optional branching caps. Zero means unlimited; fractional caps are
+  // stochastically rounded for each state or per-object trace choice. The
+  // synchronized path applies both caps directly, while legacy independent
+  // and shared modes use deterministic derived seeds for their expansions.
   double branching_factor_transitions = 0.0;
   double branching_factor_bindings = 0.0;
   std::size_t max_traces = 100;
