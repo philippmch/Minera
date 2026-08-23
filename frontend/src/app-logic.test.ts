@@ -353,17 +353,22 @@ describe("stochastic Petri playout contract", () => {
     const query = new URLSearchParams(stochasticPlayoutQuery({
       traces: 12, max_steps: 99, seed: 7, transition_weights: [1, 0.5, 0],
       stop_at_final: false, start: 1767225600, case_interval: 2.5,
-      event_interval: 0.25,
+      event_interval: 0.25, initial_marking: [0, 1, 0],
+      final_marking: [0, 0, 1],
     }));
     expect(query.get("stochastic_traces")).toBe("12");
     expect(query.get("stochastic_transition_weights")).toBe("1,0.5,0");
     expect(query.get("stochastic_stop_at_final")).toBe("false");
+    expect(query.get("stochastic_initial_marking")).toBe("0,1,0");
+    expect(query.get("stochastic_final_marking")).toBe("0,0,1");
   });
   it("rejects invalid weights and bounds", () => {
     expect(() => stochasticPlayoutQuery({ traces: 0 })).toThrow(/positive/);
     expect(() => stochasticPlayoutQuery({ transition_weights: [] })).toThrow(/non-empty/);
     expect(() => stochasticPlayoutQuery({ transition_weights: [1, -1] })).toThrow(/non-negative/);
     expect(() => stochasticPlayoutQuery({ event_interval: -1 })).toThrow(/non-negative/);
+    expect(() => stochasticPlayoutQuery({ initial_marking: [] })).toThrow(/non-empty/);
+    expect(() => stochasticPlayoutQuery({ final_marking: [0, 0xffffffff + 1] })).toThrow(/uint32/);
   });
 });
 import {

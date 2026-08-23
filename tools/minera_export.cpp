@@ -924,6 +924,8 @@ int usage(const char* program) {
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
                "  --stochastic-transition-weights <w,...> Transition weights\n"
                "  --stochastic-stop-at-final <bool> Stop at final marking\n"
+               "  --stochastic-initial-marking <n,...> Initial marker vector\n"
+               "  --stochastic-final-marking <n,...> Final marker vector\n"
                "  --monte-carlo-simulations <n> Virtual-time cases\n"
                "  --monte-carlo-max-steps <n> Firing cap per case\n"
                "  --monte-carlo-seed <u64> RNG seed\n"
@@ -2456,7 +2458,9 @@ int main(int argc, char** argv) {
         arg == "--stochastic-transition-weights" ||
         arg == "--stochastic-stop-at-final" || arg == "--stochastic-start" ||
         arg == "--stochastic-case-interval" ||
-        arg == "--stochastic-event-interval") {
+        arg == "--stochastic-event-interval" ||
+        arg == "--stochastic-initial-marking" ||
+        arg == "--stochastic-final-marking") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));

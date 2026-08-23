@@ -137,6 +137,13 @@ same synchronized workflow projection through `OcCausalNet`, with a separate
 `model=causal_net` server/frontend selector. Custom final predicates and
 stochastic branching remain open.
 
+Traditional Petri playout now applies explicit marker vectors consistently to
+the basic sampler and weighted stochastic sampler as well as exhaustive
+enumeration. The local `/api/playout` endpoint accepts `initial_marking` and
+`final_marking` for basic/extensive mode and the prefixed stochastic forms;
+the standalone playout/export CLIs and typed frontend query use the same
+comma-separated contract.
+
 Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
 the interaction, descendants, inheritance, cobirth, and codeath object graphs as
 qualified O2O relations, and can qualify every E2O relation as creation, other,

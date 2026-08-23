@@ -231,6 +231,20 @@ std::vector<std::size_t> parse_marking(std::string_view value,
   return result;
 }
 
+std::vector<std::uint32_t> parse_uint32_marking(std::string_view value,
+                                                std::string_view name) {
+  const auto parsed = parse_marking(value, name);
+  std::vector<std::uint32_t> result;
+  result.reserve(parsed.size());
+  for (const auto entry : parsed) {
+    if (entry > std::numeric_limits<std::uint32_t>::max())
+      throw std::invalid_argument(std::string(name) +
+                                  ": marking entry is out of range");
+    result.push_back(static_cast<std::uint32_t>(entry));
+  }
+  return result;
+}
+
 std::vector<int> parse_int_marking(std::string_view value,
                                    std::string_view name) {
   if (value.empty())
@@ -2466,6 +2480,12 @@ StochasticPlayoutParams parse_stochastic_playout_params(
       throw std::invalid_argument(
           "stochastic_event_interval must be non-negative");
   }
+  if (supplied("stochastic_initial_marking"))
+    params.initial_marking = parse_uint32_marking(
+        require("stochastic_initial_marking"), "stochastic_initial_marking");
+  if (supplied("stochastic_final_marking"))
+    params.final_marking = parse_uint32_marking(
+        require("stochastic_final_marking"), "stochastic_final_marking");
   return params;
 }
 

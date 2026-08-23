@@ -16,6 +16,30 @@ namespace minera {
 
 EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
   const auto& transitions = net.transitions();
+  if (net.place_count() == 0 || net.source() >= net.place_count() ||
+      net.sink() >= net.place_count()) {
+    throw std::invalid_argument(
+        "playout requires valid workflow source and sink places");
+  }
+  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
+                                   std::size_t boundary,
+                                   const char* label) {
+    if (!requested.empty() && requested.size() != net.place_count()) {
+      throw std::invalid_argument(std::string("playout ") + label +
+                                  " marking must match the place count");
+    }
+    std::vector<std::uint32_t> marking(net.place_count(), 0);
+    if (requested.empty()) {
+      marking[boundary] = 1;
+    } else {
+      marking = requested;
+    }
+    return marking;
+  };
+  const auto initial_marking =
+      resolve_marking(options.initial_marking, net.source(), "initial");
+  const auto final_marking =
+      resolve_marking(options.final_marking, net.sink(), "final");
   std::mt19937_64 rng(options.seed);
 
   EventLog log;
@@ -29,17 +53,12 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
     trace.case_id = "case_" + std::to_string(c + 1);
     double now = options.start + static_cast<double>(c) * options.case_interval;
 
-    std::fill(marking.begin(), marking.end(), 0);
-    marking[net.source()] = 1;
-    std::uint64_t tokens = 1;
+    marking = initial_marking;
 
     for (std::size_t step = 0; step < options.max_steps; ++step) {
-      // The final marking of a workflow net: the single token rests on the
-      // sink. Reaching it completes the case even if transitions could still
-      // fire (e.g. a loop's redo path).
-      if (tokens == 1 && marking[net.sink()] == 1) {
-        break;
-      }
+      // Reaching the selected final marking completes the case even if more
+      // transitions could still fire (for example, a loop's redo path).
+      if (marking == final_marking) break;
 
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
@@ -57,8 +76,6 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
           0, enabled.size() - 1)(rng);
       const auto& fired = transitions[enabled[pick]];
       fire_petri_transition(fired, marking);
-      tokens = 0;
-      for (const auto value : marking) tokens += value;
 
       if (!fired.silent()) {
         Event event;
@@ -130,20 +147,35 @@ EventLog stochastic_playout(const PetriNet& net,
   EventLog log;
   log.traces.reserve(options.traces);
   std::vector<std::uint64_t> marking(places, 0);
+  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
+                                   std::size_t boundary,
+                                   const char* label) {
+    if (!requested.empty() && requested.size() != places) {
+      throw std::invalid_argument(std::string("stochastic playout ") + label +
+                                  " marking must match the place count");
+    }
+    std::vector<std::uint64_t> result(places, 0);
+    if (requested.empty()) {
+      result[boundary] = 1;
+    } else {
+      std::copy(requested.begin(), requested.end(), result.begin());
+    }
+    return result;
+  };
+  const auto initial_marking =
+      resolve_marking(options.initial_marking, net.source(), "initial");
+  const auto final_marking =
+      resolve_marking(options.final_marking, net.sink(), "final");
   std::vector<std::size_t> enabled;
   const auto is_final = [&](const std::vector<std::uint64_t>& candidate) {
-    for (std::size_t p = 0; p < candidate.size(); ++p) {
-      if (candidate[p] != (p == net.sink() ? 1U : 0U)) return false;
-    }
-    return true;
+    return candidate == final_marking;
   };
 
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
     trace.case_id = "case_" + std::to_string(c + 1);
     double now = options.start + static_cast<double>(c) * options.case_interval;
-    std::fill(marking.begin(), marking.end(), 0);
-    marking[net.source()] = 1;
+    marking = initial_marking;
 
     for (std::size_t step = 0; step < options.max_steps; ++step) {
       if (options.stop_at_final && is_final(marking)) break;

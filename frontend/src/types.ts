@@ -2690,6 +2690,8 @@ export interface StochasticPlayoutOptions {
   seed?: number;
   transition_weights?: number[];
   stop_at_final?: boolean;
+  initial_marking?: number[];
+  final_marking?: number[];
   start?: number;
   case_interval?: number;
   event_interval?: number;
