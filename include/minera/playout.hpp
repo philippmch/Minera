@@ -24,6 +24,10 @@ struct PlayoutOptions {
   // the generated log carries a plausible, strictly ordered time perspective.
   double case_interval = 60.0;
   double event_interval = 1.0;
+  // Optional explicit marker vectors. An empty vector keeps the workflow
+  // source/sink defaults; a supplied vector must match the place count.
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
 };
 
 // Controls weighted stochastic playout of a Petri net.  Transition weights
@@ -50,6 +54,10 @@ struct StochasticPlayoutOptions {
   std::vector<double> transition_weights;
   // Stop a case as soon as the exact workflow final marking is reached.
   bool stop_at_final = true;
+  // Optional explicit marker vectors. An empty vector keeps the workflow
+  // source/sink defaults; a supplied vector must match the place count.
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
 };
 
 // Plays out a workflow net into a synthetic event log: each case starts from

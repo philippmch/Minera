@@ -139,6 +139,45 @@ void extensive_playout_accepts_explicit_markers() {
   assert(rejected);
 }
 
+void sampled_variants_accept_explicit_markers() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto initial = net.add_place();
+  const auto final = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a"});
+  net.add_transition(0, {initial}, {final});
+
+  minera::PlayoutOptions basic;
+  basic.traces = 1;
+  basic.max_steps = 1;
+  basic.initial_marking = {0, 1, 0, 0};
+  basic.final_marking = {0, 0, 1, 0};
+  const auto basic_log = minera::playout(net, basic);
+  assert(basic_log.trace_count() == 1);
+  assert(basic_log.traces.front().events.size() == 1);
+
+  minera::StochasticPlayoutOptions stochastic;
+  stochastic.traces = 1;
+  stochastic.max_steps = 1;
+  stochastic.initial_marking = {0, 1, 0, 0};
+  stochastic.final_marking = {0, 0, 1, 0};
+  const auto stochastic_log = minera::stochastic_playout(net, stochastic);
+  assert(stochastic_log.trace_count() == 1);
+  assert(stochastic_log.traces.front().events.size() == 1);
+
+  basic.final_marking = {0, 0, 1};
+  bool rejected = false;
+  try {
+    (void)minera::playout(net, basic);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -148,4 +187,5 @@ int main() {
   huge_weights_are_scaled_without_overflow();
   uniform_playout_honors_weighted_input_arcs();
   extensive_playout_accepts_explicit_markers();
+  sampled_variants_accept_explicit_markers();
 }

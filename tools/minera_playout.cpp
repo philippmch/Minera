@@ -3,14 +3,19 @@
 // the log back into Minera (or any other tool) to study or check it.
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "minera/bpmn.hpp"
 #include "minera/csv_event_log_importer.hpp"
@@ -41,6 +46,8 @@ int usage(const char* program) {
                "                     sampling randomly\n"
                "  --max-length <n>   Extensive: longest visible trace to\n"
                "                     enumerate (default: 10)\n"
+               "  --initial-marking <n,...>  Explicit starting marker vector\n"
+               "  --final-marking <n,...>    Explicit accepted marker vector\n"
                "  --dfg              Treat input CSV/XES as a log and play out its DFG\n"
                "  --variant <name>   DFG variant: classic or performance\n"
                "  --monte-carlo      Use bounded virtual-time Monte Carlo\n"
@@ -65,6 +72,31 @@ int main(int argc, char** argv) {
   bool monte_carlo = false;
   std::map<std::string, std::string> dfg_fields;
   std::map<std::string, std::string> monte_carlo_fields;
+  const auto parse_marking = [](const char* value, const char* option) {
+    if (!value || *value == '\0')
+      throw std::invalid_argument(std::string(option) +
+                                  " expects a non-empty marking");
+    std::vector<std::uint32_t> result;
+    const std::string text(value);
+    std::size_t begin = 0;
+    for (std::size_t index = 0; index <= text.size(); ++index) {
+      if (index != text.size() && text[index] != ',') continue;
+      const auto token = text.substr(begin, index - begin);
+      if (token.empty())
+        throw std::invalid_argument(std::string(option) +
+                                    " expects comma-separated counts");
+      errno = 0;
+      char* end = nullptr;
+      const auto parsed = std::strtoull(token.c_str(), &end, 10);
+      if (end != token.c_str() + token.size() || errno == ERANGE ||
+          parsed > std::numeric_limits<std::uint32_t>::max())
+        throw std::invalid_argument(std::string(option) +
+                                    " expects uint32 counts");
+      result.push_back(static_cast<std::uint32_t>(parsed));
+      begin = index + 1;
+    }
+    return result;
+  };
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -124,6 +156,19 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       extensive_options.max_length = static_cast<std::size_t>(std::atoll(value));
+    } else if (arg == "--initial-marking" || arg == "--final-marking") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto parsed = parse_marking(
+          value, arg == "--initial-marking" ? "--initial-marking"
+                                            : "--final-marking");
+      if (arg == "--initial-marking") {
+        options.initial_marking = parsed;
+        extensive_options.initial_marking = std::move(parsed);
+      } else {
+        options.final_marking = parsed;
+        extensive_options.final_marking = std::move(parsed);
+      }
     } else if (!arg.empty() && arg.front() == '-') {
       return usage(argv[0]);
     } else if (input.empty()) {

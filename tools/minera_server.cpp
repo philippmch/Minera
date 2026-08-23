@@ -600,6 +600,33 @@ std::size_t ocel_query_size(const httplib::Request& request,
   return static_cast<std::size_t>(parsed);
 }
 
+std::vector<std::uint32_t> parse_playout_marking(
+    const httplib::Request& request, std::string_view name) {
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return {};
+  const auto value = request.get_param_value(key);
+  if (value.empty())
+    throw std::invalid_argument(key + ": expected a non-empty marking");
+  std::vector<std::uint32_t> result;
+  std::size_t begin = 0;
+  for (std::size_t index = 0; index <= value.size(); ++index) {
+    if (index != value.size() && value[index] != ',') continue;
+    const auto token = value.substr(begin, index - begin);
+    if (token.empty())
+      throw std::invalid_argument(key + ": expected non-negative entries");
+    std::uint64_t parsed = 0;
+    const auto converted = std::from_chars(
+        token.data(), token.data() + token.size(), parsed);
+    if (converted.ec != std::errc{} ||
+        converted.ptr != token.data() + token.size() ||
+        parsed > std::numeric_limits<std::uint32_t>::max())
+      throw std::invalid_argument(key + ": expected uint32 entries");
+    result.push_back(static_cast<std::uint32_t>(parsed));
+    begin = index + 1;
+  }
+  return result;
+}
+
 bool ocel_query_bool(const httplib::Request& request, std::string_view name,
                      bool fallback) {
   const auto key = std::string(name);
@@ -4422,6 +4449,8 @@ void handle_playout(const httplib::Request& request,
     if (!parsed) return;
     options.traces = static_cast<std::size_t>(*parsed);
   }
+  options.initial_marking = parse_playout_marking(request, "initial_marking");
+  options.final_marking = parse_playout_marking(request, "final_marking");
 
   // mode=extensive enumerates the model's distinct traces (shortest first,
   // capped by `traces` and `max_length`) instead of sampling randomly.
@@ -4433,6 +4462,8 @@ void handle_playout(const httplib::Request& request,
       if (!parsed) return;
       extensive.max_length = static_cast<std::size_t>(*parsed);
     }
+    extensive.initial_marking = options.initial_marking;
+    extensive.final_marking = options.final_marking;
     const auto log = minera::extensive_playout(it->second, extensive);
     response.set_content(minera::to_xes(log, miner + " playout"),
                          "application/xml");
