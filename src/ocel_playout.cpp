@@ -158,22 +158,117 @@ bool has_visible_activity(const PetriNet& net, const std::string& activity) {
   return false;
 }
 
-std::vector<std::string> synchronized_activity_slots(
+struct ActivityBindingSlots {
+  std::vector<std::string> fixed;
+  std::vector<std::string> variable;
+};
+
+ActivityBindingSlots synchronized_activity_slots(
     const OcpnGraph& graph, const std::string& activity,
     const std::vector<SynchronizedObject>& objects) {
-  const auto found = graph.activity_object_types.find(activity);
-  if (found != graph.activity_object_types.end() && !found->second.empty())
-    return found->second;
+  ActivityBindingSlots slots;
+  const auto fixed = graph.activity_object_types.find(activity);
+  const auto variable = graph.activity_variable_object_types.find(activity);
+  const auto copy_unique = [](const auto& source, auto& target) {
+    for (const auto& type : source) {
+      if (type.empty() ||
+          std::find(target.begin(), target.end(), type) != target.end())
+        continue;
+      target.push_back(type);
+    }
+  };
+  if (fixed != graph.activity_object_types.end())
+    copy_unique(fixed->second, slots.fixed);
+  if (variable != graph.activity_variable_object_types.end())
+    copy_unique(variable->second, slots.variable);
+  if (!slots.fixed.empty() || !slots.variable.empty()) return slots;
 
   // Hand-built graphs may not carry discovery annotations.  In that case,
   // bind one object from every type whose projection exposes the activity.
-  std::vector<std::string> slots;
   for (const auto& object : objects) {
     if (has_visible_activity(*object.net, activity) &&
-        std::find(slots.begin(), slots.end(), object.type) == slots.end())
-      slots.push_back(object.type);
+        std::find(slots.fixed.begin(), slots.fixed.end(), object.type) ==
+            slots.fixed.end())
+      slots.fixed.push_back(object.type);
   }
   return slots;
+}
+
+void enumerate_variable_types(
+    const std::vector<std::string>& variable_types, std::size_t type_index,
+    const std::string& activity, const std::vector<SynchronizedObject>& objects,
+    const SynchronizedState& state, std::vector<bool>& used,
+    std::vector<std::pair<std::size_t, std::size_t>>& firings,
+    std::vector<std::pair<std::string, std::string>>& bound_objects,
+    std::vector<SynchronizedAction>& actions, std::size_t limit);
+
+void enumerate_variable_objects(
+    const std::vector<std::string>& variable_types, std::size_t type_index,
+    std::size_t object_index, const std::string& activity,
+    const std::vector<SynchronizedObject>& objects, const SynchronizedState& state,
+    std::vector<bool>& used,
+    std::vector<std::pair<std::size_t, std::size_t>>& firings,
+    std::vector<std::pair<std::string, std::string>>& bound_objects,
+    std::vector<SynchronizedAction>& actions, std::size_t limit) {
+  if (limit != 0 && actions.size() >= limit) return;
+  if (object_index == objects.size()) {
+    enumerate_variable_types(variable_types, type_index + 1, activity, objects,
+                             state, used, firings, bound_objects, actions, limit);
+    return;
+  }
+  const auto& object = objects[object_index];
+  if (object.type != variable_types[type_index] || used[object_index]) {
+    enumerate_variable_objects(variable_types, type_index, object_index + 1,
+                               activity, objects, state, used, firings,
+                               bound_objects, actions, limit);
+    return;
+  }
+
+  // A variable arc may omit this object.  The recursive branch also permits
+  // selecting several objects of the same type for one activity.
+  enumerate_variable_objects(variable_types, type_index, object_index + 1,
+                             activity, objects, state, used, firings,
+                             bound_objects, actions, limit);
+  for (std::size_t transition_index = 0;
+       transition_index < object.net->transitions().size(); ++transition_index) {
+    const auto& transition = object.net->transitions()[transition_index];
+    if (!transition.activity ||
+        *transition.activity >= object.net->activities().size() ||
+        object.net->activities()[*transition.activity] != activity ||
+        !petri_transition_enabled(transition, state.markings[object_index]))
+      continue;
+    used[object_index] = true;
+    firings.emplace_back(object_index, transition_index);
+    bound_objects.emplace_back(object.type, object.id);
+    enumerate_variable_objects(variable_types, type_index, object_index + 1,
+                               activity, objects, state, used, firings,
+                               bound_objects, actions, limit);
+    bound_objects.pop_back();
+    firings.pop_back();
+    used[object_index] = false;
+    if (limit != 0 && actions.size() >= limit) return;
+  }
+}
+
+void enumerate_variable_types(
+    const std::vector<std::string>& variable_types, std::size_t type_index,
+    const std::string& activity, const std::vector<SynchronizedObject>& objects,
+    const SynchronizedState& state, std::vector<bool>& used,
+    std::vector<std::pair<std::size_t, std::size_t>>& firings,
+    std::vector<std::pair<std::string, std::string>>& bound_objects,
+    std::vector<SynchronizedAction>& actions, std::size_t limit) {
+  if (limit != 0 && actions.size() >= limit) return;
+  if (type_index == variable_types.size()) {
+    if (bound_objects.empty()) return;
+    SynchronizedAction action;
+    action.binding.activity = activity;
+    action.binding.objects = bound_objects;
+    action.firings = firings;
+    actions.push_back(std::move(action));
+    return;
+  }
+  enumerate_variable_objects(variable_types, type_index, 0, activity, objects,
+                             state, used, firings, bound_objects, actions, limit);
 }
 
 void enumerate_binding_slots(
@@ -182,14 +277,12 @@ void enumerate_binding_slots(
     const SynchronizedState& state, std::vector<bool>& used,
     std::vector<std::pair<std::size_t, std::size_t>>& firings,
     std::vector<std::pair<std::string, std::string>>& bound_objects,
-    std::vector<SynchronizedAction>& actions, std::size_t limit) {
+    std::vector<SynchronizedAction>& actions, std::size_t limit,
+    const std::vector<std::string>& variable_slots) {
   if (limit != 0 && actions.size() >= limit) return;
   if (slot == slots.size()) {
-    SynchronizedAction action;
-    action.binding.activity = activity;
-    action.binding.objects = bound_objects;
-    action.firings = firings;
-    actions.push_back(std::move(action));
+    enumerate_variable_types(variable_slots, 0, activity, objects, state, used,
+                             firings, bound_objects, actions, limit);
     return;
   }
 
@@ -209,7 +302,8 @@ void enumerate_binding_slots(
       firings.emplace_back(object_index, transition_index);
       bound_objects.emplace_back(object.type, object.id);
       enumerate_binding_slots(slots, slot + 1, activity, objects, state, used,
-                              firings, bound_objects, actions, limit);
+                              firings, bound_objects, actions, limit,
+                              variable_slots);
       bound_objects.pop_back();
       firings.pop_back();
       used[object_index] = false;
@@ -250,14 +344,14 @@ std::vector<SynchronizedAction> synchronized_actions(
         state.activity_counts[activity_index] >= options.max_bindings_per_activity)
       continue;
     const auto slots = synchronized_activity_slots(graph, activity, objects);
-    if (slots.empty()) continue;
+    if (slots.fixed.empty() && slots.variable.empty()) continue;
     std::vector<bool> used(objects.size(), false);
     std::vector<std::pair<std::size_t, std::size_t>> firings;
     std::vector<std::pair<std::string, std::string>> bound_objects;
     std::vector<SynchronizedAction> bindings;
-    enumerate_binding_slots(slots, 0, activity, objects, state, used, firings,
-                            bound_objects, bindings,
-                            options.branching_factor_bindings);
+    enumerate_binding_slots(slots.fixed, 0, activity, objects, state, used,
+                            firings, bound_objects, bindings,
+                            options.branching_factor_bindings, slots.variable);
     actions.insert(actions.end(), std::make_move_iterator(bindings.begin()),
                    std::make_move_iterator(bindings.end()));
   }
@@ -272,6 +366,19 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+
+  for (const auto& [type, object_ids] : options.objects) {
+    if (!graph.petri_nets.contains(type))
+      throw std::invalid_argument("OCPN playout object type is not in the model: " +
+                                  type);
+    std::unordered_set<std::string> unique_ids;
+    for (const auto& id : object_ids) {
+      if (id.empty())
+        throw std::invalid_argument("OCPN playout object ids must not be empty");
+      if (!unique_ids.insert(id).second)
+        throw std::invalid_argument("OCPN playout object ids must be unique");
+    }
+  }
 
   std::vector<SynchronizedObject> objects;
   std::map<std::string, std::string> supplied_object_types;

@@ -1012,6 +1012,19 @@ export interface OcelSplitResult {
   variant: OcelSplitVariant;
   logs: Array<Record<string, unknown>>;
 }
+export type OcelEnrichmentGraph =
+  | "object_interaction_graph"
+  | "object_descendants_graph"
+  | "object_inheritance_graph"
+  | "object_cobirth_graph"
+  | "object_codeath_graph";
+export interface OcelEnrichmentResult {
+  family: "OCEL_ENRICHMENT";
+  variant: "CLASSIC";
+  graphs: OcelEnrichmentGraph[];
+  lifecycle_qualifiers: boolean;
+  log: Record<string, unknown>;
+}
 export type OcelPlayoutVariant = "EXTENSIVE";
 export interface OcelPlayoutBinding {
   activity: string;
@@ -1076,6 +1089,18 @@ export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
       !["CONNECTED_COMPONENTS", "ANCESTORS_DESCENDANTS"].includes(String(value.variant)) ||
       !Array.isArray(value.logs)) return false;
   return value.logs.every((log) => isOcelRecord(log));
+}
+export function isOcelEnrichmentResult(value: unknown): value is OcelEnrichmentResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_ENRICHMENT" ||
+      value.variant !== "CLASSIC" || !Array.isArray(value.graphs) ||
+      !value.graphs.every((graph) => [
+        "object_interaction_graph", "object_descendants_graph",
+        "object_inheritance_graph", "object_cobirth_graph",
+        "object_codeath_graph",
+      ].includes(String(graph))) || typeof value.lifecycle_qualifiers !== "boolean" ||
+      !isOcelRecord(value.log)) return false;
+  return isOcelRecord(value.log["ocel:events"]) &&
+    isOcelRecord(value.log["ocel:objects"]);
 }
 export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult {
   if (!isOcelRecord(value) ||

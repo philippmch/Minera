@@ -1277,6 +1277,61 @@ void handle_ocel_split(const httplib::Request& request,
   }
 }
 
+void handle_ocel_enrichment(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "graphs", "lifecycle_qualifiers"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL enrichment parameter: " + key);
+    }
+    minera::OcelEnrichmentOptions options;
+    if (request.has_param("graphs")) {
+      const auto values = ocel_query_list(request, "graphs");
+      options.include_interaction = false;
+      options.include_descendants = false;
+      options.include_inheritance = false;
+      options.include_cobirth = false;
+      options.include_codeath = false;
+      for (const auto& value : values) {
+        if (value == "all") {
+          options.include_interaction = true;
+          options.include_descendants = true;
+          options.include_inheritance = true;
+          options.include_cobirth = true;
+          options.include_codeath = true;
+        } else if (value == "interaction" || value == "object_interaction_graph") {
+          options.include_interaction = true;
+        } else if (value == "descendants" || value == "object_descendants_graph") {
+          options.include_descendants = true;
+        } else if (value == "inheritance" || value == "object_inheritance_graph") {
+          options.include_inheritance = true;
+        } else if (value == "cobirth" || value == "object_cobirth_graph") {
+          options.include_cobirth = true;
+        } else if (value == "codeath" || value == "object_codeath_graph") {
+          options.include_codeath = true;
+        } else {
+          throw std::invalid_argument(
+              "graphs expects interaction, descendants, inheritance, cobirth, codeath, or all");
+        }
+      }
+    }
+    options.include_lifecycle_qualifiers = ocel_query_bool(
+        request, "lifecycle_qualifiers", options.include_lifecycle_qualifiers);
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto enriched = minera::enrich_ocel(minera::parse_ocel_json(body), options);
+    response.set_content(
+        minera::serialize_ocel_enrichment_json(enriched, options),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -4901,6 +4956,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine", preflight);
   server.Options("/api/ocel/discover", preflight);
   server.Options("/api/ocel/split", preflight);
+  server.Options("/api/ocel/enrich", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
@@ -4983,6 +5039,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
   server.Post("/api/ocel/split", handle_ocel_split);
+  server.Post("/api/ocel/enrich", handle_ocel_enrichment);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);

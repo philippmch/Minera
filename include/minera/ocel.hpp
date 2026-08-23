@@ -238,6 +238,10 @@ struct OcpnGraph {
   // Object-type slots participating in each activity.  Repeated entries
   // represent multiple objects of the same type bound to one event.
   std::map<std::string, std::vector<std::string>> activity_object_types;
+  // Variable object-type slots permit any non-empty subset of currently
+  // enabled objects of that type to participate in one activity binding.
+  std::map<std::string, std::vector<std::string>>
+      activity_variable_object_types;
   std::map<std::string, std::map<std::string, bool>> double_arcs_on_activity;
   // The annotated discovery metrics share the deterministic OCDFG shape.
   // Keeping them with the OCPN makes the annotation variant useful to native

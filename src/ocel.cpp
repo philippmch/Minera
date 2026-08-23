@@ -1217,21 +1217,31 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
   // Preserve the object slots observed on each event.  The per-type nets
   // remain useful projections, while this relation map lets synchronized
   // playout bind one transition to the exact object types that co-occurred.
-  std::map<std::string, std::set<std::string>> object_ids_by_activity;
+  std::map<std::string,
+           std::map<std::string, std::map<std::string, std::size_t>>>
+      relation_counts;
+  std::map<std::string, std::map<std::string, std::set<std::string>>>
+      object_ids_by_activity_event;
   for (const auto& relation : log.relations) {
     const auto event_it = event_by_id.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_by_id.end() || type_it == object_type.end()) continue;
-    if (!object_ids_by_activity[event_it->second->activity].insert(
-            relation.object_id)
-             .second)
-      continue;
-    result.activity_object_types[event_it->second->activity].push_back(
-        type_it->second);
+    const auto& activity = event_it->second->activity;
+    auto& object_ids = object_ids_by_activity_event[activity][relation.event_id];
+    if (object_ids.insert(relation.object_id).second)
+      ++relation_counts[activity][type_it->second][relation.event_id];
   }
-  for (auto& [activity, types] : result.activity_object_types) {
-    (void)activity;
-    std::sort(types.begin(), types.end());
+  for (const auto& [activity, by_type] : relation_counts) {
+    for (const auto& [type, by_event] : by_type) {
+      const bool variable = std::any_of(
+          by_event.begin(), by_event.end(),
+          [](const auto& entry) { return entry.second > 1; });
+      if (variable) {
+        result.activity_variable_object_types[activity].push_back(type);
+      } else {
+        result.activity_object_types[activity].push_back(type);
+      }
+    }
   }
 
   if (options.annotated) {
@@ -1465,6 +1475,15 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
   for (const auto& [activity, types] : graph.activity_object_types) {
     if (!first_activity_binding) out << ',';
     first_activity_binding = false;
+    write_string(out, activity);
+    out << ':';
+    strings(types);
+  }
+  out << "},\"activity_variable_object_types\":{";
+  bool first_variable_activity = true;
+  for (const auto& [activity, types] : graph.activity_variable_object_types) {
+    if (!first_variable_activity) out << ',';
+    first_variable_activity = false;
     write_string(out, activity);
     out << ':';
     strings(types);

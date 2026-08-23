@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
 
 describe("isConceptDriftResult", () => {
   const valid = {
@@ -167,6 +167,20 @@ describe("isOcelPlayoutResult", () => {
   });
   it("accepts the causal-net envelope", () => expect(isOcelPlayoutResult({ ...valid, family: "OC_CAUSAL_NET_PLAYOUT" })).toBe(true));
   it("rejects an incomplete envelope", () => expect(isOcelPlayoutResult({ ...valid, log: [] })).toBe(false));
+});
+
+describe("isOcelEnrichmentResult", () => {
+  const valid = {
+    family: "OCEL_ENRICHMENT", variant: "CLASSIC",
+    graphs: ["object_interaction_graph", "object_codeath_graph"],
+    lifecycle_qualifiers: true,
+    log: { "ocel:events": {}, "ocel:objects": {} },
+  };
+  it("accepts selected graph families", () => expect(isOcelEnrichmentResult(valid)).toBe(true));
+  it("rejects unknown graph families and malformed logs", () => {
+    expect(isOcelEnrichmentResult({ ...valid, graphs: ["unknown"] })).toBe(false);
+    expect(isOcelEnrichmentResult({ ...valid, log: [] })).toBe(false);
+  });
 });
 
 describe("isOcelSqliteResult", () => {

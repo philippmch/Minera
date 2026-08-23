@@ -45,6 +45,8 @@ import {
   type OcelExchangeFormat,
   type OcelExchangeResult,
   type OcelSplitResult,
+  type OcelEnrichmentGraph,
+  type OcelEnrichmentResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelStatisticsResult,
@@ -84,6 +86,7 @@ import {
   isOcelSqliteResult,
   isOcelExchangeResult,
   isOcelSplitResult,
+  isOcelEnrichmentResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
   isOcelStatisticsResult,
@@ -4000,6 +4003,46 @@ export async function requestOcelSplit(
   if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
   const payload: unknown = await response.json();
   if (!isOcelSplitResult(payload)) throw new Error("the Minera backend returned an invalid OCEL split");
+  return payload;
+}
+
+export interface OcelEnrichmentOptions {
+  graphs?: OcelEnrichmentGraph[];
+  lifecycle_qualifiers?: boolean;
+}
+
+export function ocelEnrichmentQuery(options: OcelEnrichmentOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.graphs !== undefined) {
+    const graphs = [...options.graphs].sort();
+    if (graphs.some((graph) => ![
+      "object_interaction_graph", "object_descendants_graph",
+      "object_inheritance_graph", "object_cobirth_graph",
+      "object_codeath_graph",
+    ].includes(graph))) throw new Error("OCEL enrichment graph is invalid");
+    if (graphs.length) query.set("graphs", graphs.join(","));
+  }
+  if (options.lifecycle_qualifiers !== undefined)
+    query.set("lifecycle_qualifiers", options.lifecycle_qualifiers ? "true" : "false");
+  return query.toString();
+}
+
+export async function requestOcelEnrichment(
+  log: Blob,
+  options: OcelEnrichmentOptions = {},
+): Promise<OcelEnrichmentResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelEnrichmentQuery(options);
+  const response = await fetch(`/api/ocel/enrich${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelEnrichmentResult(payload))
+    throw new Error("the Minera backend returned an invalid OCEL enrichment");
   return payload;
 }
 

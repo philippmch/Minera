@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics } from "./api";
 
 describe("classic DFG export API", () => {
   it("serializes optional noise cleaning settings", () => {
@@ -944,6 +944,10 @@ describe("OCEL API", () => {
       .toBe("variant=saw");
     expect(ocelSplitQuery({ variant: "ancestors_descendants", object_type: "order", max_objects: 2, max_degree_centrality: 0.5 }))
       .toBe("variant=ancestors_descendants&object_type=order&max_objects=2&max_degree_centrality=0.5");
+    expect(ocelEnrichmentQuery({
+      graphs: ["object_interaction_graph", "object_cobirth_graph"],
+      lifecycle_qualifiers: false,
+    })).toBe("graphs=object_cobirth_graph%2Cobject_interaction_graph&lifecycle_qualifiers=false");
     expect(ocelPlayoutQuery({
       model: "causal_net", variant: "extensive", max_bindings_per_activity: 2, max_traces: 3,
       max_states: 40, objects: { item: ["i,1"], order: ["o1", "o2"] },
@@ -1128,6 +1132,22 @@ describe("OCEL API", () => {
     })));
     await expect(requestOcelSplit(new File(["{}"], "log.json"), { variant: "connected_components" }))
       .resolves.toMatchObject({ family: "OCEL_SPLIT", variant: "CONNECTED_COMPONENTS" });
+    vi.unstubAllGlobals();
+  });
+
+  it("posts an OCEL enrichment request and validates the response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/ocel/enrich?graphs=object_interaction_graph&lifecycle_qualifiers=false");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return { ok: true, json: async () => ({
+        family: "OCEL_ENRICHMENT", variant: "CLASSIC",
+        graphs: ["object_interaction_graph"], lifecycle_qualifiers: false,
+        log: { "ocel:events": {}, "ocel:objects": {} },
+      }) };
+    }));
+    await expect(requestOcelEnrichment(new File(["{}"], "log.json"), {
+      graphs: ["object_interaction_graph"], lifecycle_qualifiers: false,
+    })).resolves.toMatchObject({ family: "OCEL_ENRICHMENT", variant: "CLASSIC" });
     vi.unstubAllGlobals();
   });
 

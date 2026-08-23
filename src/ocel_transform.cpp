@@ -268,7 +268,247 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
   return result;
 }
 
+struct EnrichmentIndex {
+  std::vector<std::string> event_order;
+  std::map<std::string, std::size_t> event_index;
+  std::map<std::string, std::vector<std::string>> objects_by_event;
+  std::map<std::string, std::vector<std::size_t>> events_by_object;
+};
+
+EnrichmentIndex make_enrichment_index(const Ocel& log) {
+  EnrichmentIndex result;
+  for (std::size_t index = 0; index < log.events.size(); ++index) {
+    if (log.events[index].id.empty() ||
+        !result.event_index.emplace(log.events[index].id, index).second) {
+      throw std::invalid_argument(
+          "OCEL enrichment events require unique non-empty ids");
+    }
+    result.event_order.push_back(log.events[index].id);
+  }
+  std::set<std::string> object_ids;
+  for (const auto& object : log.objects) {
+    if (object.id.empty() || !object_ids.insert(object.id).second)
+      throw std::invalid_argument(
+          "OCEL enrichment objects require unique non-empty ids");
+  }
+
+  std::map<std::string, std::set<std::string>> objects_by_event;
+  for (const auto& relation : log.relations) {
+    if (!result.event_index.contains(relation.event_id) ||
+        !object_ids.contains(relation.object_id)) {
+      throw std::invalid_argument(
+          "OCEL enrichment relation references an unknown id");
+    }
+    objects_by_event[relation.event_id].insert(relation.object_id);
+  }
+  for (const auto& event_id : result.event_order) {
+    const auto found = objects_by_event.find(event_id);
+    if (found == objects_by_event.end()) continue;
+    auto& objects = result.objects_by_event[event_id];
+    objects.assign(found->second.begin(), found->second.end());
+    for (const auto& object_id : objects)
+      result.events_by_object[object_id].push_back(result.event_index.at(event_id));
+  }
+  return result;
+}
+
+using ObjectPair = std::pair<std::string, std::string>;
+
+std::set<ObjectPair> enrichment_interaction_graph(const EnrichmentIndex& index) {
+  std::set<ObjectPair> result;
+  for (const auto& [event_id, objects] : index.objects_by_event) {
+    (void)event_id;
+    for (std::size_t left = 0; left < objects.size(); ++left)
+      for (std::size_t right = left + 1; right < objects.size(); ++right)
+        result.emplace(objects[left], objects[right]);
+  }
+  return result;
+}
+
+std::set<ObjectPair> enrichment_descendants_graph(const EnrichmentIndex& index) {
+  std::set<ObjectPair> result;
+  std::set<std::string> seen;
+  for (const auto& event_id : index.event_order) {
+    const auto found = index.objects_by_event.find(event_id);
+    if (found == index.objects_by_event.end()) continue;
+    std::vector<std::string> unseen;
+    for (const auto& object : found->second) {
+      if (!seen.contains(object)) unseen.push_back(object);
+    }
+    for (const auto& object : found->second) {
+      if (!seen.contains(object)) continue;
+      for (const auto& child : unseen) result.emplace(object, child);
+    }
+    seen.insert(unseen.begin(), unseen.end());
+  }
+  return result;
+}
+
+std::set<ObjectPair> enrichment_cobirth_graph(const EnrichmentIndex& index) {
+  std::set<ObjectPair> result;
+  std::set<std::string> seen;
+  for (const auto& event_id : index.event_order) {
+    const auto found = index.objects_by_event.find(event_id);
+    if (found == index.objects_by_event.end()) continue;
+    std::vector<std::string> unseen;
+    for (const auto& object : found->second)
+      if (!seen.contains(object)) unseen.push_back(object);
+    for (std::size_t left = 0; left < unseen.size(); ++left)
+      for (std::size_t right = left + 1; right < unseen.size(); ++right)
+        result.emplace(unseen[left], unseen[right]);
+    seen.insert(unseen.begin(), unseen.end());
+  }
+  return result;
+}
+
+std::set<ObjectPair> enrichment_codeath_graph(const EnrichmentIndex& index) {
+  std::set<ObjectPair> result;
+  std::set<std::string> seen;
+  for (auto event = index.event_order.rbegin(); event != index.event_order.rend();
+       ++event) {
+    const auto found = index.objects_by_event.find(*event);
+    if (found == index.objects_by_event.end()) continue;
+    std::vector<std::string> unseen;
+    for (const auto& object : found->second)
+      if (!seen.contains(object)) unseen.push_back(object);
+    for (std::size_t left = 0; left < unseen.size(); ++left)
+      for (std::size_t right = left + 1; right < unseen.size(); ++right)
+        result.emplace(unseen[left], unseen[right]);
+    seen.insert(unseen.begin(), unseen.end());
+  }
+  return result;
+}
+
+std::set<ObjectPair> enrichment_inheritance_graph(const EnrichmentIndex& index) {
+  std::set<ObjectPair> result;
+  std::map<std::string, std::size_t> first, last;
+  for (const auto& [object, events] : index.events_by_object) {
+    if (events.empty()) continue;
+    first[object] = events.front();
+    last[object] = events.back();
+  }
+  for (const auto& event_id : index.event_order) {
+    const auto found = index.objects_by_event.find(event_id);
+    if (found == index.objects_by_event.end()) continue;
+    const auto event_index = index.event_index.at(event_id);
+    for (const auto& source : found->second) {
+      if (last[source] != event_index) continue;
+      for (const auto& target : found->second) {
+        if (source != target && first[target] == event_index)
+          result.emplace(source, target);
+      }
+    }
+  }
+  std::set<ObjectPair> asymmetric;
+  for (const auto& edge : result)
+    if (!result.contains({edge.second, edge.first})) asymmetric.insert(edge);
+  return asymmetric;
+}
+
+void append_enrichment_edge(Ocel& log, std::set<std::tuple<std::string,
+                                                           std::string,
+                                                           std::string>>& seen,
+                            const std::string& source, const std::string& target,
+                            const std::string& qualifier) {
+  if (source == target || !seen.emplace(source, target, qualifier).second) return;
+  log.o2o.push_back({source, target, qualifier});
+}
+
+void apply_lifecycle_qualifiers(Ocel& log, const EnrichmentIndex& index) {
+  std::map<std::pair<std::size_t, std::string>, std::string> qualifiers;
+  for (const auto& [object, events] : index.events_by_object) {
+    if (events.empty()) continue;
+    for (std::size_t offset = 0; offset < events.size(); ++offset) {
+      const auto event = events[offset];
+      const auto qualifier = events.size() == 1 || offset == 0
+                                 ? "creation"
+                                 : offset + 1 == events.size()
+                                       ? "termination"
+                                       : "other";
+      qualifiers[{event, object}] = qualifier;
+    }
+  }
+  for (auto& relation : log.relations) {
+    const auto event = index.event_index.find(relation.event_id);
+    if (event == index.event_index.end()) continue;
+    const auto qualifier = qualifiers.find({event->second, relation.object_id});
+    if (qualifier != qualifiers.end()) relation.qualifier = qualifier->second;
+  }
+}
+
+const char* enrichment_graph_name(OcelEnrichmentGraph graph) {
+  switch (graph) {
+    case OcelEnrichmentGraph::kInteraction: return "object_interaction_graph";
+    case OcelEnrichmentGraph::kDescendants: return "object_descendants_graph";
+    case OcelEnrichmentGraph::kInheritance: return "object_inheritance_graph";
+    case OcelEnrichmentGraph::kCobirth: return "object_cobirth_graph";
+    case OcelEnrichmentGraph::kCodeath: return "object_codeath_graph";
+  }
+  throw std::invalid_argument("unknown OCEL enrichment graph");
+}
+
 }  // namespace
+
+Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
+  const auto index = make_enrichment_index(log);
+  Ocel result = log;
+  std::set<std::tuple<std::string, std::string, std::string>> seen;
+  for (const auto& relation : result.o2o)
+    seen.emplace(relation.source_id, relation.target_id, relation.qualifier);
+
+  const auto add_undirected = [&](const std::set<ObjectPair>& edges,
+                                  const char* qualifier) {
+    for (const auto& [source, target] : edges) {
+      append_enrichment_edge(result, seen, source, target, qualifier);
+      append_enrichment_edge(result, seen, target, source, qualifier);
+    }
+  };
+  const auto add_directed = [&](const std::set<ObjectPair>& edges,
+                                const char* qualifier) {
+    for (const auto& [source, target] : edges)
+      append_enrichment_edge(result, seen, source, target, qualifier);
+  };
+  if (options.include_interaction)
+    add_undirected(enrichment_interaction_graph(index),
+                   enrichment_graph_name(OcelEnrichmentGraph::kInteraction));
+  if (options.include_descendants)
+    add_directed(enrichment_descendants_graph(index),
+                 enrichment_graph_name(OcelEnrichmentGraph::kDescendants));
+  if (options.include_inheritance)
+    add_directed(enrichment_inheritance_graph(index),
+                 enrichment_graph_name(OcelEnrichmentGraph::kInheritance));
+  if (options.include_cobirth)
+    add_undirected(enrichment_cobirth_graph(index),
+                   enrichment_graph_name(OcelEnrichmentGraph::kCobirth));
+  if (options.include_codeath)
+    add_undirected(enrichment_codeath_graph(index),
+                   enrichment_graph_name(OcelEnrichmentGraph::kCodeath));
+  if (options.include_lifecycle_qualifiers)
+    apply_lifecycle_qualifiers(result, index);
+  return result;
+}
+
+std::string serialize_ocel_enrichment_json(const Ocel& log,
+                                           const OcelEnrichmentOptions& options) {
+  std::ostringstream out;
+  out << "{\"family\":\"OCEL_ENRICHMENT\",\"variant\":\"CLASSIC\",\"graphs\":[";
+  bool first = true;
+  const auto add = [&](OcelEnrichmentGraph graph, bool enabled) {
+    if (!enabled) return;
+    if (!first) out << ',';
+    first = false;
+    write_json_string(out, enrichment_graph_name(graph));
+  };
+  add(OcelEnrichmentGraph::kInteraction, options.include_interaction);
+  add(OcelEnrichmentGraph::kDescendants, options.include_descendants);
+  add(OcelEnrichmentGraph::kInheritance, options.include_inheritance);
+  add(OcelEnrichmentGraph::kCobirth, options.include_cobirth);
+  add(OcelEnrichmentGraph::kCodeath, options.include_codeath);
+  out << "],\"lifecycle_qualifiers\":"
+      << (options.include_lifecycle_qualifiers ? "true" : "false")
+      << ",\"log\":" << serialize_ocel_json(log) << '}';
+  return out.str();
+}
 
 OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
   if (options.variant != OcelSplitVariant::kConnectedComponents &&
