@@ -79,7 +79,7 @@ are reconciled.
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
-| Label splitting | contextual | **Partial** — deterministic native contextual splitting with token-aware contexts, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused tests; a differential modularity matrix remains |
+| Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
@@ -914,14 +914,18 @@ Contextual splitting now builds one segment node for each distinct
 of those nodes. Context similarity is measured over normalized activity tokens
 rather than the characters in their labels, so multi-character names cannot
 accidentally collapse into one context. Weighted edges use the configured
-strict minimum, modularity clustering remains deterministic, and community
-numbering follows occurrence support with stable ties. Custom activity and
-target columns, target-activity selection, context bounds, suffixes, strict
-edge thresholds, and malformed numeric settings continue to share the
-native/request/CLI/server/frontend contract. Focused Release coverage includes
-token-boundary distance, deterministic numbering, custom-column preservation,
-and threshold boundaries; a broader differential modularity matrix remains
-open.
+strict minimum, and one global greedy-modularity graph accumulates
+cross-community edge weight across all selected activities. Isolated vertices
+remain singleton communities, zero-gain merges are accepted, and clustering
+stops at the first negative gain. Community numbering follows occurrence
+support with the graph's deterministic merge order as its stable tie break.
+Custom activity and target columns, target-activity selection, context bounds,
+suffixes, strict edge thresholds, and malformed numeric settings continue to
+share the native/request/CLI/server/frontend contract. Focused Release
+coverage includes token-boundary distance, weighted competing gains,
+zero-edge graphs, zero-gain paths, deterministic ties, cross-activity global
+normalization without cross-label edges, custom-column preservation, and
+threshold boundaries.
 
 ## Live-stream transport evidence
 
