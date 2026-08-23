@@ -66,12 +66,15 @@ PowlNode tree_node_to_powl(const ProcessTreeNode& node,
 
 class ProcessTreeBuilder {
  public:
+  explicit ProcessTreeBuilder(bool strict = false) : strict_(strict) {}
+
   ProcessTree run(const PowlNode& node) {
     auto root = convert(node);
     return ProcessTree(std::move(activities_), std::move(root));
   }
 
  private:
+  bool strict_ = false;
   std::vector<std::string> activities_;
   std::map<std::string, std::size_t> activity_ids_;
 
@@ -123,6 +126,8 @@ class ProcessTreeBuilder {
   ProcessTreeNode partial_order(const PowlNode& node) {
     const auto& children = node.children();
     if (children.empty()) return ProcessTreeNode::tau();
+
+    if (strict_) return strict_partial_order(node);
 
     const std::size_t count = children.size();
     const auto reduction = node.transitive_reduction();
@@ -196,6 +201,123 @@ class ProcessTreeBuilder {
       component_trees.push_back(sequence(std::move(sequence_layers)));
     }
     return parallel(std::move(component_trees));
+  }
+
+  static PowlNode project(const PowlNode& node,
+                          const std::vector<std::size_t>& members) {
+    if (members.empty()) return PowlNode::silent();
+    if (members.size() == 1) return node.children().at(members.front());
+
+    std::map<std::size_t, std::size_t> local;
+    std::vector<PowlNode> children;
+    children.reserve(members.size());
+    for (std::size_t index = 0; index < members.size(); ++index) {
+      local.emplace(members[index], index);
+      children.push_back(node.children().at(members[index]));
+    }
+    std::vector<std::pair<std::size_t, std::size_t>> order;
+    for (const auto [source, target] : node.order()) {
+      const auto source_it = local.find(source);
+      const auto target_it = local.find(target);
+      if (source_it != local.end() && target_it != local.end())
+        order.emplace_back(source_it->second, target_it->second);
+    }
+    return PowlNode::strict_partial_order(std::move(children), order);
+  }
+
+  ProcessTreeNode strict_partial_order(const PowlNode& node) {
+    const auto& children = node.children();
+    if (children.empty()) return ProcessTreeNode::tau();
+    if (children.size() == 1) return convert(children.front());
+
+    const std::size_t count = children.size();
+    std::vector<std::vector<std::size_t>> neighbours(count);
+    for (const auto [source, target] : node.order()) {
+      neighbours[source].push_back(target);
+      neighbours[target].push_back(source);
+    }
+    for (auto& values : neighbours) {
+      std::sort(values.begin(), values.end());
+      values.erase(std::unique(values.begin(), values.end()), values.end());
+    }
+
+    // A disconnected order is exactly a parallel block. Projecting each
+    // component preserves its internal order, so no layering approximation is
+    // needed for the strict conversion.
+    std::vector<std::vector<std::size_t>> components;
+    std::vector<bool> visited(count, false);
+    for (std::size_t root = 0; root < count; ++root) {
+      if (visited[root]) continue;
+      std::vector<std::size_t> component{root};
+      visited[root] = true;
+      for (std::size_t position = 0; position < component.size(); ++position) {
+        for (const auto next : neighbours[component[position]]) {
+          if (visited[next]) continue;
+          visited[next] = true;
+          component.push_back(next);
+        }
+      }
+      std::sort(component.begin(), component.end());
+      components.push_back(std::move(component));
+    }
+    if (components.size() > 1) {
+      std::vector<ProcessTreeNode> branches;
+      branches.reserve(components.size());
+      for (const auto& component : components)
+        branches.push_back(convert(project(node, component)));
+      return parallel(std::move(branches));
+    }
+
+    // A series cut is a non-empty prefix A whose every node precedes every
+    // node in B. Ancestor sets of candidate boundary nodes are sufficient for
+    // the block-structured nets produced by the forward conversion, while the
+    // cross-product check prevents accepting a merely topological prefix.
+    std::vector<std::size_t> candidates(count);
+    for (std::size_t index = 0; index < count; ++index)
+      candidates[index] = index;
+    std::stable_sort(candidates.begin(), candidates.end(), [&](auto left,
+                                                               auto right) {
+      std::size_t left_ancestors = 0;
+      std::size_t right_ancestors = 0;
+      for (const auto [source, target] : node.order()) {
+        left_ancestors += target == left;
+        right_ancestors += target == right;
+      }
+      if (left_ancestors != right_ancestors)
+        return left_ancestors < right_ancestors;
+      return left < right;
+    });
+    for (const auto boundary : candidates) {
+      std::vector<std::size_t> prefix;
+      std::vector<std::size_t> suffix;
+      for (std::size_t index = 0; index < count; ++index) {
+        if (index == boundary) continue;
+        if (node.has_edge(index, boundary)) prefix.push_back(index);
+      }
+      if (prefix.empty() || prefix.size() == count) continue;
+      std::vector<bool> in_prefix(count, false);
+      for (const auto index : prefix) in_prefix[index] = true;
+      for (std::size_t index = 0; index < count; ++index)
+        if (!in_prefix[index]) suffix.push_back(index);
+
+      bool complete = true;
+      for (const auto source : prefix) {
+        for (const auto target : suffix) {
+          if (!node.has_edge(source, target)) {
+            complete = false;
+            break;
+          }
+        }
+        if (!complete) break;
+      }
+      if (!complete) continue;
+
+      return sequence({convert(project(node, prefix)),
+                       convert(project(node, suffix))});
+    }
+
+    throw std::invalid_argument(
+        "workflow-net conversion found a non-block-structured partial order");
   }
 
   ProcessTreeNode convert(const PowlNode& node) {
@@ -924,6 +1046,10 @@ PowlNode to_powl(const ProcessTree& tree) {
 
 ProcessTree to_process_tree(const PowlNode& node) {
   return ProcessTreeBuilder().run(node);
+}
+
+ProcessTree to_process_tree(const PetriNet& net) {
+  return ProcessTreeBuilder(true).run(to_powl(net));
 }
 
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }

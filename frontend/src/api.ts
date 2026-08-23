@@ -2300,13 +2300,15 @@ export async function fetchPnml(miner: string): Promise<string> {
 }
 
 /**
- * Fetches the most recently mined inductive process tree as PTML — the only
- * miner producing a block-structured tree, so there is no miner parameter.
+ * Fetches a block-structured process tree as PTML from the most recent mine.
+ * Inductive is the default; other workflow-net miners are reduced server-side
+ * and reject when their structure is not exactly block structured.
  */
-export async function fetchPtml(): Promise<string> {
+export async function fetchPtml(miner?: string): Promise<string> {
   let response: Response;
   try {
-    response = await fetch("/api/ptml");
+    const query = miner ? `?miner=${encodeURIComponent(miner)}` : "";
+    response = await fetch(`/api/ptml${query}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",

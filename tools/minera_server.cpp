@@ -3793,9 +3793,10 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
 // its block-structured process tree, which maps cleanly onto BPMN; any other
 // model ("alpha" | "heuristic" | "powl" | "imported") converts from its workflow net
 // by the net's token semantics.
-// Exports the most recent mine's inductive process tree as PTML — the only
-// miner producing a block-structured tree, so no `miner` parameter.
-void handle_ptml(const httplib::Request&, httplib::Response& response) {
+// Exports a process tree as PTML. The default is the inductive tree; a
+// selected workflow net is reduced strictly when it is block structured.
+void handle_ptml(const httplib::Request& request,
+                 httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
@@ -3807,8 +3808,30 @@ void handle_ptml(const httplib::Request&, httplib::Response& response) {
                          "application/json");
     return;
   }
-  response.set_content(minera::to_ptml(session->tree, session->dataset),
-                       "application/xml");
+  const auto miner = request.has_param("miner")
+                         ? request.get_param_value("miner")
+                         : std::string("inductive");
+  try {
+    if (miner == "inductive") {
+      response.set_content(minera::to_ptml(session->tree, session->dataset),
+                           "application/xml");
+      return;
+    }
+    const auto it = session->nets.find(miner);
+    if (it == session->nets.end()) {
+      response.status = 400;
+      response.set_content(error_json("unknown miner: " + miner),
+                           "application/json");
+      return;
+    }
+    response.set_content(
+        minera::to_ptml(minera::to_process_tree(it->second),
+                        session->dataset + " " + miner),
+        "application/xml");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
