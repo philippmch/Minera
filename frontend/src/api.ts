@@ -165,6 +165,7 @@ import {
   type VariantStatisticsOptions,
   type DfgPlayoutOptions,
   type PetriUsageComparison,
+  type PetriUsageComparisonOptions,
   isDfgAlignmentResult,
   isDfgPetriConversionResult,
   isEditDistanceResult,
@@ -2922,13 +2923,30 @@ function validatePlayoutInteger(name: string, value: number, positive = false): 
   }
 }
 
+function serializeComparisonMarking(name: string, value: number[]): string {
+  if (value.length === 0) throw new Error(`${name} must contain at least one place`);
+  if (value.some((entry) => !Number.isSafeInteger(entry) || entry < 0 || entry > 0xffffffff)) {
+    throw new Error(`${name} must contain non-negative uint32 integers`);
+  }
+  return value.join(",");
+}
+
 export async function comparePetriUsage(
   reference: File,
   miner = "inductive",
+  options: PetriUsageComparisonOptions = {},
 ): Promise<PetriUsageComparison> {
   const form = new FormData();
   form.append("reference_log", reference, reference.name);
   form.append("miner", miner);
+  if (options.initial_marking !== undefined) {
+    form.append("initial_marking", serializeComparisonMarking(
+      "initial_marking", options.initial_marking));
+  }
+  if (options.final_marking !== undefined) {
+    form.append("final_marking", serializeComparisonMarking(
+      "final_marking", options.final_marking));
+  }
   let response: Response;
   try {
     response = await fetch("/api/compare-petri", { method: "POST", body: form });

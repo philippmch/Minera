@@ -6,10 +6,12 @@
 #include <cmath>
 #include <cstring>
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -781,6 +783,8 @@ int usage(const char* program) {
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
                "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
+               "  --compare-petri-initial-marking <n,...> Initial place marking\n"
+               "  --compare-petri-final-marking <n,...>   Final place marking\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
                "                            DYNAMIC_PROGRAMMING, MILP, or\n"
@@ -1115,6 +1119,10 @@ int main(int argc, char** argv) {
   std::filesystem::path emd_reference;
   std::filesystem::path compare_petri_reference;
   std::string compare_petri_miner = "inductive";
+  std::vector<std::uint32_t> compare_petri_initial_marking;
+  std::vector<std::uint32_t> compare_petri_final_marking;
+  bool compare_petri_initial_marking_used = false;
+  bool compare_petri_final_marking_used = false;
   minera::EmdOptions emd_options;
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
@@ -1282,6 +1290,24 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(std::string(option) +
                                   " expects a non-negative integer");
     return parsed;
+  };
+  const auto parse_uint32_marking = [&](const char* value,
+                                        std::string_view option) {
+    std::vector<std::uint32_t> result;
+    const std::string text = value;
+    std::size_t begin = 0;
+    for (std::size_t index = 0; index <= text.size(); ++index) {
+      if (index != text.size() && text[index] != ',') continue;
+      const auto token = text.substr(begin, index - begin);
+      const auto parsed = parse_nonnegative_size(token.c_str(), option);
+      if (parsed > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument(std::string(option) +
+                                    " expects uint32 entries");
+      }
+      result.push_back(static_cast<std::uint32_t>(parsed));
+      begin = index + 1;
+    }
+    return result;
   };
   const auto parse_positive_size =
       [](const char* value, std::string_view option) -> std::size_t {
@@ -2405,6 +2431,25 @@ int main(int argc, char** argv) {
       if (compare_petri_miner != "inductive" && compare_petri_miner != "alpha" &&
           compare_petri_miner != "heuristic" && compare_petri_miner != "powl") {
         std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, or powl\n";
+        return 2;
+      }
+      continue;
+    }
+    if (arg == "--compare-petri-initial-marking" ||
+        arg == "--compare-petri-final-marking") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const auto marking = parse_uint32_marking(value, arg);
+        if (arg == "--compare-petri-initial-marking") {
+          compare_petri_initial_marking = marking;
+          compare_petri_initial_marking_used = true;
+        } else {
+          compare_petri_final_marking = marking;
+          compare_petri_final_marking_used = true;
+        }
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
       continue;
@@ -3642,8 +3687,10 @@ int main(int argc, char** argv) {
     std::cerr << "error: EMD options require --emd-reference <file>\n";
     return 2;
   }
-  if (compare_petri_reference.empty() && compare_petri_miner != "inductive") {
-    std::cerr << "error: --compare-petri-miner requires --compare-petri-reference <file>\n";
+  if (compare_petri_reference.empty() &&
+      (compare_petri_miner != "inductive" ||
+       compare_petri_initial_marking_used || compare_petri_final_marking_used)) {
+    std::cerr << "error: --compare-petri options require --compare-petri-reference <file>\n";
     return 2;
   }
   if (evaluation_requested) {
@@ -4750,8 +4797,13 @@ int main(int argc, char** argv) {
       const auto reference = ends_with_ci(compare_petri_reference.string(), ".xes")
           ? minera::import_xes_event_log(compare_petri_reference)
           : minera::import_csv_event_log(compare_petri_reference, options);
+      minera::PetriUsageComparisonOptions comparison_options;
+      if (compare_petri_initial_marking_used)
+        comparison_options.initial_marking = compare_petri_initial_marking;
+      if (compare_petri_final_marking_used)
+        comparison_options.final_marking = compare_petri_final_marking;
       const auto comparison = minera::compare_petri_usage(
-          *model_it->second, log, reference);
+          *model_it->second, log, reference, comparison_options);
       const auto body = minera::petri_usage_comparison_json(comparison);
       if (output.empty()) {
         std::cout << body << '\n';

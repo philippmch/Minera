@@ -93,6 +93,84 @@ void finish_routes_when_sink_has_a_token_and_other_work_remains() {
   assert(result.places[branch].log1_occurrences == 1);
 }
 
+void explicit_markings_control_replay_boundaries() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto entry = net.add_place();
+  const auto after = net.add_place();
+  const auto alternate_final = net.add_place();
+  net.set_source(source);
+  net.set_sink(after);
+  net.set_activities({"A"});
+  net.add_transition(std::nullopt, {source}, {entry});
+  net.add_transition(0, {entry}, {after});
+  net.add_transition(std::nullopt, {after}, {alternate_final});
+
+  minera::PetriUsageComparisonOptions options;
+  options.initial_marking = {0, 1, 0, 0};
+  options.final_marking = {0, 0, 0, 1};
+  const auto result = minera::compare_petri_usage(
+      net, log_of({"A"}), log_of({}), options);
+  assert(result.transitions[0].log1_occurrences == 0);
+  assert(result.transitions[1].log1_occurrences == 1);
+  assert(result.transitions[2].log1_occurrences == 1);
+  assert(result.places[alternate_final].log1_occurrences == 1);
+}
+
+void extended_arcs_are_replayed_and_counted() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto buffered = net.add_place();
+  const auto gate = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A"});
+  net.add_transition(0, {source}, {buffered, buffered, gate});
+  const auto reset = net.add_transition(std::nullopt, {gate}, {sink});
+  net.add_reset_arc(reset, buffered);
+
+  const auto result = minera::compare_petri_usage(
+      net, log_of({"A"}), log_of({}));
+  assert(result.transitions[1].log1_occurrences == 1);
+  assert(result.places[buffered].log1_occurrences == 2);
+}
+
+void inhibitor_arcs_gate_silent_completion() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto guard = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {sink});
+  net.add_inhibitor_arc(0, guard);
+
+  const auto enabled_result = minera::compare_petri_usage(
+      net, log_of({}), log_of({}));
+  assert(enabled_result.transitions[0].log1_occurrences == 1);
+
+  minera::PetriUsageComparisonOptions blocked_options;
+  blocked_options.initial_marking = {1, 1, 0};
+  blocked_options.final_marking = {1, 1, 0};
+  const auto blocked_result = minera::compare_petri_usage(
+      net, log_of({}), log_of({}), blocked_options);
+  assert(blocked_result.transitions[0].log1_occurrences == 0);
+}
+
+void marking_dimensions_are_checked() {
+  const auto net = simple_net();
+  minera::PetriUsageComparisonOptions options;
+  options.initial_marking = {1};
+  bool rejected = false;
+  try {
+    (void)minera::compare_petri_usage(net, log_of({}), log_of({}), options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void invalid_net_indices_are_rejected() {
   minera::PetriNet net;
   const auto p0 = net.add_place();
@@ -150,6 +228,10 @@ int main() {
   usage_directions_and_silent_activation();
   weighted_arc_and_duplicate_label_contract();
   finish_routes_when_sink_has_a_token_and_other_work_remains();
+  explicit_markings_control_replay_boundaries();
+  extended_arcs_are_replayed_and_counted();
+  inhibitor_arcs_gate_silent_completion();
+  marking_dimensions_are_checked();
   invalid_net_indices_are_rejected();
   silent_search_budget_is_reported();
 }

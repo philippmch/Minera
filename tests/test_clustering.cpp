@@ -33,6 +33,20 @@ int main() {
   auto case_options=o; case_options.trace_attribute="case:concept:name";
   auto case_result=discover_trace_attribute_clustering(l,case_options);
   assert(case_result.diagnostics.group_count==3);
+  // Trace-attribute values and equal-frequency variants retain first-seen
+  // order. This is observable in leaf numbering and nearest-match ties.
+  EventLog insertion_order;
+  insertion_order.traces.push_back(Trace{"z-case", {Event{"z-case", "Z", "", "", 0, {}, ""}}, {{"segment", "z"}}});
+  insertion_order.traces.push_back(Trace{"a-case", {Event{"a-case", "A", "", "", 0, {}, ""}}, {{"segment", "a"}}});
+  auto insertion_options = case_options;
+  insertion_options.trace_attribute = "segment";
+  const auto insertion_result =
+      discover_trace_attribute_clustering(insertion_order, insertion_options);
+  assert((insertion_result.leaf_names == std::vector<std::string>{"z", "a"}));
+  assert(trace_attribute_clustering_json(insertion_result) ==
+         trace_attribute_clustering_json(
+             discover_trace_attribute_clustering(insertion_order,
+                                                 insertion_options)));
   EventLog dmm_log;
   dmm_log.traces.push_back(Trace{"left", {Event{"left", "A", "", "", 0, {}, ""}}, {{"segment", "left"}}});
   dmm_log.traces.push_back(Trace{"left-2", {Event{"left-2", "A", "", "", 0, {}, ""}}, {{"segment", "left"}}});
