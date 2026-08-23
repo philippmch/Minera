@@ -648,6 +648,40 @@ std::map<std::string, std::vector<std::string>> parse_ocel_playout_objects(
   return result;
 }
 
+std::map<std::string, std::vector<std::uint32_t>>
+parse_ocel_playout_markings(const httplib::Request& request,
+                            std::string_view name) {
+  std::map<std::string, std::vector<std::uint32_t>> result;
+  const auto key = std::string(name);
+  if (!request.has_param(key)) return result;
+  const auto entries = split_ocel_playout_value(
+      request.get_param_value(key), ';', false);
+  for (const auto& entry : entries) {
+    if (entry.empty())
+      throw std::invalid_argument(key + ": empty entry");
+    const auto fields = split_ocel_playout_value(entry, ':', false);
+    if (fields.size() != 2 || fields.front().empty())
+      throw std::invalid_argument(key + ": expected TYPE:T0,T1 entries");
+    if (result.contains(fields.front()))
+      throw std::invalid_argument(key +
+                                  ": each object type may occur once");
+    std::vector<std::uint32_t> marking;
+    for (const auto& token : split_ocel_playout_value(fields[1], ',', true)) {
+      if (token.empty())
+        throw std::invalid_argument(key + ": expected non-empty token counts");
+      errno = 0;
+      char* end = nullptr;
+      const auto parsed = std::strtoull(token.c_str(), &end, 10);
+      if (end != token.c_str() + token.size() || errno == ERANGE ||
+          parsed > std::numeric_limits<std::uint32_t>::max())
+        throw std::invalid_argument(key + ": token counts must be uint32 values");
+      marking.push_back(static_cast<std::uint32_t>(parsed));
+    }
+    result.emplace(fields.front(), std::move(marking));
+  }
+  return result;
+}
+
 std::vector<std::string> split_ocel_filter_value(std::string_view value,
                                                  char delimiter,
                                                  bool final_level = true);
@@ -1338,6 +1372,7 @@ void handle_ocel_playout(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "model", "variant", "max_bindings_per_activity", "branching_factor_transitions",
         "branching_factor_bindings", "max_traces", "max_states", "objects",
+        "initial_marking", "final_marking",
         "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
         "start", "case_interval", "event_interval", "ocpn_variant",
         "double_arc_threshold", "noise_threshold", "ocpn_annotation"};
@@ -1367,6 +1402,10 @@ void handle_ocel_playout(const httplib::Request& request,
     options.max_traces = ocel_query_size(request, "max_traces", options.max_traces);
     options.max_states = ocel_query_size(request, "max_states", options.max_states);
     options.objects = parse_ocel_playout_objects(request);
+    options.initial_markings =
+        parse_ocel_playout_markings(request, "initial_marking");
+    options.final_markings =
+        parse_ocel_playout_markings(request, "final_marking");
     options.objects_unique_per_trace = ocel_query_bool(
         request, "objects_unique_per_trace", options.objects_unique_per_trace);
     options.exists_trace = ocel_query_bool(request, "exists_trace", options.exists_trace);

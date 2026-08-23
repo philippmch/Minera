@@ -82,6 +82,12 @@ struct ExtensivePlayoutOptions {
   double start = 1767225600.0;
   double case_interval = 60.0;
   double event_interval = 1.0;
+  // Optional explicit marker vectors.  An empty vector keeps the workflow
+  // source/sink defaults; a supplied vector must have one entry per place.
+  // This makes bounded language enumeration useful for nets whose accepted
+  // initial or final marking is not the designated workflow boundary.
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
 };
 
 // Enumerates the model's language instead of sampling it: every distinct

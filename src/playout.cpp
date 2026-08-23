@@ -226,12 +226,33 @@ std::string state_key(const EnumerationState& state) {
 EventLog extensive_playout(const PetriNet& net,
                            const ExtensivePlayoutOptions& options) {
   const auto& transitions = net.transitions();
+  if (net.place_count() == 0 || net.source() >= net.place_count() ||
+      net.sink() >= net.place_count()) {
+    throw std::invalid_argument(
+        "extensive playout requires valid workflow source and sink places");
+  }
+  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
+                                   std::size_t boundary,
+                                   const char* label) {
+    if (!requested.empty() && requested.size() != net.place_count()) {
+      throw std::invalid_argument(std::string("extensive playout ") + label +
+                                  " marking must match the place count");
+    }
+    std::vector<std::uint32_t> marking(net.place_count(), 0);
+    if (requested.empty()) {
+      marking[boundary] = 1;
+    } else {
+      marking = requested;
+    }
+    return marking;
+  };
+  const auto initial_marking =
+      resolve_marking(options.initial_marking, net.source(), "initial");
+  const auto final_marking =
+      resolve_marking(options.final_marking, net.sink(), "final");
 
   const auto is_final = [&](const std::vector<std::uint32_t>& marking) {
-    for (std::size_t p = 0; p < marking.size(); ++p) {
-      if (marking[p] != (p == net.sink() ? 1U : 0U)) return false;
-    }
-    return true;
+    return marking == final_marking;
   };
 
   EventLog log;
@@ -265,8 +286,7 @@ EventLog extensive_playout(const PetriNet& net,
   std::unordered_set<std::string> visited;
 
   EnumerationState initial;
-  initial.marking.assign(net.place_count(), 0);
-  initial.marking[net.source()] = 1;
+  initial.marking = initial_marking;
   visited.insert(state_key(initial));
   if (is_final(initial.marking)) emit(initial.events);  // degenerate net
   queue.push_back(std::move(initial));
