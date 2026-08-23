@@ -7,6 +7,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -126,6 +127,33 @@ std::size_t visible_bound(const PetriNet& net,
     return std::numeric_limits<std::size_t>::max();
   }
   return max_bindings_per_activity * factor;
+}
+
+std::size_t rounded_branching_limit(double cap, std::mt19937_64& rng) {
+  if (cap <= 0.0) return 0;
+  const auto integral = std::floor(cap);
+  auto limit = integral >=
+                       static_cast<double>(std::numeric_limits<std::size_t>::max())
+                   ? std::numeric_limits<std::size_t>::max()
+                   : static_cast<std::size_t>(integral);
+  const auto fraction = cap - integral;
+  if (fraction > 0.0) {
+    std::uniform_real_distribution<double> sample(0.0, 1.0);
+    if (sample(rng) < fraction &&
+        limit != std::numeric_limits<std::size_t>::max())
+      ++limit;
+  }
+  return limit;
+}
+
+template <typename Value>
+void sample_branch(std::vector<Value>& values, double cap,
+                   std::mt19937_64& rng) {
+  if (cap <= 0.0 || values.empty()) return;
+  const auto limit = rounded_branching_limit(cap, rng);
+  if (limit >= values.size()) return;
+  std::shuffle(values.begin(), values.end(), rng);
+  values.resize(limit);
 }
 
 void write_json_string(std::ostringstream& out, const std::string& value) {
@@ -348,7 +376,7 @@ void enumerate_binding_slots(
 std::vector<SynchronizedAction> synchronized_actions(
     const OcpnGraph& graph, const std::vector<SynchronizedObject>& objects,
     const SynchronizedState& state, const std::vector<std::string>& activities,
-    const OcpnPlayoutOptions& options) {
+    const OcpnPlayoutOptions& options, std::mt19937_64& rng) {
   std::vector<SynchronizedAction> actions;
   for (std::size_t object_index = 0; object_index < objects.size();
        ++object_index) {
@@ -384,13 +412,12 @@ std::vector<SynchronizedAction> synchronized_actions(
     std::vector<SynchronizedAction> bindings;
     enumerate_binding_slots(slots.fixed, 0, activity, objects, state, used,
                             firings, bound_objects, bindings,
-                            options.branching_factor_bindings, slots.variable);
+                            0, slots.variable);
+    sample_branch(bindings, options.branching_factor_bindings, rng);
     actions.insert(actions.end(), std::make_move_iterator(bindings.begin()),
                    std::make_move_iterator(bindings.end()));
   }
-  if (options.branching_factor_transitions != 0 &&
-      actions.size() > options.branching_factor_transitions)
-    actions.resize(options.branching_factor_transitions);
+  sample_branch(actions, options.branching_factor_transitions, rng);
   return actions;
 }
 
@@ -399,6 +426,13 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+  if (!std::isfinite(options.branching_factor_transitions) ||
+      options.branching_factor_transitions < 0.0 ||
+      !std::isfinite(options.branching_factor_bindings) ||
+      options.branching_factor_bindings < 0.0) {
+    throw std::invalid_argument(
+        "OCPN branching factors must be finite and non-negative");
+  }
   validate_marker_maps(graph, options);
 
   for (const auto& [type, object_ids] : options.objects) {
@@ -454,6 +488,7 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   for (const auto& object : objects) initial.markings.push_back(object.marking);
   std::deque<SynchronizedState> queue;
   std::unordered_set<std::string> visited;
+  std::mt19937_64 rng(options.seed);
   visited.insert(synchronized_state_key(initial));
   queue.push_back(std::move(initial));
   const auto trace_limit = options.exists_trace ? std::size_t{1} : options.max_traces;
@@ -510,7 +545,8 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
         break;
       continue;
     }
-    const auto actions = synchronized_actions(graph, objects, state, activities, options);
+    const auto actions = synchronized_actions(
+        graph, objects, state, activities, options, rng);
     for (const auto& action : actions) {
       SynchronizedState next = state;
       if (action.silent) {
@@ -726,6 +762,13 @@ OcpnPlayoutResult ocpn_extensive_playout_result(
       options.event_binding != OcpnEventBinding::kSynchronized) {
     throw std::invalid_argument(
         "OCPN event_binding must be independent, shared_activity, or synchronized");
+  }
+  if (!std::isfinite(options.branching_factor_transitions) ||
+      options.branching_factor_transitions < 0.0 ||
+      !std::isfinite(options.branching_factor_bindings) ||
+      options.branching_factor_bindings < 0.0) {
+    throw std::invalid_argument(
+        "OCPN branching factors must be finite and non-negative");
   }
   if (!std::isfinite(options.start) || !std::isfinite(options.case_interval) ||
       !std::isfinite(options.event_interval) || options.case_interval < 0.0 ||

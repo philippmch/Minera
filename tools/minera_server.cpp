@@ -1401,7 +1401,7 @@ void handle_ocel_playout(const httplib::Request& request,
         "branching_factor_bindings", "max_traces", "max_states", "objects",
         "initial_marking", "final_marking",
         "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
-        "start", "case_interval", "event_interval", "ocpn_variant",
+        "seed", "start", "case_interval", "event_interval", "ocpn_variant",
         "double_arc_threshold", "noise_threshold", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
       (void)value;
@@ -1422,12 +1422,13 @@ void handle_ocel_playout(const httplib::Request& request,
     minera::OcpnPlayoutOptions options;
     options.max_bindings_per_activity = ocel_query_size(
         request, "max_bindings_per_activity", options.max_bindings_per_activity);
-    options.branching_factor_transitions = ocel_query_size(
+    options.branching_factor_transitions = ocel_query_number(
         request, "branching_factor_transitions", options.branching_factor_transitions);
-    options.branching_factor_bindings = ocel_query_size(
+    options.branching_factor_bindings = ocel_query_number(
         request, "branching_factor_bindings", options.branching_factor_bindings);
     options.max_traces = ocel_query_size(request, "max_traces", options.max_traces);
     options.max_states = ocel_query_size(request, "max_states", options.max_states);
+    options.seed = ocel_query_size(request, "seed", options.seed);
     options.objects = parse_ocel_playout_objects(request);
     options.initial_markings =
         parse_ocel_playout_markings(request, "initial_marking");
@@ -1457,6 +1458,10 @@ void handle_ocel_playout(const httplib::Request& request,
     options.event_interval =
         ocel_query_number(request, "event_interval", options.event_interval);
     if (options.max_bindings_per_activity == 0 ||
+        !std::isfinite(options.branching_factor_transitions) ||
+        options.branching_factor_transitions < 0.0 ||
+        !std::isfinite(options.branching_factor_bindings) ||
+        options.branching_factor_bindings < 0.0 ||
         options.max_bindings_per_activity > 100 ||
         options.branching_factor_transitions > 100 ||
         options.branching_factor_bindings > 100 || options.max_traces > 10000 ||
