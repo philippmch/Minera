@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "minera/event_log.hpp"
 #include "minera/petri_analysis.hpp"
@@ -15,7 +17,18 @@ namespace minera {
 // attribute.  Missing custom attributes fall back to Event::activity.
 struct ILPMinerOptions {
   std::string activity_key;
+  // Optional synthetic boundary labels.  Empty values retain the native
+  // source/sink wiring; when supplied, the labels are added as silent
+  // boundary transitions around every normalized trace.
+  std::string artificial_start_activity;
+  std::string artificial_end_activity;
+  // Sequence-encoding retention: 1 keeps every observed continuation, while
+  // 0 keeps only continuations tied for the strongest predecessor support.
+  double alpha = 1.0;
   double noise_threshold = 0.0;
+  // Optional ordered causal pairs (source activity, target activity).  When
+  // present, these pairs define the bounded candidate region search.
+  std::vector<std::pair<std::string, std::string>> causal_relation;
   std::size_t max_nodes = 100000;
 };
 

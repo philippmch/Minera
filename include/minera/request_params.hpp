@@ -212,7 +212,8 @@ using FieldLookup = std::function<std::string(std::string_view)>;
 using FieldPresence = std::function<bool(std::string_view)>;
 
 // Strict request/CLI adapter for the bounded classic ILP miner. Wire names
-// are `ilp_activity_key`, `ilp_noise_threshold`, and `ilp_max_nodes`.
+// use the `ilp_` prefix for activity selection, artificial boundaries,
+// sequence-encoding threshold, optional causal edges, noise, and safety.
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field);
 [[nodiscard]] ILPMinerOptions parse_ilp_miner_params(
     const FieldLookup& field, const FieldPresence& present);

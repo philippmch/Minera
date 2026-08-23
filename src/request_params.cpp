@@ -83,6 +83,31 @@ std::vector<std::string> parse_strict_csv(std::string_view value,
   return result;
 }
 
+std::vector<std::pair<std::string, std::string>> parse_ilp_causal_relation(
+    std::string_view value, std::string_view name) {
+  const auto items = parse_strict_csv(value, name);
+  std::vector<std::pair<std::string, std::string>> result;
+  result.reserve(items.size());
+  for (const auto& item : items) {
+    const auto separator = item.find("=>");
+    if (separator == std::string::npos || separator == 0 ||
+        separator + 2 == item.size() ||
+        item.find("=>", separator + 2) != std::string::npos) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected A=>B causal edges");
+    }
+    const auto left = item.substr(0, separator);
+    const auto right = item.substr(separator + 2);
+    if (left.empty() || right.empty())
+      throw std::invalid_argument(std::string(name) +
+                                  ": causal edge labels must not be empty");
+    result.emplace_back(left, right);
+  }
+  std::sort(result.begin(), result.end());
+  result.erase(std::unique(result.begin(), result.end()), result.end());
+  return result;
+}
+
 LtlFilterVariant parse_ltl_variant(std::string_view value) {
   if (value == "eventually_follows" || value == "eventually-follows")
     return LtlFilterVariant::kEventuallyFollows;
@@ -3264,6 +3289,22 @@ ILPMinerOptions parse_ilp_miner_params(const FieldLookup& field,
   };
   if (supplied("ilp_activity_key")) {
     options.activity_key = require("ilp_activity_key");
+  }
+  if (supplied("ilp_artificial_start_activity")) {
+    options.artificial_start_activity =
+        require("ilp_artificial_start_activity");
+  }
+  if (supplied("ilp_artificial_end_activity")) {
+    options.artificial_end_activity = require("ilp_artificial_end_activity");
+  }
+  if (supplied("ilp_alpha")) {
+    options.alpha = parse_finite_double(require("ilp_alpha"), "ilp_alpha");
+    if (options.alpha < 0.0 || options.alpha > 1.0)
+      throw std::invalid_argument("ilp_alpha must be in [0,1]");
+  }
+  if (supplied("ilp_causal_relation")) {
+    options.causal_relation = parse_ilp_causal_relation(
+        require("ilp_causal_relation"), "ilp_causal_relation");
   }
   if (supplied("ilp_noise_threshold")) {
     const auto value = require("ilp_noise_threshold");

@@ -39,6 +39,12 @@ bool has_arc(const PetriNet& net, std::size_t from, std::size_t to) {
   }
   return false;
 }
+
+std::size_t visible_transition_count(const PetriNet& net) {
+  return static_cast<std::size_t>(std::count_if(
+      net.transitions().begin(), net.transitions().end(),
+      [](const PetriTransition& transition) { return transition.activity.has_value(); }));
+}
 }  // namespace
 
 int main() {
@@ -105,5 +111,63 @@ int main() {
     high_cardinality_rejected = true;
   }
   assert(high_cardinality_rejected);
+
+  // Artificial boundaries are represented as silent transitions and are not
+  // leaked into the visible activity alphabet.
+  ILPMinerOptions boundaries;
+  boundaries.artificial_start_activity = "BEGIN";
+  boundaries.artificial_end_activity = "FINISH";
+  const auto boundary_result = mine_ilp(log_of({{"a", "b"}, {"a", "b"}}), boundaries);
+  assert(boundary_result.net.activities() == std::vector<std::string>({"a", "b"}));
+  assert(visible_transition_count(boundary_result.net) == 2);
+  assert(std::any_of(boundary_result.net.transitions().begin(), boundary_result.net.transitions().end(),
+                     [](const PetriTransition& transition) { return transition.silent(); }));
+  assert(check_workflow_net(boundary_result.net).valid);
+
+  // Duplicate variants are collapsed for the bounded search, but their
+  // frequencies still drive noise filtering: the singleton branch disappears
+  // when it is below half of the dominant variant's support.
+  ILPMinerOptions noise;
+  noise.noise_threshold = 0.5;
+  const auto denoised = mine_ilp(log_of({{"a", "b"}, {"a", "b"}, {"a", "b"},
+                                         {"a", "c"}}), noise);
+  assert(std::find(denoised.net.activities().begin(), denoised.net.activities().end(),
+                   "c") == denoised.net.activities().end());
+
+  // Alpha=1 keeps every continuation; alpha=0.5 cuts a continuation whose
+  // support is less than half of its predecessor's strongest continuation.
+  ILPMinerOptions alpha_full;
+  const auto all_sequences = mine_ilp(log_of({{"a", "b"}, {"a", "b"}, {"a", "b"},
+                                               {"a", "c"}}), alpha_full);
+  ILPMinerOptions alpha_filtered;
+  alpha_filtered.alpha = 0.5;
+  const auto filtered_sequences = mine_ilp(
+      log_of({{"a", "b"}, {"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_filtered);
+  assert(filtered_sequences.diagnostics.visited_nodes <=
+         all_sequences.diagnostics.visited_nodes);
+  assert(has_arc(all_sequences.net, 0, 2));
+  assert(std::find(filtered_sequences.net.activities().begin(),
+                   filtered_sequences.net.activities().end(), "c") !=
+         filtered_sequences.net.activities().end());
+
+  // A supplied causal relation is deterministic and receives priority under
+  // a tight node budget, so the requested directed region is discoverable.
+  ILPMinerOptions causal;
+  causal.causal_relation = {{"a", "c"}};
+  causal.max_nodes = 1;
+  const auto causal_result = mine_ilp(log_of({{"a", "c"}}), causal);
+  assert(causal_result.diagnostics.visited_nodes == 1);
+  assert(causal_result.diagnostics.lp_solved == 1);
+  assert(has_arc(causal_result.net, 0, 1));
+
+  bool invalid_alpha = false;
+  try {
+    ILPMinerOptions invalid;
+    invalid.alpha = 1.1;
+    (void)mine_ilp(log_of({{"a"}}), invalid);
+  } catch (const std::invalid_argument&) {
+    invalid_alpha = true;
+  }
+  assert(invalid_alpha);
   return 0;
 }

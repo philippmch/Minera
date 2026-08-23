@@ -828,6 +828,14 @@ describe("ILP miner API", () => {
     expect(ilpMinerQuery({ activity_key: "concept:name", noise_threshold: 0.2, max_nodes: 42 }))
       .toBe("ilp_activity_key=concept%3Aname&ilp_noise_threshold=0.2&ilp_max_nodes=42");
   });
+  it("serializes boundary, alpha, and causal settings", () => {
+    expect(ilpMinerQuery({
+      artificial_start_activity: "<begin>", artificial_end_activity: "<finish>",
+      alpha: 0.75, causal_relation: "<begin>=>A,A=>B,B=><finish>",
+    })).toBe("ilp_artificial_start_activity=%3Cbegin%3E&ilp_artificial_end_activity=%3Cfinish%3E&ilp_alpha=0.75&ilp_causal_relation=%3Cbegin%3E%3D%3EA%2CA%3D%3EB%2CB%3D%3E%3Cfinish%3E");
+    expect(() => ilpMinerQuery({ alpha: 1.1 })).toThrow(/\[0,1\]/);
+    expect(() => ilpMinerQuery({ artificial_start_activity: "" })).toThrow(/must not be empty/);
+  });
   it("rejects malformed ILP responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "ILP" }) })));
     await expect(requestIlpMine()).rejects.toThrow(/invalid ILP miner/);

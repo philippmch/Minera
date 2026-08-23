@@ -386,6 +386,10 @@ int usage(const char* program) {
                "                            or dfg (IMd: graph recursion)\n"
                "  --ilp-mine                Emit standalone classic ILP JSON\n"
                "  --ilp-activity-key <name> Event attribute used as activity\n"
+               "  --ilp-artificial-start-activity <name> Artificial start label\n"
+               "  --ilp-artificial-end-activity <name> Artificial end label\n"
+               "  --ilp-alpha <f>            Sequence-encoding threshold in [0,1]\n"
+               "  --ilp-causal-relation <A=>B,...> Optional causal edges\n"
                "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
                "  --ilp-max-nodes <n>       Positive ILP search bound\n"
                "  --genetic-mine            Emit standalone classic genetic JSON\n"
@@ -1983,7 +1987,9 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> ilp_option_names = {
-          "ilp_activity_key", "ilp_noise_threshold", "ilp_max_nodes"};
+          "ilp_activity_key", "ilp_artificial_start_activity",
+          "ilp_artificial_end_activity", "ilp_alpha", "ilp_causal_relation",
+          "ilp_noise_threshold", "ilp_max_nodes"};
       if (!ilp_option_names.contains(key)) return usage(argv[0]);
       ilp_fields.insert_or_assign(std::move(key), value);
       ilp_mine_requested = true;

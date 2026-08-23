@@ -18,7 +18,13 @@ namespace {
 
 struct NormalizedLog {
   std::vector<std::string> names;
-  std::vector<std::vector<std::size_t>> traces;
+  struct Trace {
+    std::vector<std::size_t> sequence;
+    std::size_t frequency = 1;
+  };
+  std::vector<Trace> traces;
+  std::vector<std::pair<std::size_t, std::size_t>> causal_relation;
+  std::set<std::pair<std::size_t, std::size_t>> sequence_edges;
 };
 
 struct Region {
@@ -33,6 +39,12 @@ struct Region {
 NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
   if (log.traces.empty() || log.event_count() == 0)
     throw std::invalid_argument("ILP miner requires a non-empty event log");
+
+  if (!std::isfinite(options.alpha) || options.alpha < 0.0 || options.alpha > 1.0)
+    throw std::invalid_argument("ILP miner alpha must be in [0,1]");
+  if (!options.artificial_start_activity.empty() &&
+      options.artificial_start_activity == options.artificial_end_activity)
+    throw std::invalid_argument("ILP miner artificial boundary labels must differ");
 
   std::set<std::string> names;
   std::vector<std::vector<std::string>> raw;
@@ -54,21 +66,104 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
         sequence.push_back(std::move(label));
       }
     }
-    if (!sequence.empty()) raw.push_back(std::move(sequence));
+    if (!sequence.empty()) {
+      if (!options.artificial_start_activity.empty())
+        sequence.insert(sequence.begin(), options.artificial_start_activity);
+      if (!options.artificial_end_activity.empty())
+        sequence.push_back(options.artificial_end_activity);
+      raw.push_back(std::move(sequence));
+    }
   }
   if (raw.empty() || names.empty())
     throw std::invalid_argument("ILP miner found no activities");
 
+  if ((!options.artificial_start_activity.empty() &&
+       names.count(options.artificial_start_activity) != 0) ||
+      (!options.artificial_end_activity.empty() &&
+       names.count(options.artificial_end_activity) != 0)) {
+    throw std::invalid_argument(
+        "ILP miner artificial boundary label collides with an activity");
+  }
+  if (!options.artificial_start_activity.empty())
+    names.insert(options.artificial_start_activity);
+  if (!options.artificial_end_activity.empty())
+    names.insert(options.artificial_end_activity);
+
   NormalizedLog out;
-  out.names.assign(names.begin(), names.end());
+  // Keep one representative per variant in first-seen order while retaining
+  // its multiplicity for support-based filtering.  This bounds the region
+  // search without discarding frequency information.
+  std::map<std::vector<std::string>, std::size_t> variant_ids;
+  std::vector<std::size_t> frequencies;
+  std::vector<std::vector<std::string>> variants;
+  for (auto& sequence : raw) {
+    const auto [it, inserted] = variant_ids.emplace(sequence, variants.size());
+    if (inserted) {
+      frequencies.push_back(1);
+      variants.push_back(std::move(sequence));
+    } else {
+      ++frequencies[it->second];
+    }
+  }
+  std::size_t max_frequency = 0;
+  for (const auto frequency : frequencies) max_frequency = std::max(max_frequency, frequency);
+  std::vector<bool> retained(variants.size(), true);
+  if (options.noise_threshold > 0.0) {
+    for (std::size_t i = 0; i < frequencies.size(); ++i)
+      retained[i] = static_cast<double>(frequencies[i]) + 1e-12 >=
+                    options.noise_threshold * static_cast<double>(max_frequency);
+    if (std::none_of(retained.begin(), retained.end(), [](bool value) { return value; }))
+      retained[static_cast<std::size_t>(std::distance(
+          frequencies.begin(), std::max_element(frequencies.begin(), frequencies.end())))] = true;
+  }
+  std::set<std::string> retained_names;
+  for (std::size_t i = 0; i < variants.size(); ++i) {
+    if (!retained[i]) continue;
+    retained_names.insert(variants[i].begin(), variants[i].end());
+  }
+  out.names.assign(retained_names.begin(), retained_names.end());
   std::map<std::string, std::size_t> ids;
-  for (std::size_t i = 0; i < out.names.size(); ++i) ids.emplace(out.names[i], i);
-  out.traces.reserve(raw.size());
-  for (const auto& sequence : raw) {
+  for (std::size_t i = 0; i < out.names.size(); ++i)
+    ids.emplace(out.names[i], i);
+  out.traces.reserve(variants.size());
+  for (std::size_t i = 0; i < variants.size(); ++i) {
+    if (!retained[i]) continue;
     std::vector<std::size_t> encoded;
-    encoded.reserve(sequence.size());
-    for (const auto& value : sequence) encoded.push_back(ids.at(value));
-    out.traces.push_back(std::move(encoded));
+    encoded.reserve(variants[i].size());
+    for (const auto& value : variants[i]) encoded.push_back(ids.at(value));
+    out.traces.push_back({std::move(encoded), frequencies[i]});
+  }
+  if (out.traces.empty()) throw std::invalid_argument("ILP miner found no retained variants");
+
+  // Apply the sequence-encoding threshold to predecessor continuations.  A
+  // low-support continuation filters the sequence-encoding candidates, but
+  // the complete variants and activity alphabet remain intact for region
+  // feasibility and final-marking checks.
+  std::vector<std::map<std::size_t, std::size_t>> support(out.names.size());
+  for (const auto& trace : out.traces) {
+    for (std::size_t i = 1; i < trace.sequence.size(); ++i)
+      support[trace.sequence[i - 1]][trace.sequence[i]] += trace.frequency;
+  }
+  for (const auto& trace : out.traces) {
+    for (std::size_t i = 1; i < trace.sequence.size(); ++i) {
+      const auto from = trace.sequence[i - 1];
+      const auto to = trace.sequence[i];
+      std::size_t strongest = 0;
+      for (const auto& [_, count] : support[from])
+        strongest = std::max(strongest, count);
+      const auto count = support[from].at(to);
+      if (options.alpha >= 1.0 ||
+          static_cast<double>(count) + 1e-12 >=
+              (1.0 - options.alpha) * static_cast<double>(strongest))
+        out.sequence_edges.emplace(from, to);
+    }
+  }
+  for (const auto& [from, to] : options.causal_relation) {
+    const auto from_it = ids.find(from);
+    const auto to_it = ids.find(to);
+    if (from_it == ids.end() || to_it == ids.end())
+      throw std::invalid_argument("ILP miner causal relation names an unknown activity");
+    out.causal_relation.emplace_back(from_it->second, to_it->second);
   }
   return out;
 }
@@ -78,14 +173,15 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
 // without borrowing tokens, and all complete traces must have one common final
 // marking.  The least initial marking gives a deterministic objective.
 bool solve_region(std::uint64_t input, std::uint64_t output,
-                  const std::vector<std::vector<std::size_t>>& traces,
+                  const std::vector<NormalizedLog::Trace>& traces,
                   std::size_t max_tokens, Region& out) {
   if ((input | output) == 0) return false;
   for (std::size_t initial = 0; initial <= max_tokens; ++initial) {
     bool valid = true;
     std::size_t common_final = 0;
     bool have_final = false;
-    for (const auto& trace : traces) {
+    for (const auto& trace_entry : traces) {
+      const auto& trace = trace_entry.sequence;
       std::size_t marking = initial;
       for (const auto activity : trace) {
         const bool consumes = (input & (std::uint64_t{1} << activity)) != 0;
@@ -128,16 +224,33 @@ bool region_less(const Region& a, const Region& b) {
 }
 
 std::vector<Region> discover_regions(
-    const std::vector<std::vector<std::size_t>>& traces, std::size_t n,
+    const std::vector<NormalizedLog::Trace>& traces, std::size_t n,
+    const std::vector<std::pair<std::size_t, std::size_t>>& causal_relation,
+    const std::set<std::pair<std::size_t, std::size_t>>& sequence_edges,
     ILPMinerDiagnostics& diagnostics, std::size_t max_nodes) {
   const std::size_t max_tokens = [&] {
     std::size_t longest = 0;
-    for (const auto& trace : traces) longest = std::max(longest, trace.size());
+    for (const auto& trace : traces)
+      longest = std::max(longest, trace.sequence.size());
     return longest;
   }();
   const std::uint64_t combinations = std::uint64_t{1} << (2 * n);
   std::vector<Region> regions;
-  for (std::uint64_t code = 1; code < combinations; ++code) {
+  std::vector<std::uint64_t> candidates;
+  candidates.reserve(static_cast<std::size_t>(combinations - 1));
+  std::set<std::uint64_t> seen;
+  for (const auto& [from, to] : causal_relation) {
+    // A causal pair from=>to is represented by a place produced by `from`
+    // and consumed by `to`: output bits encode producers, input bits consume.
+    const auto code = (std::uint64_t{1} << to) |
+                      (std::uint64_t{1} << (n + from));
+    if (seen.insert(code).second) candidates.push_back(code);
+  }
+  if (causal_relation.empty()) {
+    for (std::uint64_t code = 1; code < combinations; ++code)
+      if (seen.insert(code).second) candidates.push_back(code);
+  }
+  for (const auto code : candidates) {
     if (diagnostics.visited_nodes >= max_nodes) {
       diagnostics.exhausted = true;
       break;
@@ -149,6 +262,14 @@ std::vector<Region> discover_regions(
     ++diagnostics.branch_and_bound_nodes;
     const std::uint64_t input = code & ((std::uint64_t{1} << n) - 1);
     const std::uint64_t output = code >> n;
+    if (std::popcount(input) == 1 && std::popcount(output) == 1) {
+      const auto from = static_cast<std::size_t>(std::countr_zero(output));
+      const auto to = static_cast<std::size_t>(std::countr_zero(input));
+      const bool explicit_causal = std::find(causal_relation.begin(),
+                                             causal_relation.end(),
+                                             std::pair{from, to}) != causal_relation.end();
+      if (!explicit_causal && sequence_edges.count({from, to}) == 0) continue;
+    }
     Region region;
     if (solve_region(input, output, traces, max_tokens, region))
       regions.push_back(region);
@@ -179,8 +300,31 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
     throw std::invalid_argument("ILP miner supports at most 8 activities");
 
   const std::size_t n = log.names.size();
+  const auto boundary_id = [&](const std::string& label) {
+    if (label.empty()) return std::size_t{std::numeric_limits<std::size_t>::max()};
+    const auto it = std::lower_bound(log.names.begin(), log.names.end(), label);
+    return it == log.names.end() || *it != label
+               ? std::size_t{std::numeric_limits<std::size_t>::max()}
+               : static_cast<std::size_t>(it - log.names.begin());
+  };
+  const auto artificial_start = boundary_id(options.artificial_start_activity);
+  const auto artificial_end = boundary_id(options.artificial_end_activity);
+  std::vector<bool> artificial(n, false);
+  if (artificial_start != std::numeric_limits<std::size_t>::max())
+    artificial[artificial_start] = true;
+  if (artificial_end != std::numeric_limits<std::size_t>::max())
+    artificial[artificial_end] = true;
+  std::vector<std::size_t> visible_id(n, std::numeric_limits<std::size_t>::max());
+  std::vector<std::string> visible_names;
+  visible_names.reserve(n);
+  for (std::size_t a = 0; a < n; ++a) {
+    if (artificial[a]) continue;
+    visible_id[a] = visible_names.size();
+    visible_names.push_back(log.names[a]);
+  }
   std::vector<std::size_t> starts(n), ends(n), incoming(n), outgoing(n);
-  for (const auto& trace : log.traces) {
+  for (const auto& trace_entry : log.traces) {
+    const auto& trace = trace_entry.sequence;
     if (trace.empty()) continue;
     ++starts[trace.front()];
     ++ends[trace.back()];
@@ -191,13 +335,15 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
   }
 
   ILPMinerResult result;
-  result.net.set_activities(log.names);
+  result.net.set_activities(std::move(visible_names));
   const std::size_t source = result.net.add_place();
   const std::size_t sink = result.net.add_place();
   result.net.set_source(source);
   result.net.set_sink(sink);
 
-  const auto regions = discover_regions(log.traces, n, result.diagnostics, options.max_nodes);
+  const auto regions = discover_regions(log.traces, n, log.causal_relation,
+                                        log.sequence_edges, result.diagnostics,
+                                        options.max_nodes);
   std::vector<std::vector<std::size_t>> inputs(n), outputs(n);
   std::vector<bool> persistent_output(n, false);
   std::vector<std::size_t> initial_places;
@@ -210,7 +356,8 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
     // needlessly branch.  Mixed regions (for example a-loop -> b) remain.
     if (self_loop_region && region.input == region.output) {
       bool repeated = false;
-      for (const auto& trace : log.traces) {
+      for (const auto& trace_entry : log.traces) {
+        const auto& trace = trace_entry.sequence;
         std::size_t count = 0;
         for (const auto activity : trace)
           if ((region.input & (std::uint64_t{1} << activity)) != 0) ++count;
@@ -281,8 +428,14 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
     result.net.add_transition(std::nullopt, {source}, initial_places);
   if (!final_places.empty())
     result.net.add_transition(std::nullopt, final_places, {sink});
-  for (std::size_t a = 0; a < n; ++a)
-    result.net.add_transition(a, std::move(inputs[a]), std::move(outputs[a]));
+  for (std::size_t a = 0; a < n; ++a) {
+    if (artificial[a])
+      result.net.add_transition(std::nullopt, std::move(inputs[a]),
+                                std::move(outputs[a]));
+    else
+      result.net.add_transition(visible_id[a], std::move(inputs[a]),
+                                std::move(outputs[a]));
+  }
 
   result.markings.initial.assign(result.net.place_count(), 0);
   result.markings.final.assign(result.net.place_count(), 0);
