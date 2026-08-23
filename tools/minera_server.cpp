@@ -3504,9 +3504,13 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "Petri usage comparison exceeds the server work budget");
     }
-    const auto comparison = minera::compare_petri_usage(it->second,
-                                                         session->log,
-                                                         reference);
+    minera::PetriUsageComparisonOptions comparison_options;
+    comparison_options.initial_marking =
+        parse_playout_marking(request, "initial_marking");
+    comparison_options.final_marking =
+        parse_playout_marking(request, "final_marking");
+    const auto comparison = minera::compare_petri_usage(
+        it->second, session->log, reference, comparison_options);
     response.set_content(minera::petri_usage_comparison_json(comparison),
                          "application/json");
   } catch (const std::exception& error) {

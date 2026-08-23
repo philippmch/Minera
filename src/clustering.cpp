@@ -72,12 +72,26 @@ double cosine_distance(const Counts& a, const Counts& b) {
 }
 
 Profile profile(const std::vector<const Trace*>& traces, double percent) {
-  std::map<Sequence, std::size_t> counts;
-  for (const auto* t : traces) { Sequence s; for (const auto& e : t->events) s.push_back(e.activity); ++counts[s]; }
-  Profile p; p.reserve(counts.size());
-  for (const auto& [s, n] : counts) p.push_back({s, n});
-  std::sort(p.begin(), p.end(), [](const Variant& a, const Variant& b) {
-    if (a.count != b.count) return a.count > b.count; return a.seq < b.seq;
+  // Variant statistics retain first-seen order for equal frequencies.  The
+  // order is observable by the minimum-matching distance when two candidates
+  // have the same distance, so a lexical map iteration would change the
+  // clustering tree for otherwise equivalent logs.
+  std::map<Sequence, std::size_t> indices;
+  Profile p;
+  p.reserve(traces.size());
+  for (const auto* t : traces) {
+    Sequence sequence;
+    sequence.reserve(t->events.size());
+    for (const auto& event : t->events) sequence.push_back(event.activity);
+    const auto [it, inserted] = indices.emplace(sequence, p.size());
+    if (inserted) {
+      p.push_back({std::move(sequence), 1});
+    } else {
+      ++p[it->second].count;
+    }
+  }
+  std::stable_sort(p.begin(), p.end(), [](const Variant& a, const Variant& b) {
+    return a.count > b.count;
   });
   if (percent >= 1.0 || p.empty()) return p;
   std::size_t total = 0, keep = 0;
@@ -178,7 +192,14 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   if (!std::isfinite(o.percent) || o.percent <= 0 || o.percent > 1) throw std::invalid_argument("clustering: percent must be in (0,1]");
   if (o.max_groups == 0 || o.max_groups > kHardGroups || o.max_output_nodes == 0 || o.max_output_nodes > kHardNodes) throw std::invalid_argument("clustering: safety bound exceeded");
   TraceAttributeClusteringResult r; r.diagnostics.trace_count = log.traces.size();
-  std::map<std::string, std::vector<const Trace*>> groups;
+  // Attribute values are discovered in input order.  Keep a separate lookup
+  // map so grouping remains linear without imposing lexical output order.
+  std::map<std::string, std::size_t> group_indices;
+  struct TraceGroup {
+    std::string name;
+    std::vector<const Trace*> traces;
+  };
+  std::vector<TraceGroup> groups;
   for (const auto& t : log.traces) {
     const std::string key = o.trace_attribute.rfind("case:", 0) == 0 ? o.trace_attribute.substr(5) : o.trace_attribute;
     const bool case_id_selector = key == "concept:name" || key == "id" ||
@@ -186,12 +207,19 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     const auto* v = case_id_selector ? &t.case_id : t.attribute(o.trace_attribute);
     if (!v) v = t.attribute(key);
     if (!v && o.trace_attribute.rfind("case:", 0) != 0) v = t.attribute("case:" + o.trace_attribute);
-    groups[v ? *v : std::string{}].push_back(&t);
+    const std::string name = v ? *v : std::string{};
+    const auto [it, inserted] = group_indices.emplace(name, groups.size());
+    if (inserted) groups.push_back({name, {}});
+    groups[it->second].traces.push_back(&t);
   }
   if (groups.size() > o.max_groups) throw std::invalid_argument("clustering: group bound exceeded");
   r.diagnostics.group_count = groups.size();
   std::vector<std::string> names; std::vector<Profile> profiles;
-  for (const auto& [name, ts] : groups) { names.push_back(name); profiles.push_back(profile(ts, o.percent)); r.leaf_names.push_back(name); }
+  for (const auto& group : groups) {
+    names.push_back(group.name);
+    profiles.push_back(profile(group.traces, o.percent));
+    r.leaf_names.push_back(group.name);
+  }
   if (groups.empty()) {
     r.tree = {"root", {}, 0.0, 0, true};
     r.diagnostics.computed = true;
@@ -199,7 +227,13 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     return r;
   }
   std::vector<Cluster> cs; cs.reserve(groups.size());
-  for (std::size_t i = 0; i < names.size(); ++i) { Cluster c; c.members = {i}; c.name = names[i]; c.node = {names[i], {}, 0.0, groups.at(names[i]).size(), true}; cs.push_back(std::move(c)); }
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    Cluster c;
+    c.members = {i};
+    c.name = names[i];
+    c.node = {names[i], {}, 0.0, groups[i].traces.size(), true};
+    cs.push_back(std::move(c));
+  }
   // Keep average-linkage distances between active clusters. Updating the
   // merged row by the Lance-Williams weighted average avoids rescanning every
   // pair of original leaves on every merge.
@@ -216,8 +250,7 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
       const double x = d[i][j];
       if (x < bd - 1e-12 ||
           (std::abs(x - bd) <= 1e-12 &&
-           std::pair{cs[i].name, cs[j].name} <
-               std::pair{cs[bi].name, cs[bj].name})) {
+           std::pair{i, j} < std::pair{bi, bj})) {
         bd=x;bi=i;bj=j;
       }
     }

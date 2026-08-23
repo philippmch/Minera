@@ -39,16 +39,27 @@ struct PetriUsageComparison {
   std::vector<PetriArcUsageRecord> arcs;
 };
 
+// Optional replay markings.  An empty vector keeps the workflow-net defaults
+// (one token on source and one token on sink); supplied vectors must contain
+// one entry for every place.  Token counts are bounded to uint32 at the API
+// boundary and widened internally for checked replay arithmetic.
+struct PetriUsageComparisonOptions {
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
+};
+
 // Compares forward token-replay element activations for two logs.  Replay is
 // deliberately robust: unknown activities and missing tokens are counted as
 // deviations, while the corresponding forced transition still counts as
 // activated.  Place usage is consumed-token count plus final remaining-token
 // count, matching the replay bookkeeping convention.
 [[nodiscard]] PetriUsageComparison compare_petri_usage(
-    const PetriNet& net, const EventLog& log1, const EventLog& log2);
+    const PetriNet& net, const EventLog& log1, const EventLog& log2,
+    const PetriUsageComparisonOptions& options = {});
 
 // Descriptive compatibility spelling for callers that use the family name.
 [[nodiscard]] PetriUsageComparison compare_element_usage_two_logs(
-    const PetriNet& net, const EventLog& log1, const EventLog& log2);
+    const PetriNet& net, const EventLog& log1, const EventLog& log2,
+    const PetriUsageComparisonOptions& options = {});
 
 }  // namespace minera

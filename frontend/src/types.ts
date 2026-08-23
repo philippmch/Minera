@@ -1539,6 +1539,12 @@ export interface PetriUsageComparison {
   transitions: PetriUsageRecord[];
   arcs: PetriArcUsageRecord[];
 }
+export interface PetriUsageComparisonOptions {
+  /** Optional token counts by place; omitted entries use the workflow default. */
+  initial_marking?: number[];
+  /** Optional target token counts by place; omitted entries use the workflow default. */
+  final_marking?: number[];
+}
 
 /** Recursive POWL model emitted by the POWL discovery miner. */
 export type PowlNode =

@@ -397,13 +397,24 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
 function PetriUsageComparisonPanel() {
   const [reference, setReference] = useState<File | null>(null);
   const [miner, setMiner] = useState("inductive");
+  const [initialMarking, setInitialMarking] = useState("");
+  const [finalMarking, setFinalMarking] = useState("");
   const [result, setResult] = useState<PetriUsageComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     if (!reference) return;
     setBusy(true); setError(null); setResult(null);
-    try { setResult(await comparePetriUsage(reference, miner)); }
+    const parseMarking = (value: string): number[] | undefined => {
+      const trimmed = value.trim();
+      return trimmed === "" ? undefined : trimmed.split(",").map((entry) => Number(entry.trim()));
+    };
+    try {
+      setResult(await comparePetriUsage(reference, miner, {
+        initial_marking: parseMarking(initialMarking),
+        final_marking: parseMarking(finalMarking),
+      }));
+    }
     catch (cause) { setResult(null); setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -415,6 +426,8 @@ function PetriUsageComparisonPanel() {
     <div className="align-settings-grid">
       <label>Reference log<input type="file" accept=".csv,.xes" onChange={e => { setReference(e.target.files?.[0] ?? null); setResult(null); setError(null); }} /></label>
       <label>Miner<select value={miner} onChange={e => { setMiner(e.target.value); setResult(null); setError(null); }}><option value="inductive">Inductive</option><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option><option value="powl">POWL</option></select></label>
+      <label>Initial marking<input value={initialMarking} placeholder="optional: 1,0,…" onChange={e => { setInitialMarking(e.target.value); setResult(null); setError(null); }} /></label>
+      <label>Final marking<input value={finalMarking} placeholder="optional: 0,…,1" onChange={e => { setFinalMarking(e.target.value); setResult(null); setError(null); }} /></label>
     </div>
     <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
     {error && <p className="conf-inline-note">{error}</p>}

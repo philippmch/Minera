@@ -58,8 +58,8 @@ are reconciled.
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics, explicit Woflan selection, early unsound-witness return, and strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
-| Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic seeded profile clustering now has bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain the same adapters; broader differential review remains |
-| Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters; broader differential semantics remain |
+| Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic seeded profile clustering now has bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering and the same adapters; broader differential review remains |
+| Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings and extended arcs; broader differential semantics remain |
 | Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
@@ -515,9 +515,12 @@ and emits deterministic place, transition, and arc records with both log
 counts, totals, and signed direction. The CLI supports CSV/XES references and
 inductive, Alpha, heuristic, and POWL model selection; the local server accepts
 the same reference as multipart `reference_log` against its cached session;
-the frontend provides a compact upload-and-delta panel. Native replay,
-standalone JSON, CLI, server, and frontend response guards are covered; richer
-differential semantics remain outside this adapter.
+both adapters accept comma-separated initial and final place markings, while
+the frontend exposes those controls beside the reference upload. Replay uses
+normal, reset, and inhibitor arc semantics and preserves weighted arcs in the
+usage records. Native replay, standalone JSON, CLI, server, and frontend
+request/response guards are covered; richer differential semantics remain
+outside this adapter.
 
 ## Concept-drift evidence
 
@@ -793,6 +796,13 @@ representation flags are validated by the shared request parser. The
 `--profile-clustering` export mode, cached `POST /api/profile-clustering`, and
 frontend query/result guard expose labels, clusters, feature names, inertia,
 and convergence diagnostics without opening a GUI.
+
+Trace-attribute clustering keeps the input order of attribute groups and of
+equal-frequency variants before applying the five named distance families.
+This preserves deterministic nearest-variant ties for the DMM forms and keeps
+the hierarchy's leaf order stable across repeated native, JSON, CLI, server,
+and frontend calls. Focused Release coverage exercises first-seen group order
+and repeated serialization; broader numerical differential fixtures remain.
 
 ## Evaluation parity evidence
 

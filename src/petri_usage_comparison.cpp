@@ -6,6 +6,7 @@
 #include <queue>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -59,6 +60,17 @@ void validate_net(const PetriNet& net) {
         throw std::invalid_argument("Petri transition output place index is invalid");
       }
     }
+    for (const auto place : transition.reset_inputs) {
+      if (place >= net.place_count()) {
+        throw std::invalid_argument("Petri transition reset place index is invalid");
+      }
+    }
+    for (const auto place : transition.inhibitor_inputs) {
+      if (place >= net.place_count()) {
+        throw std::invalid_argument(
+            "Petri transition inhibitor place index is invalid");
+      }
+    }
   }
 }
 
@@ -73,7 +85,20 @@ bool enabled(const Marking& marking, const PetriTransition& transition) {
   for (std::size_t p = 0; p < marking.size(); ++p) {
     if (marking[p] < required[p]) return false;
   }
+  for (const auto place : transition.inhibitor_inputs) {
+    if (marking[place] != 0) return false;
+  }
   return true;
+}
+
+void apply_marking(Marking& marking, const PetriTransition& transition) {
+  for (const auto place : transition.inputs) {
+    // A forced visible replay can fire without enough tokens; retain the
+    // existing deviation-tolerant behavior instead of wrapping unsigned state.
+    if (marking[place] != 0) --marking[place];
+  }
+  for (const auto place : transition.reset_inputs) marking[place] = 0;
+  for (const auto place : transition.outputs) checked_token_add(marking[place]);
 }
 
 void fire(Marking& marking, std::size_t transition_id, const PetriNet& net,
@@ -83,9 +108,26 @@ void fire(Marking& marking, std::size_t transition_id, const PetriNet& net,
   activated.push_back(transition_id);
   for (const auto place : transition.inputs) {
     checked_add(usage.places[place]);
-    if (marking[place] != 0) --marking[place];
   }
-  for (const auto place : transition.outputs) checked_token_add(marking[place]);
+  for (const auto place : transition.reset_inputs) {
+    checked_add(usage.places[place], marking[place]);
+  }
+  apply_marking(marking, transition);
+}
+
+Marking resolve_marking(const std::vector<std::uint32_t>& configured,
+                        std::size_t place_count, std::size_t fallback,
+                        std::string_view name) {
+  if (configured.empty()) {
+    Marking result(place_count, 0);
+    result[fallback] = 1;
+    return result;
+  }
+  if (configured.size() != place_count) {
+    throw std::invalid_argument(std::string(name) +
+                                " must contain one entry per place");
+  }
+  return Marking(configured.begin(), configured.end());
 }
 
 // Finds a shortest deterministic silent path to a marking enabling one target.
@@ -124,8 +166,7 @@ std::vector<std::size_t> silent_path(const Marking& start,
       Marking next = current;
       // Silent search only visits enabled firings, so this local marking move
       // cannot incur missing tokens or alter usage counters.
-      for (const auto place : net.transitions()[t].inputs) --next[place];
-      for (const auto place : net.transitions()[t].outputs) checked_token_add(next[place]);
+      apply_marking(next, net.transitions()[t]);
       if (!seen.insert(next).second) continue;
       if (generated++ >= kSilentSearchCap) {
         throw std::runtime_error(
@@ -153,7 +194,9 @@ std::vector<std::size_t> silent_path(const Marking& start,
 }
 
 ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
-                       const std::unordered_map<std::string, std::size_t>& activities) {
+                       const std::unordered_map<std::string, std::size_t>& activities,
+                       const Marking& initial_marking,
+                       const Marking& final_marking) {
   ReplayUsage usage{std::vector<std::uint64_t>(net.transitions().size(), 0),
                     std::vector<std::uint64_t>(net.place_count(), 0)};
   std::vector<std::vector<std::size_t>> transitions_by_activity(net.activities().size());
@@ -164,8 +207,7 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
   }
 
   for (const auto& trace : log.traces) {
-    Marking marking(net.place_count(), 0);
-    checked_token_add(marking[net.source()]);
+    Marking marking = initial_marking;
     std::vector<std::size_t> activated;
     for (const auto& event : trace.events) {
       const auto activity = activities.find(event.activity);
@@ -190,10 +232,7 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
     }
 
     const auto is_final_marking = [&](const Marking& candidate) {
-      for (std::size_t p = 0; p < candidate.size(); ++p) {
-        if (candidate[p] != (p == net.sink() ? 1U : 0U)) return false;
-      }
-      return true;
+      return candidate == final_marking;
     };
     if (!is_final_marking(marking)) {
       // Route silently until the exact workflow final marking is reached.
@@ -218,8 +257,7 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
         for (std::size_t t = 0; t < net.transitions().size(); ++t) {
           if (!net.transitions()[t].silent() || !enabled(current, net.transitions()[t])) continue;
           Marking next = current;
-          for (const auto place : net.transitions()[t].inputs) --next[place];
-          for (const auto place : net.transitions()[t].outputs) checked_token_add(next[place]);
+          apply_marking(next, net.transitions()[t]);
           if (!seen.insert(next).second) continue;
           if (generated++ >= kSilentSearchCap) {
             throw std::runtime_error(
@@ -242,8 +280,8 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
       }
       for (const auto t : path) fire(marking, t, net, usage, activated);
     }
-    checked_add(usage.places[net.sink()]);  // final-marking consumption
-    if (marking[net.sink()] != 0) --marking[net.sink()];
+    // Place usage includes tokens in the reached final marking, just as it
+    // includes residual tokens when silent completion is unreachable.
     for (std::size_t p = 0; p < marking.size(); ++p) {
       checked_add(usage.places[p], marking[p]);
     }
@@ -269,14 +307,19 @@ PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2) 
 }  // namespace
 
 PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& log1,
-                                         const EventLog& log2) {
+                                         const EventLog& log2,
+                                         const PetriUsageComparisonOptions& options) {
   validate_net(net);
+  const auto initial_marking = resolve_marking(
+      options.initial_marking, net.place_count(), net.source(), "initial_marking");
+  const auto final_marking = resolve_marking(
+      options.final_marking, net.place_count(), net.sink(), "final_marking");
   std::unordered_map<std::string, std::size_t> activities;
   for (std::size_t i = 0; i < net.activities().size(); ++i) {
     activities.emplace(net.activities()[i], i);
   }
-  const auto usage1 = replay_log(log1, net, activities);
-  const auto usage2 = replay_log(log2, net, activities);
+  const auto usage1 = replay_log(log1, net, activities, initial_marking, final_marking);
+  const auto usage2 = replay_log(log2, net, activities, initial_marking, final_marking);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {
@@ -307,8 +350,9 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
 
 PetriUsageComparison compare_element_usage_two_logs(const PetriNet& net,
                                                     const EventLog& log1,
-                                                    const EventLog& log2) {
-  return compare_petri_usage(net, log1, log2);
+                                                    const EventLog& log2,
+                                                    const PetriUsageComparisonOptions& options) {
+  return compare_petri_usage(net, log1, log2, options);
 }
 
 }  // namespace minera
