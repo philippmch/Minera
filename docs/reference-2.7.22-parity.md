@@ -233,7 +233,7 @@ this traditional-log vertical.
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object and event-to-event relations, o2o links, object changes, scalar globals, classic/standard JSON/XML, and a typed OCEL 2 relational SQLite projection are present; remaining schema coverage remains |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; equation-based diagnostics explicitly report the nonlinear arc limitation, while object-centric, trie, and stochastic model families remain |
-| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
+| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, case-duration, case-count, and case-size filtering, exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path performance, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters, and complete native/CLI/server/frontend OCEL filters; OCEL adapter query values now preserve nested delimiters and typed scalar overflow is rejected under a bounded recursive level; broader filter families remain |
@@ -656,6 +656,14 @@ validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
+
+POWL-to-process-tree conversion is available through the native conversion API
+and the headless `--powl-ptml` export. Transition frequency bounds map to
+optional or silent-redo loop blocks; connected partial-order components are
+layered by deterministic topological levels and disconnected components become
+parallel branches. Sparse adjacent levels remain representable as a stable
+block-structured approximation, while ordinary sequence, choice, parallel, and
+loop models round-trip through the existing tree-to-POWL conversion.
 
 ## Genetic discovery parity evidence
 

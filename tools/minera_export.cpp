@@ -515,6 +515,8 @@ int usage(const char* program) {
                "                            or powl\n"
                "  --ptml <path>             Also write the inductive process\n"
                "                            tree as PTML to <path>\n"
+               "  --powl-ptml <path>        Convert the discovered POWL model\n"
+               "                            to a process tree and write PTML\n"
                "  --check-ptml <path>       Also check the log against the\n"
                "                            process tree in this PTML file\n"
                "                            (conformance id: imported)\n"
@@ -1072,6 +1074,7 @@ int main(int argc, char** argv) {
   std::filesystem::path check_bpmn;
   std::filesystem::path bpmn_output;
   std::filesystem::path ptml_output;
+  std::filesystem::path powl_ptml_output;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
   std::filesystem::path dfg_output;
@@ -2599,6 +2602,10 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       ptml_output = value;
+    } else if (arg == "--powl-ptml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      powl_ptml_output = value;
     } else if (arg == "--check-ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5053,6 +5060,16 @@ int main(int argc, char** argv) {
         return 1;
       }
       minera::write_ptml(ptml_file, tree, dataset);
+    }
+
+    if (!powl_ptml_output.empty()) {
+      std::ofstream ptml_file(powl_ptml_output);
+      if (!ptml_file) {
+        std::cerr << "error: cannot open POWL PTML output file "
+                  << powl_ptml_output << '\n';
+        return 1;
+      }
+      minera::write_ptml(ptml_file, minera::to_process_tree(powl), dataset);
     }
 
     // Optionally emit the (filtered) event log as standard XES, making the

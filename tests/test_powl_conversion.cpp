@@ -170,6 +170,56 @@ void process_tree_to_powl_variations() {
   }
 }
 
+void powl_to_process_tree_preserves_blocks_and_frequencies() {
+  const auto sequence = PowlNode::sequence(
+      {PowlNode::transition("A"), PowlNode::transition("B")});
+  const auto sequence_tree = minera::to_process_tree(sequence);
+  assert((sequence_tree.activities() == std::vector<std::string>{"A", "B"}));
+  assert(sequence_tree.root().op == Op::kSequence);
+  assert(sequence_tree.root().children.size() == 2);
+  assert(sequence_tree.root().children[0].activity == 0);
+  assert(sequence_tree.root().children[1].activity == 1);
+
+  const auto optional = minera::to_process_tree(
+      PowlNode::transition("A", {0, 1}));
+  assert(optional.root().op == Op::kExclusive);
+  assert(optional.root().children.size() == 2);
+  assert(optional.root().children[0].op == Op::kTau);
+  assert(optional.root().children[1].op == Op::kActivity);
+
+  const auto repeated = minera::to_process_tree(
+      PowlNode::transition("A", {1, std::nullopt}));
+  assert(repeated.root().op == Op::kLoop);
+  assert(repeated.root().children.size() == 2);
+  assert(repeated.root().children[0].op == Op::kActivity);
+  assert(repeated.root().children[1].op == Op::kTau);
+
+  const auto diamond = PowlNode::strict_partial_order(
+      {PowlNode::transition("A"), PowlNode::transition("B"),
+       PowlNode::transition("C"), PowlNode::transition("D")},
+      {{0, 1}, {0, 2}, {1, 3}, {2, 3}});
+  const auto diamond_tree = minera::to_process_tree(diamond);
+  assert(diamond_tree.root().op == Op::kSequence);
+  assert(diamond_tree.root().children.size() == 3);
+  assert(diamond_tree.root().children[1].op == Op::kParallel);
+  assert(diamond_tree.root().children[1].children.size() == 2);
+
+  // Disconnected nodes become parallel components, while a sparse adjacent
+  // layer remains deterministic and block-structured.
+  const auto sparse = PowlNode::strict_partial_order(
+      {PowlNode::transition("A"), PowlNode::transition("B"),
+       PowlNode::transition("C"), PowlNode::transition("D"),
+       PowlNode::transition("E")},
+      {{0, 1}, {0, 2}, {3, 2}});
+  const auto sparse_tree = minera::to_process_tree(sparse);
+  assert(sparse_tree.root().op == Op::kParallel);
+  assert(sparse_tree.root().children.size() == 2);
+
+  const auto round_trip = minera::to_powl(sequence_tree);
+  assert(round_trip.kind() == minera::PowlNodeKind::kStrictPartialOrder);
+  assert(round_trip.has_edge(0, 1));
+}
+
 void petri_conversion_sound_and_deterministic() {
   const auto check = [](const PowlNode& node, const std::set<Trace>& expected,
                         std::size_t max_visible_length = 3) {
@@ -223,6 +273,7 @@ void petri_conversion_sound_and_deterministic() {
 
 int main() {
   process_tree_to_powl_variations();
+  powl_to_process_tree_preserves_blocks_and_frequencies();
   petri_conversion_sound_and_deterministic();
   std::cout << "POWL conversion tests passed\n";
 }
