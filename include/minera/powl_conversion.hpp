@@ -22,4 +22,12 @@ namespace minera {
 // label is a visible activity and only PowlNode::silent() is tau.
 [[nodiscard]] PetriNet to_petri_net(const PowlNode& node);
 
+// Converts a structurally valid ordinary workflow net into a POWL model.
+// The designated source/sink places must cover a reachable final marking; a
+// silent return into the source is allowed for loop fragments. The translator
+// preserves deterministic labels and recognizes exclusive, loop, sequence,
+// and partial-order fragments. Extended arcs and nets whose structure cannot
+// be proven to fit those fragments are rejected.
+[[nodiscard]] PowlNode to_powl(const PetriNet& net);
+
 }  // namespace minera
