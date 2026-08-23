@@ -4007,11 +4007,15 @@ export interface OcelPlayoutOptions {
   model?: "ocpn" | "causal_net";
   variant?: "extensive";
   max_bindings_per_activity?: number;
+  branching_factor_transitions?: number;
+  branching_factor_bindings?: number;
   max_traces?: number;
   max_states?: number;
   objects?: Record<string, string[]>;
   objects_unique_per_trace?: boolean;
-  event_binding?: "independent" | "shared_activity";
+  event_binding?: "independent" | "shared_activity" | "synchronized";
+  exists_trace?: boolean;
+  return_sequences?: boolean;
   start?: number;
   case_interval?: number;
   event_interval?: number;
@@ -4037,6 +4041,8 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
       query.set(name, String(value));
   };
   addInteger("max_bindings_per_activity", options.max_bindings_per_activity);
+  addInteger("branching_factor_transitions", options.branching_factor_transitions);
+  addInteger("branching_factor_bindings", options.branching_factor_bindings);
   addInteger("max_traces", options.max_traces);
   addInteger("max_states", options.max_states);
   if (options.objects !== undefined) {
@@ -4053,11 +4059,16 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
     query.set("objects_unique_per_trace", options.objects_unique_per_trace ? "true" : "false");
   if (options.event_binding !== undefined &&
       options.event_binding !== "independent" &&
-      options.event_binding !== "shared_activity") {
+      options.event_binding !== "shared_activity" &&
+      options.event_binding !== "synchronized") {
     throw new Error("OCEL playout event_binding is invalid");
   }
   if (options.event_binding !== undefined)
     query.set("event_binding", options.event_binding);
+  if (options.exists_trace !== undefined)
+    query.set("exists_trace", options.exists_trace ? "true" : "false");
+  if (options.return_sequences !== undefined)
+    query.set("return_sequences", options.return_sequences ? "true" : "false");
   const addNumber = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isFinite(value)) query.set(name, String(value));
   };

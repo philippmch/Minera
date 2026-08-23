@@ -18,8 +18,13 @@ enum class OcpnEventBinding {
   // Coalesce firings with the same activity and local firing index into one
   // event, retaining every participating object relation.
   kSharedActivity,
+  // Fire one transition per bound object slot in one global event.  This is
+  // the synchronized object-centric search; it uses the activity slot map on
+  // OcpnGraph and keeps the exact object relations of every binding.
+  kSynchronized,
   INDEPENDENT = kIndependent,
   SHARED_ACTIVITY = kSharedActivity,
+  SYNCHRONIZED = kSynchronized,
 };
 
 [[nodiscard]] const char* ocpn_event_binding_name(OcpnEventBinding binding);
@@ -28,6 +33,9 @@ struct OcpnPlayoutOptions {
   // Maximum number of firings of any visible activity in one object trace.
   // The extensive search is bounded by this value and by max_states.
   std::size_t max_bindings_per_activity = 2;
+  // Optional branching caps for synchronized search.  Zero means unlimited.
+  std::size_t branching_factor_transitions = 0;
+  std::size_t branching_factor_bindings = 0;
   std::size_t max_traces = 100;
   std::size_t max_states = 200000;
   // Optional object ids per object type. Missing types receive one synthetic
@@ -35,10 +43,28 @@ struct OcpnPlayoutOptions {
   std::map<std::string, std::vector<std::string>> objects;
   bool objects_unique_per_trace = false;
   OcpnEventBinding event_binding = OcpnEventBinding::kIndependent;
+  // Return only reachability metadata or include binding sequences in the
+  // result envelope.  The regular Ocel API remains available for callers
+  // that do not request either diagnostic mode.
+  bool exists_trace = false;
+  bool return_sequences = false;
   std::uint64_t seed = 1;
   double start = 1767225600.0;
   double case_interval = 60.0;
   double event_interval = 1.0;
+};
+
+struct OcpnBinding {
+  std::string activity;
+  std::vector<std::pair<std::string, std::string>> objects;
+};
+
+struct OcpnPlayoutResult {
+  Ocel log;
+  std::vector<std::vector<OcpnBinding>> sequences;
+  bool exists_trace_requested = false;
+  bool return_sequences_requested = false;
+  bool trace_exists = false;
 };
 
 // Enumerates bounded traces of each object-type workflow net and combines the
@@ -47,8 +73,13 @@ struct OcpnPlayoutOptions {
 [[nodiscard]] Ocel ocpn_extensive_playout(
     const OcpnGraph& graph, const OcpnPlayoutOptions& options = {});
 
+[[nodiscard]] OcpnPlayoutResult ocpn_extensive_playout_result(
+    const OcpnGraph& graph, const OcpnPlayoutOptions& options = {});
+
 [[nodiscard]] std::string serialize_ocpn_playout_json(const Ocel& log);
 [[nodiscard]] std::string serialize_ocpn_playout_json(
     const Ocel& log, OcpnEventBinding binding);
+[[nodiscard]] std::string serialize_ocpn_playout_json(
+    const OcpnPlayoutResult& result, OcpnEventBinding binding);
 
 }  // namespace minera

@@ -35,6 +35,8 @@ minera::OcpnGraph shared_graph() {
   net.add_transition(1, {middle}, {sink});
   result.object_types.push_back("item");
   result.petri_nets.emplace("item", std::move(net));
+  result.activity_object_types["Create"] = {"item", "order"};
+  result.activity_object_types["Ship"] = {"item", "order"};
   return result;
 }
 
@@ -99,10 +101,57 @@ void shared_activity_binding_coalesces_relations() {
   assert(log.relations[1].object_id == "o1");
 }
 
+void synchronized_binding_fires_one_global_activity() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 1;
+  options.max_states = 100;
+  options.objects["order"] = {"o1"};
+  options.objects["item"] = {"i1"};
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  options.return_sequences = true;
+  const auto result = minera::ocpn_extensive_playout_result(shared_graph(), options);
+  assert(result.trace_exists);
+  assert(result.log.events.size() == 2);
+  assert(result.log.relations.size() == 4);
+  assert(result.log.events[0].activity == "Create");
+  assert(result.log.events[1].activity == "Ship");
+  assert(result.sequences.size() == 1);
+  assert(result.sequences[0].size() == 2);
+  assert(result.sequences[0][0].objects.size() == 2);
+  assert(result.sequences[0][0].objects[0] ==
+         std::make_pair(std::string("item"), std::string("i1")));
+  assert(result.sequences[0][0].objects[1] ==
+         std::make_pair(std::string("order"), std::string("o1")));
+  const auto json = minera::serialize_ocpn_playout_json(
+      result, options.event_binding);
+  assert(json.find("\"event_binding\":\"synchronized\"") !=
+         std::string::npos);
+  assert(json.find("\"sequences\"") != std::string::npos);
+}
+
+void synchronized_exists_trace_reports_reachability() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_states = 100;
+  options.objects["order"] = {"o1"};
+  options.objects["item"] = {"i1"};
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  options.exists_trace = true;
+  const auto result = minera::ocpn_extensive_playout_result(shared_graph(), options);
+  assert(result.trace_exists);
+  assert(result.log.events.empty());
+  const auto json = minera::serialize_ocpn_playout_json(
+      result, options.event_binding);
+  assert(json.find("\"exists_trace\":true") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
   extensive_contract();
   unique_objects_and_validation();
   shared_activity_binding_coalesces_relations();
+  synchronized_binding_fires_one_global_activity();
+  synchronized_exists_trace_reports_reachability();
 }

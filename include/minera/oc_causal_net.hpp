@@ -24,9 +24,15 @@ struct OcCausalNet {
     const OcCausalNet& net,
     const OcpnPlayoutOptions& options = {});
 
+[[nodiscard]] OcpnPlayoutResult oc_causal_net_extensive_playout_result(
+    const OcCausalNet& net,
+    const OcpnPlayoutOptions& options = {});
+
 [[nodiscard]] std::string serialize_oc_causal_net_playout_json(
     const Ocel& log);
 [[nodiscard]] std::string serialize_oc_causal_net_playout_json(
     const Ocel& log, OcpnEventBinding binding);
+[[nodiscard]] std::string serialize_oc_causal_net_playout_json(
+    const OcpnPlayoutResult& result, OcpnEventBinding binding);
 
 }  // namespace minera
