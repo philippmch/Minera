@@ -1013,16 +1013,24 @@ export interface OcelSplitResult {
   logs: Array<Record<string, unknown>>;
 }
 export type OcelPlayoutVariant = "EXTENSIVE";
+export interface OcelPlayoutBinding {
+  activity: string;
+  objects: Array<{ type: string; id: string }>;
+}
 export interface OcelPetriPlayoutResult {
   family: "OCEL_PLAYOUT";
   variant: OcelPlayoutVariant;
-  event_binding?: "independent" | "shared_activity";
+  event_binding?: "independent" | "shared_activity" | "synchronized";
+  exists_trace?: boolean;
+  sequences?: OcelPlayoutBinding[][];
   log: Record<string, unknown>;
 }
 export interface OcelCausalNetPlayoutResult {
   family: "OC_CAUSAL_NET_PLAYOUT";
   variant: OcelPlayoutVariant;
-  event_binding?: "independent" | "shared_activity";
+  event_binding?: "independent" | "shared_activity" | "synchronized";
+  exists_trace?: boolean;
+  sequences?: OcelPlayoutBinding[][];
   log: Record<string, unknown>;
 }
 export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutResult;
@@ -1075,7 +1083,17 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
       value.variant !== "EXTENSIVE") return false;
   if (value.event_binding !== undefined &&
       value.event_binding !== "independent" &&
-      value.event_binding !== "shared_activity") return false;
+      value.event_binding !== "shared_activity" &&
+      value.event_binding !== "synchronized") return false;
+  if (value.exists_trace !== undefined && typeof value.exists_trace !== "boolean") return false;
+  if (value.sequences !== undefined) {
+    if (!Array.isArray(value.sequences) || !value.sequences.every((sequence) =>
+      Array.isArray(sequence) && sequence.every((binding) =>
+        isOcelRecord(binding) && typeof binding.activity === "string" &&
+        Array.isArray(binding.objects) && binding.objects.every((object) =>
+          isOcelRecord(object) && typeof object.type === "string" &&
+          typeof object.id === "string")))) return false;
+  }
   return isOcelRecord(value.log);
 }
 export type OcelFeatureVariant = "EVENTS" | "OBJECTS" | "EVENTS_OBJECTS";

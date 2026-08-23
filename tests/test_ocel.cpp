@@ -258,6 +258,7 @@ int main() {
              .event_couples.size() == 1);
   const auto ocpn_json = minera::serialize_ocpn_json(ocpn);
   assert(ocpn_json.find("double_arcs_on_activity") != std::string::npos);
+  assert(ocpn_json.find("activity_object_types") != std::string::npos);
   assert(ocpn_json.find("\"annotations\"") != std::string::npos);
   assert(ocpn_json.find("\"event_pairs\"") != std::string::npos);
   assert(ocpn_json.find("\"total_objects\":[[") != std::string::npos);

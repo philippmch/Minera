@@ -1281,10 +1281,11 @@ void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "model", "variant", "max_bindings_per_activity", "max_traces", "max_states",
-        "objects", "objects_unique_per_trace", "event_binding", "start", "case_interval",
-        "event_interval", "ocpn_variant", "double_arc_threshold",
-        "noise_threshold", "ocpn_annotation"};
+        "model", "variant", "max_bindings_per_activity", "branching_factor_transitions",
+        "branching_factor_bindings", "max_traces", "max_states", "objects",
+        "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
+        "start", "case_interval", "event_interval", "ocpn_variant",
+        "double_arc_threshold", "noise_threshold", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1304,20 +1305,29 @@ void handle_ocel_playout(const httplib::Request& request,
     minera::OcpnPlayoutOptions options;
     options.max_bindings_per_activity = ocel_query_size(
         request, "max_bindings_per_activity", options.max_bindings_per_activity);
+    options.branching_factor_transitions = ocel_query_size(
+        request, "branching_factor_transitions", options.branching_factor_transitions);
+    options.branching_factor_bindings = ocel_query_size(
+        request, "branching_factor_bindings", options.branching_factor_bindings);
     options.max_traces = ocel_query_size(request, "max_traces", options.max_traces);
     options.max_states = ocel_query_size(request, "max_states", options.max_states);
     options.objects = parse_ocel_playout_objects(request);
     options.objects_unique_per_trace = ocel_query_bool(
         request, "objects_unique_per_trace", options.objects_unique_per_trace);
+    options.exists_trace = ocel_query_bool(request, "exists_trace", options.exists_trace);
+    options.return_sequences = ocel_query_bool(
+        request, "return_sequences", options.return_sequences);
     if (request.has_param("event_binding")) {
       const auto binding = request.get_param_value("event_binding");
       if (binding == "independent") {
         options.event_binding = minera::OcpnEventBinding::kIndependent;
       } else if (binding == "shared_activity") {
         options.event_binding = minera::OcpnEventBinding::kSharedActivity;
+      } else if (binding == "synchronized") {
+        options.event_binding = minera::OcpnEventBinding::kSynchronized;
       } else {
         throw std::invalid_argument(
-            "event_binding expects independent or shared_activity");
+            "event_binding expects independent, shared_activity, or synchronized");
       }
     }
     options.start = ocel_query_number(request, "start", options.start);
@@ -1326,7 +1336,9 @@ void handle_ocel_playout(const httplib::Request& request,
     options.event_interval =
         ocel_query_number(request, "event_interval", options.event_interval);
     if (options.max_bindings_per_activity == 0 ||
-        options.max_bindings_per_activity > 100 || options.max_traces > 10000 ||
+        options.max_bindings_per_activity > 100 ||
+        options.branching_factor_transitions > 100 ||
+        options.branching_factor_bindings > 100 || options.max_traces > 10000 ||
         options.max_states > 1'000'000) {
       throw std::invalid_argument(
           "OCEL playout bounds exceed the server safety limits");
@@ -1370,15 +1382,17 @@ void handle_ocel_playout(const httplib::Request& request,
     const auto log = minera::parse_ocel_json(body);
     if (model == "causal_net") {
       const auto causal = minera::discover_oc_causal_net(log, discovery);
+      const auto result = minera::oc_causal_net_extensive_playout_result(causal,
+                                                                           options);
       response.set_content(minera::serialize_oc_causal_net_playout_json(
-                               minera::oc_causal_net_extensive_playout(causal,
-                                                                       options),
-                           options.event_binding),
+                               result,
+                               options.event_binding),
                            "application/json");
     } else {
       const auto graph = minera::discover_ocpn(log, discovery);
+      const auto result = minera::ocpn_extensive_playout_result(graph, options);
       response.set_content(minera::serialize_ocpn_playout_json(
-                               minera::ocpn_extensive_playout(graph, options),
+                               result,
                                options.event_binding),
                            "application/json");
     }

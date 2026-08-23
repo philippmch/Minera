@@ -158,6 +158,11 @@ describe("isOcelPlayoutResult", () => {
   it("accepts the recursive OCEL log envelope", () => expect(isOcelPlayoutResult(valid)).toBe(true));
   it("accepts shared binding metadata and rejects unknown modes", () => {
     expect(isOcelPlayoutResult({ ...valid, event_binding: "shared_activity" })).toBe(true);
+    expect(isOcelPlayoutResult({ ...valid, event_binding: "synchronized" })).toBe(true);
+    expect(isOcelPlayoutResult({ ...valid, exists_trace: true, sequences: [[{
+      activity: "Create", objects: [{ type: "order", id: "o1" }],
+    }]] })).toBe(true);
+    expect(isOcelPlayoutResult({ ...valid, sequences: [{ activity: "Create" }] })).toBe(false);
     expect(isOcelPlayoutResult({ ...valid, event_binding: "unknown" })).toBe(false);
   });
   it("accepts the causal-net envelope", () => expect(isOcelPlayoutResult({ ...valid, family: "OC_CAUSAL_NET_PLAYOUT" })).toBe(true));

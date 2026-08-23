@@ -996,6 +996,10 @@ describe("OCEL API", () => {
     expect(ocelPlayoutQuery({
       model: "ocpn", event_binding: "shared_activity", objects_unique_per_trace: true,
     })).toBe("model=ocpn&objects_unique_per_trace=true&event_binding=shared_activity");
+    expect(ocelPlayoutQuery({
+      event_binding: "synchronized", branching_factor_transitions: 3,
+      branching_factor_bindings: 4, exists_trace: true, return_sequences: true,
+    })).toBe("branching_factor_transitions=3&branching_factor_bindings=4&event_binding=synchronized&exists_trace=true&return_sequences=true");
     expect(() => ocelPlayoutQuery({ event_binding: "invalid" as never }))
       .toThrow(/event_binding is invalid/);
   });

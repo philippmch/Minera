@@ -1214,6 +1214,26 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       std::unique(result.object_types.begin(), result.object_types.end()),
       result.object_types.end());
 
+  // Preserve the object slots observed on each event.  The per-type nets
+  // remain useful projections, while this relation map lets synchronized
+  // playout bind one transition to the exact object types that co-occurred.
+  std::map<std::string, std::set<std::string>> object_ids_by_activity;
+  for (const auto& relation : log.relations) {
+    const auto event_it = event_by_id.find(relation.event_id);
+    const auto type_it = object_type.find(relation.object_id);
+    if (event_it == event_by_id.end() || type_it == object_type.end()) continue;
+    if (!object_ids_by_activity[event_it->second->activity].insert(
+            relation.object_id)
+             .second)
+      continue;
+    result.activity_object_types[event_it->second->activity].push_back(
+        type_it->second);
+  }
+  for (auto& [activity, types] : result.activity_object_types) {
+    (void)activity;
+    std::sort(types.begin(), types.end());
+  }
+
   if (options.annotated) {
     result.annotations = discover_ocdfg_classic(log, false);
   }
@@ -1440,7 +1460,16 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
   strings(graph.activities);
   out << ",\"object_types\":";
   strings(graph.object_types);
-  out << ",\"petri_nets\":{";
+  out << ",\"activity_object_types\":{";
+  bool first_activity_binding = true;
+  for (const auto& [activity, types] : graph.activity_object_types) {
+    if (!first_activity_binding) out << ',';
+    first_activity_binding = false;
+    write_string(out, activity);
+    out << ':';
+    strings(types);
+  }
+  out << "},\"petri_nets\":{";
   bool first_type = true;
   for (const auto& [type, net] : graph.petri_nets) {
     if (!first_type) out << ',';

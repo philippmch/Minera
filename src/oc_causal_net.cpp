@@ -20,6 +20,11 @@ Ocel oc_causal_net_extensive_playout(const OcCausalNet& net,
   return ocpn_extensive_playout(net.workflow_projection, options);
 }
 
+OcpnPlayoutResult oc_causal_net_extensive_playout_result(
+    const OcCausalNet& net, const OcpnPlayoutOptions& options) {
+  return ocpn_extensive_playout_result(net.workflow_projection, options);
+}
+
 std::string serialize_oc_causal_net_playout_json(const Ocel& log) {
   return serialize_oc_causal_net_playout_json(log,
                                               OcpnEventBinding::kIndependent);
@@ -31,6 +36,16 @@ std::string serialize_oc_causal_net_playout_json(const Ocel& log,
              "{\"family\":\"OC_CAUSAL_NET_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"event_binding\":\"") +
          ocpn_event_binding_name(binding) + "\",\"log\":" +
          serialize_ocel_json(log) + "}";
+}
+
+std::string serialize_oc_causal_net_playout_json(
+    const OcpnPlayoutResult& result, OcpnEventBinding binding) {
+  auto json = serialize_ocpn_playout_json(result, binding);
+  const auto family = std::string("\"family\":\"OCEL_PLAYOUT\"");
+  const auto replacement = std::string("\"family\":\"OC_CAUSAL_NET_PLAYOUT\"");
+  const auto position = json.find(family);
+  if (position != std::string::npos) json.replace(position, family.size(), replacement);
+  return json;
 }
 
 }  // namespace minera

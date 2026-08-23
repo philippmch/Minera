@@ -235,6 +235,9 @@ struct OcpnGraph {
   std::vector<std::string> activities;
   std::vector<std::string> object_types;
   std::map<std::string, PetriNet> petri_nets;
+  // Object-type slots participating in each activity.  Repeated entries
+  // represent multiple objects of the same type bound to one event.
+  std::map<std::string, std::vector<std::string>> activity_object_types;
   std::map<std::string, std::map<std::string, bool>> double_arcs_on_activity;
   // The annotated discovery metrics share the deterministic OCDFG shape.
   // Keeping them with the OCPN makes the annotation variant useful to native
