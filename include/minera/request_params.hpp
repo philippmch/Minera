@@ -423,8 +423,9 @@ using FieldPresence = std::function<bool(std::string_view)>;
 
 // Parses stochastic Petri-net playout settings. Wire fields use the
 // `stochastic_` prefix. Transition weights are comma-separated finite,
-// non-negative values; the native simulator validates that their count
-// matches the selected net's transition count.
+// non-negative values; `stochastic_fit_from_log=true` asks the adapters to fit
+// weights from the cached/source event log when no explicit vector is supplied.
+// The native simulator validates that explicit vector counts match the net.
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
     const FieldLookup& field);
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(

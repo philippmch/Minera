@@ -934,6 +934,7 @@ int usage(const char* program) {
                "  --stochastic-max-steps <n> Firing cap per case\n"
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
                "  --stochastic-transition-weights <w,...> Transition weights\n"
+               "  --stochastic-fit-from-log <bool> Fit weights from input log\n"
                "  --stochastic-stop-at-final <bool> Stop at final marking\n"
                "  --stochastic-initial-marking <n,...> Initial marker vector\n"
                "  --stochastic-final-marking <n,...> Final marker vector\n"
@@ -2513,6 +2514,7 @@ int main(int argc, char** argv) {
     if (arg == "--stochastic-traces" || arg == "--stochastic-max-steps" ||
         arg == "--stochastic-seed" ||
         arg == "--stochastic-transition-weights" ||
+        arg == "--stochastic-fit-from-log" ||
         arg == "--stochastic-stop-at-final" || arg == "--stochastic-start" ||
         arg == "--stochastic-case-interval" ||
         arg == "--stochastic-event-interval" ||
@@ -5260,7 +5262,11 @@ int main(int argc, char** argv) {
           std::cerr << "error: stochastic playout requires a Petri model\n";
           return 2;
         }
-        generated = minera::stochastic_playout(*selected, stochastic_playout_options);
+        generated = stochastic_playout_options.fit_from_log
+                        ? minera::stochastic_playout(
+                              *selected, log, stochastic_playout_options)
+                        : minera::stochastic_playout(
+                              *selected, stochastic_playout_options);
       } else if (!generated) {
         generated = minera::playout(*selected);
       }

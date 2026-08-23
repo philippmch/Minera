@@ -58,6 +58,12 @@ struct StochasticPlayoutOptions {
   // source/sink defaults; a supplied vector must match the place count.
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::uint32_t> final_marking;
+  // An adapter may request source-log fitting. The native source-log overload
+  // below performs fitting directly; this flag keeps the request in one
+  // option object while preserving the original aggregate fields.
+  bool fit_from_log = false;
+  // Bound deterministic replay states per source trace while fitting.
+  std::size_t fitting_max_states = 200000;
 };
 
 // Plays out a workflow net into a synthetic event log: each case starts from
@@ -76,6 +82,29 @@ struct StochasticPlayoutOptions {
 // route tokens without appending events, and max_steps bounds every firing.
 [[nodiscard]] EventLog stochastic_playout(
     const PetriNet& net, const StochasticPlayoutOptions& options = {});
+
+// Replays a source log deterministically against the net and returns one
+// activation weight per transition. Silent transitions and duplicate labels
+// are resolved by stable transition order. Reachable transitions touched but
+// not selected receive zero; transitions never reached retain the neutral
+// weight one. Explicit transition weights always take precedence below.
+[[nodiscard]] std::vector<double> fit_stochastic_transition_weights(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options);
+
+[[nodiscard]] std::vector<double> fit_stochastic_transition_weights(
+    const PetriNet& net, const EventLog& source_log);
+
+// Plays out using weights fitted from source_log unless options already
+// supplies an explicit transition_weights vector.
+[[nodiscard]] EventLog stochastic_playout_fitted(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options = {});
+
+// Source-log overload retained as a concise alternative spelling.
+[[nodiscard]] EventLog stochastic_playout(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options = {});
 
 struct ExtensivePlayoutOptions {
   // Longest visible trace to enumerate (events per case).

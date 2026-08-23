@@ -2424,6 +2424,7 @@ void parse_stochastic_playout_params_maps_controls() {
       {"stochastic_max_steps", "99"},
       {"stochastic_seed", "7"},
       {"stochastic_transition_weights", "0.25, 2, 0"},
+      {"stochastic_fit_from_log", "true"},
       {"stochastic_stop_at_final", "false"},
       {"stochastic_start", "1767225600"},
       {"stochastic_case_interval", "2.5"},
@@ -2432,6 +2433,7 @@ void parse_stochastic_playout_params_maps_controls() {
       {"stochastic_final_marking", "0, 0, 1"}}));
   assert(parsed.traces == 12 && parsed.max_steps == 99 && parsed.seed == 7);
   assert(parsed.transition_weights == std::vector<double>({0.25, 2, 0}));
+  assert(parsed.fit_from_log);
   assert(!parsed.stop_at_final && parsed.start == 1767225600.0);
   assert(parsed.case_interval == 2.5 && parsed.event_interval == 0.25);
   assert(parsed.initial_marking == std::vector<std::uint32_t>({0, 1, 0}));
@@ -2444,6 +2446,7 @@ void parse_stochastic_playout_params_rejects_bad_values() {
            std::pair{"stochastic_max_steps", "-1"},
            std::pair{"stochastic_transition_weights", "1,-0.1"},
            std::pair{"stochastic_transition_weights", "1,"},
+           std::pair{"stochastic_fit_from_log", "maybe"},
            std::pair{"stochastic_stop_at_final", "maybe"},
            std::pair{"stochastic_event_interval", "-1"},
            std::pair{"stochastic_initial_marking", "0,,1"},
