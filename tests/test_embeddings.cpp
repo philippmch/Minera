@@ -93,6 +93,20 @@ int main() {
          transformer_selected.traces[0].case_id == "c2");
   assert(callback_texts.back() == "Approve Ship");
 
+  // Callback execution is grouped by case and remains deterministic for
+  // exact score ties: identifiers are ordered descending, with input order
+  // retained for duplicate identifiers.
+  assert(transformer_matches[0].id == "c2" &&
+         transformer_matches[1].id == "c1");
+
+  EventLog empty_log;
+  const auto empty_cases = to_embeddings(empty_log, options);
+  assert(empty_cases.items.empty());
+  options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
+  const auto empty_events = to_embeddings(empty_log, options);
+  assert(empty_events.items.empty());
+  assert(embedding_similarity("anything", empty_events, options, 3).empty());
+
   transformer_options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
   callback_texts.clear();
   const auto transformer_events = to_embeddings(log, transformer_options);
@@ -100,6 +114,38 @@ int main() {
   assert((callback_texts == std::vector<std::string>{"Approve", "Ship", "Reject"}));
   (void)embedding_similarity("Reject", transformer_events, transformer_options, 1);
   assert(callback_texts.back() == "Reject");
+
+  auto invalid_variant = options;
+  invalid_variant.variant = static_cast<EmbeddingVariant>(99);
+  bool invalid_option = false;
+  try {
+    (void)to_embeddings(log, invalid_variant);
+  } catch (const std::invalid_argument& error) {
+    invalid_option = std::string(error.what()).find("unknown variant") !=
+                     std::string::npos;
+  }
+  assert(invalid_option);
+
+  auto invalid_provider = options;
+  invalid_provider.provider = static_cast<EmbeddingProvider>(99);
+  invalid_option = false;
+  try {
+    (void)embed_text("A", invalid_provider);
+  } catch (const std::invalid_argument& error) {
+    invalid_option = std::string(error.what()).find("unknown provider") !=
+                     std::string::npos;
+  }
+  assert(invalid_option);
+
+  auto invalid_model = options;
+  invalid_model.embedding_model.clear();
+  invalid_option = false;
+  try {
+    (void)embed_text("A", invalid_model);
+  } catch (const std::invalid_argument&) {
+    invalid_option = true;
+  }
+  assert(invalid_option);
 
   EmbeddingOptions missing_transformer = transformer_options;
   missing_transformer.transformer_callback = {};
@@ -113,6 +159,45 @@ int main() {
   }
   assert(missing_provider);
 
+  // Applications may register one process-level runtime bridge when passing
+  // a callback through every options object is inconvenient. The bridge is
+  // copied under a lock and invoked without holding that lock.
+  std::vector<std::string> registered_texts;
+  bool empty_registration_rejected = false;
+  try {
+    set_default_embedding_provider(EmbeddingProviderCallback{});
+  } catch (const std::invalid_argument&) {
+    empty_registration_rejected = true;
+  }
+  assert(empty_registration_rejected);
+  set_default_embedding_provider(
+      [&](std::string_view text, std::string_view model, std::size_t dimensions) {
+        assert(model == "registered-transformer");
+        registered_texts.emplace_back(text);
+        return std::vector<double>(dimensions, 0.25);
+      });
+  auto registered_options = transformer_options;
+  registered_options.transformer_callback = {};
+  registered_options.embedding_model = "registered-transformer";
+  registered_options.variant = EmbeddingVariant::CASES_TRANSFORMERS;
+  const auto registered_cases = to_embeddings(log, registered_options);
+  assert(registered_cases.items.size() == 2);
+  registered_options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
+  const auto registered_events = to_embeddings(log, registered_options);
+  assert(registered_events.items.size() == 3);
+  assert((registered_texts == std::vector<std::string>{
+              "Approve Ship", "Reject", "Approve", "Ship", "Reject"}));
+  clear_default_embedding_provider();
+  bool cleared_provider = false;
+  try {
+    (void)embed_text("A", registered_options);
+  } catch (const std::invalid_argument& error) {
+    cleared_provider =
+        std::string(error.what()).find("requires transformer_callback") !=
+        std::string::npos;
+  }
+  assert(cleared_provider);
+
   auto bad_length = transformer_options;
   bad_length.transformer_callback = [](std::string_view, std::string_view,
                                        std::size_t) { return std::vector<double>{1.0}; };
@@ -120,6 +205,28 @@ int main() {
   try { (void)embed_text("A", bad_length); }
   catch (const std::invalid_argument&) { bad_vector = true; }
   assert(bad_vector);
+
+  auto malformed_result = transformer_events;
+  malformed_result.items[0].values[0] = std::numeric_limits<double>::infinity();
+  bool malformed_rejected = false;
+  try {
+    (void)embedding_similarity("A", malformed_result, transformer_options, 1);
+  } catch (const std::invalid_argument& error) {
+    malformed_rejected =
+        std::string(error.what()).find("result vector") != std::string::npos;
+  }
+  assert(malformed_rejected);
+
+  auto mismatched_result = transformer_events;
+  mismatched_result.variant = EmbeddingVariant::CASES_TRANSFORMERS;
+  bool mismatch_rejected = false;
+  try {
+    (void)embedding_similarity("A", mismatched_result, transformer_options, 1);
+  } catch (const std::invalid_argument& error) {
+    mismatch_rejected =
+        std::string(error.what()).find("result variant") != std::string::npos;
+  }
+  assert(mismatch_rejected);
   auto bad_values = transformer_options;
   bad_values.transformer_callback = [](std::string_view, std::string_view,
                                        std::size_t dimensions) {

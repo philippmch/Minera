@@ -295,7 +295,10 @@ the original token profile, `hashing-v2` adds character n-grams, and other
 non-empty model names select a salted token profile instead of being silently
 ignored in hashing mode. Transformer mode is an explicit injectable provider:
 the callback receives the selected text, model label, and requested dimension,
-and its output length and finite values are validated. The explicit
+and its output length and finite values are validated. Applications can either
+provide that callback per request or register a thread-safe process-level
+default runtime bridge; the latter is used only when a request has no explicit
+callback. The explicit
 `mock_transformer` model supplies the deterministic headless CLI/server/frontend
 integration path; other transformer models require an application callback and
 never fall back to hashing. Provider, model label, and vector dimension are
