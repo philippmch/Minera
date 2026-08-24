@@ -1565,8 +1565,12 @@ void handle_ocel_features(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "variant", "max_features", "include_activity_features",
         "include_timestamp_features", "include_relation_features",
+        "include_event_num_rel_objs_features",
+        "include_event_num_rel_objs_type_features",
         "include_endpoint_features", "include_attribute_counts",
-        "include_interaction_features", "include_degree_centrality_features",
+        "include_event_start_ot_features", "include_event_end_ot_features",
+        "include_interaction_features", "include_new_interactions_features",
+        "include_degree_centrality_features",
         "include_lifecycle_features",
         "include_lifecycle_length_features",
         "include_lifecycle_unique_activity_features",
@@ -1618,12 +1622,27 @@ void handle_ocel_features(const httplib::Request& request,
         request, "include_timestamp_features", options.include_timestamp_features);
     options.include_relation_features = ocel_query_bool(
         request, "include_relation_features", options.include_relation_features);
+    if (request.has_param("include_event_num_rel_objs_features"))
+      options.include_event_num_rel_objs_features = ocel_query_bool(
+          request, "include_event_num_rel_objs_features", false);
+    if (request.has_param("include_event_num_rel_objs_type_features"))
+      options.include_event_num_rel_objs_type_features = ocel_query_bool(
+          request, "include_event_num_rel_objs_type_features", false);
     options.include_endpoint_features = ocel_query_bool(
         request, "include_endpoint_features", options.include_endpoint_features);
+    if (request.has_param("include_event_start_ot_features"))
+      options.include_event_start_ot_features = ocel_query_bool(
+          request, "include_event_start_ot_features", false);
+    if (request.has_param("include_event_end_ot_features"))
+      options.include_event_end_ot_features = ocel_query_bool(
+          request, "include_event_end_ot_features", false);
     options.include_attribute_counts = ocel_query_bool(
         request, "include_attribute_counts", options.include_attribute_counts);
     options.include_interaction_features = ocel_query_bool(
         request, "include_interaction_features", options.include_interaction_features);
+    if (request.has_param("include_new_interactions_features"))
+      options.include_new_interactions_features = ocel_query_bool(
+          request, "include_new_interactions_features", false);
     if (request.has_param("include_degree_centrality_features")) {
       options.include_degree_centrality_features = ocel_query_bool(
           request, "include_degree_centrality_features", false);
@@ -1699,6 +1718,12 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_lifecycle_path_features");
     const auto related_object_control_supplied =
         request.has_param("include_related_objects_features");
+    const auto event_control_supplied =
+        request.has_param("include_event_num_rel_objs_features") ||
+        request.has_param("include_event_num_rel_objs_type_features") ||
+        request.has_param("include_event_start_ot_features") ||
+        request.has_param("include_event_end_ot_features") ||
+        request.has_param("include_new_interactions_features");
     const auto related_object_event_context =
         options.include_related_objects_features &&
         variant == minera::OcelFeatureVariant::kEvents;
@@ -1717,6 +1742,9 @@ void handle_ocel_features(const httplib::Request& request,
         variant != minera::OcelFeatureVariant::kEvents)
       throw std::invalid_argument(
           "related-object features apply only to the events variant");
+    if (event_control_supplied && variant != minera::OcelFeatureVariant::kEvents)
+      throw std::invalid_argument(
+          "independent event feature controls apply only to the events variant");
     const auto prefix_control_supplied =
         request.has_param("include_prefix_features") ||
         request.has_param("include_prefix_length_features") ||

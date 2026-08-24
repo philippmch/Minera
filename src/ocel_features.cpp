@@ -224,59 +224,81 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       builder.add(names[field], std::move(values));
     }
   }
-  if (options.include_relation_features) {
-    std::vector<double> counts(log.events.size(), 0.0);
-    for (std::size_t row = 0; row < log.events.size(); ++row)
-      counts[row] = static_cast<double>(event_objects[row].size());
-    builder.add("@@event_num_rel_objs", std::move(counts));
-    for (const auto& type : object_types) {
-      std::vector<double> values(log.events.size(), 0.0);
+  const bool include_event_num_rel_objs =
+      options.include_event_num_rel_objs_features.value_or(
+          options.include_relation_features);
+  const bool include_event_num_rel_objs_type =
+      options.include_event_num_rel_objs_type_features.value_or(
+          options.include_relation_features);
+  if (include_event_num_rel_objs || include_event_num_rel_objs_type ||
+      options.include_relation_features) {
+    if (include_event_num_rel_objs) {
+      std::vector<double> counts(log.events.size(), 0.0);
       for (std::size_t row = 0; row < log.events.size(); ++row)
-        for (const auto object : event_objects[row])
-          if (object_types_by_index[object] == type) values[row] += 1.0;
-      builder.add("@@event_num_rel_objs_type_" + type, std::move(values));
+        counts[row] = static_cast<double>(event_objects[row].size());
+      builder.add("@@event_num_rel_objs", std::move(counts));
     }
-    std::map<std::string, std::size_t> event_index;
-    for (std::size_t row = 0; row < log.events.size(); ++row)
-      event_index.emplace(log.events[row].id, row);
-    std::vector<double> outgoing(log.events.size(), 0.0);
-    std::vector<double> incoming(log.events.size(), 0.0);
-    for (const auto& relation : log.e2e) {
-      const auto source = event_index.find(relation.source_id);
-      const auto target = event_index.find(relation.target_id);
-      if (source == event_index.end() || target == event_index.end())
-        throw std::invalid_argument("OCEL feature E2E relation references an unknown id");
-      outgoing[source->second] += 1.0;
-      incoming[target->second] += 1.0;
+    if (include_event_num_rel_objs_type) {
+      for (const auto& type : object_types) {
+        std::vector<double> values(log.events.size(), 0.0);
+        for (std::size_t row = 0; row < log.events.size(); ++row)
+          for (const auto object : event_objects[row])
+            if (object_types_by_index[object] == type) values[row] += 1.0;
+        builder.add("@@event_num_rel_objs_type_" + type, std::move(values));
+      }
     }
-    builder.add("@@event_num_e2e_out", std::move(outgoing));
-    builder.add("@@event_num_e2e_in", std::move(incoming));
+    if (options.include_relation_features) {
+      std::map<std::string, std::size_t> event_index;
+      for (std::size_t row = 0; row < log.events.size(); ++row)
+        event_index.emplace(log.events[row].id, row);
+      std::vector<double> outgoing(log.events.size(), 0.0);
+      std::vector<double> incoming(log.events.size(), 0.0);
+      for (const auto& relation : log.e2e) {
+        const auto source = event_index.find(relation.source_id);
+        const auto target = event_index.find(relation.target_id);
+        if (source == event_index.end() || target == event_index.end())
+          throw std::invalid_argument("OCEL feature E2E relation references an unknown id");
+        outgoing[source->second] += 1.0;
+        incoming[target->second] += 1.0;
+      }
+      builder.add("@@event_num_e2e_out", std::move(outgoing));
+      builder.add("@@event_num_e2e_in", std::move(incoming));
+    }
   }
-  if (options.include_endpoint_features) {
+  const bool include_event_start_ot = options.include_event_start_ot_features.value_or(
+      options.include_endpoint_features);
+  const bool include_event_end_ot = options.include_event_end_ot_features.value_or(
+      options.include_endpoint_features);
+  if (include_event_start_ot || include_event_end_ot) {
     for (const auto& type : object_types) {
-      std::vector<double> starts(log.events.size(), 0.0);
-      std::vector<double> ends(log.events.size(), 0.0);
-      std::map<std::size_t, bool> seen_start, seen_end;
-      for (std::size_t row = 0; row < log.events.size(); ++row) {
-        for (const auto object : event_objects[row]) {
-          if (object_types_by_index[object] != type) continue;
-          if (!seen_start.contains(object)) {
-            starts[row] = 1.0;
-            seen_start[object] = true;
+      if (include_event_start_ot) {
+        std::vector<double> starts(log.events.size(), 0.0);
+        std::map<std::size_t, bool> seen_start;
+        for (std::size_t row = 0; row < log.events.size(); ++row) {
+          for (const auto object : event_objects[row]) {
+            if (object_types_by_index[object] != type) continue;
+            if (!seen_start.contains(object)) {
+              starts[row] = 1.0;
+              seen_start[object] = true;
+            }
           }
         }
+        builder.add("@@event_start_" + type, std::move(starts));
       }
-      for (std::size_t row = log.events.size(); row-- > 0;) {
-        for (const auto object : event_objects[row]) {
-          if (object_types_by_index[object] != type) continue;
-          if (!seen_end.contains(object)) {
-            ends[row] = 1.0;
-            seen_end[object] = true;
+      if (include_event_end_ot) {
+        std::vector<double> ends(log.events.size(), 0.0);
+        std::map<std::size_t, bool> seen_end;
+        for (std::size_t row = log.events.size(); row-- > 0;) {
+          for (const auto object : event_objects[row]) {
+            if (object_types_by_index[object] != type) continue;
+            if (!seen_end.contains(object)) {
+              ends[row] = 1.0;
+              seen_end[object] = true;
+            }
           }
         }
+        builder.add("@@event_end_" + type, std::move(ends));
       }
-      builder.add("@@event_start_" + type, std::move(starts));
-      builder.add("@@event_end_" + type, std::move(ends));
     }
   }
   if (options.include_attribute_counts) {
@@ -313,7 +335,9 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
     }
   }
 
-  if (options.include_interaction_features) {
+  const bool include_new_interactions = options.include_new_interactions_features.value_or(
+      options.include_interaction_features);
+  if (include_new_interactions) {
     std::set<std::pair<std::size_t, std::size_t>> seen_pairs;
     std::vector<double> new_interactions(log.events.size(), 0.0);
     for (std::size_t row = 0; row < event_objects.size(); ++row) {
@@ -919,6 +943,16 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   const bool related_object_event_context =
       options.include_related_objects_features &&
       variant == OcelFeatureVariant::kEvents;
+  const bool event_control_supplied =
+      options.include_event_num_rel_objs_features.has_value() ||
+      options.include_event_num_rel_objs_type_features.has_value() ||
+      options.include_event_start_ot_features.has_value() ||
+      options.include_event_end_ot_features.has_value() ||
+      options.include_new_interactions_features.has_value();
+  if (event_control_supplied && variant != OcelFeatureVariant::kEvents) {
+    throw std::invalid_argument(
+        "OCEL independent event feature controls apply only to the events variant");
+  }
   if (options.include_interaction_by_type_features &&
       variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
