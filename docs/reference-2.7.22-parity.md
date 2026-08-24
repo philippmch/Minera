@@ -169,6 +169,13 @@ graph does not add a new edge. The standalone `minera_ocel --enrich` mode,
 multipart local `POST /api/ocel/enrich`, and typed frontend adapter expose the
 same bounded selection and `OCEL_ENRICHMENT` envelope.
 
+OTG conformance threshold evidence: the scalar `otg_theta` remains the fallback
+for every relation, while the standalone OCEL CLI, multipart local conformance
+route, and typed frontend query expose strict non-negative relation overrides
+for interaction, descendants, inheritance, cobirth, and codeath. Identical
+relative-frequency deltas can therefore be accepted for one relation and
+reported for another without changing the native `compare_otg` contract.
+
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics
 alongside each per-object-type workflow net. The serialized `annotations`
