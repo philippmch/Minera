@@ -19,6 +19,29 @@ constexpr double kEps = 1e-8;
 constexpr std::int64_t kMaxExactSolverInteger =
     static_cast<std::int64_t>(1ULL << 53);
 
+// Select a deterministic, evenly spaced subset while retaining both ends.
+// Endpoint additions intentionally allow up to two more points than the
+// requested interior sample count.
+std::vector<std::size_t> select_evenly_spaced_splits(
+    const std::vector<std::size_t>& splits, std::size_t requested) {
+  if (requested == 0 || splits.size() <= requested) return splits;
+
+  const auto count = splits.size();
+  std::vector<std::size_t> selected;
+  selected.reserve(requested + 2);
+  for (std::size_t i = 0; i < requested; ++i) {
+    const auto point = i * count / requested + count / (2 * requested);
+    selected.push_back(splits[point]);
+  }
+  if (std::find(selected.begin(), selected.end(), splits.front()) ==
+      selected.end())
+    selected.insert(selected.begin(), splits.front());
+  if (std::find(selected.begin(), selected.end(), splits.back()) ==
+      selected.end())
+    selected.push_back(splits.back());
+  return selected;
+}
+
 std::string validate_net(const PetriNet& net) {
   if (net.place_count() == 0) return "net has no places";
   if (net.source() >= net.place_count() || net.sink() >= net.place_count())
@@ -1075,25 +1098,19 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
                          result.retained_splits.end()) !=
       result.retained_splits.end())
     throw std::invalid_argument("split indices must be unique");
-  if (result.retained_splits.empty() && options.max_k_value > 0 &&
-      trace.size() > 1) {
-    const auto count = std::min(options.max_k_value, trace.size() - 1);
-    for (std::size_t i = 1; i <= count; ++i)
-      result.retained_splits.push_back(i);
-    for (std::size_t i = 1; i <= count; ++i)
-      result.retained_splits.push_back(trace.size() - i);
-    std::sort(result.retained_splits.begin(), result.retained_splits.end());
-    result.retained_splits.erase(
-        std::unique(result.retained_splits.begin(), result.retained_splits.end()),
-    result.retained_splits.end());
+  if (result.retained_splits.empty() && trace.size() > 1) {
+    if (options.max_k_value == 0) {
+      result.retained_splits = {1, trace.size() - 1};
+    } else {
+      result.retained_splits.reserve(trace.size() - 1);
+      for (std::size_t i = 1; i < trace.size(); ++i)
+        result.retained_splits.push_back(i);
+    }
   }
-  if (result.retained_splits.empty() && trace.size() > 1 &&
-      options.max_k_value == 0) {
-    result.retained_splits = {1, trace.size() - 1};
-    std::sort(result.retained_splits.begin(), result.retained_splits.end());
-    result.retained_splits.erase(
-        std::unique(result.retained_splits.begin(), result.retained_splits.end()),
-        result.retained_splits.end());
+  if (options.max_k_value > 0 &&
+      result.retained_splits.size() > options.max_k_value) {
+    result.retained_splits = select_evenly_spaced_splits(
+        result.retained_splits, options.max_k_value);
   }
   result.segment_count = result.retained_splits.size() + 1;
   const auto segments = result.segment_count;
