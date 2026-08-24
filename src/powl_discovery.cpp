@@ -438,62 +438,88 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
   std::set<std::string> boundary = starts;
   boundary.insert(ends.begin(), ends.end());
 
-  // Remove boundary nodes and all incident edges before computing weak
-  // components. The remaining components are the candidate redo groups.
+  // The do group starts with all boundary activities. Remove those nodes and
+  // their incident edges before finding the weak components that can become
+  // redo groups.
   std::vector<std::set<std::string>> groups{boundary};
-  std::set<std::string> seen = boundary;
-  for (const auto& root : relations.acts) {
-    if (seen.count(root) != 0) continue;
-    std::vector<std::string> component{root};
-    seen.insert(root);
-    for (std::size_t position = 0; position < component.size(); ++position) {
-      for (const auto& candidate : relations.acts) {
-        if (seen.count(candidate) != 0 || boundary.count(candidate) != 0)
+  std::set<std::string> remaining;
+  for (const auto& activity : relations.acts)
+    if (boundary.count(activity) == 0) remaining.insert(activity);
+  while (!remaining.empty()) {
+    const auto root = *remaining.begin();
+    remaining.erase(remaining.begin());
+    std::set<std::string> component{root};
+    std::vector<std::string> pending{root};
+    while (!pending.empty()) {
+      const auto activity = pending.back();
+      pending.pop_back();
+      for (auto it = remaining.begin(); it != remaining.end();) {
+        if (!has(relations.dfg, activity, *it) &&
+            !has(relations.dfg, *it, activity)) {
+          ++it;
           continue;
-        if (has(relations.dfg, component[position], candidate) ||
-            has(relations.dfg, candidate, component[position])) {
-          seen.insert(candidate);
-          component.push_back(candidate);
         }
+        component.insert(*it);
+        pending.push_back(*it);
+        it = remaining.erase(it);
       }
     }
-    groups.emplace_back(component.begin(), component.end());
+    groups.push_back(std::move(component));
   }
 
-  const auto merge_into_do = [&](const std::string& activity) {
-    for (std::size_t index = 1; index < groups.size(); ++index) {
-      if (groups[index].count(activity) == 0) continue;
-      groups.front().insert(groups[index].begin(), groups[index].end());
-      groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(index));
+  const auto group_index = [&](const std::string& activity) {
+    for (std::size_t index = 0; index < groups.size(); ++index)
+      if (groups[index].count(activity) != 0) return index;
+    return groups.size();
+  };
+  const auto merge_edge_groups_into_do = [&](const std::string& left,
+                                             const std::string& right) {
+    const auto left_index = group_index(left);
+    const auto right_index = group_index(right);
+    if (left_index == groups.size() || right_index == groups.size() ||
+        left_index == right_index)
       return;
-    }
+    std::set<std::string> merged = groups[left_index];
+    merged.insert(groups[right_index].begin(), groups[right_index].end());
+    const auto high = std::max(left_index, right_index);
+    const auto low = std::min(left_index, right_index);
+    groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(high));
+    groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(low));
+    groups.insert(groups.begin(), std::move(merged));
   };
 
-  // A boundary-only start/end exposes a component that must be part of do.
+  // A start that is not also an end, and an end that is not also a start,
+  // expose adjacent nodes that must be absorbed into the do group.
   for (const auto& start : starts) {
     if (ends.count(start) != 0) continue;
     for (const auto& [edge, count] : relations.dfg) {
       (void)count;
-      if (edge.first == start) merge_into_do(edge.second);
+      if (edge.first == start)
+        merge_edge_groups_into_do(edge.first, edge.second);
     }
   }
   for (const auto& end : ends) {
     if (starts.count(end) != 0) continue;
     for (const auto& [edge, count] : relations.dfg) {
       (void)count;
-      if (edge.second == end) merge_into_do(edge.first);
+      if (edge.second == end)
+        merge_edge_groups_into_do(edge.first, edge.second);
     }
   }
 
-  // A redo component is complete only when every activity that returns to a
-  // possible start returns to every possible start. Components with partial
-  // return evidence are merged into the do group.
+  // A component with a return edge to one possible start must return to every
+  // possible start. Otherwise it is merged into do.
   for (std::size_t index = 1; index < groups.size();) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
       bool reaches_start = false;
-      for (const auto& start : starts)
-        reaches_start = reaches_start || has(relations.dfg, activity, start);
+      for (const auto& [edge, count] : relations.dfg) {
+        (void)count;
+        if (edge.first == activity && starts.count(edge.second) != 0) {
+          reaches_start = true;
+          break;
+        }
+      }
       if (!reaches_start) continue;
       for (const auto& start : starts) {
         if (!has(relations.dfg, activity, start)) {
@@ -516,8 +542,13 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
       bool reached_from_end = false;
-      for (const auto& end : ends)
-        reached_from_end = reached_from_end || has(relations.dfg, end, activity);
+      for (const auto& [edge, count] : relations.dfg) {
+        (void)count;
+        if (edge.second == activity && ends.count(edge.first) != 0) {
+          reached_from_end = true;
+          break;
+        }
+      }
       if (!reached_from_end) continue;
       for (const auto& end : ends) {
         if (!has(relations.dfg, end, activity)) {

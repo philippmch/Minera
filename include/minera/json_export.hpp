@@ -36,6 +36,7 @@
 #include "minera/playout.hpp"
 #include "minera/powl.hpp"
 #include "minera/process_tree.hpp"
+#include "minera/process_tree_playout.hpp"
 #include "minera/resource_analysis.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/transition_system.hpp"
@@ -286,6 +287,8 @@ void write_analysis_json(std::ostream& out,
     const PetriUsageComparison& result);
 [[nodiscard]] std::string serialize_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
+[[nodiscard]] std::string serialize_process_tree_playout_json(
+    const ProcessTreePlayoutResult& result);
 
 [[nodiscard]] std::string concept_drift_json(const ConceptDriftResult& result);
 [[nodiscard]] std::string log_to_target_json(const LogToTargetResult& result);

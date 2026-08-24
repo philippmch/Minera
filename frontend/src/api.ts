@@ -137,6 +137,7 @@ import {
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
+  type ProcessTreePlayoutSetResult,
   type BasicPlayoutOptions,
   type BasicPlayoutVisitedResult,
   type StochasticPlayoutOptions,
@@ -186,6 +187,7 @@ import {
   isMonteCarloResult,
   isDfgPlayoutVariantsResult,
   isBasicPlayoutVisitedResult,
+  isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
   isServiceTimeResult,
@@ -3182,6 +3184,13 @@ export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {})
   if (options.max_length !== undefined) { validatePlayoutInteger("max_length", options.max_length); params.set("max_length", String(options.max_length)); }
   if (options.max_loop_occurrences !== undefined) { validatePlayoutInteger("max_loop_occurrences", options.max_loop_occurrences); params.set("max_loop_occurrences", String(options.max_loop_occurrences)); }
   if (options.max_trace_cap !== undefined) { validatePlayoutInteger("max_trace_cap", options.max_trace_cap, true); params.set("max_trace_cap", String(options.max_trace_cap)); }
+  if (options.return_set_strings !== undefined) {
+    if (typeof options.return_set_strings !== "boolean")
+      throw new Error("return_set_strings must be boolean");
+    if (options.return_set_strings && options.variant !== "EXTENSIVE")
+      throw new Error("return_set_strings requires EXTENSIVE variant");
+    params.set("return_set_strings", options.return_set_strings ? "true" : "false");
+  }
   if (options.min_length !== undefined && options.max_length !== undefined && options.min_length > options.max_length) {
     throw new Error("min_length must not exceed max_length");
   }
@@ -3443,6 +3452,32 @@ export async function fetchBasicPlayoutVisited(
   if (!isBasicPlayoutVisitedResult(payload)) {
     throw new Error("the Minera backend returned an invalid Petri visited playout");
   }
+  return payload;
+}
+
+/** Fetches the deterministic activity-word set from extensive process-tree playout. */
+export async function fetchProcessTreePlayoutSet(
+  options: ProcessTreePlayoutOptions = {},
+): Promise<ProcessTreePlayoutSetResult> {
+  const query = processTreePlayoutQuery({
+    ...options,
+    variant: "EXTENSIVE",
+    return_set_strings: true,
+  });
+  let response: Response;
+  try {
+    response = await fetch(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isProcessTreePlayoutSetResult(payload))
+    throw new Error("the Minera backend returned an invalid process-tree set playout");
   return payload;
 }
 

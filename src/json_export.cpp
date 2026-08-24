@@ -3726,6 +3726,23 @@ std::string serialize_playout_visited_json(
   return out.str();
 }
 
+std::string serialize_process_tree_playout_json(
+    const ProcessTreePlayoutResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PROCESS_TREE_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"return_set_strings\":true,\"traces\":[";
+  for (std::size_t i = 0; i < result.trace_strings.size(); ++i) {
+    if (i) out << ',';
+    out << '[';
+    for (std::size_t j = 0; j < result.trace_strings[i].size(); ++j) {
+      if (j) out << ',';
+      write_json_string(out, result.trace_strings[i][j]);
+    }
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string concept_drift_json(const ConceptDriftResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"CONCEPT_DRIFT\",\"activity_attribute\":";

@@ -44,6 +44,28 @@ int main() {
   assert(log.traces.size() == 1);
   assert((labels(log.traces[0]) == std::vector<std::string>{"a", "b"}));
 
+  ex.return_set_strings = true;
+  const auto set_result = process_tree_playout_result(tree, ex);
+  assert(set_result.log.traces.size() == 1);
+  assert((set_result.trace_strings ==
+         std::vector<std::vector<std::string>>{{"a", "b"}}));
+
+  ProcessTree duplicate({"a"}, xor_node({ProcessTreeNode::leaf(0),
+                                          ProcessTreeNode::leaf(0)}));
+  ex.max_length = 1;
+  ex.min_length = 0;
+  const auto duplicate_result = process_tree_playout_result(duplicate, ex);
+  assert((duplicate_result.trace_strings ==
+         std::vector<std::vector<std::string>>{{"a"}}));
+
+  ProcessTree empty_tree({"a"}, ProcessTreeNode::tau());
+  const auto empty_result = process_tree_playout_result(empty_tree, ex);
+  assert((empty_result.trace_strings ==
+         std::vector<std::vector<std::string>>{{}}));
+  assert(empty_result.log.traces.size() == 1 &&
+         empty_result.log.traces.front().events.empty());
+  ex.return_set_strings = false;
+
   ProcessTree choice({"a", "b"}, xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}));
   ex.max_length = 1;
   ex.min_length = 0;

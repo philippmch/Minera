@@ -311,5 +311,23 @@ int main() {
   const auto ordered_a = discover_powl(log({{"B", "A"}, {"A", "B"}}), tree).serialize();
   const auto ordered_b = discover_powl(log({{"A", "B"}, {"B", "A"}}), tree).serialize();
   assert(ordered_a == ordered_b);
+
+  // Boundary alternatives and repeated redo slices still form one common
+  // loop when the middle component returns to every boundary activity.
+  const auto repeated_common_loop = discover_powl(
+      log({{"A", "X", "A"}, {"B", "X", "B"}, {"A", "X", "B"},
+           {"B", "X", "A"}, {"A", "X", "A", "X", "A"}}),
+      tree);
+  assert(repeated_common_loop.kind() == PowlNodeKind::kLoop);
+  assert(repeated_common_loop.children()[0].kind() == PowlNodeKind::kXor);
+  assert(repeated_common_loop.children()[1].label() == "X");
+
+  // An end-only boundary with incomplete incoming coverage must be repaired
+  // into the do side instead of being accepted as a common redo cut.
+  const auto incomplete_boundary_loop = discover_powl(
+      log({{"A", "X", "A"}, {"A", "X", "B"}, {"A", "Y", "B"}}),
+      tree);
+  assert(incomplete_boundary_loop.kind() != PowlNodeKind::kLoop);
+
   std::cout << "POWL discovery tests passed\n";
 }
