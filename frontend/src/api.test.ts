@@ -1029,19 +1029,21 @@ describe("trace clustering API", () => {
 describe("profile clustering API", () => {
   it("serializes deterministic profile settings and escaped lists", () => {
     expect(profileClusteringQuery({
+      profile_variant: "sklearn_profiles",
       profile_cluster_count: 3, profile_seed: 7,
       profile_include_activity: false,
       profile_trace_string_attributes: ["segment", "region"],
       profile_feature_names: ["a,b", "c"],
-    })).toBe("profile_cluster_count=3&profile_feature_names=a%5C%2Cb%2Cc&profile_include_activity=false&profile_seed=7&profile_trace_string_attributes=segment%2Cregion");
+    })).toBe("profile_cluster_count=3&profile_feature_names=a%5C%2Cb%2Cc&profile_include_activity=false&profile_seed=7&profile_trace_string_attributes=segment%2Cregion&profile_variant=sklearn_profiles");
     expect(() => profileClusteringQuery({ profile_cluster_count: 0 })).toThrow(/positive/);
+    expect(() => profileClusteringQuery({ profile_variant: "other" as "sklearn_profiles" })).toThrow(/profile_variant/);
     expect(() => profileClusteringQuery({ profile_feature_names: ["a", "a"] })).toThrow(/duplicates/);
   });
   it("validates the profile result envelope", async () => {
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
       expect(path).toBe("/api/profile-clustering?profile_cluster_count=2");
       return new Response(JSON.stringify({
-        family: "PROFILE_CLUSTERING", labels: [0, 1], clusters: [[0], [1]],
+        family: "PROFILE_CLUSTERING", variant: "sklearn_profiles", labels: [0, 1], clusters: [[0], [1]],
         feature_names: ["event:concept:name@A"], inertia: 0,
         diagnostics: { computed: true, converged: true, trace_count: 2,
           feature_count: 1, cluster_count: 2, iterations: 1, message: "converged" },

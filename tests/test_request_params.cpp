@@ -290,6 +290,7 @@ void clustering_params_contract() {
 
 void profile_clustering_params_contract() {
   const auto parsed = minera::parse_profile_clustering_params(fields({
+      {"profile_variant", "SKLEARN_PROFILES"},
       {"profile_cluster_count", "3"},
       {"profile_max_iterations", "17"},
       {"profile_max_traces", "99"},
@@ -304,6 +305,7 @@ void profile_clustering_params_contract() {
       {"profile_event_numeric_attributes", "score"},
       {"profile_feature_names", "f1,f2"}}));
   assert(parsed.cluster_count == 3 && parsed.max_iterations == 17);
+  assert(parsed.variant == minera::ProfileClusteringVariant::kSklearnProfiles);
   assert(parsed.max_traces == 99 && parsed.max_features == 123);
   assert(parsed.seed == 42 && parsed.tolerance == 0.001);
   assert(!parsed.include_activity_representation &&
@@ -317,6 +319,7 @@ void profile_clustering_params_contract() {
 
   for (const auto& item : {
            std::pair{"profile_cluster_count", "0"},
+           std::pair{"profile_variant", "other"},
            std::pair{"profile_tolerance", "-0.1"},
            std::pair{"profile_include_activity", "maybe"},
            std::pair{"profile_event_string_attributes", "A,,B"}}) {

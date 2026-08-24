@@ -434,7 +434,7 @@ int usage(const char* program) {
                "  --clustering             Emit trace-attribute clustering JSON\n"
                "  --clustering-* <v>       Attribute, variant, alpha, percent, and bounds\n"
                "  --profile-clustering      Emit profile-based clustering JSON\n"
-               "  --profile-clustering-* <v>  K-means bounds, seed, representations, and attributes\n"
+               "  --profile-clustering-* <v>  Variant, K-means bounds, seed, representations, and attributes\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -2131,7 +2131,7 @@ int main(int argc, char** argv) {
       if (key.rfind("profile_clustering_", 0) == 0)
         key = "profile_" + key.substr(std::string("profile_clustering_").size());
       static const std::set<std::string> names = {
-          "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
+          "profile_variant", "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
           "profile_max_features", "profile_seed", "profile_tolerance",
           "profile_include_activity", "profile_include_succession",
           "profile_trace_string_attributes", "profile_event_string_attributes",

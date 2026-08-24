@@ -10,6 +10,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -599,6 +600,8 @@ double profile_squared_distance(const std::vector<double>& left,
 
 ProfileClusteringResult discover_profile_clustering(
     const EventLog& log, const ProfileClusteringOptions& options) {
+  if (options.variant != ProfileClusteringVariant::kSklearnProfiles)
+    throw std::invalid_argument("profile clustering: unsupported variant");
   if (options.cluster_count == 0 || options.max_iterations == 0 ||
       options.max_traces == 0 || options.max_features == 0)
     throw std::invalid_argument("profile clustering: bounds must be positive");
@@ -607,6 +610,7 @@ ProfileClusteringResult discover_profile_clustering(
   if (log.traces.size() > options.max_traces)
     throw std::invalid_argument("profile clustering: trace bound exceeded");
   ProfileClusteringResult result;
+  result.variant = options.variant;
   result.diagnostics.trace_count = log.traces.size();
   if (log.traces.empty()) {
     result.diagnostics.computed = true;
@@ -696,7 +700,12 @@ ProfileClusteringResult discover_profile_clustering(
 
 std::string profile_clustering_json(const ProfileClusteringResult& result) {
   std::ostringstream out;
-  out << "{\"family\":\"PROFILE_CLUSTERING\",\"labels\":[";
+  const std::string variant =
+      result.variant == ProfileClusteringVariant::kSklearnProfiles
+          ? "sklearn_profiles"
+          : "unknown";
+  out << "{\"family\":\"PROFILE_CLUSTERING\",\"variant\":";
+  out << json_quote(variant) << ",\"labels\":[";
   for (std::size_t i = 0; i < result.labels.size(); ++i) {
     if (i != 0) out << ',';
     out << result.labels[i];
