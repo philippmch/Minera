@@ -3,6 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include "minera/timestamp.hpp"
 
@@ -31,6 +32,24 @@ void validate_options(const AdjacentPathFilterOptions& options) {
   }
 }
 
+const std::string* activity_value(const Event& event,
+                                  std::string_view attribute) {
+  if (attribute.empty() || attribute == "activity" ||
+      attribute == "concept:name") {
+    return &event.activity;
+  }
+  return event.attribute(attribute);
+}
+
+const std::string* timestamp_value(const Event& event,
+                                   std::string_view attribute) {
+  if (attribute.empty() || attribute == "timestamp" ||
+      attribute == "time:timestamp") {
+    return &event.timestamp;
+  }
+  return event.attribute(attribute);
+}
+
 bool trace_matches(const Trace& trace,
                    const AdjacentPathFilterOptions& options) {
   const bool by_time = options.min_elapsed_seconds.has_value() ||
@@ -38,14 +57,27 @@ bool trace_matches(const Trace& trace,
   for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
     const auto& predecessor = trace.events[i];
     const auto& successor = trace.events[i + 1];
-    if (predecessor.activity != options.predecessor ||
-        successor.activity != options.successor) {
+    const auto* predecessor_activity =
+        activity_value(predecessor, options.activity_attribute);
+    const auto* successor_activity =
+        activity_value(successor, options.activity_attribute);
+    if (predecessor_activity == nullptr || successor_activity == nullptr ||
+        *predecessor_activity != options.predecessor ||
+        *successor_activity != options.successor) {
       continue;
     }
     if (!by_time) return true;
 
-    const auto start = parse_timestamp(predecessor.timestamp);
-    const auto end = parse_timestamp(successor.timestamp);
+    const auto* predecessor_timestamp =
+        timestamp_value(predecessor, options.timestamp_attribute);
+    const auto* successor_timestamp =
+        timestamp_value(successor, options.timestamp_attribute);
+    const auto start = predecessor_timestamp == nullptr
+                           ? std::nullopt
+                           : parse_timestamp(*predecessor_timestamp);
+    const auto end = successor_timestamp == nullptr
+                         ? std::nullopt
+                         : parse_timestamp(*successor_timestamp);
     if (!start || !end) {
       throw std::invalid_argument(
           "adjacent path filter: matching path has an invalid timestamp");

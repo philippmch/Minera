@@ -286,9 +286,9 @@ std::vector<EmbeddingSimilarity> embedding_similarity(
   matches.reserve(result.items.size());
   for (const auto& item : result.items)
     matches.push_back({item.id, cosine(target, item.values)});
-  std::sort(matches.begin(), matches.end(), [](const auto& left, const auto& right) {
+  std::stable_sort(matches.begin(), matches.end(), [](const auto& left, const auto& right) {
     if (left.score != right.score) return left.score > right.score;
-    return left.id < right.id;
+    return left.id > right.id;
   });
   if (top_k != 0 && matches.size() > top_k) matches.resize(top_k);
   return matches;

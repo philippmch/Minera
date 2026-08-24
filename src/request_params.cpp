@@ -915,7 +915,9 @@ MineParams parse_mine_params(const FieldLookup& field,
                              supplied("path_successor") ||
                              supplied("path_min_performance") ||
                              supplied("path_max_performance") ||
-                             supplied("path_positive");
+                             supplied("path_positive") ||
+                             supplied("path_activity_attribute") ||
+                             supplied("path_timestamp_attribute");
   if (path_supplied) {
     AdjacentPathFilterOptions options;
     if (!supplied("path_predecessor") || field("path_predecessor").empty())
@@ -926,6 +928,18 @@ MineParams parse_mine_params(const FieldLookup& field,
           "path_successor: required when path filtering is enabled");
     options.predecessor = field("path_predecessor");
     options.successor = field("path_successor");
+    if (supplied("path_activity_attribute")) {
+      options.activity_attribute = field("path_activity_attribute");
+      if (options.activity_attribute.empty())
+        throw std::invalid_argument(
+            "path_activity_attribute: must not be empty when supplied");
+    }
+    if (supplied("path_timestamp_attribute")) {
+      options.timestamp_attribute = field("path_timestamp_attribute");
+      if (options.timestamp_attribute.empty())
+        throw std::invalid_argument(
+            "path_timestamp_attribute: must not be empty when supplied");
+    }
     if (supplied("path_min_performance")) {
       options.min_elapsed_seconds = parse_finite_double(
           field("path_min_performance"), "path_min_performance");

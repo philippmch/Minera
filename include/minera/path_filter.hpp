@@ -19,6 +19,12 @@ namespace minera {
 struct AdjacentPathFilterOptions {
   std::string predecessor;
   std::string successor;
+  // Empty, "activity", and "concept:name" use Event::activity. Any other
+  // key is looked up only among generic event attributes.
+  std::string activity_attribute;
+  // Empty, "timestamp", and "time:timestamp" use Event::timestamp. Any
+  // other key is looked up only among generic event attributes.
+  std::string timestamp_attribute;
   std::optional<double> min_elapsed_seconds;
   std::optional<double> max_elapsed_seconds;
   bool positive = true;

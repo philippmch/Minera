@@ -87,8 +87,11 @@ export function pathValidationMessage(input: {
   minPerformance: string;
   maxPerformance: string;
   positive: boolean;
+  activityAttribute?: string;
+  timestampAttribute?: string;
 }): string | null {
   const configured = input.predecessor || input.successor ||
+    input.activityAttribute?.trim() || input.timestampAttribute?.trim() ||
     input.minPerformance.trim() || input.maxPerformance.trim() || !input.positive;
   if (!configured) return null;
   if (!input.predecessor || !input.successor)
@@ -325,6 +328,8 @@ export function Filters({
   const [segmentBetweenEnd, setSegmentBetweenEnd] = useState("");
   const [pathPredecessor, setPathPredecessor] = useState("");
   const [pathSuccessor, setPathSuccessor] = useState("");
+  const [pathActivityAttribute, setPathActivityAttribute] = useState("");
+  const [pathTimestampAttribute, setPathTimestampAttribute] = useState("");
   const [pathMinPerformance, setPathMinPerformance] = useState("");
   const [pathMaxPerformance, setPathMaxPerformance] = useState("");
   const [pathPositive, setPathPositive] = useState(true);
@@ -705,6 +710,8 @@ export function Filters({
     minPerformance: pathMinPerformance,
     maxPerformance: pathMaxPerformance,
     positive: pathPositive,
+    activityAttribute: pathActivityAttribute,
+    timestampAttribute: pathTimestampAttribute,
   });
   const caseDurationValidationError = caseDurationValidationMessage({
     min: caseDurationMin,
@@ -835,6 +842,8 @@ export function Filters({
       segmentBetweenEnds: segmentBetweenEnd ? [segmentBetweenEnd] : undefined,
       pathPredecessor: pathPredecessor || undefined,
       pathSuccessor: pathSuccessor || undefined,
+      pathActivityAttribute: pathActivityAttribute.trim() || undefined,
+      pathTimestampAttribute: pathTimestampAttribute.trim() || undefined,
       pathMinPerformance: pathMinPerformance.trim() ? Number(pathMinPerformance) : undefined,
       pathMaxPerformance: pathMaxPerformance.trim() ? Number(pathMaxPerformance) : undefined,
       pathPositive: pathPredecessor && pathSuccessor ? pathPositive : undefined,
@@ -1193,6 +1202,8 @@ export function Filters({
     setSegmentBetweenEnd("");
     setPathPredecessor("");
     setPathSuccessor("");
+    setPathActivityAttribute("");
+    setPathTimestampAttribute("");
     setPathMinPerformance("");
     setPathMaxPerformance("");
     setPathPositive(true);
@@ -1241,6 +1252,8 @@ export function Filters({
     segmentBetweenEnd !== "" ||
     pathPredecessor !== "" ||
     pathSuccessor !== "" ||
+    pathActivityAttribute !== "" ||
+    pathTimestampAttribute !== "" ||
     pathMinPerformance !== "" ||
     pathMaxPerformance !== "" ||
     !pathPositive ||
@@ -2365,6 +2378,14 @@ export function Filters({
             <label className="filters-field">
               <span>Max seconds</span>
               <input type="number" step="any" value={pathMaxPerformance} onChange={(e) => setPathMaxPerformance(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Activity key</span>
+              <input placeholder="concept:name" value={pathActivityAttribute} onChange={(e) => setPathActivityAttribute(e.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Timestamp key</span>
+              <input placeholder="time:timestamp" value={pathTimestampAttribute} onChange={(e) => setPathTimestampAttribute(e.target.value)} />
             </label>
             <label className="filters-field">
               <span>Match polarity</span>

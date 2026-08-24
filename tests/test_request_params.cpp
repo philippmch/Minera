@@ -104,6 +104,8 @@ void adjacent_path_filter_params_contract() {
       {"path_min_performance", "0"},
       {"path_max_performance", "2.5"},
       {"path_positive", "false"},
+      {"path_activity_attribute", "phase"},
+      {"path_timestamp_attribute", "occurred"},
   }));
   assert(params.path_enabled && params.path);
   assert(params.path->predecessor == "A");
@@ -111,6 +113,8 @@ void adjacent_path_filter_params_contract() {
   assert(params.path->min_elapsed_seconds && *params.path->min_elapsed_seconds == 0.0);
   assert(params.path->max_elapsed_seconds && *params.path->max_elapsed_seconds == 2.5);
   assert(!params.path->positive);
+  assert(params.path->activity_attribute == "phase");
+  assert(params.path->timestamp_attribute == "occurred");
   for (const auto& item : {
            std::pair{"path_predecessor", ""},
            std::pair{"path_successor", ""},
@@ -125,6 +129,19 @@ void adjacent_path_filter_params_contract() {
     try { (void)minera::parse_mine_params(fields(std::move(values))); }
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
+  }
+  for (const auto name : {"path_activity_attribute", "path_timestamp_attribute"}) {
+    const std::map<std::string, std::string> values{
+        {"path_predecessor", "A"}, {"path_successor", "B"},
+        {name, ""}};
+    bool empty_threw = false;
+    try {
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view key) {
+            return values.contains(std::string(key));
+          });
+    } catch (const std::invalid_argument&) { empty_threw = true; }
+    assert(empty_threw);
   }
   bool threw = false;
   try {

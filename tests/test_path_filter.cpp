@@ -129,5 +129,51 @@ int main() {
     threw = true;
   }
   assert(threw);
+
+  // Custom keys are resolved from generic event attributes; an explicit
+  // missing key never falls back to the canonical activity or timestamp.
+  auto custom = sample();
+  for (auto& event : custom.traces[0].events) {
+    event.attributes.push_back({"phase", event.activity == "A" ? "start" :
+                                          event.activity == "B" ? "finish" : "other",
+                                AttributeKind::kString});
+    event.attributes.push_back({"occurred", event.timestamp,
+                                AttributeKind::kDate});
+  }
+  options.predecessor = "start";
+  options.successor = "finish";
+  options.min_elapsed_seconds.reset();
+  options.max_elapsed_seconds.reset();
+  options.activity_attribute = "phase";
+  options.timestamp_attribute = "occurred";
+  options.positive = true;
+  assert(minera::filter_adjacent_path(custom, options).traces.size() == 1);
+  options.activity_attribute = "missing_activity";
+  assert(minera::filter_adjacent_path(custom, options).traces.empty());
+  options.activity_attribute = "concept:name";
+  options.predecessor = "A";
+  options.successor = "B";
+  assert(minera::filter_adjacent_path(custom, options).traces.size() == 2);
+
+  // A malformed custom timestamp is examined only after its custom activity
+  // pair matches, and negative polarity retains nonmatching traces.
+  options.activity_attribute = "phase";
+  options.predecessor = "start";
+  options.successor = "finish";
+  options.min_elapsed_seconds = 5.0;
+  options.max_elapsed_seconds = 5.0;
+  custom.traces[0].events[1].attributes.back().value = "not-a-time";
+  threw = false;
+  try {
+    (void)minera::filter_adjacent_path(custom, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  custom.traces[0].events[1].attributes.back().value =
+      custom.traces[0].events[1].timestamp;
+  options.timestamp_attribute = "occurred";
+  options.positive = false;
+  assert(minera::filter_adjacent_path(custom, options).traces.size() == 2);
   return 0;
 }

@@ -310,6 +310,8 @@ export interface FilterOptions extends LtlFilterOptions {
   /** Optional adjacent predecessor/successor path filter. */
   pathPredecessor?: string;
   pathSuccessor?: string;
+  pathActivityAttribute?: string;
+  pathTimestampAttribute?: string;
   pathMinPerformance?: number;
   pathMaxPerformance?: number;
   pathPositive?: boolean;
@@ -864,11 +866,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("segment_between_separator", options.segmentBetweenSeparator);
   }
   if (options.pathPredecessor || options.pathSuccessor ||
+      options.pathActivityAttribute || options.pathTimestampAttribute ||
       options.pathMinPerformance !== undefined ||
       options.pathMaxPerformance !== undefined ||
       options.pathPositive !== undefined) {
     if (options.pathPredecessor) add("path_predecessor", options.pathPredecessor);
     if (options.pathSuccessor) add("path_successor", options.pathSuccessor);
+    if (options.pathActivityAttribute)
+      add("path_activity_attribute", options.pathActivityAttribute);
+    if (options.pathTimestampAttribute)
+      add("path_timestamp_attribute", options.pathTimestampAttribute);
     if (options.pathPredecessor && options.pathSuccessor) {
       if (options.pathMinPerformance !== undefined)
         add("path_min_performance", String(options.pathMinPerformance));
