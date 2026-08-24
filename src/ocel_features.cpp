@@ -335,13 +335,10 @@ std::vector<Lifecycle> make_lifecycles(
   std::vector<Lifecycle> lifecycles(log.objects.size());
   for (std::size_t object = 0; object < log.objects.size(); ++object) {
     auto& lifecycle = lifecycles[object];
+    // The relation stream is the lifecycle order.  Do not reorder it by
+    // timestamp: relation rows may intentionally describe a non-monotonic
+    // history, and path/first/last semantics follow that stream.
     lifecycle.event_indices = object_events[object];
-    std::stable_sort(lifecycle.event_indices.begin(), lifecycle.event_indices.end(),
-                     [&](std::size_t left, std::size_t right) {
-                       if (times[left] && times[right] && *times[left] != *times[right])
-                         return *times[left] < *times[right];
-                       return left < right;
-                     });
     for (const auto event : lifecycle.event_indices) {
       lifecycle.activities.push_back(log.events[event].activity);
       lifecycle.unique_activities.insert(log.events[event].activity);
@@ -352,8 +349,8 @@ std::vector<Lifecycle> make_lifecycles(
       ++lifecycle.paths[{lifecycle.activities[i - 1], lifecycle.activities[i]}];
     for (const auto timestamp : lifecycle.timestamps) {
       if (!std::isfinite(timestamp)) continue;
-      if (!lifecycle.start || timestamp < *lifecycle.start) lifecycle.start = timestamp;
-      if (!lifecycle.end || timestamp > *lifecycle.end) lifecycle.end = timestamp;
+      if (!lifecycle.start) lifecycle.start = timestamp;
+      lifecycle.end = timestamp;
     }
   }
   return lifecycles;
@@ -382,28 +379,39 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     builder.add("@@object_num_attributes", std::move(values));
   }
   if (options.include_lifecycle_features) {
-    std::vector<double> length(log.objects.size(), 0.0), duration(log.objects.size(), 0.0),
-        start(log.objects.size(), 0.0), end(log.objects.size(), 0.0), unique(log.objects.size(), 0.0);
-    for (std::size_t row = 0; row < log.objects.size(); ++row) {
-      length[row] = static_cast<double>(lifecycles[row].event_indices.size());
-      unique[row] = static_cast<double>(lifecycles[row].unique_activities.size());
-      if (lifecycles[row].start && lifecycles[row].end) {
-        duration[row] = std::max(0.0, *lifecycles[row].end - *lifecycles[row].start);
+    if (options.include_lifecycle_length_features) {
+      std::vector<double> length(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < log.objects.size(); ++row)
+        length[row] = static_cast<double>(lifecycles[row].event_indices.size());
+      builder.add("@@object_lifecycle_length", std::move(length));
+    }
+    if (options.include_lifecycle_unique_activity_features) {
+      std::vector<double> unique(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < log.objects.size(); ++row)
+        unique[row] = static_cast<double>(lifecycles[row].unique_activities.size());
+      builder.add("@@object_lifecycle_unq_act", std::move(unique));
+    }
+    if (options.include_lifecycle_duration_features) {
+      std::vector<double> duration(log.objects.size(), 0.0),
+          start(log.objects.size(), 0.0), end(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < log.objects.size(); ++row) {
+        if (!lifecycles[row].start || !lifecycles[row].end) continue;
+        duration[row] = *lifecycles[row].end - *lifecycles[row].start;
         start[row] = *lifecycles[row].start;
         end[row] = *lifecycles[row].end;
       }
+      builder.add("@@object_lifecycle_duration", std::move(duration));
+      builder.add("@@object_lifecycle_start_timestamp", std::move(start));
+      builder.add("@@object_lifecycle_end_timestamp", std::move(end));
     }
-    builder.add("@@object_lifecycle_length", std::move(length));
-    builder.add("@@object_lifecycle_unq_act", std::move(unique));
-    builder.add("@@object_lifecycle_duration", std::move(duration));
-    builder.add("@@object_lifecycle_start_timestamp", std::move(start));
-    builder.add("@@object_lifecycle_end_timestamp", std::move(end));
-    for (const auto& activity : activities) {
-      std::vector<double> values(log.objects.size(), 0.0);
-      for (std::size_t row = 0; row < log.objects.size(); ++row)
-        values[row] = static_cast<double>(std::count(
-            lifecycles[row].activities.begin(), lifecycles[row].activities.end(), activity));
-      builder.add("@@ocel_lif_activity_" + activity, std::move(values));
+    if (options.include_lifecycle_activity_features) {
+      for (const auto& activity : activities) {
+        std::vector<double> values(log.objects.size(), 0.0);
+        for (std::size_t row = 0; row < log.objects.size(); ++row)
+          values[row] = static_cast<double>(std::count(
+              lifecycles[row].activities.begin(), lifecycles[row].activities.end(), activity));
+        builder.add("@@ocel_lif_activity_" + activity, std::move(values));
+      }
     }
     if (options.include_lifecycle_path_features) {
       std::set<std::pair<std::string, std::string>> paths;
@@ -422,16 +430,18 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
                     std::move(values));
       }
     }
-    std::vector<double> wip(log.objects.size(), 0.0);
-    for (std::size_t row = 0; row < log.objects.size(); ++row) {
-      if (!lifecycles[row].start || !lifecycles[row].end) continue;
-      for (std::size_t other = 0; other < log.objects.size(); ++other) {
-        if (!lifecycles[other].start || !lifecycles[other].end) continue;
-        if (*lifecycles[other].start <= *lifecycles[row].end &&
-            *lifecycles[other].end >= *lifecycles[row].start) wip[row] += 1.0;
+    if (options.include_lifecycle_wip_features) {
+      std::vector<double> wip(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < log.objects.size(); ++row) {
+        if (!lifecycles[row].start || !lifecycles[row].end) continue;
+        for (std::size_t other = 0; other < log.objects.size(); ++other) {
+          if (!lifecycles[other].start || !lifecycles[other].end) continue;
+          if (*lifecycles[other].start <= *lifecycles[row].end &&
+              *lifecycles[other].end >= *lifecycles[row].start) wip[row] += 1.0;
+        }
       }
+      builder.add("@@object_wip", std::move(wip));
     }
-    builder.add("@@object_wip", std::move(wip));
   }
 
   auto add_numeric_attributes = [&](const std::vector<std::string>& keys) {

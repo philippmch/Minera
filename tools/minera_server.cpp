@@ -1564,6 +1564,11 @@ void handle_ocel_features(const httplib::Request& request,
         "include_timestamp_features", "include_relation_features",
         "include_endpoint_features", "include_attribute_counts",
         "include_interaction_features", "include_lifecycle_features",
+        "include_lifecycle_length_features",
+        "include_lifecycle_unique_activity_features",
+        "include_lifecycle_duration_features",
+        "include_lifecycle_activity_features",
+        "include_lifecycle_wip_features",
         "include_interaction_by_type_features",
         "include_general_interaction_features",
         "include_general_descendants_features",
@@ -1630,9 +1635,24 @@ void handle_ocel_features(const httplib::Request& request,
         request, "include_codeath_features", options.include_codeath_features);
     options.include_lifecycle_features = ocel_query_bool(
         request, "include_lifecycle_features", options.include_lifecycle_features);
+    options.include_lifecycle_length_features = ocel_query_bool(
+        request, "include_lifecycle_length_features",
+        options.include_lifecycle_length_features);
+    options.include_lifecycle_unique_activity_features = ocel_query_bool(
+        request, "include_lifecycle_unique_activity_features",
+        options.include_lifecycle_unique_activity_features);
+    options.include_lifecycle_duration_features = ocel_query_bool(
+        request, "include_lifecycle_duration_features",
+        options.include_lifecycle_duration_features);
+    options.include_lifecycle_activity_features = ocel_query_bool(
+        request, "include_lifecycle_activity_features",
+        options.include_lifecycle_activity_features);
     options.include_lifecycle_path_features = ocel_query_bool(
         request, "include_lifecycle_path_features",
         options.include_lifecycle_path_features);
+    options.include_lifecycle_wip_features = ocel_query_bool(
+        request, "include_lifecycle_wip_features",
+        options.include_lifecycle_wip_features);
     options.include_related_events_features = ocel_query_bool(
         request, "include_related_events_features",
         options.include_related_events_features);

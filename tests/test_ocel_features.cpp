@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "minera/timestamp.hpp"
+
 namespace {
 
 minera::Ocel sample() {
@@ -78,6 +80,18 @@ minera::Ocel related_feature_sample() {
   return log;
 }
 
+minera::Ocel non_monotonic_lifecycle_sample() {
+  minera::Ocel log;
+  log.events = {
+      {"late", "A", "2026-01-02T00:00:00Z", {}},
+      {"early", "B", "2026-01-03T00:00:00Z", {}},
+      {"last", "A", "2026-01-01T00:00:00Z", {}}};
+  log.objects = {{"o", "order", {}}};
+  log.relations = {{"late", "o", ""}, {"early", "o", ""},
+                   {"last", "o", ""}};
+  return log;
+}
+
 }  // namespace
 
 int main() {
@@ -118,6 +132,72 @@ int main() {
   assert(length != objects.feature_names.end());
   assert(objects.values[0][static_cast<std::size_t>(
              length - objects.feature_names.begin())] == 3.0);
+
+  const auto lifecycle_order = non_monotonic_lifecycle_sample();
+  auto lifecycle_options = minera::OcelFeatureOptions{};
+  lifecycle_options.include_activity_features = false;
+  lifecycle_options.include_timestamp_features = false;
+  lifecycle_options.include_relation_features = false;
+  lifecycle_options.include_endpoint_features = false;
+  lifecycle_options.include_attribute_counts = false;
+  lifecycle_options.include_interaction_features = false;
+  const auto lifecycle_table = minera::extract_ocel_features(
+      lifecycle_order, minera::OcelFeatureVariant::kObjects,
+      lifecycle_options);
+  const auto lifecycle_column = [&](const std::string& name) {
+    const auto it = std::find(lifecycle_table.feature_names.begin(),
+                              lifecycle_table.feature_names.end(), name);
+    assert(it != lifecycle_table.feature_names.end());
+    return static_cast<std::size_t>(it - lifecycle_table.feature_names.begin());
+  };
+  const auto duration = lifecycle_column("@@object_lifecycle_duration");
+  const auto start = lifecycle_column("@@object_lifecycle_start_timestamp");
+  const auto end = lifecycle_column("@@object_lifecycle_end_timestamp");
+  const auto path_ab = lifecycle_column("@@ocel_lif_path_A##B");
+  const auto path_ba = lifecycle_column("@@ocel_lif_path_B##A");
+  assert(lifecycle_table.values[0][duration] == -86400.0);
+  assert(lifecycle_table.values[0][start] ==
+         minera::parse_timestamp("2026-01-02T00:00:00Z").value());
+  assert(lifecycle_table.values[0][end] ==
+         minera::parse_timestamp("2026-01-01T00:00:00Z").value());
+  assert(lifecycle_table.values[0][path_ab] == 1.0 &&
+         lifecycle_table.values[0][path_ba] == 1.0);
+
+  auto duration_only = lifecycle_options;
+  duration_only.include_lifecycle_length_features = false;
+  duration_only.include_lifecycle_unique_activity_features = false;
+  duration_only.include_lifecycle_activity_features = false;
+  duration_only.include_lifecycle_path_features = false;
+  duration_only.include_lifecycle_wip_features = false;
+  const auto duration_only_table = minera::extract_ocel_features(
+      lifecycle_order, minera::OcelFeatureVariant::kObjects, duration_only);
+  assert(duration_only_table.feature_names.size() == 3);
+  assert(duration_only_table.feature_names[0] == "@@object_lifecycle_duration");
+  assert(duration_only_table.feature_names[1] == "@@object_lifecycle_start_timestamp");
+  assert(duration_only_table.feature_names[2] == "@@object_lifecycle_end_timestamp");
+
+  auto no_duration = lifecycle_options;
+  no_duration.include_lifecycle_duration_features = false;
+  const auto no_duration_table = minera::extract_ocel_features(
+      lifecycle_order, minera::OcelFeatureVariant::kObjects, no_duration);
+  assert(std::none_of(no_duration_table.feature_names.begin(),
+                      no_duration_table.feature_names.end(), [](const auto& name) {
+                        return name == "@@object_lifecycle_duration" ||
+                               name == "@@object_lifecycle_start_timestamp" ||
+                               name == "@@object_lifecycle_end_timestamp";
+                      }));
+
+  auto no_lifecycle_metrics = lifecycle_options;
+  no_lifecycle_metrics.include_lifecycle_features = false;
+  no_lifecycle_metrics.include_lifecycle_path_features = true;
+  const auto no_lifecycle_metrics_table = minera::extract_ocel_features(
+      lifecycle_order, minera::OcelFeatureVariant::kObjects,
+      no_lifecycle_metrics);
+  assert(std::none_of(no_lifecycle_metrics_table.feature_names.begin(),
+                      no_lifecycle_metrics_table.feature_names.end(), [](const auto& name) {
+                        return name.rfind("@@object_lifecycle_", 0) == 0 ||
+                               name.rfind("@@ocel_lif_", 0) == 0;
+                      }));
 
   auto paths_disabled = options;
   paths_disabled.include_lifecycle_path_features = false;
