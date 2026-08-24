@@ -26,6 +26,7 @@ export interface ConceptDriftChangePoint {
 }
 export interface ConceptDriftResult {
   family: "CONCEPT_DRIFT";
+  variant?: "bose";
   activity_attribute?: string;
   timestamp_attribute?: string;
   case_id_attribute?: string;
@@ -41,7 +42,9 @@ export interface ConceptDriftResult {
 export function isConceptDriftResult(value: unknown): value is ConceptDriftResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Partial<ConceptDriftResult>;
-  if (candidate.family !== "CONCEPT_DRIFT" || !Array.isArray(candidate.activities) ||
+  if (candidate.family !== "CONCEPT_DRIFT" ||
+      (candidate.variant !== undefined && candidate.variant !== "bose") ||
+      !Array.isArray(candidate.activities) ||
       !candidate.activities.every((x) => typeof x === "string") ||
       !Array.isArray(candidate.feature_vectors) ||
       !candidate.feature_vectors.every((row) => Array.isArray(row) &&

@@ -2840,6 +2840,16 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
       throw std::invalid_argument(std::string(name) + ": expected a value");
     return value;
   };
+  if (supplied("drift_variant")) {
+    std::string variant(require("drift_variant"));
+    std::transform(variant.begin(), variant.end(), variant.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (variant != "bose")
+      throw std::invalid_argument("drift_variant: expected bose");
+    params.variant = ConceptDriftVariant::kBose;
+  }
   if (supplied("drift_sub_log_size"))
     params.sub_log_size = parse_positive_size(require("drift_sub_log_size"), "drift_sub_log_size");
   if (supplied("drift_window_size"))

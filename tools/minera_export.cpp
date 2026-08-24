@@ -585,6 +585,7 @@ int usage(const char* program) {
                "  --spectrum-timestamp-key <name> Timestamp attribute\n"
                "  --spectrum-case-id-key <name> Case identifier attribute\n"
                "  --concept-drift          Emit standalone concept-drift JSON\n"
+               "  --drift-variant <id>    bose (default)\n"
                "  --drift-sub-log-size <n> Positive raw sub-log size\n"
                "  --drift-window-size <n> Positive comparison window size\n"
                "  --drift-num-permutations <n> Permutation count\n"
@@ -2223,7 +2224,7 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
-          "drift_sub_log_size", "drift_window_size",
+          "drift_variant", "drift_sub_log_size", "drift_window_size",
           "drift_num_permutations", "drift_threshold",
           "drift_max_no_change_points", "drift_seed",
           "drift_include_timestamps", "drift_activity_attribute",

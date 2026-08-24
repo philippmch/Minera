@@ -94,7 +94,7 @@ describe("inclusive process-tree JSON", () => {
 
 describe("isConceptDriftResult", () => {
   const valid = {
-    family: "CONCEPT_DRIFT", activity_attribute: "event:type",
+    family: "CONCEPT_DRIFT", variant: "bose", activity_attribute: "event:type",
     timestamp_attribute: "started_at", case_id_attribute: "case:order",
     activities: ["A"], feature_vectors: [[1, 0, 0]],
     sublogs: [{ trace_count: 1, event_count: 1 }],
@@ -109,6 +109,7 @@ describe("isConceptDriftResult", () => {
     expect(isConceptDriftResult({ ...valid, change_points: [{ sublog_index: -1, p_value: 0.25 }] })).toBe(false);
     expect(isConceptDriftResult({ ...valid, feature_vectors: [[Number.NaN]] })).toBe(false);
     expect(isConceptDriftResult({ ...valid, activity_attribute: 7 })).toBe(false);
+    expect(isConceptDriftResult({ ...valid, variant: "other" })).toBe(false);
   });
 });
 

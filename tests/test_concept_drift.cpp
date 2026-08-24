@@ -56,6 +56,7 @@ int main() {
     }
   }
   minera::ConceptDriftOptions projected_options;
+  projected_options.variant = minera::ConceptDriftVariant::BOSE;
   projected_options.sub_log_size = 2;
   projected_options.window_size = 1;
   projected_options.num_permutations = 5;
@@ -68,6 +69,7 @@ int main() {
       minera::detect_concept_drift(projected, projected_options);
   assert((projected_result.activities ==
           std::vector<std::string>{"Alpha", "Beta"}));
+  assert(projected_result.variant == minera::ConceptDriftVariant::kBose);
   assert(projected_result.activity_attribute == "event:type");
   assert(projected_result.timestamp_attribute == "started_at");
   assert(projected_result.case_id_attribute == "case:order");
@@ -76,6 +78,8 @@ int main() {
   assert(projected_json.find("\"activity_attribute\":\"event:type\"") !=
          std::string::npos);
   assert(projected_json.find("\"timestamp_attribute\":\"started_at\"") !=
+         std::string::npos);
+  assert(projected_json.find("\"variant\":\"bose\"") !=
          std::string::npos);
 
   minera::ConceptDriftOptions options;
@@ -87,6 +91,7 @@ int main() {
   options.seed = 42;
   options.include_timestamps = true;
   const auto result = minera::detect_concept_drift(log, options);
+  assert(result.variant == minera::ConceptDriftVariant::kBose);
   assert(result.sublogs.size() == 2);
   assert(result.cumulative_sublogs.size() == 2);
   assert(result.cumulative_sublogs[0].traces.size() == 2);
@@ -106,6 +111,11 @@ int main() {
   options.num_permutations = 10;
   options.threshold = std::nan("");
   assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
+
+  options.threshold = 0.5;
+  options.variant = static_cast<minera::ConceptDriftVariant>(99);
+  assert(throws_invalid([&] { (void)minera::detect_concept_drift(log, options); }));
+  options.variant = minera::ConceptDriftVariant::kBose;
 
   options.threshold = 0.5;
   options.activity_attribute.clear();

@@ -3745,7 +3745,11 @@ std::string serialize_process_tree_playout_json(
 
 std::string concept_drift_json(const ConceptDriftResult& result) {
   std::ostringstream out;
-  out << "{\"family\":\"CONCEPT_DRIFT\",\"activity_attribute\":";
+  const std::string_view variant =
+      result.variant == ConceptDriftVariant::kBose ? "bose" : "unknown";
+  out << "{\"family\":\"CONCEPT_DRIFT\",\"variant\":";
+  write_json_string(out, variant);
+  out << ",\"activity_attribute\":";
   write_json_string(out, result.activity_attribute);
   out << ",\"timestamp_attribute\":";
   write_json_string(out, result.timestamp_attribute);

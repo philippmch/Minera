@@ -60,7 +60,7 @@ are reconciled.
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic seeded profile clustering now has bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering and the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings and extended arcs; broader differential semantics remain |
-| Concept drift | relation-type feature extraction and permutation-window drift detection | **Partial** — native extraction, seeded permutation windows, timestamp diagnostics, strict options, JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
+| Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial** — the explicit `BOSE` selector, seeded permutation windows, timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
@@ -622,13 +622,13 @@ outside this adapter.
 
 ## Concept-drift evidence
 
-The native concept-drift surface extracts deterministic relation-type count
+The native concept-drift surface explicitly selects the `BOSE` variant and extracts deterministic relation-type count
 vectors from ordered trace sub-logs and evaluates adjacent windows with a
 seeded permutation test. It supports configurable sub-log/window sizes,
 permutation counts, p-value threshold, result cap, and optional case-start
 timestamps. Activity, timestamp, and case-id selectors accept the standard
 keys or generic event/trace attributes, and the selected keys are echoed in
-the JSON response. Strict request parsing, standalone JSON, CLI, cached-session
+the JSON response. Strict variant/request parsing, standalone JSON, CLI, cached-session
 server, frontend request/response validation, and focused native/request tests
 are included. The current row remains partial pending differential edge-contract
 fixtures and the reference implementation's dataframe/lazyframe adapters.
@@ -1760,7 +1760,8 @@ source time, omits source-only moves, and marks each projected event's
 projection markers) and their XES scalar types round-trip through the XES
 importer/exporter.
 
-Concept-drift adapters expose deterministic `CONCEPT_DRIFT` JSON from the CLI
+Concept-drift adapters expose deterministic `CONCEPT_DRIFT` JSON with the
+selected `bose` variant from the CLI
 (`--concept-drift`, `--drift-*`) and cached-log server endpoint
 `POST /api/concept-drift`. Strict controls cover sub-log/window sizes,
 permutation count, threshold, change-point cap, seed, and optional timestamps;
