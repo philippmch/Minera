@@ -10,10 +10,16 @@
 
 namespace minera {
 
+enum class ConceptDriftVariant {
+  kBose,
+  BOSE = kBose,
+};
+
 // Configuration for the eventual-follow relation feature and window test.
 // A fixed seed makes the stochastic test reproducible; callers can select a
 // different stream without changing any of the extracted features.
 struct ConceptDriftOptions {
+  ConceptDriftVariant variant = ConceptDriftVariant::kBose;
   std::size_t sub_log_size = 50;
   std::size_t window_size = 8;
   std::size_t num_permutations = 100;
@@ -34,6 +40,7 @@ struct ConceptDriftChangePoint {
 };
 
 struct ConceptDriftResult {
+  ConceptDriftVariant variant = ConceptDriftVariant::kBose;
   // Activities and one relation-type-count vector per raw sub-log. Activities
   // are sorted lexicographically and vectors are laid out [always, sometimes,
   // never] for each target activity in that order.

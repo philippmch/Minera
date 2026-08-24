@@ -75,7 +75,8 @@ describe("native alignment adapters", () => {
     expect(hasActiveFilters({ admittedVariantsPositive: false })).toBe(false);
   });
   it("serializes concept drift controls", () => {
-    expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true, drift_activity_attribute: "event:type", drift_timestamp_attribute: "started_at", drift_case_id_attribute: "case:order" })).toBe("drift_activity_attribute=event%3Atype&drift_case_id_attribute=case%3Aorder&drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_timestamp_attribute=started_at&drift_window_size=2");
+    expect(conceptDriftQuery({ drift_variant: "bose", drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true, drift_activity_attribute: "event:type", drift_timestamp_attribute: "started_at", drift_case_id_attribute: "case:order" })).toBe("drift_activity_attribute=event%3Atype&drift_case_id_attribute=case%3Aorder&drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_timestamp_attribute=started_at&drift_variant=bose&drift_window_size=2");
+    expect(() => conceptDriftQuery({ drift_variant: "other" as "bose" })).toThrow(/drift_variant/);
   });
   it("serializes target transformation controls and guards responses", () => {
     expect(logToTargetQuery({

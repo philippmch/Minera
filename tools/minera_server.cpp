@@ -2928,7 +2928,7 @@ void handle_concept_drift(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "drift_sub_log_size", "drift_window_size",
+        "drift_variant", "drift_sub_log_size", "drift_window_size",
         "drift_num_permutations", "drift_threshold",
         "drift_max_no_change_points", "drift_seed",
         "drift_include_timestamps", "drift_activity_attribute",

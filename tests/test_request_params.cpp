@@ -590,6 +590,7 @@ void variant_statistics_params_contract() {
 
 void concept_drift_params_contract() {
   const auto p = minera::parse_concept_drift_params(fields({
+      {"drift_variant", "BOSE"},
       {"drift_sub_log_size", "3"}, {"drift_window_size", "2"},
       {"drift_num_permutations", "5"}, {"drift_threshold", "0.25"},
       {"drift_max_no_change_points", "4"}, {"drift_seed", "9"},
@@ -598,12 +599,17 @@ void concept_drift_params_contract() {
       {"drift_timestamp_attribute", "started_at"},
       {"drift_case_id_attribute", "case:order"}}));
   assert(p.sub_log_size == 3 && p.window_size == 2 && p.num_permutations == 5);
+  assert(p.variant == minera::ConceptDriftVariant::kBose);
   assert(p.threshold == 0.25 && p.max_no_change_points == 4 && p.seed == 9 && p.include_timestamps);
   assert(p.activity_attribute == "event:type" &&
          p.timestamp_attribute == "started_at" &&
          p.case_id_attribute == "case:order");
   bool threw = false;
   try { (void)minera::parse_concept_drift_params(fields({{"drift_threshold", "2"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_concept_drift_params(fields({{"drift_variant", "other"}})); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 }

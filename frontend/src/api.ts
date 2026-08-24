@@ -3565,6 +3565,7 @@ export async function fetchBpmn(miner: string): Promise<string> {
 }
 
 export interface ConceptDriftOptions {
+  drift_variant?: "bose";
   drift_sub_log_size?: number;
   drift_window_size?: number;
   drift_num_permutations?: number;
@@ -3578,6 +3579,9 @@ export interface ConceptDriftOptions {
 }
 
 export function conceptDriftQuery(options: ConceptDriftOptions = {}): string {
+  if (options.drift_variant !== undefined && options.drift_variant !== "bose") {
+    throw new Error("drift_variant must be bose");
+  }
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
     if (value !== undefined) query.set(key, String(value));

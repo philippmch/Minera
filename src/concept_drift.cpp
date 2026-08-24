@@ -22,6 +22,9 @@ constexpr long double kMaxCumulativeEventCopies = 20'000'000.0L;
 
 void validate_options(const ConceptDriftOptions& options, std::size_t trace_count,
                      std::size_t event_count, std::size_t feature_size) {
+  if (options.variant != ConceptDriftVariant::kBose) {
+    throw std::invalid_argument("concept drift: unsupported variant");
+  }
   if (options.activity_attribute.empty() ||
       options.timestamp_attribute.empty() || options.case_id_attribute.empty()) {
     throw std::invalid_argument(
@@ -285,6 +288,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
   }
 
   ConceptDriftResult result;
+  result.variant = options.variant;
   result.activities = activities;
   result.activity_attribute = options.activity_attribute;
   result.timestamp_attribute = options.timestamp_attribute;
