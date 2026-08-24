@@ -142,6 +142,7 @@ import {
   type BasicPlayoutOptions,
   type BasicPlayoutVisitedResult,
   type StochasticPlayoutOptions,
+  type StochasticPlayoutVisitedResult,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -188,6 +189,7 @@ import {
   isMonteCarloResult,
   isDfgPlayoutVariantsResult,
   isBasicPlayoutVisitedResult,
+  isStochasticPlayoutVisitedResult,
   isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
@@ -3234,6 +3236,12 @@ export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): 
     if (typeof options.stop_at_final !== "boolean") throw new Error("stop_at_final must be boolean");
     params.set("stochastic_stop_at_final", options.stop_at_final ? "true" : "false");
   }
+  if (options.return_visited_elements !== undefined) {
+    if (typeof options.return_visited_elements !== "boolean")
+      throw new Error("return_visited_elements must be boolean");
+    params.set("stochastic_return_visited_elements",
+      options.return_visited_elements ? "true" : "false");
+  }
   for (const name of ["initial_marking", "final_marking"] as const) {
     const value = options[name];
     if (value === undefined) continue;
@@ -3254,6 +3262,27 @@ export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): 
     }
   }
   return params.toString();
+}
+
+/** Fetches the structured visitation sequence emitted by stochastic Petri playout. */
+export async function fetchStochasticPlayoutVisited(
+  options: StochasticPlayoutOptions = {},
+): Promise<StochasticPlayoutVisitedResult> {
+  const query = stochasticPlayoutQuery({
+    ...options,
+    return_visited_elements: true,
+  });
+  const response = await fetch(`/api/playout?miner=stochastic${query ? `&${query}` : ""}`);
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isStochasticPlayoutVisitedResult(payload))
+    throw new Error("the Minera backend returned an invalid stochastic Petri visited playout");
+  return payload;
 }
 
 export function monteCarloQuery(options: MonteCarloOptions = {}): string {

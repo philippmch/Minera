@@ -77,6 +77,40 @@ void deterministic_and_timestamped() {
          "2026-01-01T00:00:00.000Z");
 }
 
+void stochastic_visited_records_silent_steps_and_preserves_default() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"finish"});
+  net.add_transition(std::nullopt, {source}, {middle});
+  net.add_transition(0, {middle}, {sink});
+
+  minera::StochasticPlayoutOptions options;
+  options.traces = 1;
+  options.max_steps = 2;
+  options.transition_weights = {1.0, 1.0};
+  options.return_visited_elements = true;
+  const auto ordinary = minera::stochastic_playout(net, options);
+  auto ordinary_without_flag = options;
+  ordinary_without_flag.return_visited_elements = false;
+  assert(activity_signature(ordinary) ==
+         activity_signature(minera::stochastic_playout(net, ordinary_without_flag)));
+  const auto visited = minera::stochastic_playout_visited(net, options);
+  assert(visited.traces.size() == 1 && visited.traces[0].size() == 5);
+  assert(visited.traces[0][0].kind == minera::PlayoutVisitedElementKind::MARKING);
+  assert(visited.traces[0][0].marking == std::vector<std::uint32_t>({1, 0, 0}));
+  assert(visited.traces[0][1].kind == minera::PlayoutVisitedElementKind::TRANSITION &&
+         visited.traces[0][1].transition_index == 0);
+  assert(visited.traces[0][2].marking == std::vector<std::uint32_t>({0, 1, 0}));
+  assert(visited.traces[0][3].transition_index == 1);
+  assert(visited.traces[0][4].marking == std::vector<std::uint32_t>({0, 0, 1}));
+  assert(minera::serialize_stochastic_playout_visited_json(net, visited).find(
+             R"("variant":"STOCHASTIC_PLAYOUT")") != std::string::npos);
+}
+
 void weighted_input_multiplicity_and_silent_steps() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -492,6 +526,7 @@ void fitting_replay_budget_is_validated() {
 
 int main() {
   deterministic_and_timestamped();
+  stochastic_visited_records_silent_steps_and_preserves_default();
   weighted_input_multiplicity_and_silent_steps();
   invalid_weights_are_rejected();
   huge_weights_are_scaled_without_overflow();

@@ -2557,6 +2557,10 @@ StochasticPlayoutParams parse_stochastic_playout_params(
   if (supplied("stochastic_stop_at_final"))
     params.stop_at_final = parse_boolean(require("stochastic_stop_at_final"),
                                          "stochastic_stop_at_final");
+  if (supplied("stochastic_return_visited_elements"))
+    params.return_visited_elements = parse_boolean(
+        require("stochastic_return_visited_elements"),
+        "stochastic_return_visited_elements");
   if (supplied("stochastic_start"))
     params.start = parse_finite_double(require("stochastic_start"),
                                        "stochastic_start");

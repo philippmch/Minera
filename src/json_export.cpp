@@ -3694,10 +3694,15 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
   return out.str();
 }
 
-std::string serialize_playout_visited_json(
-    const PetriNet& net, const PlayoutVisitedResult& result) {
+namespace {
+
+std::string serialize_playout_visited_json_variant(
+    const PetriNet& net, const PlayoutVisitedResult& result,
+    std::string_view variant) {
   std::ostringstream out;
-  out << "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"traces\":[";
+  out << "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":";
+  write_json_string(out, variant);
+  out << ",\"traces\":[";
   for (std::size_t i = 0; i < result.traces.size(); ++i) {
     if (i) out << ',';
     out << '[';
@@ -3732,6 +3737,19 @@ std::string serialize_playout_visited_json(
   }
   out << "]}";
   return out.str();
+}
+
+}  // namespace
+
+std::string serialize_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result) {
+  return serialize_playout_visited_json_variant(net, result, "BASIC_PLAYOUT");
+}
+
+std::string serialize_stochastic_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result) {
+  return serialize_playout_visited_json_variant(net, result,
+                                                "STOCHASTIC_PLAYOUT");
 }
 
 std::string serialize_process_tree_playout_json(

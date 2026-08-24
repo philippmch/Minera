@@ -2891,13 +2891,32 @@ export interface BasicPlayoutVisitedResult {
   traces: PlayoutVisitedElement[][];
 }
 
+export interface StochasticPlayoutVisitedResult {
+  family: "PETRI_PLAYOUT_VISITED";
+  variant: "STOCHASTIC_PLAYOUT";
+  traces: PlayoutVisitedElement[][];
+}
+
 export function isBasicPlayoutVisitedResult(
   value: unknown,
 ): value is BasicPlayoutVisitedResult {
+  return isPlayoutVisitedResult(value, "BASIC_PLAYOUT");
+}
+
+export function isStochasticPlayoutVisitedResult(
+  value: unknown,
+): value is StochasticPlayoutVisitedResult {
+  return isPlayoutVisitedResult(value, "STOCHASTIC_PLAYOUT");
+}
+
+function isPlayoutVisitedResult(
+  value: unknown,
+  variant: "BASIC_PLAYOUT" | "STOCHASTIC_PLAYOUT",
+): boolean {
   if (!value || typeof value !== "object") return false;
-  const result = value as Partial<BasicPlayoutVisitedResult>;
+  const result = value as Partial<BasicPlayoutVisitedResult | StochasticPlayoutVisitedResult>;
   if (result.family !== "PETRI_PLAYOUT_VISITED" ||
-      result.variant !== "BASIC_PLAYOUT" || !Array.isArray(result.traces)) {
+      result.variant !== variant || !Array.isArray(result.traces)) {
     return false;
   }
   return result.traces.every((trace) => {
@@ -2937,6 +2956,7 @@ export interface StochasticPlayoutOptions {
   start?: number;
   case_interval?: number;
   event_interval?: number;
+  return_visited_elements?: boolean;
 }
 
 /** Controls bounded virtual-time Petri-net Monte Carlo simulation. */
