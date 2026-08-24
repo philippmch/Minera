@@ -1561,6 +1561,10 @@ void handle_ocel_features(const httplib::Request& request,
         "include_general_descendants_features",
         "include_general_inheritance_features", "include_cobirth_features",
         "include_codeath_features",
+        "include_related_events_features",
+        "include_related_activities_features",
+        "include_obj_con_in_graph_features",
+        "include_lifecycle_path_features",
         "ocel_features_filter_per_type",
         "numeric_event_attributes", "string_event_attributes",
         "numeric_object_attributes", "string_object_attributes"};
@@ -1618,6 +1622,26 @@ void handle_ocel_features(const httplib::Request& request,
         request, "include_codeath_features", options.include_codeath_features);
     options.include_lifecycle_features = ocel_query_bool(
         request, "include_lifecycle_features", options.include_lifecycle_features);
+    options.include_lifecycle_path_features = ocel_query_bool(
+        request, "include_lifecycle_path_features",
+        options.include_lifecycle_path_features);
+    options.include_related_events_features = ocel_query_bool(
+        request, "include_related_events_features",
+        options.include_related_events_features);
+    options.include_related_activities_features = ocel_query_bool(
+        request, "include_related_activities_features",
+        options.include_related_activities_features);
+    options.include_obj_con_in_graph_features = ocel_query_bool(
+        request, "include_obj_con_in_graph_features",
+        options.include_obj_con_in_graph_features);
+    const auto object_only_control_supplied =
+        request.has_param("include_related_events_features") ||
+        request.has_param("include_related_activities_features") ||
+        request.has_param("include_obj_con_in_graph_features") ||
+        request.has_param("include_lifecycle_path_features");
+    if (object_only_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
+      throw std::invalid_argument(
+          "related-event, neighbor, and lifecycle-path feature options apply only to the objects variant");
     options.numeric_event_attributes =
         ocel_query_list(request, "numeric_event_attributes");
     options.string_event_attributes =

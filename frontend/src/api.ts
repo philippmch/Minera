@@ -4405,7 +4405,11 @@ export interface OcelFeatureOptions {
   include_general_inheritance_features?: boolean;
   include_cobirth_features?: boolean;
   include_codeath_features?: boolean;
+  include_related_events_features?: boolean;
+  include_related_activities_features?: boolean;
+  include_obj_con_in_graph_features?: boolean;
   include_lifecycle_features?: boolean;
+  include_lifecycle_path_features?: boolean;
   numeric_event_attributes?: string[];
   string_event_attributes?: string[];
   numeric_object_attributes?: string[];
@@ -4421,6 +4425,12 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     options.include_cobirth_features || options.include_codeath_features;
   if (objectGraphFeatures && options.variant !== "objects")
     throw new Error("object graph features apply only to objects");
+  const objectOnlyFeatureControl = options.include_related_events_features !== undefined ||
+    options.include_related_activities_features !== undefined ||
+    options.include_obj_con_in_graph_features !== undefined ||
+    options.include_lifecycle_path_features !== undefined;
+  if (objectOnlyFeatureControl && options.variant !== "objects")
+    throw new Error("related-event, neighbor, and lifecycle-path features apply only to objects");
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
   const addInteger = (name: string, value: number | undefined) => {
@@ -4443,7 +4453,11 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_general_inheritance_features", options.include_general_inheritance_features);
   addBoolean("include_cobirth_features", options.include_cobirth_features);
   addBoolean("include_codeath_features", options.include_codeath_features);
+  addBoolean("include_related_events_features", options.include_related_events_features);
+  addBoolean("include_related_activities_features", options.include_related_activities_features);
+  addBoolean("include_obj_con_in_graph_features", options.include_obj_con_in_graph_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
+  addBoolean("include_lifecycle_path_features", options.include_lifecycle_path_features);
   const addList = (name: string, values: string[] | undefined) => {
     if (values?.length) {
       const escape = (value: string) => value.replaceAll("\\", "\\\\")
