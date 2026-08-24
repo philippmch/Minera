@@ -50,6 +50,7 @@ import {
   type OcelEnrichmentResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
+  type OcelInteractionGraphSource,
   type OcelStatisticsResult,
   type OcelDescriptionResult,
   type ProcessCubeTable,
@@ -4553,6 +4554,7 @@ export async function requestOcelPlayout(
 export interface OcelFeatureOptions {
   variant?: "events" | "objects" | "events_objects";
   feature_name_style?: "native" | "compatibility";
+  interaction_graph_source?: OcelInteractionGraphSource;
   max_features?: number;
   include_activity_features?: boolean;
   include_timestamp_features?: boolean;
@@ -4618,6 +4620,13 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   if (options.feature_name_style === "compatibility" &&
       options.variant === "events_objects")
     throw new Error("compatibility feature names apply only to events or objects");
+  if (options.interaction_graph_source !== undefined &&
+      options.interaction_graph_source !== "event_cooccurrence" &&
+      options.interaction_graph_source !== "event_and_o2o")
+    throw new Error("interaction_graph_source must be event_cooccurrence or event_and_o2o");
+  if (options.interaction_graph_source !== undefined &&
+      options.variant !== "objects" && !relatedObjectEventContext)
+    throw new Error("interaction_graph_source applies only to objects");
   if (objectGraphControl && options.variant !== "objects" &&
       !relatedObjectEventContext)
     throw new Error("object graph features apply only to objects");
@@ -4656,6 +4665,8 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   if (options.variant !== undefined) query.set("variant", options.variant);
   if (options.feature_name_style !== undefined)
     query.set("feature_name_style", options.feature_name_style);
+  if (options.interaction_graph_source !== undefined)
+    query.set("interaction_graph_source", options.interaction_graph_source);
   const addInteger = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isInteger(value) && value > 0)
       query.set(name, String(value));

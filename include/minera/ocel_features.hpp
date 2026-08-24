@@ -25,6 +25,13 @@ enum class OcelFeatureNameStyle {
   COMPATIBILITY = kCompatibility,
 };
 
+enum class OcelInteractionGraphSource {
+  kEventAndO2O,
+  kEventCooccurrence,
+  EVENT_AND_O2O = kEventAndO2O,
+  EVENT_COOCCURRENCE = kEventCooccurrence,
+};
+
 struct OcelFeatureOptions {
   bool include_activity_features = true;
   OcelFeatureNameStyle feature_name_style = OcelFeatureNameStyle::kNative;
@@ -42,6 +49,10 @@ struct OcelFeatureOptions {
   std::optional<bool> include_event_end_ot_features;
   bool include_attribute_counts = true;
   bool include_interaction_features = true;
+  // Selects the edge source for normalized object interaction features and
+  // neighboring-object projections. An omitted value preserves the native
+  // event co-occurrence plus explicit O2O union for backwards compatibility.
+  std::optional<OcelInteractionGraphSource> interaction_graph_source;
   // Event newly-observed interactions inherit include_interaction_features
   // when unset and can be selected independently.
   std::optional<bool> include_new_interactions_features;
