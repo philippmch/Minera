@@ -41,6 +41,7 @@ void validate_node(const ProcessTreeNode& n, const ProcessTree& t) {
       return;
     case ProcessTreeOperator::kSequence:
     case ProcessTreeOperator::kExclusive:
+    case ProcessTreeOperator::kInclusiveChoice:
     case ProcessTreeOperator::kParallel:
       if (n.children.empty())
         throw std::invalid_argument("process-tree operator requires at least one child");
@@ -66,6 +67,43 @@ void append_unique(Words& out, Word word, std::size_t max_length,
   }
 }
 
+Words interleave_words(const Words& prefixes, const Words& suffixes,
+                       std::size_t max_length, EnumerationBudget& budget) {
+  Words out;
+  for (const auto& prefix : prefixes) {
+    if (budget.remaining == 0) break;
+    for (const auto& suffix : suffixes) {
+      if (budget.remaining == 0) break;
+      std::function<void(std::size_t, std::size_t, Word&)> interleave;
+      Word merged;
+      interleave = [&](std::size_t i, std::size_t j, Word&) {
+        if (budget.remaining == 0) return;
+        if (i == prefix.size() && j == suffix.size()) {
+          append_unique(out, merged, max_length, budget);
+          return;
+        }
+        if (i < prefix.size()) {
+          merged.push_back(prefix[i]);
+          interleave(i + 1, j, merged);
+          merged.pop_back();
+        }
+        if (j < suffix.size() && budget.remaining != 0) {
+          merged.push_back(suffix[j]);
+          interleave(i, j + 1, merged);
+          merged.pop_back();
+        }
+      };
+      interleave(0, 0, merged);
+    }
+  }
+  return out;
+}
+
+Words combine_parallel(const Words& current, const Words& child,
+                       std::size_t max_length, EnumerationBudget& budget) {
+  return interleave_words(current, child, max_length, budget);
+}
+
 std::optional<Word> first_word(const ProcessTreeNode& n,
                                const ProcessTree& tree) {
   switch (n.op) {
@@ -75,6 +113,9 @@ std::optional<Word> first_word(const ProcessTreeNode& n,
       if (n.activity >= tree.activities().size()) return std::nullopt;
       return Word{tree.activities()[n.activity]};
     case ProcessTreeOperator::kExclusive:
+      if (n.children.empty()) return std::nullopt;
+      return first_word(n.children.front(), tree);
+    case ProcessTreeOperator::kInclusiveChoice:
       if (n.children.empty()) return std::nullopt;
       return first_word(n.children.front(), tree);
     case ProcessTreeOperator::kSequence: {
@@ -128,6 +169,28 @@ Words enumerate(const ProcessTreeNode& n, const ProcessTree& tree,
       }
       return out;
     }
+    case ProcessTreeOperator::kInclusiveChoice: {
+      // An inclusive choice selects every non-empty subset of its children;
+      // selected children execute concurrently, just like a parallel cut.
+      Words out;
+      std::function<void(std::size_t, Words, std::size_t)> visit;
+      visit = [&](std::size_t index, Words current, std::size_t selected) {
+        if (budget.remaining == 0) return;
+        if (index == n.children.size()) {
+          if (selected != 0)
+            out.insert(out.end(), std::make_move_iterator(current.begin()),
+                       std::make_move_iterator(current.end()));
+          return;
+        }
+        visit(index + 1, current, selected);
+        Words child = enumerate(n.children[index], tree, max_length,
+                               max_loops, budget);
+        Words next = combine_parallel(current, child, max_length, budget);
+        visit(index + 1, std::move(next), selected + 1);
+      };
+      visit(0, Words{Word{}}, 0);
+      return out;
+    }
     case ProcessTreeOperator::kSequence: {
       Words out{Word{}};
       for (const auto& c : n.children) {
@@ -147,30 +210,7 @@ Words enumerate(const ProcessTreeNode& n, const ProcessTree& tree,
       Words out{Word{}};
       for (const auto& c : n.children) {
         Words child = enumerate(c, tree, max_length, max_loops, budget);
-        Words next;
-        for (const auto& prefix : out) {
-          if (budget.remaining == 0) break;
-          for (const auto& suffix : child) {
-            if (budget.remaining == 0) break;
-            std::function<void(std::size_t, std::size_t, Word&)> interleave;
-            Word merged;
-            interleave = [&](std::size_t i, std::size_t j, Word&) {
-              if (budget.remaining == 0) return;
-              if (i == prefix.size() && j == suffix.size()) {
-                append_unique(next, merged, max_length, budget);
-                return;
-              }
-              if (i < prefix.size()) {
-                merged.push_back(prefix[i]); interleave(i + 1, j, merged); merged.pop_back();
-              }
-              if (j < suffix.size() && budget.remaining != 0) {
-                merged.push_back(suffix[j]); interleave(i, j + 1, merged); merged.pop_back();
-              }
-            };
-            interleave(0, 0, merged);
-          }
-        }
-        out = std::move(next);
+        out = combine_parallel(out, child, max_length, budget);
       }
       return out;
     }
@@ -226,6 +266,38 @@ bool sample_node(const ProcessTreeNode& n, const ProcessTree& tree,
             candidate.size() <= max_length) { out = std::move(candidate); return true; }
       }
       return false;
+    }
+    case ProcessTreeOperator::kInclusiveChoice: {
+      if (n.children.empty()) return false;
+      std::vector<std::size_t> selected;
+      selected.reserve(n.children.size());
+      for (std::size_t i = 0; i < n.children.size(); ++i) {
+        if (std::bernoulli_distribution(0.5)(rng)) selected.push_back(i);
+      }
+      if (selected.empty()) selected.push_back(choose(n.children.size()));
+
+      std::vector<Word> parts;
+      parts.reserve(selected.size());
+      std::size_t total = 0;
+      for (const auto i : selected) {
+        Word part;
+        if (!sample_node(n.children[i], tree,
+                         max_length - std::min(max_length, total), max_loops,
+                         rng, part, top_bottom))
+          return false;
+        total += part.size();
+        parts.push_back(std::move(part));
+      }
+      while (!parts.empty()) {
+        std::vector<std::size_t> ready;
+        for (std::size_t i = 0; i < parts.size(); ++i)
+          if (!parts[i].empty()) ready.push_back(i);
+        if (ready.empty()) break;
+        const auto i = ready[choose(ready.size())];
+        out.push_back(parts[i].front());
+        parts[i].erase(parts[i].begin());
+      }
+      return out.size() <= max_length;
     }
     case ProcessTreeOperator::kSequence:
       for (const auto& c : n.children) {

@@ -121,6 +121,58 @@ ModelFp merge_xor(const std::vector<ModelFp>& children) {
   return out;
 }
 
+ModelFp merge_inclusive(const std::vector<ModelFp>& children) {
+  // Inclusive choice selects one or more children.  Its one-child language
+  // is therefore a valid branch, while selecting several children has the
+  // same interleaving relations as a parallel block.
+  ModelFp out;
+  bool first = true;
+  out.skippable = false;
+  out.max_length = std::size_t{0};
+  for (const auto& child : children) {
+    out.starts.insert(child.starts.begin(), child.starts.end());
+    out.ends.insert(child.ends.begin(), child.ends.end());
+    out.activities.insert(child.activities.begin(), child.activities.end());
+    out.sequence.insert(child.sequence.begin(), child.sequence.end());
+    out.parallel.insert(child.parallel.begin(), child.parallel.end());
+    out.skippable = out.skippable || child.skippable;
+    if (first) {
+      out.min_length = child.min_length;
+      out.max_length = child.max_length;
+      out.aah = child.aah;
+      first = false;
+    } else {
+      out.min_length = std::min(out.min_length, child.min_length);
+      if (out.max_length && child.max_length)
+        *out.max_length += *child.max_length;
+      else
+        out.max_length.reset();
+      if (!child.skippable) {
+        std::set<std::string> intersection;
+        std::set_intersection(out.aah.begin(), out.aah.end(),
+                              child.aah.begin(), child.aah.end(),
+                              std::inserter(intersection, intersection.end()));
+        out.aah = std::move(intersection);
+      } else {
+        out.aah.clear();
+      }
+    }
+    if (child.skippable) out.aah.clear();
+  }
+  for (std::size_t i = 0; i < children.size(); ++i) {
+    for (std::size_t j = i + 1; j < children.size(); ++j) {
+      for (const auto& a : children[i].activities) {
+        for (const auto& b : children[j].activities) {
+          out.parallel.insert({a, b});
+          out.parallel.insert({b, a});
+        }
+      }
+    }
+  }
+  fix_relations(out);
+  return out;
+}
+
 ModelFp tree_fp(const ProcessTreeNode& n, const std::vector<std::string>& names) {
   if (n.op == ProcessTreeOperator::kTau) return ModelFp{};
   if (n.op == ProcessTreeOperator::kActivity) {
@@ -134,6 +186,9 @@ ModelFp tree_fp(const ProcessTreeNode& n, const std::vector<std::string>& names)
   for (const auto& c : n.children) cs.push_back(tree_fp(c, names));
   if (n.op == ProcessTreeOperator::kExclusive) {
     return merge_xor(cs);
+  }
+  if (n.op == ProcessTreeOperator::kInclusiveChoice) {
+    return merge_inclusive(cs);
   }
   if (n.op == ProcessTreeOperator::kParallel) return merge_parallel(cs);
   if (n.op == ProcessTreeOperator::kSequence) {

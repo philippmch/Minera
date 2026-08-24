@@ -685,7 +685,10 @@ are uniformly selected among sequence, loop, XOR, and parallel, operator
 child-count ranges are bounded, and loop exits are silent. Leaf probability,
 minimum/maximum depth, seed, and deterministic activity labels are validated
 and exposed through recursive JSON, standalone CLI output, cached-session-free
-server GET, and frontend response validation.
+server GET, and frontend response validation. The PT-and-log generator also
+preserves inclusive-choice nodes when the OR weight is selected; their
+non-empty subset language is available through playout, Petri conversion,
+POWL/alignment expansion, PTML, BPMN, JSON, and frontend rendering.
 
 ## POWL parity evidence
 
@@ -722,8 +725,10 @@ workflow-net route shared with the server and rejects non-block structures.
 Transition frequency bounds map to optional or silent-redo loop blocks;
 connected partial-order components are layered by deterministic topological
 levels and disconnected components become parallel branches. Ordinary sequence,
-choice, parallel, and loop models round-trip through the existing tree-to-POWL
-conversion.
+choice, inclusive-choice, parallel, and loop models round-trip through the
+existing tree-to-POWL conversion; inclusive choices use a bounded XOR of
+non-empty concurrent subsets because the POWL object model has no primitive OR
+node.
 
 The reverse workflow-net conversion is also available through the native
 `to_powl(const PetriNet&)` API. It validates designated source/sink reachability

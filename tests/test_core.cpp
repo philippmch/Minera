@@ -1656,11 +1656,10 @@ void parse_ptml_reads_a_foreign_tree() {
 }
 
 void parse_ptml_rejects_malformed_trees() {
-  // A node kind with no equivalent here.
+  // Inclusive choice is supported, but it still requires at least one child.
   assert(throws([] {
     (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
-      <or id="n0" name=""/><manualTask id="n1" name="a"/>
-      <parentsNode id="e0" sourceId="n0" targetId="n1"/>
+      <or id="n0" name=""/>
     </processTree></ptml>)");
   }));
   // An edge referencing a node that does not exist.

@@ -151,6 +151,22 @@ int main() {
          PowlNodeKind::kStrictPartialOrder);
   assert(shared_ordered_redo.children()[1].has_edge(0, 1));
 
+  // Asymmetric boundaries still admit a common redo when the middle
+  // component returns to every start and is reachable from every end.
+  const auto asymmetric_boundaries = discover_powl(
+      log({{"A", "D", "X", "A"}, {"A", "D"}, {"A", "X", "A"}}),
+      tree);
+  assert(asymmetric_boundaries.kind() == PowlNodeKind::kLoop);
+  assert(asymmetric_boundaries.children()[1].label() == "X");
+
+  // Two boundary sets with separate return components are not one common
+  // loop: each component is incomplete against the other boundary.
+  const auto asymmetric_false_positive = discover_powl(
+      log({{"A", "D", "X", "A"}, {"A", "D"}, {"A", "X", "A"},
+           {"B", "Y", "B"}}),
+      tree);
+  assert(asymmetric_false_positive.kind() != PowlNodeKind::kLoop);
+
   // A connected middle component that returns to only one boundary is not a
   // common loop; accepting it would create a false-positive redo cut.
   const auto partial_shared_return = discover_powl(

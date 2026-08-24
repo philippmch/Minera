@@ -44,6 +44,19 @@ describe("computeTreeLayout", () => {
     }
   });
 
+  it("renders an inclusive OR operator with a distinct glyph", () => {
+    const layout = computeTreeLayout({
+      operator: "inclusive_or",
+      children: [
+        { operator: "activity", activity: 0 },
+        { operator: "activity", activity: 1 },
+      ],
+    }, data(["a", "b"]));
+    const op = layout.nodes.find((node) => node.kind === "operator")!;
+    expect(op.label).toBe("⊻");
+    expect(op.operator).toBe("inclusive_or");
+  });
+
   it("labels a tau leaf and a single-leaf tree", () => {
     const layout = computeTreeLayout({ operator: "tau" }, data([]));
     expect(layout.nodes).toHaveLength(1);

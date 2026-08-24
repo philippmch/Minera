@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <optional>
 #include <queue>
@@ -15,6 +16,11 @@
 
 namespace minera {
 namespace {
+
+constexpr std::size_t kMaxInclusiveChildren = 12;
+
+PowlNode inclusive_to_powl(const ProcessTreeNode& node,
+                           const std::vector<std::string>& activities);
 
 PowlNode tree_node_to_powl(const ProcessTreeNode& node,
                            const std::vector<std::string>& activities) {
@@ -51,6 +57,8 @@ PowlNode tree_node_to_powl(const ProcessTreeNode& node,
         children.push_back(tree_node_to_powl(child, activities));
       return PowlNode::xor_node(std::move(children));
     }
+    case ProcessTreeOperator::kInclusiveChoice:
+      return inclusive_to_powl(node, activities);
     case ProcessTreeOperator::kLoop: {
       if (node.children.size() != 2) {
         throw std::invalid_argument(
@@ -62,6 +70,46 @@ PowlNode tree_node_to_powl(const ProcessTreeNode& node,
     }
   }
   throw std::invalid_argument("unknown process-tree operator");
+}
+
+PowlNode inclusive_to_powl(const ProcessTreeNode& node,
+                           const std::vector<std::string>& activities) {
+  if (node.children.empty()) {
+    throw std::invalid_argument(
+        "process-tree inclusive OR requires at least one child");
+  }
+  if (node.children.size() > kMaxInclusiveChildren) {
+    throw std::invalid_argument(
+        "process-tree inclusive OR exceeds the POWL expansion limit of 12 children");
+  }
+
+  std::vector<PowlNode> converted;
+  converted.reserve(node.children.size());
+  for (const auto& child : node.children)
+    converted.push_back(tree_node_to_powl(child, activities));
+
+  std::vector<PowlNode> alternatives;
+  std::vector<std::size_t> selected;
+  const auto visit = [&](const auto& self, std::size_t index) -> void {
+    if (index == converted.size()) {
+      if (selected.empty()) return;
+      std::vector<PowlNode> branch;
+      branch.reserve(selected.size());
+      for (const auto child : selected) branch.push_back(converted[child]);
+      if (branch.size() == 1)
+        alternatives.push_back(std::move(branch.front()));
+      else
+        alternatives.push_back(PowlNode::concurrency(std::move(branch)));
+      return;
+    }
+    self(self, index + 1);
+    selected.push_back(index);
+    self(self, index + 1);
+    selected.pop_back();
+  };
+  visit(visit, 0);
+  if (alternatives.size() == 1) return std::move(alternatives.front());
+  return PowlNode::xor_node(std::move(alternatives));
 }
 
 class ProcessTreeBuilder {

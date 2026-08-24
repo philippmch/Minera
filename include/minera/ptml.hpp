@@ -11,7 +11,7 @@ namespace minera {
 
 // Serializes a process tree as PTML, the process-tree interchange format ProM
 // and other process-mining tools read: one element per node — sequence, xor,
-// and, xorLoop for the operators; manualTask for an activity leaf,
+// and, or, xorLoop for the operators; manualTask for an activity leaf,
 // automaticTask for a silent step — and one <parentsNode> edge per
 // parent-child link, whose document order fixes the child order. A loop is
 // written in the three-child shape those tools expect (body, redo, silent

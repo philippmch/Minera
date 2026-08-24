@@ -814,6 +814,14 @@ describe("mineFormEntries", () => {
       powlOrderFrequencyRatio: 1,
       powlBruteForceActivityLimit: 0,
     })).toEqual([]);
+    expect(() => mineFormEntries({ powlFilteringThreshold: Number.NaN }))
+      .toThrow(/powlFilteringThreshold/);
+    expect(() => mineFormEntries({ powlFilteringThreshold: 1 }))
+      .toThrow(/0 <= value < 1/);
+    expect(() => mineFormEntries({ powlOrderFrequencyRatio: 0.5 }))
+      .toThrow(/0.5 < value <= 1/);
+    expect(() => mineFormEntries({ powlBruteForceActivityLimit: 1.5 }))
+      .toThrow(/non-negative integer/);
   });
 
   it("maps non-default token-replay settings", () => {
