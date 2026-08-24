@@ -301,7 +301,17 @@ default runtime bridge; the latter is used only when a request has no explicit
 callback. The explicit
 `mock_transformer` model supplies the deterministic headless CLI/server/frontend
 integration path; other transformer models require an application callback and
-never fall back to hashing. Provider, model label, and vector dimension are
+never fall back to hashing. For standalone and cached-server operation, the
+optional `--embedding-runtime-url http://host:port` bridge posts
+`{"text":"...","model":"...","dimensions":N}` to the fixed `/embed`
+path and requires a successful response shaped exactly as
+`{"embedding":[finite numbers...]}` with the requested dimension. Connection,
+read, and write calls are bounded to five seconds; malformed URLs, HTTP
+failures, extra fields, malformed numbers, empty vectors, wrong dimensions, and
+non-finite values are rejected. The CLI enables transformer mode unless an
+explicit provider is supplied; the server applies the same default only when
+the request omits its provider, so explicit hashing remains unchanged. Provider,
+model label, and vector dimension are
 echoed by JSON and similarity responses. `minera_export --embeddings`, cached-session
 `POST /api/embeddings`, and the typed frontend request/response guards share the
 same provider-aware contract. Similarity rows sort by descending cosine score,

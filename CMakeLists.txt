@@ -177,6 +177,7 @@ add_executable(minera_export
   tools/minera_export.cpp
 )
 target_link_libraries(minera_export PRIVATE minera::core)
+target_include_directories(minera_export PRIVATE third_party)
 target_compile_features(minera_export PRIVATE cxx_std_20)
 
 add_executable(minera_ocel
@@ -431,6 +432,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_embeddings_tests PRIVATE cxx_std_20)
   target_compile_options(minera_embeddings_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_embeddings_tests COMMAND minera_embeddings_tests)
+
+  add_executable(minera_embedding_runtime_tests
+    tests/test_embedding_runtime.cpp
+  )
+  target_link_libraries(minera_embedding_runtime_tests PRIVATE minera::core)
+  target_include_directories(minera_embedding_runtime_tests PRIVATE third_party tools)
+  target_compile_features(minera_embedding_runtime_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_embedding_runtime_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_embedding_runtime_tests COMMAND minera_embedding_runtime_tests)
 
   add_executable(minera_chaotic_activities_tests
     tests/test_chaotic_activities.cpp
