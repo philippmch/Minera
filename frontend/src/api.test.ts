@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
 
 describe("Petri usage comparison API", () => {
   it("serializes explicit replay markings in the multipart request", async () => {
@@ -97,6 +97,22 @@ describe("DFG playout API", () => {
       ok: true, text: async () => "<log/>",
     })));
     await expect(fetchDfgPlayout()).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("basic Petri playout API", () => {
+  it("uses the generic Petri route for basic-only controls", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/playout?miner=inductive");
+      expect(path).toContain("add_only_if_fm_is_reached=true");
+      expect(path).toContain("initial_marking=0%2C1%2C0");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchPlayout("inductive", {
+      traces: 2, initial_marking: [0, 1, 0],
+      add_only_if_fm_is_reached: true,
+    })).resolves.toBe("<log/>");
     vi.unstubAllGlobals();
   });
 });

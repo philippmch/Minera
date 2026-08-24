@@ -2808,6 +2808,20 @@ export interface ProcessTreePlayoutOptions {
   max_trace_cap?: number;
 }
 
+/** Controls uniform random execution of a Petri-net model. */
+export interface BasicPlayoutOptions {
+  traces?: number;
+  max_steps?: number;
+  seed?: number;
+  initial_marking?: number[];
+  final_marking?: number[];
+  start?: number;
+  case_interval?: number;
+  event_interval?: number;
+  add_only_if_fm_is_reached?: boolean;
+  fm_leq_accepted?: boolean;
+}
+
 /** Controls weighted random execution of a Petri-net model. */
 export interface StochasticPlayoutOptions {
   traces?: number;

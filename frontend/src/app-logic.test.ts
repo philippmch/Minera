@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, type FilterOptions } from "./api";
+import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, type FilterOptions } from "./api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -378,6 +378,30 @@ describe("DFG playout contract", () => {
     expect(() => dfgPlayoutQuery({ traces: 0 })).toThrow(/positive/);
     expect(() => dfgPlayoutQuery({ min_weighted_probability: 2 })).toThrow(/between/);
     expect(() => dfgPlayoutQuery({ case_arrival_rate: -1 })).toThrow(/non-negative/);
+  });
+});
+
+describe("basic Petri playout contract", () => {
+  it("serializes timing, markings, and final acceptance controls", () => {
+    const query = new URLSearchParams(basicPlayoutQuery({
+      traces: 12, max_steps: 99, seed: 7, start: 1767225600,
+      case_interval: 2.5, event_interval: 0.25,
+      initial_marking: [0, 1, 0], final_marking: [0, 0, 1],
+      add_only_if_fm_is_reached: true, fm_leq_accepted: true,
+    }));
+    expect(query.get("traces")).toBe("12");
+    expect(query.get("max_steps")).toBe("99");
+    expect(query.get("seed")).toBe("7");
+    expect(query.get("initial_marking")).toBe("0,1,0");
+    expect(query.get("final_marking")).toBe("0,0,1");
+    expect(query.get("add_only_if_fm_is_reached")).toBe("true");
+    expect(query.get("fm_leq_accepted")).toBe("true");
+  });
+  it("rejects invalid final-acceptance controls", () => {
+    expect(() => basicPlayoutQuery({ traces: 0 })).toThrow(/positive/);
+    expect(() => basicPlayoutQuery({ event_interval: -1 })).toThrow(/non-negative/);
+    expect(() => basicPlayoutQuery({ fm_leq_accepted: "yes" as unknown as boolean })).toThrow(/boolean/);
+    expect(() => basicPlayoutQuery({ initial_marking: [] })).toThrow(/non-empty/);
   });
 });
 

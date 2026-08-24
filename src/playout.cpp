@@ -21,6 +21,15 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
     throw std::invalid_argument(
         "playout requires valid workflow source and sink places");
   }
+  if (!std::isfinite(options.start) ||
+      !std::isfinite(options.case_interval) ||
+      !std::isfinite(options.event_interval)) {
+    throw std::invalid_argument("playout timestamps must be finite");
+  }
+  if (options.case_interval < 0.0 || options.event_interval < 0.0) {
+    throw std::invalid_argument(
+        "playout intervals must be non-negative");
+  }
   const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
                                    std::size_t boundary,
                                    const char* label) {
@@ -40,6 +49,14 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
       resolve_marking(options.initial_marking, net.source(), "initial");
   const auto final_marking =
       resolve_marking(options.final_marking, net.sink(), "final");
+  const auto final_reached = [&](const std::vector<std::uint32_t>& marking) {
+    if (marking == final_marking) return true;
+    if (!options.fm_leq_accepted) return false;
+    return std::all_of(final_marking.begin(), final_marking.end(),
+                       [&, index = std::size_t{0}](std::uint32_t required) mutable {
+                         return required <= marking[index++];
+                       });
+  };
   std::mt19937_64 rng(options.seed);
 
   EventLog log;
@@ -56,9 +73,9 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
     marking = initial_marking;
 
     for (std::size_t step = 0; step < options.max_steps; ++step) {
-      // Reaching the selected final marking completes the case even if more
+      // Reaching an accepted final marking completes the case even if more
       // transitions could still fire (for example, a loop's redo path).
-      if (marking == final_marking) break;
+      if (final_reached(marking)) break;
 
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
@@ -88,6 +105,7 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
       }
     }
 
+    if (options.add_only_if_fm_is_reached && !final_reached(marking)) continue;
     log.traces.push_back(std::move(trace));
   }
 

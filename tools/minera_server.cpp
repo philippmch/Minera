@@ -4595,10 +4595,10 @@ void handle_playout(const httplib::Request& request,
     return;
   }
 
-  if (request.has_param("min_length") || request.has_param("seed") ||
+  if (request.has_param("min_length") ||
       (request.has_param("max_length") && mode != "extensive")) {
-    reject("min_length, max_length, and seed are Declare-only unless "
-           "max_length is used with Petri mode=extensive");
+    reject("min_length and max_length are Declare-only unless max_length "
+           "is used with Petri mode=extensive");
     return;
   }
   minera::PlayoutOptions options;
@@ -4607,8 +4607,53 @@ void handle_playout(const httplib::Request& request,
     if (!parsed) return;
     options.traces = static_cast<std::size_t>(*parsed);
   }
+  if (request.has_param("max_steps")) {
+    const auto parsed = parse_bounded("max_steps", 0, 10000);
+    if (!parsed) return;
+    options.max_steps = static_cast<std::size_t>(*parsed);
+  }
+  if (request.has_param("seed")) {
+    const auto parsed = parse_bounded(
+        "seed", 0, std::numeric_limits<std::uint64_t>::max());
+    if (!parsed) return;
+    options.seed = *parsed;
+  }
+  if (mode == "extensive" &&
+      (request.has_param("max_steps") || request.has_param("seed") ||
+       request.has_param("start") || request.has_param("case_interval") ||
+       request.has_param("event_interval") ||
+       request.has_param("add_only_if_fm_is_reached") ||
+       request.has_param("fm_leq_accepted"))) {
+    reject("basic Petri playout controls require the default sampling mode");
+    return;
+  }
+  try {
+    options.start = ocel_query_number(request, "start", options.start);
+    options.case_interval =
+        ocel_query_number(request, "case_interval", options.case_interval);
+    options.event_interval =
+        ocel_query_number(request, "event_interval", options.event_interval);
+    if (options.case_interval < 0.0 || options.event_interval < 0.0) {
+      reject("case_interval and event_interval must be non-negative");
+      return;
+    }
+    options.add_only_if_fm_is_reached = ocel_query_bool(
+        request, "add_only_if_fm_is_reached", false);
+    options.fm_leq_accepted =
+        ocel_query_bool(request, "fm_leq_accepted", false);
+  } catch (const std::exception& error) {
+    reject(error.what());
+    return;
+  }
   options.initial_marking = parse_playout_marking(request, "initial_marking");
   options.final_marking = parse_playout_marking(request, "final_marking");
+
+  constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
+  if (options.traces != 0 && options.max_steps != 0 &&
+      options.traces > kMaxGeneratedEvents / options.max_steps) {
+    reject("Petri playout event budget exceeds the server safety limit");
+    return;
+  }
 
   // mode=extensive enumerates the model's distinct traces (shortest first,
   // capped by `traces` and `max_length`) instead of sampling randomly.

@@ -137,6 +137,7 @@ import {
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
+  type BasicPlayoutOptions,
   type StochasticPlayoutOptions,
   type MonteCarloOptions,
   type MonteCarloResult,
@@ -3121,6 +3122,47 @@ export async function comparePetriUsage(
   return parsed;
 }
 
+export function basicPlayoutQuery(options: BasicPlayoutOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.traces !== undefined) {
+    validatePlayoutInteger("traces", options.traces, true);
+    params.set("traces", String(options.traces));
+  }
+  if (options.max_steps !== undefined) {
+    validatePlayoutInteger("max_steps", options.max_steps);
+    params.set("max_steps", String(options.max_steps));
+  }
+  if (options.seed !== undefined) {
+    validatePlayoutInteger("seed", options.seed);
+    params.set("seed", String(options.seed));
+  }
+  for (const name of ["initial_marking", "final_marking"] as const) {
+    const value = options[name];
+    if (value === undefined) continue;
+    if (!Array.isArray(value) || value.length === 0 ||
+        value.some((entry) => !Number.isInteger(entry) || entry < 0 ||
+          entry > 0xffffffff)) {
+      throw new Error(`${name} must be a non-empty uint32 marking`);
+    }
+    params.set(name, value.join(","));
+  }
+  for (const name of ["start", "case_interval", "event_interval"] as const) {
+    const value = options[name];
+    if (value === undefined) continue;
+    if (!Number.isFinite(value) || (name !== "start" && value < 0)) {
+      throw new Error(`${name} must be a finite ${name === "start" ? "number" : "non-negative number"}`);
+    }
+    params.set(name, String(value));
+  }
+  for (const name of ["add_only_if_fm_is_reached", "fm_leq_accepted"] as const) {
+    const value = options[name];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
+    params.set(name, value ? "true" : "false");
+  }
+  return params.toString();
+}
+
 export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {}): string {
   const params = new URLSearchParams();
   if (options.variant !== undefined) {
@@ -3335,11 +3377,12 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
   return params.toString();
 }
 
-export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOptions | StochasticPlayoutOptions | MonteCarloOptions | DfgPlayoutOptions = {}): Promise<string> {
+export async function fetchPlayout(miner: string, options: BasicPlayoutOptions | ProcessTreePlayoutOptions | StochasticPlayoutOptions | MonteCarloOptions | DfgPlayoutOptions = {}): Promise<string> {
   const monteCarlo = miner === "monte_carlo" || "simulations" in options ||
     "default_duration_seconds" in options || "transition_durations" in options ||
     "resources_per_place" in options;
-  const stochastic = miner === "stochastic" || "transition_weights" in options || "fit_from_log" in options || "stop_at_final" in options || "initial_marking" in options || "final_marking" in options || "case_interval" in options || "event_interval" in options || "start" in options;
+  const stochastic = miner === "stochastic" || "transition_weights" in options ||
+    "fit_from_log" in options || "stop_at_final" in options;
   let query: string;
   if (monteCarlo) {
     const controls = monteCarloQuery(options as MonteCarloOptions);
@@ -3348,7 +3391,11 @@ export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOpt
     const controls = stochasticPlayoutQuery(options as StochasticPlayoutOptions);
     query = `mode=stochastic${controls ? `&${controls}` : ""}`;
   } else {
-    query = miner === "dfg" ? dfgPlayoutQuery(options as DfgPlayoutOptions) : processTreePlayoutQuery(options as ProcessTreePlayoutOptions);
+    query = miner === "dfg"
+      ? dfgPlayoutQuery(options as DfgPlayoutOptions)
+      : miner === "process_tree" || miner === "declare"
+        ? processTreePlayoutQuery(options as ProcessTreePlayoutOptions)
+        : basicPlayoutQuery(options as BasicPlayoutOptions);
   }
   let response: Response;
   try {
