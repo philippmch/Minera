@@ -1,8 +1,11 @@
 #include "minera/ocel.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <string>
+
+#include "minera/conformance.hpp"
 
 int main() {
   const std::string input =
@@ -256,6 +259,7 @@ int main() {
              .events.size() == 1);
   assert(ocpn.annotations.edges.at("order").at({"Create", "Ship"})
              .event_couples.size() == 1);
+  assert(ocpn.tbr_results.empty());
   const auto ocpn_json = minera::serialize_ocpn_json(ocpn);
   assert(ocpn_json.find("double_arcs_on_activity") != std::string::npos);
   assert(ocpn_json.find("activity_object_types") != std::string::npos);
@@ -264,6 +268,29 @@ int main() {
   assert(ocpn_json.find("\"annotations\"") != std::string::npos);
   assert(ocpn_json.find("\"event_pairs\"") != std::string::npos);
   assert(ocpn_json.find("\"total_objects\":[[") != std::string::npos);
+  assert(ocpn_json.find("\"tbr_results\":{}") != std::string::npos);
+  ocpn_options.diagnostics_with_token_based_replay = true;
+  const auto ocpn_with_tbr = minera::discover_ocpn(log, ocpn_options);
+  assert(ocpn_with_tbr.tbr_results.size() == 2);
+  for (const auto& [type, diagnostics] : ocpn_with_tbr.tbr_results) {
+    (void)type;
+    assert(diagnostics.enabled && diagnostics.trace_count == 1 &&
+           diagnostics.fitting_traces == 1 &&
+           diagnostics.places.size() ==
+               ocpn_with_tbr.petri_nets.at(type).place_count() &&
+           diagnostics.transition_activations.size() ==
+               ocpn_with_tbr.petri_nets.at(type).transitions().size());
+    assert(std::any_of(diagnostics.transition_activations.begin(),
+                       diagnostics.transition_activations.end(),
+                       [](std::uint64_t count) { return count != 0; }));
+  }
+  const auto ocpn_with_tbr_json = minera::serialize_ocpn_json(ocpn_with_tbr);
+  assert(ocpn_with_tbr_json.find("\"tbr_results\":{\"item\"") !=
+         std::string::npos);
+  assert(ocpn_with_tbr_json.find("\"places\":[{\"m\":") !=
+         std::string::npos);
+  assert(ocpn_with_tbr_json ==
+         minera::serialize_ocpn_json(ocpn_with_tbr));
   auto variable_log = log;
   variable_log.objects.push_back({"o3", "item", {}});
   variable_log.relations.push_back({"e2", "o3", "target"});
@@ -281,8 +308,31 @@ int main() {
   ocpn_options.annotated = false;
   const auto ocpn_plain = minera::discover_ocpn(log, ocpn_options);
   assert(!ocpn_plain.annotated && ocpn_plain.annotations.activities.empty());
+  assert(ocpn_plain.tbr_results.at("order").enabled &&
+         ocpn_plain.tbr_results.at("item").enabled);
   assert(minera::serialize_ocpn_json(ocpn_plain).find("\"annotations\":null") !=
          std::string::npos);
+
+  minera::PetriNet replay_net;
+  const auto replay_source = replay_net.add_place();
+  const auto replay_middle = replay_net.add_place();
+  const auto replay_sink = replay_net.add_place();
+  replay_net.set_source(replay_source);
+  replay_net.set_sink(replay_sink);
+  replay_net.set_activities({"A", "B"});
+  replay_net.add_transition(0, {replay_source}, {replay_middle});
+  replay_net.add_transition(1, {replay_middle}, {replay_sink});
+  minera::EventLog replay_log;
+  replay_log.traces.push_back({"deviating", {{"", "B", "", "", 0, {}, {}}}, {}});
+  const auto replay_diagnostics =
+      minera::replay_token_diagnostics(replay_log, replay_net);
+  assert(replay_diagnostics.trace_count == 1 &&
+         replay_diagnostics.fitting_traces == 0 &&
+         replay_diagnostics.transition_activations.size() == 2);
+  std::uint64_t total_missing = 0;
+  for (const auto& place : replay_diagnostics.places)
+    total_missing += place.missing;
+  assert(total_missing > 0 && replay_diagnostics.transition_activations[1] == 1);
 
   const auto tuple_description = minera::describe_ocel_tuples(log);
   assert(tuple_description.includes_timestamps);

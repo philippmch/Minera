@@ -1,4 +1,5 @@
 #include "minera/ocel.hpp"
+#include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
 
@@ -1259,13 +1260,26 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     result.annotations = discover_ocdfg_classic(log, false);
   }
   for (const auto& type : result.object_types) {
+    OcpnTokenReplayDiagnostics* token_replay_diagnostics = nullptr;
+    if (options.diagnostics_with_token_based_replay) {
+      auto& diagnostics = result.tbr_results[type];
+      diagnostics.enabled = true;
+      token_replay_diagnostics = &diagnostics;
+    }
     EventLog flattened;
+    EventLog replay_flattened;
     std::map<std::string, std::set<std::string>> object_event_ids;
+    std::map<std::string, std::vector<std::string>> replay_event_ids;
     for (const auto& relation : log.relations) {
       const auto type_it = object_type.find(relation.object_id);
       if (type_it == object_type.end() || type_it->second != type) continue;
-      if (event_by_id.count(relation.event_id))
+      if (event_by_id.count(relation.event_id)) {
         object_event_ids[relation.object_id].insert(relation.event_id);
+        auto& ordered = replay_event_ids[relation.object_id];
+        if (std::find(ordered.begin(), ordered.end(), relation.event_id) ==
+            ordered.end())
+          ordered.push_back(relation.event_id);
+      }
     }
     for (const auto& [object_id, event_ids] : object_event_ids) {
       Trace trace;
@@ -1280,14 +1294,44 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       order_events_by_time(trace.events);
       if (!trace.events.empty()) flattened.traces.push_back(std::move(trace));
     }
+    for (const auto& [object_id, event_ids] : replay_event_ids) {
+      Trace trace;
+      trace.case_id = object_id;
+      for (const auto& event_id : event_ids) {
+        const auto event_it = event_by_id.find(event_id);
+        if (event_it == event_by_id.end()) continue;
+        const auto* event = event_it->second;
+        trace.events.push_back(Event{object_id, event->activity,
+                                     event->timestamp, {}, event_order[event_id],
+                                     {}, {}});
+      }
+      if (!trace.events.empty()) replay_flattened.traces.push_back(std::move(trace));
+    }
 
     InductiveMinerOptions miner_options;
     miner_options.noise_threshold = options.noise_threshold;
     miner_options.variant = options.variant == OcpnInductiveVariant::kDfg
                                 ? InductiveMinerVariant::kDfg
                                 : InductiveMinerVariant::kLog;
-    const auto tree = discover_process_tree(flattened, miner_options);
+    const auto& discovery_log = options.diagnostics_with_token_based_replay
+                                    ? replay_flattened
+                                    : flattened;
+    const auto tree = discover_process_tree(discovery_log, miner_options);
     result.petri_nets[type] = to_petri_net(tree);
+
+    if (token_replay_diagnostics != nullptr) {
+      const auto replay = replay_token_diagnostics(
+          replay_flattened, result.petri_nets.at(type));
+      token_replay_diagnostics->trace_count = replay.trace_count;
+      token_replay_diagnostics->fitting_traces = replay.fitting_traces;
+      token_replay_diagnostics->transition_activations =
+          std::move(replay.transition_activations);
+      token_replay_diagnostics->places.reserve(replay.places.size());
+      for (const auto& place : replay.places) {
+        token_replay_diagnostics->places.push_back(
+            {place.missing, place.remaining, place.consumed, place.produced});
+      }
+    }
 
     if (options.annotated) {
       const auto type_it = result.annotations.activities_ot.find(type);
@@ -1539,6 +1583,34 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
       out << ':' << (is_double ? "true" : "false");
     }
     out << '}';
+  }
+  out << "},\"tbr_results\":{";
+  bool first_diagnostic_type = true;
+  for (const auto& [type, diagnostic] : graph.tbr_results) {
+    if (!diagnostic.enabled) continue;
+    if (!first_diagnostic_type) out << ',';
+    first_diagnostic_type = false;
+    write_string(out, type);
+    out << ":{";
+    out << "\"enabled\":" << (diagnostic.enabled ? "true" : "false")
+        << ",\"trace_count\":" << diagnostic.trace_count
+        << ",\"fitting_traces\":" << diagnostic.fitting_traces
+        << ",\"places\":[";
+    for (std::size_t place = 0; place < diagnostic.places.size(); ++place) {
+      if (place != 0) out << ',';
+      const auto& counts = diagnostic.places[place];
+      out << "{\"m\":" << counts.missing
+          << ",\"r\":" << counts.remaining
+          << ",\"c\":" << counts.consumed
+          << ",\"p\":" << counts.produced << '}';
+    }
+    out << "],\"transition_activations\":[";
+    for (std::size_t transition = 0;
+         transition < diagnostic.transition_activations.size(); ++transition) {
+      if (transition != 0) out << ',';
+      out << diagnostic.transition_activations[transition];
+    }
+    out << "]}";
   }
   out << "},\"annotations\":";
   if (graph.annotated) {

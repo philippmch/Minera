@@ -236,6 +236,22 @@ struct OcpnDiscoveryOptions {
   // no-annotation form discovers the same per-object-type nets without that
   // diagnostic payload.
   bool annotated = true;
+  bool diagnostics_with_token_based_replay = false;
+};
+
+struct OcpnTokenReplayPlaceDiagnostics {
+  std::uint64_t missing = 0;
+  std::uint64_t remaining = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t produced = 0;
+};
+
+struct OcpnTokenReplayDiagnostics {
+  bool enabled = false;
+  std::uint64_t trace_count = 0;
+  std::uint64_t fitting_traces = 0;
+  std::vector<OcpnTokenReplayPlaceDiagnostics> places;
+  std::vector<std::uint64_t> transition_activations;
 };
 
 struct OcpnGraph {
@@ -255,6 +271,7 @@ struct OcpnGraph {
   // callers without changing the compact Petri-net representation.
   OcdfgGraph annotations;
   bool annotated = true;
+  std::map<std::string, OcpnTokenReplayDiagnostics> tbr_results;
 };
 
 OcpnGraph discover_ocpn(const Ocel& log,

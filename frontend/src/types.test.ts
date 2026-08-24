@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+
+describe("OCPN token replay result guard", () => {
+  const diagnostic = { enabled: true, trace_count: 1, fitting_traces: 1,
+    places: [{ m: 0, r: 0, c: 1, p: 1 }],
+    transition_activations: [1] };
+  it("accepts deterministic per-type diagnostics and disabled empty results", () => {
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 1, transitions: [{}] } },
+        tbr_results: { order: diagnostic } } })).toBe(true);
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: {}, tbr_results: {} } })).toBe(true);
+  });
+  it("rejects malformed counters", () => {
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 1, transitions: [{}] } },
+        tbr_results: { order: { ...diagnostic, places: [{ ...diagnostic.places[0], m: -1 }] } } } })).toBe(false);
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 1, transitions: [{}] } },
+        tbr_results: { order: { ...diagnostic, enabled: false } } } })).toBe(false);
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 2, transitions: [{}] } },
+        tbr_results: { order: diagnostic } } })).toBe(false);
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 1, transitions: [{}] } },
+        tbr_results: { item: diagnostic } } })).toBe(false);
+    expect(isOcelDiscoveryResult({ family: "OCEL_DISCOVERY", variant: "ocpn",
+      result: { petri_nets: { order: { place_count: 1, transitions: [{}] } },
+        tbr_results: { order: { ...diagnostic, fitting_traces: 2 } } } })).toBe(false);
+  });
+});
 
 describe("inclusive process-tree JSON", () => {
   it("accepts inclusive OR nodes in random-tree responses", () => {

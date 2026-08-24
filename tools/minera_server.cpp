@@ -1257,7 +1257,8 @@ void handle_ocel_discovery(const httplib::Request& request,
                            httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "compute_edges_performance", "ocpn_annotation"};
+        "variant", "compute_edges_performance", "ocpn_annotation",
+        "diagnostics_with_token_based_replay"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1293,6 +1294,8 @@ void handle_ocel_discovery(const httplib::Request& request,
               "ocpn_annotation expects annotated or none");
         }
       }
+      discovery.diagnostics_with_token_based_replay = ocel_query_bool(
+          request, "diagnostics_with_token_based_replay", false);
       payload = minera::serialize_ocpn_json(
           minera::discover_ocpn(log, discovery));
     } else if (variant == "saw") {
