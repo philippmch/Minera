@@ -3214,6 +3214,17 @@ EmbeddingParams parse_embedding_params(const FieldLookup& field,
           "embedding_variant: expected cases or events");
     }
   }
+  if (supplied("embedding_provider")) {
+    const auto value = require("embedding_provider");
+    if (value == "hashing" || value == "HASHING") {
+      params.provider = EmbeddingProvider::HASHING;
+    } else if (value == "transformer" || value == "TRANSFORMER") {
+      params.provider = EmbeddingProvider::TRANSFORMER;
+    } else {
+      throw std::invalid_argument(
+          "embedding_provider: expected hashing or transformer");
+    }
+  }
   if (supplied("embedding_model"))
     params.embedding_model = require("embedding_model");
   if (supplied("embedding_attribute_key"))

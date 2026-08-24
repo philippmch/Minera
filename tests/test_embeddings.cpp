@@ -2,7 +2,10 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
+#include <string_view>
+#include <vector>
 
 using namespace minera;
 
@@ -57,6 +60,75 @@ int main() {
   }
   assert(model_mismatch);
 
+  EmbeddingOptions transformer_options = options;
+  transformer_options.provider = EmbeddingProvider::TRANSFORMER;
+  transformer_options.embedding_model = "demo-transformer";
+  std::vector<std::string> callback_texts;
+  std::string callback_model;
+  std::size_t callback_dimensions = 0;
+  transformer_options.transformer_callback =
+      [&](std::string_view text, std::string_view model, std::size_t dimensions) {
+        callback_texts.emplace_back(text);
+        callback_model = std::string(model);
+        callback_dimensions = dimensions;
+        std::vector<double> values(dimensions, 0.0);
+        values[0] = 1.0;
+        return values;
+      };
+  const auto transformer_cases = to_embeddings(log, transformer_options);
+  assert(transformer_cases.provider == EmbeddingProvider::TRANSFORMER);
+  assert(callback_texts.size() == 2 && callback_texts[0] == "Approve Ship" &&
+         callback_texts[1] == "Reject");
+  assert(callback_model == "demo-transformer" && callback_dimensions == 32);
+  const auto transformer_matches = embedding_similarity(
+      "Approve Ship", transformer_cases, transformer_options, 0);
+  assert(transformer_matches.size() == 2 && transformer_matches[0].id == "c1" &&
+         transformer_matches[1].id == "c2");
+  assert(callback_texts.back() == "Approve Ship");
+
+  transformer_options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
+  callback_texts.clear();
+  const auto transformer_events = to_embeddings(log, transformer_options);
+  assert(transformer_events.items.size() == 3);
+  assert((callback_texts == std::vector<std::string>{"Approve", "Ship", "Reject"}));
+  (void)embedding_similarity("Reject", transformer_events, transformer_options, 1);
+  assert(callback_texts.back() == "Reject");
+
+  EmbeddingOptions missing_transformer = transformer_options;
+  missing_transformer.transformer_callback = {};
+  missing_transformer.embedding_model = "real-transformer";
+  bool missing_provider = false;
+  try {
+    (void)embed_text("A", missing_transformer);
+  } catch (const std::invalid_argument& error) {
+    missing_provider = std::string(error.what()).find("requires transformer_callback") !=
+                       std::string::npos;
+  }
+  assert(missing_provider);
+
+  auto bad_length = transformer_options;
+  bad_length.transformer_callback = [](std::string_view, std::string_view,
+                                       std::size_t) { return std::vector<double>{1.0}; };
+  bool bad_vector = false;
+  try { (void)embed_text("A", bad_length); }
+  catch (const std::invalid_argument&) { bad_vector = true; }
+  assert(bad_vector);
+  auto bad_values = transformer_options;
+  bad_values.transformer_callback = [](std::string_view, std::string_view,
+                                       std::size_t dimensions) {
+    return std::vector<double>(dimensions, std::numeric_limits<double>::quiet_NaN());
+  };
+  bad_vector = false;
+  try { (void)embed_text("A", bad_values); }
+  catch (const std::invalid_argument&) { bad_vector = true; }
+  assert(bad_vector);
+
+  EmbeddingOptions mock_transformer = transformer_options;
+  mock_transformer.transformer_callback = {};
+  mock_transformer.embedding_model = "mock_transformer";
+  assert(to_embeddings(log, mock_transformer).provider ==
+         EmbeddingProvider::TRANSFORMER);
+
   options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
   const auto events = to_embeddings(log, options);
   assert(events.items.size() == 3);
@@ -78,6 +150,8 @@ int main() {
       "Approve Ship", cases, matches, 1);
   assert(similarity_json.find("TO_EMBEDDINGS_SIMILARITY") != std::string::npos);
   assert(similarity_json.find("\"embedding_model\":\"hashing-v1\"") !=
+         std::string::npos);
+  assert(similarity_json.find("\"embedding_provider\":\"hashing\"") !=
          std::string::npos);
   assert(similarity_json.find("\"dimensions\":32") != std::string::npos);
 

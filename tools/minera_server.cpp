@@ -3141,7 +3141,7 @@ void handle_embeddings(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "embedding_variant", "embedding_model", "embedding_attribute_key",
+        "embedding_variant", "embedding_provider", "embedding_model", "embedding_attribute_key",
         "embedding_event_id_key", "embedding_dimensions",
         "embedding_max_items", "embedding_keep_cases", "embedding_target",
         "embedding_top_k"};

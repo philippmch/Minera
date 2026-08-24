@@ -2565,6 +2565,7 @@ void log_to_features_params_contract() {
 void embedding_params_contract() {
   const auto parsed = minera::parse_embedding_params(fields({
       {"embedding_variant", "events"},
+      {"embedding_provider", "transformer"},
       {"embedding_model", "hashing-v1"},
       {"embedding_attribute_key", "concept:name"},
       {"embedding_event_id_key", "event_id"},
@@ -2572,6 +2573,7 @@ void embedding_params_contract() {
       {"embedding_max_items", "17"},
       {"embedding_keep_cases", "true"}}));
   assert(parsed.variant == minera::EmbeddingVariant::EVENTS_TRANSFORMERS);
+  assert(parsed.provider == minera::EmbeddingProvider::TRANSFORMER);
   assert(parsed.embedding_model == "hashing-v1" &&
          parsed.attribute_key == "concept:name" &&
          parsed.event_id_key == "event_id");
@@ -2583,6 +2585,10 @@ void embedding_params_contract() {
   assert(threw);
   threw = false;
   try { (void)minera::parse_embedding_params(fields({{"embedding_dimensions", "0"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_embedding_params(fields({{"embedding_provider", "bogus"}})); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 }

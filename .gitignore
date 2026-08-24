@@ -28,6 +28,7 @@ install_manifest.txt
 *.pdb
 
 # IDE and editor state
+/.claude/
 .vs/
 .vscode/
 .idea/

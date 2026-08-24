@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -9,12 +10,10 @@
 
 namespace minera {
 
-// The embedding transformation has two granularities.  The native providers
-// are deliberately deterministic and self-contained: they hash normalized
-// text tokens (and, for the v2 profile, character n-grams) into a bounded
-// vector, so identical inputs produce identical output across platforms and
-// runs.  `embedding_model` selects the provider profile; unknown names use a
-// salted token profile so the selector is never silently ignored.
+// The embedding transformation has two granularities.  Hashing is a
+// deterministic, self-contained provider.  Transformer mode is injectable so
+// applications can connect their own model runtime without adding a runtime
+// dependency to the native core.
 enum class EmbeddingVariant {
   CASES_TRANSFORMERS,
   EVENTS_TRANSFORMERS,
@@ -22,11 +21,25 @@ enum class EmbeddingVariant {
   kEventsTransformers = EVENTS_TRANSFORMERS,
 };
 
+enum class EmbeddingProvider {
+  HASHING,
+  TRANSFORMER,
+  kHashing = HASHING,
+  kTransformer = TRANSFORMER,
+};
+
+using EmbeddingProviderCallback = std::function<std::vector<double>(
+    std::string_view text, std::string_view model, std::size_t dimensions)>;
+
 struct EmbeddingOptions {
   EmbeddingVariant variant = EmbeddingVariant::CASES_TRANSFORMERS;
+  EmbeddingProvider provider = EmbeddingProvider::HASHING;
   // Built-in profiles are `hashing-v1` and `hashing-v2`. Other non-empty names
-  // select a deterministic salted token profile.
+  // retain the deterministic salted hashing compatibility profile.
   std::string embedding_model = "hashing-v1";
+  // Required for transformer mode except for the explicit `mock_transformer`
+  // model, which is provided for headless integration tests and demos.
+  EmbeddingProviderCallback transformer_callback;
   std::string attribute_key = "concept:name";
   // Event identifiers are global, deterministic ordinal strings by default.
   // A non-empty custom key reads an event attribute (or activity/timestamp/
@@ -44,6 +57,7 @@ struct EmbeddingItem {
 
 struct EmbeddingResult {
   EmbeddingVariant variant = EmbeddingVariant::CASES_TRANSFORMERS;
+  EmbeddingProvider provider = EmbeddingProvider::HASHING;
   std::string embedding_model;
   std::string attribute_key;
   std::size_t dimensions = 0;

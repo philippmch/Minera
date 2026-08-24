@@ -751,11 +751,13 @@ describe("isLogToFeaturesResult", () => {
 
 describe("embedding result guards", () => {
   it("accepts fixed-length vectors and similarity rows", () => {
+    expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_provider: "hashing", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0, 1] }] })).toBe(true);
+    expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", embedding_provider: "transformer", target: "A", embedding_model: "hashing-v2", dimensions: 32, top_k: 1, items: [{ id: "0", score: 0.5 }] })).toBe(true);
     expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0, 1] }] })).toBe(true);
-    expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", embedding_model: "hashing-v2", dimensions: 32, top_k: 1, items: [{ id: "0", score: 0.5 }] })).toBe(true);
   });
   it("rejects ragged vectors and non-finite scores", () => {
     expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0] }] })).toBe(false);
+    expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_provider: "unknown", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0, 1] }] })).toBe(false);
     expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", top_k: 1, items: [{ id: "0", score: Number.NaN }] })).toBe(false);
     expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", dimensions: 0, top_k: 1, items: [] })).toBe(false);
   });
