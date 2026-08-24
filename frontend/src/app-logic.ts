@@ -130,6 +130,7 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
       filters.keepEventuallyFollows?.length ||
       filters.removeEventuallyFollows?.length ||
       filters.tracePatterns?.length ||
+      filters.admittedVariants?.length ||
       filters.prefixActivity ||
       filters.suffixActivity ||
       (filters.prefixActivity &&

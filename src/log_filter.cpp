@@ -273,6 +273,33 @@ bool trace_matches_any_pattern(const Trace& trace,
   return false;
 }
 
+bool trace_matches_admitted_variant(
+    const Trace& trace, const std::vector<TracePattern>& variants) {
+  for (const auto& variant : variants) {
+    if (variant.size() != trace.events.size()) continue;
+    bool matches = true;
+    for (std::size_t i = 0; i < variant.size(); ++i) {
+      if (variant[i].empty() || variant[i] != trace.events[i].activity) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return true;
+  }
+  return false;
+}
+
+void validate_admitted_variants(
+    const std::vector<TracePattern>& variants) {
+  for (const auto& variant : variants) {
+    for (const auto& activity : variant) {
+      if (activity.empty())
+        throw std::invalid_argument(
+            "admitted_variants: activities must not be empty");
+    }
+  }
+}
+
 std::optional<double> case_duration_seconds(const Trace& trace) {
   if (trace.events.empty()) return std::nullopt;
   const auto first = parse_timestamp(trace.events.front().timestamp);
@@ -643,6 +670,45 @@ std::vector<TracePattern> parse_trace_patterns(std::string_view text) {
   return patterns;
 }
 
+std::vector<TracePattern> parse_admitted_variants(std::string_view text) {
+  if (text.empty()) return {};
+  const auto trim = [](std::string_view value) {
+    const auto begin = value.find_first_not_of(" \t\r\n");
+    if (begin == std::string_view::npos) return std::string_view{};
+    const auto end = value.find_last_not_of(" \t\r\n");
+    return value.substr(begin, end - begin + 1);
+  };
+
+  std::vector<TracePattern> variants;
+  std::size_t variant_start = 0;
+  for (std::size_t i = 0; i <= text.size(); ++i) {
+    if (i != text.size() && text[i] != ';') continue;
+    const auto variant_text = trim(text.substr(variant_start, i - variant_start));
+    if (variant_text.empty())
+      throw std::invalid_argument(
+          "admitted_variants: variants must not be empty; use [] for the empty variant");
+    if (variant_text == "[]") {
+      variants.emplace_back();
+    } else {
+      TracePattern variant;
+      std::size_t activity_start = 0;
+      for (std::size_t j = 0; j <= variant_text.size(); ++j) {
+        if (j != variant_text.size() && variant_text[j] != ',') continue;
+        const auto token = trim(variant_text.substr(activity_start,
+                                                    j - activity_start));
+        if (token.empty())
+          throw std::invalid_argument(
+              "admitted_variants: activities must not be empty");
+        variant.emplace_back(token);
+        activity_start = j + 1;
+      }
+      variants.push_back(std::move(variant));
+    }
+    variant_start = i + 1;
+  }
+  return variants;
+}
+
 EventLog filter_trace_patterns(const EventLog& event_log,
                                const TracePatternFilterOptions& options) {
   if (options.patterns.empty()) return event_log;
@@ -650,6 +716,20 @@ EventLog filter_trace_patterns(const EventLog& event_log,
   result.attributes = event_log.attributes;
   for (const auto& trace : event_log.traces) {
     const bool found = trace_matches_any_pattern(trace, options.patterns);
+    if (found == options.positive) result.traces.push_back(trace);
+  }
+  return result;
+}
+
+EventLog filter_admitted_variants(
+    const EventLog& event_log,
+    const AdmittedVariantFilterOptions& options) {
+  if (options.variants.empty()) return event_log;
+  validate_admitted_variants(options.variants);
+  EventLog result;
+  result.attributes = event_log.attributes;
+  for (const auto& trace : event_log.traces) {
+    const bool found = trace_matches_admitted_variant(trace, options.variants);
     if (found == options.positive) result.traces.push_back(trace);
   }
   return result;
@@ -887,6 +967,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
 
   if (options.numeric_attribute)
     validate_numeric_attribute_options(*options.numeric_attribute);
+  validate_admitted_variants(options.admitted_variants);
   if (options.relative_attribute_occurrence)
     validate_relative_attribute_occurrence_options(
         *options.relative_attribute_occurrence);
@@ -1078,7 +1159,13 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     Trace projected = project_events(*source, keep, remove, keep_res,
                                      remove_res, keep_life, remove_life,
                                      event_attribute);
-    if (projected.events.empty()) continue;
+    if (projected.events.empty() && options.admitted_variants.empty()) continue;
+
+    if (!options.admitted_variants.empty()) {
+      const bool found = trace_matches_admitted_variant(
+          projected, options.admitted_variants);
+      if (found != options.admitted_variants_positive) continue;
+    }
 
     if (!options.trace_patterns.empty()) {
       const bool found = trace_matches_any_pattern(projected,

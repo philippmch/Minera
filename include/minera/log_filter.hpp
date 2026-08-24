@@ -62,6 +62,20 @@ struct TracePatternFilterOptions {
   bool positive = true;
 };
 
+// Exact activity-sequence admission. Unlike trace patterns, an admitted
+// variant never treats any token specially. The empty sequence is valid and
+// can be represented natively as an empty TracePattern.
+struct AdmittedVariantFilterOptions {
+  std::vector<TracePattern> variants;
+  bool positive = true;
+};
+
+// Parses semicolon-separated exact variants. Activities are comma-separated;
+// the token [] denotes the empty variant. Empty activities and empty variants
+// (other than []) are rejected; ... is treated as a literal activity.
+[[nodiscard]] std::vector<TracePattern> parse_admitted_variants(
+    std::string_view text);
+
 // Inclusive duration bounds for a complete trace, measured from its first
 // event timestamp to its last event timestamp in input order.
 struct CasePerformanceFilterOptions {
@@ -244,6 +258,13 @@ struct LogFilterOptions {
   std::vector<TracePattern> trace_patterns;
   bool trace_pattern_positive = true;
 
+  // Exact admitted-variant filtering, applied after ordinary event
+  // projection. Positive polarity keeps only admitted variants; negative
+  // polarity removes them. Duplicate admitted variants are harmless and
+  // retained in their supplied order.
+  std::vector<TracePattern> admitted_variants;
+  bool admitted_variants_positive = true;
+
   // Prefix/suffix cuts: reduce each case to its head up to the first
   // occurrence of `prefix_activity`, and/or its tail from the first
   // occurrence of `suffix_activity` — the anchor event included on both
@@ -333,6 +354,7 @@ struct LogFilterOptions {
            !keep_eventually_follows.empty() ||
            !remove_eventually_follows.empty() ||
            !trace_patterns.empty() ||
+           !admitted_variants.empty() ||
            min_case_duration_seconds.has_value() ||
            max_case_duration_seconds.has_value() ||
            !prefix_activity.empty() || !suffix_activity.empty() ||
@@ -372,6 +394,10 @@ struct LogFilterOptions {
 // Standalone trace-pattern filter preserving log- and trace-level metadata.
 [[nodiscard]] EventLog filter_trace_patterns(
     const EventLog& event_log, const TracePatternFilterOptions& options);
+
+[[nodiscard]] EventLog filter_admitted_variants(
+    const EventLog& event_log,
+    const AdmittedVariantFilterOptions& options);
 
 [[nodiscard]] EventLog filter_case_performance(
     const EventLog& event_log, const CasePerformanceFilterOptions& options);

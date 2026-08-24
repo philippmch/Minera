@@ -1043,6 +1043,10 @@ int usage(const char* program) {
                 "  --trace-patterns <p1;p2> Keep traces matching an exact/prefix/\n"
                 "                            suffix/infix pattern; use ... as a wildcard\n"
                 "  --trace-pattern-positive <bool> Keep matching (default: true)\n"
+                "  --admitted-variants <v1;v2> Keep/drop exact variants; comma-\n"
+                "                            separate activities, [] means empty\n"
+                "  --admitted-variants-positive <bool> Keep (default) or drop\n"
+                "                            admitted variants\n"
                "  --prefix-activity <a>     Keep each case's head up to (and\n"
                "                            including) the first <a>; cases\n"
                "                            without <a> are dropped\n"
@@ -1524,6 +1528,29 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       filter.trace_pattern_positive = parse_boolean(value, arg);
+      continue;
+    }
+    if (arg == "--admitted-variants") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        filter.admitted_variants = minera::parse_admitted_variants(value);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      if (filter.admitted_variants.empty()) return usage(argv[0]);
+      continue;
+    }
+    if (arg == "--admitted-variants-positive") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        filter.admitted_variants_positive = parse_boolean(value, arg);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
       continue;
     }
     if (arg == "--case-duration-min" || arg == "--case-duration-max") {

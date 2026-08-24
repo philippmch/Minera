@@ -63,6 +63,17 @@ describe("native alignment adapters", () => {
     expect(hasActiveFilters({ tracePatterns: ["A,B"] })).toBe(true);
     expect(hasActiveFilters({ tracePatternPositive: false })).toBe(false);
   });
+  it("serializes exact admitted variants without wildcard semantics", () => {
+    expect(mineFormEntries({
+      admittedVariants: ["A,B", "C", "[]"],
+      admittedVariantsPositive: false,
+    })).toEqual([
+      ["admitted_variants", "A,B;C;[]"],
+      ["admitted_variants_positive", "false"],
+    ]);
+    expect(hasActiveFilters({ admittedVariants: ["A,B"] })).toBe(true);
+    expect(hasActiveFilters({ admittedVariantsPositive: false })).toBe(false);
+  });
   it("serializes concept drift controls", () => {
     expect(conceptDriftQuery({ drift_sub_log_size: 3, drift_window_size: 2, drift_num_permutations: 5, drift_threshold: 0.25, drift_max_no_change_points: 4, drift_seed: 7, drift_include_timestamps: true, drift_activity_attribute: "event:type", drift_timestamp_attribute: "started_at", drift_case_id_attribute: "case:order" })).toBe("drift_activity_attribute=event%3Atype&drift_case_id_attribute=case%3Aorder&drift_include_timestamps=true&drift_max_no_change_points=4&drift_num_permutations=5&drift_seed=7&drift_sub_log_size=3&drift_threshold=0.25&drift_timestamp_attribute=started_at&drift_window_size=2");
   });

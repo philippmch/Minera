@@ -265,6 +265,10 @@ export interface FilterOptions extends LtlFilterOptions {
   /** Exact/prefix/suffix/infix activity patterns; `...` matches any span. */
   tracePatterns?: string[];
   tracePatternPositive?: boolean;
+  /** Exact admitted variants, encoded as comma-separated activities and
+   * semicolon-separated variants; `[]` denotes the empty variant. */
+  admittedVariants?: string[];
+  admittedVariantsPositive?: boolean;
   /** Reduce each case to its head up to the first prefixActivity / its tail
    * from the first suffixActivity (anchor included); cases without it drop. */
   prefixActivity?: string;
@@ -551,6 +555,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("trace_patterns", options.tracePatterns.join(";"));
     if (options.tracePatternPositive === false)
       add("trace_pattern_positive", "false");
+  }
+  if (options.admittedVariants?.length) {
+    add("admitted_variants", options.admittedVariants.join(";"));
+    if (options.admittedVariantsPositive === false)
+      add("admitted_variants_positive", "false");
   }
   if (options.prefixActivity) {
     add("prefix_activity", options.prefixActivity);

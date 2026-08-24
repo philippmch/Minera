@@ -951,6 +951,8 @@ void parse_mine_params_maps_filters() {
       {"remove_eventually_follows", "a -> d"},
       {"trace_patterns", "a,b,...;...,x,y"},
       {"trace_pattern_positive", "false"},
+      {"admitted_variants", "a,b;[];a,b"},
+      {"admitted_variants_positive", "false"},
       {"prefix_activity", "c"},
       {"prefix_strict", "false"},
       {"prefix_occurrence", "last"},
@@ -1052,6 +1054,12 @@ void parse_mine_params_maps_filters() {
   assert((params.filter.trace_patterns[1] ==
           minera::TracePattern{"...", "x", "y"}));
   assert(!params.filter.trace_pattern_positive);
+  assert(params.filter.admitted_variants.size() == 3);
+  assert((params.filter.admitted_variants[0] ==
+          minera::TracePattern{"a", "b"}));
+  assert(params.filter.admitted_variants[1].empty());
+  assert(params.filter.admitted_variants[2] == params.filter.admitted_variants[0]);
+  assert(!params.filter.admitted_variants_positive);
   assert(params.filter.prefix_activity == "c");
   assert(!params.filter.prefix_strict);
   assert(params.filter.prefix_occurrence ==
@@ -1272,6 +1280,30 @@ void parse_mine_params_rejects_invalid_trace_patterns() {
     }
     assert(threw);
   }
+}
+
+void parse_mine_params_rejects_invalid_admitted_variants() {
+  for (const auto& item : {
+           std::pair<std::string, std::string>{"admitted_variants", "a,,b"},
+           std::pair<std::string, std::string>{"admitted_variants", "[];"},
+           std::pair<std::string, std::string>{"admitted_variants_positive", "maybe"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(fields({
+        {"admitted_variants_positive", "false"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_a_malformed_succession() {
@@ -2927,6 +2959,7 @@ int main() {
   parse_mine_params_rejects_invalid_numeric_attribute_ranges();
   parse_mine_params_rejects_invalid_prefix_suffix_options();
   parse_mine_params_rejects_invalid_trace_patterns();
+  parse_mine_params_rejects_invalid_admitted_variants();
   parse_mine_params_rejects_invalid_activity_split_fields();
   parse_mine_params_rejects_invalid_repetition_fields();
   parse_mine_params_rejects_invalid_case_grouping_fields();
