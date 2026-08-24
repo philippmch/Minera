@@ -9,6 +9,62 @@
 namespace minera {
 namespace {
 
+void validate_options(const RandomTreeOptions& options) {
+  if (options.min_rec_depth > options.max_rec_depth)
+    throw std::invalid_argument(
+        "random tree: min_rec_depth must not exceed max_rec_depth");
+  if (options.max_rec_depth > 512)
+    throw std::invalid_argument("random tree: max_rec_depth is too large");
+  if (!std::isfinite(options.prob_leaf) || options.prob_leaf < 0.0 ||
+      options.prob_leaf > 1.0)
+    throw std::invalid_argument(
+        "random tree: prob_leaf must be finite and in [0,1]");
+  if (options.activities.empty())
+    throw std::invalid_argument("random tree: activities must not be empty");
+  std::set<std::string> unique(options.activities.begin(),
+                               options.activities.end());
+  if (unique.size() != options.activities.size() ||
+      unique.contains(std::string{}))
+    throw std::invalid_argument(
+        "random tree: activities must be non-empty and unique");
+
+  if (options.variant != RandomTreeVariant::kPtAndLogGenerator) return;
+
+  if (options.min == 0 || options.min > options.max ||
+      options.mode < options.min || options.mode > options.max)
+    throw std::invalid_argument(
+        "random tree: PT-and-log min, mode, and max must satisfy 1 <= min <= max");
+  if (options.max > 10000)
+    throw std::invalid_argument("random tree: PT-and-log max is too large");
+  if (options.no_models > kMaxRandomTreeModels)
+    throw std::invalid_argument(
+        "random tree: no_models exceeds the native safety limit");
+  if (options.no_models != 0 &&
+      options.max > kMaxRandomTreeActivityBudget / options.no_models)
+    throw std::invalid_argument(
+        "random tree: model activity budget exceeds the native safety limit");
+  const auto check_probability = [](double value, const char* name) {
+    if (!std::isfinite(value) || value < 0.0 || value > 1.0)
+      throw std::invalid_argument(std::string("random tree: ") + name +
+                                  " must be finite and in [0,1]");
+  };
+  check_probability(options.sequence, "sequence");
+  check_probability(options.choice, "choice");
+  check_probability(options.parallel, "parallel");
+  check_probability(options.loop, "loop");
+  check_probability(options.or_probability, "or");
+  check_probability(options.silent, "silent");
+  check_probability(options.duplicate, "duplicate");
+  if (options.or_probability > 0.0)
+    throw std::invalid_argument(
+        "random tree: inclusive OR is not supported by the native process-tree model");
+  if (options.sequence + options.choice + options.parallel + options.loop +
+          options.or_probability <=
+      0.0)
+    throw std::invalid_argument(
+        "random tree: at least one PT-and-log operator probability must be positive");
+}
+
 std::size_t random_index(std::mt19937_64& generator, std::size_t size) {
   std::uniform_int_distribution<std::size_t> distribution(0, size - 1);
   return distribution(generator);
@@ -165,64 +221,37 @@ ProcessTreeNode generate_ptandlog_tree(std::mt19937_64& generator,
 
 }  // namespace
 
-ProcessTree generate_random_process_tree(const RandomTreeOptions& options) {
-  if (options.min_rec_depth > options.max_rec_depth)
-    throw std::invalid_argument(
-        "random tree: min_rec_depth must not exceed max_rec_depth");
-  if (options.max_rec_depth > 512)
-    throw std::invalid_argument("random tree: max_rec_depth is too large");
-  if (!std::isfinite(options.prob_leaf) || options.prob_leaf < 0.0 ||
-      options.prob_leaf > 1.0)
-    throw std::invalid_argument(
-        "random tree: prob_leaf must be finite and in [0,1]");
-  if (options.activities.empty())
-    throw std::invalid_argument("random tree: activities must not be empty");
-  std::set<std::string> unique(options.activities.begin(), options.activities.end());
-  if (unique.size() != options.activities.size() ||
-      unique.contains(std::string{}))
-    throw std::invalid_argument(
-        "random tree: activities must be non-empty and unique");
-
-  if (options.variant == RandomTreeVariant::kPtAndLogGenerator) {
-    if (options.min == 0 || options.min > options.max ||
-        options.mode < options.min || options.mode > options.max)
-      throw std::invalid_argument(
-          "random tree: PT-and-log min, mode, and max must satisfy 1 <= min <= mode <= max");
-    if (options.max > 10000)
-      throw std::invalid_argument("random tree: PT-and-log max is too large");
-    const auto check_probability = [](double value, const char* name) {
-      if (!std::isfinite(value) || value < 0.0 || value > 1.0)
-        throw std::invalid_argument(std::string("random tree: ") + name +
-                                    " must be finite and in [0,1]");
-    };
-    check_probability(options.sequence, "sequence");
-    check_probability(options.choice, "choice");
-    check_probability(options.parallel, "parallel");
-    check_probability(options.loop, "loop");
-    check_probability(options.or_probability, "or");
-    check_probability(options.silent, "silent");
-    check_probability(options.duplicate, "duplicate");
-    if (options.no_models == 0)
-      throw std::invalid_argument("random tree: no_models must be positive");
-    if (options.no_models > 1)
-      throw std::invalid_argument(
-          "random tree: native PT-and-log generation returns one tree");
-    if (options.or_probability > 0.0)
-      throw std::invalid_argument(
-          "random tree: inclusive OR is not supported by the native process-tree model");
-    if (options.sequence + options.choice + options.parallel + options.loop +
-            options.or_probability <=
-        0.0)
-      throw std::invalid_argument(
-          "random tree: at least one PT-and-log operator probability must be positive");
-  }
-
+std::vector<ProcessTree> generate_random_process_trees(
+    const RandomTreeOptions& options) {
+  validate_options(options);
   std::mt19937_64 generator(options.seed);
-  if (options.variant == RandomTreeVariant::kPtAndLogGenerator)
-    return ProcessTree(options.activities,
-                       generate_ptandlog_tree(generator, options));
-  return ProcessTree(options.activities,
-                     generate_node(generator, options, options.rec_depth));
+  const std::size_t count =
+      options.variant == RandomTreeVariant::kPtAndLogGenerator
+          ? options.no_models
+          : 1;
+  std::vector<ProcessTree> result;
+  result.reserve(count);
+  for (std::size_t i = 0; i < count; ++i) {
+    if (options.variant == RandomTreeVariant::kPtAndLogGenerator) {
+      result.emplace_back(options.activities,
+                          generate_ptandlog_tree(generator, options));
+    } else {
+      result.emplace_back(options.activities,
+                          generate_node(generator, options, options.rec_depth));
+    }
+  }
+  return result;
+}
+
+ProcessTree generate_random_process_tree(const RandomTreeOptions& options) {
+  if (options.variant == RandomTreeVariant::kPtAndLogGenerator &&
+      options.no_models != 1)
+    throw std::invalid_argument(
+        "random tree: singular generation requires no_models == 1");
+  auto result = generate_random_process_trees(options);
+  // BASIC always produces one model. PT-and-log reaches this path only with
+  // no_models == 1, so the vector is non-empty after validation.
+  return std::move(result.front());
 }
 
 }  // namespace minera

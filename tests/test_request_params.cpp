@@ -730,7 +730,7 @@ void random_tree_params_contract() {
       {"random_tree_or", "0"},
       {"random_tree_silent", "0.2"},
       {"random_tree_duplicate", "0.1"},
-      {"random_tree_no_models", "1"},
+      {"random_tree_no_models", "3"},
   }));
   assert(p.variant == minera::RandomTreeVariant::kPtAndLogGenerator);
   assert(p.min_rec_depth == 2 && p.max_rec_depth == 4);
@@ -738,7 +738,7 @@ void random_tree_params_contract() {
   assert((p.activities == std::vector<std::string>{"Review, senior", "A\\B"}));
   assert(p.mode == 5 && p.min == 3 && p.max == 7 && p.sequence == 0.2 &&
          p.choice == 0.3 && p.parallel == 0.1 && p.loop == 0.4 &&
-         p.silent == 0.2 && p.duplicate == 0.1 && p.no_models == 1);
+         p.silent == 0.2 && p.duplicate == 0.1 && p.no_models == 3);
   bool threw = false;
   try {
     (void)minera::parse_random_tree_params(

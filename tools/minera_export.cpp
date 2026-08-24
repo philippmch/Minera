@@ -648,7 +648,7 @@ int usage(const char* program) {
                "  --timestamp-interleavings <file> Right CSV/XES log for interleavings\n"
                "  --interleavings-timestamp-key <name> Timestamp attribute\n"
                "  --interleavings-max-results <n> Result safety bound\n"
-               "  --random-tree               Emit a seeded random process tree\n"
+               "  --random-tree               Emit one or more seeded random process trees\n"
                "  --random-tree-variant <id> basic or ptandloggenerator\n"
                "  --random-tree-rec-depth <n> Starting recursion depth\n"
                "  --random-tree-min-rec-depth <n> Minimum recursion depth\n"
@@ -664,7 +664,7 @@ int usage(const char* program) {
                "  --random-tree-or <f>      PT-and-log OR probability\n"
                "  --random-tree-silent <f>  PT-and-log silent probability\n"
                "  --random-tree-duplicate <f> PT-and-log duplicate probability\n"
-               "  --random-tree-no-models <n> PT-and-log model count\n"
+               "  --random-tree-no-models <n> PT-and-log model count (zero or more)\n"
                "  --random-tree-seed <n>      Random seed\n"
                "  --random-tree-activities <a,b> Activity labels\n"
                "  --batches                 Discover temporal event batches\n"
@@ -3920,8 +3920,9 @@ int main(int argc, char** argv) {
         return random_tree_fields.contains(std::string(name));
       };
       const auto params = minera::parse_random_tree_params(lookup, present);
-      std::cout << minera::random_tree_json(
-          minera::generate_random_process_tree(params), params.variant)
+      const auto models = minera::generate_random_process_trees(params);
+      std::cout << minera::random_tree_json(models, params.variant,
+                                            params.activities)
                 << '\n';
       return 0;
     }

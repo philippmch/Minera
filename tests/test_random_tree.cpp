@@ -43,6 +43,7 @@ bool has_operator(const ProcessTreeNode& node, ProcessTreeOperator op) {
 
 void deterministic_and_valid() {
   RandomTreeOptions options;
+  options.variant = RandomTreeVariant::kBasic;
   options.seed = 7;
   const auto first = generate_random_process_tree(options);
   const auto second = generate_random_process_tree(options);
@@ -53,12 +54,22 @@ void deterministic_and_valid() {
   assert(depth(first.root()) <= options.max_rec_depth + 2);
 }
 
+void default_variant_is_population_generator() {
+  RandomTreeOptions options;
+  assert(options.variant == RandomTreeVariant::kPtAndLogGenerator);
+  const auto tree = generate_random_process_tree(options);
+  const auto leaves = visible_leaves(tree.root());
+  assert(leaves >= options.min && leaves <= options.max);
+}
+
 void probability_extremes_and_seed() {
   RandomTreeOptions leaf_options;
+  leaf_options.variant = RandomTreeVariant::kBasic;
   leaf_options.prob_leaf = 1.0;
   const auto leaf_tree = generate_random_process_tree(leaf_options);
   assert(leaf_tree.root().children[1].op == ProcessTreeOperator::kActivity);
   RandomTreeOptions internal_options;
+  internal_options.variant = RandomTreeVariant::kBasic;
   internal_options.prob_leaf = 0.0;
   internal_options.max_rec_depth = 1;
   const auto internal_tree = generate_random_process_tree(internal_options);
@@ -115,6 +126,80 @@ void ptandlog_generation_is_seeded_and_bounded() {
   assert(visible_leaves(generate_random_process_tree(loop).root()) == 4);
 }
 
+void plural_generation_is_seeded_and_bounded() {
+  RandomTreeOptions options;
+  options.variant = RandomTreeVariant::kPtAndLogGenerator;
+  options.seed = 23;
+  options.min = 4;
+  options.mode = 5;
+  options.max = 7;
+
+  auto empty_options = options;
+  empty_options.no_models = 0;
+  assert(generate_random_process_trees(empty_options).empty());
+
+  options.no_models = 1;
+  const auto one = generate_random_process_trees(options);
+  assert(one.size() == 1);
+  assert(equal_node(one.front().root(),
+                    generate_random_process_tree(options).root()));
+
+  options.no_models = 3;
+  const auto first = generate_random_process_trees(options);
+  const auto second = generate_random_process_trees(options);
+  assert(first.size() == 3);
+  assert(second.size() == first.size());
+  for (std::size_t i = 0; i < first.size(); ++i) {
+    assert(first[i].activities() == options.activities);
+    assert(equal_node(first[i].root(), second[i].root()));
+    const auto leaves = visible_leaves(first[i].root());
+    assert(leaves >= options.min && leaves <= options.max);
+  }
+
+  auto first_only = options;
+  first_only.no_models = 1;
+  assert(equal_node(first.front().root(),
+                    generate_random_process_tree(first_only).root()));
+
+  RandomTreeOptions basic = options;
+  basic.variant = RandomTreeVariant::kBasic;
+  basic.no_models = 3;
+  const auto basic_models = generate_random_process_trees(basic);
+  assert(basic_models.size() == 1);
+  assert(basic_models.front().root().op == ProcessTreeOperator::kSequence);
+
+  auto over_limit = options;
+  over_limit.no_models = kMaxRandomTreeModels + 1;
+  bool threw = false;
+  try {
+    (void)generate_random_process_trees(over_limit);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  auto over_budget = options;
+  over_budget.min = over_budget.mode = over_budget.max = 10000;
+  over_budget.no_models = kMaxRandomTreeModels;
+  threw = false;
+  try {
+    (void)generate_random_process_trees(over_budget);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  auto singular_empty = options;
+  singular_empty.no_models = 0;
+  threw = false;
+  try {
+    (void)generate_random_process_tree(singular_empty);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void rejects_bad_options() {
   for (auto options : {RandomTreeOptions{.min_rec_depth = 3, .max_rec_depth = 1},
                        RandomTreeOptions{.prob_leaf = -0.1},
@@ -134,6 +219,8 @@ void rejects_bad_options() {
                                          .min = 3,
                                          .max = 1},
                        RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
+                                         .no_models = kMaxRandomTreeModels + 1},
+                       RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
                                          .no_models = 2},
                        RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
                                          .sequence = -0.1},
@@ -150,7 +237,9 @@ void rejects_bad_options() {
 }
 
 void json_shape_is_stable() {
-  const auto json = random_tree_json(generate_random_process_tree({}));
+  RandomTreeOptions basic;
+  basic.variant = RandomTreeVariant::kBasic;
+  const auto json = random_tree_json(generate_random_process_tree(basic));
   assert(json.find(R"({"family":"RANDOM_TREE","variant":"BASIC")" ) !=
          std::string::npos);
   assert(json.find(R"("tree":{"operator":)" ) != std::string::npos);
@@ -161,14 +250,31 @@ void json_shape_is_stable() {
       generate_random_process_tree(options), options.variant);
   assert(pt_json.find(R"("variant":"PTANDLOGGENERATOR")") !=
          std::string::npos);
+
+  options.no_models = 2;
+  const auto batch_json = random_tree_json(
+      generate_random_process_trees(options), options.variant,
+      options.activities);
+  assert(batch_json.find(R"("trees":[)") != std::string::npos);
+  assert(batch_json.find(R"("tree":)") == std::string::npos);
+
+  options.no_models = 0;
+  const auto empty_json = random_tree_json(
+      generate_random_process_trees(options), options.variant,
+      options.activities);
+  assert(empty_json.find(
+             "\"activities\":[\"A\",\"B\",\"C\",\"D\",\"E\",\"F\"],\"trees\":[]") !=
+         std::string::npos);
 }
 
 }  // namespace
 
 int main() {
   deterministic_and_valid();
+  default_variant_is_population_generator();
   probability_extremes_and_seed();
   ptandlog_generation_is_seeded_and_bounded();
+  plural_generation_is_seeded_and_bounded();
   rejects_bad_options();
   json_shape_is_stable();
 }

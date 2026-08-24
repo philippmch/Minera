@@ -83,7 +83,7 @@ are reconciled.
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
 | Reduction | process-tree transition-reduction based | **Complete** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, and JSON/CLI/server/frontend adapters are available |
-| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, seeded branching, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
+| Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, seeded branching, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; event rows infer typed attributes with bounded categorical cardinality, use canonical `event:key@value` names, and are rectangular across traces; trace extraction now defaults to trace-based rows and exposes selectable activity/succession representations, categorical cardinality bounds, case identifiers, duration/timing/path/workload/concurrency extras, and epsilon controls through native, JSON, CLI, server, and typed frontend adapters; temporal rows now provide arrival/finish-rate, service/waiting/sojourn, rework, case/resource, and legacy compact projections with explicit feature schemas; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; model-backed embedding parity and broader OCEL feature parameters remain |
 
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
@@ -92,12 +92,19 @@ Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 and frontend controls. This closes only the process-tree variants; the broader
 simulation row remains partial because other simulation families are pending.
 
-Random-tree generation evidence: the native generator now exposes both the
-legacy `BASIC` strategy and a seeded, bounded `PTANDLOGGENERATOR` strategy.
-The latter validates triangular activity-count bounds, supported operator
-weights, silent/duplicate probabilities, and its single-tree contract; strict request
-parsing, standalone CLI JSON, local `/api/random-tree`, frontend query
-serialization, and recursive response guards preserve the selected variant.
+Random-tree generation evidence: the native generator exposes both the
+`BASIC` strategy and the seeded, bounded `PTANDLOGGENERATOR` strategy. The
+latter validates triangular activity-count bounds, supported operator weights,
+silent/duplicate probabilities, and deterministic zero/one/many model
+contracts. A single model retains the legacy `tree` JSON shape; zero or many
+models use a `trees` envelope with shared activities, and a single seeded RNG
+stream makes the first batch member equal to the corresponding one-model run.
+Strict request parsing, standalone CLI JSON, local `/api/random-tree`,
+frontend query serialization, recursive response guards, and an explicit
+population/activity safety cap preserves the selected variant without silently
+clamping large requests.
+The request default is `PTANDLOGGENERATOR`; callers that need the recursive
+legacy sampler select `BASIC` explicitly.
 
 Monte Carlo simulation evidence: the native `monte_carlo` core implements the
 `PETRI_SEMAPH_FIFO` virtual-time scheduler over workflow nets, seeded transition
