@@ -119,6 +119,10 @@ int main() {
          e2e_in != events.feature_names.end());
   assert(events.values[0][static_cast<std::size_t>(e2e_out - events.feature_names.begin())] == 1.0);
   assert(events.values[2][static_cast<std::size_t>(e2e_in - events.feature_names.begin())] == 1.0);
+  assert(std::find_if(events.feature_names.begin(), events.feature_names.end(),
+                      [](const auto& name) {
+                        return name.find("@@rel_obj_fea_") == 0;
+                      }) == events.feature_names.end());
   const auto events_json = minera::serialize_ocel_features_json(events);
   assert(events_json.find("\"family\":\"OCEL_FEATURES\"") != std::string::npos);
   assert(events_json.find("\"variant\":\"EVENTS\"") != std::string::npos);
@@ -382,6 +386,90 @@ int main() {
     rejected_related_events_objects = true;
   }
   assert(rejected_related_events_objects);
+
+  auto related_object_log = related_feature_sample();
+  related_object_log.events.push_back(
+      {"r4", "Archive", "2026-01-04T00:00:00Z", {}});
+  related_object_log.relations.insert(related_object_log.relations.begin() + 1,
+                                      {"r1", "a", "duplicate"});
+  auto related_object_options = minera::OcelFeatureOptions{};
+  related_object_options.include_related_objects_features = true;
+  related_object_options.numeric_object_attributes = {"priority"};
+  auto related_objects = minera::extract_ocel_features(
+      related_object_log, minera::OcelFeatureVariant::kEvents,
+      related_object_options);
+  const auto related_object_column = [&](const std::string& name) {
+    const auto it = std::find(related_objects.feature_names.begin(),
+                              related_objects.feature_names.end(), name);
+    assert(it != related_objects.feature_names.end());
+    return static_cast<std::size_t>(it - related_objects.feature_names.begin());
+  };
+  const auto object_priority_min = related_object_column(
+      "@@rel_obj_fea_min_@@object_num_priority");
+  const auto object_priority_max = related_object_column(
+      "@@rel_obj_fea_max_@@object_num_priority");
+  assert(related_objects.values[0][object_priority_min] == 1.0 &&
+         related_objects.values[0][object_priority_max] == 5.0);
+  assert(related_objects.values[1][object_priority_min] == 1.0 &&
+         related_objects.values[1][object_priority_max] == 1.0);
+  assert(related_objects.values[2][object_priority_min] == 5.0 &&
+         related_objects.values[2][object_priority_max] == 9.0);
+  assert(related_objects.values[3][object_priority_min] == 0.0 &&
+         related_objects.values[3][object_priority_max] == 0.0);
+  assert(std::find_if(related_objects.feature_names.begin(),
+                      related_objects.feature_names.end(), [](const auto& name) {
+                        return name.find("@@rel_obj_fea_min_@@rel_") == 0;
+                      }) == related_objects.feature_names.end());
+
+  related_object_options.include_related_events_features = true;
+  related_object_options.include_related_activities_features = true;
+  related_object_options.include_obj_con_in_graph_features = true;
+  const auto selected_related_objects = minera::extract_ocel_features(
+      related_object_log, minera::OcelFeatureVariant::kEvents,
+      related_object_options);
+  assert(std::find_if(
+             selected_related_objects.feature_names.begin(),
+             selected_related_objects.feature_names.end(), [](const auto& name) {
+               return name.find("@@rel_obj_fea_min_@@rel_eve_") == 0;
+             }) != selected_related_objects.feature_names.end());
+  assert(std::find_if(
+             selected_related_objects.feature_names.begin(),
+             selected_related_objects.feature_names.end(), [](const auto& name) {
+               return name.find("@@rel_obj_fea_min_@@obj_graph_con_") == 0;
+             }) != selected_related_objects.feature_names.end());
+  auto capped_related_objects = related_object_options;
+  capped_related_objects.include_related_events_features = false;
+  capped_related_objects.include_related_activities_features = false;
+  capped_related_objects.include_obj_con_in_graph_features = false;
+  capped_related_objects.max_features = 1;
+  bool rejected_related_object_cap = false;
+  try {
+    (void)minera::extract_ocel_features(
+        related_object_log, minera::OcelFeatureVariant::kEvents,
+        capped_related_objects);
+  } catch (const std::invalid_argument&) {
+    rejected_related_object_cap = true;
+  }
+  assert(rejected_related_object_cap);
+
+  bool rejected_related_object_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        related_object_log, minera::OcelFeatureVariant::kObjects,
+        related_object_options);
+  } catch (const std::invalid_argument&) {
+    rejected_related_object_objects = true;
+  }
+  assert(rejected_related_object_objects);
+  bool rejected_related_object_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        related_object_log, minera::OcelFeatureVariant::kEventsObjects,
+        related_object_options);
+  } catch (const std::invalid_argument&) {
+    rejected_related_object_events_objects = true;
+  }
+  assert(rejected_related_object_events_objects);
 
   const auto interactions = interaction_sample();
   auto interaction_options = minera::OcelFeatureOptions{};

@@ -797,6 +797,61 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   (void)times;
 }
 
+void add_related_object_columns(
+    TableBuilder& builder, const Ocel& log, const OcelFeatureOptions& options,
+    const std::vector<std::string>& activities,
+    const std::vector<std::string>& object_types,
+    const std::vector<std::vector<std::size_t>>& object_events,
+    const std::vector<std::vector<std::size_t>>& event_objects,
+    const std::vector<std::optional<double>>& times,
+    const std::vector<Lifecycle>& lifecycles) {
+  if (!options.include_related_objects_features) return;
+
+  // Build the same deterministic object schema as the standalone OBJECTS
+  // table. Keep every selected object feature family; only this aggregation
+  // itself is disabled so the source schema cannot recurse.
+  auto base_options = options;
+  base_options.include_related_objects_features = false;
+  base_options.max_features = std::numeric_limits<std::size_t>::max();
+  TableBuilder object_builder(log.objects.size(), base_options.max_features);
+  add_object_columns(object_builder, log, base_options, activities, object_types,
+                     object_events, event_objects, times, lifecycles);
+  std::vector<std::string> object_ids, object_types_for_rows;
+  object_ids.reserve(log.objects.size());
+  object_types_for_rows.reserve(log.objects.size());
+  for (const auto& object : log.objects) {
+    object_ids.push_back(object.id);
+    object_types_for_rows.push_back(object.type);
+  }
+  const auto object_table = std::move(object_builder).finish(
+      OcelFeatureVariant::kObjects, std::move(object_ids),
+      std::move(object_types_for_rows));
+
+  for (std::size_t feature = 0; feature < object_table.feature_names.size();
+       ++feature) {
+    std::vector<double> minimum(log.events.size(), 0.0);
+    std::vector<double> maximum(log.events.size(), 0.0);
+    for (std::size_t event = 0; event < log.events.size(); ++event) {
+      std::vector<std::size_t> related = event_objects[event];
+      std::sort(related.begin(), related.end());
+      related.erase(std::unique(related.begin(), related.end()), related.end());
+      if (related.empty()) continue;
+      double min_value = object_table.values[related.front()][feature];
+      double max_value = min_value;
+      for (std::size_t index = 1; index < related.size(); ++index) {
+        const auto value = object_table.values[related[index]][feature];
+        min_value = std::min(min_value, value);
+        max_value = std::max(max_value, value);
+      }
+      minimum[event] = min_value;
+      maximum[event] = max_value;
+    }
+    const auto& name = object_table.feature_names[feature];
+    builder.add("@@rel_obj_fea_min_" + name, std::move(minimum));
+    builder.add("@@rel_obj_fea_max_" + name, std::move(maximum));
+  }
+}
+
 void add_prefix_columns(
     TableBuilder& builder, const Ocel& log, const OcelFeatureOptions& options,
     const std::vector<std::string>& activities, const IndexMap& event_index,
@@ -861,13 +916,16 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       throw std::invalid_argument(
           "OCEL filter_per_type applies only to the objects variant");
   }
+  const bool related_object_event_context =
+      options.include_related_objects_features &&
+      variant == OcelFeatureVariant::kEvents;
   if (options.include_interaction_by_type_features &&
-      variant != OcelFeatureVariant::kObjects) {
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL interaction-by-type features apply only to the objects variant");
   }
   if (options.include_degree_centrality_features.has_value() &&
-      variant != OcelFeatureVariant::kObjects) {
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL degree centrality features apply only to the objects variant");
   }
@@ -875,16 +933,21 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
        options.include_general_descendants_features ||
        options.include_general_inheritance_features || options.include_cobirth_features ||
        options.include_codeath_features) &&
-      variant != OcelFeatureVariant::kObjects) {
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL object graph features apply only to the objects variant");
   }
   if ((options.include_related_events_features ||
        options.include_related_activities_features ||
        options.include_obj_con_in_graph_features) &&
-      variant != OcelFeatureVariant::kObjects) {
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL related-event and neighbor features apply only to the objects variant");
+  }
+  if (options.include_related_objects_features &&
+      variant != OcelFeatureVariant::kEvents) {
+    throw std::invalid_argument(
+        "OCEL related-object features apply only to the events variant");
   }
   const bool prefix_control_disabled =
       !options.include_prefix_features ||
@@ -902,7 +965,7 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       !options.include_lifecycle_path_features ||
       !options.include_lifecycle_wip_features;
   if (lifecycle_object_control_disabled &&
-      variant != OcelFeatureVariant::kObjects) {
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL lifecycle metric controls apply only to the objects variant");
   }
@@ -929,6 +992,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     TableBuilder builder(log.events.size(), options.max_features);
     add_event_columns(builder, log, options, activities, object_types, event_objects,
                       times, object_types_by_index);
+    add_related_object_columns(builder, log, options, activities, object_types,
+                               object_events, event_objects, times, lifecycles);
     std::vector<std::string> ids;
     ids.reserve(log.events.size());
     for (const auto& event : log.events) ids.push_back(event.id);
@@ -972,7 +1037,9 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   // This keeps the exploded representation pointwise and makes newly added
   // event/object feature groups available here without a second implementation.
   TableBuilder event_builder(log.events.size(), options.max_features);
-  add_event_columns(event_builder, log, options, activities, object_types,
+  auto events_objects_options = options;
+  events_objects_options.include_related_objects_features = false;
+  add_event_columns(event_builder, log, events_objects_options, activities, object_types,
                     event_objects, times, object_types_by_index);
   std::vector<std::string> event_ids;
   event_ids.reserve(log.events.size());

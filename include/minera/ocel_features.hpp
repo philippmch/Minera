@@ -45,6 +45,9 @@ struct OcelFeatureOptions {
   bool include_lifecycle_path_features = true;
   bool include_related_events_features = false;
   bool include_related_activities_features = false;
+  // Aggregate the selected object feature vector over each event's related
+  // objects. This selector is valid only for EVENTS and is disabled by default.
+  bool include_related_objects_features = false;
   bool include_obj_con_in_graph_features = false;
   // Relation-prefix columns are available only for EVENTS_OBJECTS. They are
   // enabled by default there and describe each relation's object-local past.
