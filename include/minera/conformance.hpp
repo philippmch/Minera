@@ -59,6 +59,24 @@ struct TokenReplayOptions {
   bool stop_immediately_unfit = false;
 };
 
+// Per-place token accounting for a replayed log.  The four counters use the
+// same forced-firing semantics as ConformanceResult: missing tokens are
+// created when an input is unavailable, while remaining tokens are measured
+// after the final-marking check.
+struct TokenReplayPlaceDiagnostics {
+  std::uint64_t missing = 0;
+  std::uint64_t remaining = 0;
+  std::uint64_t consumed = 0;
+  std::uint64_t produced = 0;
+};
+
+struct TokenReplayDiagnostics {
+  std::uint64_t trace_count = 0;
+  std::uint64_t fitting_traces = 0;
+  std::vector<TokenReplayPlaceDiagnostics> places;
+  std::vector<std::uint64_t> transition_activations;
+};
+
 // Replays `event_log` against `tree` and reports all four quality dimensions.
 // The process tree is translated to a workflow net; fitness comes from
 // token-based replay (Rozinat & van der Aalst), precision from escaping edges
@@ -75,6 +93,14 @@ struct TokenReplayOptions {
 [[nodiscard]] ConformanceResult check_conformance(const EventLog& event_log,
                                                   const PetriNet& net,
                                                   TokenReplayOptions options = {});
+
+// Replays every trace without collapsing variants and retains the per-place
+// token accounting and transition activation counts used by object-centric
+// diagnostics.  The default variation matches check_conformance's forward
+// replay; callers may request the backwards variation when needed.
+[[nodiscard]] TokenReplayDiagnostics replay_token_diagnostics(
+    const EventLog& event_log, const PetriNet& net,
+    TokenReplayOptions options = {});
 
 // Footprint (directly-follows relation) conformance between a log and a model.
 // The footprint of each is the set of ordered activity pairs (a, b) where b can

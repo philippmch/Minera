@@ -1037,10 +1037,13 @@ describe("OCEL API", () => {
   it("serializes discovery and conformance options", () => {
     expect(ocelDiscoveryQuery({ variant: "ocdfg", compute_edges_performance: false }))
       .toBe("variant=ocdfg&compute_edges_performance=false");
-    expect(ocelDiscoveryQuery({ variant: "ocpn", ocpn_annotation: "none" }))
-      .toBe("variant=ocpn&ocpn_annotation=none");
+    expect(ocelDiscoveryQuery({ variant: "ocpn", ocpn_annotation: "none", diagnostics_with_token_based_replay: true }))
+      .toBe("variant=ocpn&ocpn_annotation=none&diagnostics_with_token_based_replay=true");
     expect(ocelDiscoveryQuery({ variant: "saw" }))
       .toBe("variant=saw");
+    expect(() => ocelDiscoveryQuery({
+      diagnostics_with_token_based_replay: "yes" as never,
+    })).toThrow(/must be boolean/);
     expect(ocelSplitQuery({ variant: "ancestors_descendants", object_type: "order", max_objects: 2, max_degree_centrality: 0.5 }))
       .toBe("variant=ancestors_descendants&object_type=order&max_objects=2&max_degree_centrality=0.5");
     expect(ocelEnrichmentQuery({

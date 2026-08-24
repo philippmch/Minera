@@ -80,6 +80,7 @@ class Replayer {
     std::uint64_t consumed = 0;
     std::uint64_t missing = 0;
     std::uint64_t remaining = 0;
+    std::vector<TokenReplayPlaceDiagnostics> places;
 
     [[nodiscard]] double fitness() const {
       const double consume_term = consumed == 0 ? 0.0 : double(missing) / double(consumed);
@@ -99,6 +100,8 @@ class Replayer {
     Marking marking = initial_marking();
     Counts counts;
     counts.produced = 1;  // the initial token on the source place
+    counts.places.resize(net_.place_count());
+    ++counts.places[net_.source()].produced;
 
     for (const auto& step : trace) {
       if (!step || transitions_by_activity_[*step].empty()) {
@@ -113,6 +116,7 @@ class Replayer {
       counts.produced += result.produced;
       counts.consumed += result.consumed;
       counts.missing += result.missing;
+      add_place_counts(counts.places, result.places);
       if (executions) {
         for (const std::size_t t : result.fired) ++(*executions)[t];
       }
@@ -124,17 +128,25 @@ class Replayer {
     counts.produced += finish.produced;
     counts.consumed += finish.consumed;
     counts.missing += finish.missing;
+    add_place_counts(counts.places, finish.places);
     if (executions) {
       for (const std::size_t t : finish.fired) ++(*executions)[t];
     }
     ++counts.consumed;
     if (marking[net_.sink()] > 0) {
       --marking[net_.sink()];
+      ++counts.places[net_.sink()].consumed;
     } else {
       ++counts.missing;
+      ++counts.places[net_.sink()].missing;
+      ++counts.places[net_.sink()].consumed;
     }
-    for (const int tokens : marking) {
-      if (tokens > 0) counts.remaining += static_cast<std::uint64_t>(tokens);
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (marking[place] > 0) {
+        const auto tokens = static_cast<std::uint64_t>(marking[place]);
+        counts.remaining += tokens;
+        counts.places[place].remaining += tokens;
+      }
     }
     return counts;
   }
@@ -155,6 +167,8 @@ class Replayer {
     BackwardsOutcome outcome;
     auto& counts = outcome.counts;
     counts.produced = 1;  // initial source token
+    counts.places.resize(net_.place_count());
+    ++counts.places[net_.source()].produced;
 
     for (const auto& step : trace) {
       // The deprecated variation silently discards labels absent from the net.
@@ -203,12 +217,18 @@ class Replayer {
     // accounting before surplus/deficit are measured.
     counts.consumed += static_cast<std::uint64_t>(
         std::max(0, marking[net_.sink()]));
+    counts.places[net_.sink()].consumed +=
+        static_cast<std::uint64_t>(std::max(0, marking[net_.sink()]));
     for (std::size_t p = 0; p < marking.size(); ++p) {
       const int target = p == net_.sink() ? 1 : 0;
       if (marking[p] > target) {
-        counts.remaining += static_cast<std::uint64_t>(marking[p] - target);
+        const auto value = static_cast<std::uint64_t>(marking[p] - target);
+        counts.remaining += value;
+        counts.places[p].remaining += value;
       } else if (marking[p] < target) {
-        counts.missing += static_cast<std::uint64_t>(target - marking[p]);
+        const auto value = static_cast<std::uint64_t>(target - marking[p]);
+        counts.missing += value;
+        counts.places[p].missing += value;
       }
     }
     if (counts.missing != 0 || counts.remaining != 0) outcome.fitting = false;
@@ -362,6 +382,7 @@ class Replayer {
     std::uint64_t produced = 0;
     std::uint64_t consumed = 0;
     std::uint64_t missing = 0;
+    std::vector<TokenReplayPlaceDiagnostics> places;
     std::vector<std::size_t> fired;  // transitions fired, silent routing included
   };
 
@@ -388,6 +409,7 @@ class Replayer {
       step.produced = counts.produced;
       step.consumed = counts.consumed;
       step.missing = counts.missing;
+      step.places = std::move(counts.places);
     }
     return it->second;
   }
@@ -403,6 +425,7 @@ class Replayer {
       step.produced = counts.produced;
       step.consumed = counts.consumed;
       step.missing = counts.missing;
+      step.places = std::move(counts.places);
     }
     return it->second;
   }
@@ -516,24 +539,43 @@ class Replayer {
   }
 
   void fire(Marking& marking, std::size_t t, Counts& counts) const {
+    if (counts.places.size() < marking.size())
+      counts.places.resize(marking.size());
     const auto& transition = net_.transitions()[t];
     for (const std::size_t place : transition.inputs) {
       if (marking[place] > 0) {
         --marking[place];
       } else {
         ++counts.missing;  // token had to be created to fire
+        ++counts.places[place].missing;
       }
       ++counts.consumed;
+      ++counts.places[place].consumed;
     }
     for (const std::size_t place : transition.reset_inputs) {
       if (marking[place] > 0) {
-        counts.consumed += static_cast<std::uint64_t>(marking[place]);
+        const auto value = static_cast<std::uint64_t>(marking[place]);
+        counts.consumed += value;
+        counts.places[place].consumed += value;
         marking[place] = 0;
       }
     }
     for (const std::size_t place : transition.outputs) {
       ++marking[place];
       ++counts.produced;
+      ++counts.places[place].produced;
+    }
+  }
+
+  static void add_place_counts(
+      std::vector<TokenReplayPlaceDiagnostics>& target,
+      const std::vector<TokenReplayPlaceDiagnostics>& source) {
+    if (target.size() < source.size()) target.resize(source.size());
+    for (std::size_t place = 0; place < source.size(); ++place) {
+      target[place].missing += source[place].missing;
+      target[place].remaining += source[place].remaining;
+      target[place].consumed += source[place].consumed;
+      target[place].produced += source[place].produced;
     }
   }
 
@@ -2428,6 +2470,48 @@ ConformanceResult check_conformance(const EventLog& event_log,
                                     const ProcessTree& tree,
                                     TokenReplayOptions options) {
   return check_conformance(event_log, to_petri_net(tree), options);
+}
+
+TokenReplayDiagnostics replay_token_diagnostics(
+    const EventLog& event_log, const PetriNet& net,
+    TokenReplayOptions options) {
+  const Replayer replayer(net);
+  TokenReplayDiagnostics result;
+  result.trace_count = event_log.trace_count();
+  result.places.resize(net.place_count());
+  result.transition_activations.resize(net.transitions().size());
+  for (const auto& trace : event_log.traces) {
+    std::vector<std::optional<std::size_t>> ids;
+    ids.reserve(trace.events.size());
+    for (const auto& event : trace.events)
+      ids.push_back(replayer.activity_id(event.activity));
+
+    std::vector<std::uint64_t> executions(net.transitions().size(), 0);
+    const bool backwards = options.variant == TokenReplayVariant::kBackwards;
+    const auto backwards_outcome =
+        backwards
+            ? std::optional<Replayer::BackwardsOutcome>(replayer.replay_backwards(
+                  ids, &executions, options.stop_immediately_unfit))
+            : std::nullopt;
+    const auto counts = backwards
+                            ? backwards_outcome->counts
+                            : replayer.replay(ids, &executions);
+    for (std::size_t place = 0; place < result.places.size(); ++place) {
+      result.places[place].missing += counts.places[place].missing;
+      result.places[place].remaining += counts.places[place].remaining;
+      result.places[place].consumed += counts.places[place].consumed;
+      result.places[place].produced += counts.places[place].produced;
+    }
+    for (std::size_t transition = 0;
+         transition < result.transition_activations.size(); ++transition) {
+      result.transition_activations[transition] += executions[transition];
+    }
+    const bool fitting = backwards ? backwards_outcome->fitting
+                                   : (counts.missing == 0 &&
+                                      counts.remaining == 0);
+    if (fitting) ++result.fitting_traces;
+  }
+  return result;
 }
 
 AlignmentResult check_alignment(const EventLog& event_log,

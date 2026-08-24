@@ -1001,6 +1001,19 @@ export interface OcelDiscoveryResult {
   variant: OcelDiscoveryVariant;
   result: Record<string, unknown>;
 }
+export interface OcpnTokenReplayPlaceDiagnostics {
+  m: number;
+  r: number;
+  c: number;
+  p: number;
+}
+export interface OcpnTokenReplayDiagnostics {
+  enabled: boolean;
+  trace_count: number;
+  fitting_traces: number;
+  places: OcpnTokenReplayPlaceDiagnostics[];
+  transition_activations: number[];
+}
 export interface OcelConformanceResult {
   family: "OCEL_CONFORMANCE";
   variant: OcelConformanceVariant;
@@ -1078,10 +1091,47 @@ export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutRes
 function isOcelRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
 export function isOcelDiscoveryResult(value: unknown): value is OcelDiscoveryResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_DISCOVERY") return false;
-  return ["etot", "ocdfg", "ocpn", "otg", "saw"].includes(String(value.variant))
-    && isOcelRecord(value.result);
+  if (!["etot", "ocdfg", "ocpn", "otg", "saw"].includes(String(value.variant)) ||
+      !isOcelRecord(value.result)) return false;
+  if (value.variant !== "ocpn") return true;
+  const tbr = value.result.tbr_results;
+  const petriNets = value.result.petri_nets;
+  if (!isOcelRecord(tbr) || !isOcelRecord(petriNets)) return false;
+  return Object.entries(tbr).every(([type, diagnostic]) => {
+    if (!type || !isOcelRecord(diagnostic) || diagnostic.enabled !== true)
+      return false;
+    const traceCount = diagnostic.trace_count;
+    const fittingTraces = diagnostic.fitting_traces;
+    const places = diagnostic.places;
+    const transitionActivations = diagnostic.transition_activations;
+    if (typeof traceCount !== "number" || !Number.isSafeInteger(traceCount) ||
+        traceCount < 0 || typeof fittingTraces !== "number" ||
+        !Number.isSafeInteger(fittingTraces) || fittingTraces < 0 ||
+        !Array.isArray(places) || !Array.isArray(transitionActivations))
+      return false;
+    const net = petriNets[type];
+    if (!isOcelRecord(net) || !isNonNegativeSafeInteger(net.place_count) ||
+        !Array.isArray(net.transitions) || fittingTraces > traceCount ||
+        places.length !== net.place_count ||
+        transitionActivations.length !== net.transitions.length)
+      return false;
+    const placeFields = ["m", "r", "c", "p"];
+    const validPlace = (place: unknown) => {
+      if (!isOcelRecord(place)) return false;
+      return placeFields.every((field) => {
+        const count = place[field];
+        return isNonNegativeSafeInteger(count);
+      });
+    };
+    return places.every(validPlace) &&
+      transitionActivations.every((count) =>
+        isNonNegativeSafeInteger(count));
+  });
 }
 export function isOcelConformanceResult(value: unknown): value is OcelConformanceResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_CONFORMANCE") return false;

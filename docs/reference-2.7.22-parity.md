@@ -77,7 +77,7 @@ are reconciled.
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
-| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd), OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
+| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
@@ -175,7 +175,14 @@ alongside each per-object-type workflow net. The serialized `annotations`
 section includes event/object tuples, event-pair aliases, object-type maps,
 performance-disabled diagnostics, and double-arc decisions; the existing
 `minera_ocel --discover ocpn`, local OCEL discovery route, and frontend result
-guard continue to select the same `ocpn` variant.
+guard continue to select the same `ocpn` variant. The opt-in
+`diagnostics_with_token_based_replay` setting adds deterministic `tbr_results`
+for each object type: relation-order flattened traces are replayed against the
+discovered net, place counters retain compact `m`/`r`/`c`/`p` missing,
+remaining, consumed, and produced token totals, and transition activation
+counts include silent routing. The option is
+strictly wired through the standalone CLI, local discovery route, and typed
+frontend query/response guard; disabled results serialize as an empty map.
 
 Link-analysis evidence: the classic relation join is available as
 `discover_link_analysis` over event logs and supports first-class or generic

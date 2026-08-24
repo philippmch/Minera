@@ -3901,6 +3901,7 @@ export interface OcelDiscoveryOptions {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
   ocpn_annotation?: "annotated" | "none";
+  diagnostics_with_token_based_replay?: boolean;
 }
 
 export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
@@ -3910,6 +3911,14 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
   }
   if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
+  if (options.diagnostics_with_token_based_replay !== undefined) {
+    if (options.diagnostics_with_token_based_replay !== true &&
+        options.diagnostics_with_token_based_replay !== false) {
+      throw new Error("diagnostics_with_token_based_replay must be boolean");
+    }
+    query.set("diagnostics_with_token_based_replay",
+      options.diagnostics_with_token_based_replay ? "true" : "false");
+  }
   return query.toString();
 }
 
