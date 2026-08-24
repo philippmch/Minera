@@ -25,6 +25,22 @@ minera::Ocel sample() {
   return log;
 }
 
+minera::Ocel interaction_sample() {
+  minera::Ocel log;
+  log.events = {
+      {"e1", "Link", "2026-01-01T00:00:00Z", {}},
+      {"e2", "Touch", "2026-01-01T01:00:00Z", {}}};
+  log.objects = {
+      {"o1", "order", {}}, {"o2", "order", {}},
+      {"i1", "item", {}},  {"i2", "item", {}},
+      {"x1", "other", {}},  {"z1", "other", {}}};
+  log.relations = {
+      {"e1", "o1", ""}, {"e1", "o2", ""}, {"e1", "o2", ""},
+      {"e1", "i1", ""}, {"e2", "i1", ""}, {"e2", "i1", ""}};
+  log.o2o = {{"i2", "x1", "contains"}, {"i2", "x1", "contains"}};
+  return log;
+}
+
 }  // namespace
 
 int main() {
@@ -65,6 +81,93 @@ int main() {
   assert(length != objects.feature_names.end());
   assert(objects.values[0][static_cast<std::size_t>(
              length - objects.feature_names.begin())] == 3.0);
+
+  const auto interactions = interaction_sample();
+  auto interaction_options = minera::OcelFeatureOptions{};
+  interaction_options.include_activity_features = false;
+  interaction_options.include_timestamp_features = false;
+  interaction_options.include_relation_features = false;
+  interaction_options.include_endpoint_features = false;
+  interaction_options.include_attribute_counts = false;
+  interaction_options.include_lifecycle_features = false;
+  interaction_options.include_interaction_by_type_features = true;
+  const auto interaction_table = minera::extract_ocel_features(
+      interactions, minera::OcelFeatureVariant::kObjects, interaction_options);
+  const auto degree_column = std::find(
+      interaction_table.feature_names.begin(), interaction_table.feature_names.end(),
+      "@@object_degree_centrality");
+  const auto item_column = std::find(
+      interaction_table.feature_names.begin(), interaction_table.feature_names.end(),
+      "@@object_interaction_graph_ot_item");
+  const auto order_column = std::find(
+      interaction_table.feature_names.begin(), interaction_table.feature_names.end(),
+      "@@object_interaction_graph_ot_order");
+  const auto other_column = std::find(
+      interaction_table.feature_names.begin(), interaction_table.feature_names.end(),
+      "@@object_interaction_graph_ot_other");
+  assert(degree_column != interaction_table.feature_names.end() &&
+         item_column != interaction_table.feature_names.end() &&
+         order_column != interaction_table.feature_names.end() &&
+         other_column != interaction_table.feature_names.end());
+  const auto column = [&](decltype(degree_column) iterator) {
+    return static_cast<std::size_t>(iterator - interaction_table.feature_names.begin());
+  };
+  const auto degree = column(degree_column);
+  const auto item = column(item_column);
+  const auto order = column(order_column);
+  const auto other = column(other_column);
+  // o1 and o2 share an event (same-type), o1/i1 and o2/i1 cross types,
+  // i2/x1 is O2O-only, and z1 is isolated. Duplicate links count once.
+  assert(interaction_table.values[0][item] == 1.0 &&
+         interaction_table.values[0][order] == 1.0 &&
+         interaction_table.values[0][other] == 0.0);
+  assert(interaction_table.values[1][item] == 1.0 &&
+         interaction_table.values[1][order] == 1.0);
+  assert(interaction_table.values[2][item] == 0.0 &&
+         interaction_table.values[2][order] == 2.0);
+  assert(interaction_table.values[3][other] == 1.0);
+  assert(interaction_table.values[4][item] == 1.0);
+  assert(interaction_table.values[5][item] == 0.0 &&
+         interaction_table.values[5][order] == 0.0 &&
+         interaction_table.values[5][other] == 0.0);
+  for (const auto& row : interaction_table.values)
+    assert(row[item] + row[order] + row[other] == row[degree] * 5.0);
+
+  auto no_by_type = interaction_options;
+  no_by_type.include_interaction_by_type_features = false;
+  const auto ordinary_interactions = minera::extract_ocel_features(
+      interactions, minera::OcelFeatureVariant::kObjects, no_by_type);
+  assert(ordinary_interactions.feature_names.size() == 1 &&
+         ordinary_interactions.feature_names[0] == "@@object_degree_centrality");
+  auto capped = interaction_options;
+  capped.include_interaction_features = false;
+  capped.max_features = 2;
+  bool rejected_interaction_cap = false;
+  try {
+    (void)minera::extract_ocel_features(
+        interactions, minera::OcelFeatureVariant::kObjects, capped);
+  } catch (const std::invalid_argument&) {
+    rejected_interaction_cap = true;
+  }
+  assert(rejected_interaction_cap);
+
+  bool rejected_interaction_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        interactions, minera::OcelFeatureVariant::kEvents, interaction_options);
+  } catch (const std::invalid_argument&) {
+    rejected_interaction_events = true;
+  }
+  assert(rejected_interaction_events);
+  bool rejected_interaction_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        interactions, minera::OcelFeatureVariant::kEventsObjects,
+        interaction_options);
+  } catch (const std::invalid_argument&) {
+    rejected_interaction_events_objects = true;
+  }
+  assert(rejected_interaction_events_objects);
 
   auto filtered_options = options;
   filtered_options.filter_per_type = "item";

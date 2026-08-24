@@ -1556,6 +1556,7 @@ void handle_ocel_features(const httplib::Request& request,
         "include_timestamp_features", "include_relation_features",
         "include_endpoint_features", "include_attribute_counts",
         "include_interaction_features", "include_lifecycle_features",
+        "include_interaction_by_type_features",
         "ocel_features_filter_per_type",
         "numeric_event_attributes", "string_event_attributes",
         "numeric_object_attributes", "string_object_attributes"};
@@ -1595,6 +1596,9 @@ void handle_ocel_features(const httplib::Request& request,
         request, "include_attribute_counts", options.include_attribute_counts);
     options.include_interaction_features = ocel_query_bool(
         request, "include_interaction_features", options.include_interaction_features);
+    options.include_interaction_by_type_features = ocel_query_bool(
+        request, "include_interaction_by_type_features",
+        options.include_interaction_by_type_features);
     options.include_lifecycle_features = ocel_query_bool(
         request, "include_lifecycle_features", options.include_lifecycle_features);
     options.numeric_event_attributes =
