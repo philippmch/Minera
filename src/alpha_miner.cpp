@@ -5,6 +5,7 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <stdexcept>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -128,6 +129,55 @@ bool all_causal(const ActivitySet& a, const ActivitySet& b, const Footprint& fp)
   return true;
 }
 
+std::vector<Place> maximal_places(const Footprint& fp);
+
+PetriNet build_classic_net(const std::vector<std::string>& names,
+                           const Footprint& fp) {
+  PetriNet net;
+  net.set_activities(names);
+  const std::size_t source = net.add_place();
+  const std::size_t sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+
+  const std::size_t n = fp.size();
+  std::vector<std::vector<std::size_t>> inputs(n);
+  std::vector<std::vector<std::size_t>> outputs(n);
+  for (const auto start : fp.starts) inputs[start].push_back(source);
+  for (const auto end : fp.ends) outputs[end].push_back(sink);
+
+  for (const auto& pair : maximal_places(fp)) {
+    const std::size_t place = net.add_place();
+    for (const auto from : pair.first) outputs[from].push_back(place);
+    for (const auto to : pair.second) inputs[to].push_back(place);
+  }
+
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    net.add_transition(activity, std::move(inputs[activity]),
+                       std::move(outputs[activity]));
+  }
+  return net;
+}
+
+Footprint footprint_from_graph(const DirectlyFollowsGraph& graph) {
+  Footprint fp;
+  const auto& names = graph.activities();
+  const std::size_t n = names.size();
+  fp.follows.assign(n, std::vector<bool>(n, false));
+  for (const auto& edge : graph.edges()) {
+    if (edge.source >= n || edge.target >= n)
+      throw std::invalid_argument("Alpha: graph edge activity id is out of range");
+    fp.follows[edge.source][edge.target] = true;
+  }
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    if (graph.start_activity_count(names[activity]) != 0)
+      fp.starts.insert(activity);
+    if (graph.end_activity_count(names[activity]) != 0)
+      fp.ends.insert(activity);
+  }
+  return fp;
+}
+
 // Enumerates the maximal place candidates (A, B). Seeds with singleton causal
 // pairs, then grows either side by union — keeping the other side fixed — until
 // no new admissible pair appears. Growing one side at a time reaches every
@@ -191,6 +241,7 @@ PetriNet discover_petri_net(const EventLog& log,
   // search runs on the log read without them, and each is re-attached to the
   // place between its neighbours afterwards.
   const Footprint full = build_footprint(ids, nullptr, options.short_loops);
+  if (!options.short_loops) return build_classic_net(ids.names, full);
   std::vector<bool> loops(n, false);
   bool any_loop = false;
   if (options.short_loops) {
@@ -266,6 +317,15 @@ PetriNet discover_petri_net(const EventLog& log,
                        std::move(outputs[activity]));
   }
   return net;
+}
+
+PetriNet discover_petri_net(const DirectlyFollowsGraph& graph,
+                            const AlphaMinerOptions& options) {
+  if (options.short_loops) {
+    throw std::invalid_argument(
+        "Alpha: Alpha+ requires event-log trace context; direct graph input supports classic only");
+  }
+  return build_classic_net(graph.activities(), footprint_from_graph(graph));
 }
 
 }  // namespace minera

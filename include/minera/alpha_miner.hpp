@@ -1,5 +1,6 @@
 #pragma once
 
+#include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
 
@@ -33,5 +34,12 @@ struct AlphaMinerOptions {
 // net.
 [[nodiscard]] PetriNet discover_petri_net(const EventLog& event_log,
                                           const AlphaMinerOptions& options = {});
+
+// Direct graph input is the classic Alpha footprint: graph edges and start/end
+// counts contain no trace context for the short-loop repair, so Alpha+ is not
+// a valid request for this overload.
+[[nodiscard]] PetriNet discover_petri_net(
+    const DirectlyFollowsGraph& graph,
+    const AlphaMinerOptions& options = {});
 
 }  // namespace minera
