@@ -1418,7 +1418,7 @@ void handle_ocel_playout(const httplib::Request& request,
   try {
     static const std::set<std::string> allowed = {
         "model", "variant", "max_bindings_per_activity", "branching_factor_transitions",
-        "branching_factor_bindings", "max_traces", "max_states", "objects",
+        "branching_factor_bindings", "branching_factor_activities", "max_traces", "max_states", "objects",
         "initial_marking", "final_marking",
         "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
         "seed", "start", "case_interval", "event_interval", "ocpn_variant",
@@ -1438,7 +1438,6 @@ void handle_ocel_playout(const httplib::Request& request,
                            : std::string("ocpn");
     if (model != "ocpn" && model != "causal_net")
       throw std::invalid_argument("model expects ocpn or causal_net");
-
     minera::OcpnPlayoutOptions options;
     options.max_bindings_per_activity = ocel_query_size(
         request, "max_bindings_per_activity", options.max_bindings_per_activity);
@@ -1446,6 +1445,12 @@ void handle_ocel_playout(const httplib::Request& request,
         request, "branching_factor_transitions", options.branching_factor_transitions);
     options.branching_factor_bindings = ocel_query_number(
         request, "branching_factor_bindings", options.branching_factor_bindings);
+    options.branching_factor_activities = ocel_query_number(
+        request, "branching_factor_activities", options.branching_factor_activities);
+    if (request.has_param("branching_factor_activities") &&
+        model != "causal_net")
+      throw std::invalid_argument(
+          "branching_factor_activities requires model=causal_net");
     options.max_traces = ocel_query_size(request, "max_traces", options.max_traces);
     options.max_states = ocel_query_size(request, "max_states", options.max_states);
     options.seed = ocel_query_size(request, "seed", options.seed);
@@ -1482,9 +1487,12 @@ void handle_ocel_playout(const httplib::Request& request,
         options.branching_factor_transitions < 0.0 ||
         !std::isfinite(options.branching_factor_bindings) ||
         options.branching_factor_bindings < 0.0 ||
+        !std::isfinite(options.branching_factor_activities) ||
+        options.branching_factor_activities < 0.0 ||
         options.max_bindings_per_activity > 100 ||
         options.branching_factor_transitions > 100 ||
-        options.branching_factor_bindings > 100 || options.max_traces > 10000 ||
+        options.branching_factor_bindings > 100 ||
+        options.branching_factor_activities > 100 || options.max_traces > 10000 ||
         options.max_states > 1'000'000) {
       throw std::invalid_argument(
           "OCEL playout bounds exceed the server safety limits");
