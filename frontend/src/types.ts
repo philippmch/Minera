@@ -684,7 +684,7 @@ export function isEmbeddingResult(value: unknown): value is EmbeddingResult {
     && (c.variant === "cases_transformers" || c.variant === "events_transformers")
     && (c.embedding_provider === undefined || c.embedding_provider === "hashing" || c.embedding_provider === "transformer")
     && typeof c.embedding_model === "string" && typeof c.attribute_key === "string"
-    && typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0
+    && typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0 && dimensions <= 4096
     && Array.isArray(c.items) && c.items.every((item) => !!item && typeof item === "object"
       && typeof (item as EmbeddingItem).id === "string"
       && Array.isArray((item as EmbeddingItem).embedding)

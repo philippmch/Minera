@@ -31,8 +31,10 @@ enum class EmbeddingProvider {
 // Host runtimes provide model execution through this callback. The native
 // library passes the already grouped case text or selected event value, the
 // requested model label, and the exact output dimension. A callback must
-// return exactly `dimensions` finite values; no provider fallback is applied
-// when a transformer callback is absent.
+// return exactly `dimensions` finite values when dimensions is positive. A
+// zero transformer dimension is an inference sentinel: the callback returns a
+// finite, non-empty vector up to 4096 values and the first result establishes
+// the dimension for the operation.
 using EmbeddingProviderCallback = std::function<std::vector<double>(
     std::string_view text, std::string_view model, std::size_t dimensions)>;
 
@@ -60,6 +62,8 @@ struct EmbeddingOptions {
   // A non-empty custom key reads an event attribute (or activity/timestamp/
   // resource) and falls back to the ordinal when it is absent.
   std::string event_id_key;
+  // Zero is accepted only for transformer providers and requests provider-
+  // native dimension inference. Hashing providers require a positive value.
   std::size_t dimensions = 64;
   std::size_t max_items = 10000;
   bool keep_cases = false;

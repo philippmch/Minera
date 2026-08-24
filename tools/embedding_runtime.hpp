@@ -123,14 +123,17 @@ inline std::vector<double> parse_response(std::string_view body,
   expect(body, position, ':', "response field");
   expect(body, position, '[', "embedding array");
   std::vector<double> values;
-  values.reserve(dimensions);
+  values.reserve(dimensions == 0 ? 64 : dimensions);
   skip_space(body, position);
   if (position >= body.size() || body[position] == ']')
     throw std::invalid_argument("embedding runtime: response embedding is empty");
   while (true) {
-    if (values.size() >= dimensions)
+    if (values.size() >= 4096 ||
+        (dimensions != 0 && values.size() >= dimensions))
       throw std::invalid_argument(
-          "embedding runtime: response embedding has the wrong dimension");
+          dimensions == 0
+              ? "embedding runtime: response embedding is oversized"
+              : "embedding runtime: response embedding has the wrong dimension");
     values.push_back(parse_number(body, position));
     skip_space(body, position);
     if (position >= body.size())
@@ -143,7 +146,7 @@ inline std::vector<double> parse_response(std::string_view body,
       throw std::invalid_argument("embedding runtime: malformed embedding array");
     ++position;
   }
-  if (values.size() != dimensions)
+  if (dimensions != 0 && values.size() != dimensions)
     throw std::invalid_argument(
         "embedding runtime: response embedding has the wrong dimension");
   expect(body, position, '}', "response object");

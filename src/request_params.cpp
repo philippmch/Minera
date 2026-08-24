@@ -3325,9 +3325,14 @@ EmbeddingParams parse_embedding_params(const FieldLookup& field,
     params.attribute_key = require("embedding_attribute_key");
   if (supplied("embedding_event_id_key"))
     params.event_id_key = require("embedding_event_id_key");
-  if (supplied("embedding_dimensions"))
-    params.dimensions = parse_positive_size(require("embedding_dimensions"),
-                                            "embedding_dimensions");
+  if (supplied("embedding_dimensions")) {
+    params.dimensions = parse_nonnegative_size(require("embedding_dimensions"),
+                                               "embedding_dimensions");
+    if (params.dimensions == 0 &&
+        params.provider != EmbeddingProvider::TRANSFORMER)
+      throw std::invalid_argument(
+          "embedding_dimensions: zero requires transformer provider");
+  }
   if (supplied("embedding_max_items"))
     params.max_items = parse_positive_size(require("embedding_max_items"),
                                            "embedding_max_items");

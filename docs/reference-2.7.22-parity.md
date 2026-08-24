@@ -337,7 +337,12 @@ the original token profile, `hashing-v2` adds character n-grams, and other
 non-empty model names select a salted token profile instead of being silently
 ignored in hashing mode. Transformer mode is an explicit injectable provider:
 the callback receives the selected text, model label, and requested dimension,
-and its output length and finite values are validated. Applications can either
+and its output length and finite values are validated. Transformer callers may
+set `embedding_dimensions=0` (or `--embedding-dimensions 0`) as an inference
+sentinel; zero is passed through to the callback/runtime, the first non-empty
+finite vector establishes a bounded width (at most 4096), and every later or
+target vector must match. Hashing providers continue to require a positive
+explicit dimension. Applications can either
 provide that callback per request or register a thread-safe process-level
 default runtime bridge; the latter is used only when a request has no explicit
 callback. The explicit
@@ -347,7 +352,8 @@ never fall back to hashing. For standalone and cached-server operation, the
 optional `--embedding-runtime-url http://host:port` bridge posts
 `{"text":"...","model":"...","dimensions":N}` to the fixed `/embed`
 path and requires a successful response shaped exactly as
-`{"embedding":[finite numbers...]}` with the requested dimension. Connection,
+`{"embedding":[finite numbers...]}`; zero-dimensional requests return the
+provider's inferred width. Connection,
 read, and write calls are bounded to five seconds; malformed URLs, HTTP
 failures, extra fields, malformed numbers, empty vectors, wrong dimensions, and
 non-finite values are rejected. The CLI enables transformer mode unless an

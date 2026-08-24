@@ -617,7 +617,7 @@ int usage(const char* program) {
                "  --embedding-model <name>  Deterministic encoder label\n"
                "  --embedding-attribute-key <name> Text attribute\n"
                "  --embedding-event-id-key <name> Optional event id attribute\n"
-               "  --embedding-dimensions <n> Vector dimension\n"
+               "  --embedding-dimensions <n> Vector dimension (0 infers transformer width)\n"
                "  --embedding-max-items <n> Safety bound\n"
                "  --embedding-target <text> Emit cosine top-k matches\n"
                "  --embedding-top-k <n>    Match count (zero means all)\n"

@@ -908,6 +908,12 @@ describe("embedding API", () => {
     })).toBe("embedding_dimensions=32&embedding_keep_cases=true&embedding_target=Approve+Ship&embedding_top_k=2&embedding_variant=events_transformers");
     expect(embeddingsQuery({ embedding_provider: "transformer", embedding_model: "mock_transformer" }))
       .toBe("embedding_model=mock_transformer&embedding_provider=transformer");
+    expect(embeddingsQuery({ embedding_provider: "transformer", embedding_dimensions: 0 }))
+      .toBe("embedding_dimensions=0&embedding_provider=transformer");
+    expect(() => embeddingsQuery({ embedding_dimensions: 0 })).toThrow(/transformer/);
+    expect(() => embeddingsQuery({ embedding_provider: "hashing", embedding_dimensions: 0 })).toThrow(/transformer/);
+    expect(() => embeddingsQuery({ embedding_provider: "transformer", embedding_dimensions: 4097 })).toThrow(/4096/);
+    expect(() => embeddingsQuery({ embedding_provider: "other" as never })).toThrow(/hashing or transformer/);
   });
 
   it("rejects malformed embedding responses", async () => {
