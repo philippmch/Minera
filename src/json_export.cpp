@@ -3530,6 +3530,32 @@ std::string dfg_alignment_json(const DfgAlignmentLogResult& result,
   return out.str();
 }
 
+std::string dfg_playout_json(const DfgPlayoutResult& result) {
+  const char* variant = result.variant == DfgPlayoutVariant::kPerformance
+                            ? "PERFORMANCE"
+                            : "CLASSIC";
+  std::ostringstream out;
+  out << "{\"family\":\"DFG_PLAYOUT\",\"variant\":";
+  write_json_string(out, variant);
+  out << ",\"return_variants\":true,\"complete\":"
+      << (result.complete ? "true" : "false")
+      << ",\"interrupted\":"
+      << (result.interrupted ? "true" : "false")
+      << ",\"variants\":[";
+  std::size_t index = 0;
+  for (const auto& [activities, occurrences] : result.counts) {
+    if (index++ != 0) out << ',';
+    out << "{\"activities\":[";
+    for (std::size_t i = 0; i < activities.size(); ++i) {
+      if (i != 0) out << ',';
+      write_json_string(out, activities[i]);
+    }
+    out << "],\"occurrences\":" << occurrences << '}';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string edit_distance_json(const std::vector<EditDistanceAlignment>& result,
                                bool anti_alignment,
                                const EventLog* projected_log) {

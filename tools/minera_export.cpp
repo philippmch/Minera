@@ -1066,8 +1066,8 @@ int usage(const char* program) {
   return 2;
 }
 
-minera::EventLog generate_dfg_playout(const minera::EventLog& log,
-                                      const minera::DfgPlayoutOptions& options) {
+minera::DfgPlayoutResult generate_dfg_playout(
+    const minera::EventLog& log, const minera::DfgPlayoutOptions& options) {
   const auto frequency = minera::discover_frequency_dfg(log);
   minera::DfgActivityCounts starts, ends;
   for (const auto& trace : log.traces) {
@@ -1079,8 +1079,8 @@ minera::EventLog generate_dfg_playout(const minera::EventLog& log,
   std::optional<minera::DfgPerformance> performance;
   if (options.variant == minera::DfgPlayoutVariant::kPerformance)
     performance = minera::discover_performance_dfg(log);
-  return minera::dfg_playout(frequency, starts, ends, options,
-                             performance ? &*performance : nullptr);
+  return minera::dfg_playout_result(frequency, starts, ends, options,
+                                    performance ? &*performance : nullptr);
 }
 
 }  // namespace
@@ -5221,6 +5221,7 @@ int main(int argc, char** argv) {
 
     if (!playout_output.empty()) {
       std::optional<minera::EventLog> generated;
+      std::optional<std::string> generated_json;
       const minera::PetriNet* selected = nullptr;
       const bool stochastic = stochastic_playout_requested || playout_miner == "stochastic";
       const bool monte_carlo_mode =
@@ -5243,15 +5244,24 @@ int main(int argc, char** argv) {
       else if (model_miner == "process_tree")
         generated = minera::process_tree_playout(tree,
                                                  process_tree_playout_options);
-      else if (model_miner == "dfg")
-        generated = generate_dfg_playout(log, dfg_playout_options);
+      else if (model_miner == "dfg") {
+        const auto result = generate_dfg_playout(log, dfg_playout_options);
+        if (dfg_playout_options.return_variants &&
+            dfg_playout_options.variant == minera::DfgPlayoutVariant::kClassic)
+          generated_json = minera::dfg_playout_json(result);
+        else
+          generated = result.log;
+      }
       else {
         std::cerr << "error: unknown --playout-miner '" << playout_miner
                   << "' (expected inductive, alpha, heuristic, powl, or "
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
-      if (monte_carlo_mode) {
+      if (generated_json) {
+        // JSON is the explicit return-variants representation; no XES
+        // conversion is performed for that request.
+      } else if (monte_carlo_mode) {
         if (selected == nullptr) {
           std::cerr << "error: Monte Carlo playout requires a Petri model\n";
           return 2;
@@ -5277,10 +5287,14 @@ int main(int argc, char** argv) {
                   << playout_output << '\n';
         return 1;
       }
-      minera::write_xes(playout_file, *generated,
-                        (monte_carlo_mode ? model_miner + " Monte Carlo playout"
-                         : stochastic ? model_miner + " stochastic playout"
-                                    : playout_miner + " playout"));
+      if (generated_json) {
+        playout_file << *generated_json << '\n';
+      } else {
+        minera::write_xes(playout_file, *generated,
+                          (monte_carlo_mode ? model_miner + " Monte Carlo playout"
+                           : stochastic ? model_miner + " stochastic playout"
+                                      : playout_miner + " playout"));
+      }
     }
   } catch (const std::exception& error) {
     std::cerr << "error: " << error.what() << '\n';

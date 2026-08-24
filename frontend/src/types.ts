@@ -2804,6 +2804,42 @@ export interface DfgPlayoutOptions {
   start_time?: string;
 }
 
+export type DfgPlayoutResultVariant = "CLASSIC" | "PERFORMANCE";
+export interface DfgPlayoutVariantEntry {
+  activities: string[];
+  occurrences: number;
+}
+export interface DfgPlayoutVariantsResult {
+  family: "DFG_PLAYOUT";
+  variant: DfgPlayoutResultVariant;
+  return_variants: true;
+  complete: boolean;
+  interrupted: boolean;
+  variants: DfgPlayoutVariantEntry[];
+}
+
+export function isDfgPlayoutVariantsResult(
+  value: unknown,
+): value is DfgPlayoutVariantsResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<DfgPlayoutVariantsResult>;
+  if (result.family !== "DFG_PLAYOUT" ||
+      (result.variant !== "CLASSIC" && result.variant !== "PERFORMANCE") ||
+      result.return_variants !== true ||
+      typeof result.complete !== "boolean" ||
+      typeof result.interrupted !== "boolean" ||
+      !Array.isArray(result.variants)) return false;
+  return result.variants.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const item = entry as Partial<DfgPlayoutVariantEntry>;
+    const occurrences = item.occurrences;
+    return Array.isArray(item.activities) && item.activities.length > 0 &&
+      item.activities.every((activity) => typeof activity === "string") &&
+      typeof occurrences === "number" && Number.isSafeInteger(occurrences) &&
+      occurrences >= 0;
+  });
+}
+
 /** Response from the standalone Petri-analysis endpoint. */
 export interface PetriAnalysisResult {
   family: PetriAnalysisFamily;

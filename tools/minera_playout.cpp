@@ -21,6 +21,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/json_export.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/playout.hpp"
@@ -50,6 +51,11 @@ int usage(const char* program) {
                "  --final-marking <n,...>    Explicit accepted marker vector\n"
                "  --dfg              Treat input CSV/XES as a log and play out its DFG\n"
                "  --variant <name>   DFG variant: classic or performance\n"
+               "  --return-variants <bool> Return classic variant counts as JSON\n"
+               "  --return-only-if-complete <bool> Suppress incomplete results\n"
+               "  --min-variant-occurrences <n> Minimum variant count\n"
+               "  --interrupt-when-dfg-complete <bool> Stop after graph coverage\n"
+               "  --add-trace-if-takes-new-edges <bool> Keep edge-covering traces\n"
                "  --monte-carlo      Use bounded virtual-time Monte Carlo\n"
                "  --monte-carlo-simulations <n> Case count\n"
                "  --monte-carlo-max-steps <n> Firing cap\n"
@@ -141,7 +147,11 @@ int main(int argc, char** argv) {
                arg == "--max-occurrences-per-activity" ||
                arg == "--max-execution-time-ms" || arg == "--case-arrival-rate" ||
                arg == "--max-events-per-trace" || arg == "--start-time" ||
-               arg == "--dfg-seed") {
+               arg == "--dfg-seed" || arg == "--return-variants" ||
+               arg == "--return-only-if-complete" ||
+               arg == "--min-variant-occurrences" ||
+               arg == "--interrupt-when-dfg-complete" ||
+               arg == "--add-trace-if-takes-new-edges") {
       const auto* value = next(); if (!value) return usage(argv[0]);
       const std::string key = arg == "--dfg-traces" ? "dfg_playout_traces" :
           arg == "--max-variants" ? "dfg_playout_max_variants" :
@@ -150,7 +160,13 @@ int main(int argc, char** argv) {
           arg == "--max-execution-time-ms" ? "dfg_playout_max_execution_time_ms" :
           arg == "--case-arrival-rate" ? "dfg_playout_case_arrival_rate" :
           arg == "--max-events-per-trace" ? "dfg_playout_max_events_per_trace" :
-          arg == "--dfg-seed" ? "dfg_playout_seed" : "dfg_playout_start_time";
+          arg == "--dfg-seed" ? "dfg_playout_seed" :
+          arg == "--start-time" ? "dfg_playout_start_time" :
+          arg == "--return-variants" ? "dfg_playout_return_variants" :
+          arg == "--return-only-if-complete" ? "dfg_playout_return_only_if_complete" :
+          arg == "--min-variant-occurrences" ? "dfg_playout_min_variant_occurrences" :
+          arg == "--interrupt-when-dfg-complete" ? "dfg_playout_interrupt_when_dfg_complete" :
+          "dfg_playout_add_trace_if_takes_new_edges";
       dfg_fields[key] = value;
     } else if (arg == "--max-length") {
       const auto* value = next();
@@ -206,16 +222,24 @@ int main(int argc, char** argv) {
       std::optional<minera::DfgPerformance> performance;
       if (dfg_options.variant == minera::DfgPlayoutVariant::kPerformance)
         performance = minera::discover_performance_dfg(source);
-      const auto generated = minera::dfg_playout(
+      const auto result = minera::dfg_playout_result(
           frequency, starts, ends, dfg_options,
           performance ? &*performance : nullptr);
       const auto name = input.stem().string() + " dfg playout";
       if (output.empty()) {
-        minera::write_xes(std::cout, generated, name);
+        if (dfg_options.return_variants &&
+            dfg_options.variant == minera::DfgPlayoutVariant::kClassic)
+          std::cout << minera::dfg_playout_json(result) << '\n';
+        else
+          minera::write_xes(std::cout, result.log, name);
       } else {
         std::ofstream file(output);
         if (!file) throw std::runtime_error("cannot open output file");
-        minera::write_xes(file, generated, name);
+        if (dfg_options.return_variants &&
+            dfg_options.variant == minera::DfgPlayoutVariant::kClassic)
+          file << minera::dfg_playout_json(result) << '\n';
+        else
+          minera::write_xes(file, result.log, name);
       }
       return 0;
     }
