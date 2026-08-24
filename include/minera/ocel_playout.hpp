@@ -39,6 +39,9 @@ struct OcpnPlayoutOptions {
   // and shared modes use deterministic derived seeds for their expansions.
   double branching_factor_transitions = 0.0;
   double branching_factor_bindings = 0.0;
+  // Causal-net-only cap on enabled activity branches. Zero is unlimited;
+  // ordinary object-centric Petri-net playout ignores this field.
+  double branching_factor_activities = 0.0;
   std::size_t max_traces = 100;
   std::size_t max_states = 200000;
   // Optional object ids per object type. Missing types receive one synthetic

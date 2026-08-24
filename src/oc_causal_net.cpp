@@ -436,6 +436,7 @@ std::vector<CausalAction> enabled_actions(
     const CausalState& state, const OcpnPlayoutOptions& options,
     std::mt19937_64& rng) {
   std::vector<CausalAction> result;
+  std::vector<std::vector<CausalAction>> activity_groups;
   for (std::size_t activity_index = 0; activity_index < net.activities.size();
        ++activity_index) {
     const auto& activity = net.activities[activity_index];
@@ -500,6 +501,11 @@ std::vector<CausalAction> enabled_actions(
         activity_actions.push_back(std::move(action));
       }
     }
+    if (!activity_actions.empty())
+      activity_groups.push_back(std::move(activity_actions));
+  }
+  sample_branch(activity_groups, options.branching_factor_activities, rng);
+  for (auto& activity_actions : activity_groups) {
     sample_branch(activity_actions, options.branching_factor_bindings, rng);
     result.insert(result.end(), std::make_move_iterator(activity_actions.begin()),
                   std::make_move_iterator(activity_actions.end()));
@@ -619,7 +625,9 @@ OcpnPlayoutResult causal_playout(
   if (!std::isfinite(options.branching_factor_transitions) ||
       options.branching_factor_transitions < 0.0 ||
       !std::isfinite(options.branching_factor_bindings) ||
-      options.branching_factor_bindings < 0.0)
+      options.branching_factor_bindings < 0.0 ||
+      !std::isfinite(options.branching_factor_activities) ||
+      options.branching_factor_activities < 0.0)
     throw std::invalid_argument("OC causal branching factors must be finite and non-negative");
   if (!std::isfinite(options.start) || !std::isfinite(options.case_interval) ||
       !std::isfinite(options.event_interval) || options.case_interval < 0.0 ||

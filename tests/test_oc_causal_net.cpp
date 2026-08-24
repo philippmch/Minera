@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -41,6 +44,20 @@ minera::OcpnPlayoutOptions one_order_options() {
   options.max_states = 1000;
   options.return_sequences = true;
   return options;
+}
+
+bool same_sequences(const std::vector<std::vector<minera::OcpnBinding>>& left,
+                    const std::vector<std::vector<minera::OcpnBinding>>& right) {
+  if (left.size() != right.size()) return false;
+  for (std::size_t trace = 0; trace < left.size(); ++trace) {
+    if (left[trace].size() != right[trace].size()) return false;
+    for (std::size_t binding = 0; binding < left[trace].size(); ++binding) {
+      if (left[trace][binding].activity != right[trace][binding].activity ||
+          left[trace][binding].objects != right[trace][binding].objects)
+        return false;
+    }
+  }
+  return true;
 }
 
 void test_chain_and_serialization() {
@@ -296,6 +313,68 @@ void test_empty_and_deadlocked_states() {
   assert(reachability_result.trace_exists);
 }
 
+void test_activity_branching_cap() {
+  minera::OcCausalNet alternatives;
+  alternatives.object_types = {"item"};
+  alternatives.activities = {
+      {"A", {group({marker("START_item", "item")})}, {}},
+      {"B", {group({marker("START_item", "item")})}, {}},
+  };
+  auto unlimited = one_order_options();
+  unlimited.objects.clear();
+  unlimited.objects["item"] = {"i1"};
+  unlimited.max_traces = 8;
+  const auto all = minera::oc_causal_net_extensive_playout_result(
+      alternatives, unlimited);
+  assert(all.trace_exists);
+  assert(all.sequences.size() == 2);
+
+  auto capped = unlimited;
+  capped.branching_factor_activities = 1.0;
+  capped.seed = 17;
+  const auto first = minera::oc_causal_net_extensive_playout_result(
+      alternatives, capped);
+  const auto repeat = minera::oc_causal_net_extensive_playout_result(
+      alternatives, capped);
+  assert(first.trace_exists);
+  assert(first.sequences.size() == 1);
+  assert(first.sequences.size() == repeat.sequences.size());
+  assert(first.sequences.front().size() == repeat.sequences.front().size());
+  for (std::size_t index = 0; index < first.sequences.front().size(); ++index) {
+    assert(first.sequences.front()[index].activity ==
+           repeat.sequences.front()[index].activity);
+    assert(first.sequences.front()[index].objects ==
+           repeat.sequences.front()[index].objects);
+  }
+  assert(first.sequences.front().size() == 2);
+
+  capped.branching_factor_activities = 1.5;
+  const auto fractional_first = minera::oc_causal_net_extensive_playout_result(
+      alternatives, capped);
+  const auto fractional_repeat = minera::oc_causal_net_extensive_playout_result(
+      alternatives, capped);
+  assert(same_sequences(fractional_first.sequences, fractional_repeat.sequences));
+  assert(fractional_first.sequences.size() >= 1);
+  assert(fractional_first.sequences.size() <= 2);
+
+  capped.branching_factor_activities = 0.0;
+  const auto restored = minera::oc_causal_net_extensive_playout_result(
+      alternatives, capped);
+  assert(restored.sequences.size() == 2);
+
+  for (const double invalid : {-1.0, std::numeric_limits<double>::quiet_NaN(),
+                               std::numeric_limits<double>::infinity()}) {
+    capped.branching_factor_activities = invalid;
+    bool rejected = false;
+    try {
+      (void)minera::oc_causal_net_extensive_playout_result(alternatives, capped);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
 void test_discovery_and_fallback() {
   minera::Ocel log;
   log.events = {
@@ -326,6 +405,7 @@ int main() {
   test_and_and_alternative_groups();
   test_cardinality_and_key_constraints();
   test_empty_and_deadlocked_states();
+  test_activity_branching_cap();
   test_discovery_and_fallback();
   std::cout << "OC causal-net tests passed\n";
 }

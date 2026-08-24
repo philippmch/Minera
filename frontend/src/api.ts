@@ -4273,6 +4273,7 @@ export interface OcelPlayoutOptions {
   max_bindings_per_activity?: number;
   branching_factor_transitions?: number;
   branching_factor_bindings?: number;
+  branching_factor_activities?: number;
   seed?: number;
   max_traces?: number;
   max_states?: number;
@@ -4316,6 +4317,11 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   addInteger("max_bindings_per_activity", options.max_bindings_per_activity);
   addBranching("branching_factor_transitions", options.branching_factor_transitions);
   addBranching("branching_factor_bindings", options.branching_factor_bindings);
+  addBranching("branching_factor_activities", options.branching_factor_activities);
+  if (options.branching_factor_activities !== undefined &&
+      options.model !== "causal_net") {
+    throw new Error("branching_factor_activities requires model=causal_net");
+  }
   addInteger("seed", options.seed);
   addInteger("max_traces", options.max_traces);
   addInteger("max_states", options.max_states);

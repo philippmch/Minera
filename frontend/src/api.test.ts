@@ -1136,15 +1136,20 @@ describe("OCEL API", () => {
       model: "ocpn", event_binding: "shared_activity", objects_unique_per_trace: true,
     })).toBe("model=ocpn&objects_unique_per_trace=true&event_binding=shared_activity");
     expect(ocelPlayoutQuery({
-      event_binding: "synchronized", branching_factor_transitions: 3,
-      branching_factor_bindings: 4, exists_trace: true, return_sequences: true,
-    })).toBe("branching_factor_transitions=3&branching_factor_bindings=4&event_binding=synchronized&exists_trace=true&return_sequences=true");
+      model: "causal_net", event_binding: "synchronized", branching_factor_transitions: 3,
+      branching_factor_bindings: 4, branching_factor_activities: 1,
+      exists_trace: true, return_sequences: true,
+    })).toBe("model=causal_net&branching_factor_transitions=3&branching_factor_bindings=4&branching_factor_activities=1&event_binding=synchronized&exists_trace=true&return_sequences=true");
     expect(ocelPlayoutQuery({
       event_binding: "synchronized", branching_factor_transitions: 1.5,
       branching_factor_bindings: 0.5, seed: 42,
     })).toBe("branching_factor_transitions=1.5&branching_factor_bindings=0.5&seed=42&event_binding=synchronized");
     expect(() => ocelPlayoutQuery({ branching_factor_bindings: -0.1 }))
       .toThrow(/finite non-negative/);
+    expect(() => ocelPlayoutQuery({ branching_factor_activities: Number.NaN }))
+      .toThrow(/finite non-negative/);
+    expect(() => ocelPlayoutQuery({ model: "ocpn", branching_factor_activities: 1 }))
+      .toThrow(/requires model=causal_net/);
     expect(ocelPlayoutQuery({
       initial_marking: { order: [0, 1, 0], item: [1, 0, 0, 0] },
       final_marking: { order: [0, 0, 1], item: [0, 0, 0, 1] },
