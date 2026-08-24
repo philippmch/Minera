@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 
+#include "minera/conformance.hpp"
+#include "minera/json_export.hpp"
+#include "minera/petri_net.hpp"
+#include "minera/ptml.hpp"
+
 using namespace minera;
 
 namespace {
@@ -15,6 +20,10 @@ ProcessTreeNode seq(std::initializer_list<ProcessTreeNode> c) {
 }
 ProcessTreeNode xor_node(std::initializer_list<ProcessTreeNode> c) {
   return ProcessTreeNode{ProcessTreeOperator::kExclusive, 0,
+                         std::vector<ProcessTreeNode>(c)};
+}
+ProcessTreeNode or_node(std::initializer_list<ProcessTreeNode> c) {
+  return ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice, 0,
                          std::vector<ProcessTreeNode>(c)};
 }
 std::vector<std::string> labels(const Trace& t) {
@@ -54,6 +63,70 @@ int main() {
                       {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
   log = process_tree_playout(parallel, ex);
   assert(log.traces.size() == 2);
+
+  ProcessTree inclusive(
+      {"a", "b"}, or_node({ProcessTreeNode::leaf(0),
+                              ProcessTreeNode::leaf(1)}));
+  ex.max_length = 2;
+  ex.min_length = 0;
+  ex.max_traces = 10;
+  log = process_tree_playout(inclusive, ex);
+  assert(log.traces.size() == 4);
+  assert(labels(log.traces[0]) == std::vector<std::string>{"a"});
+  assert(labels(log.traces[1]) == std::vector<std::string>{"b"});
+  assert(labels(log.traces[2]) == std::vector<std::string>({"a", "b"}) ||
+         labels(log.traces[2]) == std::vector<std::string>({"b", "a"}));
+  assert(labels(log.traces[3]) == std::vector<std::string>({"a", "b"}) ||
+         labels(log.traces[3]) == std::vector<std::string>({"b", "a"}));
+  assert(labels(log.traces[2]) != labels(log.traces[3]));
+
+  // Basic sampling selects a non-empty child subset and remains deterministic
+  // for a fixed seed.
+  ProcessTreePlayoutOptions sampled;
+  sampled.traces = 24;
+  sampled.max_length = 2;
+  sampled.seed = 77;
+  const auto sampled_first = process_tree_playout(inclusive, sampled);
+  const auto sampled_second = process_tree_playout(inclusive, sampled);
+  assert(sampled_first.traces.size() == sampled_second.traces.size());
+  for (std::size_t i = 0; i < sampled_first.traces.size(); ++i) {
+    assert(labels(sampled_first.traces[i]) == labels(sampled_second.traces[i]));
+    assert(!sampled_first.traces[i].events.empty());
+    assert(sampled_first.traces[i].events.size() <= 2);
+  }
+
+  const auto ptml = to_ptml(inclusive);
+  assert(ptml.find("<or ") != std::string::npos);
+  const auto ptml_round_trip = parse_ptml(ptml);
+  assert(ptml_round_trip.root().op == ProcessTreeOperator::kInclusiveChoice);
+  const auto json = random_tree_json(inclusive);
+  assert(json.find("inclusive_or") != std::string::npos);
+
+  // The workflow net accepts every non-empty subset, including the concurrent
+  // a+b branch, without leaving residual tokens at completion.
+  const auto inclusive_net = to_petri_net(inclusive);
+  assert(final_marking_reachable(inclusive_net));
+  assert(check_alignment(log, inclusive_net).fitness == 1.0);
+
+  bool invalid_or = false;
+  try {
+    (void)process_tree_playout(
+        ProcessTree({"a"}, ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice,
+                                             0, {}}),
+        ex);
+  } catch (const std::invalid_argument&) {
+    invalid_or = true;
+  }
+  assert(invalid_or);
+  invalid_or = false;
+  try {
+    (void)to_petri_net(
+        ProcessTree({"a"}, ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice,
+                                             0, {}}));
+  } catch (const std::invalid_argument&) {
+    invalid_or = true;
+  }
+  assert(invalid_or);
 
   ProcessTree with_tau({"a"}, seq({ProcessTreeNode::tau(), ProcessTreeNode::leaf(0)}));
   log = process_tree_playout(with_tau, ex);

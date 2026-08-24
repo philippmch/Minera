@@ -132,6 +132,27 @@ void process_tree_to_powl_variations() {
   assert(loop_model.children()[0].label() == "A");
   assert(loop_model.children()[1].label() == "B");
 
+  ProcessTreeNode inclusive{Op::kInclusiveChoice, 0,
+                            {ProcessTreeNode::leaf(0),
+                             ProcessTreeNode::leaf(1)}};
+  const auto inclusive_model =
+      minera::to_powl(ProcessTree({"A", "B"}, inclusive));
+  assert(inclusive_model.kind() == minera::PowlNodeKind::kXor);
+  assert(inclusive_model.children().size() == 3);
+  bool saw_a = false;
+  bool saw_b = false;
+  bool saw_ab = false;
+  for (const auto& child : inclusive_model.children()) {
+    if (child.kind() == minera::PowlNodeKind::kTransition && child.label() == "A")
+      saw_a = true;
+    if (child.kind() == minera::PowlNodeKind::kTransition && child.label() == "B")
+      saw_b = true;
+    if (child.kind() == minera::PowlNodeKind::kStrictPartialOrder &&
+        child.children().size() == 2 && child.order().empty())
+      saw_ab = true;
+  }
+  assert(saw_a && saw_b && saw_ab);
+
   bool invalid = false;
   try {
     (void)minera::to_powl(ProcessTree({"A"}, ProcessTreeNode::leaf(1)));

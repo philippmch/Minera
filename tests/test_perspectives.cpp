@@ -445,6 +445,16 @@ void bpmn_export_uses_a_gateway_for_an_exclusive_choice() {
   assert(bpmn.find("<exclusiveGateway") != std::string::npos);
 }
 
+void bpmn_export_uses_a_gateway_for_an_inclusive_choice() {
+  const minera::ProcessTree tree(
+      {"a", "b"},
+      minera::ProcessTreeNode{minera::ProcessTreeOperator::kInclusiveChoice, 0,
+                              {minera::ProcessTreeNode::leaf(0),
+                               minera::ProcessTreeNode::leaf(1)}});
+  const auto bpmn = minera::to_bpmn(tree);
+  assert(bpmn.find("<inclusiveGateway") != std::string::npos);
+}
+
 void bpmn_export_escapes_xml_metacharacters() {
   const auto tree =
       minera::discover_process_tree(log_from_variants({{"a & b", "c"}}));
@@ -569,6 +579,7 @@ int main() {
   pnml_export_escapes_xml_metacharacters();
   bpmn_export_carries_block_structure();
   bpmn_export_uses_a_gateway_for_an_exclusive_choice();
+  bpmn_export_uses_a_gateway_for_an_inclusive_choice();
   bpmn_export_escapes_xml_metacharacters();
   bpmn_net_export_keeps_a_sequence_gateway_free();
   bpmn_net_export_maps_places_and_transitions_to_gateways();

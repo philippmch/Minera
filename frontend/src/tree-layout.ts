@@ -40,6 +40,7 @@ const GAP_X = 26; // horizontal gap between adjacent leaves
 const OPERATOR_GLYPH: Record<ProcessTreeOperator, string> = {
   sequence: "→",
   exclusive: "×",
+  inclusive_or: "⊻",
   parallel: "∧",
   loop: "↺",
   activity: "",

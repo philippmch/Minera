@@ -158,8 +158,10 @@ void fire_petri_transition(const PetriTransition& transition,
 // Translates a block-structured process tree into an equivalent workflow net.
 // Each operator expands to the textbook fragment: sequence chains its children
 // through intermediate places, exclusive choice shares one entry and one exit
-// place, parallel adds silent AND-split/join transitions, and loop wires the
-// redo children from the body's exit back to its entry.
+// place, inclusive choice gives each child an execute/skip selector and joins
+// after at least one child was selected, parallel adds silent AND-split/join
+// transitions, and loop wires the redo children from the body's exit back to
+// its entry.
 [[nodiscard]] PetriNet to_petri_net(const ProcessTree& tree);
 
 // Translates a Heuristic Miner dependency graph into a workflow net so it can

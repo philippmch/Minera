@@ -7,10 +7,12 @@
 
 using namespace minera;
 namespace {
-EventLog log_of(std::initializer_list<std::string> xs) { Trace t; t.case_id="c"; std::size_t i=0; for (auto& x:xs) t.events.push_back(Event{"c",x,{}, {},i++}); return EventLog{{std::move(t)}}; }
+EventLog log_of(const std::vector<std::string>& xs) { Trace t; t.case_id="c"; std::size_t i=0; for (const auto& x:xs) t.events.push_back(Event{"c",x,{}, {},i++}); return EventLog{{std::move(t)}}; }
+EventLog log_of(std::initializer_list<std::string> xs) { return log_of(std::vector<std::string>(xs)); }
 ProcessTree seq(std::vector<std::string> a) { std::vector<ProcessTreeNode> c; for(std::size_t i=0;i<a.size();++i)c.push_back(ProcessTreeNode::leaf(i)); return ProcessTree(std::move(a), ProcessTreeNode{ProcessTreeOperator::kSequence,0,std::move(c)}); }
 ProcessTree loop2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kLoop,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
 ProcessTree parallel2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
+ProcessTree inclusive2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
 ProcessTree nested() { return ProcessTree({"a","b","c","d"}, ProcessTreeNode{ProcessTreeOperator::kSequence,0,{
   ProcessTreeNode{ProcessTreeOperator::kExclusive,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}},
   ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(2),ProcessTreeNode::leaf(3)}}}}); }
@@ -28,6 +30,16 @@ int main() {
     auto p=align_process_tree(log_of({"b","a"}),parallel2(),o); assert(p.computed&&p.total_cost==0);
     auto n=align_process_tree(log_of({"b","d","c"}),nested(),o); assert(n.computed&&n.total_cost==0);
     assert(n.diagnostics.traces_aligned==1);
+  }
+  for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT, ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING, ProcessTreeAlignmentVariant::MILP, ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {
+    ProcessTreeAlignmentOptions o; o.variant=v;
+    for (const auto& trace : {std::vector<std::string>{"a"},
+                              std::vector<std::string>{"b"},
+                              std::vector<std::string>{"a", "b"},
+                              std::vector<std::string>{"b", "a"}}) {
+      const auto result = align_process_tree(log_of(trace), inclusive2(), o);
+      assert(result.computed && result.total_cost == 0);
+    }
   }
   ProcessTree dup({"a","a"},ProcessTreeNode{ProcessTreeOperator::kSequence,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}});
   ProcessTreeAlignmentOptions dp; dp.variant=ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING;

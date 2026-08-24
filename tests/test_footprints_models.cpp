@@ -28,6 +28,30 @@ int main() {
   assert(xf.start_activities == std::set<std::string>({"A", "B"}) &&
          xf.parallel.empty());
   assert(xf.skippable && !*xf.skippable);
+
+  const ProcessTree inclusive_tree({"A", "B"},
+      ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice, 0,
+          {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  const auto inf = discover_footprints(inclusive_tree);
+  assert(inf.start_activities == std::set<std::string>({"A", "B"}));
+  assert(inf.end_activities == std::set<std::string>({"A", "B"}));
+  assert(inf.parallel.count({"A", "B"}) && inf.parallel.count({"B", "A"}));
+  assert(inf.min_trace_length && *inf.min_trace_length == 1);
+  assert(inf.max_trace_length_without_loops &&
+         *inf.max_trace_length_without_loops == 2);
+  assert(inf.skippable && !*inf.skippable);
+
+  const ProcessTree optional_inclusive({"A"},
+      ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice, 0,
+          {ProcessTreeNode::tau(), ProcessTreeNode::leaf(0)}});
+  const auto oinf = discover_footprints(optional_inclusive);
+  assert(oinf.skippable && *oinf.skippable);
+  assert(oinf.min_trace_length && *oinf.min_trace_length == 0);
+  assert(oinf.max_trace_length_without_loops &&
+         *oinf.max_trace_length_without_loops == 1);
+  assert(oinf.activities_always_happening &&
+         oinf.activities_always_happening->empty());
+
   const ProcessTree par_tree({"A", "B"},
       ProcessTreeNode{ProcessTreeOperator::kParallel, 0,
           {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});

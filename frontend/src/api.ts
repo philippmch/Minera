@@ -777,6 +777,39 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.transitionWindow !== undefined && options.transitionWindow !== 2)
     add("transition_window", String(options.transitionWindow));
   if (options.transitionIncludeData) add("transition_include_data", "true");
+
+  // Validate every explicitly supplied POWL setting before serializing it.
+  // Omitting an invalid value would silently select the backend default and
+  // make a user-visible setting appear to have been accepted.
+  if (options.powlVariant !== undefined &&
+      !(<[string, ...string[]]>[
+        "tree", "brute_force", "maximal", "dynamic_clustering",
+        "dynamic_clustering_plain",
+      ]).includes(options.powlVariant)) {
+    throw new Error("powlVariant is not a supported POWL variant");
+  }
+  if (options.powlFilteringType !== undefined &&
+      !(<[string, ...string[]]>["decreasing_factor", "dynamic"])
+        .includes(options.powlFilteringType)) {
+    throw new Error("powlFilteringType is not a supported POWL filtering type");
+  }
+  if (options.powlFilteringThreshold !== undefined &&
+      (!Number.isFinite(options.powlFilteringThreshold) ||
+       options.powlFilteringThreshold < 0 ||
+       options.powlFilteringThreshold >= 1)) {
+    throw new Error("powlFilteringThreshold must be finite and satisfy 0 <= value < 1");
+  }
+  if (options.powlOrderFrequencyRatio !== undefined &&
+      (!Number.isFinite(options.powlOrderFrequencyRatio) ||
+       options.powlOrderFrequencyRatio <= 0.5 ||
+       options.powlOrderFrequencyRatio > 1)) {
+    throw new Error("powlOrderFrequencyRatio must be finite and satisfy 0.5 < value <= 1");
+  }
+  if (options.powlBruteForceActivityLimit !== undefined &&
+      (!Number.isInteger(options.powlBruteForceActivityLimit) ||
+       options.powlBruteForceActivityLimit < 0)) {
+    throw new Error("powlBruteForceActivityLimit must be a non-negative integer");
+  }
   if (options.powlVariant && options.powlVariant !== "maximal")
     add("powl_variant", options.powlVariant);
   if (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor")

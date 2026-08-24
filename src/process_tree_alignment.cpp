@@ -18,6 +18,7 @@ namespace minera {
 namespace {
 using Op = ProcessTreeOperator;
 using Clock = std::chrono::steady_clock;
+constexpr std::size_t kMaxInclusiveChildren = 12;
 
 struct Expr;
 using EP = std::shared_ptr<const Expr>;
@@ -51,6 +52,27 @@ struct ExprFactory {
     std::vector<EP> flat; for(auto& x:xs){ if(x->kind==Expr::Parallel) flat.insert(flat.end(),x->children.begin(),x->children.end()); else if(x->kind!=Expr::Epsilon) flat.push_back(x); }
     if(flat.empty()) return eps(); if(flat.size()==1)return flat[0]; std::sort(flat.begin(),flat.end(),[](EP a,EP b){return a->key<b->key;}); Expr e; e.kind=Expr::Parallel;e.children=flat;e.key="p(";e.nullable=true;e.min_visible=0;for(auto& c:flat){e.key+=c->key+",";e.nullable &= c->nullable;e.min_visible+=c->min_visible;}e.key+=")";return intern(std::move(e));
   }
+  EP inclusive(std::vector<EP> xs) {
+    if (xs.empty()) return eps();
+    if (xs.size() == 1) return xs.front();
+    if (xs.size() > kMaxInclusiveChildren)
+      throw std::invalid_argument(
+          "process-tree inclusive OR exceeds the alignment expansion limit of 12 children");
+    std::vector<EP> alternatives;
+    std::vector<EP> selected;
+    const auto visit = [&](const auto& self, std::size_t index) -> void {
+      if (index == xs.size()) {
+        if (!selected.empty()) alternatives.push_back(par(selected));
+        return;
+      }
+      self(self, index + 1);
+      selected.push_back(xs[index]);
+      self(self, index + 1);
+      selected.pop_back();
+    };
+    visit(visit, 0);
+    return xorr(std::move(alternatives));
+  }
   EP star(EP x) { Expr e; e.kind=Expr::Star;e.children={x};e.key="*("+x->key+")";e.nullable=true;return intern(std::move(e)); }
 };
 
@@ -58,7 +80,7 @@ void validate(const ProcessTreeNode& n, const ProcessTree& t, ProcessTreeAlignme
   h=std::max<std::size_t>(h,1);
   if(n.op==Op::kActivity){if(!n.children.empty()||n.activity>=t.activities().size()) throw std::invalid_argument("process-tree alignment: invalid activity leaf"); return;}
   if(n.op==Op::kTau){if(!n.children.empty()) throw std::invalid_argument("process-tree alignment: tau cannot have children"); return;}
-  if((n.op==Op::kSequence||n.op==Op::kExclusive||n.op==Op::kParallel) && n.children.empty()) throw std::invalid_argument("process-tree alignment: operator requires children");
+  if((n.op==Op::kSequence||n.op==Op::kExclusive||n.op==Op::kInclusiveChoice||n.op==Op::kParallel) && n.children.empty()) throw std::invalid_argument("process-tree alignment: operator requires children");
   if(n.op==Op::kLoop && n.children.empty()) throw std::invalid_argument("process-tree alignment: loop requires a body");
   if(v==ProcessTreeAlignmentVariant::kMilp && n.op==Op::kLoop && n.children.size()!=2) throw std::invalid_argument("process-tree alignment MILP supports only binary loops");
   for(const auto& c:n.children){std::size_t ch=0;validate(c,t,v,ch);h=std::max(h,ch+1);} }
@@ -68,6 +90,7 @@ EP compile(const ProcessTreeNode& n, const ProcessTree& t, ExprFactory& f) {
     case Op::kActivity:return f.act(t.activities()[n.activity]); case Op::kTau:return f.eps();
     case Op::kSequence:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.seq(x);}
     case Op::kExclusive:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.xorr(x);}
+    case Op::kInclusiveChoice:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.inclusive(x);}
     case Op::kParallel:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.par(x);}
     case Op::kLoop:{EP body=compile(n.children[0],t,f);if(n.children.size()==1)return body;std::vector<EP> rs;for(std::size_t i=1;i<n.children.size();++i)rs.push_back(compile(n.children[i],t,f));return f.seq({body,f.star(f.seq({f.xorr(rs),body}))});}
   } return f.eps();
@@ -408,6 +431,9 @@ struct RecursiveAligner {
         break;
       case Op::kParallel:
         out = align_parallel(node, trace, approximate);
+        break;
+      case Op::kInclusiveChoice:
+        out = exact_subtree(node, trace);
         break;
       case Op::kLoop:
         if (approximate) ++approximation_loop_fallbacks;

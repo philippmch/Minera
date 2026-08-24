@@ -19,7 +19,8 @@ struct Metadata {
 bool is_flattenable(ProcessTreeOperator op) {
   return op == ProcessTreeOperator::kSequence ||
          op == ProcessTreeOperator::kParallel ||
-         op == ProcessTreeOperator::kExclusive;
+         op == ProcessTreeOperator::kExclusive ||
+         op == ProcessTreeOperator::kInclusiveChoice;
 }
 
 void add_activities(ActivityNames& target, const Metadata& source) {
@@ -38,10 +39,11 @@ Metadata inspect(const ProcessTreeNode& node,
       break;
     case ProcessTreeOperator::kSequence:
     case ProcessTreeOperator::kExclusive:
+    case ProcessTreeOperator::kInclusiveChoice:
     case ProcessTreeOperator::kParallel:
       if (node.children.empty()) {
         throw std::invalid_argument(
-            "process tree sequence, exclusive, and parallel operators require "
+            "process tree sequence, exclusive, inclusive, and parallel operators require "
             "at least one child");
       }
       break;
@@ -85,6 +87,7 @@ Metadata inspect(const ProcessTreeNode& node,
       break;
     }
     case ProcessTreeOperator::kExclusive:
+    case ProcessTreeOperator::kInclusiveChoice:
       result.skippable = false;
       for (const auto& child : result.children) {
         result.skippable = result.skippable || child.skippable;
@@ -142,7 +145,8 @@ ProcessTreeNode canonicalize(ProcessTreeNode node) {
     }
     node.children = std::move(flattened);
 
-    if (node.op == ProcessTreeOperator::kExclusive) {
+    if (node.op == ProcessTreeOperator::kExclusive ||
+        node.op == ProcessTreeOperator::kInclusiveChoice) {
       std::vector<ProcessTreeNode> deduplicated;
       deduplicated.reserve(node.children.size());
       bool saw_tau = false;

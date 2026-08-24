@@ -52,6 +52,7 @@ std::string_view operator_name(ProcessTreeOperator op) {
     case ProcessTreeOperator::kTau: return "tau";
     case ProcessTreeOperator::kSequence: return "sequence";
     case ProcessTreeOperator::kExclusive: return "exclusive";
+    case ProcessTreeOperator::kInclusiveChoice: return "inclusive_or";
     case ProcessTreeOperator::kParallel: return "parallel";
     case ProcessTreeOperator::kLoop: return "loop";
   }

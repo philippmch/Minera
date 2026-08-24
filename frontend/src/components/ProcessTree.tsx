@@ -5,6 +5,7 @@ import { type TreeLayout } from "../tree-layout";
 const OPERATOR_NAME: Record<string, string> = {
   sequence: "Sequence",
   exclusive: "Exclusive choice",
+  inclusive_or: "Inclusive choice",
   parallel: "Parallel",
   loop: "Loop",
 };
@@ -61,6 +62,7 @@ export function ProcessTree({ layout, title, actions }: ProcessTreeProps) {
           <div className="tree-legend">
             <span><i className="tree-legend-op">→</i> sequence</span>
             <span><i className="tree-legend-op">×</i> choice</span>
+            <span><i className="tree-legend-op">⊻</i> inclusive choice</span>
             <span><i className="tree-legend-op">∧</i> parallel</span>
             <span><i className="tree-legend-op">↺</i> loop</span>
           </div>

@@ -118,6 +118,15 @@ void ptandlog_generation_is_seeded_and_bounded() {
   const auto choice_tree = generate_random_process_tree(choice);
   assert(has_operator(choice_tree.root(), ProcessTreeOperator::kExclusive));
 
+  RandomTreeOptions inclusive = options;
+  inclusive.min = inclusive.mode = inclusive.max = 4;
+  inclusive.sequence = inclusive.choice = inclusive.parallel = inclusive.loop =
+      0.0;
+  inclusive.or_probability = 1.0;
+  const auto inclusive_tree = generate_random_process_tree(inclusive);
+  assert(has_operator(inclusive_tree.root(),
+                      ProcessTreeOperator::kInclusiveChoice));
+
   RandomTreeOptions loop = options;
   loop.min = loop.mode = loop.max = 4;
   loop.sequence = loop.choice = loop.parallel = loop.or_probability = 0.0;
@@ -225,7 +234,7 @@ void rejects_bad_options() {
                        RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
                                          .sequence = -0.1},
                        RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
-                                         .or_probability = 1.0}}) {
+                                         .or_probability = -0.1}}) {
     bool threw = false;
     try {
       (void)generate_random_process_tree(options);

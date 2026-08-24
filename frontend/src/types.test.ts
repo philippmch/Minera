@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+
+describe("inclusive process-tree JSON", () => {
+  it("accepts inclusive OR nodes in random-tree responses", () => {
+    const result = {
+      family: "RANDOM_TREE", variant: "PTANDLOGGENERATOR", activities: ["A", "B"],
+      tree: {
+        operator: "inclusive_or", children: [
+          { operator: "activity", activity: "A", children: [] },
+          { operator: "activity", activity: "B", children: [] },
+        ],
+      },
+    };
+    expect(isRandomTreeResult(result)).toBe(true);
+  });
+});
 
 describe("isConceptDriftResult", () => {
   const valid = {

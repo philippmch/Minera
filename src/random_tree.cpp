@@ -55,9 +55,6 @@ void validate_options(const RandomTreeOptions& options) {
   check_probability(options.or_probability, "or");
   check_probability(options.silent, "silent");
   check_probability(options.duplicate, "duplicate");
-  if (options.or_probability > 0.0)
-    throw std::invalid_argument(
-        "random tree: inclusive OR is not supported by the native process-tree model");
   if (options.sequence + options.choice + options.parallel + options.loop +
           options.or_probability <=
       0.0)
@@ -203,8 +200,8 @@ ProcessTreeNode generate_ptandlog_tree(std::mt19937_64& generator,
         if (random_event(generator, options.silent))
           combined.children.push_back(ProcessTreeNode::tau());
         break;
-      default:  // OR is represented by the process-tree XOR operator.
-        combined.op = ProcessTreeOperator::kExclusive;
+      default:
+        combined.op = ProcessTreeOperator::kInclusiveChoice;
         combined.children = {std::move(population[first]),
                              std::move(population[second])};
         break;

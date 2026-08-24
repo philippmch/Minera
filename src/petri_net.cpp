@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -12,6 +13,57 @@ namespace {
 
 // Wires the fragment for `node` between the given entry and exit places,
 // appending the transitions (and any intermediate places) to `net`.
+void build(const ProcessTreeNode& node,
+           std::size_t in,
+           std::size_t out,
+           PetriNet& net);
+
+void build_inclusive_or(const ProcessTreeNode& node,
+                        std::size_t in,
+                        std::size_t out,
+                        PetriNet& net) {
+  // Split one control token into one selector token per child. Each selector
+  // can skip its child or start it. The first selected child moves the state
+  // token from `not_started` to `started`; later selected children preserve
+  // that token. Requiring `started` at the join excludes the empty subset
+  // without enumerating all 2^n choices.
+  if (node.children.empty()) {
+    throw std::invalid_argument(
+        "process-tree inclusive OR requires at least one child");
+  }
+  const std::size_t not_started = net.add_place();
+  const std::size_t started = net.add_place();
+  std::vector<std::size_t> selectors;
+  std::vector<std::size_t> completions;
+  selectors.reserve(node.children.size());
+  completions.reserve(node.children.size());
+
+  for (const auto& child : node.children) {
+    const std::size_t selector = net.add_place();
+    const std::size_t child_in = net.add_place();
+    const std::size_t child_out = net.add_place();
+    const std::size_t completion = net.add_place();
+    selectors.push_back(selector);
+    completions.push_back(completion);
+
+    build(child, child_in, child_out, net);
+    net.add_transition(std::nullopt, {child_out}, {completion});
+    net.add_transition(std::nullopt, {selector}, {completion});
+    net.add_transition(std::nullopt, {selector, not_started},
+                       {child_in, started});
+    net.add_transition(std::nullopt, {selector, started},
+                       {child_in, started});
+  }
+
+  std::vector<std::size_t> split_outputs = selectors;
+  split_outputs.push_back(not_started);
+  net.add_transition(std::nullopt, {in}, std::move(split_outputs));
+
+  std::vector<std::size_t> join_inputs = completions;
+  join_inputs.push_back(started);
+  net.add_transition(std::nullopt, std::move(join_inputs), {out});
+}
+
 void build(const ProcessTreeNode& node,
            std::size_t in,
            std::size_t out,
@@ -39,6 +91,9 @@ void build(const ProcessTreeNode& node,
       for (const auto& child : node.children) {
         build(child, in, out, net);
       }
+      return;
+    case ProcessTreeOperator::kInclusiveChoice:
+      build_inclusive_or(node, in, out, net);
       return;
     case ProcessTreeOperator::kParallel: {
       // Silent AND-split forks a token into every branch; the AND-join waits

@@ -927,7 +927,7 @@ export function isTimestampInterleavingsResult(value: unknown): value is Timesta
 }
 
 export interface RandomTreeNode {
-  operator: "activity" | "tau" | "sequence" | "exclusive" | "parallel" | "loop";
+  operator: "activity" | "tau" | "sequence" | "exclusive" | "inclusive_or" | "parallel" | "loop";
   activity?: string;
   children: RandomTreeNode[];
 }
@@ -942,7 +942,7 @@ function isRandomTreeNode(value: unknown, activities: string[], root = false,
                           basicRoot = false): value is RandomTreeNode {
   if (!value || typeof value !== "object") return false;
   const node = value as Partial<RandomTreeNode>;
-  if (!["activity", "tau", "sequence", "exclusive", "parallel", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
+  if (!["activity", "tau", "sequence", "exclusive", "inclusive_or", "parallel", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
   if (node.operator === "activity") return node.children.length === 0 && typeof node.activity === "string" && activities.includes(node.activity);
   if (node.activity !== undefined) return false;
   if (node.operator === "tau") return node.children.length === 0;
@@ -1513,6 +1513,7 @@ export interface VariantStat {
 export type ProcessTreeOperator =
   | "sequence"
   | "exclusive"
+  | "inclusive_or"
   | "parallel"
   | "loop"
   | "activity"
@@ -2429,7 +2430,7 @@ export function isPetriAntiAlignmentResult(value: unknown): value is PetriAntiAl
 export function isPetriMultiAlignmentResult(value: unknown): value is PetriMultiAlignmentResult { return isPetriAdvancedResult(value, "petri_multi_alignment"); }
 
 function isProcessTreeNode(value: unknown): value is ProcessTreeNode {
-  if (!isRecord(value) || !["sequence", "exclusive", "parallel", "loop", "activity", "tau"].includes(value.operator as string)) return false;
+  if (!isRecord(value) || !["sequence", "exclusive", "inclusive_or", "parallel", "loop", "activity", "tau"].includes(value.operator as string)) return false;
   if (value.operator === "activity" && !nonNegativeInt(value.activity)) return false;
   if (value.activity !== undefined && !nonNegativeInt(value.activity)) return false;
   if (value.children !== undefined && (!Array.isArray(value.children) || !value.children.every(isProcessTreeNode))) return false;

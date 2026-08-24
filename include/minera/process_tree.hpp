@@ -15,6 +15,7 @@ enum class ProcessTreeOperator {
   kTau,        // leaf: silent step (no observable event)
   kSequence,   // children executed left to right
   kExclusive,  // exactly one child executed
+  kInclusiveChoice,  // one or more children executed concurrently
   kParallel,   // children executed concurrently (any interleaving)
   kLoop,       // child[0] is the body; child[1..] are redo paths
 };

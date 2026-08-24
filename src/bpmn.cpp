@@ -89,6 +89,8 @@ class BpmnBuilder {
         return emit_sequence(node);
       case ProcessTreeOperator::kExclusive:
         return emit_gateway(node, "exclusiveGateway");
+      case ProcessTreeOperator::kInclusiveChoice:
+        return emit_gateway(node, "inclusiveGateway");
       case ProcessTreeOperator::kParallel:
         return emit_gateway(node, "parallelGateway");
       case ProcessTreeOperator::kLoop:
