@@ -2422,18 +2422,20 @@ void parse_process_tree_playout_params_maps_variants_and_limits() {
   const auto omitted = minera::parse_process_tree_playout_params(fields({}));
   assert(omitted.variant == minera::ProcessTreePlayoutVariant::kTopBottom);
   const auto parsed = minera::parse_process_tree_playout_params(fields({
-      {"playout_variant", "TOPBOTTOM"},
+      {"playout_variant", "EXTENSIVE"},
       {"playout_traces", "12"},
       {"playout_max_steps", "99"},
       {"playout_seed", "7"},
       {"playout_min_length", "2"},
       {"playout_max_length", "8"},
       {"playout_max_loop_occurrences", "4"},
-      {"playout_max_trace_cap", "50"}}));
-  assert(parsed.variant == minera::ProcessTreePlayoutVariant::kTopBottom);
+      {"playout_max_trace_cap", "50"},
+      {"playout_return_set_strings", "true"}}));
+  assert(parsed.variant == minera::ProcessTreePlayoutVariant::kExtensive);
   assert(parsed.traces == 12 && parsed.max_steps == 99 && parsed.seed == 7);
   assert(parsed.min_length == 2 && parsed.max_length == 8);
   assert(parsed.max_loop_occurrences == 4 && parsed.max_traces == 50);
+  assert(parsed.return_set_strings);
 }
 
 void parse_process_tree_playout_params_rejects_bad_values() {
@@ -2454,6 +2456,14 @@ void parse_process_tree_playout_params_rejects_bad_values() {
   try {
     (void)minera::parse_process_tree_playout_params(fields({
         {"playout_min_length", "4"}, {"playout_max_length", "2"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_process_tree_playout_params(
+        fields({{"playout_return_set_strings", "true"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }

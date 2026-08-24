@@ -2806,6 +2806,43 @@ export interface ProcessTreePlayoutOptions {
   max_length?: number;
   max_loop_occurrences?: number;
   max_trace_cap?: number;
+  return_set_strings?: boolean;
+}
+
+export interface ProcessTreePlayoutSetResult {
+  family: "PROCESS_TREE_PLAYOUT";
+  variant: "EXTENSIVE";
+  return_set_strings: true;
+  traces: string[][];
+}
+
+export function isProcessTreePlayoutSetResult(
+  value: unknown,
+): value is ProcessTreePlayoutSetResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<ProcessTreePlayoutSetResult>;
+  if (result.family !== "PROCESS_TREE_PLAYOUT" ||
+      result.variant !== "EXTENSIVE" || result.return_set_strings !== true ||
+      !Array.isArray(result.traces) ||
+      !result.traces.every((trace) =>
+        Array.isArray(trace) && trace.every((activity) => typeof activity === "string"))) {
+    return false;
+  }
+
+  // The native extensive enumerator emits unique words ordered by length,
+  // then lexicographically within each length. Keep the runtime guard aligned
+  // with that deterministic contract so callers can rely on stable results.
+  const comesBefore = (left: string[], right: string[]): boolean => {
+    if (left.length !== right.length) return left.length < right.length;
+    for (let i = 0; i < left.length; ++i) {
+      if (left[i] !== right[i]) return left[i] < right[i];
+    }
+    return false;
+  };
+  for (let i = 1; i < result.traces.length; ++i) {
+    if (!comesBefore(result.traces[i - 1]!, result.traces[i]!)) return false;
+  }
+  return true;
 }
 
 /** Controls uniform random execution of a Petri-net model. */

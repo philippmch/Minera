@@ -4332,6 +4332,13 @@ void handle_playout(const httplib::Request& request,
         "application/json");
     return;
   }
+  if (request.has_param("return_set_strings") && miner != "process_tree") {
+    response.status = 400;
+    response.set_content(
+        error_json("return_set_strings requires process-tree extensive playout"),
+        "application/json");
+    return;
+  }
   if (is_monte_carlo) {
     const std::string selected_miner =
         miner == "monte_carlo" ? "inductive" : miner;
@@ -4462,9 +4469,16 @@ void handle_playout(const httplib::Request& request,
         reject("max_length must not exceed 64");
         return;
       }
-      const auto log = minera::process_tree_playout(session->tree, options);
-      response.set_content(minera::to_xes(log, "process_tree playout"),
-                           "application/xml");
+      const auto result =
+          minera::process_tree_playout_result(session->tree, options);
+      if (options.return_set_strings) {
+        response.set_content(
+            minera::serialize_process_tree_playout_json(result),
+            "application/json");
+      } else {
+        response.set_content(minera::to_xes(result.log, "process_tree playout"),
+                             "application/xml");
+      }
     } catch (const std::exception& error) {
       reject(error.what());
     }

@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "minera/event_log.hpp"
 #include "minera/process_tree.hpp"
@@ -36,7 +38,18 @@ struct ProcessTreePlayoutOptions {
   double start = 1767225600.0;
   double case_interval = 60.0;
   double event_interval = 1.0;
+  // Extensive mode can expose the canonical activity-word set through the
+  // result helper while the legacy EventLog API remains unchanged.
+  bool return_set_strings = false;
 };
+
+struct ProcessTreePlayoutResult {
+  EventLog log;
+  std::vector<std::vector<std::string>> trace_strings;
+};
+
+[[nodiscard]] ProcessTreePlayoutResult process_tree_playout_result(
+    const ProcessTree& tree, ProcessTreePlayoutOptions options = {});
 
 [[nodiscard]] EventLog process_tree_playout(
     const ProcessTree& tree, ProcessTreePlayoutOptions options = {});

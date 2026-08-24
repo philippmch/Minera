@@ -94,6 +94,13 @@ and frontend controls. Omitted process-tree playout settings select
 closes only the process-tree variants; the broader simulation row remains
 partial because other simulation families are pending.
 
+Extensive process-tree playout also supports an opt-in set-string result. The
+native result helper returns the deduplicated activity-word set while the
+legacy EventLog API remains unchanged; the export CLI, cached local server,
+and typed frontend helper expose the deterministic JSON envelope
+`PROCESS_TREE_PLAYOUT` with sorted activity arrays. The option is restricted
+to `EXTENSIVE` and rejects malformed or non-extensive requests.
+
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
 Alpha consistently across native options, strict request parsing, CLI, and the
 frontend. The short-loop-aware Alpha+ implementation remains available through

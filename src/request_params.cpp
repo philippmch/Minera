@@ -2395,8 +2395,16 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
     params.max_traces = parse_positive_size(require("playout_max_traces"), "playout_max_traces");
   if (supplied("playout_max_trace_cap"))
     params.max_traces = parse_positive_size(require("playout_max_trace_cap"), "playout_max_trace_cap");
+  if (supplied("playout_return_set_strings"))
+    params.return_set_strings = parse_boolean(
+        require("playout_return_set_strings"),
+        "playout_return_set_strings");
   if (params.min_length > params.max_length)
     throw std::invalid_argument("playout_min_length must not exceed playout_max_length");
+  if (params.return_set_strings &&
+      params.variant != ProcessTreePlayoutVariant::kExtensive)
+    throw std::invalid_argument(
+        "playout_return_set_strings requires EXTENSIVE variant");
   return params;
 }
 

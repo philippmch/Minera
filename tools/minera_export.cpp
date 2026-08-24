@@ -937,6 +937,7 @@ int usage(const char* program) {
                "  --playout-max-loop-occurrences <n> Loop re-do limit\n"
                "  --playout-max-traces <n> Extensive trace cap\n"
                "  --playout-max-trace-cap <n> Alias for max-traces\n"
+               "  --playout-return-set-strings <bool> Extensive activity-word JSON\n"
                "  --petri-playout-traces <n> Petri sampled cases\n"
                "  --petri-playout-max-steps <n> Petri firing cap per case\n"
                "  --petri-playout-seed <u64> Petri random seed\n"
@@ -2820,7 +2821,8 @@ int main(int argc, char** argv) {
                arg == "--playout-max-length" ||
                arg == "--playout-max-loop-occurrences" ||
                arg == "--playout-max-traces" ||
-               arg == "--playout-max-trace-cap") {
+               arg == "--playout-max-trace-cap" ||
+               arg == "--playout-return-set-strings") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
@@ -5386,9 +5388,14 @@ int main(int argc, char** argv) {
       else if (model_miner == "declare")
         generated =
             minera::declare_playout(declare, declare_playout_options);
-      else if (model_miner == "process_tree")
-        generated = minera::process_tree_playout(tree,
-                                                 process_tree_playout_options);
+      else if (model_miner == "process_tree") {
+        const auto result = minera::process_tree_playout_result(
+            tree, process_tree_playout_options);
+        if (process_tree_playout_options.return_set_strings)
+          generated_json = minera::serialize_process_tree_playout_json(result);
+        else
+          generated = result.log;
+      }
       else if (model_miner == "dfg") {
         const auto result = generate_dfg_playout(log, dfg_playout_options);
         if (dfg_playout_options.return_variants &&

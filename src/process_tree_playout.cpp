@@ -394,13 +394,18 @@ EventLog words_to_log(const Words& words, const ProcessTreePlayoutOptions& o) {
 
 }  // namespace
 
-EventLog process_tree_playout(const ProcessTree& tree, ProcessTreePlayoutOptions options) {
+ProcessTreePlayoutResult process_tree_playout_result(
+    const ProcessTree& tree, ProcessTreePlayoutOptions options) {
   validate_node(tree.root(), tree);
   if (options.max_length > 10000 || options.max_loop_occurrences > 10000)
     throw std::invalid_argument(
         "process-tree playout length and loop bounds must not exceed 10000");
   if (options.min_length > options.max_length)
     throw std::invalid_argument("process-tree playout min_length exceeds max_length");
+  if (options.return_set_strings &&
+      options.variant != ProcessTreePlayoutVariant::kExtensive)
+    throw std::invalid_argument(
+        "process-tree return_set_strings requires extensive playout");
   if (!std::isfinite(options.start) || !std::isfinite(options.case_interval) ||
       !std::isfinite(options.event_interval))
     throw std::invalid_argument("process-tree playout timestamps and intervals must be finite");
@@ -437,7 +442,10 @@ EventLog process_tree_playout(const ProcessTree& tree, ProcessTreePlayoutOptions
       return w.size() < options.min_length;
     }), words.end());
     if (words.size() > options.max_traces) words.resize(options.max_traces);
-    return words_to_log(words, options);
+    ProcessTreePlayoutResult result;
+    result.log = words_to_log(words, options);
+    if (options.return_set_strings) result.trace_strings = std::move(words);
+    return result;
   }
   Words words;
   std::mt19937_64 rng(options.seed);
@@ -450,7 +458,14 @@ EventLog process_tree_playout(const ProcessTree& tree, ProcessTreePlayoutOptions
                     options.variant == ProcessTreePlayoutVariant::kTopBottom))
       words.push_back(std::move(w));
   }
-  return words_to_log(words, options);
+  ProcessTreePlayoutResult result;
+  result.log = words_to_log(words, options);
+  return result;
+}
+
+EventLog process_tree_playout(const ProcessTree& tree,
+                              ProcessTreePlayoutOptions options) {
+  return process_tree_playout_result(tree, std::move(options)).log;
 }
 
 }  // namespace minera
