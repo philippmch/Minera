@@ -1097,6 +1097,10 @@ describe("OCEL API", () => {
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_related_events_features: false }))
       .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_duration_features: false }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_wip_features: true }))
+      .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_path_features: true }))
       .toThrow(/objects/);
     expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))

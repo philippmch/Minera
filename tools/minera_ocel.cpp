@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
     bool ocpn_activity_branching_used = false;
     minera::OcpnPlayoutOptions ocpn_playout_options;
     minera::OcelFeatureOptions feature_options;
+    bool lifecycle_object_control_used = false;
     minera::OcelEnrichmentOptions enrichment_options;
     bool enrich_no_lifecycle = false;
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
@@ -371,16 +372,22 @@ int main(int argc, char** argv) {
         feature_options.include_lifecycle_features = false;
       } else if (option == "--features-no-lifecycle-length") {
         feature_options.include_lifecycle_length_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-unique-activities") {
         feature_options.include_lifecycle_unique_activity_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-duration") {
         feature_options.include_lifecycle_duration_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-activities") {
         feature_options.include_lifecycle_activity_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-paths") {
         feature_options.include_lifecycle_path_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-wip") {
         feature_options.include_lifecycle_wip_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--describe" && i + 1 < argc) {
         describe = argv[++i];
       } else if (option == "--enrich" && i + 1 < argc) {
@@ -660,13 +667,13 @@ int main(int argc, char** argv) {
     if (object_relation_features && !features.empty() && features != "objects")
       throw std::invalid_argument(
           "related-event and neighbor feature options apply only to --features objects");
-    if (!feature_options.include_lifecycle_path_features && features.empty())
+    if (lifecycle_object_control_used && features.empty())
       throw std::invalid_argument(
-          "--features-no-lifecycle-paths requires --features objects");
-    if (!feature_options.include_lifecycle_path_features && !features.empty() &&
+          "lifecycle metric controls require --features objects");
+    if (lifecycle_object_control_used && !features.empty() &&
         features != "objects")
       throw std::invalid_argument(
-          "--features-no-lifecycle-paths applies only to --features objects");
+          "lifecycle metric controls apply only to --features objects");
     if (!statistics.empty() && statistics != "object_type_activities" &&
         statistics != "objects_ot_count" &&
         statistics != "activity_associations" &&
