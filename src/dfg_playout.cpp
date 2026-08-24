@@ -120,10 +120,26 @@ Event make_event(const std::string& case_id, const std::string& activity,
   return event;
 }
 
-EventLog classic_playout(const DfgFrequency& frequency,
-                         const DfgActivityCounts& starts,
-                         const DfgActivityCounts& ends,
-                         const DfgPlayoutOptions& options) {
+std::uint64_t variant_occurrence_count(double probability,
+                                       std::size_t max_variants) {
+  if (!std::isfinite(probability) || probability <= 0.0 || max_variants == 0)
+    return 0;
+  const long double scaled =
+      std::ceil(static_cast<long double>(probability) *
+                static_cast<long double>(max_variants));
+  if (scaled >= static_cast<long double>(
+                    std::numeric_limits<std::uint64_t>::max()))
+    return std::numeric_limits<std::uint64_t>::max();
+  return static_cast<std::uint64_t>(scaled);
+}
+
+DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
+                                  const DfgActivityCounts& starts,
+                                  const DfgActivityCounts& ends,
+                                  const DfgPlayoutOptions& options) {
+  DfgPlayoutResult result;
+  result.variant = DfgPlayoutVariant::kClassic;
+
   // Log probabilities turn products into additive costs and make a best-first
   // queue numerically stable. std::map iteration gives lexical tie ordering.
   std::map<std::string, std::map<std::string, double>> transitions;
@@ -139,21 +155,11 @@ EventLog classic_playout(const DfgFrequency& frequency,
       queue;
   double start_total = 0.0;
   for (const auto& [activity, count] : starts) start_total += count;
-  if (start_total <= 0.0 || options.max_variants == 0) return {};
-  for (const auto& [activity, count] : starts) {
-    if (count == 0) continue;
-    queue.push(PartialTrace{-std::log(static_cast<double>(count) / start_total),
-                            {activity}});
-  }
-
   std::set<std::string> seen_starts;
   std::set<std::string> seen_ends;
   std::set<DfgActivityPair> seen_edges;
-  EventLog log;
   double cumulative_probability = 0.0;
   std::size_t max_occ = 0;
-  bool complete = false;
-  bool interrupted = false;
   const std::size_t expansion_budget =
       options.max_variants > (std::numeric_limits<std::size_t>::max() / 128)
           ? std::numeric_limits<std::size_t>::max()
@@ -168,7 +174,7 @@ EventLog classic_playout(const DfgFrequency& frequency,
   };
   const auto coverage_complete = [&] {
     for (const auto& [edge, count] : frequency) {
-      (void)count;
+      if (count == 0) continue;
       if (!seen_edges.contains(edge)) return false;
     }
     for (const auto& [activity, count] : starts) {
@@ -182,17 +188,28 @@ EventLog classic_playout(const DfgFrequency& frequency,
     return true;
   };
 
+  result.complete = coverage_complete();
+  if (start_total <= 0.0 || options.max_variants == 0) {
+    result.interrupted = start_total > 0.0 && options.max_variants == 0;
+    return result;
+  }
+  for (const auto& [activity, count] : starts) {
+    if (count == 0) continue;
+    queue.push(PartialTrace{-std::log(static_cast<double>(count) / start_total),
+                            {activity}});
+  }
+
   while (!queue.empty()) {
     if (++expansions > expansion_budget) {
-      interrupted = true;
+      result.interrupted = true;
       break;
     }
     if (timed_out()) {
-      interrupted = true;
+      result.interrupted = true;
       break;
     }
-    if (log.traces.size() >= options.max_variants) {
-      interrupted = true;
+    if (result.log.traces.size() >= options.max_variants) {
+      result.interrupted = true;
       break;
     }
     auto state = queue.top();
@@ -215,14 +232,17 @@ EventLog classic_playout(const DfgFrequency& frequency,
                                      return total;
                                    }());
         if (!std::isfinite(probability) || probability <= 0.0) continue;
-        const std::size_t variant_occurrences = static_cast<std::size_t>(
-            std::ceil(probability * static_cast<double>(options.max_variants)));
-        max_occ = std::max(max_occ, variant_occurrences);
+        const std::uint64_t variant_occurrences =
+            variant_occurrence_count(probability, options.max_variants);
+        max_occ = std::max<std::size_t>(
+            max_occ, static_cast<std::size_t>(std::min<std::uint64_t>(
+                         variant_occurrences,
+                         std::numeric_limits<std::size_t>::max())));
         if (variant_occurrences < options.min_variant_occurrences &&
-            max_occ >= options.min_variant_occurrences)
+            options.min_variant_occurrences <= max_occ)
           break;
         if (cumulative_probability > options.min_weighted_probability) {
-          interrupted = true;
+          result.interrupted = true;
           break;
         }
 
@@ -242,12 +262,14 @@ EventLog classic_playout(const DfgFrequency& frequency,
           seen_edges.insert({state.activities[i - 1], state.activities[i]});
 
         Trace trace;
-        trace.case_id = "case_" + std::to_string(log.traces.size() + 1);
+        trace.case_id =
+            "case_" + std::to_string(result.log.traces.size() + 1);
         trace.attributes.push_back(
             {"probability", std::to_string(probability), AttributeKind::kFloat});
         trace.attributes.push_back(
             {"variant_occurrences", std::to_string(variant_occurrences),
              AttributeKind::kInt});
+        result.counts[state.activities] = variant_occurrences;
         if (options.return_variants) {
           std::string variant;
           for (const auto& activity : state.activities) {
@@ -258,18 +280,18 @@ EventLog classic_playout(const DfgFrequency& frequency,
               {"variant", std::move(variant), AttributeKind::kString});
         }
         double instant = start_epoch(options) +
-                          static_cast<double>(log.traces.size());
+                          static_cast<double>(result.log.traces.size());
         for (const auto& activity : state.activities) {
           trace.events.push_back(make_event(trace.case_id, activity, instant,
                                             trace.events.size()));
           instant += 1.0;
         }
-        log.traces.push_back(std::move(trace));
+        result.log.traces.push_back(std::move(trace));
         cumulative_probability += probability;
-        complete = coverage_complete();
+        result.complete = coverage_complete();
 
         if (options.interrupt_when_dfg_complete) {
-          if (complete) break;
+          if (result.complete) break;
         }
       } else {
         if (occurrences[next] >= options.max_occurrences_per_activity) continue;
@@ -281,10 +303,14 @@ EventLog classic_playout(const DfgFrequency& frequency,
                                 std::move(next_trace)});
       }
     }
-    if (complete) break;
+    if (options.interrupt_when_dfg_complete && result.complete) break;
   }
-  if (options.return_only_if_complete && (interrupted || !complete)) return {};
-  return log;
+  if (options.return_only_if_complete &&
+      (result.interrupted || !result.complete)) {
+    result.log = {};
+    result.counts.clear();
+  }
+  return result;
 }
 
 EventLog performance_playout(const DfgFrequency& frequency,
@@ -356,21 +382,37 @@ EventLog performance_playout(const DfgFrequency& frequency,
 
 }  // namespace
 
-EventLog dfg_playout(const DfgFrequency& frequency,
-                     const DfgActivityCounts& start_activities,
-                     const DfgActivityCounts& end_activities,
-                     const DfgPlayoutOptions& options,
-                     const DfgPerformance* performance) {
+DfgPlayoutResult dfg_playout_result(
+    const DfgFrequency& frequency,
+    const DfgActivityCounts& start_activities,
+    const DfgActivityCounts& end_activities,
+    const DfgPlayoutOptions& options,
+    const DfgPerformance* performance) {
   validate_options(options, performance);
   if (options.variant == DfgPlayoutVariant::kPerformance &&
       performance == nullptr) {
     throw std::invalid_argument(
         "performance DFG playout requires performance statistics");
   }
-  if (options.variant == DfgPlayoutVariant::kPerformance)
-    return performance_playout(frequency, start_activities, end_activities,
-                               options, performance);
+  if (options.variant == DfgPlayoutVariant::kPerformance) {
+    DfgPlayoutResult result;
+    result.variant = DfgPlayoutVariant::kPerformance;
+    result.log = performance_playout(frequency, start_activities,
+                                     end_activities, options, performance);
+    result.complete = true;
+    return result;
+  }
   return classic_playout(frequency, start_activities, end_activities, options);
+}
+
+EventLog dfg_playout(const DfgFrequency& frequency,
+                     const DfgActivityCounts& start_activities,
+                     const DfgActivityCounts& end_activities,
+                     const DfgPlayoutOptions& options,
+                     const DfgPerformance* performance) {
+  return dfg_playout_result(frequency, start_activities, end_activities,
+                            options, performance)
+      .log;
 }
 
 }  // namespace minera

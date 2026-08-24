@@ -164,6 +164,7 @@ import {
   type VariantStatisticsResult,
   type VariantStatisticsOptions,
   type DfgPlayoutOptions,
+  type DfgPlayoutVariantsResult,
   type PetriUsageComparison,
   type PetriUsageComparisonOptions,
   isDfgAlignmentResult,
@@ -180,6 +181,7 @@ import {
   isMineraExport,
   isPetriUsageComparison,
   isMonteCarloResult,
+  isDfgPlayoutVariantsResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
   isServiceTimeResult,
@@ -3238,6 +3240,36 @@ export async function fetchPlayout(miner: string, options: ProcessTreePlayoutOpt
       throw new Error(String((parsed as { error: unknown }).error));
     }
     throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  return response.text();
+}
+
+/** Fetches DFG playout, decoding the structured classic variant response. */
+export async function fetchDfgPlayout(
+  options: DfgPlayoutOptions = {},
+): Promise<string | DfgPlayoutVariantsResult> {
+  const query = dfgPlayoutQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/playout?miner=dfg${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  if (!response.ok) {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (options.return_variants && (options.variant ?? "classic") === "classic") {
+    const parsed: unknown = await response.json().catch(() => null);
+    if (!isDfgPlayoutVariantsResult(parsed)) {
+      throw new Error("the Minera backend returned invalid DFG variants");
+    }
+    return parsed;
   }
   return response.text();
 }

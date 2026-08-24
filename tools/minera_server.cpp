@@ -50,6 +50,7 @@
 #include "minera/dfg_precision.hpp"
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
+#include "minera/json_export.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
@@ -4402,11 +4403,17 @@ void handle_playout(const httplib::Request& request,
       if (options.variant == minera::DfgPlayoutVariant::kPerformance) {
         performance = minera::discover_performance_dfg(session->log, dfg_options);
       }
-      const auto log = minera::dfg_playout(
+      const auto result = minera::dfg_playout_result(
           frequency, starts, ends, options,
           performance ? &*performance : nullptr);
-      response.set_content(minera::to_xes(log, "dfg playout"),
-                           "application/xml");
+      if (options.return_variants &&
+          options.variant == minera::DfgPlayoutVariant::kClassic) {
+        response.set_content(minera::dfg_playout_json(result),
+                             "application/json");
+      } else {
+        response.set_content(minera::to_xes(result.log, "dfg playout"),
+                             "application/xml");
+      }
     } catch (const std::exception& error) {
       reject(error.what());
     }

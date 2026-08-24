@@ -2,6 +2,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "minera/dfg_playout.hpp"
 #include "minera/timestamp.hpp"
@@ -169,6 +170,105 @@ void classic_complete_only_and_variant_metadata_are_effective() {
   assert(found_variant);
 }
 
+void classic_result_exposes_deterministic_variant_counts() {
+  DfgFrequency dfg{{{"A", "B"}, 3}, {{"A", "C"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}, {"C", 1}};
+  minera::DfgPlayoutOptions options;
+  options.max_variants = 2;
+  options.return_variants = true;
+
+  const auto result =
+      minera::dfg_playout_result(dfg, starts, ends, options);
+  assert(result.variant == minera::DfgPlayoutVariant::kClassic);
+  assert(result.log.traces.size() == 2);
+  assert(result.counts.size() == 2);
+  assert(result.counts.at(std::vector<std::string>{"A", "B"}) == 2);
+  assert(result.counts.at(std::vector<std::string>{"A", "C"}) == 1);
+  assert(result.counts.begin()->first ==
+         (std::vector<std::string>{"A", "B"}));
+
+  const auto repeat =
+      minera::dfg_playout_result(dfg, starts, ends, options);
+  assert(repeat.counts == result.counts);
+  assert(repeat.log.traces.size() == result.log.traces.size());
+}
+
+void classic_result_honors_minimum_variant_occurrences() {
+  DfgFrequency dfg{{{"A", "B"}, 3}, {{"A", "C"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}, {"C", 1}};
+  minera::DfgPlayoutOptions options;
+  options.max_variants = 2;
+  options.return_variants = true;
+  options.min_variant_occurrences = 2;
+
+  const auto result =
+      minera::dfg_playout_result(dfg, starts, ends, options);
+  assert(result.counts.size() == 1);
+  assert(result.counts.at(std::vector<std::string>{"A", "B"}) == 2);
+  assert(result.log.traces.size() == 1);
+}
+
+void classic_result_complete_only_suppresses_partial_counts() {
+  DfgFrequency dfg{{{"A", "B"}, 1}, {{"X", "Y"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}};
+  minera::DfgPlayoutOptions options;
+  options.max_variants = 1;
+  options.return_variants = true;
+  options.return_only_if_complete = true;
+
+  const auto result =
+      minera::dfg_playout_result(dfg, starts, ends, options);
+  assert(!result.complete);
+  assert(result.log.traces.empty());
+  assert(result.counts.empty());
+}
+
+void performance_result_keeps_legacy_log_without_variant_counts() {
+  DfgFrequency dfg{{{"A", "B"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}};
+  minera::DfgPerformance performance;
+  minera::DfgPerformanceStatistics stats;
+  stats.summary.mean = 1.0;
+  stats.value = 1.0;
+  performance[{"A", "B"}] = stats;
+  minera::DfgPlayoutOptions options;
+  options.variant = minera::DfgPlayoutVariant::kPerformance;
+  options.return_variants = true;
+  options.traces = 2;
+  options.max_events_per_trace = 2;
+
+  const auto result = minera::dfg_playout_result(
+      dfg, starts, ends, options, &performance);
+  assert(result.variant == minera::DfgPlayoutVariant::kPerformance);
+  assert(result.counts.empty());
+  assert(result.log.traces.size() == 2);
+}
+
+void classic_completion_flag_controls_early_stop() {
+  DfgFrequency dfg{{{"A", "A"}, 1}, {{"A", "B"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"A", 1}, {"B", 1}};
+
+  minera::DfgPlayoutOptions continuing;
+  continuing.max_variants = 8;
+  continuing.max_occurrences_per_activity = 3;
+  const auto all =
+      minera::dfg_playout_result(dfg, starts, ends, continuing);
+  assert(all.complete);
+  assert(all.counts.size() > 2);
+
+  continuing.interrupt_when_dfg_complete = true;
+  const auto stopped =
+      minera::dfg_playout_result(dfg, starts, ends, continuing);
+  assert(stopped.complete);
+  assert(stopped.counts.size() >= 3);
+  assert(stopped.counts.size() < all.counts.size());
+}
+
 }  // namespace
 
 int main() {
@@ -179,4 +279,9 @@ int main() {
   invalid_performance_inputs_are_rejected();
   classic_timeout_and_probability_settings_bound_work();
   classic_complete_only_and_variant_metadata_are_effective();
+  classic_result_exposes_deterministic_variant_counts();
+  classic_result_honors_minimum_variant_occurrences();
+  classic_result_complete_only_suppresses_partial_counts();
+  performance_result_keeps_legacy_log_without_variant_counts();
+  classic_completion_flag_controls_early_stop();
 }

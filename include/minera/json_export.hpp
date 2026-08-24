@@ -11,6 +11,7 @@
 #include "minera/declare.hpp"
 #include "minera/decision_table.hpp"
 #include "minera/decision_mining.hpp"
+#include "minera/dfg_playout.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
@@ -252,6 +253,10 @@ void write_analysis_json(std::ostream& out,
     const DfgAlignmentLogResult& result,
     const DfgAlignmentProjection* projection = nullptr,
     const EventLog* projected_log = nullptr);
+
+// Serializes the deterministic sequence/count result returned by classic DFG
+// playout when variant output is requested.
+[[nodiscard]] std::string dfg_playout_json(const DfgPlayoutResult& result);
 
 [[nodiscard]] std::string edit_distance_json(
     const std::vector<EditDistanceAlignment>& result,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
 
 describe("isConceptDriftResult", () => {
   const valid = {
@@ -30,6 +30,22 @@ describe("isDfgPrecisionResult", () => {
     expect(isDfgPrecisionResult({ ...valid, precision: 2 })).toBe(false);
     expect(isDfgPrecisionResult({ ...valid, escaping_transitions: -1 })).toBe(false);
     expect(isDfgPrecisionResult({ ...valid, error: null })).toBe(false);
+  });
+});
+
+describe("isDfgPlayoutVariantsResult", () => {
+  const valid = {
+    family: "DFG_PLAYOUT", variant: "CLASSIC", return_variants: true,
+    complete: true, interrupted: false,
+    variants: [{ activities: ["A", "B"], occurrences: 3 }],
+  };
+  it("accepts deterministic sequence/count envelopes", () => {
+    expect(isDfgPlayoutVariantsResult(valid)).toBe(true);
+  });
+  it("rejects malformed entries and status fields", () => {
+    expect(isDfgPlayoutVariantsResult({ ...valid, variants: [{ activities: [], occurrences: 1 }] })).toBe(false);
+    expect(isDfgPlayoutVariantsResult({ ...valid, variants: [{ activities: ["A"], occurrences: -1 }] })).toBe(false);
+    expect(isDfgPlayoutVariantsResult({ ...valid, interrupted: "false" })).toBe(false);
   });
 });
 

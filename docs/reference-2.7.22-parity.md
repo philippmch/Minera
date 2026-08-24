@@ -252,10 +252,13 @@ limits, graph-completeness interruption, and safety bounds. `PERFORMANCE`
 samples frequency-weighted paths and exponential edge delays from the native
 performance DFG using a reproducible seed and case-arrival schedule. Both
 variants are exposed by `minera_playout --dfg`, `minera_export
---playout-miner dfg`, local-server `/api/playout?miner=dfg`, and frontend XES
-controls. The native API preserves probability and estimated-occurrence trace
-attributes; map-shaped variant return remains represented through those
-attributes while the transport remains XES.
+--playout-miner dfg`, local-server `/api/playout?miner=dfg`, and frontend
+controls. Ordinary requests retain XES output. Classic requests with
+`return_variants=true` use a deterministic JSON envelope containing one
+activity-sequence and occurrence-count entry per discovered variant, together
+with completeness and interruption status; `return_only_if_complete` clears
+the entries when coverage is not complete. The native log continues to carry
+probability and estimated-occurrence trace attributes for XES consumers.
 
 Petri stochastic simulation evidence: the native `stochastic_playout` API uses
 transition-index weights, validates finite non-negative values and weighted

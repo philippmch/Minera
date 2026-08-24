@@ -40,7 +40,7 @@ import {
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
+import { fetchDfgPlayout, fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -564,10 +564,12 @@ function DfgPlayoutPanel({ dataset, available }: { dataset: string; available: b
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      const xes = await fetchPlayout("dfg", options);
-      const blob = new Blob([xes], { type: "application/xml" });
+      const result = await fetchDfgPlayout(options);
+      const structured = typeof result !== "string";
+      const body = structured ? JSON.stringify(result, null, 2) : result;
+      const blob = new Blob([body], { type: structured ? "application/json" : "application/xml" });
       const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-dfg-playout.xes`; anchor.click();
+      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-dfg-playout.${structured ? "json" : "xes"}`; anchor.click();
       URL.revokeObjectURL(anchor.href);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "minera/dfg_variants.hpp"
 #include "minera/event_log.hpp"
@@ -36,6 +37,28 @@ struct DfgPlayoutOptions {
 
 using DfgPlayoutParams = DfgPlayoutOptions;
 using DfgActivityCounts = std::map<std::string, std::uint64_t>;
+using DfgVariantCounts =
+    std::map<std::vector<std::string>, std::uint64_t>;
+
+// Native result for both DFG playout strategies. Classic playout always
+// computes the variant counts; the legacy EventLog wrapper exposes the same
+// generated traces without requiring callers to consume the diagnostics.
+struct DfgPlayoutResult {
+  DfgPlayoutVariant variant = DfgPlayoutVariant::kClassic;
+  EventLog log;
+  DfgVariantCounts counts;
+  bool complete = false;
+  bool interrupted = false;
+};
+
+// Generates a DFG playout and, for classic playout, the deterministic variant
+// occurrence counts. Counts are keyed by complete activity sequences.
+[[nodiscard]] DfgPlayoutResult dfg_playout_result(
+    const DfgFrequency& frequency,
+    const DfgActivityCounts& start_activities,
+    const DfgActivityCounts& end_activities,
+    const DfgPlayoutOptions& options = {},
+    const DfgPerformance* performance = nullptr);
 
 // Samples the complete frequency DFG. Starts and ends are supplied separately
 // because a DFG's edge map does not encode boundary frequencies.
