@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <numeric>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -128,6 +129,33 @@ LocalDfg build_local_dfg(const Sublog& log) {
     }
   }
 
+  apply_noise_filter(dfg, 0.0);
+  return dfg;
+}
+
+LocalDfg build_local_dfg(const DirectlyFollowsGraph& graph) {
+  LocalDfg dfg;
+  const auto& names = graph.activities();
+  const std::size_t n = names.size();
+  dfg.to_global.resize(n);
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    dfg.to_global[activity] = activity;
+    dfg.to_local.emplace(activity, activity);
+  }
+  dfg.edge_count.assign(n, std::vector<std::uint64_t>(n, 0));
+  dfg.start_count.assign(n, 0);
+  dfg.end_count.assign(n, 0);
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    dfg.start_count[activity] =
+        graph.start_activity_count(names[activity]);
+    dfg.end_count[activity] = graph.end_activity_count(names[activity]);
+  }
+  for (const auto& edge : graph.edges()) {
+    if (edge.source >= n || edge.target >= n)
+      throw std::invalid_argument(
+          "Inductive: graph edge activity id is out of range");
+    dfg.edge_count[edge.source][edge.target] += edge.count;
+  }
   apply_noise_filter(dfg, 0.0);
   return dfg;
 }
@@ -1005,6 +1033,17 @@ ProcessTree discover_process_tree(const EventLog& event_log,
                              ? mine_dfg_root(sublog, f)
                              : mine(sublog, f);
   return ProcessTree(std::move(names), std::move(root));
+}
+
+ProcessTree discover_process_tree(const DirectlyFollowsGraph& graph,
+                                  const InductiveMinerOptions& options) {
+  // A graph input has already discarded trace bodies, so all selectors use the
+  // graph-recursive IMd semantics just as the reference DFG entry point does.
+  // The noise threshold still applies to raw edge and endpoint counts during
+  // graph fall-throughs.
+  const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
+  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f);
+  return ProcessTree(graph.activities(), std::move(root));
 }
 
 }  // namespace minera

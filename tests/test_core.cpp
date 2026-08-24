@@ -708,6 +708,25 @@ void inductive_miner_dfg_filters_noise_on_fallthrough() {
   assert(mine_tree_imd(variants, 0.2) == "->(a, b, c, d)");
 }
 
+void inductive_miner_accepts_direct_dfg_input() {
+  const auto log = log_from_variants({{"a", "b", "c"},
+                                      {"a", "b", "d"},
+                                      {"a", "c", "d"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  minera::InductiveMinerOptions options;
+  // Graph input always uses IMd semantics, even when the scalar selector is
+  // left at its log-recursive default.
+  const auto tree = minera::discover_process_tree(graph, options);
+  const auto expected = minera::discover_process_tree(
+      log, {.variant = minera::InductiveMinerVariant::kDfg});
+  assert(render(tree, tree.root()) == render(expected, expected.root()));
+
+  const auto empty_graph =
+      minera::discover_directly_follows_graph(minera::EventLog{});
+  const auto empty_tree = minera::discover_process_tree(empty_graph);
+  assert(empty_tree.root().op == minera::ProcessTreeOperator::kTau);
+}
+
 void inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity() {
   // The rare trace adds a->c and c->a hops. c ends twenty-one traces, so
   // ending is its dominant behaviour and the stray c->a edge (its only
@@ -882,6 +901,36 @@ void alpha_miner_handles_an_empty_log() {
   const auto net = minera::discover_petri_net(empty);
   assert(net.place_count() == 2);  // just source and sink
   assert(net.transitions().empty());
+}
+
+void alpha_miner_accepts_direct_dfg_input() {
+  const auto log = log_from_variants({{"a", "b", "c"},
+                                      {"a", "b", "d"},
+                                      {"a", "c", "d"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto from_log = minera::discover_petri_net(log, {.short_loops = false});
+  const auto from_graph = minera::discover_petri_net(graph);
+  assert(from_graph.activities() == from_log.activities());
+  assert(from_graph.place_count() == from_log.place_count());
+  assert(from_graph.source() == from_log.source());
+  assert(from_graph.sink() == from_log.sink());
+  assert(from_graph.transitions().size() == from_log.transitions().size());
+  for (std::size_t i = 0; i < from_log.transitions().size(); ++i) {
+    assert(from_graph.transitions()[i].activity ==
+           from_log.transitions()[i].activity);
+    assert(from_graph.transitions()[i].inputs ==
+           from_log.transitions()[i].inputs);
+    assert(from_graph.transitions()[i].outputs ==
+           from_log.transitions()[i].outputs);
+  }
+
+  bool rejected_plus = false;
+  try {
+    (void)minera::discover_petri_net(graph, {.short_loops = true});
+  } catch (const std::invalid_argument&) {
+    rejected_plus = true;
+  }
+  assert(rejected_plus);
 }
 
 void json_export_carries_the_petri_net_contract() {
@@ -5459,6 +5508,7 @@ int main() {
   inductive_miner_dfg_matches_log_recursion_on_structured_logs();
   inductive_miner_dfg_skips_empty_traces_at_the_root();
   inductive_miner_dfg_filters_noise_on_fallthrough();
+  inductive_miner_accepts_direct_dfg_input();
   petri_net_translates_sequence();
   petri_net_adds_silent_split_and_join_for_parallel();
   alpha_miner_discovers_a_sequence();
@@ -5469,6 +5519,7 @@ int main() {
   alpha_plus_discovers_a_length_two_loop();
   alpha_plus_matches_classic_without_short_loops();
   alpha_miner_handles_an_empty_log();
+  alpha_miner_accepts_direct_dfg_input();
   json_export_carries_the_petri_net_contract();
   json_export_carries_recursive_powl_contract();
   json_export_carries_log_skeleton_contract();

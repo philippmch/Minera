@@ -1,5 +1,6 @@
 #pragma once
 
+#include "minera/directly_follows_graph.hpp"
 #include "minera/event_log.hpp"
 #include "minera/process_tree.hpp"
 
@@ -51,6 +52,13 @@ struct InductiveMinerOptions {
 // sublogs, scaling to huge logs at some model-quality cost.
 [[nodiscard]] ProcessTree discover_process_tree(
     const EventLog& event_log,
+    const InductiveMinerOptions& options = {});
+
+// Direct graph input always uses the IMd graph-recursion semantics. The
+// selector is accepted for scalar compatibility, but is intentionally ignored
+// because graph input has no traces to feed the log-recursive variants.
+[[nodiscard]] ProcessTree discover_process_tree(
+    const DirectlyFollowsGraph& graph,
     const InductiveMinerOptions& options = {});
 
 }  // namespace minera
