@@ -4404,6 +4404,7 @@ export interface OcelFeatureOptions {
   string_event_attributes?: string[];
   numeric_object_attributes?: string[];
   string_object_attributes?: string[];
+  filter_per_type?: string;
 }
 
 export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
@@ -4436,6 +4437,8 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addList("string_event_attributes", options.string_event_attributes);
   addList("numeric_object_attributes", options.numeric_object_attributes);
   addList("string_object_attributes", options.string_object_attributes);
+  if (options.filter_per_type !== undefined)
+    query.set("ocel_features_filter_per_type", options.filter_per_type);
   return query.toString();
 }
 

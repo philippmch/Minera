@@ -498,6 +498,13 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
                                        OcelFeatureVariant variant,
                                        const OcelFeatureOptions& options) {
   if (options.max_features == 0) throw std::invalid_argument("OCEL max_features must be positive");
+  if (options.filter_per_type) {
+    if (options.filter_per_type->empty())
+      throw std::invalid_argument("OCEL filter_per_type must not be empty");
+    if (variant != OcelFeatureVariant::kObjects)
+      throw std::invalid_argument(
+          "OCEL filter_per_type applies only to the objects variant");
+  }
   IndexMap event_index, object_index;
   for (std::size_t i = 0; i < log.events.size(); ++i) {
     if (log.events[i].id.empty() || !event_index.emplace(log.events[i].id, i).second)
@@ -537,7 +544,24 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       ids.push_back(object.id);
       types.push_back(object.type);
     }
-    return std::move(builder).finish(variant, std::move(ids), std::move(types));
+    auto table = std::move(builder).finish(variant, std::move(ids), std::move(types));
+    if (options.filter_per_type) {
+      std::vector<std::string> filtered_ids, filtered_types;
+      std::vector<std::vector<double>> filtered_values;
+      filtered_ids.reserve(table.row_ids.size());
+      filtered_types.reserve(table.row_types.size());
+      filtered_values.reserve(table.values.size());
+      for (std::size_t row = 0; row < table.row_ids.size(); ++row) {
+        if (table.row_types[row] != *options.filter_per_type) continue;
+        filtered_ids.push_back(table.row_ids[row]);
+        filtered_types.push_back(table.row_types[row]);
+        filtered_values.push_back(std::move(table.values[row]));
+      }
+      table.row_ids = std::move(filtered_ids);
+      table.row_types = std::move(filtered_types);
+      table.values = std::move(filtered_values);
+    }
+    return table;
   }
 
   const auto row_count = log.relations.size();
