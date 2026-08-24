@@ -300,6 +300,63 @@ void structural_pair_diagnostics() {
          split.handled_pairs->end());
 }
 
+void woflan_short_circuit_diagnostics() {
+  SoundnessOptions options;
+  options.variant = SoundnessVariant::kWoflan;
+  options.diagnostics = true;
+  const auto result = analyze_soundness(chain(), options);
+  assert(result.short_circuit_valid);
+  assert(result.short_circuit_strongly_connected);
+  assert(result.short_circuit_transition.has_value() &&
+         *result.short_circuit_transition == 2);
+  assert(!result.short_circuit_diagnostic_messages.empty());
+  assert(!result.short_circuit_reachability_markings.empty());
+  assert(std::find(result.short_circuit_reachability_edges.begin(),
+                   result.short_circuit_reachability_edges.end(),
+                   std::vector<std::size_t>({2, 0, 2})) !=
+         result.short_circuit_reachability_edges.end());
+  assert(std::find(result.coverability_edges.begin(),
+                   result.coverability_edges.end(),
+                   std::vector<std::size_t>({2, 0, 2})) !=
+         result.coverability_edges.end());
+  assert(result.short_circuit_reachability_markings ==
+         result.reachability_markings);
+  const auto json = petri_analysis_json(result);
+  assert(json.find("\"short_circuit_valid\":true") != std::string::npos);
+  assert(json.find("\"short_circuit_transition\":2") !=
+         std::string::npos);
+  assert(json.find("\"short_circuit_reachability_edges\"") !=
+         std::string::npos);
+
+  auto stale_boundaries = chain();
+  stale_boundaries.set_source(1);
+  stale_boundaries.set_sink(1);
+  const auto stale_result = analyze_soundness(stale_boundaries, options);
+  assert(stale_result.status == SoundnessStatus::SOUND);
+  assert(stale_result.completion_witness == std::vector<std::size_t>({0, 1}));
+
+  SoundnessOptions malformed_marking = options;
+  malformed_marking.initial_marking = {1, 0, 1};
+  bool threw = false;
+  try {
+    (void)analyze_soundness(chain(), malformed_marking);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  PetriNet invalid;
+  invalid.set_activities({"A"});
+  invalid.add_place();
+  invalid.add_place();
+  invalid.set_source(0);
+  invalid.set_sink(1);
+  const auto invalid_result = analyze_soundness(invalid, options);
+  assert(!invalid_result.short_circuit_valid);
+  assert(!invalid_result.short_circuit_diagnostic_messages.empty());
+  assert(invalid_result.status == SoundnessStatus::UNSOUND);
+}
+
 void unsound_models() {
   PetriNet improper; improper.set_activities({"A"});
   const auto s = improper.add_place(), extra = improper.add_place(), sink = improper.add_place();
@@ -436,6 +493,7 @@ int main() {
   sound_models();
   positive_invariant_diagnostics();
   structural_pair_diagnostics();
+  woflan_short_circuit_diagnostics();
   unsound_models();
   caps_markings_determinism_and_weights();
 }
