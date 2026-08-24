@@ -9,10 +9,12 @@
 
 namespace minera {
 
-// The embedding transformation has two granularities.  The native encoder is
-// deliberately deterministic and self-contained: it hashes normalized text
-// tokens into a bounded vector, so identical inputs produce identical output
-// across platforms and runs.
+// The embedding transformation has two granularities.  The native providers
+// are deliberately deterministic and self-contained: they hash normalized
+// text tokens (and, for the v2 profile, character n-grams) into a bounded
+// vector, so identical inputs produce identical output across platforms and
+// runs.  `embedding_model` selects the provider profile; unknown names use a
+// salted token profile so the selector is never silently ignored.
 enum class EmbeddingVariant {
   CASES_TRANSFORMERS,
   EVENTS_TRANSFORMERS,
@@ -22,6 +24,8 @@ enum class EmbeddingVariant {
 
 struct EmbeddingOptions {
   EmbeddingVariant variant = EmbeddingVariant::CASES_TRANSFORMERS;
+  // Built-in profiles are `hashing-v1` and `hashing-v2`. Other non-empty names
+  // select a deterministic salted token profile.
   std::string embedding_model = "hashing-v1";
   std::string attribute_key = "concept:name";
   // Event identifiers are global, deterministic ordinal strings by default.

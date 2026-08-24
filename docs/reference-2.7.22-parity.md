@@ -228,13 +228,16 @@ part and can download either deterministic event or object CSV; typed frontend
 exchange helpers cover every JSON/XML/CSV direction.
 
 Embedding evidence: `to_embeddings` exposes both case-level and event-level
-variants through a deterministic bounded token-hash encoder. The native API
-returns fixed-length normalized vectors and deterministic cosine top-k matches;
-`minera_export --embeddings`, cached-session `POST /api/embeddings`, and the
-typed frontend request/response guards share the same JSON contract. Event
-filtering can retain only selected events or complete cases. Model-backed
-embedding loading remains outside the native core; the encoder label and
-vector dimension are explicit request settings.
+variants through deterministic bounded encoder profiles. `hashing-v1` retains
+the original token profile, `hashing-v2` adds character n-grams, and other
+non-empty model names select a salted token profile instead of being silently
+ignored. The native API returns fixed-length normalized vectors and
+deterministic cosine top-k matches; `minera_export --embeddings`, cached-session
+`POST /api/embeddings`, and the typed frontend request/response guards share the
+same JSON contract. Event filtering can retain only selected events or complete
+cases. Loading external transformer weights remains outside the native core;
+the selected profile, model label, and vector dimension are explicit request
+settings and are echoed in similarity responses.
 
 Timestamp-interleavings evidence: the native discovery joins related left/right
 event logs through `CaseRelation` rows, adds deterministic extreme trace
