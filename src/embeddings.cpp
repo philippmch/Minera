@@ -100,8 +100,12 @@ void validate_options(const EmbeddingOptions& options) {
     throw std::invalid_argument("embeddings: embedding_model must not be empty");
   if (options.attribute_key.empty())
     throw std::invalid_argument("embeddings: attribute_key must not be empty");
-  if (options.dimensions == 0 || options.dimensions > 4096)
+  if (options.dimensions > 4096)
     throw std::invalid_argument("embeddings: dimensions must be in [1,4096]");
+  if (options.dimensions == 0 &&
+      options.provider != EmbeddingProvider::TRANSFORMER)
+    throw std::invalid_argument(
+        "embeddings: dimensions=0 is only supported for transformer providers");
   if (options.max_items == 0 || options.max_items > 1'000'000)
     throw std::invalid_argument("embeddings: max_items must be in [1,1000000]");
 }
@@ -186,7 +190,15 @@ std::string provider_name(EmbeddingProvider provider) {
 void validate_embedding_vector(const std::vector<double>& values,
                                std::size_t dimensions,
                                std::string_view source) {
-  if (values.size() != dimensions)
+  if (values.empty())
+    throw std::invalid_argument(std::string("embeddings: ") +
+                                std::string(source) +
+                                " returned an empty vector");
+  if (values.size() > 4096)
+    throw std::invalid_argument(std::string("embeddings: ") +
+                                std::string(source) +
+                                " returned an oversized vector");
+  if (dimensions != 0 && values.size() != dimensions)
     throw std::invalid_argument(std::string("embeddings: ") +
                                 std::string(source) +
                                 " returned the wrong dimension");
@@ -203,7 +215,7 @@ void validate_result(const EmbeddingResult& result,
   if (result.variant != options.variant)
     throw std::invalid_argument("embeddings: result variant does not match options");
   if (result.dimensions == 0 || result.dimensions > 4096 ||
-      result.dimensions != options.dimensions)
+      (options.dimensions != 0 && result.dimensions != options.dimensions))
     throw std::invalid_argument(
         "embeddings: result dimensions do not match options");
   if (!result.embedding_model.empty() &&
@@ -244,7 +256,8 @@ std::vector<double> embed_text(std::string_view text,
       callback = default_transformer_callback();
     if (callback) {
       values = callback(text, options.embedding_model, options.dimensions);
-    } else if (options.embedding_model == "mock_transformer") {
+    } else if (options.embedding_model == "mock_transformer" &&
+               options.dimensions != 0) {
       values = mock_transformer(text, options.embedding_model,
                                 options.dimensions);
     } else {
@@ -311,9 +324,14 @@ EmbeddingResult to_embeddings(const EventLog& log,
         first = false;
         text << selected_value(event, options.attribute_key);
       }
-      result.items.push_back(
-          {trace.case_id, embed_text(text.str(), options)});
+      auto values = embed_text(text.str(), options);
+      if (result.dimensions == 0) result.dimensions = values.size();
+      validate_embedding_vector(values, result.dimensions, "transformer vector");
+      result.items.push_back({trace.case_id, std::move(values)});
     }
+    if (result.dimensions == 0 && options.dimensions == 0)
+      throw std::invalid_argument(
+          "embeddings: unable to infer dimensions from empty input");
     return result;
   }
 
@@ -323,14 +341,19 @@ EmbeddingResult to_embeddings(const EventLog& log,
   std::size_t ordinal = 0;
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
+      auto values = embed_text(selected_value(event, options.attribute_key),
+                               options);
+      if (result.dimensions == 0) result.dimensions = values.size();
+      validate_embedding_vector(values, result.dimensions, "transformer vector");
       result.items.push_back({event_identifier(event, ordinal,
                                                options.event_id_key),
-                              embed_text(selected_value(event,
-                                                         options.attribute_key),
-                                        options)});
+                              std::move(values)});
       ++ordinal;
     }
   }
+  if (result.dimensions == 0 && options.dimensions == 0)
+    throw std::invalid_argument(
+        "embeddings: unable to infer dimensions from empty input");
   return result;
 }
 
@@ -340,6 +363,7 @@ std::vector<EmbeddingSimilarity> embedding_similarity(
   validate_options(options);
   validate_result(result, options);
   const auto target = embed_text(target_text, options);
+  validate_embedding_vector(target, result.dimensions, "target vector");
   std::vector<EmbeddingSimilarity> matches;
   matches.reserve(result.items.size());
   for (const auto& item : result.items)

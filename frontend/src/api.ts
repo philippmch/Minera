@@ -3780,6 +3780,17 @@ export interface EmbeddingOptions {
   embedding_top_k?: number;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {
+  if (options.embedding_provider !== undefined &&
+      options.embedding_provider !== "hashing" &&
+      options.embedding_provider !== "transformer")
+    throw new Error("embedding_provider must be hashing or transformer");
+  if (options.embedding_dimensions !== undefined) {
+    if (!Number.isInteger(options.embedding_dimensions) ||
+        options.embedding_dimensions < 0 || options.embedding_dimensions > 4096)
+      throw new Error("embedding_dimensions must be an integer in [0,4096]");
+    if (options.embedding_dimensions === 0 && options.embedding_provider !== "transformer")
+      throw new Error("embedding_dimensions=0 requires transformer provider");
+  }
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) {
     if (value !== undefined) query.set(key, String(value));

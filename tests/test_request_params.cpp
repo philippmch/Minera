@@ -2691,6 +2691,10 @@ void embedding_params_contract() {
          parsed.event_id_key == "event_id");
   assert(parsed.dimensions == 32 && parsed.max_items == 17 &&
          parsed.keep_cases);
+  const auto inferred = minera::parse_embedding_params(fields({
+      {"embedding_provider", "transformer"}, {"embedding_dimensions", "0"}}));
+  assert(inferred.provider == minera::EmbeddingProvider::TRANSFORMER &&
+         inferred.dimensions == 0);
   bool threw = false;
   try { (void)minera::parse_embedding_params(fields({{"embedding_variant", "bogus"}})); }
   catch (const std::invalid_argument&) { threw = true; }

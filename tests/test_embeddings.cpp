@@ -1,5 +1,6 @@
 #include "minera/embeddings.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -92,6 +93,66 @@ int main() {
   assert(transformer_selected.traces.size() == 1 &&
          transformer_selected.traces[0].case_id == "c2");
   assert(callback_texts.back() == "Approve Ship");
+
+  // Transformer runtimes may negotiate their native width when dimensions is
+  // zero. The sentinel is passed through on every call and the first vector
+  // establishes the width for subsequent vectors and target queries.
+  auto inferred_options = transformer_options;
+  inferred_options.dimensions = 0;
+  std::vector<std::size_t> inferred_requests;
+  inferred_options.transformer_callback =
+      [&](std::string_view, std::string_view, std::size_t dimensions) {
+        inferred_requests.push_back(dimensions);
+        return std::vector<double>(7, 0.25);
+      };
+  const auto inferred = to_embeddings(log, inferred_options);
+  assert(inferred.dimensions == 7 && inferred.items.size() == 2);
+  assert(inferred.items[0].values.size() == 7 &&
+         inferred.items[1].values.size() == 7);
+  (void)embedding_similarity("Approve Ship", inferred, inferred_options, 1);
+  assert(inferred_requests.size() == 3 &&
+         std::all_of(inferred_requests.begin(), inferred_requests.end(),
+                     [](std::size_t dimensions) { return dimensions == 0; }));
+
+  auto inconsistent_inference = inferred_options;
+  std::size_t inconsistent_calls = 0;
+  inconsistent_inference.transformer_callback =
+      [&](std::string_view, std::string_view, std::size_t) {
+        return std::vector<double>(inconsistent_calls++ == 0 ? 7 : 6, 0.25);
+      };
+  bool inconsistent_rejected = false;
+  try {
+    (void)to_embeddings(log, inconsistent_inference);
+  } catch (const std::invalid_argument&) {
+    inconsistent_rejected = true;
+  }
+  assert(inconsistent_rejected);
+
+  auto empty_inference = inferred_options;
+  empty_inference.transformer_callback =
+      [](std::string_view, std::string_view, std::size_t) {
+        return std::vector<double>{};
+      };
+  bool empty_rejected = false;
+  try {
+    (void)embed_text("A", empty_inference);
+  } catch (const std::invalid_argument&) {
+    empty_rejected = true;
+  }
+  assert(empty_rejected);
+
+  auto oversized_inference = inferred_options;
+  oversized_inference.transformer_callback =
+      [](std::string_view, std::string_view, std::size_t) {
+        return std::vector<double>(4097, 0.25);
+      };
+  bool oversized_rejected = false;
+  try {
+    (void)embed_text("A", oversized_inference);
+  } catch (const std::invalid_argument&) {
+    oversized_rejected = true;
+  }
+  assert(oversized_rejected);
 
   // Callback execution is grouped by case and remains deterministic for
   // exact score ties: identifiers are ordered descending, with input order

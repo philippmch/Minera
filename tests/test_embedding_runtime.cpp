@@ -25,6 +25,8 @@ int main() {
   const auto values = parse_response(R"({"embedding":[1,-2.5,3e-1]})", 3);
   assert(values.size() == 3 && values[0] == 1.0 && values[1] == -2.5 &&
          values[2] == 0.3);
+  const auto inferred_values = parse_response(R"({"embedding":[1,-2.5,3e-1]})", 0);
+  assert(inferred_values == values);
   for (const auto* invalid : {R"({"embedding":[]})",
                               R"({"embedding":[1,2]})",
                               R"({"embedding":[1,2,3,4]})",
@@ -63,11 +65,12 @@ int main() {
   const auto callback = minera::embedding_runtime::make_http_provider(
       "http://127.0.0.1:" + std::to_string(port));
   const auto text = std::string("quote \" and newline\nutf8 ") + "\xC3\xA4";
-  const auto result = callback(text, "model\\name", 2);
+  const auto result = callback(text, "model\\name", 0);
   worker.join();
   assert(result.size() == 2 && result[0] == 0.25 && result[1] == -0.5);
   assert(received.find("\"text\":\"quote \\\" and newline\\nutf8 ") !=
          std::string::npos);
   assert(received.find(R"("model":"model\\name")") != std::string::npos);
+  assert(received.find(R"("dimensions":0)") != std::string::npos);
   return 0;
 }
