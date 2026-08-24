@@ -4,10 +4,12 @@
 #include <cmath>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace minera {
 namespace {
@@ -37,6 +39,12 @@ bool subcontracting_variant(OrganizationalSnaVariant variant) {
          variant == OrganizationalSnaVariant::kSubcontractingPandas;
 }
 
+bool case_id_variant(OrganizationalSnaVariant variant) {
+  return variant == OrganizationalSnaVariant::kHandoverPandas ||
+         variant == OrganizationalSnaVariant::kWorkingTogetherPandas ||
+         variant == OrganizationalSnaVariant::kSubcontractingPandas;
+}
+
 std::vector<std::size_t> resource_ids(
     const Trace& trace, const std::unordered_map<std::string, std::size_t>& ids,
     const std::string& resource_attribute) {
@@ -48,6 +56,43 @@ std::vector<std::size_t> resource_ids(
     if (it != ids.end()) result.push_back(it->second);
   }
   return result;
+}
+
+bool default_case_id_attribute(const std::string& key) {
+  return key.empty() || key == "case_id" || key == "case:id" ||
+         key == "case:concept:name";
+}
+
+std::optional<std::string> selected_case_id(const Trace& trace,
+                                            const Event& event,
+                                            const std::string& key) {
+  if (default_case_id_attribute(key))
+    return trace.case_id.empty() ? event.case_id : trace.case_id;
+  if (const auto* value = trace.attribute(key)) return *value;
+  if (const auto* value = event.attribute(key)) return *value;
+  return std::nullopt;
+}
+
+std::vector<Trace> regroup_traces(const EventLog& log,
+                                  const std::string& case_id_attribute) {
+  if (default_case_id_attribute(case_id_attribute)) return log.traces;
+  std::vector<Trace> grouped;
+  std::unordered_map<std::string, std::size_t> positions;
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      const auto case_id = selected_case_id(trace, event, case_id_attribute);
+      if (!case_id)
+        throw std::invalid_argument(
+            "organizational SNA case selector is missing: " +
+            case_id_attribute);
+      auto [it, inserted] = positions.emplace(*case_id, grouped.size());
+      if (inserted) grouped.push_back(Trace{*case_id, {}, {}});
+      grouped[it->second].events.push_back(event);
+    }
+  }
+  for (auto& trace : grouped)
+    for (auto& event : trace.events) event.case_id = trace.case_id;
+  return grouped;
 }
 
 void emit_edges(const std::map<Pair, double>& weights,
@@ -75,6 +120,10 @@ OrganizationalSnaResult discover_organizational_sna(
     throw std::invalid_argument("organizational SNA max_resources safety bound exceeded");
   if (options.max_edges == 0 || options.max_edges > kHardEdges)
     throw std::invalid_argument("organizational SNA max_edges safety bound exceeded");
+  if (!default_case_id_attribute(options.case_id_attribute) &&
+      !case_id_variant(options.variant))
+    throw std::invalid_argument(
+        "organizational SNA case selector requires a handover, working-together, or subcontracting pandas variant");
 
   OrganizationalSnaResult result;
   result.variant = options.variant;
@@ -96,11 +145,14 @@ OrganizationalSnaResult discover_organizational_sna(
     ids.emplace(result.resources[i], i);
 
   std::map<Pair, double> weights;
+  const auto traces = case_id_variant(options.variant)
+                          ? regroup_traces(log, options.case_id_attribute)
+                          : log.traces;
   switch (options.variant) {
     case OrganizationalSnaVariant::kHandover:
     case OrganizationalSnaVariant::kHandoverPandas: {
       std::map<std::vector<std::string>, std::size_t> variants;
-      for (const auto& trace : log.traces) {
+      for (const auto& trace : traces) {
         std::vector<std::string> sequence;
         for (const auto& event : trace.events)
           sequence.push_back(selected_value(event, options.resource_attribute, true));
@@ -131,9 +183,9 @@ OrganizationalSnaResult discover_organizational_sna(
     }
     case OrganizationalSnaVariant::kWorkingTogether:
     case OrganizationalSnaVariant::kWorkingTogetherPandas: {
-      if (log.trace_count() != 0) {
-        const double normalizer = 1.0 / static_cast<double>(log.trace_count());
-        for (const auto& trace : log.traces) {
+      if (!traces.empty()) {
+        const double normalizer = 1.0 / static_cast<double>(traces.size());
+        for (const auto& trace : traces) {
           auto events = resource_ids(trace, ids, options.resource_attribute);
           std::sort(events.begin(), events.end());
           events.erase(std::unique(events.begin(), events.end()), events.end());
@@ -149,7 +201,7 @@ OrganizationalSnaResult discover_organizational_sna(
     }
     case OrganizationalSnaVariant::kSubcontracting:
     case OrganizationalSnaVariant::kSubcontractingPandas: {
-      for (const auto& trace : log.traces) {
+      for (const auto& trace : traces) {
         std::vector<std::string> events;
         for (const auto& event : trace.events)
           events.push_back(selected_value(event, options.resource_attribute, true));
@@ -164,8 +216,8 @@ OrganizationalSnaResult discover_organizational_sna(
           }
         }
       }
-      if (log.trace_count() != 0)
-        for (auto& [pair, weight] : weights) { (void)pair; weight /= log.trace_count(); }
+      if (!traces.empty())
+        for (auto& [pair, weight] : weights) { (void)pair; weight /= traces.size(); }
       break;
     }
     case OrganizationalSnaVariant::kJointActivities:

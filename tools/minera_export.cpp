@@ -409,6 +409,7 @@ int usage(const char* program) {
                "  --sna-variant <id>     four log variants or their _pandas variants\n"
                "  --sna-activity-attribute <key> Activity selector\n"
                "  --sna-resource-attribute <key> Resource selector\n"
+               "  --sna-case-id-attribute <key> Case selector for pandas variants\n"
                "  --sna-beta <f>         Handover beta in [0,1]\n"
                "  --sna-n <n>            Subcontracting distance\n"
                "  --sna-metric-normalization <bool> Normalize edge weights\n"
@@ -2152,6 +2153,7 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
           "sna_variant", "sna_activity_attribute", "sna_resource_attribute",
+          "sna_case_id_attribute",
           "sna_beta", "sna_n", "sna_metric_normalization",
           "sna_max_resources", "sna_max_edges"};
       if (!names.contains(key)) return usage(argv[0]);

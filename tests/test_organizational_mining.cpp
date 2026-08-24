@@ -96,5 +96,73 @@ int main() {
   assert(custom_sna.edges.size() == 1);
   assert(custom_sna.edges.front().source == 0 &&
          custom_sna.edges.front().target == 1);
+
+  // Pandas-style variants regroup a stable event stream by the selected
+  // trace-level case attribute, while log variants retain Trace boundaries.
+  minera::EventLog regrouped;
+  regrouped.traces.push_back({
+      "original-1",
+      { {"original-1", "A", "", "r1", 0, {}, ""},
+        {"original-1", "B", "", "r2", 1, {}, ""} },
+      {{"case:batch", "shared"}}});
+  regrouped.traces.push_back({
+      "original-2",
+      { {"original-2", "C", "", "r3", 2, {}, ""},
+        {"original-2", "D", "", "r1", 3, {}, ""} },
+      {{"case:batch", "shared"}}});
+  custom_options.variant = minera::OrganizationalSnaVariant::kHandoverPandas;
+  custom_options.beta = 0.0;
+  custom_options.resource_attribute = "org:resource";
+  custom_options.case_id_attribute = "case:batch";
+  const auto regrouped_pandas =
+      minera::discover_organizational_sna(regrouped, custom_options);
+  assert(regrouped_pandas.edges.size() == 3);
+  assert(regrouped_pandas.edges[0].source == 0 &&
+         regrouped_pandas.edges[0].target == 1);
+  assert(std::abs(regrouped_pandas.edges[0].weight - 1.0 / 3.0) < 1e-12);
+  custom_options.variant = minera::OrganizationalSnaVariant::kHandover;
+  custom_options.case_id_attribute = "case:concept:name";
+  const auto bounded_log =
+      minera::discover_organizational_sna(regrouped, custom_options);
+  assert(bounded_log.edges.size() == 2);
+
+  // Event-level selectors can split one source trace into independent cases.
+  minera::EventLog event_cases;
+  event_cases.traces.push_back({
+      "original",
+      { {"original", "A", "", "r1", 0,
+          {{"case:segment", "left"}}, ""},
+        {"original", "B", "", "r2", 1,
+          {{"case:segment", "left"}}, ""},
+        {"original", "C", "", "r3", 2,
+          {{"case:segment", "right"}}, ""},
+        {"original", "D", "", "r1", 3,
+          {{"case:segment", "right"}}, ""} }});
+  custom_options.variant =
+      minera::OrganizationalSnaVariant::kWorkingTogetherPandas;
+  custom_options.case_id_attribute = "case:segment";
+  const auto event_grouped =
+      minera::discover_organizational_sna(event_cases, custom_options);
+  assert(event_grouped.edges.size() == 4);
+
+  custom_options.variant = minera::OrganizationalSnaVariant::kHandoverPandas;
+  custom_options.case_id_attribute = "case:missing";
+  bool missing_case_selector = false;
+  try {
+    (void)minera::discover_organizational_sna(regrouped, custom_options);
+  } catch (const std::invalid_argument&) {
+    missing_case_selector = true;
+  }
+  assert(missing_case_selector);
+
+  custom_options.variant = minera::OrganizationalSnaVariant::kJointActivitiesPandas;
+  custom_options.case_id_attribute = "case:batch";
+  bool unsupported_case_selector = false;
+  try {
+    (void)minera::discover_organizational_sna(regrouped, custom_options);
+  } catch (const std::invalid_argument&) {
+    unsupported_case_selector = true;
+  }
+  assert(unsupported_case_selector);
   return 0;
 }

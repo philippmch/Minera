@@ -879,7 +879,11 @@ eight selectable variant names. Deterministic role discovery is also exposed via
 the `ROLE_DISCOVERY` contract and `--roles`/`POST /api/roles`; both verticals
 accept `*_activity_attribute` and `*_resource_attribute` selectors, resolving
 standard keys from first-class event fields and custom keys from typed event
-attributes; local diagnostics and network analysis are documented below.
+attributes; the handover, working-together, and subcontracting pandas-style SNA
+variants also accept a case selector that stably
+regroups events from trace or event attributes, while the log variants retain
+their existing trace boundaries. Local diagnostics and network analysis are
+documented below.
 
 The organizational network-analysis vertical emits deterministic flat rows
 (`NETWORK_ANALYSIS`) by linking each event to the earliest later event with

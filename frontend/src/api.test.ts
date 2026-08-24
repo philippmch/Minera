@@ -921,10 +921,14 @@ describe("genetic miner API", () => {
 
 describe("organizational SNA API", () => {
   it("serializes bounded metric options", () => {
-    expect(organizationalSnaQuery({ sna_variant: "working_together", sna_activity_attribute: "team:activity", sna_resource_attribute: "team:resource", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
-      .toBe("sna_variant=working_together&sna_activity_attribute=team%3Aactivity&sna_resource_attribute=team%3Aresource&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
+    expect(organizationalSnaQuery({ sna_variant: "working_together_pandas", sna_activity_attribute: "team:activity", sna_resource_attribute: "team:resource", sna_case_id_attribute: "case:batch", sna_beta: 0.5, sna_n: 3, sna_metric_normalization: true, sna_max_edges: 12 }))
+      .toBe("sna_variant=working_together_pandas&sna_activity_attribute=team%3Aactivity&sna_resource_attribute=team%3Aresource&sna_case_id_attribute=case%3Abatch&sna_beta=0.5&sna_n=3&sna_metric_normalization=true&sna_max_edges=12");
     expect(organizationalSnaQuery({ sna_variant: "jointactivities_pandas", sna_beta: 0.25 }))
       .toBe("sna_variant=jointactivities_pandas&sna_beta=0.25");
+    expect(() => organizationalSnaQuery({ sna_variant: "working_together", sna_case_id_attribute: "case:batch" }))
+      .toThrow(/requires a handover/);
+    expect(() => organizationalSnaQuery({ sna_variant: "jointactivities_pandas", sna_case_id_attribute: "case:batch" }))
+      .toThrow(/requires a handover/);
   });
   it("rejects malformed responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ family: "bad" }), { status: 200 })));

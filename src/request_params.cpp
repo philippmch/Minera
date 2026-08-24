@@ -3597,6 +3597,21 @@ OrganizationalSnaOptions parse_organizational_sna_params(
     options.activity_attribute = require("sna_activity_attribute");
   if (supplied("sna_resource_attribute"))
     options.resource_attribute = require("sna_resource_attribute");
+  if (supplied("sna_case_id_attribute"))
+    options.case_id_attribute = require("sna_case_id_attribute");
+  const auto default_case_id = [](const std::string& key) {
+    return key.empty() || key == "case_id" || key == "case:id" ||
+           key == "case:concept:name";
+  };
+  const auto case_id_variant = [&]() {
+    return options.variant == OrganizationalSnaVariant::kHandoverPandas ||
+           options.variant == OrganizationalSnaVariant::kWorkingTogetherPandas ||
+           options.variant == OrganizationalSnaVariant::kSubcontractingPandas;
+  };
+  if (supplied("sna_case_id_attribute") &&
+      !default_case_id(options.case_id_attribute) && !case_id_variant())
+    throw std::invalid_argument(
+        "sna_case_id_attribute requires a handover, working-together, or subcontracting pandas variant");
   if (supplied("sna_beta")) {
     options.beta = parse_finite_double(require("sna_beta"), "sna_beta");
     if (options.beta < 0.0 || options.beta > 1.0)
