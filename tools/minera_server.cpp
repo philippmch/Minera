@@ -1666,10 +1666,15 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_related_events_features") ||
         request.has_param("include_related_activities_features") ||
         request.has_param("include_obj_con_in_graph_features") ||
+        request.has_param("include_lifecycle_length_features") ||
+        request.has_param("include_lifecycle_unique_activity_features") ||
+        request.has_param("include_lifecycle_duration_features") ||
+        request.has_param("include_lifecycle_activity_features") ||
+        request.has_param("include_lifecycle_wip_features") ||
         request.has_param("include_lifecycle_path_features");
     if (object_only_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
-          "related-event, neighbor, and lifecycle-path feature options apply only to the objects variant");
+          "related-event, neighbor, and lifecycle metric options apply only to the objects variant");
     options.numeric_event_attributes =
         ocel_query_list(request, "numeric_event_attributes");
     options.string_event_attributes =

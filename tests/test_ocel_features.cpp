@@ -228,6 +228,62 @@ int main() {
   }
   assert(rejected_path_events);
 
+  auto lifecycle_control_disabled = options;
+  lifecycle_control_disabled.include_lifecycle_length_features = false;
+  bool rejected_lifecycle_control_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents,
+        lifecycle_control_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_lifecycle_control_events = true;
+  }
+  assert(rejected_lifecycle_control_events);
+  lifecycle_control_disabled.include_lifecycle_length_features = true;
+  lifecycle_control_disabled.include_lifecycle_unique_activity_features = false;
+  bool rejected_unique_control_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents,
+        lifecycle_control_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_unique_control_events = true;
+  }
+  assert(rejected_unique_control_events);
+  lifecycle_control_disabled.include_lifecycle_unique_activity_features = true;
+  lifecycle_control_disabled.include_lifecycle_duration_features = false;
+  bool rejected_duration_control_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents,
+        lifecycle_control_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_duration_control_events = true;
+  }
+  assert(rejected_duration_control_events);
+  lifecycle_control_disabled.include_lifecycle_duration_features = true;
+  lifecycle_control_disabled.include_lifecycle_activity_features = false;
+  bool rejected_activity_control_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents,
+        lifecycle_control_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_activity_control_events = true;
+  }
+  assert(rejected_activity_control_events);
+  lifecycle_control_disabled.include_lifecycle_activity_features = true;
+  lifecycle_control_disabled.include_lifecycle_wip_features = false;
+  bool rejected_wip_control_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents,
+        lifecycle_control_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_wip_control_events = true;
+  }
+  assert(rejected_wip_control_events);
+
   auto related_options = minera::OcelFeatureOptions{};
   related_options.include_activity_features = false;
   related_options.include_timestamp_features = false;

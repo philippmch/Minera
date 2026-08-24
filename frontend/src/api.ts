@@ -4449,6 +4449,11 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   const objectOnlyFeatureControl = options.include_related_events_features !== undefined ||
     options.include_related_activities_features !== undefined ||
     options.include_obj_con_in_graph_features !== undefined ||
+    options.include_lifecycle_length_features !== undefined ||
+    options.include_lifecycle_unique_activity_features !== undefined ||
+    options.include_lifecycle_duration_features !== undefined ||
+    options.include_lifecycle_activity_features !== undefined ||
+    options.include_lifecycle_wip_features !== undefined ||
     options.include_lifecycle_path_features !== undefined;
   if (objectOnlyFeatureControl && options.variant !== "objects")
     throw new Error("related-event, neighbor, and lifecycle-path features apply only to objects");

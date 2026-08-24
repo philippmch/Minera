@@ -830,10 +830,17 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     throw std::invalid_argument(
         "OCEL related-event and neighbor features apply only to the objects variant");
   }
-  if (!options.include_lifecycle_path_features &&
+  const bool lifecycle_object_control_disabled =
+      !options.include_lifecycle_length_features ||
+      !options.include_lifecycle_unique_activity_features ||
+      !options.include_lifecycle_duration_features ||
+      !options.include_lifecycle_activity_features ||
+      !options.include_lifecycle_path_features ||
+      !options.include_lifecycle_wip_features;
+  if (lifecycle_object_control_disabled &&
       variant != OcelFeatureVariant::kObjects) {
     throw std::invalid_argument(
-        "OCEL lifecycle-path features apply only to the objects variant");
+        "OCEL lifecycle metric controls apply only to the objects variant");
   }
   IndexMap event_index, object_index;
   for (std::size_t i = 0; i < log.events.size(); ++i) {
