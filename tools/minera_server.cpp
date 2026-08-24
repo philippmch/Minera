@@ -1563,7 +1563,7 @@ void handle_ocel_features(const httplib::Request& request,
                           httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "feature_name_style", "max_features", "include_activity_features",
+        "variant", "feature_name_style", "interaction_graph_source", "max_features", "include_activity_features",
         "include_timestamp_features", "include_relation_features",
         "include_event_num_rel_objs_features",
         "include_event_num_rel_objs_type_features",
@@ -1630,6 +1630,19 @@ void handle_ocel_features(const httplib::Request& request,
           variant == minera::OcelFeatureVariant::kEventsObjects)
         throw std::invalid_argument(
             "compatibility feature names apply only to events or objects variants");
+    }
+    if (request.has_param("interaction_graph_source")) {
+      const auto source = request.get_param_value("interaction_graph_source");
+      if (source == "event_cooccurrence") {
+        options.interaction_graph_source =
+            minera::OcelInteractionGraphSource::kEventCooccurrence;
+      } else if (source == "event_and_o2o") {
+        options.interaction_graph_source =
+            minera::OcelInteractionGraphSource::kEventAndO2O;
+      } else {
+        throw std::invalid_argument(
+            "interaction_graph_source expects event_cooccurrence or event_and_o2o");
+      }
     }
     options.max_features =
         ocel_query_size(request, "max_features", options.max_features);
@@ -1769,6 +1782,8 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_general_inheritance_features") ||
         request.has_param("include_cobirth_features") ||
         request.has_param("include_codeath_features");
+    const auto interaction_graph_source_supplied =
+        request.has_param("interaction_graph_source");
     if (all_object_control_supplied &&
         variant != minera::OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
@@ -1782,6 +1797,11 @@ void handle_ocel_features(const httplib::Request& request,
         !related_object_event_context)
       throw std::invalid_argument(
           "object graph feature controls apply only to the objects variant");
+    if (interaction_graph_source_supplied &&
+        variant != minera::OcelFeatureVariant::kObjects &&
+        !related_object_event_context)
+      throw std::invalid_argument(
+          "interaction graph source applies only to the objects variant");
     if (object_only_control_supplied &&
         variant != minera::OcelFeatureVariant::kObjects &&
         !related_object_event_context)

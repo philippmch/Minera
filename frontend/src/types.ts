@@ -1215,6 +1215,7 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
   return isOcelRecord(value.log);
 }
 export type OcelFeatureVariant = "EVENTS" | "OBJECTS" | "EVENTS_OBJECTS";
+export type OcelInteractionGraphSource = "event_cooccurrence" | "event_and_o2o";
 export interface OcelFeatureResult {
   family: "OCEL_FEATURES";
   variant: OcelFeatureVariant;

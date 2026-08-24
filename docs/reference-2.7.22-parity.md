@@ -295,6 +295,14 @@ OBJECTS; the server and typed frontend reject this control for event and
 exploded variants. When omitted, native callers retain the historical behavior
 where degree follows `include_interaction_features`; the default remains
 enabled.
+The `interaction_graph_source` selector chooses the edge source for normalized
+degree, per-object-type interaction counts, and neighboring-object min/max
+projections: `event_cooccurrence` uses only objects sharing an event, while
+`event_and_o2o` preserves the native union with explicit O2O links. The latter
+is the default when the selector is omitted. An explicitly supplied selector
+is strictly limited to OBJECTS, or to the
+related-object EVENTS context, and does not alter the separate general graph
+scalar families, which remain event-cooccurrence based.
 Strict feature-count, selector, and relation-id validation is shared by
 `minera_ocel --features`, multipart local `POST /api/ocel/features`, and the
 typed frontend query/response adapter.

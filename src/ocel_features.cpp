@@ -24,6 +24,7 @@ namespace minera {
 namespace {
 
 using IndexMap = std::map<std::string, std::size_t>;
+using ObjectPair = std::pair<std::size_t, std::size_t>;
 
 struct Column {
   std::string name;
@@ -110,6 +111,31 @@ std::vector<std::string> object_type_names(const Ocel& log) {
   values.reserve(log.objects.size());
   for (const auto& object : log.objects) values.push_back(object.type);
   return sorted_unique(std::move(values));
+}
+
+std::set<ObjectPair> interaction_edges(
+    const Ocel& log, const std::vector<std::vector<std::size_t>>& event_objects,
+    OcelInteractionGraphSource source) {
+  std::set<ObjectPair> edges;
+  for (const auto& objects : event_objects) {
+    std::vector<std::size_t> unique = objects;
+    std::sort(unique.begin(), unique.end());
+    unique.erase(std::unique(unique.begin(), unique.end()), unique.end());
+    for (std::size_t left = 0; left < unique.size(); ++left)
+      for (std::size_t right = left + 1; right < unique.size(); ++right)
+        edges.emplace(unique[left], unique[right]);
+  }
+  if (source == OcelInteractionGraphSource::kEventCooccurrence) return edges;
+  IndexMap ids;
+  for (std::size_t i = 0; i < log.objects.size(); ++i)
+    ids.emplace(log.objects[i].id, i);
+  for (const auto& relation : log.o2o) {
+    const auto left = ids.find(relation.source_id);
+    const auto right = ids.find(relation.target_id);
+    if (left != ids.end() && right != ids.end() && left->second != right->second)
+      edges.insert(std::minmax(left->second, right->second));
+  }
+  return edges;
 }
 
 std::map<std::string, std::vector<std::size_t>> event_relations(
@@ -512,22 +538,9 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   if (include_degree_centrality_features ||
       options.include_interaction_features ||
       include_interaction_by_type_features) {
-    std::set<std::pair<std::size_t, std::size_t>> interactions;
-    for (const auto& objects : event_objects) {
-      std::vector<std::size_t> unique = objects;
-      std::sort(unique.begin(), unique.end());
-      unique.erase(std::unique(unique.begin(), unique.end()), unique.end());
-      for (std::size_t left = 0; left < unique.size(); ++left)
-        for (std::size_t right = left + 1; right < unique.size(); ++right)
-          interactions.insert({unique[left], unique[right]});
-    }
-    for (const auto& relation : log.o2o) {
-      IndexMap ids;
-      for (std::size_t i = 0; i < log.objects.size(); ++i) ids[log.objects[i].id] = i;
-      const auto left = ids.find(relation.source_id), right = ids.find(relation.target_id);
-      if (left != ids.end() && right != ids.end() && left->second != right->second)
-        interactions.insert(std::minmax(left->second, right->second));
-    }
+    const auto interactions = interaction_edges(
+        log, event_objects, options.interaction_graph_source.value_or(
+                                OcelInteractionGraphSource::kEventAndO2O));
     std::vector<std::set<std::size_t>> neighbors(log.objects.size());
     for (const auto& edge : interactions) {
       neighbors[edge.first].insert(edge.second);
@@ -781,24 +794,9 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   }
 
   if (options.include_obj_con_in_graph_features) {
-    using ObjectPair = std::pair<std::size_t, std::size_t>;
-    std::set<ObjectPair> interactions;
-    for (const auto& objects : event_objects) {
-      std::vector<std::size_t> unique = objects;
-      std::sort(unique.begin(), unique.end());
-      unique.erase(std::unique(unique.begin(), unique.end()), unique.end());
-      for (std::size_t left = 0; left < unique.size(); ++left)
-        for (std::size_t right = left + 1; right < unique.size(); ++right)
-          interactions.emplace(unique[left], unique[right]);
-    }
-    IndexMap ids;
-    for (std::size_t i = 0; i < log.objects.size(); ++i)
-      ids.emplace(log.objects[i].id, i);
-    for (const auto& relation : log.o2o) {
-      const auto left = ids.find(relation.source_id), right = ids.find(relation.target_id);
-      if (left != ids.end() && right != ids.end() && left->second != right->second)
-        interactions.insert(std::minmax(left->second, right->second));
-    }
+    const auto interactions = interaction_edges(
+        log, event_objects, options.interaction_graph_source.value_or(
+                                OcelInteractionGraphSource::kEventAndO2O));
     std::vector<std::set<std::size_t>> neighbors(log.objects.size());
     for (const auto& [left, right] : interactions) {
       neighbors[left].insert(right);
@@ -977,6 +975,16 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   const bool related_object_event_context =
       options.include_related_objects_features &&
       variant == OcelFeatureVariant::kEvents;
+  if (options.interaction_graph_source.has_value() &&
+      *options.interaction_graph_source !=
+          OcelInteractionGraphSource::kEventAndO2O &&
+      *options.interaction_graph_source !=
+          OcelInteractionGraphSource::kEventCooccurrence)
+    throw std::invalid_argument("OCEL interaction_graph_source is invalid");
+  if (options.interaction_graph_source.has_value() &&
+      variant != OcelFeatureVariant::kObjects && !related_object_event_context)
+    throw std::invalid_argument(
+        "OCEL interaction_graph_source applies only to objects or related-object events");
   const bool event_control_supplied =
       options.include_event_num_rel_objs_features.has_value() ||
       options.include_event_num_rel_objs_type_features.has_value() ||

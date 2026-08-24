@@ -43,6 +43,17 @@ minera::Ocel interaction_sample() {
   return log;
 }
 
+minera::Ocel interaction_source_sample() {
+  minera::Ocel log;
+  log.events = {{"e1", "Shared", "2026-01-01T00:00:00Z", {}}};
+  log.objects = {{"a", "order", {{"priority", std::int64_t{1}}}},
+                 {"b", "order", {{"priority", std::int64_t{5}}}},
+                 {"c", "item", {{"priority", std::int64_t{9}}}}};
+  log.relations = {{"e1", "b", ""}, {"e1", "c", ""}};
+  log.o2o = {{"a", "b", "connects"}};
+  return log;
+}
+
 minera::Ocel graph_feature_sample() {
   minera::Ocel log;
   log.events = {
@@ -606,6 +617,97 @@ int main() {
          interaction_table.values[5][other] == 0.0);
   for (const auto& row : interaction_table.values)
     assert(row[item] + row[order] + row[other] == row[degree] * 5.0);
+
+  const auto source_log = interaction_source_sample();
+  auto source_options = interaction_options;
+  source_options.numeric_object_attributes = {"priority"};
+  source_options.include_obj_con_in_graph_features = true;
+  source_options.interaction_graph_source =
+      minera::OcelInteractionGraphSource::kEventCooccurrence;
+  const auto event_only = minera::extract_ocel_features(
+      source_log, minera::OcelFeatureVariant::kObjects, source_options);
+  auto source_column = [&](const auto& table, const std::string& name) {
+    const auto it = std::find(table.feature_names.begin(), table.feature_names.end(), name);
+    assert(it != table.feature_names.end());
+    return static_cast<std::size_t>(it - table.feature_names.begin());
+  };
+  const auto event_degree = source_column(event_only, "@@object_degree_centrality");
+  const auto event_order = source_column(
+      event_only, "@@object_interaction_graph_ot_order");
+  const auto event_item = source_column(
+      event_only, "@@object_interaction_graph_ot_item");
+  const auto event_neighbor_min = source_column(
+      event_only, "@@obj_graph_con_min_@@object_num_priority");
+  const auto event_neighbor_max = source_column(
+      event_only, "@@obj_graph_con_max_@@object_num_priority");
+  assert(event_only.row_ids == std::vector<std::string>({"a", "b", "c"}));
+  assert(event_only.values[0][event_degree] == 0.0 &&
+         event_only.values[0][event_order] == 0.0 &&
+         event_only.values[0][event_item] == 0.0);
+  assert(event_only.values[1][event_degree] == 0.5 &&
+         event_only.values[1][event_order] == 0.0 &&
+         event_only.values[1][event_item] == 1.0);
+  assert(event_only.values[2][event_degree] == 0.5 &&
+         event_only.values[2][event_order] == 1.0 &&
+         event_only.values[2][event_item] == 0.0);
+  assert(event_only.values[0][event_neighbor_min] == 0.0 &&
+         event_only.values[0][event_neighbor_max] == 0.0 &&
+         event_only.values[1][event_neighbor_min] == 9.0 &&
+         event_only.values[1][event_neighbor_max] == 9.0 &&
+         event_only.values[2][event_neighbor_min] == 5.0 &&
+         event_only.values[2][event_neighbor_max] == 5.0);
+
+  auto union_options = source_options;
+  union_options.interaction_graph_source =
+      minera::OcelInteractionGraphSource::kEventAndO2O;
+  const auto union_table = minera::extract_ocel_features(
+      source_log, minera::OcelFeatureVariant::kObjects, union_options);
+  const auto union_degree = source_column(union_table, "@@object_degree_centrality");
+  const auto union_order = source_column(
+      union_table, "@@object_interaction_graph_ot_order");
+  const auto union_item = source_column(
+      union_table, "@@object_interaction_graph_ot_item");
+  const auto union_neighbor_min = source_column(
+      union_table, "@@obj_graph_con_min_@@object_num_priority");
+  const auto union_neighbor_max = source_column(
+      union_table, "@@obj_graph_con_max_@@object_num_priority");
+  assert(union_table.row_ids == event_only.row_ids &&
+         union_table.feature_names == event_only.feature_names);
+  assert(union_table.values[0][union_degree] == 0.5 &&
+         union_table.values[0][union_order] == 1.0 &&
+         union_table.values[0][union_item] == 0.0);
+  assert(union_table.values[1][union_degree] == 1.0 &&
+         union_table.values[1][union_order] == 1.0 &&
+         union_table.values[1][union_item] == 1.0);
+  assert(union_table.values[2][union_degree] == 0.5 &&
+         union_table.values[2][union_order] == 1.0 &&
+         union_table.values[2][union_item] == 0.0);
+  assert(union_table.values[0][union_neighbor_min] == 5.0 &&
+         union_table.values[0][union_neighbor_max] == 5.0 &&
+         union_table.values[1][union_neighbor_min] == 1.0 &&
+         union_table.values[1][union_neighbor_max] == 9.0 &&
+         union_table.values[2][union_neighbor_min] == 5.0 &&
+         union_table.values[2][union_neighbor_max] == 5.0);
+  auto default_source_options = source_options;
+  default_source_options.interaction_graph_source.reset();
+  const auto default_source_table = minera::extract_ocel_features(
+      source_log, minera::OcelFeatureVariant::kObjects, default_source_options);
+  assert(default_source_table.row_ids == union_table.row_ids &&
+         default_source_table.feature_names == union_table.feature_names &&
+         default_source_table.values == union_table.values);
+  auto invalid_source = minera::OcelFeatureOptions{};
+  for (const auto source : {minera::OcelInteractionGraphSource::kEventCooccurrence,
+                            minera::OcelInteractionGraphSource::kEventAndO2O}) {
+    invalid_source.interaction_graph_source = source;
+    bool source_variant_rejected = false;
+    try {
+      (void)minera::extract_ocel_features(
+          source_log, minera::OcelFeatureVariant::kEvents, invalid_source);
+    } catch (const std::invalid_argument&) {
+      source_variant_rejected = true;
+    }
+    assert(source_variant_rejected);
+  }
 
   auto no_by_type = interaction_options;
   no_by_type.include_interaction_by_type_features = false;
