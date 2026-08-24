@@ -569,6 +569,8 @@ int usage(const char* program) {
                "  --path-successor <name>  Adjacent-path successor activity\n"
                "  --path-min-performance <seconds> Inclusive lower elapsed bound\n"
                "  --path-max-performance <seconds> Inclusive upper elapsed bound\n"
+               "  --path-activity-attribute <key> Activity attribute key\n"
+               "  --path-timestamp-attribute <key> Timestamp attribute key\n"
                "  --path-positive <bool>   Keep matching adjacent paths (default: true)\n"
                "  --spectrum <a,b,c>        Compute the performance spectrum\n"
                "                            over this activity pattern (2+\n"
@@ -1733,7 +1735,8 @@ int main(int argc, char** argv) {
     }
     if (arg == "--path-predecessor" || arg == "--path-successor" ||
         arg == "--path-min-performance" || arg == "--path-max-performance" ||
-        arg == "--path-positive") {
+        arg == "--path-positive" || arg == "--path-activity-attribute" ||
+        arg == "--path-timestamp-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));

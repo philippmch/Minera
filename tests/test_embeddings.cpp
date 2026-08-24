@@ -82,8 +82,15 @@ int main() {
   assert(callback_model == "demo-transformer" && callback_dimensions == 32);
   const auto transformer_matches = embedding_similarity(
       "Approve Ship", transformer_cases, transformer_options, 0);
-  assert(transformer_matches.size() == 2 && transformer_matches[0].id == "c1" &&
-         transformer_matches[1].id == "c2");
+  assert(transformer_matches.size() == 2 && transformer_matches[0].id == "c2" &&
+         transformer_matches[1].id == "c1");
+  const auto transformer_top = embedding_similarity(
+      "Approve Ship", transformer_cases, transformer_options, 1);
+  assert(transformer_top.size() == 1 && transformer_top[0].id == "c2");
+  const auto transformer_selected = filter_embeddings_top_k(
+      log, "Approve Ship", 1, transformer_options);
+  assert(transformer_selected.traces.size() == 1 &&
+         transformer_selected.traces[0].case_id == "c2");
   assert(callback_texts.back() == "Approve Ship");
 
   transformer_options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
@@ -128,6 +135,8 @@ int main() {
   mock_transformer.embedding_model = "mock_transformer";
   assert(to_embeddings(log, mock_transformer).provider ==
          EmbeddingProvider::TRANSFORMER);
+  assert(embed_text("Approve Ship", mock_transformer) !=
+         embed_text("Approve Ship", options));
 
   options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
   const auto events = to_embeddings(log, options);

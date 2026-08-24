@@ -1275,9 +1275,13 @@ describe("mineFormEntries", () => {
       pathMinPerformance: 0,
       pathMaxPerformance: 2.5,
       pathPositive: false,
+      pathActivityAttribute: "phase",
+      pathTimestampAttribute: "occurred",
     })).toEqual([
       ["path_predecessor", "A"],
       ["path_successor", "B"],
+      ["path_activity_attribute", "phase"],
+      ["path_timestamp_attribute", "occurred"],
       ["path_min_performance", "0"],
       ["path_max_performance", "2.5"],
       ["path_positive", "false"],
