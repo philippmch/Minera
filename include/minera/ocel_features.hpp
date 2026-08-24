@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,9 @@ struct OcelFeatureOptions {
   std::vector<std::string> string_event_attributes;
   std::vector<std::string> numeric_object_attributes;
   std::vector<std::string> string_object_attributes;
+  // When set, OBJECTS output contains only rows with this object type.
+  // This selector is invalid for EVENTS and EVENTS_OBJECTS output.
+  std::optional<std::string> filter_per_type;
   std::size_t max_features = 10000;
 };
 

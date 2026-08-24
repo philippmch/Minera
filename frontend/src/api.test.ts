@@ -1062,7 +1062,10 @@ describe("OCEL API", () => {
       include_lifecycle_features: false,
       numeric_event_attributes: ["z", "a"],
       string_object_attributes: ["color"],
-    })).toBe("variant=objects&max_features=12&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color");
+      filter_per_type: "item",
+    })).toBe("variant=objects&max_features=12&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color&ocel_features_filter_per_type=item");
+    expect(ocelFeaturesQuery({ variant: "events", filter_per_type: "" }))
+      .toBe("variant=events&ocel_features_filter_per_type=");
     expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))
       .toBe("variant=activity_associations&prefilter=start");
     expect(ocelStatisticsQuery({

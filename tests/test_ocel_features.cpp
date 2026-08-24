@@ -66,6 +66,53 @@ int main() {
   assert(objects.values[0][static_cast<std::size_t>(
              length - objects.feature_names.begin())] == 3.0);
 
+  auto filtered_options = options;
+  filtered_options.filter_per_type = "item";
+  const auto filtered = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kObjects, filtered_options);
+  assert(filtered.row_ids.size() == 2 && filtered.row_ids[0] == "i1" &&
+         filtered.row_ids[1] == "i2");
+  assert(filtered.row_types.size() == 2 && filtered.row_types[0] == "item" &&
+         filtered.row_types[1] == "item");
+  assert(filtered.feature_names == objects.feature_names);
+  assert(filtered.values.size() == 2 && filtered.values[0] == objects.values[1] &&
+         filtered.values[1] == objects.values[2]);
+
+  filtered_options.filter_per_type = "missing";
+  const auto no_rows = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kObjects, filtered_options);
+  assert(no_rows.row_ids.empty() && no_rows.row_types.empty() &&
+         no_rows.values.empty() && no_rows.feature_names == objects.feature_names);
+
+  bool rejected_empty = false;
+  try {
+    filtered_options.filter_per_type = "";
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kObjects, filtered_options);
+  } catch (const std::invalid_argument&) {
+    rejected_empty = true;
+  }
+  assert(rejected_empty);
+
+  bool rejected_events = false;
+  try {
+    filtered_options.filter_per_type = "item";
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents, filtered_options);
+  } catch (const std::invalid_argument&) {
+    rejected_events = true;
+  }
+  assert(rejected_events);
+
+  bool rejected_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEventsObjects, filtered_options);
+  } catch (const std::invalid_argument&) {
+    rejected_events_objects = true;
+  }
+  assert(rejected_events_objects);
+
   const auto exploded = minera::extract_ocel_features(
       log, minera::OcelFeatureVariant::kEventsObjects, options);
   assert(exploded.row_ids.size() == log.relations.size());

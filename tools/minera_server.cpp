@@ -1556,6 +1556,7 @@ void handle_ocel_features(const httplib::Request& request,
         "include_timestamp_features", "include_relation_features",
         "include_endpoint_features", "include_attribute_counts",
         "include_interaction_features", "include_lifecycle_features",
+        "ocel_features_filter_per_type",
         "numeric_event_attributes", "string_event_attributes",
         "numeric_object_attributes", "string_object_attributes"};
     for (const auto& [key, value] : request.params) {
@@ -1604,6 +1605,10 @@ void handle_ocel_features(const httplib::Request& request,
         ocel_query_list(request, "numeric_object_attributes");
     options.string_object_attributes =
         ocel_query_list(request, "string_object_attributes");
+    if (request.has_param("ocel_features_filter_per_type")) {
+      options.filter_per_type =
+          request.get_param_value("ocel_features_filter_per_type");
+    }
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     response.set_content(minera::serialize_ocel_features_json(
