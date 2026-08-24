@@ -25,6 +25,7 @@ struct OcelFeatureOptions {
   bool include_endpoint_features = true;
   bool include_attribute_counts = true;
   bool include_interaction_features = true;
+  bool include_interaction_by_type_features = false;
   bool include_lifecycle_features = true;
   std::vector<std::string> numeric_event_attributes;
   std::vector<std::string> string_event_attributes;

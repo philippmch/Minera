@@ -456,7 +456,8 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
   }
 
-  if (options.include_interaction_features) {
+  if (options.include_interaction_features ||
+      options.include_interaction_by_type_features) {
     std::set<std::pair<std::size_t, std::size_t>> interactions;
     for (const auto& objects : event_objects) {
       std::vector<std::size_t> unique = objects;
@@ -473,16 +474,31 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       if (left != ids.end() && right != ids.end() && left->second != right->second)
         interactions.insert(std::minmax(left->second, right->second));
     }
-    std::vector<double> degree(log.objects.size(), 0.0);
+    std::vector<std::set<std::size_t>> neighbors(log.objects.size());
     for (const auto& edge : interactions) {
-      degree[edge.first] += 1.0;
-      degree[edge.second] += 1.0;
+      neighbors[edge.first].insert(edge.second);
+      neighbors[edge.second].insert(edge.first);
     }
-    const auto denominator = log.objects.size() > 1
-                                 ? static_cast<double>(log.objects.size() - 1)
-                                 : 1.0;
-    for (auto& value : degree) value /= denominator;
-    builder.add("@@object_degree_centrality", std::move(degree));
+    if (options.include_interaction_features) {
+      std::vector<double> degree(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < neighbors.size(); ++row)
+        degree[row] = static_cast<double>(neighbors[row].size());
+      const auto denominator = log.objects.size() > 1
+                                   ? static_cast<double>(log.objects.size() - 1)
+                                   : 1.0;
+      for (auto& value : degree) value /= denominator;
+      builder.add("@@object_degree_centrality", std::move(degree));
+    }
+    if (options.include_interaction_by_type_features) {
+      for (const auto& type : object_types) {
+        std::vector<double> values(log.objects.size(), 0.0);
+        for (std::size_t row = 0; row < neighbors.size(); ++row)
+          for (const auto neighbor : neighbors[row])
+            if (log.objects[neighbor].type == type) values[row] += 1.0;
+        builder.add("@@object_interaction_graph_ot_" + type,
+                    std::move(values));
+      }
+    }
   }
   (void)object_events;
   (void)times;
@@ -504,6 +520,11 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     if (variant != OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
           "OCEL filter_per_type applies only to the objects variant");
+  }
+  if (options.include_interaction_by_type_features &&
+      variant != OcelFeatureVariant::kObjects) {
+    throw std::invalid_argument(
+        "OCEL interaction-by-type features apply only to the objects variant");
   }
   IndexMap event_index, object_index;
   for (std::size_t i = 0; i < log.events.size(); ++i) {

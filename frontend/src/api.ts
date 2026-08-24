@@ -4399,6 +4399,7 @@ export interface OcelFeatureOptions {
   include_endpoint_features?: boolean;
   include_attribute_counts?: boolean;
   include_interaction_features?: boolean;
+  include_interaction_by_type_features?: boolean;
   include_lifecycle_features?: boolean;
   numeric_event_attributes?: string[];
   string_event_attributes?: string[];
@@ -4408,6 +4409,8 @@ export interface OcelFeatureOptions {
 }
 
 export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
+  if (options.include_interaction_by_type_features && options.variant !== "objects")
+    throw new Error("include_interaction_by_type_features applies only to objects");
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
   const addInteger = (name: string, value: number | undefined) => {
@@ -4424,6 +4427,7 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_endpoint_features", options.include_endpoint_features);
   addBoolean("include_attribute_counts", options.include_attribute_counts);
   addBoolean("include_interaction_features", options.include_interaction_features);
+  addBoolean("include_interaction_by_type_features", options.include_interaction_by_type_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
   const addList = (name: string, values: string[] | undefined) => {
     if (values?.length) {
