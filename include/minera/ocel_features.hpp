@@ -67,6 +67,10 @@ struct OcelFeatureOptions {
   bool include_prefix_length_features = true;
   bool include_prefix_timediff_features = true;
   bool include_prefix_one_hot_features = true;
+  // EVENTS_OBJECTS pointwise projections inherit the complete exploded
+  // schema when unset. Explicit controls apply only to that variant.
+  std::optional<bool> include_event_pointwise_features;
+  std::optional<bool> include_object_pointwise_features;
   std::vector<std::string> numeric_event_attributes;
   std::vector<std::string> string_event_attributes;
   std::vector<std::string> numeric_object_attributes;

@@ -265,6 +265,12 @@ relation order or duplicate row suffixes. The OBJECTS table can be
 filtered after feature computation to one requested object type, preserving
 feature columns and original row order; missing types produce an empty table,
 while the selector is rejected for event and exploded event-object variants.
+Exploded pointwise event and object projections can be disabled independently
+with `include_event_pointwise_features` and
+`include_object_pointwise_features` (or the matching CLI switches); an unset
+control preserves both projections, and explicit controls are rejected for
+EVENTS and OBJECTS. Disabled source tables are not computed, so
+`max_features` applies only to the selected exploded output families.
 Exploded rows also provide object-specific relation prefixes by default:
 `@@ev_obj_pref_length`, `@@ev_obj_pref_timediff`, and deterministic one-hot
 activity counts named `@@ev_obj_pref_act_<activity>`. Prefixes follow relation
