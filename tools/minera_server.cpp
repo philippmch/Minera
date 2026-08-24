@@ -1571,6 +1571,7 @@ void handle_ocel_features(const httplib::Request& request,
         "include_event_start_ot_features", "include_event_end_ot_features",
         "include_interaction_features", "include_new_interactions_features",
         "include_degree_centrality_features",
+        "include_all_object_features",
         "include_lifecycle_features",
         "include_lifecycle_length_features",
         "include_lifecycle_unique_activity_features",
@@ -1648,22 +1649,28 @@ void handle_ocel_features(const httplib::Request& request,
       options.include_degree_centrality_features = ocel_query_bool(
           request, "include_degree_centrality_features", false);
     }
-    options.include_interaction_by_type_features = ocel_query_bool(
-        request, "include_interaction_by_type_features",
-        options.include_interaction_by_type_features);
-    options.include_general_interaction_features = ocel_query_bool(
-        request, "include_general_interaction_features",
-        options.include_general_interaction_features);
-    options.include_general_descendants_features = ocel_query_bool(
-        request, "include_general_descendants_features",
-        options.include_general_descendants_features);
-    options.include_general_inheritance_features = ocel_query_bool(
-        request, "include_general_inheritance_features",
-        options.include_general_inheritance_features);
-    options.include_cobirth_features = ocel_query_bool(
-        request, "include_cobirth_features", options.include_cobirth_features);
-    options.include_codeath_features = ocel_query_bool(
-        request, "include_codeath_features", options.include_codeath_features);
+    if (request.has_param("include_all_object_features")) {
+      options.include_all_object_features = ocel_query_bool(
+          request, "include_all_object_features", false);
+    }
+    if (request.has_param("include_interaction_by_type_features"))
+      options.include_interaction_by_type_features = ocel_query_bool(
+          request, "include_interaction_by_type_features", false);
+    if (request.has_param("include_general_interaction_features"))
+      options.include_general_interaction_features = ocel_query_bool(
+          request, "include_general_interaction_features", false);
+    if (request.has_param("include_general_descendants_features"))
+      options.include_general_descendants_features = ocel_query_bool(
+          request, "include_general_descendants_features", false);
+    if (request.has_param("include_general_inheritance_features"))
+      options.include_general_inheritance_features = ocel_query_bool(
+          request, "include_general_inheritance_features", false);
+    if (request.has_param("include_cobirth_features"))
+      options.include_cobirth_features = ocel_query_bool(
+          request, "include_cobirth_features", false);
+    if (request.has_param("include_codeath_features"))
+      options.include_codeath_features = ocel_query_bool(
+          request, "include_codeath_features", false);
     options.include_lifecycle_features = ocel_query_bool(
         request, "include_lifecycle_features", options.include_lifecycle_features);
     options.include_lifecycle_length_features = ocel_query_bool(
@@ -1736,10 +1743,28 @@ void handle_ocel_features(const httplib::Request& request,
         variant == minera::OcelFeatureVariant::kEvents;
     const auto degree_control_supplied =
         request.has_param("include_degree_centrality_features");
+    const auto all_object_control_supplied =
+        request.has_param("include_all_object_features");
+    const auto object_graph_control_supplied =
+        request.has_param("include_interaction_by_type_features") ||
+        request.has_param("include_general_interaction_features") ||
+        request.has_param("include_general_descendants_features") ||
+        request.has_param("include_general_inheritance_features") ||
+        request.has_param("include_cobirth_features") ||
+        request.has_param("include_codeath_features");
+    if (all_object_control_supplied &&
+        variant != minera::OcelFeatureVariant::kObjects)
+      throw std::invalid_argument(
+          "all-object features apply only to the objects variant");
     if (degree_control_supplied && variant != minera::OcelFeatureVariant::kObjects &&
         !related_object_event_context)
       throw std::invalid_argument(
           "degree centrality features apply only to the objects variant");
+    if (object_graph_control_supplied &&
+        variant != minera::OcelFeatureVariant::kObjects &&
+        !related_object_event_context)
+      throw std::invalid_argument(
+          "object graph feature controls apply only to the objects variant");
     if (object_only_control_supplied &&
         variant != minera::OcelFeatureVariant::kObjects &&
         !related_object_event_context)

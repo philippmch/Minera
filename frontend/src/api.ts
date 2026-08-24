@@ -4554,6 +4554,7 @@ export interface OcelFeatureOptions {
   include_interaction_features?: boolean;
   include_new_interactions_features?: boolean;
   include_degree_centrality_features?: boolean;
+  include_all_object_features?: boolean;
   include_interaction_by_type_features?: boolean;
   include_general_interaction_features?: boolean;
   include_general_descendants_features?: boolean;
@@ -4587,16 +4588,18 @@ export interface OcelFeatureOptions {
 export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   const relatedObjectEventContext = options.include_related_objects_features === true &&
     options.variant === "events";
-  if (options.include_interaction_by_type_features && options.variant !== "objects" &&
-      !relatedObjectEventContext)
-    throw new Error("include_interaction_by_type_features applies only to objects");
+  const objectGraphControl = options.include_interaction_by_type_features !== undefined ||
+    options.include_general_interaction_features !== undefined ||
+    options.include_general_descendants_features !== undefined ||
+    options.include_general_inheritance_features !== undefined ||
+    options.include_cobirth_features !== undefined ||
+    options.include_codeath_features !== undefined;
   if (options.include_degree_centrality_features !== undefined &&
       options.variant !== "objects" && !relatedObjectEventContext)
     throw new Error("include_degree_centrality_features applies only to objects");
-  const objectGraphFeatures = options.include_general_interaction_features ||
-    options.include_general_descendants_features || options.include_general_inheritance_features ||
-    options.include_cobirth_features || options.include_codeath_features;
-  if (objectGraphFeatures && options.variant !== "objects" &&
+  if (options.include_all_object_features !== undefined && options.variant !== "objects")
+    throw new Error("include_all_object_features applies only to objects");
+  if (objectGraphControl && options.variant !== "objects" &&
       !relatedObjectEventContext)
     throw new Error("object graph features apply only to objects");
   const objectOnlyFeatureControl = options.include_related_events_features !== undefined ||
@@ -4652,6 +4655,7 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_interaction_features", options.include_interaction_features);
   addBoolean("include_new_interactions_features", options.include_new_interactions_features);
   addBoolean("include_degree_centrality_features", options.include_degree_centrality_features);
+  addBoolean("include_all_object_features", options.include_all_object_features);
   addBoolean("include_interaction_by_type_features", options.include_interaction_by_type_features);
   addBoolean("include_general_interaction_features", options.include_general_interaction_features);
   addBoolean("include_general_descendants_features", options.include_general_descendants_features);

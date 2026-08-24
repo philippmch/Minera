@@ -41,13 +41,18 @@ struct OcelFeatureOptions {
   // legacy interaction toggle; an explicit value enables independent control.
   // The control applies only to OBJECTS.
   std::optional<bool> include_degree_centrality_features;
-  bool include_interaction_by_type_features = false;
-  // Optional object-graph scalar columns. These are valid only for OBJECTS.
-  bool include_general_interaction_features = false;
-  bool include_general_descendants_features = false;
-  bool include_general_inheritance_features = false;
-  bool include_cobirth_features = false;
-  bool include_codeath_features = false;
+  // When explicitly true, enable the independent object graph families that
+  // are part of the broad OBJECTS feature preset. Unset and false preserve
+  // the compact defaults and existing child controls.
+  std::optional<bool> include_all_object_features;
+  std::optional<bool> include_interaction_by_type_features;
+  // Optional object-graph scalar columns. These are valid for OBJECTS and as
+  // source controls in the related-object EVENTS context.
+  std::optional<bool> include_general_interaction_features;
+  std::optional<bool> include_general_descendants_features;
+  std::optional<bool> include_general_inheritance_features;
+  std::optional<bool> include_cobirth_features;
+  std::optional<bool> include_codeath_features;
   bool include_lifecycle_features = true;
   bool include_lifecycle_length_features = true;
   bool include_lifecycle_unique_activity_features = true;
