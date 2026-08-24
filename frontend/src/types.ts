@@ -935,7 +935,8 @@ export interface RandomTreeResult {
   family: "RANDOM_TREE";
   variant: "BASIC" | "PTANDLOGGENERATOR";
   activities: string[];
-  tree: RandomTreeNode;
+  tree?: RandomTreeNode;
+  trees?: RandomTreeNode[];
 }
 function isRandomTreeNode(value: unknown, activities: string[], root = false,
                           basicRoot = false): value is RandomTreeNode {
@@ -966,9 +967,23 @@ export function isRandomTreeResult(value: unknown): value is RandomTreeResult {
   if (candidate.family !== "RANDOM_TREE" ||
       !["BASIC", "PTANDLOGGENERATOR"].includes(String(candidate.variant)) ||
       !Array.isArray(candidate.activities)) return false;
-  if (candidate.activities.length === 0 || candidate.activities.some((activity) => typeof activity !== "string" || activity.length === 0) || new Set(candidate.activities).size !== candidate.activities.length) return false;
-  return isRandomTreeNode(candidate.tree, candidate.activities, true,
-                         candidate.variant === "BASIC");
+  const hasTree = candidate.tree !== undefined;
+  const hasTrees = candidate.trees !== undefined;
+  if (hasTree === hasTrees) return false;
+  if (candidate.activities.length === 0) {
+    if (!hasTrees || !Array.isArray(candidate.trees) || candidate.trees.length !== 0)
+      return false;
+  } else if (candidate.activities.some((activity) => typeof activity !== "string" || activity.length === 0) ||
+             new Set(candidate.activities).size !== candidate.activities.length) {
+    return false;
+  }
+  if (hasTree)
+    return isRandomTreeNode(candidate.tree, candidate.activities, true,
+                            candidate.variant === "BASIC");
+  if (!Array.isArray(candidate.trees)) return false;
+  return candidate.trees!.every((tree) =>
+    isRandomTreeNode(tree, candidate.activities!, true,
+                     candidate.variant === "BASIC"));
 }
 
 export type OcelDiscoveryVariant = "etot" | "ocdfg" | "ocpn" | "otg" | "saw";

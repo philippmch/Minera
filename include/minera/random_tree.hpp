@@ -9,9 +9,9 @@
 
 namespace minera {
 
-// Random process-tree construction strategies.  BASIC is retained as the
-// default for source compatibility; PT-and-log uses a bounded population
-// construction controlled by the activity-count and operator probabilities.
+// Random process-tree construction strategies. PT-and-log is the default
+// construction controlled by the activity-count and operator probabilities;
+// BASIC remains available as the legacy recursive strategy.
 enum class RandomTreeVariant {
   kBasic,
   kPtAndLogGenerator,
@@ -24,7 +24,7 @@ enum class RandomTreeVariant {
 };
 
 struct RandomTreeOptions {
-  RandomTreeVariant variant = RandomTreeVariant::kBasic;
+  RandomTreeVariant variant = RandomTreeVariant::kPtAndLogGenerator;
 
   // Parameters of the recursive BASIC generator.
   std::size_t rec_depth = 0;
@@ -51,6 +51,16 @@ struct RandomTreeOptions {
   std::size_t no_models = 1;
 };
 
+// The plural generator is intentionally bounded so a request cannot reserve
+// an unbounded number of process trees before generation starts.
+inline constexpr std::size_t kMaxRandomTreeModels = 1024;
+inline constexpr std::size_t kMaxRandomTreeActivityBudget = 250'000;
+
+[[nodiscard]] std::vector<ProcessTree> generate_random_process_trees(
+    const RandomTreeOptions& options = {});
+
+// The singular API remains available for callers that request exactly one
+// PT-and-log model. BASIC ignores no_models and continues to return one tree.
 [[nodiscard]] ProcessTree generate_random_process_tree(
     const RandomTreeOptions& options = {});
 

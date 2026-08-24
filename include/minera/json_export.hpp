@@ -296,9 +296,14 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string case_relations_json(
     const EventLog& result,
     CaseRelationsVariant variant = CaseRelationsVariant::kPandas);
+// The one-argument overload is the legacy BASIC serializer. Pass the
+// variant explicitly for PT-and-log results.
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result);
 [[nodiscard]] std::string random_tree_json(const ProcessTree& result,
                                             RandomTreeVariant variant);
+[[nodiscard]] std::string random_tree_json(
+    const std::vector<ProcessTree>& results, RandomTreeVariant variant,
+    const std::vector<std::string>& activities = {});
 
 // Standalone deterministic JSON for the classic bounded ILP miner.
 [[nodiscard]] std::string ilp_miner_json(const ILPMinerResult& result);

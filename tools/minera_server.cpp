@@ -3451,9 +3451,9 @@ void handle_random_tree(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto params = minera::parse_random_tree_params(lookup, present);
+    const auto models = minera::generate_random_process_trees(params);
     response.set_content(
-        minera::random_tree_json(minera::generate_random_process_tree(params),
-                                 params.variant),
+        minera::random_tree_json(models, params.variant, params.activities),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

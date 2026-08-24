@@ -3891,18 +3891,41 @@ std::string random_tree_json(const ProcessTree& result) {
 
 std::string random_tree_json(const ProcessTree& result,
                              RandomTreeVariant variant) {
+  return random_tree_json(std::vector<ProcessTree>{result}, variant);
+}
+
+std::string random_tree_json(const std::vector<ProcessTree>& results,
+                             RandomTreeVariant variant,
+                             const std::vector<std::string>& activities) {
   std::ostringstream out;
   const auto variant_name = variant == RandomTreeVariant::kBasic
                                 ? "BASIC"
                                 : "PTANDLOGGENERATOR";
+  const auto* shared_activities = &activities;
+  if (shared_activities->empty() && !results.empty())
+    shared_activities = &results.front().activities();
+  for (const auto& result : results) {
+    if (result.activities() != *shared_activities)
+      throw std::invalid_argument(
+          "random tree: all generated models must share activities");
+  }
   out << "{\"family\":\"RANDOM_TREE\",\"variant\":\""
       << variant_name << "\",\"activities\":[";
-  for (std::size_t i = 0; i < result.activities().size(); ++i) {
+  for (std::size_t i = 0; i < shared_activities->size(); ++i) {
     if (i) out << ',';
-    write_json_string(out, result.activities()[i]);
+    write_json_string(out, (*shared_activities)[i]);
   }
-  out << "],\"tree\":";
-  write_random_tree_node_json(out, result.root(), result);
+  if (results.size() == 1) {
+    out << "],\"tree\":";
+    write_random_tree_node_json(out, results.front().root(), results.front());
+  } else {
+    out << "],\"trees\":[";
+    for (std::size_t i = 0; i < results.size(); ++i) {
+      if (i) out << ',';
+      write_random_tree_node_json(out, results[i].root(), results[i]);
+    }
+    out << ']';
+  }
   out << '}';
   return out.str();
 }
