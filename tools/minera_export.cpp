@@ -753,7 +753,8 @@ int usage(const char* program) {
                "  --edit-deviation-cost <n>  Positive edit deviation cost\n"
                "  --edit-projection <mode>  none or log\n"
                "  --evaluation-family <id> Model evaluation: replay_fitness,\n"
-               "                            precision, generalization, or simplicity\n"
+               "                            precision, generalization, simplicity,\n"
+               "                            or composite\n"
                "  --fitness-variant <id>   auto, token_based, or alignment_based\n"
                "  --precision-variant <id> auto, etconformance_token,\n"
                "                            align_etconformance, or automaton_after_align\n"
@@ -766,6 +767,10 @@ int usage(const char* program) {
                "  --simplicity-max-states <n> Positive simplicity search limit\n"
                "  --simplicity-initial-marking <n,...> Initial place marking\n"
                "  --simplicity-final-marking <n,...> Final place marking\n"
+               "  --fitness-weight <f>     Composite fitness weight (default: 0.25)\n"
+               "  --precision-weight <f>   Composite precision weight (default: 0.25)\n"
+               "  --simplicity-weight <f>  Composite simplicity weight (default: 0.25)\n"
+               "  --generalization-weight <f> Composite generalization weight\n"
                "  --petri-analysis-family <id> marking_equation,\n"
                "                            extended_marking_equation,\n"
                "                            workflow_net, soundness, or woflan\n"
@@ -2406,7 +2411,9 @@ int main(int argc, char** argv) {
         arg == "--simplicity-arc-degree-k" ||
         arg == "--simplicity-max-states" ||
         arg == "--simplicity-initial-marking" ||
-        arg == "--simplicity-final-marking") {
+        arg == "--simplicity-final-marking" ||
+        arg == "--fitness-weight" || arg == "--precision-weight" ||
+        arg == "--simplicity-weight" || arg == "--generalization-weight") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
@@ -4945,6 +4952,10 @@ int main(int argc, char** argv) {
             result.simplicity = minera::evaluate_simplicity(
                 *petri, evaluation_params->simplicity_variant,
                 evaluation_params->simplicity_options);
+            break;
+          case minera::EvaluationFamily::kComposite:
+            result.composite = minera::evaluate_composite(
+                log, *petri, evaluation_params->composite_options);
             break;
         }
         evaluation->push_back(std::move(result));

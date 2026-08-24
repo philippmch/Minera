@@ -3616,6 +3616,10 @@ void handle_evaluate(const httplib::Request& request,
         result.simplicity = minera::evaluate_simplicity(
             it->second, params.simplicity_variant, params.simplicity_options);
         break;
+      case minera::EvaluationFamily::kComposite:
+        result.composite = minera::evaluate_composite(
+            session->log, it->second, params.composite_options);
+        break;
     }
     response.set_content(
         minera::model_evaluation_json(result, &session->graph),

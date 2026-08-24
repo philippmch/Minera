@@ -1642,6 +1642,35 @@ void write_simplicity(std::ostream& out, const SimplicityResult& result) {
       << result.strongly_connected_components << '}';
 }
 
+void write_composite(std::ostream& out,
+                     const CompositeEvaluationResult& result) {
+  out << "{\"computed\": " << (result.computed ? "true" : "false")
+      << ", \"error\": ";
+  if (result.error.empty()) out << "null";
+  else write_json_string(out, result.error);
+  out << ", \"fitness\": ";
+  write_finite_or_null(out, result.fitness);
+  out << ", \"precision\": ";
+  write_finite_or_null(out, result.precision);
+  out << ", \"generalization\": ";
+  write_finite_or_null(out, result.generalization);
+  out << ", \"simplicity\": ";
+  write_finite_or_null(out, result.simplicity);
+  out << ", \"metrics_average_weight\": ";
+  write_finite_or_null(out, result.metrics_average_weight);
+  out << ", \"fscore\": ";
+  write_finite_or_null(out, result.fscore);
+  out << ", \"weights\": {\"fitness\": ";
+  write_finite_or_null(out, result.fitness_weight);
+  out << ", \"precision\": ";
+  write_finite_or_null(out, result.precision_weight);
+  out << ", \"simplicity\": ";
+  write_finite_or_null(out, result.simplicity_weight);
+  out << ", \"generalization\": ";
+  write_finite_or_null(out, result.generalization_weight);
+  out << "}}";
+}
+
 void write_emd(std::ostream& out, const EmdResult& result) {
   out << "{\"distance\": ";
   write_finite_or_null(out, result.distance);
@@ -1688,6 +1717,11 @@ void write_model_evaluation(std::ostream& out, const ModelEvaluation& result,
   if (result.simplicity) {
     field("simplicity", [&](std::ostream& stream) {
       write_simplicity(stream, *result.simplicity);
+    });
+  }
+  if (result.composite) {
+    field("composite", [&](std::ostream& stream) {
+      write_composite(stream, *result.composite);
     });
   }
   out << '}';
@@ -2989,6 +3023,16 @@ void write_analysis_json(std::ostream& out,
         throw std::invalid_argument("duplicate evaluation miner: " +
                                     result.miner);
       }
+      const std::size_t families =
+          static_cast<std::size_t>(result.replay_fitness.has_value()) +
+          static_cast<std::size_t>(result.precision.has_value()) +
+          static_cast<std::size_t>(result.generalization.has_value()) +
+          static_cast<std::size_t>(result.simplicity.has_value()) +
+          static_cast<std::size_t>(result.composite.has_value());
+      if (families != 1) {
+        throw std::invalid_argument(
+            "evaluation result must contain exactly one family");
+      }
     }
   }
   validate_overlap_counts(log, interval_event_overlap_counts,
@@ -3366,6 +3410,15 @@ std::string emd_json(const EmdResult& result) {
 
 std::string model_evaluation_json(const ModelEvaluation& result,
                                   const DirectlyFollowsGraph* graph) {
+  const std::size_t families =
+      static_cast<std::size_t>(result.replay_fitness.has_value()) +
+      static_cast<std::size_t>(result.precision.has_value()) +
+      static_cast<std::size_t>(result.generalization.has_value()) +
+      static_cast<std::size_t>(result.simplicity.has_value()) +
+      static_cast<std::size_t>(result.composite.has_value());
+  if (families != 1)
+    throw std::invalid_argument(
+        "evaluation result must contain exactly one family");
   std::ostringstream out;
   write_model_evaluation(out, result, graph, true);
   return out.str();

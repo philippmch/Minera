@@ -1904,9 +1904,13 @@ void parse_evaluation_params_defaults_and_variants() {
   assert(defaults.simplicity_options.max_states == 100000);
   assert(defaults.simplicity_options.initial_marking.empty());
   assert(defaults.simplicity_options.final_marking.empty());
+  assert(defaults.composite_options.fitness_weight == 0.25 &&
+         defaults.composite_options.precision_weight == 0.25 &&
+         defaults.composite_options.simplicity_weight == 0.25 &&
+         defaults.composite_options.generalization_weight == 0.25);
 
   for (const auto& family : {"replay_fitness", "precision", "generalization",
-                             "simplicity"}) {
+                             "simplicity", "composite"}) {
     const auto parsed = minera::parse_evaluation_params(
         fields({{"evaluation_family", family}}));
     assert((family == std::string("replay_fitness") &&
@@ -1916,7 +1920,9 @@ void parse_evaluation_params_defaults_and_variants() {
            (family == std::string("generalization") &&
             parsed.family == minera::EvaluationFamily::kGeneralization) ||
            (family == std::string("simplicity") &&
-            parsed.family == minera::EvaluationFamily::kSimplicity));
+            parsed.family == minera::EvaluationFamily::kSimplicity) ||
+           (family == std::string("composite") &&
+            parsed.family == minera::EvaluationFamily::kComposite));
   }
   for (const auto& value : {"auto", "token_based", "alignment_based"}) {
     const auto parsed = minera::parse_evaluation_params(
@@ -1963,12 +1969,18 @@ void parse_evaluation_params_defaults_and_variants() {
       {"simplicity_arc_degree_k", "0"},
       {"simplicity_max_states", "7"},
       {"simplicity_initial_marking", "0, 1,2"},
-      {"simplicity_final_marking", "3,4"}}));
+      {"simplicity_final_marking", "3,4"},
+      {"fitness_weight", "2"}, {"precision_weight", "1"},
+      {"simplicity_weight", "0"}, {"generalization_weight", "0"}}));
   assert(all.precision_options.use_task_ids && all.precision_options.max_states == 1);
   assert(all.simplicity_options.arc_degree_k == 0.0 &&
          all.simplicity_options.max_states == 7);
   assert((all.simplicity_options.initial_marking == std::vector<int>{0, 1, 2}));
   assert((all.simplicity_options.final_marking == std::vector<int>{3, 4}));
+  assert(all.composite_options.fitness_weight == 2.0 &&
+         all.composite_options.precision_weight == 1.0 &&
+         all.composite_options.simplicity_weight == 0.0 &&
+         all.composite_options.generalization_weight == 0.0);
 }
 
 void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
@@ -1998,6 +2010,28 @@ void parse_evaluation_params_rejects_invalid_and_explicit_empty_values() {
     }
     assert(threw);
   }
+
+  for (const auto& item : {std::pair{"fitness_weight", "-1"},
+                           std::pair{"precision_weight", "nan"},
+                           std::pair{"simplicity_weight", "inf"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_evaluation_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool zero_weights_threw = false;
+  try {
+    (void)minera::parse_evaluation_params(fields({
+        {"evaluation_family", "composite"}, {"fitness_weight", "0"},
+        {"precision_weight", "0"}, {"simplicity_weight", "0"},
+        {"generalization_weight", "0"}}));
+  } catch (const std::invalid_argument&) {
+    zero_weights_threw = true;
+  }
+  assert(zero_weights_threw);
 
   for (const auto& field_name : {"evaluation_family", "precision_use_task_ids",
                                  "simplicity_initial_marking"}) {

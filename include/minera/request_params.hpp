@@ -158,6 +158,7 @@ enum class EvaluationFamily {
   kPrecision,
   kGeneralization,
   kSimplicity,
+  kComposite,
 };
 
 struct EvaluationParams {
@@ -169,6 +170,7 @@ struct EvaluationParams {
       GeneralizationVariant::GENERALIZATION_TOKEN;
   SimplicityVariant simplicity_variant = SimplicityVariant::ARC_DEGREE;
   SimplicityOptions simplicity_options;
+  CompositeEvaluationOptions composite_options;
 };
 
 enum class PetriAnalysisFamily {

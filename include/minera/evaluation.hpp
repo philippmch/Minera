@@ -102,6 +102,28 @@ struct SimplicityResult {
   std::string error;
 };
 
+struct CompositeEvaluationOptions {
+  double fitness_weight = 0.25;
+  double precision_weight = 0.25;
+  double simplicity_weight = 0.25;
+  double generalization_weight = 0.25;
+};
+
+struct CompositeEvaluationResult {
+  double fitness = 0.0;
+  double precision = 0.0;
+  double generalization = 0.0;
+  double simplicity = 0.0;
+  double metrics_average_weight = 0.0;
+  double fscore = 0.0;
+  double fitness_weight = 0.25;
+  double precision_weight = 0.25;
+  double simplicity_weight = 0.25;
+  double generalization_weight = 0.25;
+  bool computed = true;
+  std::string error;
+};
+
 struct WeightedTrace {
   std::vector<std::string> activities;
   double weight = 0.0;
@@ -132,6 +154,7 @@ struct ModelEvaluation {
   std::optional<PrecisionResult> precision;
   std::optional<GeneralizationResult> generalization;
   std::optional<SimplicityResult> simplicity;
+  std::optional<CompositeEvaluationResult> composite;
 };
 
 [[nodiscard]] ReplayFitnessResult evaluate_replay_fitness(
@@ -153,6 +176,13 @@ struct ModelEvaluation {
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const PetriNet&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
+
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventLog&, const PetriNet&,
+    const CompositeEvaluationOptions& = {});
+[[nodiscard]] CompositeEvaluationResult evaluate_composite(
+    const EventLog&, const ProcessTree&,
+    const CompositeEvaluationOptions& = {});
 [[nodiscard]] SimplicityResult evaluate_simplicity(
     const ProcessTree&, SimplicityVariant = SimplicityVariant::ARC_DEGREE,
     const SimplicityOptions& = {});
