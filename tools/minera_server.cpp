@@ -4492,6 +4492,15 @@ void handle_playout(const httplib::Request& request,
   const bool is_stochastic = mode == "stochastic" || miner == "stochastic";
   const bool is_monte_carlo =
       mode == "monte_carlo" || miner == "monte_carlo";
+  const bool is_extensive = mode == "extensive";
+  if ((request.has_param("return_elements") ||
+       request.has_param("max_marking_occ")) && !is_extensive) {
+    response.status = 400;
+    response.set_content(
+        error_json("return_elements and max_marking_occ require extensive Petri playout"),
+        "application/json");
+    return;
+  }
   if (request.has_param("return_visited_elements") &&
       (is_declare || is_stochastic || is_monte_carlo ||
        miner == "process_tree" || miner == "dfg")) {
@@ -4856,6 +4865,32 @@ void handle_playout(const httplib::Request& request,
   options.initial_marking = parse_playout_marking(request, "initial_marking");
   options.final_marking = parse_playout_marking(request, "final_marking");
 
+  minera::ExtensivePlayoutOptions extensive;
+  if (is_extensive) {
+    const auto lookup = [&](std::string_view name) {
+      const std::string wire =
+          name == "extensive_return_elements" ? "return_elements"
+                                               : "max_marking_occ";
+      return request.has_param(wire) ? request.get_param_value(wire)
+                                     : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const std::string wire =
+          name == "extensive_return_elements" ? "return_elements"
+                                               : "max_marking_occ";
+      return request.has_param(wire);
+    };
+    try {
+      extensive = minera::parse_extensive_playout_params(lookup, present);
+    } catch (const std::exception& error) {
+      reject(error.what());
+      return;
+    }
+    extensive.max_traces = options.traces;
+    extensive.initial_marking = options.initial_marking;
+    extensive.final_marking = options.final_marking;
+  }
+
   constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
   if (options.traces != 0 && options.max_steps != 0 &&
       options.traces > kMaxGeneratedEvents / options.max_steps) {
@@ -4874,18 +4909,22 @@ void handle_playout(const httplib::Request& request,
   // mode=extensive enumerates the model's distinct traces (shortest first,
   // capped by `traces` and `max_length`) instead of sampling randomly.
   if (mode == "extensive") {
-    minera::ExtensivePlayoutOptions extensive;
-    extensive.max_traces = options.traces;
     if (request.has_param("max_length")) {
       const auto parsed = parse_bounded("max_length", 1, 1000);
       if (!parsed) return;
       extensive.max_length = static_cast<std::size_t>(*parsed);
     }
-    extensive.initial_marking = options.initial_marking;
-    extensive.final_marking = options.final_marking;
-    const auto log = minera::extensive_playout(it->second, extensive);
-    response.set_content(minera::to_xes(log, miner + " playout"),
-                         "application/xml");
+    if (extensive.return_elements) {
+      response.set_content(
+          minera::serialize_extensive_playout_visited_json(
+              it->second,
+              minera::extensive_playout_visited(it->second, extensive)),
+          "application/json");
+    } else {
+      const auto log = minera::extensive_playout(it->second, extensive);
+      response.set_content(minera::to_xes(log, miner + " playout"),
+                           "application/xml");
+    }
     return;
   }
 

@@ -143,6 +143,7 @@ import {
   type BasicPlayoutVisitedResult,
   type StochasticPlayoutOptions,
   type StochasticPlayoutVisitedResult,
+  type ExtensivePlayoutVisitedResult,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -190,6 +191,7 @@ import {
   isDfgPlayoutVariantsResult,
   isBasicPlayoutVisitedResult,
   isStochasticPlayoutVisitedResult,
+  isExtensivePlayoutVisitedResult,
   isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
@@ -3140,13 +3142,26 @@ export async function comparePetriUsage(
 
 export function basicPlayoutQuery(options: BasicPlayoutOptions = {}): string {
   const params = new URLSearchParams();
+  if (options.mode !== undefined) {
+    if (options.mode !== "basic" && options.mode !== "extensive")
+      throw new Error("mode must be basic or extensive");
+    params.set("mode", options.mode);
+  }
   if (options.traces !== undefined) {
     validatePlayoutInteger("traces", options.traces, true);
     params.set("traces", String(options.traces));
   }
   if (options.max_steps !== undefined) {
+    if (options.mode === "extensive")
+      throw new Error("max_steps requires basic mode");
     validatePlayoutInteger("max_steps", options.max_steps);
     params.set("max_steps", String(options.max_steps));
+  }
+  if (options.max_length !== undefined) {
+    if (options.mode !== "extensive")
+      throw new Error("max_length requires extensive mode");
+    validatePlayoutInteger("max_length", options.max_length);
+    params.set("max_length", String(options.max_length));
   }
   if (options.seed !== undefined) {
     validatePlayoutInteger("seed", options.seed);
@@ -3177,6 +3192,19 @@ export function basicPlayoutQuery(options: BasicPlayoutOptions = {}): string {
     if (value === undefined) continue;
     if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
     params.set(name, value ? "true" : "false");
+  }
+  if (options.return_elements !== undefined) {
+    if (typeof options.return_elements !== "boolean")
+      throw new Error("return_elements must be boolean");
+    if (options.mode !== "extensive")
+      throw new Error("return_elements requires extensive mode");
+    params.set("return_elements", options.return_elements ? "true" : "false");
+  }
+  if (options.max_marking_occ !== undefined) {
+    validatePlayoutInteger("max_marking_occ", options.max_marking_occ, true);
+    if (options.mode !== "extensive")
+      throw new Error("max_marking_occ requires extensive mode");
+    params.set("max_marking_occ", String(options.max_marking_occ));
   }
   return params.toString();
 }
@@ -3498,6 +3526,33 @@ export async function fetchBasicPlayoutVisited(
   if (!isBasicPlayoutVisitedResult(payload)) {
     throw new Error("the Minera backend returned an invalid Petri visited playout");
   }
+  return payload;
+}
+
+/** Fetches alternating markings and transitions from extensive Petri playout. */
+export async function fetchExtensivePlayoutVisited(
+  miner = "inductive",
+  options: BasicPlayoutOptions = {},
+): Promise<ExtensivePlayoutVisitedResult> {
+  const query = basicPlayoutQuery({
+    ...options,
+    mode: "extensive",
+    return_elements: true,
+  });
+  let response: Response;
+  try {
+    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isExtensivePlayoutVisitedResult(payload))
+    throw new Error("the Minera backend returned an invalid extensive visited playout");
   return payload;
 }
 

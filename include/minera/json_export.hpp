@@ -289,6 +289,8 @@ void write_analysis_json(std::ostream& out,
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
+[[nodiscard]] std::string serialize_extensive_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result);
 

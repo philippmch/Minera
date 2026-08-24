@@ -2857,8 +2857,10 @@ export function isProcessTreePlayoutSetResult(
 
 /** Controls uniform random execution of a Petri-net model. */
 export interface BasicPlayoutOptions {
+  mode?: "basic" | "extensive";
   traces?: number;
   max_steps?: number;
+  max_length?: number;
   seed?: number;
   initial_marking?: number[];
   final_marking?: number[];
@@ -2868,6 +2870,8 @@ export interface BasicPlayoutOptions {
   add_only_if_fm_is_reached?: boolean;
   fm_leq_accepted?: boolean;
   return_visited_elements?: boolean;
+  return_elements?: boolean;
+  max_marking_occ?: number;
 }
 
 export interface PlayoutVisitedMarking {
@@ -2897,6 +2901,12 @@ export interface StochasticPlayoutVisitedResult {
   traces: PlayoutVisitedElement[][];
 }
 
+export interface ExtensivePlayoutVisitedResult {
+  family: "PETRI_PLAYOUT_VISITED";
+  variant: "EXTENSIVE_PLAYOUT";
+  traces: PlayoutVisitedElement[][];
+}
+
 export function isBasicPlayoutVisitedResult(
   value: unknown,
 ): value is BasicPlayoutVisitedResult {
@@ -2909,9 +2919,15 @@ export function isStochasticPlayoutVisitedResult(
   return isPlayoutVisitedResult(value, "STOCHASTIC_PLAYOUT");
 }
 
+export function isExtensivePlayoutVisitedResult(
+  value: unknown,
+): value is ExtensivePlayoutVisitedResult {
+  return isPlayoutVisitedResult(value, "EXTENSIVE_PLAYOUT");
+}
+
 function isPlayoutVisitedResult(
   value: unknown,
-  variant: "BASIC_PLAYOUT" | "STOCHASTIC_PLAYOUT",
+  variant: "BASIC_PLAYOUT" | "STOCHASTIC_PLAYOUT" | "EXTENSIVE_PLAYOUT",
 ): boolean {
   if (!value || typeof value !== "object") return false;
   const result = value as Partial<BasicPlayoutVisitedResult | StochasticPlayoutVisitedResult>;

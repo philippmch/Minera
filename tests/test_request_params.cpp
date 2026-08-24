@@ -2479,6 +2479,24 @@ void parse_process_tree_playout_params_rejects_bad_values() {
   assert(threw);
 }
 
+void parse_extensive_playout_params_maps_controls_and_rejects_zero() {
+  const auto parsed = minera::parse_extensive_playout_params(fields({
+      {"extensive_return_elements", "true"},
+      {"extensive_max_marking_occ", "3"},
+      {"extensive_max_length", "4"}}));
+  assert(parsed.return_elements);
+  assert(parsed.max_marking_occ && *parsed.max_marking_occ == 3);
+  assert(parsed.max_length == 4);
+  bool rejected = false;
+  try {
+    (void)minera::parse_extensive_playout_params(
+        fields({{"extensive_max_marking_occ", "0"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void parse_dfg_playout_params_maps_controls_and_aliases() {
   const auto parsed = minera::parse_dfg_playout_params(fields({
       {"dfg_playout_variant", "performance"},
@@ -3040,6 +3058,7 @@ int main() {
   parse_petri_analysis_params_rejects_bad_values();
   parse_process_tree_playout_params_maps_variants_and_limits();
   parse_process_tree_playout_params_rejects_bad_values();
+  parse_extensive_playout_params_maps_controls_and_rejects_zero();
   parse_dfg_playout_params_maps_controls_and_aliases();
   parse_dfg_playout_params_rejects_invalid_bounds();
   parse_stochastic_playout_params_maps_controls();

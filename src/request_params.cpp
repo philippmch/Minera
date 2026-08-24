@@ -2408,6 +2408,41 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
   return params;
 }
 
+ExtensivePlayoutParams parse_extensive_playout_params(
+    const FieldLookup& field) {
+  return parse_extensive_playout_params(field, {});
+}
+
+ExtensivePlayoutParams parse_extensive_playout_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  ExtensivePlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("extensive_return_elements")) {
+    params.return_elements = parse_boolean(
+        require("extensive_return_elements"), "extensive_return_elements");
+  }
+  if (supplied("extensive_max_length"))
+    params.max_length = parse_nonnegative_size(
+        require("extensive_max_length"), "extensive_max_length");
+  if (supplied("extensive_max_marking_occ")) {
+    const auto value = parse_nonnegative_size(
+        require("extensive_max_marking_occ"), "extensive_max_marking_occ");
+    if (value == 0)
+      throw std::invalid_argument(
+          "extensive_max_marking_occ must be positive when supplied");
+    params.max_marking_occ = value;
+  }
+  return params;
+}
+
 DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field) {
   return parse_dfg_playout_params(field, {});
 }

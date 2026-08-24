@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { fetchExtensivePlayoutVisited } from "./api";
 import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
 
 describe("Petri usage comparison API", () => {
@@ -152,6 +153,29 @@ describe("basic Petri playout API", () => {
     }));
     await expect(fetchStochasticPlayoutVisited({
       traces: 1, initial_marking: [1, 0],
+    })).resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+  });
+
+  it("requests extensive Petri visited elements with strict mode controls", async () => {
+    const payload = {
+      family: "PETRI_PLAYOUT_VISITED", variant: "EXTENSIVE_PLAYOUT",
+      traces: [[
+        { kind: "marking", marking: [1, 0] },
+        { kind: "transition", transition: 0, activity: null },
+        { kind: "marking", marking: [0, 1] },
+      ]],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/playout?miner=inductive");
+      expect(path).toContain("mode=extensive");
+      expect(path).toContain("return_elements=true");
+      expect(path).toContain("max_marking_occ=2");
+      expect(path).toContain("max_length=1");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchExtensivePlayoutVisited("inductive", {
+      max_marking_occ: 2, max_length: 1,
     })).resolves.toEqual(payload);
     vi.unstubAllGlobals();
   });

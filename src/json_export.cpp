@@ -3752,6 +3752,12 @@ std::string serialize_stochastic_playout_visited_json(
                                                 "STOCHASTIC_PLAYOUT");
 }
 
+std::string serialize_extensive_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result) {
+  return serialize_playout_visited_json_variant(net, result,
+                                                "EXTENSIVE_PLAYOUT");
+}
+
 std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result) {
   std::ostringstream out;
