@@ -834,7 +834,8 @@ void alpha_plus_attaches_a_length_one_loop() {
   // never place it. Alpha+ mines the net without t, then re-attaches t as a
   // self loop on the place between its neighbours a and b.
   const auto net = minera::discover_petri_net(
-      log_from_variants({{"a", "t", "t", "b"}, {"a", "b"}}));
+      log_from_variants({{"a", "t", "t", "b"}, {"a", "b"}}),
+      {.short_loops = true});
   const auto* a = transition_for(net, "a");
   const auto* b = transition_for(net, "b");
   const auto* t = transition_for(net, "t");
@@ -851,7 +852,8 @@ void alpha_plus_discovers_a_length_two_loop() {
   // concurrency of single occurrences cannot produce, so Alpha+ reads causality
   // in both directions and wires the loop instead of dropping the arcs.
   const auto net = minera::discover_petri_net(
-      log_from_variants({{"x", "a", "b", "a", "b", "a", "y"}, {"x", "a", "y"}}));
+      log_from_variants({{"x", "a", "b", "a", "b", "a", "y"}, {"x", "a", "y"}}),
+      {.short_loops = true});
   const auto* a = transition_for(net, "a");
   const auto* b = transition_for(net, "b");
   assert(a && b);
@@ -865,7 +867,7 @@ void alpha_plus_matches_classic_without_short_loops() {
   // so both variants must produce the same net.
   const auto log = log_from_variants(
       {{"a", "b", "c", "e"}, {"a", "c", "b", "e"}, {"a", "d", "e"}});
-  const auto plus = minera::discover_petri_net(log);
+  const auto plus = minera::discover_petri_net(log, {.short_loops = true});
   const auto classic = minera::discover_petri_net(log, {.short_loops = false});
   assert(plus.place_count() == classic.place_count());
   assert(plus.transitions().size() == classic.transitions().size());

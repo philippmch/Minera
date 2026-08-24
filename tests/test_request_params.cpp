@@ -77,7 +77,10 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.csv.delimiter == ',');
   assert(!params.filter.any());
   assert(params.inductive.noise_threshold == 0.0);
-  assert(params.alpha.short_loops);  // Alpha+ is the default variant
+  assert(!params.alpha.short_loops);  // classic Alpha is the default variant
+  const auto explicit_plus = minera::parse_mine_params(
+      fields({{"alpha_variant", "plus"}}));
+  assert(explicit_plus.alpha.short_loops);
   assert(params.correlation_variants.empty());
   assert(params.correlation.start_timestamp_attribute.empty());
   assert(!params.correlation.exact_time_matching);
@@ -2333,6 +2336,8 @@ void parse_petri_analysis_params_accepts_woflan_alias() {
 }
 
 void parse_process_tree_playout_params_maps_variants_and_limits() {
+  const auto omitted = minera::parse_process_tree_playout_params(fields({}));
+  assert(omitted.variant == minera::ProcessTreePlayoutVariant::kTopBottom);
   const auto parsed = minera::parse_process_tree_playout_params(fields({
       {"playout_variant", "TOPBOTTOM"},
       {"playout_traces", "12"},

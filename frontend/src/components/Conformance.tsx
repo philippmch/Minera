@@ -436,7 +436,7 @@ function PetriUsageComparisonPanel() {
 }
 
 function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; available: boolean }) {
-  const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "BASIC_PLAYOUT", traces: 100, max_trace_cap: 1000 });
+  const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "TOPBOTTOM", traces: 100, max_trace_cap: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {

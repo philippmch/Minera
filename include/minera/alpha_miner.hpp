@@ -6,14 +6,16 @@
 namespace minera {
 
 struct AlphaMinerOptions {
-  // When set (the default), runs the Alpha+ variant, which repairs the two
+  // When set, runs the Alpha+ variant, which repairs the two
   // short-loop blind spots of the classic algorithm: activities that directly
   // repeat (length-one loops) are mined out of the log and re-attached as self
   // loops on the place between their neighbours, and a length-two loop
   // (a b a b …) is recognised as causality in both directions instead of being
   // mistaken for concurrency. On a log without short loops the result is
   // identical to the classic miner. Clear it for the textbook classic Alpha.
-  bool short_loops = true;
+  // The omitted/default variant is the classic Alpha miner; callers opt into
+  // Alpha+ explicitly by setting this to true.
+  bool short_loops = false;
 };
 
 // Discovers a Petri net from an event log using the Alpha Miner. The algorithm
@@ -24,7 +26,8 @@ struct AlphaMinerOptions {
 // transitions to the B transitions; a source place feeds the start activities
 // and a sink place drains the end activities.
 //
-// By default the Alpha+ variant runs (see AlphaMinerOptions::short_loops).
+// By default the classic Alpha variant runs; Alpha+ is selected through
+// AlphaMinerOptions::short_loops.
 // Like the textbook algorithm it offers no soundness guarantee, but it
 // reconstructs the control flow of well-structured logs directly as a Petri
 // net.

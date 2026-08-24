@@ -89,8 +89,15 @@ are reconciled.
 Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
 (`--playout-miner process_tree`), local-server `/api/playout`, cached-tree XES,
-and frontend controls. This closes only the process-tree variants; the broader
-simulation row remains partial because other simulation families are pending.
+and frontend controls. Omitted process-tree playout settings select
+`TOPBOTTOM`; `BASIC_PLAYOUT` and `EXTENSIVE` remain explicit selections. This
+closes only the process-tree variants; the broader simulation row remains
+partial because other simulation families are pending.
+
+Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
+Alpha consistently across native options, strict request parsing, CLI, and the
+frontend. The short-loop-aware Alpha+ implementation remains available through
+an explicit `plus` selection.
 
 Random-tree generation evidence: the native generator exposes both the
 `BASIC` strategy and the seeded, bounded `PTANDLOGGENERATOR` strategy. The
