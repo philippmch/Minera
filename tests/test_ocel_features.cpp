@@ -741,6 +741,94 @@ int main() {
   }
   assert(rejected_graph_events_objects);
 
+  auto all_object_options = graph_options;
+  all_object_options.include_general_interaction_features.reset();
+  all_object_options.include_general_descendants_features.reset();
+  all_object_options.include_general_inheritance_features.reset();
+  all_object_options.include_cobirth_features.reset();
+  all_object_options.include_codeath_features.reset();
+  all_object_options.include_interaction_by_type_features.reset();
+  all_object_options.include_degree_centrality_features.reset();
+  all_object_options.include_all_object_features = true;
+  const auto all_object_table = minera::extract_ocel_features(
+      graph_feature_sample(), minera::OcelFeatureVariant::kObjects,
+      all_object_options);
+  const auto has_all_column = [&](const std::string& name) {
+    return std::find(all_object_table.feature_names.begin(),
+                     all_object_table.feature_names.end(), name) !=
+           all_object_table.feature_names.end();
+  };
+  assert(has_all_column("@@object_degree_centrality"));
+  assert(has_all_column("@@object_interaction_graph_ot_item"));
+  assert(has_all_column("@@object_general_interaction_graph"));
+  assert(has_all_column("@@object_general_descendants_graph_ascendants"));
+  assert(has_all_column("@@object_general_inheritance_graph_descendants"));
+  assert(has_all_column("@@object_cobirth"));
+  assert(has_all_column("@@object_codeath"));
+  assert(!has_all_column("@@object_wip"));
+  auto mixed_all_object_options = all_object_options;
+  mixed_all_object_options.include_degree_centrality_features = false;
+  mixed_all_object_options.include_interaction_by_type_features = false;
+  mixed_all_object_options.include_general_interaction_features = false;
+  mixed_all_object_options.include_general_descendants_features = false;
+  mixed_all_object_options.include_general_inheritance_features = false;
+  mixed_all_object_options.include_cobirth_features = false;
+  mixed_all_object_options.include_codeath_features = false;
+  const auto mixed_all_object_table = minera::extract_ocel_features(
+      graph_feature_sample(), minera::OcelFeatureVariant::kObjects,
+      mixed_all_object_options);
+  const auto has_mixed_column = [&](const std::string& name) {
+    return std::find(mixed_all_object_table.feature_names.begin(),
+                     mixed_all_object_table.feature_names.end(), name) !=
+           mixed_all_object_table.feature_names.end();
+  };
+  assert(!has_mixed_column("@@object_degree_centrality"));
+  assert(!has_mixed_column("@@object_interaction_graph_ot_item"));
+  assert(!has_mixed_column("@@object_general_interaction_graph"));
+  assert(!has_mixed_column("@@object_general_descendants_graph_ascendants"));
+  assert(!has_mixed_column("@@object_general_inheritance_graph_descendants"));
+  assert(!has_mixed_column("@@object_cobirth"));
+  assert(!has_mixed_column("@@object_codeath"));
+  auto all_object_disabled = all_object_options;
+  all_object_disabled.include_all_object_features = false;
+  const auto compact_table = minera::extract_ocel_features(
+      graph_feature_sample(), minera::OcelFeatureVariant::kObjects,
+      all_object_disabled);
+  assert(!std::any_of(compact_table.feature_names.begin(),
+                      compact_table.feature_names.end(), [](const auto& name) {
+                        return name == "@@object_degree_centrality" ||
+                               name == "@@object_general_interaction_graph";
+                      }));
+  bool rejected_all_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        graph_feature_sample(), minera::OcelFeatureVariant::kEvents,
+        all_object_options);
+  } catch (const std::invalid_argument&) {
+    rejected_all_events = true;
+  }
+  assert(rejected_all_events);
+  bool rejected_all_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        graph_feature_sample(), minera::OcelFeatureVariant::kEventsObjects,
+        all_object_options);
+  } catch (const std::invalid_argument&) {
+    rejected_all_events_objects = true;
+  }
+  assert(rejected_all_events_objects);
+  auto explicit_graph_disabled = minera::OcelFeatureOptions{};
+  explicit_graph_disabled.include_general_interaction_features = false;
+  bool rejected_explicit_graph_disabled = false;
+  try {
+    (void)minera::extract_ocel_features(
+        graph_feature_sample(), minera::OcelFeatureVariant::kEvents,
+        explicit_graph_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_explicit_graph_disabled = true;
+  }
+  assert(rejected_explicit_graph_disabled);
+
   auto filtered_options = options;
   filtered_options.filter_per_type = "item";
   const auto filtered = minera::extract_ocel_features(

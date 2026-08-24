@@ -265,6 +265,12 @@ relation order or duplicate row suffixes. The OBJECTS table can be
 filtered after feature computation to one requested object type, preserving
 feature columns and original row order; missing types produce an empty table,
 while the selector is rejected for event and exploded event-object variants.
+The optional `include_all_object_features` control (and matching CLI, server,
+and frontend adapters) enables the degree, per-object-type interaction, and
+all five general graph scalar families together for OBJECTS only. It does not
+enable lifecycle, related-event/activity, neighbor, or related-object paths;
+explicit child false values suppress their family, while explicit false and an
+omitted preset control retain compact defaults.
 Exploded pointwise event and object projections can be disabled independently
 with `include_event_pointwise_features` and
 `include_object_pointwise_features` (or the matching CLI switches); an unset

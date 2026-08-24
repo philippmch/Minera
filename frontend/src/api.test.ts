@@ -1133,6 +1133,16 @@ describe("OCEL API", () => {
       filter_per_type: "item",
     })).toBe("variant=objects&max_features=12&include_degree_centrality_features=true&include_interaction_by_type_features=true&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color&ocel_features_filter_per_type=item");
     expect(ocelFeaturesQuery({
+      variant: "objects", include_all_object_features: true,
+    })).toBe("variant=objects&include_all_object_features=true");
+    expect(ocelFeaturesQuery({
+      variant: "objects", include_all_object_features: true,
+      include_general_interaction_features: false,
+    })).toBe("variant=objects&include_all_object_features=true&include_general_interaction_features=false");
+    expect(ocelFeaturesQuery({
+      variant: "objects", include_all_object_features: false,
+    })).toBe("variant=objects&include_all_object_features=false");
+    expect(ocelFeaturesQuery({
       variant: "objects", include_lifecycle_length_features: false,
       include_lifecycle_unique_activity_features: false,
       include_lifecycle_duration_features: false,
@@ -1187,7 +1197,15 @@ describe("OCEL API", () => {
       .toBe("variant=events&ocel_features_filter_per_type=");
     expect(() => ocelFeaturesQuery({ variant: "events", include_interaction_by_type_features: true }))
       .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_interaction_by_type_features: false }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_general_interaction_features: false }))
+      .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_degree_centrality_features: false }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_all_object_features: true }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events_objects", include_all_object_features: false }))
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_codeath_features: true }))
       .toThrow(/objects/);

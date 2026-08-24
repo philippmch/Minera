@@ -493,12 +493,17 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
   }
 
+  const bool include_all_object_features =
+      options.include_all_object_features.value_or(false);
   const bool include_degree_centrality_features =
       options.include_degree_centrality_features.value_or(
-          options.include_interaction_features);
+          include_all_object_features || options.include_interaction_features);
+  const bool include_interaction_by_type_features =
+      options.include_interaction_by_type_features.value_or(
+          include_all_object_features);
   if (include_degree_centrality_features ||
       options.include_interaction_features ||
-      options.include_interaction_by_type_features) {
+      include_interaction_by_type_features) {
     std::set<std::pair<std::size_t, std::size_t>> interactions;
     for (const auto& objects : event_objects) {
       std::vector<std::size_t> unique = objects;
@@ -530,7 +535,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       for (auto& value : degree) value /= denominator;
       builder.add("@@object_degree_centrality", std::move(degree));
     }
-    if (options.include_interaction_by_type_features) {
+    if (include_interaction_by_type_features) {
       for (const auto& type : object_types) {
         std::vector<double> values(log.objects.size(), 0.0);
         for (std::size_t row = 0; row < neighbors.size(); ++row)
@@ -542,11 +547,23 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
   }
 
+  const bool include_general_interaction_features =
+      options.include_general_interaction_features.value_or(
+          include_all_object_features);
+  const bool include_general_descendants_features =
+      options.include_general_descendants_features.value_or(
+          include_all_object_features);
+  const bool include_general_inheritance_features =
+      options.include_general_inheritance_features.value_or(
+          include_all_object_features);
+  const bool include_cobirth_features =
+      options.include_cobirth_features.value_or(include_all_object_features);
+  const bool include_codeath_features =
+      options.include_codeath_features.value_or(include_all_object_features);
   const bool include_general_graph_features =
-      options.include_general_interaction_features ||
-      options.include_general_descendants_features ||
-      options.include_general_inheritance_features ||
-      options.include_cobirth_features || options.include_codeath_features;
+      include_general_interaction_features || include_general_descendants_features ||
+      include_general_inheritance_features || include_cobirth_features ||
+      include_codeath_features;
   if (include_general_graph_features) {
     using ObjectPair = std::pair<std::size_t, std::size_t>;
     std::set<ObjectPair> interaction_graph;
@@ -651,24 +668,24 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
         values[incoming ? target : source] += 1.0;
       builder.add(std::move(name), std::move(values));
     };
-    if (options.include_general_interaction_features)
+    if (include_general_interaction_features)
       builder.add("@@object_general_interaction_graph",
                   undirected_degrees(interaction_graph));
-    if (options.include_general_descendants_features) {
+    if (include_general_descendants_features) {
       add_directed_degrees(descendants_graph, true,
                            "@@object_general_descendants_graph_ascendants");
       add_directed_degrees(descendants_graph, false,
                            "@@object_general_descendants_graph_descendants");
     }
-    if (options.include_general_inheritance_features) {
+    if (include_general_inheritance_features) {
       add_directed_degrees(inheritance_graph, true,
                            "@@object_general_inheritance_graph_ascendants");
       add_directed_degrees(inheritance_graph, false,
                            "@@object_general_inheritance_graph_descendants");
     }
-    if (options.include_cobirth_features)
+    if (include_cobirth_features)
       builder.add("@@object_cobirth", undirected_degrees(cobirth_graph));
-    if (options.include_codeath_features)
+    if (include_codeath_features)
       builder.add("@@object_codeath", undirected_degrees(codeath_graph));
   }
 
@@ -953,23 +970,27 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     throw std::invalid_argument(
         "OCEL independent event feature controls apply only to the events variant");
   }
-  if (options.include_interaction_by_type_features &&
+  const bool object_graph_control_supplied =
+      options.include_interaction_by_type_features.has_value() ||
+      options.include_general_interaction_features.has_value() ||
+      options.include_general_descendants_features.has_value() ||
+      options.include_general_inheritance_features.has_value() ||
+      options.include_cobirth_features.has_value() ||
+      options.include_codeath_features.has_value();
+  if (object_graph_control_supplied &&
       variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
-        "OCEL interaction-by-type features apply only to the objects variant");
+        "OCEL object graph feature controls apply only to the objects variant");
   }
   if (options.include_degree_centrality_features.has_value() &&
       variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
         "OCEL degree centrality features apply only to the objects variant");
   }
-  if ((options.include_general_interaction_features ||
-       options.include_general_descendants_features ||
-       options.include_general_inheritance_features || options.include_cobirth_features ||
-       options.include_codeath_features) &&
-      variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
+  if (options.include_all_object_features.has_value() &&
+      variant != OcelFeatureVariant::kObjects) {
     throw std::invalid_argument(
-        "OCEL object graph features apply only to the objects variant");
+        "OCEL all-object features apply only to the objects variant");
   }
   if ((options.include_related_events_features ||
        options.include_related_activities_features ||
