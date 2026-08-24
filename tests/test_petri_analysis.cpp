@@ -146,6 +146,23 @@ void extended_equation() {
       {"A", "B", "C", "D", "E", "F", "G"}, net, capped);
   assert(capped_trace.retained_splits ==
          std::vector<std::size_t>({1, 2, 5, 6}));
+
+  // Sampling is deterministic and keeps the two boundaries while spreading
+  // the requested points across a longer trace.
+  const std::vector<std::string> sampled_trace = {
+      "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
+  const auto sampled = solve_extended_marking_equation(sampled_trace, net);
+  assert(sampled.retained_splits ==
+         std::vector<std::size_t>({1, 2, 4, 6, 8, 9}));
+  const auto sampled_again = solve_extended_marking_equation(sampled_trace, net);
+  assert(sampled_again.retained_splits == sampled.retained_splits);
+  ExtendedMarkingEquationOptions explicit_many;
+  explicit_many.split_indices = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  explicit_many.max_k_value = 5;
+  const auto explicit_sampled = solve_extended_marking_equation(
+      sampled_trace, net, explicit_many);
+  assert(explicit_sampled.retained_splits == sampled.retained_splits);
+
   ExtendedMarkingEquationOptions boundary_only;
   boundary_only.max_k_value = 0;
   const auto boundary_trace = solve_extended_marking_equation(
@@ -167,6 +184,15 @@ void extended_equation() {
   bool threw = false;
   try {
     explicit_splits.split_indices = {0};
+    (void)solve_extended_marking_equation({"A", "B"}, net, explicit_splits);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    explicit_splits.split_indices = {1, 1};
     (void)solve_extended_marking_equation({"A", "B"}, net, explicit_splits);
   } catch (const std::invalid_argument&) {
     threw = true;
