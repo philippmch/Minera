@@ -356,6 +356,7 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
       short_circuit_transition: 2,
       short_circuit_diagnostic_messages: ["connected"],
       short_circuit_reachability_exhausted: false,
+      short_circuit_reachability_strongly_connected: true,
       short_circuit_reachability_markings: [[1, 0], [0, 1]],
       short_circuit_reachability_edges: [[0, 1, 0]],
     })).toBe(true);

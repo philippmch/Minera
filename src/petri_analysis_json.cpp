@@ -280,6 +280,9 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << optional_number(result.short_circuit_transition)
       << ",\"short_circuit_reachability_exhausted\":"
       << (result.short_circuit_reachability_exhausted ? "true" : "false")
+      << ",\"short_circuit_reachability_strongly_connected\":"
+      << (result.short_circuit_reachability_strongly_connected ? "true"
+                                                               : "false")
       << ",\"short_circuit_diagnostic_messages\":[";
   for (std::size_t i = 0;
        i < result.short_circuit_diagnostic_messages.size(); ++i) {

@@ -60,6 +60,11 @@ struct OcelObjectChange {
   OcelValue value;
 };
 
+// Declared OCEL type metadata is kept separately from observed records so
+// empty types and attributes survive format round-trips.
+using OcelTypeSchema = std::map<std::string, std::string>;
+using OcelTypeCatalog = std::map<std::string, OcelTypeSchema>;
+
 struct Ocel {
   std::vector<OcelEvent> events;
   std::vector<OcelObject> objects;
@@ -68,6 +73,8 @@ struct Ocel {
   std::vector<OcelE2eRelation> e2e;
   std::vector<OcelObjectChange> object_changes;
   std::map<std::string, OcelValue> globals;
+  OcelTypeCatalog event_type_attributes;
+  OcelTypeCatalog object_type_attributes;
 };
 
 using OCEL = Ocel;

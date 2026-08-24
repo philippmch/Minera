@@ -321,11 +321,14 @@ void woflan_short_circuit_diagnostics() {
          result.coverability_edges.end());
   assert(result.short_circuit_reachability_markings ==
          result.reachability_markings);
+  assert(result.short_circuit_reachability_strongly_connected);
   const auto json = petri_analysis_json(result);
   assert(json.find("\"short_circuit_valid\":true") != std::string::npos);
   assert(json.find("\"short_circuit_transition\":2") !=
          std::string::npos);
   assert(json.find("\"short_circuit_reachability_edges\"") !=
+         std::string::npos);
+  assert(json.find("\"short_circuit_reachability_strongly_connected\":true") !=
          std::string::npos);
 
   auto stale_boundaries = chain();

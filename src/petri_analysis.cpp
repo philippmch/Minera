@@ -793,6 +793,40 @@ ReachabilityProjection reachability_projection(const PetriNet& net,
   return result;
 }
 
+bool graph_projection_strongly_connected(
+    std::size_t node_count,
+    const std::vector<std::vector<std::size_t>>& edges) {
+  if (node_count == 0) return false;
+  std::vector<std::vector<std::size_t>> graph(node_count);
+  std::vector<std::vector<std::size_t>> reverse(node_count);
+  for (const auto& edge : edges) {
+    if (edge.size() != 3 || edge[0] >= node_count || edge[1] >= node_count)
+      continue;
+    graph[edge[0]].push_back(edge[1]);
+    reverse[edge[1]].push_back(edge[0]);
+  }
+  const auto reaches_all = [node_count](
+                               const std::vector<std::vector<std::size_t>>& adjacency) {
+    std::vector<bool> seen(node_count, false);
+    std::queue<std::size_t> pending;
+    seen[0] = true;
+    pending.push(0);
+    while (!pending.empty()) {
+      const auto node = pending.front();
+      pending.pop();
+      for (const auto next : adjacency[node]) {
+        if (seen[next]) continue;
+        seen[next] = true;
+        pending.push(next);
+      }
+    }
+    return std::all_of(seen.begin(), seen.end(), [](bool value) {
+      return value;
+    });
+  };
+  return reaches_all(graph) && reaches_all(reverse);
+}
+
 bool cover_leq(const std::vector<std::int64_t>& lhs,
                const std::vector<std::int64_t>& rhs) {
   for (std::size_t p = 0; p < lhs.size(); ++p) {
@@ -1346,12 +1380,21 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     result.short_circuit_reachability_markings =
         short_circuit_graph.markings;
     result.short_circuit_reachability_edges = short_circuit_graph.edges;
+    result.short_circuit_reachability_strongly_connected =
+        !short_circuit_graph.exhausted && graph_projection_strongly_connected(
+            short_circuit_graph.markings.size(), short_circuit_graph.edges);
     if (options.diagnostics) {
       for (const auto& message : result.short_circuit_diagnostic_messages)
         result.diagnostic_messages.push_back("Woflan: " + message);
       if (short_circuit_graph.exhausted)
         result.diagnostic_messages.push_back(
             "Woflan short-circuit reachability state limit reached");
+      else if (result.short_circuit_reachability_strongly_connected)
+        result.diagnostic_messages.push_back(
+            "Woflan short-circuit reachability graph is strongly connected");
+      else
+        result.diagnostic_messages.push_back(
+            "Woflan short-circuit reachability graph is not strongly connected");
     }
   }
   const PetriNet* coverability_net = short_circuited ? &*short_circuited : &net;

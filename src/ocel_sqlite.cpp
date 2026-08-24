@@ -327,6 +327,37 @@ TypeColumns collect_type_columns(
   return result;
 }
 
+std::string declared_sql_type(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(),
+                 [](const unsigned char character) {
+                   return static_cast<char>(std::tolower(character));
+                 });
+  if (value.find("bool") != std::string::npos) return "BOOLEAN";
+  if (value.find("int") != std::string::npos ||
+      value.find("long") != std::string::npos)
+    return "INTEGER";
+  if (value.find("float") != std::string::npos ||
+      value.find("double") != std::string::npos ||
+      value == "real" || value == "number")
+    return "REAL";
+  return "TEXT";
+}
+
+TypeColumns merge_declared_type_columns(
+    TypeColumns observed, const OcelTypeSchema& declared) {
+  std::map<std::string, std::string> columns;
+  for (const auto& [name, type] : declared) {
+    if (!reserved_type_column(name)) columns.emplace(name, declared_sql_type(type));
+  }
+  for (const auto& [name, type] : observed) {
+    if (!reserved_type_column(name)) columns.emplace(name, type);
+  }
+  TypeColumns result;
+  result.reserve(columns.size());
+  for (const auto& column : columns) result.push_back(column);
+  return result;
+}
+
 TypeColumns collect_type_columns(
     const std::vector<const std::vector<OcelAttribute>*>& rows,
     const std::vector<const OcelObjectChange*>& changes) {
@@ -654,6 +685,42 @@ std::map<std::string, std::string> read_type_map(sqlite3* db,
   return result;
 }
 
+void read_type_catalog(sqlite3* db,
+                       const std::map<std::string, std::string>& type_map,
+                       std::string_view table_prefix,
+                       OcelTypeCatalog& catalog) {
+  for (const auto& [type, mapped] : type_map) {
+    auto& schema = catalog[type];
+    const auto table = std::string(table_prefix) + mapped;
+    for (const auto& column : table_columns(db, table)) {
+      if (reserved_type_column(column.name)) continue;
+      schema[column.name] =
+          column.declared_type.empty() ? "string"
+                                       : declared_sql_type(column.declared_type);
+      if (schema[column.name] == "INTEGER") schema[column.name] = "int";
+      else if (schema[column.name] == "REAL") schema[column.name] = "float";
+      else if (schema[column.name] == "BOOLEAN") schema[column.name] = "boolean";
+      else schema[column.name] = "string";
+    }
+  }
+}
+
+void read_declared_type_catalog(sqlite3* db, std::string_view table,
+                                OcelTypeCatalog& catalog) {
+  if (!table_exists(db, table)) return;
+  Statement statement(db, "SELECT ocel_type, attribute_name, attribute_type FROM " +
+                             quote_identifier(table) +
+                             " ORDER BY ocel_type, attribute_name");
+  while (true) {
+    const auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) break;
+    if (status != SQLITE_ROW)
+      throw std::runtime_error("SQLite declared type query failed");
+    catalog[column_string(statement.get(), 0)][column_string(statement.get(), 1)] =
+        column_string(statement.get(), 2);
+  }
+}
+
 void read_relations(sqlite3* db, Ocel& log, bool validate_references) {
   const std::set<std::string> event_ids = [&] {
     std::set<std::string> result;
@@ -768,6 +835,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   }
   const auto event_map = read_type_map(db, "event_map_type");
   const auto object_map = read_type_map(db, "object_map_type");
+  read_type_catalog(db, event_map, "event_", log.event_type_attributes);
+  read_type_catalog(db, object_map, "object_", log.object_type_attributes);
+  read_declared_type_catalog(db, "event_type_attributes",
+                             log.event_type_attributes);
+  read_declared_type_catalog(db, "object_type_attributes",
+                             log.object_type_attributes);
   std::map<std::string, std::vector<OcelAttribute>> event_attributes;
   std::map<std::string, std::vector<OcelAttribute>> object_attributes;
   read_attributes(db, "event_attributes", event_attributes);
@@ -789,6 +862,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       event.attributes = read_type_table_attributes(db, table, id);
     }
     log.events.push_back(std::move(event));
+    log.event_type_attributes.try_emplace(activity);
   }
   for (const auto& [id, type] : object_types) {
     OcelObject object;
@@ -805,6 +879,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       object.attributes = read_type_table_attributes(db, table, id);
     }
     log.objects.push_back(std::move(object));
+    log.object_type_attributes.try_emplace(type);
   }
   read_relations(db, log, options.validate_references);
 
@@ -881,6 +956,8 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
         "CREATE TABLE object (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
         "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
         "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+        "CREATE TABLE event_type_attributes (ocel_type TEXT, attribute_name TEXT, attribute_type TEXT, PRIMARY KEY(ocel_type, attribute_name));"
+        "CREATE TABLE object_type_attributes (ocel_type TEXT, attribute_name TEXT, attribute_type TEXT, PRIMARY KEY(ocel_type, attribute_name));"
         "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
         "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
         "CREATE TABLE event_event (source_event_id TEXT, target_event_id TEXT, qualifier TEXT);"
@@ -919,6 +996,14 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
     std::set<std::string> object_types;
     for (const auto* event : events) activities.insert(event->activity);
     for (const auto* object : objects) object_types.insert(object->type);
+    for (const auto& [activity, schema] : log.event_type_attributes) {
+      (void)schema;
+      activities.insert(activity);
+    }
+    for (const auto& [type, schema] : log.object_type_attributes) {
+      (void)schema;
+      object_types.insert(type);
+    }
     {
       Statement statement(db, "INSERT INTO event_map_type(ocel_type, ocel_type_map) VALUES(?1,?2)");
       for (const auto& activity : activities) {
@@ -935,13 +1020,38 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
         step_done(db, statement.get());
       }
     }
+    {
+      Statement statement(db, "INSERT INTO event_type_attributes(ocel_type, attribute_name, attribute_type) VALUES(?1,?2,?3)");
+      for (const auto& [activity, schema] : log.event_type_attributes) {
+        for (const auto& [name, type] : schema) {
+          bind_text(statement.get(), 1, activity);
+          bind_text(statement.get(), 2, name);
+          bind_text(statement.get(), 3, type);
+          step_done(db, statement.get());
+        }
+      }
+    }
+    {
+      Statement statement(db, "INSERT INTO object_type_attributes(ocel_type, attribute_name, attribute_type) VALUES(?1,?2,?3)");
+      for (const auto& [type_name, schema] : log.object_type_attributes) {
+        for (const auto& [name, type] : schema) {
+          bind_text(statement.get(), 1, type_name);
+          bind_text(statement.get(), 2, name);
+          bind_text(statement.get(), 3, type);
+          step_done(db, statement.get());
+        }
+      }
+    }
     for (const auto& activity : activities) {
       const auto table = "event_" + type_table_token(activity, options);
       std::vector<const std::vector<OcelAttribute>*> rows;
       for (const auto* event : events) {
         if (event->activity == activity) rows.push_back(&event->attributes);
       }
-      const auto columns = collect_type_columns(rows);
+      const auto columns = merge_declared_type_columns(
+          collect_type_columns(rows), log.event_type_attributes.contains(activity)
+                                           ? log.event_type_attributes.at(activity)
+                                           : OcelTypeSchema{});
       database.exec(type_table_schema(table, columns, false, false));
       Statement statement(db, type_table_insert_sql(table, columns, false, false));
       for (const auto* event : events) {
@@ -977,7 +1087,11 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
                                 std::tie(right->object_id, right->timestamp, right->field);
                        });
       const bool has_changes = !changes.empty();
-      const auto columns = collect_type_columns(rows, changes);
+      const auto columns = merge_declared_type_columns(
+          collect_type_columns(rows, changes),
+          log.object_type_attributes.contains(type)
+              ? log.object_type_attributes.at(type)
+              : OcelTypeSchema{});
       database.exec(type_table_schema(table, columns, true, has_changes));
       Statement statement(db, type_table_insert_sql(table, columns, true, has_changes));
       for (const auto* object : objects) {

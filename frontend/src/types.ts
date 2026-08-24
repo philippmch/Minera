@@ -2886,6 +2886,7 @@ export interface PetriAnalysisResult {
   short_circuit_transition?: number | null;
   short_circuit_diagnostic_messages?: string[];
   short_circuit_reachability_exhausted?: boolean;
+  short_circuit_reachability_strongly_connected?: boolean;
   short_circuit_reachability_markings?: number[][];
   short_circuit_reachability_edges?: number[][];
   error?: string;
@@ -2916,6 +2917,9 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if ("short_circuit_reachability_exhausted" in value &&
       value.short_circuit_reachability_exhausted !== undefined &&
       typeof value.short_circuit_reachability_exhausted !== "boolean") return false;
+  if ("short_circuit_reachability_strongly_connected" in value &&
+      value.short_circuit_reachability_strongly_connected !== undefined &&
+      typeof value.short_circuit_reachability_strongly_connected !== "boolean") return false;
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;

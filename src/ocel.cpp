@@ -285,13 +285,13 @@ Ocel parse_classic(const Json::Object& root) {
   const auto& objects = obj(required(root, "ocel:objects"), "ocel:objects");
   for (const auto& [id, raw] : objects) {
     if (!object_ids.insert(id).second) throw std::invalid_argument("duplicate object id");
-    const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap"); log.objects.push_back(std::move(o)); types.emplace(id, log.objects.back().type);
+    const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap"); log.objects.push_back(std::move(o)); log.object_type_attributes.try_emplace(log.objects.back().type); types.emplace(id, log.objects.back().type);
     if (const auto* rs = optional(x, "ocel:o2o")) { if (!rs->is_array()) throw std::invalid_argument("ocel:o2o must be array"); for (const auto& r : rs->array()) { const auto& rr = obj(r, "ocel:o2o"); log.o2o.push_back({id, str(required(rr, "ocel:oid"), "ocel:oid"), optional(rr, "ocel:qualifier") ? str(*optional(rr, "ocel:qualifier"), "ocel:qualifier") : ""}); } }
   }
   const auto& events = obj(required(root, "ocel:events"), "ocel:events");
   for (const auto& [id, raw] : events) {
     if (!event_ids.insert(id).second) throw std::invalid_argument("duplicate event id");
-    const auto& x = obj(raw, "event"); OcelEvent e{id, str(required(x, "ocel:activity"), "ocel:activity"), str(required(x, "ocel:timestamp"), "ocel:timestamp"), {}}; attrs(optional(x, "ocel:vmap"), e.attributes, "ocel:vmap"); log.events.push_back(std::move(e));
+    const auto& x = obj(raw, "event"); OcelEvent e{id, str(required(x, "ocel:activity"), "ocel:activity"), str(required(x, "ocel:timestamp"), "ocel:timestamp"), {}}; attrs(optional(x, "ocel:vmap"), e.attributes, "ocel:vmap"); log.events.push_back(std::move(e)); log.event_type_attributes.try_emplace(log.events.back().activity);
     const auto* omap = optional(x, "ocel:omap"); if (!omap || !omap->is_array()) throw std::invalid_argument("ocel:omap must be array");
     std::unordered_set<std::string> seen;
     for (const auto& oidj : omap->array()) { const auto oid = str(oidj, "ocel:omap"); if (!types.count(oid)) throw std::invalid_argument("relation references unknown object"); if (seen.insert(oid).second) log.relations.push_back({id, oid, ""}); }
@@ -331,6 +331,8 @@ Ocel parse_standard(const Json::Object& root) {
                             "objectTypes");
   parse_standard_type_table(optional(root, "eventTypes"), event_attribute_types,
                             "eventTypes");
+  log.object_type_attributes = object_attribute_types;
+  log.event_type_attributes = event_attribute_types;
   const auto& object_array = required(root, "objects");
   if (!object_array.is_array())
     throw std::invalid_argument("objects must be array");
@@ -381,6 +383,7 @@ Ocel parse_standard(const Json::Object& root) {
       }
     }
     log.objects.push_back(std::move(object));
+    log.object_type_attributes.try_emplace(type);
     if (const auto* rr = optional(x, "relationships")) {
       if (!rr->is_array())
         throw std::invalid_argument("object relationships must be array");
@@ -418,6 +421,7 @@ Ocel parse_standard(const Json::Object& root) {
       }
     }
     log.events.push_back(std::move(event));
+    log.event_type_attributes.try_emplace(activity);
     if (const auto* rels = optional(x, "relationships")) {
       if (!rels->is_array())
         throw std::invalid_argument("event relationships must be array");
@@ -505,18 +509,25 @@ using StandardTypeTable =
 
 void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
                             StandardTypeTable& event_types) {
+  object_types = log.object_type_attributes;
+  event_types = log.event_type_attributes;
   for (const auto& object : log.objects) {
     auto& attributes = object_types[object.type];
-    for (const auto& attribute : object.attributes)
-      merge_standard_type(attributes[attribute.key], attribute.value);
+    for (const auto& attribute : object.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) merge_standard_type(declared, attribute.value);
+    }
   }
-  for (const auto& change : log.object_changes)
-    merge_standard_type(object_types[change.object_type][change.field],
-                        change.value);
+  for (const auto& change : log.object_changes) {
+    auto& declared = object_types[change.object_type][change.field];
+    if (declared.empty()) merge_standard_type(declared, change.value);
+  }
   for (const auto& event : log.events) {
     auto& attributes = event_types[event.activity];
-    for (const auto& attribute : event.attributes)
-      merge_standard_type(attributes[attribute.key], attribute.value);
+    for (const auto& attribute : event.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) merge_standard_type(declared, attribute.value);
+    }
   }
 }
 

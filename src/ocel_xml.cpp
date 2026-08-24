@@ -261,6 +261,7 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
       append_values_filtered(*on, o.attributes, reject_lists,
                              {"id", "object-id", "type", "object-type"});
       log.objects.push_back(std::move(o));
+      log.object_type_attributes.try_emplace(type);
       for (const auto* links : children(*on, "o2o"))
         for (const auto* rel : children(*links, "relation")) {
           log.o2o.push_back({id, attr_or(*rel, "target-id",
@@ -292,6 +293,7 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
       append_values_filtered(*en, e.attributes, reject_lists,
                              {"id", "event-id", "activity", "type", "timestamp", "time"});
       log.events.push_back(std::move(e));
+      log.event_type_attributes.try_emplace(log.events.back().activity);
       for (const auto& child_node : en->children) {
         const auto name = local(child_node.name);
         const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
@@ -334,6 +336,8 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
                                 object_attribute_types);
   parse_standard_xml_type_table(root, "event-types", "event-type",
                                 event_attribute_types);
+  log.object_type_attributes = object_attribute_types;
+  log.event_type_attributes = event_attribute_types;
   struct StandardAttribute {
     std::string name;
     OcelValue value;
@@ -375,6 +379,7 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         }
       } else append_values(*on, o.attributes, reject_lists);
       log.objects.push_back(std::move(o));
+      log.object_type_attributes.try_emplace(type);
       for (const auto* rs : children(*on, "relationships"))
         for (const auto* r : children(*rs, "relationship"))
           log.o2o.push_back({id, attr_or(*r, "object-id", attr_or(*r, "objectId")), attr_or(*r, "qualifier")});
@@ -403,6 +408,7 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         }
       }
       log.events.push_back(std::move(e));
+      log.event_type_attributes.try_emplace(log.events.back().activity);
       for (const auto* rs : children(*en, "objects"))
         for (const auto* r : children(*rs, "relationship")) {
           const std::string oid = attr_or(*r, "object-id", attr_or(*r, "objectId"));
@@ -464,17 +470,25 @@ void merge_standard_type(std::string& current, const OcelValue& value) {
 }
 void collect_standard_types(const Ocel& log, StandardXmlTypeTable& object_types,
                             StandardXmlTypeTable& event_types) {
+  object_types = log.object_type_attributes;
+  event_types = log.event_type_attributes;
   for (const auto& object : log.objects) {
     auto& attributes = object_types[object.type];
-    for (const auto& attribute : object.attributes)
-      merge_standard_type(attributes[attribute.key], attribute.value);
+    for (const auto& attribute : object.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) merge_standard_type(declared, attribute.value);
+    }
   }
-  for (const auto& change : log.object_changes)
-    merge_standard_type(object_types[change.object_type][change.field], change.value);
+  for (const auto& change : log.object_changes) {
+    auto& declared = object_types[change.object_type][change.field];
+    if (declared.empty()) merge_standard_type(declared, change.value);
+  }
   for (const auto& event : log.events) {
     auto& attributes = event_types[event.activity];
-    for (const auto& attribute : event.attributes)
-      merge_standard_type(attributes[attribute.key], attribute.value);
+    for (const auto& attribute : event.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) merge_standard_type(declared, attribute.value);
+    }
   }
 }
 void write_standard_type_table(std::ostream& out, std::string_view container,

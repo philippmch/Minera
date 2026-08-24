@@ -105,10 +105,17 @@ int main() {
       <attribute name="amount" type="int"/>
       <attribute name="status" type="string"/>
     </attributes></object-type>
+    <object-type name="EmptyObject"><attributes>
+      <attribute name="label" type="string"/>
+    </attributes></object-type>
   </object-types>
   <event-types>
     <event-type name="Create"><attributes>
       <attribute name="approved" type="boolean"/>
+      <attribute name="planned_at" type="datetime"/>
+    </attributes></event-type>
+    <event-type name="EmptyEvent"><attributes>
+      <attribute name="reason" type="string"/>
     </attributes></event-type>
   </event-types>
   <objects>
@@ -130,5 +137,11 @@ int main() {
   assert(std::get<bool>(typed.events.front().attributes.front().value));
   assert(typed.object_changes.size() == 1 &&
          std::get<std::string>(typed.object_changes.front().value) == "paid");
+  assert(typed.object_type_attributes.at("EmptyObject").at("label") ==
+         "string");
+  assert(typed.event_type_attributes.at("EmptyEvent").at("reason") ==
+         "string");
+  assert(typed.event_type_attributes.at("Create").at("planned_at") ==
+         "datetime");
   return 0;
 }
