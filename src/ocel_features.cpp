@@ -983,6 +983,14 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     throw std::invalid_argument(
         "OCEL related-object features apply only to the events variant");
   }
+  const bool pointwise_control_supplied =
+      options.include_event_pointwise_features.has_value() ||
+      options.include_object_pointwise_features.has_value();
+  if (pointwise_control_supplied &&
+      variant != OcelFeatureVariant::kEventsObjects) {
+    throw std::invalid_argument(
+        "OCEL pointwise feature controls apply only to the events_objects variant");
+  }
   const bool prefix_control_disabled =
       !options.include_prefix_features ||
       !options.include_prefix_length_features ||
@@ -1066,38 +1074,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
 
   const auto row_count = log.relations.size();
 
-  // Build the two entity tables with the same option groups used by their
-  // standalone variants, then project each column onto the relation rows.
-  // This keeps the exploded representation pointwise and makes newly added
-  // event/object feature groups available here without a second implementation.
-  TableBuilder event_builder(log.events.size(), options.max_features);
-  auto events_objects_options = options;
-  events_objects_options.include_related_objects_features = false;
-  add_event_columns(event_builder, log, events_objects_options, activities, object_types,
-                    event_objects, times, object_types_by_index);
-  std::vector<std::string> event_ids;
-  event_ids.reserve(log.events.size());
-  for (const auto& event : log.events) event_ids.push_back(event.id);
-  const auto event_table = std::move(event_builder).finish(
-      OcelFeatureVariant::kEvents, std::move(event_ids), {});
-
-  TableBuilder object_builder(log.objects.size(), options.max_features);
-  add_object_columns(object_builder, log, options, activities, object_types,
-                    object_events, event_objects, times, lifecycles);
-  std::vector<std::string> object_ids, object_types_for_rows;
-  object_ids.reserve(log.objects.size());
-  object_types_for_rows.reserve(log.objects.size());
-  for (const auto& object : log.objects) {
-    object_ids.push_back(object.id);
-    object_types_for_rows.push_back(object.type);
-  }
-  const auto object_table = std::move(object_builder).finish(
-      OcelFeatureVariant::kObjects, std::move(object_ids),
-      std::move(object_types_for_rows));
-
   TableBuilder builder(row_count, options.max_features);
-  const auto project = [&](const OcelFeatureTable& source,
-                           bool project_event) {
+  const auto project = [&](const OcelFeatureTable& source, bool project_event) {
     for (std::size_t column = 0; column < source.feature_names.size(); ++column) {
       std::vector<double> values;
       values.reserve(row_count);
@@ -1110,8 +1088,37 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       builder.add(source.feature_names[column], std::move(values));
     }
   };
-  project(event_table, true);
-  project(object_table, false);
+  if (options.include_event_pointwise_features.value_or(true)) {
+    // The standalone source is built only when its projection is selected;
+    // this keeps disabled pointwise families out of feature-cap accounting.
+    TableBuilder event_builder(log.events.size(), options.max_features);
+    auto events_objects_options = options;
+    events_objects_options.include_related_objects_features = false;
+    add_event_columns(event_builder, log, events_objects_options, activities,
+                      object_types, event_objects, times, object_types_by_index);
+    std::vector<std::string> event_ids;
+    event_ids.reserve(log.events.size());
+    for (const auto& event : log.events) event_ids.push_back(event.id);
+    const auto event_table = std::move(event_builder).finish(
+        OcelFeatureVariant::kEvents, std::move(event_ids), {});
+    project(event_table, true);
+  }
+  if (options.include_object_pointwise_features.value_or(true)) {
+    TableBuilder object_builder(log.objects.size(), options.max_features);
+    add_object_columns(object_builder, log, options, activities, object_types,
+                       object_events, event_objects, times, lifecycles);
+    std::vector<std::string> object_ids, object_types_for_rows;
+    object_ids.reserve(log.objects.size());
+    object_types_for_rows.reserve(log.objects.size());
+    for (const auto& object : log.objects) {
+      object_ids.push_back(object.id);
+      object_types_for_rows.push_back(object.type);
+    }
+    const auto object_table = std::move(object_builder).finish(
+        OcelFeatureVariant::kObjects, std::move(object_ids),
+        std::move(object_types_for_rows));
+    project(object_table, false);
+  }
   add_prefix_columns(builder, log, options, activities, event_index, object_index,
                      times);
   std::vector<std::string> row_ids, row_types;

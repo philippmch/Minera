@@ -868,6 +868,64 @@ int main() {
              exploded_objects.values[object_row][column]);
   }
 
+  // EVENTS_OBJECTS pointwise families are independently selectable. Unset
+  // preserves the complete exploded schema, while disabled source tables are
+  // not built and therefore cannot consume the output feature cap.
+  auto event_pointwise_off = exploded_options;
+  event_pointwise_off.include_event_pointwise_features = false;
+  const auto object_only_exploded = minera::extract_ocel_features(
+      exploded_log, minera::OcelFeatureVariant::kEventsObjects,
+      event_pointwise_off);
+  assert(std::find_if(object_only_exploded.feature_names.begin(),
+                      object_only_exploded.feature_names.end(),
+                      [](const auto& name) {
+                        return name.find("@@event_") == 0;
+                      }) == object_only_exploded.feature_names.end());
+  assert(std::find_if(object_only_exploded.feature_names.begin(),
+                      object_only_exploded.feature_names.end(),
+                      [](const auto& name) {
+                        return name.find("@@object_") == 0;
+                      }) != object_only_exploded.feature_names.end());
+  auto object_pointwise_off = exploded_options;
+  object_pointwise_off.include_object_pointwise_features = false;
+  const auto event_only_exploded = minera::extract_ocel_features(
+      exploded_log, minera::OcelFeatureVariant::kEventsObjects,
+      object_pointwise_off);
+  assert(std::find_if(event_only_exploded.feature_names.begin(),
+                      event_only_exploded.feature_names.end(),
+                      [](const auto& name) {
+                        return name.find("@@event_") == 0;
+                      }) != event_only_exploded.feature_names.end());
+  assert(std::find_if(event_only_exploded.feature_names.begin(),
+                      event_only_exploded.feature_names.end(),
+                      [](const auto& name) {
+                        return name.find("@@object_") == 0;
+                      }) == event_only_exploded.feature_names.end());
+  auto no_pointwise = exploded_options;
+  no_pointwise.include_event_pointwise_features = false;
+  no_pointwise.include_object_pointwise_features = false;
+  no_pointwise.max_features = 1;
+  const auto no_pointwise_table = minera::extract_ocel_features(
+      exploded_log, minera::OcelFeatureVariant::kEventsObjects,
+      no_pointwise);
+  assert(no_pointwise_table.feature_names.empty());
+  bool rejected_event_pointwise = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents, event_pointwise_off);
+  } catch (const std::invalid_argument&) {
+    rejected_event_pointwise = true;
+  }
+  assert(rejected_event_pointwise);
+  bool rejected_object_pointwise = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kObjects, object_pointwise_off);
+  } catch (const std::invalid_argument&) {
+    rejected_object_pointwise = true;
+  }
+  assert(rejected_object_pointwise);
+
   auto disabled = minera::OcelFeatureOptions{};
   disabled.include_activity_features = false;
   disabled.include_timestamp_features = false;

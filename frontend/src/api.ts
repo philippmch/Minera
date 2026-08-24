@@ -4568,6 +4568,8 @@ export interface OcelFeatureOptions {
   include_prefix_length_features?: boolean;
   include_prefix_timediff_features?: boolean;
   include_prefix_one_hot_features?: boolean;
+  include_event_pointwise_features?: boolean;
+  include_object_pointwise_features?: boolean;
   include_lifecycle_features?: boolean;
   include_lifecycle_length_features?: boolean;
   include_lifecycle_unique_activity_features?: boolean;
@@ -4621,6 +4623,10 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     options.include_prefix_one_hot_features !== undefined;
   if (prefixControl && options.variant !== "events_objects")
     throw new Error("prefix features apply only to events_objects");
+  const pointwiseControl = options.include_event_pointwise_features !== undefined ||
+    options.include_object_pointwise_features !== undefined;
+  if (pointwiseControl && options.variant !== "events_objects")
+    throw new Error("pointwise features apply only to events_objects");
   if (objectOnlyFeatureControl && options.variant !== "objects" &&
       !relatedObjectEventContext)
     throw new Error("related-event, neighbor, and lifecycle-path features apply only to objects");
@@ -4660,6 +4666,8 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_prefix_length_features", options.include_prefix_length_features);
   addBoolean("include_prefix_timediff_features", options.include_prefix_timediff_features);
   addBoolean("include_prefix_one_hot_features", options.include_prefix_one_hot_features);
+  addBoolean("include_event_pointwise_features", options.include_event_pointwise_features);
+  addBoolean("include_object_pointwise_features", options.include_object_pointwise_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
   addBoolean("include_lifecycle_length_features", options.include_lifecycle_length_features);
   addBoolean("include_lifecycle_unique_activity_features", options.include_lifecycle_unique_activity_features);

@@ -28,7 +28,7 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type] [--features-no-degree-centrality] [--features-general-interaction] [--features-general-descendants] [--features-general-inheritance] [--features-cobirth] [--features-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--conformance etot|ocdfg|otg --normative MODEL.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type] [--features-no-degree-centrality] [--features-general-interaction] [--features-general-descendants] [--features-general-inheritance] [--features-cobirth] [--features-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--conformance etot|ocdfg|otg --normative MODEL.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, enrich, split, conformance,
@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
     bool degree_centrality_control_used = false;
     bool related_object_control_used = false;
     bool event_control_used = false;
+    bool pointwise_control_used = false;
     minera::OcelEnrichmentOptions enrichment_options;
     bool enrich_no_lifecycle = false;
     std::size_t split_max_objects = std::numeric_limits<std::size_t>::max();
@@ -383,6 +384,16 @@ int main(int argc, char** argv) {
         related_object_control_used = true;
       } else if (option == "--features-object-neighbor-features") {
         feature_options.include_obj_con_in_graph_features = true;
+      } else if (option == "--features-event-pointwise" ||
+                 option == "--features-no-event-pointwise") {
+        feature_options.include_event_pointwise_features =
+            option == "--features-event-pointwise";
+        pointwise_control_used = true;
+      } else if (option == "--features-object-pointwise" ||
+                 option == "--features-no-object-pointwise") {
+        feature_options.include_object_pointwise_features =
+            option == "--features-object-pointwise";
+        pointwise_control_used = true;
       } else if (option == "--features-no-prefix") {
         feature_options.include_prefix_features = false;
         feature_options.include_prefix_length_features = false;
@@ -724,6 +735,12 @@ int main(int argc, char** argv) {
     if (event_control_used && !features.empty() && features != "events")
       throw std::invalid_argument(
           "independent event feature controls apply only to --features events");
+    if (pointwise_control_used && features.empty())
+      throw std::invalid_argument(
+          "pointwise feature controls require --features events_objects");
+    if (pointwise_control_used && !features.empty() && features != "events_objects")
+      throw std::invalid_argument(
+          "pointwise feature controls apply only to --features events_objects");
     const auto object_graph_features =
         feature_options.include_general_interaction_features ||
         feature_options.include_general_descendants_features ||
