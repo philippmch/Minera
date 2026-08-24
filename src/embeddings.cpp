@@ -5,12 +5,29 @@
 #include <cstdint>
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace minera {
 namespace {
+
+std::mutex& default_transformer_mutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+EmbeddingProviderCallback& default_transformer_storage() {
+  static EmbeddingProviderCallback callback;
+  return callback;
+}
+
+EmbeddingProviderCallback default_transformer_callback() {
+  std::lock_guard lock(default_transformer_mutex());
+  return default_transformer_storage();
+}
 
 std::string selected_value(const Event& event, std::string_view key) {
   if (key.empty() || key == "activity" || key == "concept:name")
@@ -73,6 +90,9 @@ std::vector<std::string> tokens(std::string_view text) {
 }
 
 void validate_options(const EmbeddingOptions& options) {
+  if (options.variant != EmbeddingVariant::CASES_TRANSFORMERS &&
+      options.variant != EmbeddingVariant::EVENTS_TRANSFORMERS)
+    throw std::invalid_argument("embeddings: unknown variant");
   if (options.provider != EmbeddingProvider::HASHING &&
       options.provider != EmbeddingProvider::TRANSFORMER)
     throw std::invalid_argument("embeddings: unknown provider");
@@ -163,16 +183,67 @@ std::string provider_name(EmbeddingProvider provider) {
                                                     : "hashing";
 }
 
+void validate_embedding_vector(const std::vector<double>& values,
+                               std::size_t dimensions,
+                               std::string_view source) {
+  if (values.size() != dimensions)
+    throw std::invalid_argument(std::string("embeddings: ") +
+                                std::string(source) +
+                                " returned the wrong dimension");
+  if (!std::all_of(values.begin(), values.end(), [](const double value) {
+        return std::isfinite(value);
+      }))
+    throw std::invalid_argument(std::string("embeddings: ") +
+                                std::string(source) +
+                                " returned a non-finite value");
+}
+
+void validate_result(const EmbeddingResult& result,
+                     const EmbeddingOptions& options) {
+  if (result.variant != options.variant)
+    throw std::invalid_argument("embeddings: result variant does not match options");
+  if (result.dimensions == 0 || result.dimensions > 4096 ||
+      result.dimensions != options.dimensions)
+    throw std::invalid_argument(
+        "embeddings: result dimensions do not match options");
+  if (!result.embedding_model.empty() &&
+      result.embedding_model != options.embedding_model)
+    throw std::invalid_argument(
+        "embeddings: result embedding_model does not match options");
+  if (result.provider != options.provider)
+    throw std::invalid_argument("embeddings: result provider does not match options");
+  if (!result.attribute_key.empty() && result.attribute_key != options.attribute_key)
+    throw std::invalid_argument(
+        "embeddings: result attribute_key does not match options");
+  for (const auto& item : result.items)
+    validate_embedding_vector(item.values, result.dimensions, "result vector");
+}
+
 }  // namespace
+
+void set_default_embedding_provider(EmbeddingProviderCallback callback) {
+  if (!callback)
+    throw std::invalid_argument(
+        "embeddings: default provider callback must not be empty");
+  std::lock_guard lock(default_transformer_mutex());
+  default_transformer_storage() = std::move(callback);
+}
+
+void clear_default_embedding_provider() {
+  std::lock_guard lock(default_transformer_mutex());
+  default_transformer_storage() = {};
+}
 
 std::vector<double> embed_text(std::string_view text,
                                const EmbeddingOptions& options) {
   validate_options(options);
   if (options.provider == EmbeddingProvider::TRANSFORMER) {
     std::vector<double> values;
-    if (options.transformer_callback) {
-      values = options.transformer_callback(text, options.embedding_model,
-                                             options.dimensions);
+    auto callback = options.transformer_callback;
+    if (!callback && options.embedding_model != "mock_transformer")
+      callback = default_transformer_callback();
+    if (callback) {
+      values = callback(text, options.embedding_model, options.dimensions);
     } else if (options.embedding_model == "mock_transformer") {
       values = mock_transformer(text, options.embedding_model,
                                 options.dimensions);
@@ -180,13 +251,8 @@ std::vector<double> embed_text(std::string_view text,
       throw std::invalid_argument(
           "embeddings: transformer provider requires transformer_callback");
     }
-    if (values.size() != options.dimensions)
-      throw std::invalid_argument(
-          "embeddings: transformer callback returned the wrong dimension");
-    if (!std::all_of(values.begin(), values.end(),
-                     [](const double value) { return std::isfinite(value); }))
-      throw std::invalid_argument(
-          "embeddings: transformer callback returned a non-finite value");
+    validate_embedding_vector(values, options.dimensions,
+                             "transformer callback");
     return values;
   }
   const auto profile = encoder_profile(options.embedding_model);
@@ -272,15 +338,7 @@ std::vector<EmbeddingSimilarity> embedding_similarity(
     std::string_view target_text, const EmbeddingResult& result,
     const EmbeddingOptions& options, std::size_t top_k) {
   validate_options(options);
-  if (result.dimensions == 0 || result.dimensions > 4096 ||
-      result.dimensions != options.dimensions)
-    throw std::invalid_argument("embeddings: result dimensions do not match options");
-  if (!result.embedding_model.empty() &&
-      result.embedding_model != options.embedding_model)
-    throw std::invalid_argument(
-        "embeddings: result embedding_model does not match options");
-  if (result.provider != options.provider)
-    throw std::invalid_argument("embeddings: result provider does not match options");
+  validate_result(result, options);
   const auto target = embed_text(target_text, options);
   std::vector<EmbeddingSimilarity> matches;
   matches.reserve(result.items.size());

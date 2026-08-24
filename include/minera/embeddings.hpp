@@ -28,8 +28,21 @@ enum class EmbeddingProvider {
   kTransformer = TRANSFORMER,
 };
 
+// Host runtimes provide model execution through this callback. The native
+// library passes the already grouped case text or selected event value, the
+// requested model label, and the exact output dimension. A callback must
+// return exactly `dimensions` finite values; no provider fallback is applied
+// when a transformer callback is absent.
 using EmbeddingProviderCallback = std::function<std::vector<double>(
     std::string_view text, std::string_view model, std::size_t dimensions)>;
+
+// Register the host application's transformer runtime for calls whose
+// EmbeddingOptions do not carry an explicit callback. Registration and
+// clearing are thread-safe; the callback itself is invoked outside the
+// registry lock. A registered runtime is never used for hashing providers or
+// the explicit `mock_transformer` model.
+void set_default_embedding_provider(EmbeddingProviderCallback callback);
+void clear_default_embedding_provider();
 
 struct EmbeddingOptions {
   EmbeddingVariant variant = EmbeddingVariant::CASES_TRANSFORMERS;
@@ -37,8 +50,10 @@ struct EmbeddingOptions {
   // Built-in profiles are `hashing-v1` and `hashing-v2`. Other non-empty names
   // retain the deterministic salted hashing compatibility profile.
   std::string embedding_model = "hashing-v1";
-  // Required for transformer mode except for the explicit `mock_transformer`
-  // model, which is provided for headless integration tests and demos.
+  // Required for transformer mode unless a default provider is registered,
+  // except for the explicit `mock_transformer` model, which is provided for
+  // headless integration tests and demos. A non-mock model without either
+  // callback is rejected rather than substituted.
   EmbeddingProviderCallback transformer_callback;
   std::string attribute_key = "concept:name";
   // Event identifiers are global, deterministic ordinal strings by default.
