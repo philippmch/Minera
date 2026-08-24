@@ -586,49 +586,51 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   }
 
   const auto row_count = log.relations.size();
+
+  // Build the two entity tables with the same option groups used by their
+  // standalone variants, then project each column onto the relation rows.
+  // This keeps the exploded representation pointwise and makes newly added
+  // event/object feature groups available here without a second implementation.
+  TableBuilder event_builder(log.events.size(), options.max_features);
+  add_event_columns(event_builder, log, options, activities, object_types,
+                    event_objects, times, object_types_by_index);
+  std::vector<std::string> event_ids;
+  event_ids.reserve(log.events.size());
+  for (const auto& event : log.events) event_ids.push_back(event.id);
+  const auto event_table = std::move(event_builder).finish(
+      OcelFeatureVariant::kEvents, std::move(event_ids), {});
+
+  TableBuilder object_builder(log.objects.size(), options.max_features);
+  add_object_columns(object_builder, log, options, activities, object_types,
+                    object_events, event_objects, times, lifecycles);
+  std::vector<std::string> object_ids, object_types_for_rows;
+  object_ids.reserve(log.objects.size());
+  object_types_for_rows.reserve(log.objects.size());
+  for (const auto& object : log.objects) {
+    object_ids.push_back(object.id);
+    object_types_for_rows.push_back(object.type);
+  }
+  const auto object_table = std::move(object_builder).finish(
+      OcelFeatureVariant::kObjects, std::move(object_ids),
+      std::move(object_types_for_rows));
+
   TableBuilder builder(row_count, options.max_features);
-  // The exploded table reuses the event/object feature semantics but keeps one
-  // row per relation, which is the useful join shape for downstream learners.
-  for (const auto& activity : activities) {
-    std::vector<double> values;
-    values.reserve(row_count);
-    for (const auto& relation : log.relations) {
-      const auto event = event_index.at(relation.event_id);
-      values.push_back(log.events[event].activity == activity ? 1.0 : 0.0);
+  const auto project = [&](const OcelFeatureTable& source,
+                           bool project_event) {
+    for (std::size_t column = 0; column < source.feature_names.size(); ++column) {
+      std::vector<double> values;
+      values.reserve(row_count);
+      for (const auto& relation : log.relations) {
+        const auto index = project_event
+                               ? event_index.at(relation.event_id)
+                               : object_index.at(relation.object_id);
+        values.push_back(source.values[index][column]);
+      }
+      builder.add(source.feature_names[column], std::move(values));
     }
-    builder.add("@@event_act_" + activity, std::move(values));
-  }
-  std::vector<double> event_timestamp, event_relation_count, object_lifecycle_length,
-      object_lifecycle_duration;
-  event_timestamp.reserve(row_count);
-  event_relation_count.reserve(row_count);
-  object_lifecycle_length.reserve(row_count);
-  object_lifecycle_duration.reserve(row_count);
-  for (const auto& relation : log.relations) {
-    const auto event = event_index.at(relation.event_id);
-    const auto object = object_index.at(relation.object_id);
-    event_timestamp.push_back(times[event].value_or(0.0));
-    event_relation_count.push_back(static_cast<double>(event_objects[event].size()));
-    object_lifecycle_length.push_back(
-        static_cast<double>(lifecycles[object].event_indices.size()));
-    object_lifecycle_duration.push_back(
-        lifecycles[object].start && lifecycles[object].end
-            ? std::max(0.0, *lifecycles[object].end - *lifecycles[object].start)
-            : 0.0);
-  }
-  builder.add("@@event_timestamp", std::move(event_timestamp));
-  builder.add("@@event_num_rel_objs", std::move(event_relation_count));
-  for (const auto& type : object_types) {
-    std::vector<double> values;
-    values.reserve(row_count);
-    for (const auto& relation : log.relations) {
-      const auto object = object_index.at(relation.object_id);
-      values.push_back(log.objects[object].type == type ? 1.0 : 0.0);
-    }
-    builder.add("@@object_type_" + type, std::move(values));
-  }
-  builder.add("@@object_lifecycle_length", std::move(object_lifecycle_length));
-  builder.add("@@object_lifecycle_duration", std::move(object_lifecycle_duration));
+  };
+  project(event_table, true);
+  project(object_table, false);
   std::vector<std::string> row_ids, row_types;
   row_ids.reserve(row_count);
   row_types.reserve(row_count);

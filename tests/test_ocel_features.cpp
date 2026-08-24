@@ -216,11 +216,92 @@ int main() {
   }
   assert(rejected_events_objects);
 
+  auto exploded_log = log;
+  exploded_log.relations.insert(exploded_log.relations.begin() + 1,
+                                {"e1", "o1", "duplicate"});
   const auto exploded = minera::extract_ocel_features(
-      log, minera::OcelFeatureVariant::kEventsObjects, options);
-  assert(exploded.row_ids.size() == log.relations.size());
-  assert(exploded.row_ids[0] == "e1::o1");
+      exploded_log, minera::OcelFeatureVariant::kEventsObjects, options);
+  assert(exploded.row_ids.size() == exploded_log.relations.size());
+  assert(exploded.row_ids[0] == "e1::o1" &&
+         exploded.row_ids[1] == "e1::o1#2" &&
+         exploded.row_ids[2] == "e1::i1");
   assert(exploded.values.size() == exploded.row_types.size());
+  const auto exploded_events = extract_ocel_features(
+      exploded_log, minera::OcelFeatureVariant::kEvents, options);
+  const auto exploded_objects = extract_ocel_features(
+      exploded_log, minera::OcelFeatureVariant::kObjects, options);
+  assert(exploded.feature_names.size() ==
+         exploded_events.feature_names.size() + exploded_objects.feature_names.size());
+  const auto exploded_column = [&](const std::string& name) {
+    const auto it = std::find(exploded.feature_names.begin(),
+                              exploded.feature_names.end(), name);
+    assert(it != exploded.feature_names.end());
+    return static_cast<std::size_t>(it - exploded.feature_names.begin());
+  };
+  const auto event_amount = exploded_column("@@event_num_amount");
+  const auto event_kind_fast = exploded_column("@@event_str_kind_fast");
+  const auto event_object_count = exploded_column("@@event_num_rel_objs");
+  const auto event_order_count =
+      exploded_column("@@event_num_rel_objs_type_order");
+  const auto event_start_order = exploded_column("@@event_start_order");
+  const auto object_priority = exploded_column("@@object_num_priority");
+  const auto object_color_blue = exploded_column("@@object_str_color_blue");
+  const auto object_item_type = exploded_column("@@object_type_item");
+  const auto object_lifecycle =
+      exploded_column("@@object_lifecycle_length");
+  assert(exploded.values[0][event_amount] == 2.0 &&
+         exploded.values[0][event_kind_fast] == 0.0);
+  assert(exploded.values[1][event_amount] == 2.0 &&
+         exploded.values[1][event_object_count] == 3.0 &&
+         exploded.values[1][event_order_count] == 2.0);
+  assert(exploded.values[2][event_kind_fast] == 0.0 &&
+         exploded.values[2][event_start_order] == 1.0 &&
+         exploded.values[2][object_color_blue] == 1.0 &&
+         exploded.values[2][object_item_type] == 1.0 &&
+         exploded.values[2][object_lifecycle] == 2.0);
+  assert(exploded.values[4][event_kind_fast] == 1.0 &&
+         exploded.values[4][object_color_blue] == 1.0 &&
+         exploded.values[4][object_item_type] == 1.0);
+  assert(exploded.values[0][object_priority] == 3.0 &&
+         exploded.values[0][object_item_type] == 0.0);
+  for (std::size_t row = 0; row < exploded_log.relations.size(); ++row) {
+    const auto event_it = std::find_if(
+        exploded_log.events.begin(), exploded_log.events.end(),
+        [&](const auto& event) {
+          return event.id == exploded_log.relations[row].event_id;
+        });
+    const auto object_it = std::find_if(
+        exploded_log.objects.begin(), exploded_log.objects.end(),
+        [&](const auto& object) {
+          return object.id == exploded_log.relations[row].object_id;
+        });
+    const auto event_row = static_cast<std::size_t>(
+        event_it - exploded_log.events.begin());
+    const auto object_row = static_cast<std::size_t>(
+        object_it - exploded_log.objects.begin());
+    for (std::size_t column = 0;
+         column < exploded_events.feature_names.size(); ++column)
+      assert(exploded.values[row][column] ==
+             exploded_events.values[event_row][column]);
+    for (std::size_t column = 0;
+         column < exploded_objects.feature_names.size(); ++column)
+      assert(exploded.values[row][exploded_events.feature_names.size() + column] ==
+             exploded_objects.values[object_row][column]);
+  }
+
+  auto disabled = minera::OcelFeatureOptions{};
+  disabled.include_activity_features = false;
+  disabled.include_timestamp_features = false;
+  disabled.include_relation_features = false;
+  disabled.include_endpoint_features = false;
+  disabled.include_attribute_counts = false;
+  disabled.include_interaction_features = false;
+  disabled.include_lifecycle_features = false;
+  const auto disabled_exploded = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEventsObjects, disabled);
+  assert(disabled_exploded.row_ids.size() == log.relations.size());
+  assert(disabled_exploded.feature_names.empty());
+  for (const auto& row : disabled_exploded.values) assert(row.empty());
 
   bool rejected = false;
   try {
