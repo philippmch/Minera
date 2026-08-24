@@ -23,7 +23,9 @@ enum class ProcessTreePlayoutVariant {
 };
 
 struct ProcessTreePlayoutOptions {
-  ProcessTreePlayoutVariant variant = ProcessTreePlayoutVariant::kBasicPlayout;
+  // The omitted/default variant is top-bottom; basic and extensive remain
+  // explicit selections.
+  ProcessTreePlayoutVariant variant = ProcessTreePlayoutVariant::kTopBottom;
   std::size_t traces = 1000;                // basic/top-bottom cases
   std::size_t max_steps = 1000;             // visible steps per sampled case
   std::uint64_t seed = 1;

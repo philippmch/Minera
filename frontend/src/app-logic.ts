@@ -61,7 +61,7 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
   return Boolean(
     options.noiseThreshold ||
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
-      (options.alphaVariant && options.alphaVariant !== "plus") ||
+      (options.alphaVariant && options.alphaVariant !== "classic") ||
       (options.heuristicVariant && options.heuristicVariant !== "classic") ||
       options.dependencyThreshold !== undefined ||
       options.andThreshold !== undefined ||

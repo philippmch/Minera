@@ -625,7 +625,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0 })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "log" })).toBe(false);
     expect(hasActiveMinerOptions({ inductiveVariant: "imf" })).toBe(true);
-    expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(false);
+    expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(false);
     expect(hasActiveMinerOptions({
       heuristicVariant: "classic",
       heuristicDecoration: "frequency",
@@ -655,7 +655,7 @@ describe("hasActiveMinerOptions", () => {
   it("is true when any setting deviates", () => {
     expect(hasActiveMinerOptions({ noiseThreshold: 0.2 })).toBe(true);
     expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
-    expect(hasActiveMinerOptions({ alphaVariant: "classic" })).toBe(true);
+    expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicVariant: "plusplus" })).toBe(true);
     // Zero is a meaningful heuristic threshold, not "off".
     expect(hasActiveMinerOptions({ dependencyThreshold: 0 })).toBe(true);
@@ -721,7 +721,7 @@ describe("mineFormEntries", () => {
     const entries = mineFormEntries({
       noiseThreshold: 0.2,
       inductiveVariant: "dfg",
-      alphaVariant: "classic",
+      alphaVariant: "plus",
       heuristicVariant: "plusplus",
       dependencyThreshold: 0.75,
       andThreshold: 0,
@@ -739,7 +739,7 @@ describe("mineFormEntries", () => {
     expect(entries).toEqual([
       ["noise_threshold", "0.2"],
       ["inductive_variant", "dfg"],
-      ["alpha_variant", "classic"],
+      ["alpha_variant", "plus"],
       ["heuristic_variant", "plusplus"],
       ["dependency_threshold", "0.75"],
       ["and_threshold", "0"],

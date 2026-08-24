@@ -356,7 +356,7 @@ export interface MinerOptions {
   noiseThreshold?: number;
   /** "log" splits sublogs; "imf" applies infrequent filtering; "dfg" recurses on the graph (IMd). */
   inductiveVariant?: "log" | "imf" | "dfg";
-  /** "plus" (default) handles short loops; "classic" is the textbook Alpha. */
+  /** "classic" (default) is the textbook Alpha; "plus" handles short loops. */
   alphaVariant?: "plus" | "classic";
   /** Heuristic Miner algorithm variant (classic by default). */
   heuristicVariant?: "classic" | "plusplus";

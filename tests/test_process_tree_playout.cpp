@@ -145,6 +145,30 @@ int main() {
   ProcessTree loop({"a", "b"},
       ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
                       {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  ProcessTreePlayoutOptions omitted;
+  omitted.traces = 1;
+  omitted.max_loop_occurrences = 2;
+  omitted.max_length = 8;
+  bool default_matches_topbottom = true;
+  bool default_differs_from_basic = false;
+  for (std::uint64_t seed = 1; seed <= 64; ++seed) {
+    omitted.seed = seed;
+    const auto default_log = process_tree_playout(loop, omitted);
+    auto explicit_topbottom = omitted;
+    explicit_topbottom.variant = ProcessTreePlayoutVariant::TOPBOTTOM;
+    auto explicit_basic = omitted;
+    explicit_basic.variant = ProcessTreePlayoutVariant::BASIC_PLAYOUT;
+    default_matches_topbottom =
+        default_matches_topbottom &&
+        labels(default_log.traces.front()) ==
+            labels(process_tree_playout(loop, explicit_topbottom).traces.front());
+    default_differs_from_basic =
+        default_differs_from_basic ||
+        labels(default_log.traces.front()) !=
+            labels(process_tree_playout(loop, explicit_basic).traces.front());
+  }
+  assert(default_matches_topbottom && default_differs_from_basic);
+
   basic.traces = 1;
   basic.max_loop_occurrences = 2;
   basic.max_length = 8;

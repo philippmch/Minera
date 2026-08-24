@@ -376,7 +376,7 @@ export function Filters({
   // Miner settings; an empty field leaves the backend default in charge.
   const [noiseThreshold, setNoiseThreshold] = useState("");
   const [inductiveVariant, setInductiveVariant] = useState<"log" | "imf" | "dfg">("log");
-  const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("plus");
+  const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("classic");
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
   const [dependencyThreshold, setDependencyThreshold] = useState("");
@@ -901,7 +901,7 @@ export function Filters({
       ltlResourceKey: ltlVariant ? ltlResourceKey || undefined : undefined,
       noiseThreshold: toFloat(noiseThreshold),
       inductiveVariant: inductiveVariant !== "log" ? inductiveVariant : undefined,
-      alphaVariant: alphaVariant !== "plus" ? alphaVariant : undefined,
+      alphaVariant: alphaVariant !== "classic" ? alphaVariant : undefined,
       heuristicVariant:
         heuristicVariant !== "classic" ? heuristicVariant : undefined,
       dependencyThreshold: toFloat(dependencyThreshold),
@@ -1102,7 +1102,7 @@ export function Filters({
     setRemovedCaseValues(new Set());
     setNoiseThreshold("");
     setInductiveVariant("log");
-    setAlphaVariant("plus");
+    setAlphaVariant("classic");
     setHeuristicVariant("classic");
     setDependencyThreshold("");
     setAndThreshold("");
@@ -1255,7 +1255,7 @@ export function Filters({
     caseAttributeKey !== "" ||
     noiseThreshold !== "" ||
     inductiveVariant !== "log" ||
-    alphaVariant !== "plus" ||
+    alphaVariant !== "classic" ||
     heuristicVariant !== "classic" ||
     dependencyThreshold !== "" ||
     andThreshold !== "" ||
@@ -2704,8 +2704,8 @@ export function Filters({
                   setAlphaVariant(e.target.value as "plus" | "classic")
                 }
               >
-                <option value="plus">Alpha+ (short loops, default)</option>
-                <option value="classic">classic (textbook)</option>
+                <option value="classic">classic (default, textbook)</option>
+                <option value="plus">Alpha+ (short loops)</option>
               </select>
             </label>
           </div>
