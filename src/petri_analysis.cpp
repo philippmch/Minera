@@ -177,17 +177,118 @@ std::vector<std::string> structural_node_labels(const PetriNet& net) {
   return labels;
 }
 
+struct ShortCircuitNetResult {
+  PetriNet net;
+  bool valid = false;
+  bool strongly_connected = false;
+  std::optional<std::size_t> transition;
+  std::vector<std::string> diagnostics;
+};
+
+std::vector<std::vector<std::size_t>> structural_graph(const PetriNet& net) {
+  const auto element_count = net.place_count() + net.transitions().size();
+  std::vector<std::vector<std::size_t>> graph(element_count);
+  for (std::size_t transition = 0;
+       transition < net.transitions().size(); ++transition) {
+    const auto node = net.place_count() + transition;
+    const auto add_input = [&](const auto& places) {
+      for (const auto place : places) {
+        if (place < net.place_count()) graph[place].push_back(node);
+      }
+    };
+    add_input(net.transitions()[transition].inputs);
+    add_input(net.transitions()[transition].reset_inputs);
+    add_input(net.transitions()[transition].inhibitor_inputs);
+    for (const auto place : net.transitions()[transition].outputs) {
+      if (place < net.place_count()) graph[node].push_back(place);
+    }
+  }
+  return graph;
+}
+
+bool strongly_connected(const PetriNet& net) {
+  const auto graph = structural_graph(net);
+  if (graph.empty()) return false;
+  const auto visit = [&](const auto& adjacency) {
+    std::vector<bool> seen(adjacency.size(), false);
+    std::queue<std::size_t> pending;
+    seen[0] = true;
+    pending.push(0);
+    while (!pending.empty()) {
+      const auto node = pending.front();
+      pending.pop();
+      for (const auto next : adjacency[node]) {
+        if (next >= seen.size() || seen[next]) continue;
+        seen[next] = true;
+        pending.push(next);
+      }
+    }
+    return std::all_of(seen.begin(), seen.end(), [](bool value) {
+      return value;
+    });
+  };
+  if (!visit(graph)) return false;
+  std::vector<std::vector<std::size_t>> reverse(graph.size());
+  for (std::size_t from = 0; from < graph.size(); ++from)
+    for (const auto to : graph[from]) reverse[to].push_back(from);
+  return visit(reverse);
+}
+
+ShortCircuitNetResult short_circuit_workflow_net(
+    const PetriNet& input, const WorkflowNetResult& workflow,
+    const std::string& validation_error) {
+  ShortCircuitNetResult result;
+  if (!validation_error.empty()) {
+    result.diagnostics.push_back(validation_error);
+    return result;
+  }
+  if (!workflow.valid) {
+    result.diagnostics.push_back(
+        workflow.reason.empty() ? "workflow net validation failed"
+                                : workflow.reason);
+    if (workflow.source_candidates.empty())
+      result.diagnostics.push_back("no structural source place was found");
+    if (workflow.sink_candidates.empty())
+      result.diagnostics.push_back("no structural sink place was found");
+    return result;
+  }
+  result.net = input;
+  const auto source = workflow.source_candidates.front();
+  const auto sink = workflow.sink_candidates.front();
+  result.transition = result.net.add_transition(std::nullopt, {sink}, {source});
+  result.valid = true;
+  result.strongly_connected = strongly_connected(result.net);
+  if (result.strongly_connected) {
+    result.diagnostics.push_back(
+        "short-circuit transition connects the unique sink to the unique source");
+    result.diagnostics.push_back(
+        "short-circuited structural graph is strongly connected");
+  } else {
+    result.diagnostics.push_back(
+        "short-circuited structural graph is not strongly connected");
+  }
+  return result;
+}
+
 void validate_marking(const Marking& marking, std::size_t places,
                       const char* name) {
   if (marking.size() != places)
     throw std::invalid_argument(std::string(name) + " has the wrong dimension");
   if (std::any_of(marking.begin(), marking.end(), [](auto value) { return value < 0; }))
     throw std::invalid_argument(std::string(name) + " contains a negative token count");
-  if (std::any_of(marking.begin(), marking.end(), [](auto value) {
+    if (std::any_of(marking.begin(), marking.end(), [](auto value) {
         return value > kMaxExactSolverInteger;
       }))
     throw std::invalid_argument(std::string(name) +
                                 " exceeds the exact numeric solver range");
+}
+
+void validate_single_place_marking(const Marking& marking, const char* name) {
+  const auto marked_places = static_cast<std::size_t>(std::count_if(
+      marking.begin(), marking.end(), [](const auto value) { return value > 0; }));
+  if (marked_places != 1)
+    throw std::invalid_argument(std::string(name) +
+                                " must contain exactly one marked place");
 }
 
 WorkflowMarkings resolved_markings(const PetriNet& net, const Marking& initial,
@@ -198,6 +299,24 @@ WorkflowMarkings resolved_markings(const PetriNet& net, const Marking& initial,
   validate_marking(defaults.initial, net.place_count(), "initial marking");
   validate_marking(defaults.final, net.place_count(), "final marking");
   return defaults;
+}
+
+WorkflowMarkings resolved_woflan_markings(const PetriNet& net,
+                                           const WorkflowNetResult& workflow,
+                                           const Marking& initial,
+                                           const Marking& final) {
+  auto result = resolved_markings(net, initial, final);
+  if (workflow.valid && initial.empty()) {
+    result.initial.assign(net.place_count(), 0);
+    result.initial[workflow.source_candidates.front()] = 1;
+  }
+  if (workflow.valid && final.empty()) {
+    result.final.assign(net.place_count(), 0);
+    result.final[workflow.sink_candidates.front()] = 1;
+  }
+  validate_marking(result.initial, net.place_count(), "initial marking");
+  validate_marking(result.final, net.place_count(), "final marking");
+  return result;
 }
 
 std::vector<std::int64_t> arc_weights(const std::vector<std::size_t>& arcs,
@@ -620,6 +739,59 @@ struct CoverabilityResult {
 };
 
 constexpr std::int64_t kOmega = -1;
+
+struct ReachabilityProjection {
+  bool exhausted = false;
+  std::vector<Marking> markings;
+  std::vector<std::vector<std::size_t>> edges;
+};
+
+ReachabilityProjection reachability_projection(const PetriNet& net,
+                                               const Marking& initial,
+                                               std::size_t max_states) {
+  struct Node {
+    Marking marking;
+  };
+  ReachabilityProjection result;
+  std::vector<Node> nodes{{initial}};
+  std::map<Marking, std::size_t> ids{{initial, 0}};
+  std::vector<std::vector<std::pair<std::size_t, std::size_t>>> edges(1);
+  std::queue<std::size_t> pending;
+  pending.push(0);
+  const auto snapshot = [&]() {
+    result.markings.clear();
+    result.markings.reserve(nodes.size());
+    for (const auto& node : nodes) result.markings.push_back(node.marking);
+    result.edges.clear();
+    for (std::size_t from = 0; from < edges.size(); ++from)
+      for (const auto [to, transition] : edges[from])
+        result.edges.push_back({from, to, transition});
+  };
+  while (!pending.empty()) {
+    const auto from = pending.front();
+    pending.pop();
+    for (std::size_t transition = 0;
+         transition < net.transitions().size(); ++transition) {
+      Marking next;
+      if (!fire(nodes[from].marking, net.transitions()[transition], next))
+        continue;
+      auto [it, inserted] = ids.emplace(next, nodes.size());
+      if (inserted) {
+        if (nodes.size() >= max_states) {
+          result.exhausted = true;
+          snapshot();
+          return result;
+        }
+        nodes.push_back({std::move(next)});
+        edges.emplace_back();
+        pending.push(it->second);
+      }
+      edges[from].push_back({it->second, transition});
+    }
+  }
+  snapshot();
+  return result;
+}
 
 bool cover_leq(const std::vector<std::int64_t>& lhs,
                const std::vector<std::int64_t>& rhs) {
@@ -1104,22 +1276,42 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   result.variant = options.variant;
   result.workflow = check_workflow_net(net);
   const auto validation_error = validate_net(net);
+  std::optional<WorkflowMarkings> woflan_markings;
+  if (options.variant == SoundnessVariant::kWoflan && validation_error.empty()) {
+    woflan_markings.emplace(resolved_woflan_markings(
+        net, result.workflow, options.initial_marking, options.final_marking));
+    validate_single_place_marking(woflan_markings->initial, "initial marking");
+    validate_single_place_marking(woflan_markings->final, "final marking");
+  }
+  std::optional<PetriNet> short_circuited;
+  if (options.variant == SoundnessVariant::kWoflan) {
+    const auto short_circuit = short_circuit_workflow_net(
+        net, result.workflow, validation_error);
+    result.short_circuit_valid = short_circuit.valid;
+    result.short_circuit_strongly_connected =
+        short_circuit.strongly_connected;
+    result.short_circuit_transition = short_circuit.transition;
+    result.short_circuit_diagnostic_messages = short_circuit.diagnostics;
+    if (short_circuit.valid)
+      short_circuited.emplace(short_circuit.net);
+  }
+  const PetriNet* structural_net = short_circuited ? &*short_circuited : &net;
   if (validation_error.empty()) {
-    result.place_invariant_basis = invariant_basis(net);
+    result.place_invariant_basis = invariant_basis(*structural_net);
     result.uncovered_places = uncovered_from_vectors(
-        result.place_invariant_basis, net.place_count());
+        result.place_invariant_basis, structural_net->place_count());
     result.uniform_place_invariants =
         uniform_invariants(result.place_invariant_basis);
     result.uncovered_places_uniform = uncovered_from_vectors(
-        result.uniform_place_invariants, net.place_count());
+        result.uniform_place_invariants, structural_net->place_count());
     result.weighted_place_invariants =
         weighted_invariants(result.place_invariant_basis);
     result.uncovered_places_weighted = uncovered_from_vectors(
-        result.weighted_place_invariants, net.place_count());
+        result.weighted_place_invariants, structural_net->place_count());
     if (result.workflow.valid) {
       result.s_components = invariant_supports(result.uniform_place_invariants);
       result.uncovered_places_s_component = uncovered_from_supports(
-          *result.s_components, net.place_count());
+          *result.s_components, structural_net->place_count());
     }
   }
   if (!result.workflow.valid) {
@@ -1129,6 +1321,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
                                                   : result.workflow.reason;
     if (options.diagnostics) {
       result.diagnostic_messages.push_back(result.error);
+      for (const auto& message : result.short_circuit_diagnostic_messages)
+        result.diagnostic_messages.push_back("Woflan: " + message);
       if (!result.uncovered_places.empty())
         result.diagnostic_messages.push_back(
             "positive place-invariant coverage is missing for one or more places");
@@ -1136,12 +1330,33 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     return result;
   }
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
-  result.structural_node_labels = structural_node_labels(net);
-  result.handled_pairs = structural_pair_diagnostics(net);
+  result.structural_node_labels = structural_node_labels(*structural_net);
+  result.handled_pairs = structural_pair_diagnostics(*structural_net);
   if (options.max_states == 0)
     throw std::invalid_argument("max_states must be positive");
-  const auto markings = resolved_markings(net, options.initial_marking, options.final_marking);
-  const auto coverability = coverability_search(net, markings.initial, options.max_states);
+  const auto markings = woflan_markings
+                            ? *woflan_markings
+                            : resolved_markings(net, options.initial_marking,
+                                                options.final_marking);
+  if (short_circuited) {
+    const auto short_circuit_graph = reachability_projection(
+        *short_circuited, markings.initial, options.max_states);
+    result.short_circuit_reachability_exhausted =
+        short_circuit_graph.exhausted;
+    result.short_circuit_reachability_markings =
+        short_circuit_graph.markings;
+    result.short_circuit_reachability_edges = short_circuit_graph.edges;
+    if (options.diagnostics) {
+      for (const auto& message : result.short_circuit_diagnostic_messages)
+        result.diagnostic_messages.push_back("Woflan: " + message);
+      if (short_circuit_graph.exhausted)
+        result.diagnostic_messages.push_back(
+            "Woflan short-circuit reachability state limit reached");
+    }
+  }
+  const PetriNet* coverability_net = short_circuited ? &*short_circuited : &net;
+  const auto coverability = coverability_search(
+      *coverability_net, markings.initial, options.max_states);
   result.coverability_markings = coverability.markings;
   result.coverability_edges = coverability.edges;
   if (coverability.unbounded) {

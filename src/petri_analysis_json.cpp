@@ -65,6 +65,10 @@ std::string optional_index_vectors(
   return out.str();
 }
 
+std::string optional_number(const std::optional<std::size_t>& value) {
+  return value ? std::to_string(*value) : "null";
+}
+
 std::string index_vectors(
     const std::vector<std::vector<std::size_t>>& values) {
   std::ostringstream out;
@@ -268,6 +272,25 @@ std::string petri_analysis_json(const SoundnessResult& result) {
   }
   out
       << "]"
+      << ",\"short_circuit_valid\":"
+      << (result.short_circuit_valid ? "true" : "false")
+      << ",\"short_circuit_strongly_connected\":"
+      << (result.short_circuit_strongly_connected ? "true" : "false")
+      << ",\"short_circuit_transition\":"
+      << optional_number(result.short_circuit_transition)
+      << ",\"short_circuit_reachability_exhausted\":"
+      << (result.short_circuit_reachability_exhausted ? "true" : "false")
+      << ",\"short_circuit_diagnostic_messages\":[";
+  for (std::size_t i = 0;
+       i < result.short_circuit_diagnostic_messages.size(); ++i) {
+    if (i != 0) out << ',';
+    out << quote(result.short_circuit_diagnostic_messages[i]);
+  }
+  out << "]"
+      << ",\"short_circuit_reachability_markings\":"
+      << markings(result.short_circuit_reachability_markings)
+      << ",\"short_circuit_reachability_edges\":"
+      << index_vectors(result.short_circuit_reachability_edges)
       << ",\"error\":" << quote(result.error) << '}';
   return out.str();
 }

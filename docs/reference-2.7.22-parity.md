@@ -56,7 +56,7 @@ are reconciled.
 
 | Domain | Reference families and behavioral variants | Minera status |
 |---|---|---|
-| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics, explicit Woflan selection, early unsound-witness return, and strict CLI/server/frontend adapters; full differential edge-contract review remains |
+| Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics, explicit Woflan selection, short-circuit construction and graph projection, single-place marking validation, early unsound-witness return, and strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — deterministic seeded profile clustering now has bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering and the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings and extended arcs; broader differential semantics remain |
@@ -491,7 +491,11 @@ The native analysis surface now exposes the classic integer marking equation,
 the split-aware extended marking equation, structural workflow-net validation,
 and bounded soundness diagnostics, including an explicit `woflan` family
 selector over the same reachability, coverability, invariant, and pair
-diagnostic contract. The soundness family also exposes a strict
+diagnostic contract. Woflan additionally constructs the silent sink-to-source
+short circuit, reports its transition id and strong-connectivity result, and
+serializes a separate short-circuit reachability projection while retaining
+the original graph for completion witnesses. Woflan marking inputs follow its
+single-place boundary contract. The soundness family also exposes a strict
 `return_asap_when_unsound` control: a reachable non-final deadlock or improper
 completion marking returns immediately with the partial reachability graph and
 its shortest witness. Structural pair diagnostics use a deterministic

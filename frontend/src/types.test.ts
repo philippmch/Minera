@@ -347,6 +347,25 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
       family: "soundness", weighted_place_invariants: [[1, Number.NaN]],
     })).toBe(false);
   });
+
+  it("accepts Woflan short-circuit projections", () => {
+    expect(isPetriAnalysisResult({
+      family: "woflan", variant: "woflan",
+      short_circuit_valid: true,
+      short_circuit_strongly_connected: true,
+      short_circuit_transition: 2,
+      short_circuit_diagnostic_messages: ["connected"],
+      short_circuit_reachability_exhausted: false,
+      short_circuit_reachability_markings: [[1, 0], [0, 1]],
+      short_circuit_reachability_edges: [[0, 1, 0]],
+    })).toBe(true);
+    expect(isPetriAnalysisResult({
+      family: "woflan", short_circuit_transition: -1,
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "woflan", short_circuit_diagnostic_messages: [2],
+    })).toBe(false);
+  });
 });
 
 describe("isOcelStatisticsResult", () => {

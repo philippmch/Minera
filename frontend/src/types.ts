@@ -2881,6 +2881,13 @@ export interface PetriAnalysisResult {
   coverability_edges?: number[][];
   reachability_markings?: number[][];
   reachability_edges?: number[][];
+  short_circuit_valid?: boolean;
+  short_circuit_strongly_connected?: boolean;
+  short_circuit_transition?: number | null;
+  short_circuit_diagnostic_messages?: string[];
+  short_circuit_reachability_exhausted?: boolean;
+  short_circuit_reachability_markings?: number[][];
+  short_circuit_reachability_edges?: number[][];
   error?: string;
   [key: string]: unknown;
 }
@@ -2895,6 +2902,20 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
       value.variant !== "soundness" && value.variant !== "woflan") return false;
   if ("returned_asap" in value && value.returned_asap !== undefined &&
       typeof value.returned_asap !== "boolean") return false;
+  if ("short_circuit_valid" in value && value.short_circuit_valid !== undefined &&
+      typeof value.short_circuit_valid !== "boolean") return false;
+  if ("short_circuit_strongly_connected" in value &&
+      value.short_circuit_strongly_connected !== undefined &&
+      typeof value.short_circuit_strongly_connected !== "boolean") return false;
+  if ("short_circuit_transition" in value &&
+      value.short_circuit_transition !== undefined &&
+      value.short_circuit_transition !== null &&
+      (typeof value.short_circuit_transition !== "number" ||
+       !Number.isSafeInteger(value.short_circuit_transition) ||
+       value.short_circuit_transition < 0)) return false;
+  if ("short_circuit_reachability_exhausted" in value &&
+      value.short_circuit_reachability_exhausted !== undefined &&
+      typeof value.short_circuit_reachability_exhausted !== "boolean") return false;
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;
@@ -2908,6 +2929,9 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     uncovered_places_weighted?: unknown; uncovered_places_s_component?: unknown;
     coverability_markings?: unknown; coverability_edges?: unknown;
     reachability_markings?: unknown; reachability_edges?: unknown;
+    short_circuit_diagnostic_messages?: unknown;
+    short_circuit_reachability_markings?: unknown;
+    short_circuit_reachability_edges?: unknown;
   };
   const validIndices = (indices: unknown) => indices === undefined ||
     (Array.isArray(indices) && indices.every((item) => Number.isSafeInteger(item) && item >= 0));
@@ -2931,6 +2955,9 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   const validLabels = result.structural_node_labels === undefined ||
     (Array.isArray(result.structural_node_labels) &&
       result.structural_node_labels.every((label) => typeof label === "string"));
+  const validMessages = result.short_circuit_diagnostic_messages === undefined ||
+    (Array.isArray(result.short_circuit_diagnostic_messages) &&
+      result.short_circuit_diagnostic_messages.every((message) => typeof message === "string"));
   return validIndices(result.dead_transitions) && validIndices(result.dead_tasks) &&
     validIndices(result.completion_witness) && validIndices(result.locking_witness) &&
     validWitnesses(result.deadlock_witnesses) && validWitnesses(result.improper_witnesses) &&
@@ -2946,7 +2973,9 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     validMarkings(result.coverability_markings, true) &&
     validMarkings(result.reachability_markings, false) &&
     validGraphEdges(result.coverability_edges) &&
-    validGraphEdges(result.reachability_edges);
+    validGraphEdges(result.reachability_edges) && validMessages &&
+    validMarkings(result.short_circuit_reachability_markings, false) &&
+    validGraphEdges(result.short_circuit_reachability_edges);
 }
 
 type EvaluationMetric = number | null;

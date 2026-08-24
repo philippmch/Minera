@@ -107,6 +107,15 @@ export function PetriAnalysis({ data, importedAvailable = false, onRequest }: Pr
           {result?.structural_node_labels?.[pair[0]] ?? `node ${pair[0]}`} → {result?.structural_node_labels?.[pair[1]] ?? `node ${pair[1]}`}
         </li>)}</ul>}
     </div>}
+    {result?.family === "woflan" && result.short_circuit_valid !== undefined && <div className="conf-inline-note">
+      <strong>Short-circuited workflow</strong>
+      <div>Valid: {result.short_circuit_valid ? "yes" : "no"}</div>
+      {result.short_circuit_valid && <div>Transition: {result.short_circuit_transition ?? "none"}</div>}
+      {result.short_circuit_strongly_connected !== undefined &&
+        <div>Strongly connected: {result.short_circuit_strongly_connected ? "yes" : "no"}</div>}
+      {result.short_circuit_reachability_exhausted &&
+        <div>Short-circuit reachability reached the state limit.</div>}
+    </div>}
     {(result?.family === "soundness" || result?.family === "woflan") && (result.dead_tasks || lockingScenarios) && <div className="conf-inline-note">
       <strong>Soundness witnesses</strong>
       {result.dead_tasks && <div>Dead tasks: {result.dead_tasks.length}</div>}

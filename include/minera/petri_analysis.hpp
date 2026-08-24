@@ -173,6 +173,16 @@ struct SoundnessResult {
   std::optional<std::vector<std::vector<std::size_t>>> handled_pairs;
   // Human-readable labels for the node coordinates used by handled_pairs.
   std::vector<std::string> structural_node_labels;
+  // Woflan exposes the short-circuited workflow as an explicit diagnostic
+  // projection.  The added transition is silent and is appended after the
+  // input transitions; it is absent when the source/sink contract fails.
+  bool short_circuit_valid = false;
+  bool short_circuit_strongly_connected = false;
+  std::optional<std::size_t> short_circuit_transition;
+  std::vector<std::string> short_circuit_diagnostic_messages;
+  bool short_circuit_reachability_exhausted = false;
+  std::vector<Marking> short_circuit_reachability_markings;
+  std::vector<std::vector<std::size_t>> short_circuit_reachability_edges;
   std::string error;
 };
 
