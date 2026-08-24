@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "./types";
+
+describe("isBasicPlayoutVisitedResult", () => {
+  const valid = {
+    family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+    traces: [[
+      { kind: "marking", marking: [1, 0] },
+      { kind: "transition", transition: 0, activity: null },
+      { kind: "marking", marking: [0, 1] },
+    ]],
+  };
+  it("accepts the discriminated visitation envelope", () => {
+    expect(isBasicPlayoutVisitedResult(valid)).toBe(true);
+  });
+  it("rejects malformed elements", () => {
+    expect(isBasicPlayoutVisitedResult({ ...valid, traces: [[
+      { kind: "transition", transition: -1, activity: null },
+    ]] })).toBe(false);
+    expect(isBasicPlayoutVisitedResult({ ...valid, traces: [[
+      { kind: "marking", marking: [1, -1] },
+    ]] })).toBe(false);
+    expect(isBasicPlayoutVisitedResult({ ...valid, traces: [[
+      { kind: "transition", transition: 0, activity: null },
+      { kind: "marking", marking: [1, 0] },
+    ]] })).toBe(false);
+    expect(isBasicPlayoutVisitedResult({ ...valid, traces: [[
+      { kind: "marking", marking: [1, 0] },
+      { kind: "transition", transition: 0, activity: null },
+    ]] })).toBe(false);
+  });
+});
 
 describe("OCPN token replay result guard", () => {
   const diagnostic = { enabled: true, trace_count: 1, fitting_traces: 1,

@@ -112,6 +112,90 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
   return log;
 }
 
+PlayoutVisitedResult playout_visited(const PetriNet& net,
+                                     const PlayoutOptions& options) {
+  const auto& transitions = net.transitions();
+  if (net.place_count() == 0 || net.source() >= net.place_count() ||
+      net.sink() >= net.place_count()) {
+    throw std::invalid_argument(
+        "playout requires valid workflow source and sink places");
+  }
+  if (!std::isfinite(options.start) ||
+      !std::isfinite(options.case_interval) ||
+      !std::isfinite(options.event_interval)) {
+    throw std::invalid_argument("playout timestamps must be finite");
+  }
+  if (options.case_interval < 0.0 || options.event_interval < 0.0) {
+    throw std::invalid_argument("playout intervals must be non-negative");
+  }
+  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
+                                   std::size_t boundary,
+                                   const char* label) {
+    if (!requested.empty() && requested.size() != net.place_count()) {
+      throw std::invalid_argument(std::string("playout ") + label +
+                                  " marking must match the place count");
+    }
+    std::vector<std::uint32_t> marking(net.place_count(), 0);
+    if (requested.empty()) {
+      marking[boundary] = 1;
+    } else {
+      marking = requested;
+    }
+    return marking;
+  };
+  const auto initial_marking =
+      resolve_marking(options.initial_marking, net.source(), "initial");
+  const auto final_marking =
+      resolve_marking(options.final_marking, net.sink(), "final");
+  const auto final_reached = [&](const std::vector<std::uint32_t>& marking) {
+    if (marking == final_marking) return true;
+    if (!options.fm_leq_accepted) return false;
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (final_marking[place] > marking[place]) return false;
+    }
+    return true;
+  };
+
+  PlayoutVisitedResult result;
+  result.traces.reserve(options.traces);
+  std::mt19937_64 rng(options.seed);
+  std::vector<std::uint32_t> marking(net.place_count(), 0);
+  std::vector<std::size_t> enabled;
+
+  for (std::size_t c = 0; c < options.traces; ++c) {
+    PlayoutVisitedTrace visited;
+    visited.reserve(options.max_steps * 2 + 1);
+    marking = initial_marking;
+    visited.push_back({PlayoutVisitedElementKind::MARKING, marking, 0});
+
+    for (std::size_t step = 0; step < options.max_steps; ++step) {
+      if (final_reached(marking)) break;
+
+      enabled.clear();
+      for (std::size_t t = 0; t < transitions.size(); ++t) {
+        if (petri_transition_enabled(transitions[t], marking) &&
+            (!transitions[t].inputs.empty() ||
+             transitions[t].has_extended_arcs())) {
+          enabled.push_back(t);
+        }
+      }
+      if (enabled.empty()) break;
+
+      const auto pick = std::uniform_int_distribution<std::size_t>(
+          0, enabled.size() - 1)(rng);
+      const auto selected = enabled[pick];
+      fire_petri_transition(transitions[selected], marking);
+      visited.push_back(
+          {PlayoutVisitedElementKind::TRANSITION, {}, selected});
+      visited.push_back({PlayoutVisitedElementKind::MARKING, marking, 0});
+    }
+
+    if (options.add_only_if_fm_is_reached && !final_reached(marking)) continue;
+    result.traces.push_back(std::move(visited));
+  }
+  return result;
+}
+
 namespace {
 
 void validate_stochastic_net(const PetriNet& net) {
