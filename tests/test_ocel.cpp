@@ -201,18 +201,23 @@ int main() {
   const minera::OtgGraph otg_norm{
       {"order", "item"},
       {{"order", "object_interaction", "item", 10},
-       {"order", "object_descendants", "item", 5}}};
+       {"order", "object_descendants", "item", 10}}};
   const minera::OtgGraph otg_equal{
       {"order", "item"},
       {{"order", "object_interaction", "item", 12},
-       {"order", "object_descendants", "item", 5}}};
+       {"order", "object_descendants", "item", 12}}};
   minera::OtgConformanceOptions otg_options;
   otg_options.theta_by_relation["object_interaction"] = 0.1;
+  otg_options.theta_by_relation["object_descendants"] = 0.3;
   const auto otg_bad = minera::compare_otg(otg_equal, otg_norm, otg_options);
   assert(otg_bad.non_conforming_edges.size() == 1);
   assert(std::get<1>(otg_bad.non_conforming_edges.begin()->first) ==
          "object_interaction");
   assert(otg_bad.fitness < 1.0);
+  minera::OtgConformanceOptions otg_scalar;
+  otg_scalar.theta = 0.3;
+  assert(minera::compare_otg(otg_equal, otg_norm, otg_scalar)
+             .non_conforming_edges.empty());
   assert(minera::otg_conformance_json(otg_bad).find("non_conforming_edges") !=
          std::string::npos);
 

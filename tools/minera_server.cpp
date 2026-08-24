@@ -2,6 +2,7 @@
 // CSV event logs with the native core via POST /api/mine.
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <chrono>
 #include <cctype>
@@ -1747,7 +1748,9 @@ void handle_ocel_conformance(const httplib::Request& request,
   try {
     static const std::set<std::string> allowed = {
         "variant", "alpha", "beta", "gamma", "delta", "etot_theta",
-        "otg_theta", "ocdfg_theta_activity", "ocdfg_theta_flow"};
+        "otg_theta", "otg_theta_interaction", "otg_theta_descendants",
+        "otg_theta_inheritance", "otg_theta_cobirth", "otg_theta_codeath",
+        "ocdfg_theta_activity", "ocdfg_theta_flow"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1793,6 +1796,20 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.gamma = gamma;
       options.theta =
           ocel_query_number(request, "otg_theta", options.theta);
+      const std::array<std::pair<std::string_view, std::string_view>, 5>
+          relation_thresholds = {{
+              {"otg_theta_interaction", "object_interaction"},
+              {"otg_theta_descendants", "object_descendants"},
+              {"otg_theta_inheritance", "object_inheritance"},
+              {"otg_theta_cobirth", "object_cobirth"},
+              {"otg_theta_codeath", "object_codeath"},
+          }};
+      for (const auto& [parameter, relation] : relation_thresholds) {
+        if (request.has_param(std::string(parameter))) {
+          options.theta_by_relation[std::string(relation)] =
+              ocel_query_number(request, parameter, options.theta);
+        }
+      }
       payload = minera::otg_conformance_json(minera::compare_otg(
           minera::discover_otg_classic(real),
           minera::discover_otg_classic(normative), options));

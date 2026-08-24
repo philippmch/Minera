@@ -4508,6 +4508,11 @@ export interface OcelConformanceOptions {
   delta?: number;
   etot_theta?: number;
   otg_theta?: number;
+  otg_theta_interaction?: number;
+  otg_theta_descendants?: number;
+  otg_theta_inheritance?: number;
+  otg_theta_cobirth?: number;
+  otg_theta_codeath?: number;
   ocdfg_theta_activity?: number;
   ocdfg_theta_flow?: number;
 }
@@ -4524,6 +4529,17 @@ export function ocelConformanceQuery(options: OcelConformanceOptions = {}): stri
   add("delta", options.delta);
   add("etot_theta", options.etot_theta);
   add("otg_theta", options.otg_theta);
+  const addRelationThreshold = (name: string, value: number | undefined) => {
+    if (value === undefined) return;
+    if (!Number.isFinite(value) || value < 0)
+      throw new Error(`${name} must be a finite non-negative number`);
+    query.set(name, String(value));
+  };
+  addRelationThreshold("otg_theta_interaction", options.otg_theta_interaction);
+  addRelationThreshold("otg_theta_descendants", options.otg_theta_descendants);
+  addRelationThreshold("otg_theta_inheritance", options.otg_theta_inheritance);
+  addRelationThreshold("otg_theta_cobirth", options.otg_theta_cobirth);
+  addRelationThreshold("otg_theta_codeath", options.otg_theta_codeath);
   add("ocdfg_theta_activity", options.ocdfg_theta_activity);
   add("ocdfg_theta_flow", options.ocdfg_theta_flow);
   return query.toString();

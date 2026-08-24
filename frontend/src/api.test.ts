@@ -1078,6 +1078,13 @@ describe("OCEL API", () => {
     })).toThrow(/business_hours=true/);
     expect(ocelConformanceQuery({ variant: "etot", alpha: 0.5, etot_theta: 0.2 }))
       .toBe("variant=etot&alpha=0.5&etot_theta=0.2");
+    expect(ocelConformanceQuery({
+      variant: "otg", otg_theta: 0.4, otg_theta_interaction: 0.1,
+      otg_theta_descendants: 0.2, otg_theta_inheritance: 0.3,
+      otg_theta_cobirth: 0.4, otg_theta_codeath: 0.5,
+    })).toBe("variant=otg&otg_theta=0.4&otg_theta_interaction=0.1&otg_theta_descendants=0.2&otg_theta_inheritance=0.3&otg_theta_cobirth=0.4&otg_theta_codeath=0.5");
+    expect(() => ocelConformanceQuery({ otg_theta_interaction: -0.1 }))
+      .toThrow(/finite non-negative/);
     expect(ocelFilterQuery({
       variant: "object_count", minimum_counts: { item: 2, order: 1 }, positive: true,
       level: 2, object_type: "order", min_size: 1, max_size: 4,
