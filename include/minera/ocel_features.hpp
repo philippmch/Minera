@@ -33,6 +33,10 @@ struct OcelFeatureOptions {
   bool include_cobirth_features = false;
   bool include_codeath_features = false;
   bool include_lifecycle_features = true;
+  bool include_lifecycle_path_features = true;
+  bool include_related_events_features = false;
+  bool include_related_activities_features = false;
+  bool include_obj_con_in_graph_features = false;
   std::vector<std::string> numeric_event_attributes;
   std::vector<std::string> string_event_attributes;
   std::vector<std::string> numeric_object_attributes;

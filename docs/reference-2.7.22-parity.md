@@ -224,10 +224,15 @@ indicators, lifecycle length/duration/endpoints, activity/path counts, custom
 attributes, work-in-progress, interaction degree, and optional per-object-type
 interaction counts. Optional OBJECTS-only graph columns cover general
 interaction degree, descendants and inheritance incoming/outgoing counts, and
-cobirth/codeath degree. Exploded event-object rows project the same event and
-object feature columns pointwise, so the shared option groups and custom
-attribute selectors are effective without changing relation order or duplicate
-row suffixes. The OBJECTS table can be
+cobirth/codeath degree. The OBJECTS table also supports opt-in related-event
+min/max projections, last-related-activity event projections, neighboring-object
+min/max projections, and a lifecycle-path toggle within the lifecycle feature
+group; these derived columns use the same bounded event/object feature schemas
+and deterministic relation/interaction ordering as the base tables. Exploded
+event-object rows
+project the same event and object feature columns pointwise, so the shared
+option groups and custom attribute selectors are effective without changing
+relation order or duplicate row suffixes. The OBJECTS table can be
 filtered after feature computation to one requested object type, preserving
 feature columns and original row order; missing types produce an empty table,
 while the selector is rejected for event and exploded event-object variants.
