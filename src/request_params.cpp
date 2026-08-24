@@ -1299,6 +1299,20 @@ MineParams parse_mine_params(const FieldLookup& field,
           field("trace_pattern_positive"), "trace_pattern_positive");
     }
   }
+  const bool admitted_variants_supplied =
+      supplied("admitted_variants") || supplied("admitted_variants_positive");
+  if (admitted_variants_supplied) {
+    if (!supplied("admitted_variants") || field("admitted_variants").empty()) {
+      throw std::invalid_argument(
+          "admitted_variants: at least one exact variant is required");
+    }
+    params.filter.admitted_variants =
+        parse_admitted_variants(field("admitted_variants"));
+    if (supplied("admitted_variants_positive")) {
+      params.filter.admitted_variants_positive = parse_boolean(
+          field("admitted_variants_positive"), "admitted_variants_positive");
+    }
+  }
   const auto parse_filter_anchor_occurrence = [&](std::string_view name) {
     const auto value = field(name);
     if (value == "first") return FilterAnchorOccurrence::first;

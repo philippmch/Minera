@@ -340,6 +340,8 @@ export function Filters({
   const [successionTo, setSuccessionTo] = useState("");
   const [tracePattern, setTracePattern] = useState("");
   const [tracePatternPositive, setTracePatternPositive] = useState(true);
+  const [admittedVariants, setAdmittedVariants] = useState("");
+  const [admittedVariantsPositive, setAdmittedVariantsPositive] = useState(true);
   // Activities and resources start all-selected; deselected ones are removed.
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [removedResources, setRemovedResources] = useState<Set<string>>(
@@ -813,6 +815,10 @@ export function Filters({
       tracePatternPositive: tracePattern.trim() && !tracePatternPositive
         ? false
         : undefined,
+      admittedVariants: admittedVariants.trim()
+        ? admittedVariants.split(";").map((value) => value.trim()) : undefined,
+      admittedVariantsPositive: admittedVariants.trim() && !admittedVariantsPositive
+        ? false : undefined,
       prefixActivity: prefixActivity || undefined,
       suffixActivity: suffixActivity || undefined,
       prefixStrict: prefixActivity ? prefixStrict : undefined,
@@ -1082,6 +1088,8 @@ export function Filters({
     setSuccessionTo("");
     setTracePattern("");
     setTracePatternPositive(true);
+    setAdmittedVariants("");
+    setAdmittedVariantsPositive(true);
     setRemoved(new Set());
     setRemovedResources(new Set());
     setRemovedLifecycles(new Set());
@@ -1921,6 +1929,29 @@ export function Filters({
                 value={tracePatternPositive ? "positive" : "negative"}
                 disabled={!tracePattern.trim()}
                 onChange={(e) => setTracePatternPositive(e.target.value === "positive")}
+              >
+                <option value="positive">positive (keep matches)</option>
+                <option value="negative">negative (drop matches)</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="filters-row">
+            <label className="filters-field filters-field-wide">
+              <span>Admitted variants <small>(exact; comma-separated activities, semicolon-separated variants; [] is empty)</small></span>
+              <input
+                type="text"
+                placeholder="A,B;C;[]"
+                value={admittedVariants}
+                onChange={(e) => setAdmittedVariants(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Variant polarity</span>
+              <select
+                value={admittedVariantsPositive ? "positive" : "negative"}
+                disabled={!admittedVariants.trim()}
+                onChange={(e) => setAdmittedVariantsPositive(e.target.value === "positive")}
               >
                 <option value="positive">positive (keep matches)</option>
                 <option value="negative">negative (drop matches)</option>

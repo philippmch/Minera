@@ -2921,6 +2921,41 @@ void filter_matches_trace_patterns() {
   }));
 }
 
+void filter_matches_exact_admitted_variants() {
+  const auto log = log_from_variants({{"a", "b"}, {"a"}, {}, {"b"}});
+  const auto parsed = minera::parse_admitted_variants("a,b; a,b; []");
+  assert(parsed.size() == 3);
+  assert(parsed[0] == minera::TracePattern({"a", "b"}));
+  assert(parsed[1] == parsed[0]);
+  assert(parsed[2].empty());
+
+  minera::AdmittedVariantFilterOptions positive;
+  positive.variants = parsed;
+  const auto kept = minera::filter_admitted_variants(log, positive);
+  assert(kept.trace_count() == 2);
+  assert(kept.traces[0].case_id == "0");
+  assert(kept.traces[1].case_id == "2");
+
+  positive.positive = false;
+  const auto removed = minera::filter_admitted_variants(log, positive);
+  assert(removed.trace_count() == 2);
+  assert(removed.traces[0].case_id == "1");
+  assert(removed.traces[1].case_id == "3");
+
+  minera::LogFilterOptions integrated;
+  integrated.admitted_variants = {minera::TracePattern{}};
+  const auto empty_only = minera::filter_event_log(log, integrated);
+  assert(empty_only.trace_count() == 1);
+  assert(empty_only.traces[0].case_id == "2");
+
+  const auto literal = log_from_variants({{"..."}});
+  minera::AdmittedVariantFilterOptions literal_filter;
+  literal_filter.variants = minera::parse_admitted_variants("...");
+  assert(minera::filter_admitted_variants(literal, literal_filter).trace_count() == 1);
+  assert(throws([] { (void)minera::parse_admitted_variants("a,,b"); }));
+  assert(throws([] { (void)minera::parse_admitted_variants("[];"); }));
+}
+
 void filter_cuts_prefixes_and_suffixes() {
   const auto log = log_from_variants({{"a", "b", "c", "d"}, {"a", "d"}});
 
@@ -5594,6 +5629,7 @@ int main() {
   filter_supports_variant_percentage_and_endpoint_polarity();
   filter_selects_cases_by_succession();
   filter_matches_trace_patterns();
+  filter_matches_exact_admitted_variants();
   filter_cuts_prefixes_and_suffixes();
   parse_activity_pairs_reads_the_arrow_syntax();
   filter_projects_activities();
