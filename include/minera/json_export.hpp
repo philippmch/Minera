@@ -33,6 +33,7 @@
 #include "minera/case_statistics.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/playout.hpp"
 #include "minera/powl.hpp"
 #include "minera/process_tree.hpp"
 #include "minera/resource_analysis.hpp"
@@ -283,6 +284,8 @@ void write_analysis_json(std::ostream& out,
 
 [[nodiscard]] std::string petri_usage_comparison_json(
     const PetriUsageComparison& result);
+[[nodiscard]] std::string serialize_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result);
 
 [[nodiscard]] std::string concept_drift_json(const ConceptDriftResult& result);
 [[nodiscard]] std::string log_to_target_json(const LogToTargetResult& result);

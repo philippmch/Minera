@@ -3686,6 +3686,46 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
   return out.str();
 }
 
+std::string serialize_playout_visited_json(
+    const PetriNet& net, const PlayoutVisitedResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"traces\":[";
+  for (std::size_t i = 0; i < result.traces.size(); ++i) {
+    if (i) out << ',';
+    out << '[';
+    const auto& trace = result.traces[i];
+    for (std::size_t j = 0; j < trace.size(); ++j) {
+      if (j) out << ',';
+      const auto& element = trace[j];
+      if (element.kind == PlayoutVisitedElementKind::MARKING) {
+        out << "{\"kind\":\"marking\",\"marking\":[";
+        for (std::size_t p = 0; p < element.marking.size(); ++p) {
+          if (p) out << ',';
+          out << element.marking[p];
+        }
+        out << "]}";
+      } else {
+        out << "{\"kind\":\"transition\",\"transition\":"
+            << element.transition_index;
+        if (element.transition_index < net.transitions().size()) {
+          const auto& transition = net.transitions()[element.transition_index];
+          out << ",\"activity\":";
+          if (transition.activity &&
+              *transition.activity < net.activities().size()) {
+            write_json_string(out, net.activities()[*transition.activity]);
+          } else {
+            out << "null";
+          }
+        }
+        out << '}';
+      }
+    }
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string concept_drift_json(const ConceptDriftResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"CONCEPT_DRIFT\",\"activity_attribute\":";

@@ -172,6 +172,12 @@ can retain only cases that reach the final marking and optionally accept
 markings that contain it. The native API, `--petri-playout-*` export options,
 generic `/api/playout` parameters, and typed frontend query serialize these
 controls with matching validation.
+Basic Petri sampling can also opt into a structured visitation response: each
+trace alternates marking snapshots with fired transition indices (including
+silent transitions), with transition activity labels where available. The
+native serializer, CLI JSON output, generic endpoint, and typed
+`fetchBasicPlayoutVisited` adapter share the `PETRI_PLAYOUT_VISITED`/
+`BASIC_PLAYOUT` envelope.
 
 Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
 the interaction, descendants, inheritance, cobirth, and codeath object graphs as

@@ -388,6 +388,7 @@ describe("basic Petri playout contract", () => {
       case_interval: 2.5, event_interval: 0.25,
       initial_marking: [0, 1, 0], final_marking: [0, 0, 1],
       add_only_if_fm_is_reached: true, fm_leq_accepted: true,
+      return_visited_elements: true,
     }));
     expect(query.get("traces")).toBe("12");
     expect(query.get("max_steps")).toBe("99");
@@ -396,11 +397,13 @@ describe("basic Petri playout contract", () => {
     expect(query.get("final_marking")).toBe("0,0,1");
     expect(query.get("add_only_if_fm_is_reached")).toBe("true");
     expect(query.get("fm_leq_accepted")).toBe("true");
+    expect(query.get("return_visited_elements")).toBe("true");
   });
   it("rejects invalid final-acceptance controls", () => {
     expect(() => basicPlayoutQuery({ traces: 0 })).toThrow(/positive/);
     expect(() => basicPlayoutQuery({ event_interval: -1 })).toThrow(/non-negative/);
     expect(() => basicPlayoutQuery({ fm_leq_accepted: "yes" as unknown as boolean })).toThrow(/boolean/);
+    expect(() => basicPlayoutQuery({ return_visited_elements: "yes" as unknown as boolean })).toThrow(/boolean/);
     expect(() => basicPlayoutQuery({ initial_marking: [] })).toThrow(/non-empty/);
   });
 });

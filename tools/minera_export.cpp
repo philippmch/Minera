@@ -947,6 +947,7 @@ int usage(const char* program) {
                "  --petri-playout-event-interval <f> Event interval\n"
                "  --petri-playout-add-only-if-fm-is-reached <bool> Keep accepted cases only\n"
                "  --petri-playout-fm-leq-accepted <bool> Accept final-marking supersets\n"
+               "  --petri-playout-return-visited-elements <bool> Emit visited markings/transitions as JSON\n"
                "  --stochastic-traces <n>  Weighted Petri cases\n"
                "  --stochastic-max-steps <n> Firing cap per case\n"
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
@@ -2571,7 +2572,8 @@ int main(int argc, char** argv) {
         arg == "--petri-playout-case-interval" ||
         arg == "--petri-playout-event-interval" ||
         arg == "--petri-playout-add-only-if-fm-is-reached" ||
-        arg == "--petri-playout-fm-leq-accepted") {
+        arg == "--petri-playout-fm-leq-accepted" ||
+        arg == "--petri-playout-return-visited-elements") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(std::string_view("--petri-playout-").size()));
@@ -3931,6 +3933,10 @@ int main(int argc, char** argv) {
         basic_playout_options.fm_leq_accepted = parse_boolean(
             lookup("fm_leq_accepted").c_str(),
             "--petri-playout-fm-leq-accepted");
+      if (present("return_visited_elements"))
+        basic_playout_options.return_visited_elements = parse_boolean(
+            lookup("return_visited_elements").c_str(),
+            "--petri-playout-return-visited-elements");
     } catch (const std::invalid_argument& error) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;
@@ -5397,6 +5403,9 @@ int main(int argc, char** argv) {
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
+      if (selected != nullptr && basic_playout_options.return_visited_elements)
+        generated_json = minera::serialize_playout_visited_json(
+            *selected, minera::playout_visited(*selected, basic_playout_options));
       if (generated_json) {
         // JSON is the explicit return-variants representation; no XES
         // conversion is performed for that request.

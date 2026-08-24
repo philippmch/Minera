@@ -35,6 +35,9 @@ struct PlayoutOptions {
   // Treat a marking containing at least the selected final marking's tokens
   // as accepted. Exact equality remains accepted in either mode.
   bool fm_leq_accepted = false;
+  // Adapter-facing opt-in for the visited-elements representation returned by
+  // playout_visited; the EventLog-returning playout function remains unchanged.
+  bool return_visited_elements = false;
 };
 
 // Controls weighted stochastic playout of a Petri net.  Transition weights
@@ -82,6 +85,33 @@ struct StochasticPlayoutOptions {
 // imported ones. Case ids are "case_1".. in generation order.
 [[nodiscard]] EventLog playout(const PetriNet& net,
                                const PlayoutOptions& options = {});
+
+enum class PlayoutVisitedElementKind { MARKING, TRANSITION };
+
+struct PlayoutVisitedElement {
+  PlayoutVisitedElementKind kind = PlayoutVisitedElementKind::MARKING;
+  // Set for MARKING elements; transition_index is ignored for those values.
+  std::vector<std::uint32_t> marking;
+  // Set for TRANSITION elements; this is the stable index in the net's
+  // transition vector and includes silent transitions.
+  std::size_t transition_index = 0;
+
+  friend bool operator==(const PlayoutVisitedElement&,
+                         const PlayoutVisitedElement&) = default;
+};
+
+using PlayoutVisitedTrace = std::vector<PlayoutVisitedElement>;
+
+struct PlayoutVisitedResult {
+  std::vector<PlayoutVisitedTrace> traces;
+};
+
+// Returns the alternating marking/transition visitation sequence for each
+// accepted basic-playout case. Every case starts with its initial marking;
+// each fired transition is followed by the resulting marking, including
+// silent transitions. Cases rejected by the acceptance options are omitted.
+[[nodiscard]] PlayoutVisitedResult playout_visited(
+    const PetriNet& net, const PlayoutOptions& options = {});
 
 // Samples enabled Petri-net transitions according to transition_weights and
 // returns one synthetic trace per requested case.  Input arc multiplicity is

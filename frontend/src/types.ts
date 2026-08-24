@@ -2820,6 +2820,61 @@ export interface BasicPlayoutOptions {
   event_interval?: number;
   add_only_if_fm_is_reached?: boolean;
   fm_leq_accepted?: boolean;
+  return_visited_elements?: boolean;
+}
+
+export interface PlayoutVisitedMarking {
+  kind: "marking";
+  marking: number[];
+}
+
+export interface PlayoutVisitedTransition {
+  kind: "transition";
+  transition: number;
+  activity: string | null;
+}
+
+export type PlayoutVisitedElement =
+  | PlayoutVisitedMarking
+  | PlayoutVisitedTransition;
+
+export interface BasicPlayoutVisitedResult {
+  family: "PETRI_PLAYOUT_VISITED";
+  variant: "BASIC_PLAYOUT";
+  traces: PlayoutVisitedElement[][];
+}
+
+export function isBasicPlayoutVisitedResult(
+  value: unknown,
+): value is BasicPlayoutVisitedResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<BasicPlayoutVisitedResult>;
+  if (result.family !== "PETRI_PLAYOUT_VISITED" ||
+      result.variant !== "BASIC_PLAYOUT" || !Array.isArray(result.traces)) {
+    return false;
+  }
+  return result.traces.every((trace) => {
+    if (!Array.isArray(trace) || trace.length === 0 || trace.length % 2 === 0) {
+      return false;
+    }
+    return trace.every((element, index) => {
+      if (!element || typeof element !== "object") return false;
+      const item = element as {
+        kind?: unknown;
+        marking?: unknown;
+        transition?: unknown;
+        activity?: unknown;
+      };
+      if (index % 2 === 0) {
+        return item.kind === "marking" && Array.isArray(item.marking) &&
+          item.marking.length > 0 &&
+          item.marking.every((token) => Number.isSafeInteger(token) && token >= 0);
+      }
+      return item.kind === "transition" && typeof item.transition === "number" &&
+        Number.isSafeInteger(item.transition) && item.transition >= 0 &&
+        (typeof item.activity === "string" || item.activity === null);
+    });
+  });
 }
 
 /** Controls weighted random execution of a Petri-net model. */

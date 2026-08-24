@@ -4323,6 +4323,15 @@ void handle_playout(const httplib::Request& request,
   const bool is_stochastic = mode == "stochastic" || miner == "stochastic";
   const bool is_monte_carlo =
       mode == "monte_carlo" || miner == "monte_carlo";
+  if (request.has_param("return_visited_elements") &&
+      (is_declare || is_stochastic || is_monte_carlo ||
+       miner == "process_tree" || miner == "dfg")) {
+    response.status = 400;
+    response.set_content(
+        error_json("return_visited_elements requires basic Petri playout"),
+        "application/json");
+    return;
+  }
   if (is_monte_carlo) {
     const std::string selected_miner =
         miner == "monte_carlo" ? "inductive" : miner;
@@ -4623,7 +4632,8 @@ void handle_playout(const httplib::Request& request,
        request.has_param("start") || request.has_param("case_interval") ||
        request.has_param("event_interval") ||
        request.has_param("add_only_if_fm_is_reached") ||
-       request.has_param("fm_leq_accepted"))) {
+       request.has_param("fm_leq_accepted") ||
+       request.has_param("return_visited_elements"))) {
     reject("basic Petri playout controls require the default sampling mode");
     return;
   }
@@ -4641,6 +4651,8 @@ void handle_playout(const httplib::Request& request,
         request, "add_only_if_fm_is_reached", false);
     options.fm_leq_accepted =
         ocel_query_bool(request, "fm_leq_accepted", false);
+    options.return_visited_elements =
+        ocel_query_bool(request, "return_visited_elements", false);
   } catch (const std::exception& error) {
     reject(error.what());
     return;
@@ -4652,6 +4664,14 @@ void handle_playout(const httplib::Request& request,
   if (options.traces != 0 && options.max_steps != 0 &&
       options.traces > kMaxGeneratedEvents / options.max_steps) {
     reject("Petri playout event budget exceeds the server safety limit");
+    return;
+  }
+
+  if (options.return_visited_elements) {
+    response.set_content(
+        minera::serialize_playout_visited_json(
+            it->second, minera::playout_visited(it->second, options)),
+        "application/json");
     return;
   }
 

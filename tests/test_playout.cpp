@@ -1,3 +1,4 @@
+#include "minera/json_export.hpp"
 #include "minera/playout.hpp"
 
 #include <cassert>
@@ -201,6 +202,73 @@ void basic_playout_acceptance_controls() {
   assert(activity_signature(superset_log) == activity_signature(repeat));
 }
 
+void visited_playout_records_markings_and_transitions() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a"});
+  net.add_transition(std::nullopt, {source}, {middle});
+  net.add_transition(0, {middle}, {sink});
+
+  minera::PlayoutOptions options;
+  options.traces = 1;
+  options.max_steps = 2;
+  const auto result = minera::playout_visited(net, options);
+  assert(result.traces.size() == 1);
+  const auto& visited = result.traces.front();
+  assert(visited.size() == 5);
+  assert(visited[0].kind == minera::PlayoutVisitedElementKind::MARKING);
+  assert(visited[0].marking == std::vector<std::uint32_t>({1, 0, 0}));
+  assert(visited[1].kind == minera::PlayoutVisitedElementKind::TRANSITION);
+  assert(visited[1].transition_index == 0);
+  assert(visited[2].kind == minera::PlayoutVisitedElementKind::MARKING);
+  assert(visited[2].marking == std::vector<std::uint32_t>({0, 1, 0}));
+  assert(visited[3].kind == minera::PlayoutVisitedElementKind::TRANSITION);
+  assert(visited[3].transition_index == 1);
+  assert(visited[4].kind == minera::PlayoutVisitedElementKind::MARKING);
+  assert(visited[4].marking == std::vector<std::uint32_t>({0, 0, 1}));
+  assert(minera::serialize_playout_visited_json(net, result) ==
+         "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"traces\":[[{\"kind\":\"marking\",\"marking\":[1,0,0]},"
+         "{\"kind\":\"transition\",\"transition\":0,\"activity\":null},"
+         "{\"kind\":\"marking\",\"marking\":[0,1,0]},"
+         "{\"kind\":\"transition\",\"transition\":1,\"activity\":\"a\"},"
+         "{\"kind\":\"marking\",\"marking\":[0,0,1]}]]}");
+}
+
+void visited_playout_honors_filtering_and_seed() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  const auto dead = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"finish", "dead"});
+  net.add_transition(0, {source}, {sink});
+  net.add_transition(1, {source}, {dead});
+
+  minera::PlayoutOptions options;
+  options.traces = 20;
+  options.max_steps = 1;
+  options.seed = 7;
+  options.add_only_if_fm_is_reached = true;
+  const auto first = minera::playout_visited(net, options);
+  const auto second = minera::playout_visited(net, options);
+  assert(first.traces == second.traces);
+  assert(!first.traces.empty());
+  for (const auto& visited : first.traces) {
+    assert(!visited.empty());
+    assert(visited.back().kind == minera::PlayoutVisitedElementKind::MARKING);
+    assert(visited.back().marking == std::vector<std::uint32_t>({0, 1, 0}));
+  }
+
+  options.add_only_if_fm_is_reached = false;
+  const auto unfiltered = minera::playout_visited(net, options);
+  assert(unfiltered.traces.size() == options.traces);
+}
+
 void basic_playout_timing_is_validated() {
   const auto net = linear_net();
   for (const auto invalid : {std::numeric_limits<double>::quiet_NaN(),
@@ -214,12 +282,26 @@ void basic_playout_timing_is_validated() {
       rejected = true;
     }
     assert(rejected);
+    rejected = false;
+    try {
+      (void)minera::playout_visited(net, options);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
   }
   minera::PlayoutOptions negative;
   negative.case_interval = -1.0;
   bool rejected = false;
   try {
     (void)minera::playout(net, negative);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+  rejected = false;
+  try {
+    (void)minera::playout_visited(net, negative);
   } catch (const std::invalid_argument&) {
     rejected = true;
   }
@@ -415,6 +497,8 @@ int main() {
   huge_weights_are_scaled_without_overflow();
   uniform_playout_honors_weighted_input_arcs();
   basic_playout_acceptance_controls();
+  visited_playout_records_markings_and_transitions();
+  visited_playout_honors_filtering_and_seed();
   basic_playout_timing_is_validated();
   extensive_playout_accepts_explicit_markers();
   sampled_variants_accept_explicit_markers();

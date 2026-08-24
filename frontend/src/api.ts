@@ -138,6 +138,7 @@ import {
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
   type BasicPlayoutOptions,
+  type BasicPlayoutVisitedResult,
   type StochasticPlayoutOptions,
   type MonteCarloOptions,
   type MonteCarloResult,
@@ -184,6 +185,7 @@ import {
   isPetriUsageComparison,
   isMonteCarloResult,
   isDfgPlayoutVariantsResult,
+  isBasicPlayoutVisitedResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
   isServiceTimeResult,
@@ -3154,7 +3156,9 @@ export function basicPlayoutQuery(options: BasicPlayoutOptions = {}): string {
     }
     params.set(name, String(value));
   }
-  for (const name of ["add_only_if_fm_is_reached", "fm_leq_accepted"] as const) {
+  for (const name of [
+    "add_only_if_fm_is_reached", "fm_leq_accepted", "return_visited_elements",
+  ] as const) {
     const value = options[name];
     if (value === undefined) continue;
     if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
@@ -3413,6 +3417,33 @@ export async function fetchPlayout(miner: string, options: BasicPlayoutOptions |
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+/** Fetches the structured visitation sequence emitted by basic Petri playout. */
+export async function fetchBasicPlayoutVisited(
+  miner = "inductive",
+  options: BasicPlayoutOptions = {},
+): Promise<BasicPlayoutVisitedResult> {
+  const query = basicPlayoutQuery({ ...options, return_visited_elements: true });
+  let response: Response;
+  try {
+    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload) {
+      throw new Error(String((payload as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isBasicPlayoutVisitedResult(payload)) {
+    throw new Error("the Minera backend returned an invalid Petri visited playout");
+  }
+  return payload;
 }
 
 /** Fetches DFG playout, decoding the structured classic variant response. */
