@@ -2454,6 +2454,14 @@ export function requestDataPetriNet(
 export interface DfgExportOptions {
   noise_threshold?: number;
   most_common_paths?: string;
+  activities_percentage?: number;
+  paths_percentage?: number;
+  /** Dependency threshold used by the connected-edge filter. */
+  keep_connected?: number;
+  keep_all_activities?: boolean;
+  to_activity?: string;
+  from_activity?: string;
+  contain_activity?: string;
 }
 
 export function dfgExportQuery(options: DfgExportOptions = {}): string {
@@ -2466,7 +2474,41 @@ export function dfgExportQuery(options: DfgExportOptions = {}): string {
   if (options.most_common_paths !== undefined) {
     const paths = options.most_common_paths.trim();
     if (!paths) throw new Error("most_common_paths must not be empty");
+    if (options.noise_threshold === undefined)
+      throw new Error("most_common_paths requires noise_threshold");
     query.set("most_common_paths", paths);
+  }
+  const fractionOptions = [
+    ["activities_percentage", options.activities_percentage],
+    ["paths_percentage", options.paths_percentage],
+  ] as const;
+  for (const [name, value] of fractionOptions) {
+    if (value === undefined) continue;
+    if (!Number.isFinite(value) || value < 0 || value > 1)
+      throw new Error(`${name} must be finite and in [0, 1]`);
+    query.set(name, String(value));
+  }
+  if (options.keep_connected !== undefined) {
+    if (!Number.isFinite(options.keep_connected))
+      throw new Error("keep_connected must be finite");
+    query.set("keep_connected", String(options.keep_connected));
+  }
+  if (options.keep_all_activities !== undefined) {
+    if (options.keep_all_activities &&
+        options.paths_percentage === undefined &&
+        options.keep_connected === undefined) {
+      throw new Error(
+        "keep_all_activities requires paths_percentage or keep_connected",
+      );
+    }
+    query.set("keep_all_activities", options.keep_all_activities ? "true" : "false");
+  }
+  for (const name of ["to_activity", "from_activity", "contain_activity"] as const) {
+    const value = options[name];
+    if (value === undefined) continue;
+    const activity = value.trim();
+    if (!activity) throw new Error(`${name} must not be empty`);
+    query.set(name, activity);
   }
   return query.toString();
 }
