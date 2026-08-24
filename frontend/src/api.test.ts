@@ -837,6 +837,7 @@ describe("Monte Carlo API", () => {
       max_steps: 8,
       seed: 7,
       default_duration_seconds: 3,
+      force_distribution: "exponential",
       transition_weights: [0.25, 1],
       transition_durations: [
         { distribution: "deterministic", value_seconds: 1 },
@@ -846,7 +847,7 @@ describe("Monte Carlo API", () => {
       ],
       resources_per_place: { 0: 2, 3: 4 },
       enable_diagnostics: false,
-    })).toBe("monte_carlo_simulations=4&monte_carlo_max_steps=8&monte_carlo_seed=7&monte_carlo_case_arrival_seconds=2.5&monte_carlo_default_duration_seconds=3&monte_carlo_transition_weights=0.25%2C1&monte_carlo_transition_durations=deterministic%3A1%2Cexponential%3A2%2Cnormal%3A3%3B1%2Clognormal%3A0.5%3B0%3B1&monte_carlo_resources_per_place=0%3D2%2C3%3D4&monte_carlo_enable_diagnostics=false");
+    })).toBe("monte_carlo_simulations=4&monte_carlo_max_steps=8&monte_carlo_seed=7&monte_carlo_case_arrival_seconds=2.5&monte_carlo_default_duration_seconds=3&monte_carlo_force_distribution=exponential&monte_carlo_transition_weights=0.25%2C1&monte_carlo_transition_durations=deterministic%3A1%2Cexponential%3A2%2Cnormal%3A3%3B1%2Clognormal%3A0.5%3B0%3B1&monte_carlo_resources_per_place=0%3D2%2C3%3D4&monte_carlo_enable_diagnostics=false");
   });
 
   it("validates simulation results", async () => {

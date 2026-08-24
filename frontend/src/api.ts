@@ -3272,6 +3272,12 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
       params.set(`monte_carlo_${name}`, String(value));
     }
   }
+  if (options.force_distribution !== undefined) {
+    if (!["normal", "uniform", "exponential"].includes(options.force_distribution)) {
+      throw new Error("force_distribution must be normal, uniform, or exponential");
+    }
+    params.set("monte_carlo_force_distribution", options.force_distribution);
+  }
   if (options.transition_weights !== undefined) {
     if (!Array.isArray(options.transition_weights) || options.transition_weights.length === 0 ||
         options.transition_weights.some((value) => !Number.isFinite(value) || value < 0)) {
@@ -3393,6 +3399,7 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
 export async function fetchPlayout(miner: string, options: BasicPlayoutOptions | ProcessTreePlayoutOptions | StochasticPlayoutOptions | MonteCarloOptions | DfgPlayoutOptions = {}): Promise<string> {
   const monteCarlo = miner === "monte_carlo" || "simulations" in options ||
     "default_duration_seconds" in options || "transition_durations" in options ||
+    "force_distribution" in options ||
     "resources_per_place" in options;
   const stochastic = miner === "stochastic" || "transition_weights" in options ||
     "fit_from_log" in options || "stop_at_final" in options;

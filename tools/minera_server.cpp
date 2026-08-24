@@ -178,6 +178,7 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request) {
       "monte_carlo_case_arrival_seconds", "monte_carlo_max_steps",
       "monte_carlo_seed", "monte_carlo_start",
       "monte_carlo_default_duration_seconds",
+      "monte_carlo_force_distribution",
       "monte_carlo_transition_weights",
       "monte_carlo_transition_durations",
       "monte_carlo_resources_per_place",

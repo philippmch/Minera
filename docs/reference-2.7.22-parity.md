@@ -125,11 +125,14 @@ Monte Carlo simulation evidence: the native `monte_carlo` core implements the
 selection, deterministic, exponential, constant-zero, immediate, normal, uniform,
 lognormal, and gamma service times, bounded case/step
 budgets, shared output-place resource pools, completion/deadlock diagnostics,
-and deterministic EventLog output. `monte_carlo_*` request fields are strictly
+and deterministic EventLog output. Source-log fitting can force normal,
+uniform, or exponential service-time distributions while retaining deterministic
+fallbacks for degenerate samples; explicit duration vectors take precedence.
+`monte_carlo_*` request fields are strictly
 validated, the export CLI can select `--playout-miner monte_carlo`, the local
 server exposes both `/api/playout?mode=monte_carlo` (XES) and `/api/monte-carlo`
 (JSON), and the frontend offers typed query/result guards and controls. Fitted
-activation weights and timestamp-derived deterministic service means are applied
+activation weights and timestamp-derived service durations are applied
 when the source log overload is used.
 
 Object-centric Petri-net simulation evidence: the bounded native adapter

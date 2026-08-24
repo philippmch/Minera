@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,9 @@ struct MonteCarloOptions {
   // Stop a case at the exact workflow final marking.  When false, the case
   // continues until max_steps or a deadlock.
   bool stop_at_final = true;
+  // Optional distribution used only when fitting missing durations from a
+  // source event log. Explicit transition_durations take precedence.
+  std::optional<MonteCarloDurationDistribution> force_distribution;
 };
 
 struct MonteCarloDiagnostics {
@@ -105,10 +109,10 @@ struct MonteCarloResult {
   MonteCarloDiagnostics diagnostics;
 };
 
-// Fits the optional transition weights and deterministic service means from a
-// source log.  Visible transitions use activity frequencies; when timestamps
-// are available, the elapsed time to the next event estimates the current
-// activity's service interval. Explicit options always take precedence.
+// Fits optional transition weights and service durations from a source log.
+// Visible transitions use activity frequencies; when timestamps are available,
+// the elapsed time to the next event estimates the current activity's service
+// interval. Explicit options always take precedence.
 [[nodiscard]] MonteCarloOptions fit_monte_carlo_options(
     const EventLog& input_log, const PetriNet& net,
     const MonteCarloOptions& options = {});

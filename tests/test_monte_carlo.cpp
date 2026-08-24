@@ -1,5 +1,6 @@
 #include "minera/monte_carlo.hpp"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -158,6 +159,80 @@ void source_log_fits_missing_weights_and_durations() {
   assert(result.diagnostics.case_execution_seconds.front() == 5.0);
 }
 
+void source_log_forces_duration_distributions() {
+  const auto net = sequential_net();
+  minera::EventLog input;
+  const std::array<int, 3> elapsed = {2, 4, 6};
+  for (std::size_t index = 0; index < elapsed.size(); ++index) {
+    minera::Trace trace;
+    trace.case_id = "fit_" + std::to_string(index);
+    trace.events = {
+        minera::Event{trace.case_id, "A", "2026-01-01T00:00:00Z"},
+        minera::Event{trace.case_id, "B",
+                      "2026-01-01T00:00:0" + std::to_string(elapsed[index]) + "Z"}};
+    input.traces.push_back(std::move(trace));
+  }
+
+  minera::MonteCarloOptions options;
+  options.force_distribution =
+      minera::MonteCarloDurationDistribution::kNormal;
+  const auto normal = minera::fit_monte_carlo_options(input, net, options);
+  assert(normal.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kNormal);
+  assert(normal.transition_durations[0].value_seconds == 4.0);
+  assert(std::abs(normal.transition_durations[0].secondary_seconds -
+                  std::sqrt(8.0 / 3.0)) < 1e-9);
+
+  options.force_distribution =
+      minera::MonteCarloDurationDistribution::kUniform;
+  const auto uniform = minera::fit_monte_carlo_options(input, net, options);
+  assert(uniform.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kUniform);
+  assert(uniform.transition_durations[0].value_seconds == 2.0);
+  assert(uniform.transition_durations[0].secondary_seconds == 4.0);
+
+  options.force_distribution =
+      minera::MonteCarloDurationDistribution::kExponential;
+  const auto exponential = minera::fit_monte_carlo_options(input, net, options);
+  assert(exponential.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kExponential);
+  assert(exponential.transition_durations[0].value_seconds == 4.0);
+
+  options.transition_durations = {
+      {minera::MonteCarloDurationDistribution::kDeterministic, 9.0},
+      {minera::MonteCarloDurationDistribution::kDeterministic, 1.0}};
+  const auto explicit_durations =
+      minera::fit_monte_carlo_options(input, net, options);
+  assert(explicit_durations.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kDeterministic);
+  assert(explicit_durations.transition_durations[0].value_seconds == 9.0);
+
+  minera::EventLog degenerate;
+  minera::Trace zero_trace;
+  zero_trace.case_id = "zero";
+  zero_trace.events = {
+      minera::Event{"zero", "A", "2026-01-01T00:00:00Z"},
+      minera::Event{"zero", "B", "2026-01-01T00:00:00Z"}};
+  degenerate.traces.push_back(std::move(zero_trace));
+  options.transition_durations.clear();
+  options.force_distribution =
+      minera::MonteCarloDurationDistribution::kUniform;
+  const auto fallback = minera::fit_monte_carlo_options(degenerate, net, options);
+  assert(fallback.transition_durations[0].distribution ==
+         minera::MonteCarloDurationDistribution::kDeterministic);
+  assert(fallback.transition_durations[0].value_seconds == 0.0);
+
+  options.force_distribution =
+      static_cast<minera::MonteCarloDurationDistribution>(99);
+  bool rejected = false;
+  try {
+    (void)minera::fit_monte_carlo_options({}, net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void scalar_duration_distributions_are_seeded_and_nonnegative() {
   const auto net = linear_net();
   const auto options_for = [&](minera::MonteCarloDuration duration) {
@@ -289,6 +364,17 @@ void invalid_options_are_rejected() {
   rejected = false;
   try {
     minera::MonteCarloOptions options;
+    options.force_distribution =
+        static_cast<minera::MonteCarloDurationDistribution>(99);
+    (void)minera::monte_carlo(net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+
+  rejected = false;
+  try {
+    minera::MonteCarloOptions options;
     options.default_duration_seconds = std::numeric_limits<double>::quiet_NaN();
     (void)minera::monte_carlo(net, options);
   } catch (const std::invalid_argument&) {
@@ -359,6 +445,7 @@ int main() {
   deterministic_seed_and_diagnostics();
   weighted_choices_and_exponential_replay();
   source_log_fits_missing_weights_and_durations();
+  source_log_forces_duration_distributions();
   scalar_duration_distributions_are_seeded_and_nonnegative();
   resources_create_virtual_fifo_wait();
   deadlocks_and_step_limits_are_reported();
