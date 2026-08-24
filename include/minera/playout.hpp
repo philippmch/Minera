@@ -28,6 +28,13 @@ struct PlayoutOptions {
   // source/sink defaults; a supplied vector must match the place count.
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::uint32_t> final_marking;
+  // When enabled, omit cases that stop at a deadlock or firing cap before
+  // reaching the selected final marking. The default preserves the original
+  // behavior and emits the partial case.
+  bool add_only_if_fm_is_reached = false;
+  // Treat a marking containing at least the selected final marking's tokens
+  // as accepted. Exact equality remains accepted in either mode.
+  bool fm_leq_accepted = false;
 };
 
 // Controls weighted stochastic playout of a Petri net.  Transition weights

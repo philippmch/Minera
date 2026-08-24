@@ -151,6 +151,81 @@ void uniform_playout_honors_weighted_input_arcs() {
   assert(log.traces[0].events.size() == 1);
 }
 
+void basic_playout_acceptance_controls() {
+  const auto net = linear_net();
+
+  minera::PlayoutOptions exact;
+  exact.traces = 2;
+  exact.max_steps = 1;
+  exact.add_only_if_fm_is_reached = true;
+  const auto accepted = minera::playout(net, exact);
+  assert(accepted.trace_count() == 2);
+  assert(accepted.traces.front().events.size() == 1);
+
+  minera::PetriNet unreachable;
+  const auto source = unreachable.add_place();
+  const auto sink = unreachable.add_place();
+  const auto dead = unreachable.add_place();
+  unreachable.set_source(source);
+  unreachable.set_sink(sink);
+  unreachable.set_activities({"dead"});
+  unreachable.add_transition(0, {source}, {dead});
+  minera::PlayoutOptions require_final;
+  require_final.traces = 2;
+  require_final.max_steps = 2;
+  require_final.add_only_if_fm_is_reached = true;
+  assert(minera::playout(unreachable, require_final).traces.empty());
+
+  minera::PetriNet superset;
+  const auto superset_source = superset.add_place();
+  const auto superset_sink = superset.add_place();
+  const auto extra = superset.add_place();
+  superset.set_source(superset_source);
+  superset.set_sink(superset_sink);
+  superset.set_activities({"finish"});
+  superset.add_transition(0, {superset_source}, {superset_sink, extra});
+
+  auto exact_only = require_final;
+  exact_only.traces = 1;
+  exact_only.max_steps = 1;
+  exact_only.add_only_if_fm_is_reached = true;
+  assert(minera::playout(superset, exact_only).traces.empty());
+
+  auto superset_accepted = exact_only;
+  superset_accepted.fm_leq_accepted = true;
+  const auto superset_log = minera::playout(superset, superset_accepted);
+  assert(superset_log.trace_count() == 1);
+  assert(superset_log.traces.front().events.size() == 1);
+
+  const auto repeat = minera::playout(superset, superset_accepted);
+  assert(activity_signature(superset_log) == activity_signature(repeat));
+}
+
+void basic_playout_timing_is_validated() {
+  const auto net = linear_net();
+  for (const auto invalid : {std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::infinity()}) {
+    minera::PlayoutOptions options;
+    options.start = invalid;
+    bool rejected = false;
+    try {
+      (void)minera::playout(net, options);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  minera::PlayoutOptions negative;
+  negative.case_interval = -1.0;
+  bool rejected = false;
+  try {
+    (void)minera::playout(net, negative);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void extensive_playout_accepts_explicit_markers() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -339,6 +414,8 @@ int main() {
   invalid_weights_are_rejected();
   huge_weights_are_scaled_without_overflow();
   uniform_playout_honors_weighted_input_arcs();
+  basic_playout_acceptance_controls();
+  basic_playout_timing_is_validated();
   extensive_playout_accepts_explicit_markers();
   sampled_variants_accept_explicit_markers();
   fitting_tracks_reachable_rates_and_silent_routing();

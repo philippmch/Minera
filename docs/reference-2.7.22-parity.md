@@ -166,7 +166,12 @@ the basic sampler and weighted stochastic sampler as well as exhaustive
 enumeration. The local `/api/playout` endpoint accepts `initial_marking` and
 `final_marking` for basic/extensive mode and the prefixed stochastic forms;
 the standalone playout/export CLIs and typed frontend query use the same
-comma-separated contract.
+comma-separated contract. Basic sampling also exposes deterministic seed and
+timing controls, a firing cap, and final-marking acceptance controls: callers
+can retain only cases that reach the final marking and optionally accept
+markings that contain it. The native API, `--petri-playout-*` export options,
+generic `/api/playout` parameters, and typed frontend query serialize these
+controls with matching validation.
 
 Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
 the interaction, descendants, inheritance, cobirth, and codeath object graphs as

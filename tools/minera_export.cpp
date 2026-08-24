@@ -937,6 +937,16 @@ int usage(const char* program) {
                "  --playout-max-loop-occurrences <n> Loop re-do limit\n"
                "  --playout-max-traces <n> Extensive trace cap\n"
                "  --playout-max-trace-cap <n> Alias for max-traces\n"
+               "  --petri-playout-traces <n> Petri sampled cases\n"
+               "  --petri-playout-max-steps <n> Petri firing cap per case\n"
+               "  --petri-playout-seed <u64> Petri random seed\n"
+               "  --petri-playout-initial-marking <n,...> Initial marker vector\n"
+               "  --petri-playout-final-marking <n,...> Final marker vector\n"
+               "  --petri-playout-start <f> First event epoch seconds\n"
+               "  --petri-playout-case-interval <f> Case start interval\n"
+               "  --petri-playout-event-interval <f> Event interval\n"
+               "  --petri-playout-add-only-if-fm-is-reached <bool> Keep accepted cases only\n"
+               "  --petri-playout-fm-leq-accepted <bool> Accept final-marking supersets\n"
                "  --stochastic-traces <n>  Weighted Petri cases\n"
                "  --stochastic-max-steps <n> Firing cap per case\n"
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
@@ -1223,6 +1233,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> process_tree_playout_fields;
   bool process_tree_playout_options_used = false;
   minera::ProcessTreePlayoutOptions process_tree_playout_options;
+  std::map<std::string, std::string> basic_playout_fields;
+  bool basic_playout_options_used = false;
+  minera::PlayoutOptions basic_playout_options;
   std::map<std::string, std::string> dfg_playout_fields;
   bool dfg_playout_options_used = false;
   minera::DfgPlayoutOptions dfg_playout_options;
@@ -2549,6 +2562,25 @@ int main(int argc, char** argv) {
       continue;
     }
 
+    if (arg == "--petri-playout-traces" ||
+        arg == "--petri-playout-max-steps" ||
+        arg == "--petri-playout-seed" ||
+        arg == "--petri-playout-initial-marking" ||
+        arg == "--petri-playout-final-marking" ||
+        arg == "--petri-playout-start" ||
+        arg == "--petri-playout-case-interval" ||
+        arg == "--petri-playout-event-interval" ||
+        arg == "--petri-playout-add-only-if-fm-is-reached" ||
+        arg == "--petri-playout-fm-leq-accepted") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(std::string_view("--petri-playout-").size()));
+      std::replace(key.begin(), key.end(), '-', '_');
+      basic_playout_fields.insert_or_assign(std::move(key), value);
+      basic_playout_options_used = true;
+      continue;
+    }
+
     if (arg == "--stochastic-traces" || arg == "--stochastic-max-steps" ||
         arg == "--stochastic-seed" ||
         arg == "--stochastic-transition-weights" ||
@@ -3834,6 +3866,71 @@ int main(int argc, char** argv) {
     try {
       process_tree_playout_options =
           minera::parse_process_tree_playout_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
+
+  if (basic_playout_options_used &&
+      (playout_miner == "declare" || playout_miner == "process_tree" ||
+       playout_miner == "dfg" || playout_miner == "stochastic" ||
+       playout_miner == "monte_carlo")) {
+    std::cerr << "error: --petri-playout-* options require a Petri "
+                 "--playout-miner\n";
+    return 2;
+  }
+  if (basic_playout_options_used) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = basic_playout_fields.find(std::string(name));
+      return it == basic_playout_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return basic_playout_fields.contains(std::string(name));
+    };
+    try {
+      if (present("traces"))
+        basic_playout_options.traces = parse_positive_size(
+            lookup("traces").c_str(), "--petri-playout-traces");
+      if (present("max_steps"))
+        basic_playout_options.max_steps = parse_nonnegative_size(
+            lookup("max_steps").c_str(), "--petri-playout-max-steps");
+      if (present("seed"))
+        basic_playout_options.seed = static_cast<std::uint64_t>(
+            parse_nonnegative_size(lookup("seed").c_str(),
+                                   "--petri-playout-seed"));
+      if (present("initial_marking"))
+        basic_playout_options.initial_marking = parse_uint32_marking(
+            lookup("initial_marking").c_str(),
+            "--petri-playout-initial-marking");
+      if (present("final_marking"))
+        basic_playout_options.final_marking = parse_uint32_marking(
+            lookup("final_marking").c_str(),
+            "--petri-playout-final-marking");
+      if (present("start"))
+        basic_playout_options.start = parse_finite_double(
+            lookup("start").c_str(), "--petri-playout-start");
+      if (present("case_interval"))
+        basic_playout_options.case_interval = parse_finite_double(
+            lookup("case_interval").c_str(),
+            "--petri-playout-case-interval");
+      if (present("event_interval"))
+        basic_playout_options.event_interval = parse_finite_double(
+            lookup("event_interval").c_str(),
+            "--petri-playout-event-interval");
+      if (basic_playout_options.case_interval < 0.0 ||
+          basic_playout_options.event_interval < 0.0) {
+        throw std::invalid_argument(
+            "Petri playout intervals must be non-negative");
+      }
+      if (present("add_only_if_fm_is_reached"))
+        basic_playout_options.add_only_if_fm_is_reached = parse_boolean(
+            lookup("add_only_if_fm_is_reached").c_str(),
+            "--petri-playout-add-only-if-fm-is-reached");
+      if (present("fm_leq_accepted"))
+        basic_playout_options.fm_leq_accepted = parse_boolean(
+            lookup("fm_leq_accepted").c_str(),
+            "--petri-playout-fm-leq-accepted");
     } catch (const std::invalid_argument& error) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;
@@ -5321,7 +5418,7 @@ int main(int argc, char** argv) {
                         : minera::stochastic_playout(
                               *selected, stochastic_playout_options);
       } else if (!generated) {
-        generated = minera::playout(*selected);
+        generated = minera::playout(*selected, basic_playout_options);
       }
       std::ofstream playout_file(playout_output);
       if (!playout_file) {
