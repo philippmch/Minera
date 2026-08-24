@@ -4548,6 +4548,7 @@ export interface OcelFeatureOptions {
   include_endpoint_features?: boolean;
   include_attribute_counts?: boolean;
   include_interaction_features?: boolean;
+  include_degree_centrality_features?: boolean;
   include_interaction_by_type_features?: boolean;
   include_general_interaction_features?: boolean;
   include_general_descendants_features?: boolean;
@@ -4578,6 +4579,8 @@ export interface OcelFeatureOptions {
 export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   if (options.include_interaction_by_type_features && options.variant !== "objects")
     throw new Error("include_interaction_by_type_features applies only to objects");
+  if (options.include_degree_centrality_features !== undefined && options.variant !== "objects")
+    throw new Error("include_degree_centrality_features applies only to objects");
   const objectGraphFeatures = options.include_general_interaction_features ||
     options.include_general_descendants_features || options.include_general_inheritance_features ||
     options.include_cobirth_features || options.include_codeath_features;
@@ -4616,6 +4619,7 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_endpoint_features", options.include_endpoint_features);
   addBoolean("include_attribute_counts", options.include_attribute_counts);
   addBoolean("include_interaction_features", options.include_interaction_features);
+  addBoolean("include_degree_centrality_features", options.include_degree_centrality_features);
   addBoolean("include_interaction_by_type_features", options.include_interaction_by_type_features);
   addBoolean("include_general_interaction_features", options.include_general_interaction_features);
   addBoolean("include_general_descendants_features", options.include_general_descendants_features);

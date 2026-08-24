@@ -1126,11 +1126,12 @@ describe("OCEL API", () => {
     expect(ocelFeaturesQuery({
       variant: "objects", max_features: 12,
       include_lifecycle_features: false,
+      include_degree_centrality_features: true,
       include_interaction_by_type_features: true,
       numeric_event_attributes: ["z", "a"],
       string_object_attributes: ["color"],
       filter_per_type: "item",
-    })).toBe("variant=objects&max_features=12&include_interaction_by_type_features=true&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color&ocel_features_filter_per_type=item");
+    })).toBe("variant=objects&max_features=12&include_degree_centrality_features=true&include_interaction_by_type_features=true&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color&ocel_features_filter_per_type=item");
     expect(ocelFeaturesQuery({
       variant: "objects", include_lifecycle_length_features: false,
       include_lifecycle_unique_activity_features: false,
@@ -1163,6 +1164,8 @@ describe("OCEL API", () => {
     expect(ocelFeaturesQuery({ variant: "events", filter_per_type: "" }))
       .toBe("variant=events&ocel_features_filter_per_type=");
     expect(() => ocelFeaturesQuery({ variant: "events", include_interaction_by_type_features: true }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_degree_centrality_features: false }))
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_codeath_features: true }))
       .toThrow(/objects/);

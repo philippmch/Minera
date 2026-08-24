@@ -1566,7 +1566,8 @@ void handle_ocel_features(const httplib::Request& request,
         "variant", "max_features", "include_activity_features",
         "include_timestamp_features", "include_relation_features",
         "include_endpoint_features", "include_attribute_counts",
-        "include_interaction_features", "include_lifecycle_features",
+        "include_interaction_features", "include_degree_centrality_features",
+        "include_lifecycle_features",
         "include_lifecycle_length_features",
         "include_lifecycle_unique_activity_features",
         "include_lifecycle_duration_features",
@@ -1622,6 +1623,10 @@ void handle_ocel_features(const httplib::Request& request,
         request, "include_attribute_counts", options.include_attribute_counts);
     options.include_interaction_features = ocel_query_bool(
         request, "include_interaction_features", options.include_interaction_features);
+    if (request.has_param("include_degree_centrality_features")) {
+      options.include_degree_centrality_features = ocel_query_bool(
+          request, "include_degree_centrality_features", false);
+    }
     options.include_interaction_by_type_features = ocel_query_bool(
         request, "include_interaction_by_type_features",
         options.include_interaction_by_type_features);
@@ -1688,6 +1693,11 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_lifecycle_activity_features") ||
         request.has_param("include_lifecycle_wip_features") ||
         request.has_param("include_lifecycle_path_features");
+    const auto degree_control_supplied =
+        request.has_param("include_degree_centrality_features");
+    if (degree_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
+      throw std::invalid_argument(
+          "degree centrality features apply only to the objects variant");
     if (object_only_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
           "related-event, neighbor, and lifecycle metric options apply only to the objects variant");

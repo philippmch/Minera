@@ -25,6 +25,10 @@ struct OcelFeatureOptions {
   bool include_endpoint_features = true;
   bool include_attribute_counts = true;
   bool include_interaction_features = true;
+  // Normalized object interaction-graph degree. When unset, this follows the
+  // legacy interaction toggle; an explicit value enables independent control.
+  // The control applies only to OBJECTS.
+  std::optional<bool> include_degree_centrality_features;
   bool include_interaction_by_type_features = false;
   // Optional object-graph scalar columns. These are valid only for OBJECTS.
   bool include_general_interaction_features = false;
