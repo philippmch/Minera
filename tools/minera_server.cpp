@@ -1580,6 +1580,7 @@ void handle_ocel_features(const httplib::Request& request,
         "include_codeath_features",
         "include_related_events_features",
         "include_related_activities_features",
+        "include_related_objects_features",
         "include_obj_con_in_graph_features",
         "include_prefix_features", "include_prefix_length_features",
         "include_prefix_timediff_features", "include_prefix_one_hot_features",
@@ -1669,6 +1670,9 @@ void handle_ocel_features(const httplib::Request& request,
     options.include_related_activities_features = ocel_query_bool(
         request, "include_related_activities_features",
         options.include_related_activities_features);
+    options.include_related_objects_features = ocel_query_bool(
+        request, "include_related_objects_features",
+        options.include_related_objects_features);
     options.include_obj_con_in_graph_features = ocel_query_bool(
         request, "include_obj_con_in_graph_features",
         options.include_obj_con_in_graph_features);
@@ -1693,14 +1697,26 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_lifecycle_activity_features") ||
         request.has_param("include_lifecycle_wip_features") ||
         request.has_param("include_lifecycle_path_features");
+    const auto related_object_control_supplied =
+        request.has_param("include_related_objects_features");
+    const auto related_object_event_context =
+        options.include_related_objects_features &&
+        variant == minera::OcelFeatureVariant::kEvents;
     const auto degree_control_supplied =
         request.has_param("include_degree_centrality_features");
-    if (degree_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
+    if (degree_control_supplied && variant != minera::OcelFeatureVariant::kObjects &&
+        !related_object_event_context)
       throw std::invalid_argument(
           "degree centrality features apply only to the objects variant");
-    if (object_only_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
+    if (object_only_control_supplied &&
+        variant != minera::OcelFeatureVariant::kObjects &&
+        !related_object_event_context)
       throw std::invalid_argument(
           "related-event, neighbor, and lifecycle metric options apply only to the objects variant");
+    if (related_object_control_supplied &&
+        variant != minera::OcelFeatureVariant::kEvents)
+      throw std::invalid_argument(
+          "related-object features apply only to the events variant");
     const auto prefix_control_supplied =
         request.has_param("include_prefix_features") ||
         request.has_param("include_prefix_length_features") ||

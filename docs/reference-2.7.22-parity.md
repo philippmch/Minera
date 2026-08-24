@@ -240,7 +240,8 @@ OCEL feature evidence: `extract_ocel_features` provides deterministic numeric
 tables for event rows, object rows, and exploded event-object rows. Event
 features cover activity indicators, timestamps/calendar parts, related-object
 counts by type, lifecycle endpoints, attribute counts, custom numeric/string
-attributes, and newly observed interactions. Object features cover type
+attributes, newly observed interactions, and opt-in min/max aggregation of the
+selected object feature vector over each event's related objects. Object features cover type
 indicators, lifecycle length/duration/endpoints, activity/path counts, custom
 attributes, work-in-progress, normalized interaction-graph degree, and optional
 per-object-type interaction counts. Degree centrality is independently
@@ -270,6 +271,11 @@ order, retain each earlier event at most once per object, and use zero for
 missing timestamps; length, timediff, and activity groups can be disabled
 independently through native, server, CLI, and typed frontend options that are
 strictly limited to the exploded variant.
+The `include_related_objects_features` control and its
+`--features-related-objects` CLI counterpart enable this aggregation; they are
+strictly limited to EVENTS and remain disabled for the exploded projection,
+with duplicate relations deduplicated before aggregation and empty
+related-object sets represented by zero columns.
 The `include_degree_centrality_features` control and its
 `--features-no-degree-centrality` CLI counterpart are strictly limited to
 OBJECTS; the server and typed frontend reject this control for event and
