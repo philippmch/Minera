@@ -39,6 +39,17 @@ std::uint64_t fnv1a(std::string_view text) {
   return hash;
 }
 
+std::uint64_t mix_hash(std::uint64_t seed, std::string_view text) {
+  // FNV is deliberately kept as the stable primitive, while the model seed
+  // makes separately selected encoder profiles independent of one another.
+  std::uint64_t hash = seed ^ 1469598103934665603ULL;
+  for (const unsigned char c : text) {
+    hash ^= c;
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
 std::vector<std::string> tokens(std::string_view text) {
   std::vector<std::string> result;
   std::string current;
@@ -70,6 +81,22 @@ void validate_options(const EmbeddingOptions& options) {
     throw std::invalid_argument("embeddings: dimensions must be in [1,4096]");
   if (options.max_items == 0 || options.max_items > 1'000'000)
     throw std::invalid_argument("embeddings: max_items must be in [1,1000000]");
+}
+
+struct EncoderProfile {
+  std::uint64_t seed = 0;
+  bool character_ngrams = false;
+};
+
+EncoderProfile encoder_profile(std::string_view model) {
+  // `hashing-v1` is the original compact encoder and remains byte-for-byte
+  // stable.  Other model names select an independent salted profile.  The
+  // second built-in profile adds character n-grams, which gives callers a
+  // deterministic local alternative without requiring a runtime model file.
+  if (model == "hashing-v1") return {};
+  if (model == "hashing-v2")
+    return {fnv1a(model), true};
+  return {fnv1a(model), false};
 }
 
 double cosine(const std::vector<double>& left,
@@ -114,11 +141,30 @@ std::string variant_name(EmbeddingVariant variant) {
 std::vector<double> embed_text(std::string_view text,
                                const EmbeddingOptions& options) {
   validate_options(options);
+  const auto profile = encoder_profile(options.embedding_model);
   std::vector<double> values(options.dimensions, 0.0);
   for (const auto& token : tokens(text)) {
-    const auto hash = fnv1a(token);
+    const auto hash = profile.seed == 0 ? fnv1a(token)
+                                       : mix_hash(profile.seed, token);
     const auto bucket = static_cast<std::size_t>(hash % options.dimensions);
     values[bucket] += (hash & 1ULL) == 0ULL ? 1.0 : -1.0;
+
+    if (!profile.character_ngrams) continue;
+    std::string padded;
+    padded.reserve(token.size() + 2);
+    padded.push_back('^');
+    padded += token;
+    padded.push_back('$');
+    if (padded.size() < 3) continue;
+    for (std::size_t offset = 0; offset + 3 <= padded.size(); ++offset) {
+      const auto ngram = std::string_view(padded).substr(offset, 3);
+      const auto ngram_hash = mix_hash(profile.seed ^ 0x9e3779b97f4a7c15ULL,
+                                       ngram);
+      const auto ngram_bucket = static_cast<std::size_t>(
+          ngram_hash % options.dimensions);
+      values[ngram_bucket] +=
+          (ngram_hash & 1ULL) == 0ULL ? 0.5 : -0.5;
+    }
   }
   double norm = 0.0;
   for (const auto value : values) norm += value * value;
@@ -180,6 +226,10 @@ std::vector<EmbeddingSimilarity> embedding_similarity(
   if (result.dimensions == 0 || result.dimensions > 4096 ||
       result.dimensions != options.dimensions)
     throw std::invalid_argument("embeddings: result dimensions do not match options");
+  if (!result.embedding_model.empty() &&
+      result.embedding_model != options.embedding_model)
+    throw std::invalid_argument(
+        "embeddings: result embedding_model does not match options");
   const auto target = embed_text(target_text, options);
   std::vector<EmbeddingSimilarity> matches;
   matches.reserve(result.items.size());
@@ -273,7 +323,10 @@ std::string serialize_embedding_similarity_json(
   write_json_string(out, variant_name(result.variant));
   out << ",\"target\":";
   write_json_string(out, target_text);
-  out << ",\"top_k\":" << top_k << ",\"items\":[";
+  out << ",\"embedding_model\":";
+  write_json_string(out, result.embedding_model);
+  out << ",\"dimensions\":" << result.dimensions
+      << ",\"top_k\":" << top_k << ",\"items\":[";
   for (std::size_t i = 0; i < matches.size(); ++i) {
     if (i) out << ',';
     out << "{\"id\":";

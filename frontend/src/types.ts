@@ -656,6 +656,9 @@ export interface EmbeddingSimilarityResult {
   family: "TO_EMBEDDINGS_SIMILARITY";
   variant: EmbeddingVariant;
   target: string;
+  /** Echoed by newer backends; optional for backwards-compatible payloads. */
+  embedding_model?: string;
+  dimensions?: number;
   top_k: number;
   items: EmbeddingSimilarityItem[];
 }
@@ -678,9 +681,13 @@ export function isEmbeddingSimilarityResult(value: unknown): value is EmbeddingS
   if (!value || typeof value !== "object") return false;
   const c = value as Partial<EmbeddingSimilarityResult>;
   const topK = c.top_k;
+  const dimensions = c.dimensions;
   return c.family === "TO_EMBEDDINGS_SIMILARITY"
     && (c.variant === "cases_transformers" || c.variant === "events_transformers")
-    && typeof c.target === "string" && typeof topK === "number" && Number.isInteger(topK) && topK >= 0
+    && typeof c.target === "string"
+    && (c.embedding_model === undefined || typeof c.embedding_model === "string")
+    && (dimensions === undefined || (typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0 && dimensions <= 4096))
+    && typeof topK === "number" && Number.isInteger(topK) && topK >= 0
     && Array.isArray(c.items) && c.items.every((item) => !!item && typeof item === "object"
       && typeof (item as EmbeddingSimilarityItem).id === "string"
       && typeof (item as EmbeddingSimilarityItem).score === "number"

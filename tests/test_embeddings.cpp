@@ -37,6 +37,26 @@ int main() {
   const auto selected = filter_embeddings_top_k(log, "Approve Ship", 1, options);
   assert(selected.traces.size() == 1 && selected.traces[0].case_id == "c1");
 
+  // The selected model is part of the encoder contract. The n-gram profile is
+  // deterministic and intentionally produces a different vector from v1.
+  auto v2_options = options;
+  v2_options.embedding_model = "hashing-v2";
+  const auto v2 = embed_text("Approve Ship", v2_options);
+  const auto v2_again = embed_text("Approve Ship", v2_options);
+  assert(v2 == v2_again);
+  assert(v2 != embed_text("Approve Ship", options));
+  auto named_options = options;
+  named_options.embedding_model = "all-MiniLM-L6-v2";
+  assert(embed_text("Approve Ship", named_options) !=
+         embed_text("Approve Ship", options));
+  bool model_mismatch = false;
+  try {
+    (void)embedding_similarity("Approve Ship", cases, v2_options, 1);
+  } catch (const std::invalid_argument&) {
+    model_mismatch = true;
+  }
+  assert(model_mismatch);
+
   options.variant = EmbeddingVariant::EVENTS_TRANSFORMERS;
   const auto events = to_embeddings(log, options);
   assert(events.items.size() == 3);
@@ -57,6 +77,9 @@ int main() {
   const auto similarity_json = serialize_embedding_similarity_json(
       "Approve Ship", cases, matches, 1);
   assert(similarity_json.find("TO_EMBEDDINGS_SIMILARITY") != std::string::npos);
+  assert(similarity_json.find("\"embedding_model\":\"hashing-v1\"") !=
+         std::string::npos);
+  assert(similarity_json.find("\"dimensions\":32") != std::string::npos);
 
   bool threw = false;
   try {
