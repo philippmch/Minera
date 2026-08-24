@@ -953,6 +953,10 @@ int usage(const char* program) {
                "  --petri-playout-add-only-if-fm-is-reached <bool> Keep accepted cases only\n"
                "  --petri-playout-fm-leq-accepted <bool> Accept final-marking supersets\n"
                "  --petri-playout-return-visited-elements <bool> Emit visited markings/transitions as JSON\n"
+               "  --petri-playout-mode <basic|extensive> Petri playout algorithm\n"
+               "  --petri-playout-max-length <n> Extensive visible trace bound\n"
+               "  --petri-playout-return-elements <bool> Extensive visited JSON\n"
+               "  --petri-playout-max-marking-occ <n> Extensive marking repetition bound\n"
                "  --stochastic-traces <n>  Weighted Petri cases\n"
                "  --stochastic-max-steps <n> Firing cap per case\n"
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
@@ -1244,6 +1248,10 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> basic_playout_fields;
   bool basic_playout_options_used = false;
   minera::PlayoutOptions basic_playout_options;
+  std::map<std::string, std::string> extensive_playout_fields;
+  bool extensive_playout_options_used = false;
+  std::string petri_playout_mode = "basic";
+  minera::ExtensivePlayoutOptions extensive_playout_options;
   std::map<std::string, std::string> dfg_playout_fields;
   bool dfg_playout_options_used = false;
   minera::DfgPlayoutOptions dfg_playout_options;
@@ -2618,6 +2626,30 @@ int main(int argc, char** argv) {
       basic_playout_options_used = true;
       continue;
     }
+    if (arg == "--petri-playout-mode" ||
+        arg == "--petri-playout-max-length" ||
+        arg == "--petri-playout-return-elements" ||
+        arg == "--petri-playout-max-marking-occ") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--petri-playout-mode") {
+        petri_playout_mode = value;
+        if (petri_playout_mode != "basic" &&
+            petri_playout_mode != "extensive") {
+          std::cerr << "error: --petri-playout-mode expects basic or extensive\n";
+          return 2;
+        }
+      } else {
+        std::string key = arg == "--petri-playout-return-elements"
+                              ? "extensive_return_elements"
+                              : arg == "--petri-playout-max-length"
+                                    ? "extensive_max_length"
+                                    : "extensive_max_marking_occ";
+        extensive_playout_fields.insert_or_assign(std::move(key), value);
+      }
+      extensive_playout_options_used = true;
+      continue;
+    }
 
     if (arg == "--stochastic-traces" || arg == "--stochastic-max-steps" ||
         arg == "--stochastic-seed" ||
@@ -3922,6 +3954,13 @@ int main(int argc, char** argv) {
                  "--playout-miner\n";
     return 2;
   }
+  if (petri_playout_mode == "extensive" &&
+      (playout_miner == "declare" || playout_miner == "process_tree" ||
+       playout_miner == "dfg" || playout_miner == "stochastic" ||
+       playout_miner == "monte_carlo")) {
+    std::cerr << "error: extensive Petri playout requires a Petri model\n";
+    return 2;
+  }
   if (basic_playout_options_used) {
     const auto lookup = [&](std::string_view name) {
       const auto it = basic_playout_fields.find(std::string(name));
@@ -3980,6 +4019,36 @@ int main(int argc, char** argv) {
     } catch (const std::invalid_argument& error) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;
+    }
+  }
+
+  if (extensive_playout_options_used) {
+    if (petri_playout_mode != "extensive" &&
+        !extensive_playout_fields.empty()) {
+      std::cerr << "error: extensive Petri controls require "
+                   "--petri-playout-mode extensive\n";
+      return 2;
+    }
+    if (petri_playout_mode == "extensive") {
+      if (basic_playout_fields.contains("max_steps")) {
+        std::cerr << "error: --petri-playout-max-steps requires basic mode; "
+                     "use --petri-playout-max-length for extensive mode\n";
+        return 2;
+      }
+      const auto lookup = [&](std::string_view name) {
+        const auto it = extensive_playout_fields.find(std::string(name));
+        return it == extensive_playout_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return extensive_playout_fields.contains(std::string(name));
+      };
+      try {
+        extensive_playout_options =
+            minera::parse_extensive_playout_params(lookup, present);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
     }
   }
 
@@ -5451,7 +5520,27 @@ int main(int argc, char** argv) {
                      "declare, process_tree, or dfg)\n";
         return 1;
       }
-      if (selected != nullptr && basic_playout_options.return_visited_elements)
+      if (selected != nullptr && petri_playout_mode == "extensive") {
+        if (basic_playout_fields.contains("traces"))
+          extensive_playout_options.max_traces = basic_playout_options.traces;
+        if (basic_playout_fields.contains("initial_marking"))
+          extensive_playout_options.initial_marking =
+              basic_playout_options.initial_marking;
+        if (basic_playout_fields.contains("final_marking"))
+          extensive_playout_options.final_marking =
+              basic_playout_options.final_marking;
+        if (extensive_playout_options.return_elements) {
+          generated_json = minera::serialize_extensive_playout_visited_json(
+              *selected,
+              minera::extensive_playout_visited(
+                  *selected, extensive_playout_options));
+        } else {
+          generated = minera::extensive_playout(
+              *selected, extensive_playout_options);
+        }
+      }
+      if (selected != nullptr && petri_playout_mode == "basic" &&
+          basic_playout_options.return_visited_elements)
         generated_json = minera::serialize_playout_visited_json(
             *selected, minera::playout_visited(*selected, basic_playout_options));
       if (selected != nullptr && stochastic_playout_options.return_visited_elements)

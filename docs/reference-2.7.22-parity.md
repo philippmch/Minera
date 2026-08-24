@@ -198,6 +198,15 @@ native serializer, CLI JSON output, generic endpoint, and typed
 `fetchBasicPlayoutVisited` adapter share the `PETRI_PLAYOUT_VISITED`/
 `BASIC_PLAYOUT` envelope.
 
+Extensive Petri enumeration also has an opt-in `return_elements` control.
+When `mode=extensive`, the local server, standalone export CLI, and typed
+frontend helper expose an `EXTENSIVE_PLAYOUT` visited envelope with alternating
+markings and transition indices, including silent firings. `max_marking_occ`
+limits repeated occurrences of a marking on each candidate; omission keeps the
+native unlimited behavior, while an explicit zero is rejected. Final-marking
+acceptance and the visible trace-length bound remain unchanged, and ordinary
+extensive requests still return XES/EventLog output.
+
 Object-centric enrichment evidence: `enrich_ocel` deterministically materializes
 the interaction, descendants, inheritance, cobirth, and codeath object graphs as
 qualified O2O relations, and can qualify every E2O relation as creation, other,

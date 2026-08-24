@@ -47,6 +47,8 @@ int usage(const char* program) {
                "                     sampling randomly\n"
                "  --max-length <n>   Extensive: longest visible trace to\n"
                "                     enumerate (default: 10)\n"
+               "  --return-elements <bool> Extensive visited JSON output\n"
+               "  --max-marking-occ <n> Extensive marking repetition bound\n"
                "  --initial-marking <n,...>  Explicit starting marker vector\n"
                "  --final-marking <n,...>    Explicit accepted marker vector\n"
                "  --dfg              Treat input CSV/XES as a log and play out its DFG\n"
@@ -74,6 +76,7 @@ int main(int argc, char** argv) {
   minera::PlayoutOptions options;
   minera::ExtensivePlayoutOptions extensive_options;
   bool extensive = false;
+  bool extensive_control_used = false;
   bool dfg = false;
   bool monte_carlo = false;
   std::map<std::string, std::string> dfg_fields;
@@ -172,6 +175,34 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       extensive_options.max_length = static_cast<std::size_t>(std::atoll(value));
+    } else if (arg == "--return-elements") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view parsed(value);
+      if (parsed == "true" || parsed == "1") {
+        extensive_options.return_elements = true;
+      } else if (parsed == "false" || parsed == "0") {
+        extensive_options.return_elements = false;
+      } else {
+        std::cerr << "error: --return-elements expects true or false\n";
+        return 2;
+      }
+      extensive_control_used = true;
+    } else if (arg == "--max-marking-occ") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        std::size_t parsed = 0;
+        const auto text = std::string(value);
+        std::size_t consumed = 0;
+        parsed = std::stoull(text, &consumed);
+        if (consumed != text.size()) throw std::invalid_argument("suffix");
+        extensive_options.max_marking_occ = parsed;
+        extensive_control_used = true;
+      } catch (const std::exception&) {
+        std::cerr << "error: --max-marking-occ expects a non-negative integer\n";
+        return 2;
+      }
     } else if (arg == "--initial-marking" || arg == "--final-marking") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -196,6 +227,10 @@ int main(int argc, char** argv) {
   if (input.empty() || options.traces == 0 || options.max_steps == 0 ||
       extensive_options.max_length == 0) {
     return usage(argv[0]);
+  }
+  if (extensive_control_used && !extensive) {
+    std::cerr << "error: extensive controls require --extensive\n";
+    return 2;
   }
   extensive_options.max_traces = options.traces;
 
@@ -275,7 +310,20 @@ int main(int argc, char** argv) {
     }
     const auto name = input.stem().string() + " playout";
 
-    if (output.empty()) {
+    if (extensive && extensive_options.return_elements) {
+      const auto json = minera::serialize_extensive_playout_visited_json(
+          net, minera::extensive_playout_visited(net, extensive_options));
+      if (output.empty()) {
+        std::cout << json << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << json << '\n';
+      }
+    } else if (output.empty()) {
       minera::write_xes(std::cout, log, name);
     } else {
       std::ofstream file(output);

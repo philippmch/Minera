@@ -8,6 +8,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -589,19 +590,37 @@ namespace {
 struct EnumerationState {
   std::vector<std::uint32_t> marking;
   std::vector<std::size_t> events;  // fired visible transitions, in order
+  std::vector<std::size_t> fired;   // all fired transitions for element output
+  PlayoutVisitedTrace elements;
+  std::unordered_map<std::string, std::size_t> marking_occurrences;
 };
 
-std::string state_key(const EnumerationState& state) {
+std::string marking_key(const std::vector<std::uint32_t>& marking) {
   std::string key;
-  key.reserve(state.marking.size() * 2 + state.events.size() * 2);
-  for (const auto tokens : state.marking) {
+  key.reserve(marking.size() * 2);
+  for (const auto tokens : marking) {
     key += std::to_string(tokens);
     key += ',';
   }
+  return key;
+}
+
+std::string state_key(const EnumerationState& state, bool include_path) {
+  std::string key;
+  key.reserve(state.marking.size() * 2 + state.events.size() * 2 +
+              (include_path ? state.fired.size() * 2 : 0));
+  key += marking_key(state.marking);
   key += '|';
   for (const auto transition : state.events) {
     key += std::to_string(transition);
     key += ',';
+  }
+  if (include_path) {
+    key += '|';
+    for (const auto transition : state.fired) {
+      key += std::to_string(transition);
+      key += ',';
+    }
   }
   return key;
 }
@@ -631,8 +650,9 @@ void sample_enabled(std::vector<std::size_t>& enabled, double cap,
 
 }  // namespace
 
-EventLog extensive_playout(const PetriNet& net,
-                           const ExtensivePlayoutOptions& options) {
+EventLog extensive_playout_impl(const PetriNet& net,
+                                const ExtensivePlayoutOptions& options,
+                                PlayoutVisitedResult* visited_result) {
   const auto& transitions = net.transitions();
   if (net.place_count() == 0 || net.source() >= net.place_count() ||
       net.sink() >= net.place_count()) {
@@ -663,7 +683,14 @@ EventLog extensive_playout(const PetriNet& net,
     throw std::invalid_argument(
         "extensive playout branching factor must be finite and non-negative");
   }
+  if (options.max_marking_occ && *options.max_marking_occ == 0) {
+    throw std::invalid_argument(
+        "extensive playout max_marking_occ must be positive when supplied");
+  }
   std::mt19937_64 rng(options.seed);
+  const bool include_elements = visited_result != nullptr;
+  const bool track_marking_occurrences = options.max_marking_occ.has_value();
+  const bool track_path = include_elements || track_marking_occurrences;
 
   const auto is_final = [&](const std::vector<std::uint32_t>& marking) {
     return marking == final_marking;
@@ -701,8 +728,18 @@ EventLog extensive_playout(const PetriNet& net,
 
   EnumerationState initial;
   initial.marking = initial_marking;
-  visited.insert(state_key(initial));
-  if (is_final(initial.marking)) emit(initial.events);  // degenerate net
+  if (include_elements) {
+    initial.elements.push_back(
+        {PlayoutVisitedElementKind::MARKING, initial.marking, 0});
+  }
+  if (track_marking_occurrences) {
+    initial.marking_occurrences.emplace(marking_key(initial.marking), 1);
+  }
+  visited.insert(state_key(initial, track_path));
+  if (is_final(initial.marking)) {
+    emit(initial.events);  // degenerate net
+    if (include_elements) visited_result->traces.push_back(initial.elements);
+  }
   queue.push_back(std::move(initial));
 
   while (!queue.empty() && log.traces.size() < options.max_traces &&
@@ -729,10 +766,31 @@ EventLog extensive_playout(const PetriNet& net,
       fire_petri_transition(transition, next.marking);
       next.events = state.events;
       if (!transition.silent()) next.events.push_back(t);
+      if (track_path) {
+        next.fired = state.fired;
+        next.fired.push_back(t);
+      }
+      if (include_elements) {
+        next.elements = state.elements;
+        next.elements.push_back(
+            {PlayoutVisitedElementKind::TRANSITION, {}, t});
+        next.elements.push_back(
+            {PlayoutVisitedElementKind::MARKING, next.marking, 0});
+      }
+      if (track_marking_occurrences) {
+        next.marking_occurrences = state.marking_occurrences;
+        const auto key = marking_key(next.marking);
+        const auto occurrence = ++next.marking_occurrences[key];
+        if (options.max_marking_occ &&
+            occurrence > *options.max_marking_occ) {
+          continue;
+        }
+      }
 
-      if (!visited.insert(state_key(next)).second) continue;
+      if (!visited.insert(state_key(next, track_path)).second) continue;
       if (is_final(next.marking)) {
         emit(next.events);
+        if (include_elements) visited_result->traces.push_back(next.elements);
         if (log.traces.size() >= options.max_traces) break;
       }
       queue.push_back(std::move(next));
@@ -740,6 +798,18 @@ EventLog extensive_playout(const PetriNet& net,
   }
 
   return log;
+}
+
+EventLog extensive_playout(const PetriNet& net,
+                           const ExtensivePlayoutOptions& options) {
+  return extensive_playout_impl(net, options, nullptr);
+}
+
+PlayoutVisitedResult extensive_playout_visited(
+    const PetriNet& net, const ExtensivePlayoutOptions& options) {
+  PlayoutVisitedResult result;
+  (void)extensive_playout_impl(net, options, &result);
+  return result;
 }
 
 }  // namespace minera

@@ -202,6 +202,7 @@ struct PetriAnalysisParams {
 // Strict wire contract for process-tree simulation. Fields use the
 // `playout_` prefix when parsed from request/CLI adapters.
 using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
+using ExtensivePlayoutParams = ExtensivePlayoutOptions;
 using DfgPlayoutParams = DfgPlayoutOptions;
 using StochasticPlayoutParams = StochasticPlayoutOptions;
 using MonteCarloParams = MonteCarloOptions;
@@ -413,6 +414,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
     const FieldLookup& field);
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] ExtensivePlayoutParams parse_extensive_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] ExtensivePlayoutParams parse_extensive_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parses DFG playout settings. Wire fields use the `dfg_playout_` prefix;

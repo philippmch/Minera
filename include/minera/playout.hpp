@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -183,6 +184,12 @@ struct ExtensivePlayoutOptions {
   // initializers for the original option members.
   double branching_factor_transitions = 0.0;
   std::uint64_t seed = 1;
+  // Opt-in structured visitation output. Appended to preserve positional
+  // aggregate initializers for the original option members.
+  bool return_elements = false;
+  // Maximum occurrences of any marking along one candidate. Omitted means
+  // unlimited; an explicit zero is invalid.
+  std::optional<std::size_t> max_marking_occ;
 };
 
 // Enumerates the model's language instead of sampling it: every distinct
@@ -195,6 +202,13 @@ struct ExtensivePlayoutOptions {
 // `max_traces` and `max_states`, so an infinite language yields its shortest
 // members rather than spinning forever.
 [[nodiscard]] EventLog extensive_playout(
+    const PetriNet& net,
+    const ExtensivePlayoutOptions& options = {});
+
+// Enumerates accepted extensive candidates as alternating markings and fired
+// transition indices, including silent transitions. The initial marking and
+// the marking reached by the final firing are included.
+[[nodiscard]] PlayoutVisitedResult extensive_playout_visited(
     const PetriNet& net,
     const ExtensivePlayoutOptions& options = {});
 

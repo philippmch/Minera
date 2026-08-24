@@ -372,6 +372,67 @@ void extensive_playout_accepts_explicit_markers() {
   assert(rejected);
 }
 
+void extensive_visited_preserves_silent_steps_and_occurrence_bound() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"finish"});
+  net.add_transition(std::nullopt, {source}, {middle});
+  net.add_transition(0, {middle}, {sink});
+
+  minera::ExtensivePlayoutOptions options;
+  options.max_traces = 1;
+  options.max_length = 1;
+  options.return_elements = true;
+  const auto result = minera::extensive_playout_visited(net, options);
+  assert(result.traces.size() == 1);
+  const auto& trace = result.traces.front();
+  assert(trace.size() == 5);
+  assert(trace[0].kind == minera::PlayoutVisitedElementKind::MARKING);
+  assert(trace[0].marking == std::vector<std::uint32_t>({1, 0, 0}));
+  assert(trace[1].kind == minera::PlayoutVisitedElementKind::TRANSITION);
+  assert(trace[1].transition_index == 0);
+  assert(trace[2].marking == std::vector<std::uint32_t>({0, 1, 0}));
+  assert(trace[3].transition_index == 1);
+  assert(trace[4].marking == std::vector<std::uint32_t>({0, 0, 1}));
+  assert(minera::serialize_extensive_playout_visited_json(net, result)
+             .find("\"variant\":\"EXTENSIVE_PLAYOUT\"") !=
+         std::string::npos);
+
+  minera::PetriNet loop;
+  const auto loop_source = loop.add_place();
+  const auto loop_sink = loop.add_place();
+  loop.set_source(loop_source);
+  loop.set_sink(loop_sink);
+  loop.set_activities({"loop", "finish"});
+  loop.add_transition(0, {loop_source}, {loop_source});
+  loop.add_transition(1, {loop_source}, {loop_sink});
+  options.max_traces = 2;
+  options.max_length = 1;
+  options.max_marking_occ.reset();
+  const auto unbounded = minera::extensive_playout(loop, options);
+  assert(unbounded.traces.size() == 1);
+  options.max_length = 2;
+  const auto unbounded_with_loop = minera::extensive_playout(loop, options);
+  assert(unbounded_with_loop.traces.size() == 2);
+  options.max_marking_occ = 1;
+  const auto bounded = minera::extensive_playout_visited(loop, options);
+  assert(bounded.traces.size() == 1);
+  const auto bounded_log = minera::extensive_playout(loop, options);
+  assert(bounded_log.traces.size() == 1);
+  options.max_marking_occ = 0;
+  bool rejected = false;
+  try {
+    (void)minera::extensive_playout_visited(loop, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void sampled_variants_accept_explicit_markers() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -536,6 +597,7 @@ int main() {
   visited_playout_honors_filtering_and_seed();
   basic_playout_timing_is_validated();
   extensive_playout_accepts_explicit_markers();
+  extensive_visited_preserves_silent_steps_and_occurrence_bound();
   sampled_variants_accept_explicit_markers();
   fitting_tracks_reachable_rates_and_silent_routing();
   fitting_handles_duplicate_labels_unknowns_and_empty_logs();
