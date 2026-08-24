@@ -78,7 +78,7 @@ are reconciled.
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics, annotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
-| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
+| Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
@@ -918,7 +918,9 @@ and repeated serialization; broader numerical differential fixtures remain.
 Model evaluation covers token- and alignment-based replay fitness; token,
 alignment escaping-edge, and aligned-automaton precision; token-frequency
 generalization; arc-degree, extended Cardoso, and extended cyclomatic
-simplicity; and stochastic-language earth-mover distance. Automatic fitness
+simplicity; the composite evaluator with normalized fitness, precision,
+generalization, and simplicity weights plus F-score; and stochastic-language
+earth-mover distance. Automatic fitness
 and precision selection uses workflow-net soundness, while every concrete
 variation remains directly selectable. Precision exposes task-identity and
 search-state controls; simplicity exposes its arc-degree target, reachability
@@ -929,7 +931,8 @@ strict equal-mass validation.
 The shared request parser rejects empty, malformed, non-finite, negative, and
 out-of-range settings before evaluation. Results have standalone and embedded
 JSON forms, active-variation replay details, explicit completion/exhaustion
-state, and finite-or-null metrics. The CLI evaluates every built-in Petri model
+state, and finite-or-null metrics. Composite results include the four component
+scores, normalized weights, weighted average, and F-score. The CLI evaluates every built-in Petri model
 and an optional imported model; the local server evaluates any cached model and
 accepts multipart reference logs. The frontend exposes the complete option set,
 discovers models from actual nets as well as embedded results, and guards

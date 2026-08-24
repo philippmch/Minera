@@ -711,10 +711,12 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
       params.family = EvaluationFamily::kGeneralization;
     } else if (value == "simplicity") {
       params.family = EvaluationFamily::kSimplicity;
+    } else if (value == "composite") {
+      params.family = EvaluationFamily::kComposite;
     } else {
       throw std::invalid_argument(
           "evaluation_family: expected replay_fitness, precision, "
-          "generalization, or simplicity, got '" + value + "'");
+          "generalization, simplicity, or composite, got '" + value + "'");
     }
   }
 
@@ -808,6 +810,34 @@ EvaluationParams parse_evaluation_params(const FieldLookup& field,
     params.simplicity_options.final_marking =
         parse_int_marking(require("simplicity_final_marking"),
                           "simplicity_final_marking");
+  }
+  const auto parse_composite_weight = [&](std::string_view name,
+                                          double& destination) {
+    if (!supplied(name)) return;
+    destination = parse_finite_double(require(name), name);
+    if (destination < 0.0) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-negative number");
+    }
+  };
+  parse_composite_weight("fitness_weight",
+                         params.composite_options.fitness_weight);
+  parse_composite_weight("precision_weight",
+                         params.composite_options.precision_weight);
+  parse_composite_weight("simplicity_weight",
+                         params.composite_options.simplicity_weight);
+  parse_composite_weight("generalization_weight",
+                         params.composite_options.generalization_weight);
+  if (supplied("fitness_weight") || supplied("precision_weight") ||
+      supplied("simplicity_weight") || supplied("generalization_weight")) {
+    const double total = params.composite_options.fitness_weight +
+                         params.composite_options.precision_weight +
+                         params.composite_options.simplicity_weight +
+                         params.composite_options.generalization_weight;
+    if (!std::isfinite(total) || total <= 0.0) {
+      throw std::invalid_argument(
+          "composite weights must have a positive total");
+    }
   }
   return params;
 }

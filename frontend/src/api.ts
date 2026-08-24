@@ -1302,7 +1302,7 @@ export async function alignEditDistance(reference: File, options: EditDistanceOp
 /** Stable, validated query serialization for one model-quality evaluation. */
 export function evaluationQuery(options: EvaluationOptions = {}): string {
   const family = options.evaluation_family ?? "replay_fitness";
-  if (!["replay_fitness", "precision", "generalization", "simplicity"].includes(family)) {
+  if (!["replay_fitness", "precision", "generalization", "simplicity", "composite"].includes(family)) {
     throw new Error("evaluation_family is invalid");
   }
   if (options.fitness_variant !== undefined && !["auto", "token_based", "alignment_based"].includes(options.fitness_variant)) {
@@ -1329,6 +1329,24 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   if (options.simplicity_arc_degree_k !== undefined && (!Number.isFinite(options.simplicity_arc_degree_k) || options.simplicity_arc_degree_k < 0)) {
     throw new Error("simplicity_arc_degree_k must be a finite non-negative number");
   }
+  const weights = [
+    ["fitness_weight", options.fitness_weight],
+    ["precision_weight", options.precision_weight],
+    ["simplicity_weight", options.simplicity_weight],
+    ["generalization_weight", options.generalization_weight],
+  ] as const;
+  let suppliedWeight = false;
+  let weightTotal = 0;
+  for (const [name, value] of weights) {
+    if (value !== undefined) {
+      suppliedWeight = true;
+      if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be a finite non-negative number`);
+    }
+    weightTotal += value ?? 0.25;
+  }
+  if (suppliedWeight && (!Number.isFinite(weightTotal) || weightTotal <= 0)) {
+    throw new Error("composite weights must have a positive total");
+  }
   for (const [name, value] of [
     ["simplicity_initial_marking", options.simplicity_initial_marking],
     ["simplicity_final_marking", options.simplicity_final_marking],
@@ -1351,6 +1369,10 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   add("simplicity_max_states", options.simplicity_max_states);
   add("simplicity_initial_marking", options.simplicity_initial_marking);
   add("simplicity_final_marking", options.simplicity_final_marking);
+  add("fitness_weight", options.fitness_weight);
+  add("precision_weight", options.precision_weight);
+  add("simplicity_weight", options.simplicity_weight);
+  add("generalization_weight", options.generalization_weight);
   return query.toString();
 }
 

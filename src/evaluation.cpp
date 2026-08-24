@@ -660,6 +660,66 @@ SimplicityResult evaluate_simplicity(const ProcessTree& tree,
   return evaluate_simplicity(to_petri_net(tree), variant, options);
 }
 
+CompositeEvaluationResult evaluate_composite(
+    const EventLog& log, const PetriNet& net,
+    const CompositeEvaluationOptions& options) {
+  CompositeEvaluationResult out;
+  const double total = options.fitness_weight + options.precision_weight +
+                       options.simplicity_weight + options.generalization_weight;
+  if (!std::isfinite(options.fitness_weight) ||
+      !std::isfinite(options.precision_weight) ||
+      !std::isfinite(options.simplicity_weight) ||
+      !std::isfinite(options.generalization_weight) ||
+      options.fitness_weight < 0.0 || options.precision_weight < 0.0 ||
+      options.simplicity_weight < 0.0 || options.generalization_weight < 0.0 ||
+      !std::isfinite(total) || total <= 0.0) {
+    out.computed = false;
+    out.error = "composite weights must be finite, non-negative, and have a positive total";
+    return out;
+  }
+  out.fitness_weight = options.fitness_weight / total;
+  out.precision_weight = options.precision_weight / total;
+  out.simplicity_weight = options.simplicity_weight / total;
+  out.generalization_weight = options.generalization_weight / total;
+
+  const auto fitness = evaluate_replay_fitness(
+      log, net, ReplayFitnessVariant::TOKEN_BASED);
+  const auto precision = evaluate_precision(
+      log, net, PrecisionVariant::ETCONFORMANCE_TOKEN);
+  const auto generalization = evaluate_generalization(
+      log, net, GeneralizationVariant::GENERALIZATION_TOKEN);
+  const auto simplicity = evaluate_simplicity(
+      net, SimplicityVariant::ARC_DEGREE);
+  out.fitness = fitness.log_fitness;
+  out.precision = precision.precision;
+  out.generalization = generalization.generalization;
+  out.simplicity = simplicity.simplicity;
+  out.metrics_average_weight =
+      out.fitness_weight * out.fitness +
+      out.precision_weight * out.precision +
+      out.generalization_weight * out.generalization +
+      out.simplicity_weight * out.simplicity;
+  const double denominator = out.fitness + out.precision;
+  out.fscore = denominator > 0.0
+                   ? 2.0 * out.fitness * out.precision / denominator
+                   : 0.0;
+  if (!fitness.computed || !precision.computed || !generalization.computed ||
+      !simplicity.computed) {
+    out.computed = false;
+    if (!fitness.error.empty()) out.error = fitness.error;
+    else if (!precision.error.empty()) out.error = precision.error;
+    else if (!generalization.error.empty()) out.error = generalization.error;
+    else out.error = simplicity.error;
+  }
+  return out;
+}
+
+CompositeEvaluationResult evaluate_composite(
+    const EventLog& log, const ProcessTree& tree,
+    const CompositeEvaluationOptions& options) {
+  return evaluate_composite(log, to_petri_net(tree), options);
+}
+
 StochasticLanguage derive_stochastic_language(const EventLog& log,bool normalize) {
   StochasticLanguage out; std::map<std::vector<std::string>,double> counts; for(const auto&tr:log.traces){std::vector<std::string>a;for(const auto&e:tr.events)a.push_back(e.activity);counts[a]+=1.0;}
   for(auto&[a,w]:counts){out.traces.push_back({a,w});out.total_mass+=w;} if(normalize&&out.total_mass>0)for(auto&t:out.traces)t.weight/=out.total_mass; if(normalize&&out.total_mass>0)out.total_mass=1; return out;

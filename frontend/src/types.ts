@@ -2424,16 +2424,43 @@ function isSimplicityEvaluation(value: unknown): value is SimplicityEvaluation {
     evaluationNonNegativeInt(value.edges) && evaluationNonNegativeInt(value.strongly_connected_components);
 }
 
+export interface CompositeEvaluation {
+  computed: boolean;
+  error: string | null;
+  fitness: EvaluationMetric;
+  precision: EvaluationMetric;
+  generalization: EvaluationMetric;
+  simplicity: EvaluationMetric;
+  metrics_average_weight: EvaluationMetric;
+  fscore: EvaluationMetric;
+  weights: {
+    fitness: EvaluationMetric;
+    precision: EvaluationMetric;
+    simplicity: EvaluationMetric;
+    generalization: EvaluationMetric;
+  };
+}
+function isCompositeEvaluation(value: unknown): value is CompositeEvaluation {
+  if (!isRecord(value) || typeof value.computed !== "boolean" ||
+      !nullableString(value.error) || !metric(value.fitness) ||
+      !metric(value.precision) || !metric(value.generalization) ||
+      !metric(value.simplicity) || !metric(value.metrics_average_weight) ||
+      !metric(value.fscore) || !isRecord(value.weights)) return false;
+  return metric(value.weights.fitness) && metric(value.weights.precision) &&
+    metric(value.weights.simplicity) && metric(value.weights.generalization);
+}
+
 /** Validates a standalone response from the model-quality endpoint. */
 export function isModelEvaluation(value: unknown): value is ModelEvaluation {
   if (!isRecord(value) || typeof value.miner !== "string") return false;
-  const present = [value.replay_fitness, value.precision, value.generalization, value.simplicity]
+  const present = [value.replay_fitness, value.precision, value.generalization, value.simplicity, value.composite]
     .filter((item) => item !== undefined).length;
   if (present !== 1) return false;
   return (value.replay_fitness === undefined || isReplayFitnessEvaluation(value.replay_fitness)) &&
     (value.precision === undefined || isPrecisionEvaluation(value.precision)) &&
     (value.generalization === undefined || isGeneralizationEvaluation(value.generalization)) &&
-    (value.simplicity === undefined || isSimplicityEvaluation(value.simplicity));
+    (value.simplicity === undefined || isSimplicityEvaluation(value.simplicity)) &&
+    (value.composite === undefined || isCompositeEvaluation(value.composite));
 }
 
 /** Validates the stochastic-language distance endpoint response. */
@@ -2710,7 +2737,8 @@ export type EvaluationFamily =
   | "replay_fitness"
   | "precision"
   | "generalization"
-  | "simplicity";
+  | "simplicity"
+  | "composite";
 export type ReplayFitnessVariant = "auto" | "token_based" | "alignment_based";
 export type PrecisionVariant =
   | "auto"
@@ -2736,6 +2764,10 @@ export interface EvaluationOptions {
   simplicity_max_states?: number;
   simplicity_initial_marking?: number[];
   simplicity_final_marking?: number[];
+  fitness_weight?: number;
+  precision_weight?: number;
+  simplicity_weight?: number;
+  generalization_weight?: number;
 }
 
 export type PetriAnalysisFamily =
@@ -3091,6 +3123,7 @@ export interface ModelEvaluation {
   precision?: PrecisionEvaluation;
   generalization?: GeneralizationEvaluation;
   simplicity?: SimplicityEvaluation;
+  composite?: CompositeEvaluation;
 }
 
 export interface EmdOptions {

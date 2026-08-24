@@ -10,7 +10,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, type EdgeStat, type MineraExport, type Trace } from "./types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "./types";
 
 describe("native alignment adapters", () => {
   it("serializes opt-in overlap controls and marks them active", () => {
@@ -222,6 +222,10 @@ describe("evaluation adapters", () => {
       simplicity_final_marking: [0, 1],
     })).toBe("evaluation_family=simplicity&fitness_variant=alignment_based&precision_variant=automaton_after_align&precision_use_task_ids=true&precision_max_states=200&generalization_variant=generalization_token&simplicity_variant=extended_cyclomatic&simplicity_arc_degree_k=2.5&simplicity_max_states=300&simplicity_initial_marking=1%2C0&simplicity_final_marking=0%2C1");
     expect(evaluationQuery()).toBe("evaluation_family=replay_fitness");
+    expect(new URLSearchParams(evaluationQuery({
+      evaluation_family: "composite", fitness_weight: 2, precision_weight: 1,
+      simplicity_weight: 0, generalization_weight: 0,
+    })).toString()).toBe("evaluation_family=composite&fitness_weight=2&precision_weight=1&simplicity_weight=0&generalization_weight=0");
   });
 
   it("serializes and validates every Petri-analysis setting", () => {
@@ -254,6 +258,17 @@ describe("evaluation adapters", () => {
     expect(() => evaluationQuery({ evaluation_family: "precision", simplicity_max_states: 0 })).toThrow(/positive integer/);
     expect(() => evaluationQuery({ evaluation_family: "generalization", simplicity_initial_marking: [] })).toThrow(/non-negative integers/);
     expect(() => evaluationQuery({ simplicity_arc_degree_k: Number.POSITIVE_INFINITY })).toThrow(/finite/);
+    expect(() => evaluationQuery({ evaluation_family: "composite", fitness_weight: 0, precision_weight: 0, simplicity_weight: 0, generalization_weight: 0 })).toThrow(/positive total/);
+    expect(evaluationQuery({ evaluation_family: "composite", fitness_weight: 0 })).toContain("fitness_weight=0");
+    expect(() => evaluationQuery({ fitness_weight: Number.NaN })).toThrow(/finite/);
+    const composite = { miner: "alpha", composite: {
+      computed: true, error: null, fitness: 1, precision: 0.5,
+      generalization: 0.75, simplicity: 0.25, metrics_average_weight: 0.625,
+      fscore: 2 / 3, weights: { fitness: 0.25, precision: 0.25, simplicity: 0.25, generalization: 0.25 },
+    }};
+    expect(isModelEvaluation(composite)).toBe(true);
+    expect(isModelEvaluation({ ...composite, simplicity: { computed: true } })).toBe(false);
+    expect(isModelEvaluation({ miner: "alpha", replay_fitness: {}, composite: composite.composite })).toBe(false);
   });
 
   it("serializes strict stochastic-language controls", () => {

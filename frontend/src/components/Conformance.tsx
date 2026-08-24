@@ -618,6 +618,7 @@ function embeddedEvaluation(data: MineraExport, miner: string, family: Evaluatio
   if (family === "precision" && value?.precision) return { miner, precision: value.precision };
   if (family === "generalization" && value?.generalization) return { miner, generalization: value.generalization };
   if (family === "simplicity" && value?.simplicity) return { miner, simplicity: value.simplicity };
+  if (family === "composite" && value?.composite) return { miner, composite: value.composite };
   return null;
 }
 
@@ -636,6 +637,10 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     precision_use_task_ids: false,
     generalization_variant: "generalization_token",
     simplicity_variant: "arc_degree",
+    fitness_weight: 0.25,
+    precision_weight: 0.25,
+    simplicity_weight: 0.25,
+    generalization_weight: 0.25,
   });
   const [markings, setMarkings] = useState({ initial: "", final: "" });
   const [result, setResult] = useState<ModelEvaluation | null>(null);
@@ -703,14 +708,14 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
     }
   };
 
-  const numberOption = (name: "precision_max_states" | "simplicity_arc_degree_k" | "simplicity_max_states", value: string) =>
+  const numberOption = (name: "precision_max_states" | "simplicity_arc_degree_k" | "simplicity_max_states" | "fitness_weight" | "precision_weight" | "simplicity_weight" | "generalization_weight", value: string) =>
     setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
 
   return <section className="panel conf-panel other-alignments">
-    <div className="panel-head"><h2>Model quality evaluation</h2><span className="panel-meta">Fitness · precision · generalization · simplicity</span></div>
+    <div className="panel-head"><h2>Model quality evaluation</h2><span className="panel-meta">Fitness · precision · generalization · simplicity · composite</span></div>
     <div className="align-settings-grid">
       <label>Model<select value={miner} onChange={(event) => { const next = event.target.value; setMiner(next); const embedded = embeddedEvaluation(data, next, options.evaluation_family ?? "replay_fitness"); setResult(embedded); setResultSelectionKey(embedded ? selectionKeyFor(next, options) : null); setError(null); }} disabled={modelIds.length === 0}>{modelIds.map((id) => <option value={id} key={id}>{id}</option>)}</select></label>
-      <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option></select></label>
+      <label>Family<select value={family} onChange={(event) => updateFamily(event.target.value as EvaluationFamily)}><option value="replay_fitness">Replay fitness</option><option value="precision">Precision</option><option value="generalization">Generalization</option><option value="simplicity">Simplicity</option><option value="composite">Composite</option></select></label>
       {family === "replay_fitness" && <label>Variant<select value={options.fitness_variant ?? "auto"} onChange={(event) => setOptions({ ...options, fitness_variant: event.target.value as EvaluationOptions["fitness_variant"] })}><option value="auto">Automatic</option><option value="token_based">Token based</option><option value="alignment_based">Alignment based</option></select></label>}
       {family === "precision" && <>
         <label>Variant<select value={options.precision_variant ?? "auto"} onChange={(event) => setOptions({ ...options, precision_variant: event.target.value as EvaluationOptions["precision_variant"] })}><option value="auto">Automatic</option><option value="etconformance_token">Token escaping edges</option><option value="align_etconformance">Alignment escaping edges</option><option value="automaton_after_align">Automaton after alignment</option></select></label>
@@ -725,6 +730,12 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
         <label>Initial marking<input value={markings.initial} placeholder="0,1" onChange={(event) => setMarkings({ ...markings, initial: event.target.value })} /></label>
         <label>Final marking<input value={markings.final} placeholder="2,3" onChange={(event) => setMarkings({ ...markings, final: event.target.value })} /></label>
       </>}
+      {family === "composite" && <>
+        <label>Fitness weight<input type="number" min={0} step={0.05} value={options.fitness_weight ?? ""} onChange={(event) => numberOption("fitness_weight", event.target.value)} /></label>
+        <label>Precision weight<input type="number" min={0} step={0.05} value={options.precision_weight ?? ""} onChange={(event) => numberOption("precision_weight", event.target.value)} /></label>
+        <label>Generalization weight<input type="number" min={0} step={0.05} value={options.generalization_weight ?? ""} onChange={(event) => numberOption("generalization_weight", event.target.value)} /></label>
+        <label>Simplicity weight<input type="number" min={0} step={0.05} value={options.simplicity_weight ?? ""} onChange={(event) => numberOption("simplicity_weight", event.target.value)} /></label>
+      </>}
     </div>
     {modelIds.length === 0 && <p className="conf-inline-note">No evaluable Petri model is available in this analysis.</p>}
     <div className="align-settings-actions"><button type="button" className="button" disabled={!onRequestEvaluation || !miner || loading} onClick={() => void run()}>{loading ? "Evaluating…" : "Evaluate model"}</button></div>
@@ -734,22 +745,29 @@ function ModelEvaluationPanel({ data, importedAvailable, onRequestEvaluation }: 
 }
 
 function ModelEvaluationResultView({ result }: { result: ModelEvaluation }) {
-  const family = result.replay_fitness ?? result.precision ?? result.generalization ?? result.simplicity;
+  const family = result.replay_fitness ?? result.precision ?? result.generalization ?? result.simplicity ?? result.composite;
   const error = family?.error;
   if (!family) return null;
+  const familyLabel = result.composite
+    ? "composite"
+    : "variant" in family
+      ? family.variant.replaceAll("_", " ")
+      : "unknown";
   const metrics: Array<[string, number | null]> = result.replay_fitness ? [
     ["Fitness", result.replay_fitness.fitness],
     ["Average trace fitness", result.replay_fitness.average_trace_fitness],
     ["Fitting traces", result.replay_fitness.percentage_of_fitting_traces === null ? null : result.replay_fitness.percentage_of_fitting_traces / 100],
   ] : result.precision ? [["Precision", result.precision.precision]]
     : result.generalization ? [["Generalization", result.generalization.score]]
-      : [["Simplicity", result.simplicity?.simplicity ?? null]];
+      : result.simplicity ? [["Simplicity", result.simplicity.simplicity]]
+        : [["Composite average", result.composite?.metrics_average_weight ?? null], ["F-score", result.composite?.fscore ?? null]];
   return <div className="other-result">
     <div className="conf-metrics">{metrics.map(([label, value]) => <div className={`conf-gauge ${value === null ? "poor" : grade(value)}`} key={label}><div className="conf-gauge-value">{value === null ? "—" : percent(value)}</div><div className="conf-gauge-label">{label}</div></div>)}</div>
-    <p><strong>{result.miner}</strong> · {family.variant.replaceAll("_", " ")} · {family.computed ? "computed" : "not computed"}{"exhausted" in family && family.exhausted ? " · search exhausted" : ""}</p>
+    <p><strong>{result.miner}</strong> · {familyLabel} · {family.computed ? "computed" : "not computed"}{"exhausted" in family && family.exhausted ? " · search exhausted" : ""}</p>
     {result.replay_fitness && <small>{numberFormat.format(result.replay_fitness.fitting_traces)} / {numberFormat.format(result.replay_fitness.trace_count)} fitting traces · total cost {result.replay_fitness.total_cost ?? "—"}</small>}
     {result.generalization && <small>{numberFormat.format(result.generalization.executed_transitions)} / {numberFormat.format(result.generalization.transition_count)} transitions executed · frequencies {result.generalization.transition_frequencies.join(", ") || "none"}</small>}
     {result.simplicity && <small>Complexity {result.simplicity.complexity ?? "—"} · raw value {result.simplicity.value ?? "—"} · {numberFormat.format(result.simplicity.vertices)} vertices · {numberFormat.format(result.simplicity.edges)} edges · {numberFormat.format(result.simplicity.strongly_connected_components)} strongly connected components</small>}
+    {result.composite && <small>Fitness {result.composite.fitness === null ? "—" : percent(result.composite.fitness)} · precision {result.composite.precision === null ? "—" : percent(result.composite.precision)} · generalization {result.composite.generalization === null ? "—" : percent(result.composite.generalization)} · simplicity {result.composite.simplicity === null ? "—" : percent(result.composite.simplicity)}</small>}
     {error && <p className="conf-inline-note">{error}</p>}
     {(result.replay_fitness?.token_replay || result.replay_fitness?.alignments || result.precision?.token_replay || result.precision?.alignments) && <details><summary>Replay details</summary><pre className="json-preview">{JSON.stringify(result.replay_fitness?.token_replay ?? result.replay_fitness?.alignments ?? result.precision?.token_replay ?? result.precision?.alignments, null, 2)}</pre></details>}
   </div>;

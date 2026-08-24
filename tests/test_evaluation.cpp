@@ -1,4 +1,5 @@
 #include "minera/evaluation.hpp"
+#include "minera/json_export.hpp"
 #include <cassert>
 #include <cmath>
 
@@ -164,6 +165,66 @@ void precision_option_errors_preserve_variant_and_convert_trees() {
   assert(tree_result.variant==PrecisionVariant::ALIGN_ETCONFORMANCE);
 }
 
+void composite_evaluation_uses_equal_and_custom_weights() {
+  const auto n = sequence_net();
+  const auto l = log({{"A", "B"}, {"A"}});
+  const auto fitness = evaluate_replay_fitness(l, n, ReplayFitnessVariant::TOKEN_BASED);
+  const auto precision = evaluate_precision(l, n, PrecisionVariant::ETCONFORMANCE_TOKEN);
+  const auto generalization = evaluate_generalization(l, n);
+  const auto simplicity = evaluate_simplicity(n, SimplicityVariant::ARC_DEGREE);
+  const auto equal = evaluate_composite(l, n);
+  assert(equal.computed);
+  assert(std::abs(equal.metrics_average_weight -
+                  (equal.fitness + equal.precision + equal.generalization +
+                   equal.simplicity) / 4.0) < 1e-12);
+  assert(std::abs(equal.fitness - fitness.log_fitness) < 1e-12);
+  assert(std::abs(equal.precision - precision.precision) < 1e-12);
+  assert(std::abs(equal.generalization - generalization.generalization) < 1e-12);
+  assert(std::abs(equal.simplicity - simplicity.simplicity) < 1e-12);
+
+  CompositeEvaluationOptions custom;
+  custom.fitness_weight = 2.0;
+  custom.precision_weight = 1.0;
+  custom.simplicity_weight = 0.0;
+  custom.generalization_weight = 0.0;
+  const auto weighted = evaluate_composite(l, n, custom);
+  assert(weighted.computed);
+  assert(std::abs(weighted.fitness_weight - 2.0 / 3.0) < 1e-12);
+  assert(std::abs(weighted.precision_weight - 1.0 / 3.0) < 1e-12);
+  assert(std::abs(weighted.metrics_average_weight -
+                  (2.0 * weighted.fitness + weighted.precision) / 3.0) <
+         1e-12);
+
+  CompositeEvaluationOptions invalid;
+  invalid.fitness_weight = invalid.precision_weight =
+      invalid.simplicity_weight = invalid.generalization_weight = 0.0;
+  const auto rejected = evaluate_composite(l, n, invalid);
+  assert(!rejected.computed && !rejected.error.empty());
+}
+
+void composite_evaluation_serializes_as_a_model_family() {
+  CompositeEvaluationResult result;
+  result.fitness = 0.9;
+  result.precision = 0.8;
+  result.generalization = 0.7;
+  result.simplicity = 0.6;
+  result.metrics_average_weight = 0.75;
+  result.fscore = 0.8470588235;
+  result.fitness_weight = 0.5;
+  result.precision_weight = 0.25;
+  result.generalization_weight = 0.15;
+  result.simplicity_weight = 0.10;
+  ModelEvaluation model;
+  model.miner = "composite-test";
+  model.composite = result;
+  const auto json = model_evaluation_json(model);
+  assert(json.find("\"composite\"") != std::string::npos);
+  assert(json.find("\"metrics_average_weight\": 0.75") !=
+         std::string::npos);
+  assert(json.find("\"fscore\"") != std::string::npos);
+  assert(json.find("\"weights\"") != std::string::npos);
+}
+
 int main() {
   auto n=sequence_net(); auto l=log({{"A","B"},{"A"}});
   auto f=evaluate_replay_fitness(l,n,ReplayFitnessVariant::TOKEN_BASED); assert(f.trace_count==2&&f.fitness<1&&f.percentage_fit_traces==50);
@@ -190,4 +251,6 @@ int main() {
   automaton_task_ids_disambiguate_duplicate_labels(); automaton_differs_from_alignment_precision_on_deviation();
   cyclomatic_default_multiple_empty_preset_places(); default_variant_dispatch_follows_soundness();
   precision_option_errors_preserve_variant_and_convert_trees();
+  composite_evaluation_uses_equal_and_custom_weights();
+  composite_evaluation_serializes_as_a_model_family();
 }
