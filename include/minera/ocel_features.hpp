@@ -33,6 +33,11 @@ struct OcelFeatureOptions {
   bool include_cobirth_features = false;
   bool include_codeath_features = false;
   bool include_lifecycle_features = true;
+  bool include_lifecycle_length_features = true;
+  bool include_lifecycle_unique_activity_features = true;
+  bool include_lifecycle_duration_features = true;
+  bool include_lifecycle_activity_features = true;
+  bool include_lifecycle_wip_features = true;
   bool include_lifecycle_path_features = true;
   bool include_related_events_features = false;
   bool include_related_activities_features = false;

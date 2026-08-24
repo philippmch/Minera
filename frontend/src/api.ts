@@ -4425,7 +4425,12 @@ export interface OcelFeatureOptions {
   include_related_activities_features?: boolean;
   include_obj_con_in_graph_features?: boolean;
   include_lifecycle_features?: boolean;
+  include_lifecycle_length_features?: boolean;
+  include_lifecycle_unique_activity_features?: boolean;
+  include_lifecycle_duration_features?: boolean;
+  include_lifecycle_activity_features?: boolean;
   include_lifecycle_path_features?: boolean;
+  include_lifecycle_wip_features?: boolean;
   numeric_event_attributes?: string[];
   string_event_attributes?: string[];
   numeric_object_attributes?: string[];
@@ -4473,7 +4478,12 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_related_activities_features", options.include_related_activities_features);
   addBoolean("include_obj_con_in_graph_features", options.include_obj_con_in_graph_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
+  addBoolean("include_lifecycle_length_features", options.include_lifecycle_length_features);
+  addBoolean("include_lifecycle_unique_activity_features", options.include_lifecycle_unique_activity_features);
+  addBoolean("include_lifecycle_duration_features", options.include_lifecycle_duration_features);
+  addBoolean("include_lifecycle_activity_features", options.include_lifecycle_activity_features);
   addBoolean("include_lifecycle_path_features", options.include_lifecycle_path_features);
+  addBoolean("include_lifecycle_wip_features", options.include_lifecycle_wip_features);
   const addList = (name: string, values: string[] | undefined) => {
     if (values?.length) {
       const escape = (value: string) => value.replaceAll("\\", "\\\\")
