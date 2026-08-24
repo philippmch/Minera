@@ -181,6 +181,7 @@ struct SoundnessResult {
   std::optional<std::size_t> short_circuit_transition;
   std::vector<std::string> short_circuit_diagnostic_messages;
   bool short_circuit_reachability_exhausted = false;
+  bool short_circuit_reachability_strongly_connected = false;
   std::vector<Marking> short_circuit_reachability_markings;
   std::vector<std::vector<std::size_t>> short_circuit_reachability_edges;
   std::string error;

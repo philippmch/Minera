@@ -321,5 +321,27 @@ int main() {
   assert(variant2.find("\"events\":[[\"Create\",\"o1\",") !=
          std::string::npos);
   assert(variant2.find("\"objects\":[[") != std::string::npos);
+
+  minera::Ocel catalog;
+  catalog.event_type_attributes["EmptyEvent"] = {{"planned_at", "datetime"}};
+  catalog.event_type_attributes["Create"] = {{"count", "long"}};
+  catalog.object_type_attributes["EmptyObject"] = {{"label", "string"}};
+  catalog.object_type_attributes["Order"] = {{"amount", "decimal"}};
+  catalog.events.push_back({"ce1", "Create", "2024-01-01T00:00:00Z",
+                            {{"count", std::int64_t(3)}}});
+  catalog.objects.push_back({"co1", "Order", {}});
+  const auto catalog_json =
+      minera::serialize_ocel_json(catalog, minera::OcelJsonFormat::kStandard);
+  assert(catalog_json.find("EmptyEvent") != std::string::npos &&
+         catalog_json.find("EmptyObject") != std::string::npos);
+  const auto catalog_round = minera::parse_ocel_json(catalog_json);
+  assert(catalog_round.event_type_attributes.at("EmptyEvent").at("planned_at") ==
+         "datetime");
+  assert(catalog_round.event_type_attributes.at("Create").at("count") ==
+         "long");
+  assert(catalog_round.object_type_attributes.at("EmptyObject").at("label") ==
+         "string");
+  assert(catalog_round.object_type_attributes.at("Order").at("amount") ==
+         "decimal");
   return 0;
 }

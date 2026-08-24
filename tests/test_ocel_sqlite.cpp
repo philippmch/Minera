@@ -135,6 +135,10 @@ int main() {
   };
   log.globals["source"] = std::string("fixture");
   log.globals["version"] = std::int64_t(2);
+  log.event_type_attributes["EmptyEvent"] = {{"reason", "string"}};
+  log.event_type_attributes["Create"] = {{"count", "int"}};
+  log.object_type_attributes["EmptyObject"] = {{"label", "string"}};
+  log.object_type_attributes["sales:order"] = {{"priority", "int"}};
 
   minera::export_ocel_sqlite(log, path);
   assert(std::filesystem::exists(path));
@@ -157,6 +161,13 @@ int main() {
   assert(round.object_changes.size() == 1 && round.object_changes[0].field == "status");
   assert(std::get<std::string>(round.globals.at("source")) == "fixture");
   assert(std::get<std::int64_t>(round.globals.at("version")) == 2);
+  assert(round.event_type_attributes.at("EmptyEvent").at("reason") ==
+         "string");
+  assert(round.event_type_attributes.at("Create").at("count") == "int");
+  assert(round.object_type_attributes.at("EmptyObject").at("label") ==
+         "string");
+  assert(round.object_type_attributes.at("sales:order").at("priority") ==
+         "int");
 
   throws([&] {
     auto invalid = log;
@@ -197,6 +208,9 @@ int main() {
   assert(external.object_changes[0].object_type == "order");
   assert(external.object_changes[0].field == "status");
   assert(std::get<std::string>(external.object_changes[0].value) == "paid");
+  assert(external.event_type_attributes.at("Create").at("priority") == "int");
+  assert(external.event_type_attributes.at("Create").at("active") == "boolean");
+  assert(external.object_type_attributes.at("order").at("status") == "string");
 
   std::filesystem::remove(path, ignored);
   std::filesystem::remove(external_path, ignored);

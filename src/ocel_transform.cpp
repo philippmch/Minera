@@ -94,6 +94,8 @@ std::set<std::pair<std::string, std::string>> interaction_edges(
 Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
   Ocel result;
   result.globals = log.globals;
+  result.event_type_attributes = log.event_type_attributes;
+  result.object_type_attributes = log.object_type_attributes;
   std::set<std::string> event_ids;
   for (const auto& object : log.objects) {
     if (selected.contains(object.id)) result.objects.push_back(object);
