@@ -962,6 +962,7 @@ int usage(const char* program) {
                "  --monte-carlo-seed <u64> RNG seed\n"
                "  --monte-carlo-case-arrival-seconds <f> Case arrival interval\n"
                "  --monte-carlo-default-duration-seconds <f> Default duration\n"
+               "  --monte-carlo-force-distribution <name> Fitted duration distribution\n"
                "  --monte-carlo-transition-weights <w,...> Transition weights\n"
                "  --monte-carlo-transition-durations <d:v,...> Durations\n"
                "  --monte-carlo-resources-per-place <p=n,...> Resource pools\n"
@@ -2616,6 +2617,7 @@ int main(int argc, char** argv) {
         arg == "--monte-carlo-max-steps" || arg == "--monte-carlo-seed" ||
         arg == "--monte-carlo-start" ||
         arg == "--monte-carlo-default-duration-seconds" ||
+        arg == "--monte-carlo-force-distribution" ||
         arg == "--monte-carlo-transition-weights" ||
         arg == "--monte-carlo-transition-durations" ||
         arg == "--monte-carlo-resources-per-place" ||

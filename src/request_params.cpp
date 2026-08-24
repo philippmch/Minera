@@ -2643,6 +2643,24 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
   if (supplied("monte_carlo_stop_at_final"))
     params.stop_at_final = parse_boolean(require("monte_carlo_stop_at_final"),
                                          "monte_carlo_stop_at_final");
+  if (supplied("monte_carlo_force_distribution")) {
+    std::string distribution =
+        std::string(trim(require("monte_carlo_force_distribution")));
+    std::transform(distribution.begin(), distribution.end(), distribution.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (distribution == "normal") {
+      params.force_distribution = MonteCarloDurationDistribution::kNormal;
+    } else if (distribution == "uniform") {
+      params.force_distribution = MonteCarloDurationDistribution::kUniform;
+    } else if (distribution == "exponential") {
+      params.force_distribution = MonteCarloDurationDistribution::kExponential;
+    } else {
+      throw std::invalid_argument(
+          "monte_carlo_force_distribution must be normal, uniform, or exponential");
+    }
+  }
 
   if (supplied("monte_carlo_transition_weights")) {
     const auto value = require("monte_carlo_transition_weights");

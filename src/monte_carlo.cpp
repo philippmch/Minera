@@ -52,6 +52,16 @@ struct PreparedOptions {
   std::vector<std::size_t> capacities;
 };
 
+void validate_force_distribution(const MonteCarloOptions& options) {
+  if (options.force_distribution &&
+      *options.force_distribution != MonteCarloDurationDistribution::kNormal &&
+      *options.force_distribution != MonteCarloDurationDistribution::kUniform &&
+      *options.force_distribution != MonteCarloDurationDistribution::kExponential) {
+    throw std::invalid_argument(
+        "Monte Carlo force_distribution must be normal, uniform, or exponential");
+  }
+}
+
 [[nodiscard]] bool is_final_marking(const PetriNet& net,
                                     const Marking& marking) {
   if (marking.size() != net.place_count()) return false;
@@ -109,6 +119,7 @@ PreparedOptions prepare_options(const PetriNet& net,
     throw std::invalid_argument(
         "Monte Carlo default resource count must be positive");
   }
+  validate_force_distribution(options);
 
   const auto transition_count = net.transitions().size();
   if (!options.transition_weights.empty() &&
@@ -507,12 +518,14 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
 MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
                                           const PetriNet& net,
                                           const MonteCarloOptions& options) {
+  validate_force_distribution(options);
   MonteCarloOptions fitted = options;
   if (input_log.traces.empty()) return fitted;
 
   std::map<std::string, std::uint64_t> activity_counts;
   std::map<std::string, double> elapsed_seconds;
   std::map<std::string, std::size_t> elapsed_samples;
+  std::map<std::string, std::vector<double>> elapsed_values;
   for (const auto& trace : input_log.traces) {
     for (std::size_t index = 0; index < trace.events.size(); ++index) {
       const auto& event = trace.events[index];
@@ -528,6 +541,7 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
       if (!std::isfinite(elapsed)) continue;
       elapsed_seconds[event.activity] += elapsed;
       ++elapsed_samples[event.activity];
+      elapsed_values[event.activity].push_back(elapsed);
     }
   }
 
@@ -570,7 +584,49 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
       }
       const double mean = total->second /
                           static_cast<double>(samples->second);
-      if (std::isfinite(mean) && mean >= 0.0) durations[index].value_seconds = mean;
+      if (!std::isfinite(mean) || mean < 0.0) continue;
+      const auto values = elapsed_values.find(activity);
+      const bool force_distribution = fitted.force_distribution.has_value();
+      if (!force_distribution || values == elapsed_values.end() ||
+          values->second.empty()) {
+        durations[index].value_seconds = mean;
+        continue;
+      }
+      const auto& samples_for_activity = values->second;
+      const auto [minimum, maximum] = std::minmax_element(
+          samples_for_activity.begin(), samples_for_activity.end());
+      const double width = *maximum - *minimum;
+      double variance = 0.0;
+      for (const double value : samples_for_activity) {
+        const double delta = value - mean;
+        variance += delta * delta;
+      }
+      variance /= static_cast<double>(samples_for_activity.size());
+      if (!std::isfinite(width) || !std::isfinite(variance) ||
+          width <= 0.0 || variance <= 0.0 || mean <= 0.0) {
+        durations[index].value_seconds = mean;
+        continue;
+      }
+      switch (*fitted.force_distribution) {
+        case MonteCarloDurationDistribution::kNormal:
+          durations[index] = MonteCarloDuration{
+              MonteCarloDurationDistribution::kNormal, mean,
+              std::sqrt(variance)};
+          break;
+        case MonteCarloDurationDistribution::kUniform:
+          durations[index] = MonteCarloDuration{
+              MonteCarloDurationDistribution::kUniform, *minimum, width};
+          break;
+        case MonteCarloDurationDistribution::kExponential:
+          durations[index] = MonteCarloDuration{
+              MonteCarloDurationDistribution::kExponential, mean};
+          break;
+        default:
+          // prepare_options validates this before simulation; retain a safe
+          // deterministic fit if this helper is called independently.
+          durations[index].value_seconds = mean;
+          break;
+      }
     }
     fitted.transition_durations = std::move(durations);
   }

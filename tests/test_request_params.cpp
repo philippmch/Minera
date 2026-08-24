@@ -2567,6 +2567,7 @@ void parse_monte_carlo_params_maps_controls() {
       {"monte_carlo_seed", "7"},
       {"monte_carlo_start", "1767225600"},
       {"monte_carlo_default_duration_seconds", "3"},
+      {"monte_carlo_force_distribution", " EXPONENTIAL "},
       {"monte_carlo_default_resources_per_place", "2"},
       {"monte_carlo_transition_weights", "0.25, 2, 0"},
       {"monte_carlo_transition_durations",
@@ -2579,6 +2580,9 @@ void parse_monte_carlo_params_maps_controls() {
          parsed.max_steps == 99 && parsed.seed == 7);
   assert(parsed.start == 1767225600.0 &&
          parsed.default_duration_seconds == 3.0);
+  assert(parsed.force_distribution &&
+         *parsed.force_distribution ==
+             minera::MonteCarloDurationDistribution::kExponential);
   assert(parsed.default_resources_per_place == 2 &&
          parsed.transition_weights == std::vector<double>({0.25, 2, 0}));
   assert(parsed.transition_durations.size() == 7);
@@ -2609,6 +2613,7 @@ void parse_monte_carlo_params_rejects_bad_values() {
   for (const auto& item : {
            std::pair{"monte_carlo_simulations", "0"},
            std::pair{"monte_carlo_case_arrival_seconds", "-1"},
+           std::pair{"monte_carlo_force_distribution", "deterministic"},
            std::pair{"monte_carlo_transition_weights", "1,"},
            std::pair{"monte_carlo_transition_durations", "normal:1"},
            std::pair{"monte_carlo_transition_durations", "lognormal:1;0;0"},

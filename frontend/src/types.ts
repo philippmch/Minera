@@ -2937,6 +2937,7 @@ export interface MonteCarloOptions {
   seed?: number;
   start?: number;
   default_duration_seconds?: number;
+  force_distribution?: "normal" | "uniform" | "exponential";
   transition_weights?: number[];
   transition_durations?: Array<{
     distribution: "deterministic" | "exponential" | "constant0" | "immediate" |
