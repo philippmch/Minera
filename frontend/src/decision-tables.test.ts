@@ -7,6 +7,9 @@ describe("decision table API", () => {
     variant: "encoded",
     trace_count: 1,
     observed_traces: 1,
+    replayed_traces: 1,
+    aligned_traces: 0,
+    alignment_failures: 0,
     tables: [{
       place: 1,
       classes: ["B", "C"],

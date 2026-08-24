@@ -50,6 +50,9 @@ struct EncodedDecisionTable {
 
 struct DecisionTablesResult {
   std::uint64_t observed_traces = 0;
+  std::uint64_t replayed_traces = 0;
+  std::uint64_t aligned_traces = 0;
+  std::uint64_t alignment_failures = 0;
   std::uint64_t trace_count = 0;
   std::vector<EncodedDecisionTable> tables;
 };

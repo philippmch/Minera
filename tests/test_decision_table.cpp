@@ -32,6 +32,24 @@ minera::PetriNet branching_net() {
   return net;
 }
 
+minera::PetriNet silent_branching_net() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto choice = net.add_place();
+  const auto after_b = net.add_place();
+  const auto after_c = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B", "C"});
+  net.add_transition(0, {source}, {choice});
+  net.add_transition(std::nullopt, {choice}, {after_b});
+  net.add_transition(std::nullopt, {choice}, {after_c});
+  net.add_transition(1, {after_b}, {sink});
+  net.add_transition(2, {after_c}, {sink});
+  return net;
+}
+
 minera::PetriNet two_step_branching_net() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -104,11 +122,14 @@ minera::EventLog sample_log() {
 int main() {
   const auto result = minera::mine_decision_tables(sample_log(), branching_net());
   assert(result.trace_count == 4);
-  assert(result.observed_traces == 3);
+  assert(result.observed_traces == 4);
+  assert(result.replayed_traces == 3);
+  assert(result.aligned_traces == 1);
+  assert(result.alignment_failures == 0);
   assert(result.tables.size() == 1);
   const auto& table = result.tables.front();
   assert(table.classes.size() == 2);
-  assert(table.rows.size() == 3);
+  assert(table.rows.size() == 4);
   assert(table.feature_names.size() == 3);
   assert(table.feature_names[0] == "amount");
   assert(table.feature_names[1] == "region=north");
@@ -217,5 +238,25 @@ int main() {
   assert(json.find("DECISION_TABLES") != std::string::npos);
   assert(json.find("feature_names") != std::string::npos);
   assert(json.find("region=north") != std::string::npos);
+  assert(json.find("aligned_traces") != std::string::npos);
+
+  // Alignment-backed observations retain hidden branch transitions. The
+  // deviating trace has no visible B/C event, but its optimal model path still
+  // chooses one of the two silent alternatives at the decision place.
+  minera::EventLog hidden_log;
+  hidden_log.traces.push_back({
+      "h1", {event("A", "10"), event("B", "")}, {}});
+  hidden_log.traces.push_back({
+      "h2", {event("A", "20"), event("C", "")}, {}});
+  hidden_log.traces.push_back({
+      "h3", {event("A", "30"), event("X", "")}, {}});
+  const auto hidden = minera::mine_decision_tables(
+      hidden_log, silent_branching_net());
+  assert(hidden.observed_traces == 3);
+  assert(hidden.replayed_traces == 2);
+  assert(hidden.aligned_traces == 1);
+  assert(hidden.alignment_failures == 0);
+  assert(hidden.tables.size() == 1);
+  assert(hidden.tables.front().rows.size() == 3);
   return 0;
 }

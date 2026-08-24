@@ -70,20 +70,27 @@ struct DecisionMiningResult {
   // "alpha", …). mine_decisions leaves it empty; callers that serialize the
   // result set it, so a stored export knows which model it describes.
   std::string miner;
-  std::uint64_t observed_traces = 0;  // traces whose clean replay contributed
+  // Traces whose clean replay or alignment path contributed observations.
+  std::uint64_t observed_traces = 0;
+  // Diagnostics split the observed total by path source. A failed alignment
+  // is kept separate so bounded or unsound models never fabricate a choice.
+  std::uint64_t replayed_traces = 0;
+  std::uint64_t aligned_traces = 0;
+  std::uint64_t alignment_failures = 0;
   std::uint64_t trace_count = 0;
   std::vector<DecisionPoint> decision_points;  // only points observed at all
 };
 
-// Mines the decision points of `net` from the traces of `log` that replay
-// cleanly (deviating traces are skipped: a forced replay's choices are not
-// trustworthy). Each choice is observed together with the attributes in scope
-// at that moment — the case attributes plus the latest value of every event
-// attribute (and the performing resource, under "resource") seen strictly
-// before the event that triggered the choice — and a small CART-style tree
-// (Gini impurity, binary splits, missing values falling to the else side) is
-// grown per decision point. On a model discovered from the log itself (the
-// Inductive Miner guarantees a perfect fit) every trace contributes.
+// Mines the decision points of `net` from `log`. Clean variants use their
+// exact firing path; deviating variants fall back to an optimal alignment and
+// contribute the model transitions selected by that alignment. A choice is
+// observed together with the attributes in scope at that moment — the case
+// attributes plus the latest value of every event attribute (and the
+// performing resource, under "resource") seen strictly before the event that
+// triggered the choice — and a small CART-style tree (Gini impurity, binary
+// splits, missing values falling to the else side) is grown per decision
+// point. If reachability or the alignment bound prevents a trustworthy path,
+// that trace is reported in `alignment_failures` and contributes no row.
 [[nodiscard]] DecisionMiningResult mine_decisions(const EventLog& log,
                                                   const PetriNet& net,
                                                   const DecisionMiningOptions& options = {});

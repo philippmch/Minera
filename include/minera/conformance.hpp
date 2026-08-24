@@ -192,6 +192,11 @@ struct VariantAlignment {
   // log-only moves are omitted. Transition ids remain available for duplicate
   // labels in evaluator variants that opt into task identities.
   std::vector<ProjectedAlignmentMove> projected_model_moves;
+  // Full optimal path retained for decision mining. Unlike `moves`, this also
+  // contains silent model transitions with empty activity names, so a hidden
+  // branch at a decision place remains observable without changing the public
+  // alignment display contract.
+  std::vector<AlignmentMove> complete_moves;
 };
 
 // Alignment-based conformance of an event log against a discovered process
