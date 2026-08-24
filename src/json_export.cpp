@@ -1399,6 +1399,9 @@ void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
     out << ", ";
   }
   out << "\"observed_traces\": " << decisions.observed_traces
+      << ", \"replayed_traces\": " << decisions.replayed_traces
+      << ", \"aligned_traces\": " << decisions.aligned_traces
+      << ", \"alignment_failures\": " << decisions.alignment_failures
       << ", \"trace_count\": " << decisions.trace_count
       << ", \"decision_points\": [";
   for (std::size_t i = 0; i < decisions.decision_points.size(); ++i) {

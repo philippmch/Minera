@@ -279,7 +279,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, numeric/date KDE, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, numeric/date attribute KDE grids, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
 | Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, a file-backed restartable streaming DFG store, deterministic classic and mutex-protected dictionaries, a bounded RESP remote dictionary, Declare, footprints, token, and temporal conformance are present; richer distributed lifecycle orchestration remains |
-| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls and selected context attributes, deterministic encoded numeric/one-hot tables with bounded pre-choice lookback, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; richer classifier backends and columnar training integrations remain |
+| Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls and selected context attributes, deterministic encoded numeric/one-hot tables with bounded pre-choice lookback, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; clean variants use exact replay while deviating variants now use optimal-alignment model choices with replay/alignment/failure diagnostics; richer classifier backends and columnar training integrations remain |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Partial** — deterministic seeded train/test trace splits, fixed and all-prefix projections, until-activity targets, activity-targeted sublogs, automatic event/case feature selection, and typed process-cube tables now have native, standalone CLI, cached-log server, and typed frontend adapters; model training and columnar dataframe integrations remain |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
@@ -912,8 +912,15 @@ guard and read-variable set; transitions consuming multiple decision places
 combine those rules conjunctively. The native API, standalone
 `minera_data_petri`, cached local `POST /api/data-petri-net`, and typed frontend
 request/response guard expose the same `DATA_PETRI_NET` envelope. The native
-`mine_decision_tables` API and `minera_decision_table` command emit the clean
-replay observations as deterministic numeric and one-hot columns. The standard
+`mine_decision_tables` API and `minera_decision_table` command emit deterministic
+numeric and one-hot columns from both clean replay and alignment-backed model
+choices. Deviating variants use their optimal alignment; model-only moves do not
+consume a log event, while synchronous and log-only moves advance the context.
+The alignment path retains hidden transition ids for this extraction even
+though ordinary conformance display continues to omit silent moves.
+The response reports replayed, aligned, and alignment-failed trace counts, and
+never fabricates rows when the net is unsound or a bounded alignment cannot be
+computed. The standard
 export accepts `--decision-tables`, the cached server exposes
 `POST /api/decision-tables`, and the typed frontend request validates the same
 encoded-table envelope. Decision depth, split/leaf minimums, candidate caps,

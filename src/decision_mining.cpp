@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "decision_replay.hpp"
 
 namespace minera {
 namespace {
@@ -350,35 +351,19 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
     }
   }
 
-  // Replay each distinct variant once; every trace of the variant follows the
-  // same path through the net, only its attribute context differs.
-  std::vector<std::vector<std::string>> variants;
-  std::unordered_map<std::string, std::size_t> variant_ids;
-  std::vector<std::size_t> variant_of(log.traces.size());
-  for (std::size_t i = 0; i < log.traces.size(); ++i) {
-    std::string key;
-    for (const auto& event : log.traces[i].events) {
-      key.push_back('\x1f');
-      key += event.activity;
-    }
-    const auto [it, inserted] = variant_ids.emplace(std::move(key), variants.size());
-    if (inserted) {
-      std::vector<std::string> activities;
-      activities.reserve(log.traces[i].events.size());
-      for (const auto& event : log.traces[i].events) {
-        activities.push_back(event.activity);
-      }
-      variants.push_back(std::move(activities));
-    }
-    variant_of[i] = it->second;
-  }
-  const auto firing = replay_firing_sequences(net, variants);
+  // Every distinct activity variant is replayed once. Deviating variants
+  // receive an alignment path, so both clean and non-fitting traces expose
+  // the same model-choice observations to the tree learner.
+  const auto paths = detail::collect_decision_replay_paths(log, net);
+  result.observed_traces = paths.observed_traces();
+  result.replayed_traces = paths.replayed_traces;
+  result.aligned_traces = paths.aligned_traces;
+  result.alignment_failures = paths.alignment_failures;
 
   std::vector<std::vector<Row>> rows(decision_places.size());
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
-    const auto& sequence = firing[variant_of[i]];
-    if (!sequence) continue;  // deviating trace: its choices are not trustworthy
-    ++result.observed_traces;
+    const auto& path = paths.paths[paths.variant_of[i]];
+    if (!path.available) continue;
     const auto& trace = log.traces[i];
 
     // The attributes in scope, growing as the trace unfolds: case attributes
@@ -390,8 +375,11 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
         context[attribute.key] = attribute.value;
       }
     }
-    for (std::size_t step = 0; step < sequence->size(); ++step) {
-      for (const std::size_t t : (*sequence)[step]) {
+    std::size_t event_index = 0;
+    for (const auto& move : path.moves) {
+      if (move.transition != static_cast<std::size_t>(-1) &&
+          move.transition < net.transitions().size()) {
+        const std::size_t t = move.transition;
         for (const std::size_t place : net.transitions()[t].inputs) {
           const int d = decision_index[place];
           if (d < 0) continue;
@@ -411,12 +399,19 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
               Row{std::move(scoped), label});
         }
       }
-      if (step < trace.events.size()) {
-        const auto& event = trace.events[step];
-        if (!event.resource.empty()) context["resource"] = event.resource;
-        for (const auto& attribute : event.attributes) {
-          context[attribute.key] = attribute.value;
+      // Synchronous and log-only moves consume the next log event. Model-only
+      // moves (including visible insertions) leave it pending, so a later
+      // decision sees the same pre-event context.
+      if (move.type == AlignmentMoveType::kSynchronous ||
+          move.type == AlignmentMoveType::kLog) {
+        if (event_index < trace.events.size()) {
+          const auto& event = trace.events[event_index];
+          if (!event.resource.empty()) context["resource"] = event.resource;
+          for (const auto& attribute : event.attributes) {
+            context[attribute.key] = attribute.value;
+          }
         }
+        ++event_index;
       }
     }
   }

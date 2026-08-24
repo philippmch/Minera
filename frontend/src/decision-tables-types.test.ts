@@ -6,6 +6,9 @@ const valid = {
   variant: "encoded",
   trace_count: 1,
   observed_traces: 1,
+  replayed_traces: 0,
+  aligned_traces: 1,
+  alignment_failures: 0,
   tables: [{
     place: 1,
     classes: ["B", "C"],
@@ -30,6 +33,7 @@ describe("encoded decision table guards", () => {
 
   it("rejects invalid rows and counters", () => {
     expect(isDecisionTablesResult({ ...valid, observed_traces: 2 })).toBe(false);
+    expect(isDecisionTablesResult({ ...valid, aligned_traces: 2 })).toBe(false);
     expect(isDecisionTablesResult({
       ...valid,
       tables: [{ ...valid.tables[0], rows: [{ features: [10], target: 2 }] }],

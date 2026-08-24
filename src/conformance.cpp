@@ -1226,6 +1226,7 @@ class Aligner {
 
   struct Outcome {
     std::vector<AlignmentMove> moves;
+    std::vector<AlignmentMove> complete_moves;
     double cost = 0.0;
     bool capped = false;  // search hit its bound before reaching the goal
     // The model marking the optimal alignment is in right before it consumes
@@ -1651,18 +1652,21 @@ class Aligner {
       std::vector<std::uint32_t> path{final_id};
       for (std::uint32_t id = final_id; id != start_id;) {
         const Entry& entry = entries[id];
-        if (!entry.silent) {
-          outcome.moves.push_back(
-              {entry.type, entry.type == AlignmentMoveType::kLog
-                               ? names[static_cast<std::size_t>(entry.ref)]
-                               : net_.activities()[static_cast<std::size_t>(
-                                     entry.ref)],
-               entry.transition < 0 ? static_cast<std::size_t>(-1)
-                                    : static_cast<std::size_t>(entry.transition)});
-        }
+        const AlignmentMove move{
+            entry.type,
+            entry.silent
+                ? std::string{}
+                : (entry.type == AlignmentMoveType::kLog
+                       ? names[static_cast<std::size_t>(entry.ref)]
+                       : net_.activities()[static_cast<std::size_t>(entry.ref)]),
+            entry.transition < 0 ? static_cast<std::size_t>(-1)
+                                 : static_cast<std::size_t>(entry.transition)};
+        outcome.complete_moves.push_back(move);
+        if (!entry.silent) outcome.moves.push_back(move);
         id = entry.prev;
         path.push_back(id);
       }
+      std::reverse(outcome.complete_moves.begin(), outcome.complete_moves.end());
       std::reverse(outcome.moves.begin(), outcome.moves.end());
       std::reverse(path.begin(), path.end());
 
@@ -1699,7 +1703,9 @@ class Aligner {
     // trustworthy.
     Outcome outcome;
     for (std::size_t i = 0; i < len; ++i) {
-      outcome.moves.push_back({AlignmentMoveType::kLog, names[i]});
+      const AlignmentMove move{AlignmentMoveType::kLog, names[i]};
+      outcome.moves.push_back(move);
+      outcome.complete_moves.push_back(move);
     }
     outcome.cost = static_cast<std::uint64_t>(len) + empty_run_cost_;
     outcome.capped = true;
@@ -2091,6 +2097,7 @@ class Aligner {
         std::move(before), std::move(after)});
     }
     result.primary.moves = std::move(primary.moves);
+    result.primary.complete_moves = result.primary.moves;
     result.primary.prefix_markings = std::move(primary.prefixes);
     for (std::size_t i = 1; i < goals.size(); ++i)
       result.alternatives.push_back(std::move(goals[i].moves));
@@ -2479,6 +2486,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
       fitness});
     result.variants.back().worst_cost = static_cast<double>(worst);
     result.variants.back().projected_model_moves = outcome.projected_model_moves;
+    result.variants.back().complete_moves = std::move(outcome.complete_moves);
     variant_markings.push_back(std::move(outcome.prefix_markings));
   }
 
@@ -2691,6 +2699,9 @@ AlignmentResult check_alignment(const EventLog& event_log,
     item.diagnostics = configured.diagnostics;
     item.worst_cost = worst;
     item.projected_model_moves = configured.primary.projected_model_moves;
+    item.complete_moves = configured.primary.complete_moves.empty()
+                              ? item.moves
+                              : std::move(configured.primary.complete_moves);
     item.optimal_alignments.push_back(item.moves);
     for (auto& alt : configured.alternatives)
       item.optimal_alignments.push_back(std::move(alt));

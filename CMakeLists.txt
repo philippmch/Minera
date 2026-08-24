@@ -46,6 +46,7 @@ add_library(minera_core
   src/declare_playout.cpp
   src/declare_streaming.cpp
   src/decision_mining.cpp
+  src/decision_replay.cpp
   src/decision_table.cpp
   src/dfg_playout.cpp
   src/dfg_alignment.cpp

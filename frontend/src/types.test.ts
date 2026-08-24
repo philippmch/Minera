@@ -71,7 +71,8 @@ describe("isDataPetriNetResult", () => {
     source: 0, sink: 2, activities: ["A"],
     transitions: [{ index: 0, activity: "A", silent: false, inputs: [0], outputs: [2],
       guard: "true", read_variables: [], write_variables: [] }],
-    decisions: { observed_traces: 1, trace_count: 1, decision_points: [] },
+    decisions: { observed_traces: 1, replayed_traces: 1, aligned_traces: 0,
+      alignment_failures: 0, trace_count: 1, decision_points: [] },
     decision_tables: { family: "DECISION_TABLES", variant: "encoded", trace_count: 1,
       observed_traces: 1, tables: [{ place: 1, classes: ["B", "C"],
         feature_names: ["amount"], rows: [{ features: [10], target: 0 }] }] },
@@ -80,6 +81,7 @@ describe("isDataPetriNetResult", () => {
   it("rejects malformed guard transitions", () => {
     expect(isDataPetriNetResult({ ...valid, transitions: [{ ...valid.transitions[0], guard: 4 }] })).toBe(false);
     expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, observed_traces: -1 } })).toBe(false);
+    expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, aligned_traces: 2 } })).toBe(false);
     expect(isDataPetriNetResult({ ...valid, decision_tables: { ...valid.decision_tables, tables: [{ ...valid.decision_tables.tables[0], rows: [{ features: [], target: 3 }] }] } })).toBe(false);
   });
 });

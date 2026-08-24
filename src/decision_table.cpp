@@ -16,6 +16,7 @@
 
 #include "minera/conformance.hpp"
 #include "minera/decision_mining.hpp"
+#include "decision_replay.hpp"
 
 namespace minera {
 namespace {
@@ -59,21 +60,11 @@ void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
 }
 
-std::vector<std::vector<std::string>> activity_variants(const EventLog& log) {
-  std::vector<std::vector<std::string>> variants;
-  std::map<std::vector<std::string>, std::size_t> ids;
-  for (const auto& trace : log.traces) {
-    std::vector<std::string> activities;
-    activities.reserve(trace.events.size());
-    for (const auto& event : trace.events) activities.push_back(event.activity);
-    if (!ids.emplace(activities, variants.size()).second) continue;
-    variants.push_back(std::move(activities));
-  }
-  return variants;
-}
-
 struct RawTables {
   std::uint64_t observed_traces = 0;
+  std::uint64_t replayed_traces = 0;
+  std::uint64_t aligned_traces = 0;
+  std::uint64_t alignment_failures = 0;
   std::vector<std::size_t> decision_places;
   std::vector<std::vector<RawRow>> rows;
 };
@@ -103,22 +94,14 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
     }
   }
 
-  const auto variants = activity_variants(log);
-  const auto firing = replay_firing_sequences(net, variants);
+  const auto paths = detail::collect_decision_replay_paths(log, net);
   std::vector<std::vector<RawRow>> rows(decision_places.size());
   std::uint64_t observed = 0;
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
-    std::vector<std::string> activities;
-    activities.reserve(trace.events.size());
-    for (const auto& event : trace.events) activities.push_back(event.activity);
-    const auto variant_it = std::find(variants.begin(), variants.end(), activities);
-    if (variant_it == variants.end() || *variant_it != activities)
-      throw std::logic_error("decision table variant indexing failed");
-    const auto variant_index = static_cast<std::size_t>(
-        std::distance(variants.begin(), variant_it));
-    if (!firing[variant_index]) continue;
+    const auto& path = paths.paths[paths.variant_of[trace_index]];
+    if (!path.available) continue;
     ++observed;
 
     std::map<std::string, std::string> trace_context;
@@ -153,8 +136,10 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
       context_slots[slot] = std::move(snapshot);
       ++event_index;
     };
-    for (std::size_t step = 0; step < firing[variant_index]->size(); ++step) {
-      for (const std::size_t transition : (*firing[variant_index])[step]) {
+    for (const auto& move : path.moves) {
+      if (move.transition != static_cast<std::size_t>(-1) &&
+          move.transition < net.transitions().size()) {
+        const std::size_t transition = move.transition;
         for (const std::size_t place : net.transitions()[transition].inputs) {
           const int decision = decision_index[place];
           if (decision < 0) continue;
@@ -173,12 +158,19 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
           }
         }
       }
-      if (step < trace.events.size()) {
-        remember_event(trace.events[step]);
+      if (move.type == AlignmentMoveType::kSynchronous ||
+          move.type == AlignmentMoveType::kLog) {
+        if (event_index < trace.events.size())
+          remember_event(trace.events[event_index]);
       }
     }
   }
-  return RawTables{observed, std::move(decision_places), std::move(rows)};
+  return RawTables{observed,
+                   paths.replayed_traces,
+                   paths.aligned_traces,
+                   paths.alignment_failures,
+                   std::move(decision_places),
+                   std::move(rows)};
 }
 
 struct Column {
@@ -258,6 +250,9 @@ DecisionTablesResult mine_decision_tables(const EventLog& log,
   const auto decisions = mine_decisions(log, net, options.mining);
   DecisionTablesResult result;
   result.observed_traces = raw.observed_traces;
+  result.replayed_traces = raw.replayed_traces;
+  result.aligned_traces = raw.aligned_traces;
+  result.alignment_failures = raw.alignment_failures;
   result.trace_count = log.trace_count();
   std::map<std::size_t, const DecisionPoint*> points;
   for (const auto& point : decisions.decision_points) points[point.place] = &point;
@@ -283,6 +278,9 @@ std::string serialize_decision_tables_json(const DecisionTablesResult& result) {
   out << "{\"family\":\"DECISION_TABLES\",\"variant\":\"encoded\","
       << "\"trace_count\":" << result.trace_count
       << ",\"observed_traces\":" << result.observed_traces
+      << ",\"replayed_traces\":" << result.replayed_traces
+      << ",\"aligned_traces\":" << result.aligned_traces
+      << ",\"alignment_failures\":" << result.alignment_failures
       << ",\"tables\":[";
   for (std::size_t ti = 0; ti < result.tables.size(); ++ti) {
     if (ti != 0) out << ',';

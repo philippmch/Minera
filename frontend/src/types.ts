@@ -3615,8 +3615,12 @@ export interface Decisions {
   /** Miner id the decisions belong to; absent in on-demand server responses
    * from older versions. */
   miner?: string;
-  /** Traces that replayed cleanly and contributed observations. */
+  /** Traces whose replay or alignment path contributed observations. */
   observed_traces: number;
+  /** Optional path diagnostics added by newer decision-mining responses. */
+  replayed_traces?: number;
+  aligned_traces?: number;
+  alignment_failures?: number;
   trace_count: number;
   decision_points: DecisionPoint[];
 }
@@ -3649,16 +3653,39 @@ export interface DecisionTablesResult {
   variant: "encoded";
   trace_count: number;
   observed_traces: number;
+  replayed_traces?: number;
+  aligned_traces?: number;
+  alignment_failures?: number;
   tables: EncodedDecisionTable[];
+}
+
+function validDecisionDiagnostics(
+  value: Record<string, unknown>,
+  traceCount: number,
+  observed: number,
+): boolean {
+  if (observed < 0 || observed > traceCount) return false;
+  const keys = ["replayed_traces", "aligned_traces", "alignment_failures"] as const;
+  const present = keys.map((key) => value[key] !== undefined);
+  if (present.every((entry) => !entry)) return true;
+  if (present.some((entry) => !entry)) return false;
+  const replayed = value.replayed_traces;
+  const aligned = value.aligned_traces;
+  const failures = value.alignment_failures;
+  if (![replayed, aligned, failures].every((entry) =>
+    Number.isSafeInteger(entry) && (entry as number) >= 0 &&
+    (entry as number) <= traceCount)) return false;
+  return (replayed as number) + (aligned as number) === observed &&
+    (failures as number) + observed === traceCount;
 }
 
 export function isDecisionTablesResult(value: unknown): value is DecisionTablesResult {
   if (!isOcelRecord(value) || value.family !== "DECISION_TABLES" ||
       value.variant !== "encoded" || !Number.isSafeInteger(value.trace_count) ||
       (value.trace_count as number) < 0 || !Number.isSafeInteger(value.observed_traces) ||
-      (value.observed_traces as number) < 0 ||
-      (value.observed_traces as number) > (value.trace_count as number) ||
       !Array.isArray(value.tables)) return false;
+  if (!validDecisionDiagnostics(value, value.trace_count as number,
+                               value.observed_traces as number)) return false;
   return value.tables.every((rawTable) => {
     if (!isOcelRecord(rawTable)) return false;
     const table = rawTable;
@@ -3835,6 +3862,9 @@ export function isDataPetriNetResult(value: unknown): value is DataPetriNetResul
       (value.decisions.observed_traces as number) < 0 ||
       !Number.isSafeInteger(value.decisions.trace_count) ||
       (value.decisions.trace_count as number) < 0 ||
+      !validDecisionDiagnostics(value.decisions,
+                                value.decisions.trace_count as number,
+                                value.decisions.observed_traces as number) ||
       !Array.isArray(value.decisions.decision_points) ||
       (value.decision_tables !== undefined && !isDecisionTablesResult(value.decision_tables))) return false;
   return value.transitions.every((transition) => isOcelRecord(transition) &&

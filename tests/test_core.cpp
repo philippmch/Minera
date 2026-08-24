@@ -4073,12 +4073,12 @@ void decision_mining_options_bound_tree_and_scope_attributes() {
   assert(threw);
 }
 
-void decision_mining_skips_deviating_traces() {
+void decision_mining_uses_alignment_for_deviating_traces() {
   auto log = decision_amount_log();
   const auto net = minera::to_petri_net(minera::discover_process_tree(log));
 
-  // A trace with an activity the model lacks cannot replay cleanly, so its
-  // choices are not observed.
+  // A trace with an activity the model lacks is aligned: the inserted model
+  // branch still gives a deterministic decision observation.
   minera::Trace rogue;
   rogue.case_id = "rogue";
   rogue.events.push_back(minera::Event{"rogue", "Register", "", "", 0});
@@ -4087,9 +4087,12 @@ void decision_mining_skips_deviating_traces() {
 
   const auto decisions = minera::mine_decisions(log, net);
   assert(decisions.trace_count == 21);
-  assert(decisions.observed_traces == 20);
+  assert(decisions.observed_traces == 21);
+  assert(decisions.replayed_traces == 20);
+  assert(decisions.aligned_traces == 1);
+  assert(decisions.alignment_failures == 0);
   assert(decisions.decision_points.size() == 1);
-  assert(decisions.decision_points.front().observations == 20);
+  assert(decisions.decision_points.front().observations == 21);
 }
 
 void json_export_carries_the_decisions_contract() {
@@ -4104,6 +4107,7 @@ void json_export_carries_the_decisions_contract() {
       nullptr, nullptr, &decisions);
   for (const char* key :
        {"\"decisions\"", "\"miner\": \"inductive\"", "\"observed_traces\": 20",
+        "\"replayed_traces\": 20", "\"aligned_traces\": 0",
         "\"decision_points\"", "\"branches\"", "\"tree\"",
         "\"key\": \"amount\"", "\"threshold\"", "\"branch\"",
         "\"accuracy\"", "\"majority_share\""}) {
@@ -5568,7 +5572,7 @@ int main() {
   decision_mining_recovers_a_numeric_rule();
   decision_mining_uses_prior_event_attributes_only();
   decision_mining_options_bound_tree_and_scope_attributes();
-  decision_mining_skips_deviating_traces();
+  decision_mining_uses_alignment_for_deviating_traces();
   json_export_carries_the_decisions_contract();
   importers_read_lifecycle_transitions();
   xes_export_round_trips_lifecycle();
