@@ -1557,6 +1557,10 @@ void handle_ocel_features(const httplib::Request& request,
         "include_endpoint_features", "include_attribute_counts",
         "include_interaction_features", "include_lifecycle_features",
         "include_interaction_by_type_features",
+        "include_general_interaction_features",
+        "include_general_descendants_features",
+        "include_general_inheritance_features", "include_cobirth_features",
+        "include_codeath_features",
         "ocel_features_filter_per_type",
         "numeric_event_attributes", "string_event_attributes",
         "numeric_object_attributes", "string_object_attributes"};
@@ -1599,6 +1603,19 @@ void handle_ocel_features(const httplib::Request& request,
     options.include_interaction_by_type_features = ocel_query_bool(
         request, "include_interaction_by_type_features",
         options.include_interaction_by_type_features);
+    options.include_general_interaction_features = ocel_query_bool(
+        request, "include_general_interaction_features",
+        options.include_general_interaction_features);
+    options.include_general_descendants_features = ocel_query_bool(
+        request, "include_general_descendants_features",
+        options.include_general_descendants_features);
+    options.include_general_inheritance_features = ocel_query_bool(
+        request, "include_general_inheritance_features",
+        options.include_general_inheritance_features);
+    options.include_cobirth_features = ocel_query_bool(
+        request, "include_cobirth_features", options.include_cobirth_features);
+    options.include_codeath_features = ocel_query_bool(
+        request, "include_codeath_features", options.include_codeath_features);
     options.include_lifecycle_features = ocel_query_bool(
         request, "include_lifecycle_features", options.include_lifecycle_features);
     options.numeric_event_attributes =

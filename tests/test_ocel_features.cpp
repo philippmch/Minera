@@ -41,6 +41,23 @@ minera::Ocel interaction_sample() {
   return log;
 }
 
+minera::Ocel graph_feature_sample() {
+  minera::Ocel log;
+  log.events = {
+      {"e1", "Create", "2026-01-01T00:00:00Z", {}},
+      {"e2", "Add", "2026-01-01T01:00:00Z", {}},
+      {"e3", "Split", "2026-01-01T02:00:00Z", {}},
+      {"e4", "Close", "2026-01-01T03:00:00Z", {}}};
+  log.objects = {{"a", "order", {}}, {"b", "order", {}},
+                 {"c", "item", {}}, {"d", "item", {}}};
+  log.relations = {{"e1", "a", ""}, {"e1", "b", ""},
+                   {"e1", "b", "duplicate"}, {"e2", "a", ""},
+                   {"e2", "c", ""}, {"e3", "c", ""},
+                   {"e3", "d", ""}, {"e4", "b", ""},
+                   {"e4", "d", ""}};
+  return log;
+}
+
 }  // namespace
 
 int main() {
@@ -168,6 +185,89 @@ int main() {
     rejected_interaction_events_objects = true;
   }
   assert(rejected_interaction_events_objects);
+
+  auto graph_options = minera::OcelFeatureOptions{};
+  graph_options.include_activity_features = false;
+  graph_options.include_timestamp_features = false;
+  graph_options.include_relation_features = false;
+  graph_options.include_endpoint_features = false;
+  graph_options.include_attribute_counts = false;
+  graph_options.include_interaction_features = false;
+  graph_options.include_lifecycle_features = false;
+  graph_options.include_general_interaction_features = true;
+  graph_options.include_general_descendants_features = true;
+  graph_options.include_general_inheritance_features = true;
+  graph_options.include_cobirth_features = true;
+  graph_options.include_codeath_features = true;
+  const auto graph_table = minera::extract_ocel_features(
+      graph_feature_sample(), minera::OcelFeatureVariant::kObjects,
+      graph_options);
+  const auto graph_column = [&](const std::string& name) {
+    const auto it = std::find(graph_table.feature_names.begin(),
+                              graph_table.feature_names.end(), name);
+    assert(it != graph_table.feature_names.end());
+    return static_cast<std::size_t>(it - graph_table.feature_names.begin());
+  };
+  const auto general_interaction =
+      graph_column("@@object_general_interaction_graph");
+  const auto descendants_asc = graph_column(
+      "@@object_general_descendants_graph_ascendants");
+  const auto descendants_desc = graph_column(
+      "@@object_general_descendants_graph_descendants");
+  const auto inheritance_asc = graph_column(
+      "@@object_general_inheritance_graph_ascendants");
+  const auto inheritance_desc = graph_column(
+      "@@object_general_inheritance_graph_descendants");
+  const auto cobirth = graph_column("@@object_cobirth");
+  const auto codeath = graph_column("@@object_codeath");
+  // Event order gives a-b, a-c, c-d, b-d interactions; duplicate rows do not
+  // change the graph. New objects create a->c and c->d descendants, while
+  // first/last-seen boundaries produce the same inheritance edges. Reverse
+  // event order gives b-d as the only codeath edge.
+  for (const auto& row : graph_table.values)
+    assert(row[general_interaction] == 2.0);
+  assert(graph_table.values[0][descendants_asc] == 0.0 &&
+         graph_table.values[0][descendants_desc] == 1.0 &&
+         graph_table.values[1][descendants_asc] == 0.0 &&
+         graph_table.values[1][descendants_desc] == 0.0 &&
+         graph_table.values[2][descendants_asc] == 1.0 &&
+         graph_table.values[2][descendants_desc] == 1.0 &&
+         graph_table.values[3][descendants_asc] == 1.0 &&
+         graph_table.values[3][descendants_desc] == 0.0);
+  assert(graph_table.values[0][inheritance_asc] == 0.0 &&
+         graph_table.values[0][inheritance_desc] == 1.0 &&
+         graph_table.values[1][inheritance_asc] == 0.0 &&
+         graph_table.values[1][inheritance_desc] == 0.0 &&
+         graph_table.values[2][inheritance_asc] == 1.0 &&
+         graph_table.values[2][inheritance_desc] == 1.0 &&
+         graph_table.values[3][inheritance_asc] == 1.0 &&
+         graph_table.values[3][inheritance_desc] == 0.0);
+  assert(graph_table.values[0][cobirth] == 1.0 &&
+         graph_table.values[1][cobirth] == 1.0 &&
+         graph_table.values[2][cobirth] == 0.0 &&
+         graph_table.values[3][cobirth] == 0.0);
+  assert(graph_table.values[0][codeath] == 0.0 &&
+         graph_table.values[1][codeath] == 1.0 &&
+         graph_table.values[2][codeath] == 0.0 &&
+         graph_table.values[3][codeath] == 1.0);
+  bool rejected_graph_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        graph_feature_sample(), minera::OcelFeatureVariant::kEvents,
+        graph_options);
+  } catch (const std::invalid_argument&) {
+    rejected_graph_events = true;
+  }
+  assert(rejected_graph_events);
+  bool rejected_graph_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        graph_feature_sample(), minera::OcelFeatureVariant::kEventsObjects,
+        graph_options);
+  } catch (const std::invalid_argument&) {
+    rejected_graph_events_objects = true;
+  }
+  assert(rejected_graph_events_objects);
 
   auto filtered_options = options;
   filtered_options.filter_per_type = "item";
