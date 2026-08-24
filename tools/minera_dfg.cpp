@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -59,6 +60,38 @@ minera::DfgCleanAnalysis to_clean_analysis(const minera::DfgFilterData& input) {
   return {input.edges, input.start_activities, input.end_activities};
 }
 
+minera::DfgFilterData apply_filters(
+    minera::DfgFilterData data, const std::optional<double>& activities_percentage,
+    const std::optional<double>& paths_percentage,
+    const std::optional<double>& keep_connected, bool keep_all_activities,
+    const std::optional<std::string>& to_activity,
+    const std::optional<std::string>& from_activity,
+    const std::optional<std::string>& contain_activity) {
+  if (keep_all_activities && !paths_percentage && !keep_connected) {
+    throw std::invalid_argument(
+        "--keep-all-activities requires --paths-percentage or "
+        "--keep-connected");
+  }
+  if (activities_percentage) {
+    data = minera::filter_dfg_on_activities_percentage(
+        data, *activities_percentage);
+  }
+  if (paths_percentage) {
+    data = minera::filter_dfg_on_paths_percentage(
+        data, *paths_percentage, keep_all_activities);
+  }
+  if (keep_connected) {
+    data = minera::filter_dfg_keep_connected(
+        data, *keep_connected, keep_all_activities);
+  }
+  if (to_activity) data = minera::filter_dfg_to_activity(data, *to_activity);
+  if (from_activity)
+    data = minera::filter_dfg_from_activity(data, *from_activity);
+  if (contain_activity)
+    data = minera::filter_dfg_contain_activity(data, *contain_activity);
+  return data;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -91,7 +124,13 @@ int main(int argc, char** argv) {
                    "       "
                 << argv[0]
                 << " --clean-noise THRESHOLD [--most-common-paths A->B,...] "
-                   "INPUT.dfg [OUTPUT.dfg]\n"
+                   "[filter options] INPUT.dfg [OUTPUT.dfg]\n"
+                   "       "
+                << argv[0]
+                << " filter options: --activities-percentage P "
+                   "--paths-percentage P --keep-connected T "
+                   "[--keep-all-activities] --to-activity A "
+                   "--from-activity A --contain-activity A\n"
                    "       "
                 << argv[0]
                 << " --to-petri <variant> INPUT.dfg [OUTPUT.json]\n";
@@ -101,6 +140,13 @@ int main(int argc, char** argv) {
     bool clean_noise = false;
     double noise_threshold = 0.0;
     std::set<std::pair<std::string, std::string>> most_common_paths;
+    std::optional<double> activities_percentage;
+    std::optional<double> paths_percentage;
+    std::optional<double> keep_connected;
+    bool keep_all_activities = false;
+    std::optional<std::string> to_activity;
+    std::optional<std::string> from_activity;
+    std::optional<std::string> contain_activity;
     std::vector<std::string> positional;
     for (int i = 1; i < argc; ++i) {
       const std::string_view argument(argv[i]);
@@ -114,6 +160,49 @@ int main(int argc, char** argv) {
           throw std::invalid_argument(
               "--most-common-paths requires a path list");
         most_common_paths = parse_paths(argv[i]);
+      } else if (argument == "--activities-percentage" ||
+                 argument == "--activities_percentage") {
+        if (++i >= argc)
+          throw std::invalid_argument(
+              "--activities-percentage requires a percentage");
+        activities_percentage = parse_number(argv[i], "--activities-percentage");
+      } else if (argument == "--paths-percentage" ||
+                 argument == "--paths_percentage") {
+        if (++i >= argc)
+          throw std::invalid_argument("--paths-percentage requires a percentage");
+        paths_percentage = parse_number(argv[i], "--paths-percentage");
+      } else if (argument == "--keep-connected" ||
+                 argument == "--keep_connected") {
+        if (++i >= argc)
+          throw std::invalid_argument(
+              "--keep-connected requires a dependency threshold");
+        keep_connected = parse_number(argv[i], "--keep-connected");
+      } else if (argument == "--keep-all-activities" ||
+                 argument == "--keep_all_activities") {
+        keep_all_activities = true;
+      } else if (argument == "--to-activity" || argument == "--to_activity") {
+        if (++i >= argc)
+          throw std::invalid_argument("--to-activity requires an activity");
+        to_activity = std::string(argv[i]);
+        if (to_activity->empty())
+          throw std::invalid_argument("--to-activity requires a non-empty activity");
+      } else if (argument == "--from-activity" ||
+                 argument == "--from_activity") {
+        if (++i >= argc)
+          throw std::invalid_argument("--from-activity requires an activity");
+        from_activity = std::string(argv[i]);
+        if (from_activity->empty())
+          throw std::invalid_argument(
+              "--from-activity requires a non-empty activity");
+      } else if (argument == "--contain-activity" ||
+                 argument == "--contain_activity") {
+        if (++i >= argc)
+          throw std::invalid_argument(
+              "--contain-activity requires an activity");
+        contain_activity = std::string(argv[i]);
+        if (contain_activity->empty())
+          throw std::invalid_argument(
+              "--contain-activity requires a non-empty activity");
       } else if (!argument.empty() && argument.front() == '-') {
         throw std::invalid_argument("unknown option: " + std::string(argument));
       } else {
@@ -127,10 +216,16 @@ int main(int argc, char** argv) {
           "--most-common-paths requires --clean-noise");
 
     auto dfg = minera::import_dfg(positional.front());
+    auto filter_data = to_filter_data(dfg);
     if (clean_noise) {
-      dfg = to_clean_analysis(minera::clean_dfg_based_on_noise_threshold(
-          to_filter_data(dfg), noise_threshold, most_common_paths));
+      filter_data = minera::clean_dfg_based_on_noise_threshold(
+          filter_data, noise_threshold, most_common_paths);
     }
+    filter_data = apply_filters(std::move(filter_data), activities_percentage,
+                                paths_percentage, keep_connected,
+                                keep_all_activities, to_activity, from_activity,
+                                contain_activity);
+    dfg = to_clean_analysis(filter_data);
     if (positional.size() == 2) {
       minera::export_dfg(positional[1], dfg);
     } else {

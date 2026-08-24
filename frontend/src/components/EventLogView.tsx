@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, type Trace, numberFormat } from "../types";
-import { fetchDfg, fetchXes } from "../api";
+import { type DfgExportOptions, fetchDfg, fetchXes } from "../api";
 
 const PAGE_SIZE = 50;
 
@@ -127,11 +127,22 @@ function XesButton({ dataset }: { dataset: string }) {
 function DfgButton({ dataset }: { dataset: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [options, setOptions] = useState<DfgExportOptions>({});
+
+  const setNumber = (name: keyof DfgExportOptions, value: string) => {
+    setOptions((current) => ({
+      ...current,
+      [name]: value.trim() ? Number(value) : undefined,
+    }));
+  };
+  const setText = (name: keyof DfgExportOptions, value: string) => {
+    setOptions((current) => ({ ...current, [name]: value }));
+  };
 
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchDfg()
+    fetchDfg(options)
       .then((text) => {
         const blob = new Blob([text], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
@@ -148,6 +159,98 @@ function DfgButton({ dataset }: { dataset: string }) {
 
   return (
     <span className="pnml-export">
+      <details className="dfg-options">
+        <summary>DFG filters</summary>
+        <div className="dfg-options-grid">
+          <label>
+            Noise threshold
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={options.noise_threshold ?? ""}
+              onChange={(event) => setNumber("noise_threshold", event.target.value)}
+            />
+          </label>
+          <label>
+            Most common paths
+            <input
+              type="text"
+              placeholder="A -> B"
+              value={options.most_common_paths ?? ""}
+              onChange={(event) => setText("most_common_paths", event.target.value)}
+            />
+          </label>
+          <label>
+            Activities percentage
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="any"
+              value={options.activities_percentage ?? ""}
+              onChange={(event) => setNumber("activities_percentage", event.target.value)}
+            />
+          </label>
+          <label>
+            Paths percentage
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="any"
+              value={options.paths_percentage ?? ""}
+              onChange={(event) => setNumber("paths_percentage", event.target.value)}
+            />
+          </label>
+          <label>
+            Connected threshold
+            <input
+              type="number"
+              step="any"
+              value={options.keep_connected ?? ""}
+              onChange={(event) => setNumber("keep_connected", event.target.value)}
+            />
+          </label>
+          <label>
+            To activity
+            <input
+              type="text"
+              value={options.to_activity ?? ""}
+              onChange={(event) => setText("to_activity", event.target.value)}
+            />
+          </label>
+          <label>
+            From activity
+            <input
+              type="text"
+              value={options.from_activity ?? ""}
+              onChange={(event) => setText("from_activity", event.target.value)}
+            />
+          </label>
+          <label>
+            Contain activity
+            <input
+              type="text"
+              value={options.contain_activity ?? ""}
+              onChange={(event) => setText("contain_activity", event.target.value)}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={options.keep_all_activities ?? false}
+              onChange={(event) =>
+                setOptions((current) => ({
+                  ...current,
+                  keep_all_activities: event.target.checked,
+                }))
+              }
+            />
+            Keep all activities
+          </label>
+        </div>
+      </details>
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : "Download DFG"}
       </button>

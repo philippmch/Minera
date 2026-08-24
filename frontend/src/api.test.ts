@@ -34,8 +34,23 @@ describe("classic DFG export API", () => {
   it("serializes optional noise cleaning settings", () => {
     expect(dfgExportQuery({ noise_threshold: 0.5, most_common_paths: "A -> B" }))
       .toBe("noise_threshold=0.5&most_common_paths=A+-%3E+B");
+    expect(dfgExportQuery({
+      activities_percentage: 0.5,
+      paths_percentage: 0.75,
+      keep_connected: 0.8,
+      keep_all_activities: true,
+      to_activity: "C",
+      from_activity: "A",
+      contain_activity: "B",
+    })).toBe("activities_percentage=0.5&paths_percentage=0.75&keep_connected=0.8&keep_all_activities=true&to_activity=C&from_activity=A&contain_activity=B");
     expect(() => dfgExportQuery({ noise_threshold: Number.NaN })).toThrow(/finite/);
     expect(() => dfgExportQuery({ most_common_paths: " " })).toThrow(/empty/);
+    expect(() => dfgExportQuery({ most_common_paths: "A -> B" })).toThrow(/requires noise_threshold/);
+    expect(() => dfgExportQuery({ activities_percentage: -0.1 })).toThrow(/\[0, 1\]/);
+    expect(() => dfgExportQuery({ paths_percentage: 1.1 })).toThrow(/\[0, 1\]/);
+    expect(() => dfgExportQuery({ keep_connected: Number.NaN })).toThrow(/finite/);
+    expect(() => dfgExportQuery({ keep_all_activities: true })).toThrow(/requires paths_percentage/);
+    expect(() => dfgExportQuery({ to_activity: " " })).toThrow(/must not be empty/);
   });
 
   it("fetches the cached graph as text", async () => {

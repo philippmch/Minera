@@ -4559,16 +4559,30 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
   try {
     for (const auto& [key, value] : request.params) {
       (void)value;
-      if (key != "noise_threshold" && key != "most_common_paths") {
+      if (key != "noise_threshold" && key != "most_common_paths" &&
+          key != "activities_percentage" && key != "paths_percentage" &&
+          key != "keep_connected" && key != "keep_all_activities" &&
+          key != "to_activity" && key != "from_activity" &&
+          key != "contain_activity") {
         throw std::invalid_argument("unknown DFG export parameter: " + key);
       }
     }
-    auto analysis = minera::to_dfg_analysis(session->graph);
     if (request.has_param("most_common_paths") &&
         !request.has_param("noise_threshold")) {
       throw std::invalid_argument(
           "most_common_paths requires noise_threshold");
     }
+
+    const bool keep_all_activities =
+        ocel_query_bool(request, "keep_all_activities", false);
+    const bool has_paths_percentage = request.has_param("paths_percentage");
+    const bool has_keep_connected = request.has_param("keep_connected");
+    if (keep_all_activities && !has_paths_percentage && !has_keep_connected) {
+      throw std::invalid_argument(
+          "keep_all_activities requires paths_percentage or keep_connected");
+    }
+
+    auto filtered = minera::make_dfg_filter_data(session->graph);
     if (request.has_param("noise_threshold")) {
       std::set<std::pair<std::string, std::string>> most_common_paths;
       if (request.has_param("most_common_paths")) {
@@ -4577,13 +4591,47 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
           most_common_paths.emplace(pair.predecessor, pair.successor);
         }
       }
-      const auto filtered = minera::clean_dfg_based_on_noise_threshold(
-          minera::make_dfg_filter_data(session->graph),
+      filtered = minera::clean_dfg_based_on_noise_threshold(
+          filtered,
           ocel_query_number(request, "noise_threshold", 0.0),
           most_common_paths);
-      analysis = {filtered.edges, filtered.start_activities,
-                  filtered.end_activities};
     }
+    if (request.has_param("activities_percentage")) {
+      filtered = minera::filter_dfg_on_activities_percentage(
+          filtered, ocel_query_number(request, "activities_percentage", 0.0));
+    }
+    if (has_paths_percentage) {
+      filtered = minera::filter_dfg_on_paths_percentage(
+          filtered, ocel_query_number(request, "paths_percentage", 0.0),
+          keep_all_activities);
+    }
+    if (has_keep_connected) {
+      filtered = minera::filter_dfg_keep_connected(
+          filtered, ocel_query_number(request, "keep_connected", 0.0),
+          keep_all_activities);
+    }
+
+    const auto query_activity = [&](std::string_view name) {
+      const auto key = std::string(name);
+      const auto value = request.get_param_value(key);
+      if (value.empty())
+        throw std::invalid_argument(key + " must not be empty");
+      return value;
+    };
+    if (request.has_param("to_activity")) {
+      filtered = minera::filter_dfg_to_activity(
+          filtered, query_activity("to_activity"));
+    }
+    if (request.has_param("from_activity")) {
+      filtered = minera::filter_dfg_from_activity(
+          filtered, query_activity("from_activity"));
+    }
+    if (request.has_param("contain_activity")) {
+      filtered = minera::filter_dfg_contain_activity(
+          filtered, query_activity("contain_activity"));
+    }
+    const auto analysis = minera::DfgCleanAnalysis{
+        filtered.edges, filtered.start_activities, filtered.end_activities};
     response.set_content(minera::to_dfg(analysis), "text/plain");
   } catch (const std::exception& error) {
     response.status = 400;
