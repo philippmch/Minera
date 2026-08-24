@@ -726,10 +726,45 @@ StochasticLanguage derive_stochastic_language(const EventLog& log,bool normalize
 }
 
 EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb,const EmdOptions& opt) {
-  EmdResult out; auto a=aa,b=bb;
-  // Validate and consolidate duplicate trace keys deterministically.
-  auto consolidate=[](StochasticLanguage& x){std::map<std::vector<std::string>,double> c;for(auto&t:x.traces)c[t.activities]+=t.weight;x.traces.clear();x.total_mass=0;for(auto&[k,w]:c){x.traces.push_back({k,w});x.total_mass+=w;}}; consolidate(a); consolidate(b);
-  double ma=0,mb=0; for(auto&t:a.traces){if(!std::isfinite(t.weight)||t.weight<0){out.computed=false;out.error="invalid language weight";return out;}ma+=t.weight;}for(auto&t:b.traces){if(!std::isfinite(t.weight)||t.weight<0){out.computed=false;out.error="invalid language weight";return out;}mb+=t.weight;} if(a.traces.empty()&&b.traces.empty()){out.distance=0;return out;} if(ma<=0||mb<=0){out.computed=false;out.error="stochastic language has zero mass";return out;}
+  EmdResult out;
+  out.variant = opt.variant;
+  switch (opt.variant) {
+    case EmdVariant::EXACT:
+    case EmdVariant::PYEMD:
+      break;
+    default:
+      out.computed = false;
+      out.error = "unsupported EMD variant";
+      return out;
+  }
+
+  // Validate every source weight before consolidation. This prevents an
+  // invalid negative entry from being hidden by a duplicate positive entry.
+  // The ordered map gives duplicate traces a deterministic representation.
+  auto consolidate=[](const StochasticLanguage& input,
+                       StochasticLanguage& output) -> bool {
+    std::map<std::vector<std::string>,double> c;
+    for (const auto& trace : input.traces) {
+      if (!std::isfinite(trace.weight) || trace.weight < 0.0) return false;
+      c[trace.activities] += trace.weight;
+    }
+    output.traces.clear();
+    output.total_mass = 0.0;
+    for (const auto& [activities, weight] : c) {
+      if (!std::isfinite(weight) || weight < 0.0) return false;
+      output.traces.push_back({activities, weight});
+      output.total_mass += weight;
+    }
+    return std::isfinite(output.total_mass);
+  };
+  StochasticLanguage a, b;
+  if (!consolidate(aa, a) || !consolidate(bb, b)) {
+    out.computed=false;
+    out.error="invalid language weight";
+    return out;
+  }
+  double ma=a.total_mass,mb=b.total_mass;
+  if (a.traces.empty()&&b.traces.empty()){out.distance=0;return out;} if(ma<=0||mb<=0){out.computed=false;out.error="stochastic language has zero mass";return out;}
   if(std::abs(ma-mb)>1e-9){
     // Strict mode is deliberately checked before the default
     // normalization: callers opting into it asked to detect unequal mass,
@@ -738,7 +773,13 @@ EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb
     if(opt.normalize_masses){for(auto&t:a.traces)t.weight/=ma;for(auto&t:b.traces)t.weight/=mb;ma=mb=1;out.normalized=true;}
     else {out.computed=false;out.error="masses must be equal";return out;}
   }
-  const auto dist=opt.distance?opt.distance:normalized_levenshtein_distance; const std::size_t n=a.traces.size(),m=b.traces.size();
+  // The explicit PYEMD selector has fixed normalized Levenshtein costs. The
+  // historical selector continues to honor a caller-supplied distance.
+  const auto dist = opt.variant == EmdVariant::PYEMD
+                        ? DistanceFunction(normalized_levenshtein_distance)
+                        : (opt.distance ? opt.distance
+                                        : DistanceFunction(normalized_levenshtein_distance));
+  const std::size_t n=a.traces.size(),m=b.traces.size();
   std::vector<std::vector<double>> cost(n,std::vector<double>(m)); for(std::size_t i=0;i<n;++i)for(std::size_t j=0;j<m;++j){cost[i][j]=dist(a.traces[i].activities,b.traces[j].activities);if(!std::isfinite(cost[i][j])||cost[i][j]<0){out.computed=false;out.error="invalid distance";return out;}}
   struct Edge{int to,rev;double cap,cost;}; const int S=0,I=1,J=int(1+n),T=J+int(m),N=T+1; std::vector<std::vector<Edge>> g(N);
   auto add=[&](int u,int v,double c,double w){g[u].push_back({v,(int)g[v].size(),c,w});g[v].push_back({u,(int)g[u].size()-1,0,-w});};

@@ -1038,6 +1038,8 @@ describe("model-quality result guards", () => {
 
   it("accepts computed and failed stochastic-language distances", () => {
     expect(isEmdResult({ distance: 0.125, computed: true, normalized: true, error: null })).toBe(true);
+    expect(isEmdResult({ variant: "pyemd", distance: 0.125, computed: true, normalized: false, error: null })).toBe(true);
+    expect(isEmdResult({ variant: "unsupported", distance: 0.125, computed: true, normalized: false, error: null })).toBe(false);
     expect(isEmdResult({ distance: null, computed: false, normalized: false, error: "unequal mass" })).toBe(true);
     expect(isEmdResult({ distance: NaN, computed: false, normalized: false, error: null })).toBe(false);
   });

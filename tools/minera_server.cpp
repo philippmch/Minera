@@ -3836,6 +3836,17 @@ void handle_evaluate_emd(const httplib::Request& request,
                                   " expects true, false, 1, or 0");
     };
     minera::EmdOptions options;
+    if (request.has_param("emd_variant")) {
+      const auto value = lower_ascii(request.get_param_value("emd_variant"));
+      if (value == "exact") {
+        options.variant = minera::EmdVariant::EXACT;
+      } else if (value == "pyemd") {
+        options.variant = minera::EmdVariant::PYEMD;
+      } else {
+        throw std::invalid_argument(
+            "emd_variant expects exact or pyemd");
+      }
+    }
     options.normalize_masses =
         parse_boolean("normalize_masses", options.normalize_masses);
     options.strict_equal_mass =

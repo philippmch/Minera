@@ -988,6 +988,15 @@ on-demand caches/results across analysis changes. Native evaluator, request,
 JSON, CLI, hidden-server, frontend-test, and production-build validation cover
 the full vertical.
 
+Earth-mover evaluation retains the historical `EXACT` selector as the
+backwards-compatible default and also exposes `PYEMD`. The explicit variant
+uses normalized Levenshtein trace costs with the same dependency-free exact
+transport solver. Duplicate trace keys are consolidated in stable order;
+invalid weights, non-finite costs, empty positive-mass inputs, and unequal
+masses under strict mode are rejected deterministically. Normalized unequal
+masses are reported through the result's `normalized` flag, and the selected
+variant is retained in standalone and embedded JSON.
+
 ## Token-replay parity evidence
 
 The backwards token-replay variation independently follows the pinned legacy

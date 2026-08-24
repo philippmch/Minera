@@ -1460,10 +1460,15 @@ export async function analyzePetriModel(options: PetriAnalysisOptions = {}): Pro
 
 /** Stable query serialization for stochastic-language distance controls. */
 export function emdQuery(options: EmdOptions = {}): string {
+  if (options.emd_variant !== undefined && options.emd_variant !== "exact" && options.emd_variant !== "pyemd") {
+    throw new Error("emd_variant is invalid");
+  }
   for (const [name, value] of Object.entries(options)) {
+    if (name === "emd_variant") continue;
     if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
   }
   const query = new URLSearchParams();
+  if (options.emd_variant !== undefined) query.set("emd_variant", options.emd_variant);
   if (options.normalize_masses !== undefined) query.set("normalize_masses", String(options.normalize_masses));
   if (options.strict_equal_mass !== undefined) query.set("strict_equal_mass", String(options.strict_equal_mass));
   return query.toString();

@@ -1672,7 +1672,15 @@ void write_composite(std::ostream& out,
 }
 
 void write_emd(std::ostream& out, const EmdResult& result) {
-  out << "{\"distance\": ";
+  const char* variant = "exact";
+  switch (result.variant) {
+    case EmdVariant::EXACT: variant = "exact"; break;
+    case EmdVariant::PYEMD: variant = "pyemd"; break;
+    default: variant = "unknown"; break;
+  }
+  out << "{\"variant\": ";
+  write_json_string(out, variant);
+  out << ", \"distance\": ";
   write_finite_or_null(out, result.distance);
   out << ", \"computed\": " << (result.computed ? "true" : "false")
       << ", \"normalized\": " << (result.normalized ? "true" : "false")
