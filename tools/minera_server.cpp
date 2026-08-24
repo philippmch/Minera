@@ -2012,6 +2012,7 @@ void handle_organizational_sna(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "sna_variant", "sna_activity_attribute", "sna_resource_attribute",
+        "sna_case_id_attribute",
         "sna_beta", "sna_n", "sna_metric_normalization",
         "sna_max_resources", "sna_max_edges"};
     for (const auto& [key, value] : request.params) {

@@ -1689,11 +1689,21 @@ export const mineGenetic = requestGeneticMine;
 export const requestGeneticMiner = requestGeneticMine;
 /** Query string for the cached-session organizational SNA endpoint. */
 export function organizationalSnaQuery(options: OrganizationalSnaOptions = {}): string {
+  const caseId = options.sna_case_id_attribute;
+  const defaultCase = caseId === undefined || caseId === "case_id" ||
+    caseId === "case:id" || caseId === "case:concept:name";
+  const caseIdVariant = options.sna_variant === "handover_pandas" ||
+    options.sna_variant === "working_together_pandas" ||
+    options.sna_variant === "subcontracting_pandas";
+  if (!defaultCase && !caseIdVariant)
+    throw new Error(
+      "sna_case_id_attribute requires a handover, working_together, or subcontracting pandas variant");
   const query = new URLSearchParams();
   const entries: Array<[string, string | undefined]> = [
     ["sna_variant", options.sna_variant],
     ["sna_activity_attribute", options.sna_activity_attribute],
     ["sna_resource_attribute", options.sna_resource_attribute],
+    ["sna_case_id_attribute", options.sna_case_id_attribute],
     ["sna_beta", options.sna_beta === undefined ? undefined : String(options.sna_beta)],
     ["sna_n", options.sna_n === undefined ? undefined : String(options.sna_n)],
     ["sna_metric_normalization", options.sna_metric_normalization === undefined ? undefined : String(options.sna_metric_normalization)],

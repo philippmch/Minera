@@ -2797,19 +2797,21 @@ void genetic_params_contract() {
 
 void organizational_sna_params_contract() {
   const auto parsed = minera::parse_organizational_sna_params(fields({
-      {"sna_variant", "working_together"},
+      {"sna_variant", "working_together_pandas"},
       {"sna_beta", "0.25"},
       {"sna_n", "4"},
       {"sna_metric_normalization", "true"},
       {"sna_activity_attribute", "team:activity"},
       {"sna_resource_attribute", "team:resource"},
+      {"sna_case_id_attribute", "case:batch"},
       {"sna_max_resources", "20"},
       {"sna_max_edges", "80"}}));
-  assert(parsed.variant == minera::OrganizationalSnaVariant::kWorkingTogether);
+  assert(parsed.variant == minera::OrganizationalSnaVariant::kWorkingTogetherPandas);
   assert(parsed.beta == 0.25 && parsed.n == 4 && parsed.metric_normalization);
   assert(parsed.max_resources == 20 && parsed.max_edges == 80);
   assert(parsed.activity_attribute == "team:activity" &&
          parsed.resource_attribute == "team:resource");
+  assert(parsed.case_id_attribute == "case:batch");
   for (const auto& [wire, expected] : {
            std::pair{"handover_pandas", minera::OrganizationalSnaVariant::kHandoverPandas},
            std::pair{"working_together_pandas", minera::OrganizationalSnaVariant::kWorkingTogetherPandas},
@@ -2823,6 +2825,7 @@ void organizational_sna_params_contract() {
                            std::pair{"sna_beta", "1.1"},
                            std::pair{"sna_beta", "nan"},
                            std::pair{"sna_n", "0"},
+                           std::pair{"sna_case_id_attribute", ""},
                            std::pair{"sna_metric_normalization", "maybe"},
                            std::pair{"sna_max_edges", "0"}}) {
     bool threw = false;
@@ -2834,6 +2837,15 @@ void organizational_sna_params_contract() {
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
   }
+  bool unsupported_case_selector = false;
+  try {
+    (void)minera::parse_organizational_sna_params(
+        fields({{"sna_variant", "jointactivities_pandas"},
+                {"sna_case_id_attribute", "case:batch"}}));
+  } catch (const std::invalid_argument&) {
+    unsupported_case_selector = true;
+  }
+  assert(unsupported_case_selector);
 }
 
 void role_discovery_params_contract() {

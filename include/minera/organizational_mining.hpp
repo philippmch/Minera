@@ -35,6 +35,9 @@ struct OrganizationalSnaOptions {
   // dataframe-style variants on one typed surface.
   std::string activity_attribute = "concept:name";
   std::string resource_attribute = "org:resource";
+  // Case selector used to regroup events for the sequence-based metrics.
+  // The default preserves the EventLog trace boundaries.
+  std::string case_id_attribute = "case:concept:name";
   double beta = 0.0;          // distance decay for handover weights
   std::size_t n = 2;          // maximum subcontracting gap
   bool metric_normalization = false;

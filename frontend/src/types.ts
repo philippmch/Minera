@@ -238,6 +238,7 @@ export interface OrganizationalSnaResult {
 }
 export interface OrganizationalSnaOptions {
   sna_variant?: OrganizationalSnaVariant; sna_activity_attribute?: string; sna_resource_attribute?: string;
+  sna_case_id_attribute?: string;
   sna_beta?: number; sna_n?: number;
   sna_metric_normalization?: boolean; sna_max_resources?: number; sna_max_edges?: number;
 }
