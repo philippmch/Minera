@@ -1140,6 +1140,10 @@ describe("OCEL API", () => {
       include_general_interaction_features: false,
     })).toBe("variant=objects&include_all_object_features=true&include_general_interaction_features=false");
     expect(ocelFeaturesQuery({
+      variant: "events", feature_name_style: "compatibility",
+      string_event_attributes: ["kind"],
+    })).toBe("variant=events&feature_name_style=compatibility&string_event_attributes=kind");
+    expect(ocelFeaturesQuery({
       variant: "objects", include_all_object_features: false,
     })).toBe("variant=objects&include_all_object_features=false");
     expect(ocelFeaturesQuery({
@@ -1207,6 +1211,12 @@ describe("OCEL API", () => {
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events_objects", include_all_object_features: false }))
       .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({
+      variant: "events_objects", feature_name_style: "compatibility",
+    })).toThrow(/events or objects/);
+    expect(() => ocelFeaturesQuery({
+      variant: "events", feature_name_style: "invalid" as never,
+    })).toThrow(/feature_name_style/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_codeath_features: true }))
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_related_events_features: false }))

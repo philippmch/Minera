@@ -18,8 +18,16 @@ enum class OcelFeatureVariant {
   EVENTS_OBJECTS = kEventsObjects,
 };
 
+enum class OcelFeatureNameStyle {
+  kNative,
+  kCompatibility,
+  NATIVE = kNative,
+  COMPATIBILITY = kCompatibility,
+};
+
 struct OcelFeatureOptions {
   bool include_activity_features = true;
+  OcelFeatureNameStyle feature_name_style = OcelFeatureNameStyle::kNative;
   bool include_timestamp_features = true;
   bool include_relation_features = true;
   // Event relation-count components inherit include_relation_features when

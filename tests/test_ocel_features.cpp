@@ -174,6 +174,54 @@ int main() {
   assert(objects.values[0][static_cast<std::size_t>(
              length - objects.feature_names.begin())] == 3.0);
 
+  auto compatibility_events = options;
+  compatibility_events.feature_name_style =
+      minera::OcelFeatureNameStyle::kCompatibility;
+  compatibility_events.include_related_objects_features = true;
+  const auto compatibility_event_table = extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEvents, compatibility_events);
+  assert(std::find(compatibility_event_table.feature_names.begin(),
+                   compatibility_event_table.feature_names.end(),
+                   "@@event_attr_value_kind_fast") !=
+         compatibility_event_table.feature_names.end());
+  assert(std::find(compatibility_event_table.feature_names.begin(),
+                   compatibility_event_table.feature_names.end(),
+                   "@@rel_obj_fea_min_@@object_attr_value_color_blue") !=
+         compatibility_event_table.feature_names.end());
+  assert(std::find(compatibility_event_table.feature_names.begin(),
+                   compatibility_event_table.feature_names.end(),
+                   "@@event_str_kind_fast") ==
+         compatibility_event_table.feature_names.end());
+
+  auto compatibility_objects = options;
+  compatibility_objects.feature_name_style =
+      minera::OcelFeatureNameStyle::kCompatibility;
+  compatibility_objects.include_interaction_by_type_features = true;
+  compatibility_objects.include_related_events_features = true;
+  const auto compatibility_object_table = extract_ocel_features(
+      log, minera::OcelFeatureVariant::kObjects, compatibility_objects);
+  assert(std::find(compatibility_object_table.feature_names.begin(),
+                   compatibility_object_table.feature_names.end(),
+                   "@@object_attr_value_color_blue") !=
+         compatibility_object_table.feature_names.end());
+  assert(std::find(compatibility_object_table.feature_names.begin(),
+                   compatibility_object_table.feature_names.end(),
+                   "@@object_interaction_graph_item") !=
+         compatibility_object_table.feature_names.end());
+  assert(std::find(compatibility_object_table.feature_names.begin(),
+                   compatibility_object_table.feature_names.end(),
+                   "@@rel_eve_min_@@event_attr_value_kind_fast") !=
+         compatibility_object_table.feature_names.end());
+  bool rejected_compatibility_exploded = false;
+  try {
+    (void)extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEventsObjects,
+        compatibility_events);
+  } catch (const std::invalid_argument&) {
+    rejected_compatibility_exploded = true;
+  }
+  assert(rejected_compatibility_exploded);
+
   const auto lifecycle_order = non_monotonic_lifecycle_sample();
   auto lifecycle_options = minera::OcelFeatureOptions{};
   lifecycle_options.include_activity_features = false;
