@@ -26,6 +26,12 @@ struct OcelFeatureOptions {
   bool include_attribute_counts = true;
   bool include_interaction_features = true;
   bool include_interaction_by_type_features = false;
+  // Optional object-graph scalar columns. These are valid only for OBJECTS.
+  bool include_general_interaction_features = false;
+  bool include_general_descendants_features = false;
+  bool include_general_inheritance_features = false;
+  bool include_cobirth_features = false;
+  bool include_codeath_features = false;
   bool include_lifecycle_features = true;
   std::vector<std::string> numeric_event_attributes;
   std::vector<std::string> string_event_attributes;

@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -500,6 +501,136 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       }
     }
   }
+
+  const bool include_general_graph_features =
+      options.include_general_interaction_features ||
+      options.include_general_descendants_features ||
+      options.include_general_inheritance_features ||
+      options.include_cobirth_features || options.include_codeath_features;
+  if (include_general_graph_features) {
+    using ObjectPair = std::pair<std::size_t, std::size_t>;
+    std::set<ObjectPair> interaction_graph;
+    std::set<ObjectPair> descendants_graph;
+    std::set<ObjectPair> inheritance_graph;
+    std::set<ObjectPair> cobirth_graph;
+    std::set<ObjectPair> codeath_graph;
+
+    // Relations are deduplicated per event before constructing the graph
+    // families, so repeated object-event rows do not inflate any feature.
+    const auto event_objects_unique = [&]() {
+      std::vector<std::vector<std::size_t>> result = event_objects;
+      for (auto& objects : result) {
+        std::sort(objects.begin(), objects.end());
+        objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
+      }
+      return result;
+    }();
+
+    for (const auto& objects : event_objects_unique) {
+      for (std::size_t left = 0; left < objects.size(); ++left) {
+        for (std::size_t right = left + 1; right < objects.size(); ++right)
+          interaction_graph.emplace(objects[left], objects[right]);
+      }
+    }
+
+    std::vector<std::size_t> forward_events(log.events.size());
+    std::iota(forward_events.begin(), forward_events.end(), 0);
+    // Build descendants and cobirth together in the event order.
+    {
+      std::set<std::size_t> seen;
+      for (const auto event : forward_events) {
+        const auto& objects = event_objects_unique[event];
+        std::vector<std::size_t> unseen;
+        for (const auto object : objects)
+          if (!seen.contains(object)) unseen.push_back(object);
+        for (const auto object : objects) {
+          if (!seen.contains(object)) continue;
+          for (const auto child : unseen) descendants_graph.emplace(object, child);
+        }
+        for (std::size_t left = 0; left < unseen.size(); ++left)
+          for (std::size_t right = left + 1; right < unseen.size(); ++right)
+            cobirth_graph.emplace(unseen[left], unseen[right]);
+        seen.insert(unseen.begin(), unseen.end());
+      }
+    }
+    // Codeath is the same first-seen construction with the event order
+    // traversed backwards.
+    {
+      std::set<std::size_t> seen;
+      for (auto event = forward_events.rbegin(); event != forward_events.rend();
+           ++event) {
+        const auto& objects = event_objects_unique[*event];
+        std::vector<std::size_t> unseen;
+        for (const auto object : objects)
+          if (!seen.contains(object)) unseen.push_back(object);
+        for (std::size_t left = 0; left < unseen.size(); ++left)
+          for (std::size_t right = left + 1; right < unseen.size(); ++right)
+            codeath_graph.emplace(unseen[left], unseen[right]);
+        seen.insert(unseen.begin(), unseen.end());
+      }
+    }
+
+    std::vector<std::size_t> first(log.objects.size(), log.events.size());
+    std::vector<std::size_t> last(log.objects.size(), log.events.size());
+    for (std::size_t event = 0; event < event_objects_unique.size(); ++event)
+      for (const auto object : event_objects_unique[event]) {
+        first[object] = std::min(first[object], event);
+        last[object] = event;
+      }
+    for (std::size_t event = 0; event < event_objects_unique.size(); ++event) {
+      const auto& objects = event_objects_unique[event];
+      for (const auto source : objects) {
+        if (last[source] != event) continue;
+        for (const auto target : objects) {
+          if (source != target && first[target] == event)
+            inheritance_graph.emplace(source, target);
+        }
+      }
+    }
+    std::set<ObjectPair> reciprocal_edges;
+    for (const auto& edge : inheritance_graph)
+      if (inheritance_graph.contains({edge.second, edge.first}))
+        reciprocal_edges.insert(edge);
+    for (const auto& edge : reciprocal_edges) inheritance_graph.erase(edge);
+
+    const auto undirected_degrees = [&](const std::set<ObjectPair>& graph) {
+      std::vector<std::set<std::size_t>> neighbors(log.objects.size());
+      for (const auto& [left, right] : graph) {
+        neighbors[left].insert(right);
+        neighbors[right].insert(left);
+      }
+      std::vector<double> result(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < result.size(); ++row)
+        result[row] = static_cast<double>(neighbors[row].size());
+      return result;
+    };
+    const auto add_directed_degrees = [&](const std::set<ObjectPair>& graph,
+                                          bool incoming, std::string name) {
+      std::vector<double> values(log.objects.size(), 0.0);
+      for (const auto& [source, target] : graph)
+        values[incoming ? target : source] += 1.0;
+      builder.add(std::move(name), std::move(values));
+    };
+    if (options.include_general_interaction_features)
+      builder.add("@@object_general_interaction_graph",
+                  undirected_degrees(interaction_graph));
+    if (options.include_general_descendants_features) {
+      add_directed_degrees(descendants_graph, true,
+                           "@@object_general_descendants_graph_ascendants");
+      add_directed_degrees(descendants_graph, false,
+                           "@@object_general_descendants_graph_descendants");
+    }
+    if (options.include_general_inheritance_features) {
+      add_directed_degrees(inheritance_graph, true,
+                           "@@object_general_inheritance_graph_ascendants");
+      add_directed_degrees(inheritance_graph, false,
+                           "@@object_general_inheritance_graph_descendants");
+    }
+    if (options.include_cobirth_features)
+      builder.add("@@object_cobirth", undirected_degrees(cobirth_graph));
+    if (options.include_codeath_features)
+      builder.add("@@object_codeath", undirected_degrees(codeath_graph));
+  }
   (void)object_events;
   (void)times;
 }
@@ -525,6 +656,14 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       variant != OcelFeatureVariant::kObjects) {
     throw std::invalid_argument(
         "OCEL interaction-by-type features apply only to the objects variant");
+  }
+  if ((options.include_general_interaction_features ||
+       options.include_general_descendants_features ||
+       options.include_general_inheritance_features || options.include_cobirth_features ||
+       options.include_codeath_features) &&
+      variant != OcelFeatureVariant::kObjects) {
+    throw std::invalid_argument(
+        "OCEL object graph features apply only to the objects variant");
   }
   IndexMap event_index, object_index;
   for (std::size_t i = 0; i < log.events.size(); ++i) {

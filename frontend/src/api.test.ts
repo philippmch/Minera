@@ -1065,9 +1065,17 @@ describe("OCEL API", () => {
       string_object_attributes: ["color"],
       filter_per_type: "item",
     })).toBe("variant=objects&max_features=12&include_interaction_by_type_features=true&include_lifecycle_features=false&numeric_event_attributes=a%2Cz&string_object_attributes=color&ocel_features_filter_per_type=item");
+    expect(ocelFeaturesQuery({
+      variant: "objects", include_general_interaction_features: true,
+      include_general_descendants_features: true,
+      include_general_inheritance_features: true,
+      include_cobirth_features: true, include_codeath_features: true,
+    })).toBe("variant=objects&include_general_interaction_features=true&include_general_descendants_features=true&include_general_inheritance_features=true&include_cobirth_features=true&include_codeath_features=true");
     expect(ocelFeaturesQuery({ variant: "events", filter_per_type: "" }))
       .toBe("variant=events&ocel_features_filter_per_type=");
     expect(() => ocelFeaturesQuery({ variant: "events", include_interaction_by_type_features: true }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_codeath_features: true }))
       .toThrow(/objects/);
     expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))
       .toBe("variant=activity_associations&prefilter=start");
