@@ -101,6 +101,7 @@
 #include "minera/transition_system.hpp"
 #include "minera/xes_export.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "embedding_runtime.hpp"
 
 namespace {
 
@@ -612,6 +613,7 @@ int usage(const char* program) {
                "  --embeddings              Emit case/event embeddings JSON\n"
                "  --embedding-variant <id>  cases (default) or events\n"
                "  --embedding-provider <id> hashing (default) or transformer (mock_transformer model for CLI)\n"
+               "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
                "  --embedding-model <name>  Deterministic encoder label\n"
                "  --embedding-attribute-key <name> Text attribute\n"
                "  --embedding-event-id-key <name> Optional event id attribute\n"
@@ -1264,6 +1266,7 @@ int main(int argc, char** argv) {
   bool features_requested = false;
   std::map<std::string, std::string> features_fields;
   bool embeddings_requested = false;
+  std::string embedding_runtime_url;
   std::map<std::string, std::string> embedding_fields;
   bool embedding_target_requested = false;
   std::string embedding_target;
@@ -2293,6 +2296,15 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--embeddings" || arg == "--to-embeddings") {
+      embeddings_requested = true;
+      continue;
+    }
+    if (arg == "--embedding-runtime-url") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      embedding_runtime_url = value;
+      if (!embedding_fields.contains("embedding_provider"))
+        embedding_fields.insert_or_assign("embedding_provider", "transformer");
       embeddings_requested = true;
       continue;
     }
@@ -4058,6 +4070,9 @@ int main(int argc, char** argv) {
   }
 
   try {
+    if (!embedding_runtime_url.empty())
+      minera::set_default_embedding_provider(
+          minera::embedding_runtime::make_http_provider(embedding_runtime_url));
     if (reverse_tree_inputs != 0) {
       const auto net = !pnml_to_ptml_input.empty()
                            ? minera::import_pnml(pnml_to_ptml_input)

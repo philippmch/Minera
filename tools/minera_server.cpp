@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "httplib.h"
+#include "embedding_runtime.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/attribute_kde.hpp"
@@ -155,6 +156,7 @@ struct MinedSession {
 };
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
+bool g_embedding_runtime_enabled = false;
 constexpr std::size_t kServerIlpMaxNodes = 1'000'000;
 constexpr std::size_t kServerGeneticMaxPopulation = 10'000;
 constexpr std::size_t kServerGeneticMaxGenerations = 10'000;
@@ -3237,11 +3239,14 @@ void handle_embeddings(const httplib::Request& request,
     }
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
-      return request.has_param(key) ? request.get_param_value(key)
-                                    : std::string{};
+      if (request.has_param(key)) return request.get_param_value(key);
+      if (g_embedding_runtime_enabled && key == "embedding_provider")
+        return std::string("transformer");
+      return std::string{};
     };
     const auto present = [&](std::string_view name) {
-      return request.has_param(std::string(name));
+      return request.has_param(std::string(name)) ||
+             (g_embedding_runtime_enabled && name == "embedding_provider");
     };
     const auto options = minera::parse_embedding_params(lookup, present);
     const auto result = minera::to_embeddings(session->log, options);
@@ -5278,7 +5283,8 @@ int usage(const char* program) {
             << " [options]\n"
                "  --port <port>      Listen port (default: 8484)\n"
                "  --frontend <dir>   Static frontend directory"
-               " (default: frontend/dist next to the working directory)\n";
+               " (default: frontend/dist next to the working directory)\n"
+               "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n";
   return 2;
 }
 
@@ -5287,6 +5293,7 @@ int usage(const char* program) {
 int main(int argc, char** argv) {
   int port = 8484;
   std::filesystem::path frontend_dir = "frontend/dist";
+  std::string embedding_runtime_url;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -5303,9 +5310,23 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       frontend_dir = value;
+    } else if (arg == "--embedding-runtime-url") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      embedding_runtime_url = value;
     } else {
       return usage(argv[0]);
     }
+  }
+
+  try {
+    if (!embedding_runtime_url.empty())
+      minera::set_default_embedding_provider(
+          minera::embedding_runtime::make_http_provider(embedding_runtime_url));
+    g_embedding_runtime_enabled = !embedding_runtime_url.empty();
+  } catch (const std::exception& error) {
+    std::cerr << "error: " << error.what() << '\n';
+    return 2;
   }
 
   httplib::Server server;
