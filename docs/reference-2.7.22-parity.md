@@ -298,6 +298,13 @@ enabled.
 Strict feature-count, selector, and relation-id validation is shared by
 `minera_ocel --features`, multipart local `POST /api/ocel/features`, and the
 typed frontend query/response adapter.
+The optional `feature_name_style=compatibility` mode (or
+`--features-name-style compatibility`) maps categorical event/object columns
+to `@@event_attr_value_<key>_<value>` and
+`@@object_attr_value_<key>_<value>`, and maps object interaction-by-type
+columns to `@@object_interaction_graph_<type>`. Native names remain the
+default; compatibility names are reused consistently in related projections
+and are rejected for the ambiguous exploded EVENTS_OBJECTS variant.
 
 OCEL interchange evidence: the native core now parses and writes deterministic
 extended-table CSV (with an optional object table), typed OCEL 2 relational

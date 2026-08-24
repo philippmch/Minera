@@ -1563,7 +1563,7 @@ void handle_ocel_features(const httplib::Request& request,
                           httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "max_features", "include_activity_features",
+        "variant", "feature_name_style", "max_features", "include_activity_features",
         "include_timestamp_features", "include_relation_features",
         "include_event_num_rel_objs_features",
         "include_event_num_rel_objs_type_features",
@@ -1614,6 +1614,23 @@ void handle_ocel_features(const httplib::Request& request,
           "variant expects events, objects, or events_objects");
     }
     minera::OcelFeatureOptions options;
+    if (request.has_param("feature_name_style")) {
+      const auto style = request.get_param_value("feature_name_style");
+      if (style == "native") {
+        options.feature_name_style = minera::OcelFeatureNameStyle::kNative;
+      } else if (style == "compatibility") {
+        options.feature_name_style =
+            minera::OcelFeatureNameStyle::kCompatibility;
+      } else {
+        throw std::invalid_argument(
+            "feature_name_style expects native or compatibility");
+      }
+      if (options.feature_name_style ==
+              minera::OcelFeatureNameStyle::kCompatibility &&
+          variant == minera::OcelFeatureVariant::kEventsObjects)
+        throw std::invalid_argument(
+            "compatibility feature names apply only to events or objects variants");
+    }
     options.max_features =
         ocel_query_size(request, "max_features", options.max_features);
     if (options.max_features == 0 || options.max_features > 10000)

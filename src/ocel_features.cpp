@@ -331,7 +331,11 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       for (std::size_t row = 0; row < log.events.size(); ++row)
         if (const auto* attr = find_attribute(log.events[row].attributes, key))
           column[row] = string_value(attr->value) == category ? 1.0 : 0.0;
-      builder.add("@@event_str_" + key + "_" + category, std::move(column));
+      const auto prefix = options.feature_name_style ==
+                                  OcelFeatureNameStyle::kCompatibility
+                              ? "@@event_attr_value_"
+                              : "@@event_str_";
+      builder.add(prefix + key + "_" + category, std::move(column));
     }
   }
 
@@ -489,7 +493,11 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       for (std::size_t row = 0; row < log.objects.size(); ++row)
         if (const auto* attr = find_attribute(log.objects[row].attributes, key))
           column[row] = string_value(attr->value) == category ? 1.0 : 0.0;
-      builder.add("@@object_str_" + key + "_" + category, std::move(column));
+      const auto prefix = options.feature_name_style ==
+                                  OcelFeatureNameStyle::kCompatibility
+                              ? "@@object_attr_value_"
+                              : "@@object_str_";
+      builder.add(prefix + key + "_" + category, std::move(column));
     }
   }
 
@@ -541,7 +549,11 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
         for (std::size_t row = 0; row < neighbors.size(); ++row)
           for (const auto neighbor : neighbors[row])
             if (log.objects[neighbor].type == type) values[row] += 1.0;
-        builder.add("@@object_interaction_graph_ot_" + type,
+        const auto prefix = options.feature_name_style ==
+                                    OcelFeatureNameStyle::kCompatibility
+                                ? "@@object_interaction_graph_"
+                                : "@@object_interaction_graph_ot_";
+        builder.add(prefix + type,
                     std::move(values));
       }
     }
@@ -950,6 +962,11 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
                                        OcelFeatureVariant variant,
                                        const OcelFeatureOptions& options) {
   if (options.max_features == 0) throw std::invalid_argument("OCEL max_features must be positive");
+  if (options.feature_name_style == OcelFeatureNameStyle::kCompatibility &&
+      variant == OcelFeatureVariant::kEventsObjects) {
+    throw std::invalid_argument(
+        "OCEL compatibility feature names apply only to events or objects variants");
+  }
   if (options.filter_per_type) {
     if (options.filter_per_type->empty())
       throw std::invalid_argument("OCEL filter_per_type must not be empty");

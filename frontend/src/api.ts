@@ -4541,6 +4541,7 @@ export async function requestOcelPlayout(
 
 export interface OcelFeatureOptions {
   variant?: "events" | "objects" | "events_objects";
+  feature_name_style?: "native" | "compatibility";
   max_features?: number;
   include_activity_features?: boolean;
   include_timestamp_features?: boolean;
@@ -4599,6 +4600,13 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     throw new Error("include_degree_centrality_features applies only to objects");
   if (options.include_all_object_features !== undefined && options.variant !== "objects")
     throw new Error("include_all_object_features applies only to objects");
+  if (options.feature_name_style !== undefined &&
+      options.feature_name_style !== "native" &&
+      options.feature_name_style !== "compatibility")
+    throw new Error("feature_name_style must be native or compatibility");
+  if (options.feature_name_style === "compatibility" &&
+      options.variant === "events_objects")
+    throw new Error("compatibility feature names apply only to events or objects");
   if (objectGraphControl && options.variant !== "objects" &&
       !relatedObjectEventContext)
     throw new Error("object graph features apply only to objects");
@@ -4635,6 +4643,8 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     throw new Error("related-event, neighbor, and lifecycle-path features apply only to objects");
   const query = new URLSearchParams();
   if (options.variant !== undefined) query.set("variant", options.variant);
+  if (options.feature_name_style !== undefined)
+    query.set("feature_name_style", options.feature_name_style);
   const addInteger = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isInteger(value) && value > 0)
       query.set(name, String(value));
