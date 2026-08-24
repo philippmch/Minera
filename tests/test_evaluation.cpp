@@ -2,6 +2,7 @@
 #include "minera/json_export.hpp"
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 using namespace minera;
 
@@ -225,6 +226,59 @@ void composite_evaluation_serializes_as_a_model_family() {
   assert(json.find("\"weights\"") != std::string::npos);
 }
 
+void emd_pyemd_variant_is_deterministic_and_strict() {
+  StochasticLanguage left{{{{"A"}, 0.25},
+                           {{"A"}, 0.25},
+                           {{"B"}, 0.5}},
+                          1.0};
+  StochasticLanguage right{{{{"A"}, 0.5}, {{"C"}, 0.5}}, 1.0};
+
+  EmdOptions pyemd;
+  pyemd.variant = EmdVariant::PYEMD;
+  // The explicit selector owns its normalized trace costs and does not
+  // silently switch to a caller's unrelated distance function.
+  pyemd.distance = [](const auto&, const auto&) { return 0.0; };
+  const auto first = evaluate_emd(left, right, pyemd);
+  const auto second = evaluate_emd(left, right, pyemd);
+  assert(first.computed && first.variant == EmdVariant::PYEMD);
+  assert(std::abs(first.distance - 0.5) < 1e-12);
+  assert(first.distance == second.distance);
+
+  const auto empty = evaluate_emd({}, {}, pyemd);
+  assert(empty.computed && empty.variant == EmdVariant::PYEMD &&
+         empty.distance == 0.0);
+
+  StochasticLanguage unequal{{{{"A"}, 2.0}}, 2.0};
+  EmdOptions strict = pyemd;
+  strict.strict_equal_mass = true;
+  const auto rejected = evaluate_emd(unequal, right, strict);
+  assert(!rejected.computed && rejected.variant == EmdVariant::PYEMD &&
+         rejected.error == "masses must be equal");
+  strict.strict_equal_mass = false;
+  strict.normalize_masses = true;
+  const auto normalized = evaluate_emd(unequal, right, strict);
+  assert(normalized.computed && normalized.normalized);
+
+  StochasticLanguage negative_duplicate{{{{"A"}, -1.0}, {{"A"}, 1.0}}, 0.0};
+  const auto invalid_weight = evaluate_emd(negative_duplicate, right, pyemd);
+  assert(!invalid_weight.computed && invalid_weight.error == "invalid language weight");
+
+  EmdOptions invalid_cost;
+  invalid_cost.distance = [](const auto&, const auto&) {
+    return std::numeric_limits<double>::quiet_NaN();
+  };
+  const auto rejected_cost = evaluate_emd(left, right, invalid_cost);
+  assert(!rejected_cost.computed && rejected_cost.error == "invalid distance");
+
+  EmdOptions invalid_variant;
+  invalid_variant.variant = static_cast<EmdVariant>(999);
+  const auto invalid = evaluate_emd(left, right, invalid_variant);
+  assert(!invalid.computed && invalid.error == "unsupported EMD variant");
+
+  const auto json = emd_json(first);
+  assert(json.find("\"variant\": \"pyemd\"") != std::string::npos);
+}
+
 int main() {
   auto n=sequence_net(); auto l=log({{"A","B"},{"A"}});
   auto f=evaluate_replay_fitness(l,n,ReplayFitnessVariant::TOKEN_BASED); assert(f.trace_count==2&&f.fitness<1&&f.percentage_fit_traces==50);
@@ -253,4 +307,5 @@ int main() {
   precision_option_errors_preserve_variant_and_convert_trees();
   composite_evaluation_uses_equal_and_custom_weights();
   composite_evaluation_serializes_as_a_model_family();
+  emd_pyemd_variant_is_deterministic_and_strict();
 }

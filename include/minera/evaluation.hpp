@@ -134,16 +134,29 @@ struct StochasticLanguage {
 };
 using DistanceFunction = std::function<double(const std::vector<std::string>&,
                                               const std::vector<std::string>&)>;
+// EMD variants. EXACT is the historical native implementation. PYEMD uses
+// the same dependency-free transportation solver with the standard normalized
+// trace distance, while retaining the legacy variant as the default.
+enum class EmdVariant {
+  EXACT,
+  PYEMD,
+  kExact = EXACT,
+  kPyemd = PYEMD,
+};
 struct EmdOptions {
   bool normalize_masses = true;  // default for unequal mass
   bool strict_equal_mass = false;
   DistanceFunction distance;
+  // Appended to preserve positional initialization of the legacy options.
+  EmdVariant variant = EmdVariant::EXACT;
 };
 struct EmdResult {
   double distance = std::numeric_limits<double>::quiet_NaN();
   bool computed = true;
   bool normalized = false;
   std::string error;
+  // Appended to preserve positional initialization of the legacy result.
+  EmdVariant variant = EmdVariant::EXACT;
 };
 
 // A request-scoped container for the selected model-quality evaluation.  Only

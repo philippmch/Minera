@@ -793,6 +793,7 @@ int usage(const char* program) {
                "  --petri-analysis-diagnostics <bool> Include diagnostics\n"
                "  --petri-analysis-return-asap-when-unsound <bool> Stop at first unsound witness\n"
                "  --emd-reference <file>   Compare trace languages with CSV/XES log\n"
+               "  --emd-variant <id>       exact (default) or pyemd\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
@@ -2484,6 +2485,25 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       emd_reference = value;
+      continue;
+    }
+    if (arg == "--emd-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string variant(value);
+      std::transform(variant.begin(), variant.end(), variant.begin(),
+                     [](unsigned char character) {
+                       return static_cast<char>(std::tolower(character));
+                     });
+      if (variant == "exact") {
+        emd_options.variant = minera::EmdVariant::EXACT;
+      } else if (variant == "pyemd") {
+        emd_options.variant = minera::EmdVariant::PYEMD;
+      } else {
+        std::cerr << "error: --emd-variant expects exact or pyemd\n";
+        return 2;
+      }
+      emd_option_used = true;
       continue;
     }
     if (arg == "--compare-petri-reference") {

@@ -5332,6 +5332,7 @@ void json_export_carries_evaluation_contract() {
   emd.normalized = true;
   emd.error = "distance unavailable";
   const auto ej = minera::emd_json(emd);
+  assert(ej.find("\"variant\": \"exact\"") != std::string::npos);
   assert(ej.find("\"distance\": null") != std::string::npos);
   assert(ej.find("\"computed\": false") != std::string::npos);
   assert(ej.find("\"normalized\": true") != std::string::npos);

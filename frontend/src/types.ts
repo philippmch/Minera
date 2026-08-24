@@ -2472,8 +2472,10 @@ export function isModelEvaluation(value: unknown): value is ModelEvaluation {
 }
 
 /** Validates the stochastic-language distance endpoint response. */
+export type EmdVariant = "exact" | "pyemd";
 export function isEmdResult(value: unknown): value is EmdResult {
-  return isRecord(value) && metric(value.distance) && typeof value.computed === "boolean" &&
+  return isRecord(value) && (value.variant === undefined || value.variant === "exact" || value.variant === "pyemd") &&
+    metric(value.distance) && typeof value.computed === "boolean" &&
     typeof value.normalized === "boolean" && nullableString(value.error);
 }
 
@@ -3242,10 +3244,12 @@ export interface ModelEvaluation {
 }
 
 export interface EmdOptions {
+  emd_variant?: EmdVariant;
   normalize_masses?: boolean;
   strict_equal_mass?: boolean;
 }
 export interface EmdResult {
+  variant?: EmdVariant;
   distance: EvaluationMetric;
   computed: boolean;
   normalized: boolean;
