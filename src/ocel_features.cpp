@@ -793,6 +793,53 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   (void)times;
 }
 
+void add_prefix_columns(
+    TableBuilder& builder, const Ocel& log, const OcelFeatureOptions& options,
+    const std::vector<std::string>& activities, const IndexMap& event_index,
+    const IndexMap& object_index,
+    const std::vector<std::optional<double>>& times) {
+  if (!options.include_prefix_features) return;
+
+  std::vector<std::vector<std::size_t>> seen_events(log.objects.size());
+  std::vector<std::vector<std::size_t>> prefixes(log.relations.size());
+  for (std::size_t row = 0; row < log.relations.size(); ++row) {
+    const auto event = event_index.find(log.relations[row].event_id);
+    const auto object = object_index.find(log.relations[row].object_id);
+    if (event == event_index.end() || object == object_index.end())
+      throw std::invalid_argument("OCEL feature prefix relation references an unknown id");
+    auto& seen = seen_events[object->second];
+    prefixes[row] = seen;
+    if (std::find(seen.begin(), seen.end(), event->second) == seen.end())
+      seen.push_back(event->second);
+  }
+
+  if (options.include_prefix_length_features) {
+    std::vector<double> values(log.relations.size(), 0.0);
+    for (std::size_t row = 0; row < values.size(); ++row)
+      values[row] = static_cast<double>(prefixes[row].size());
+    builder.add("@@ev_obj_pref_length", std::move(values));
+  }
+  if (options.include_prefix_timediff_features) {
+    std::vector<double> values(log.relations.size(), 0.0);
+    for (std::size_t row = 0; row < values.size(); ++row) {
+      const auto event = event_index.at(log.relations[row].event_id);
+      if (!prefixes[row].empty() && times[event] &&
+          times[prefixes[row].front()])
+        values[row] = *times[event] - *times[prefixes[row].front()];
+    }
+    builder.add("@@ev_obj_pref_timediff", std::move(values));
+  }
+  if (options.include_prefix_one_hot_features) {
+    for (const auto& activity : activities) {
+      std::vector<double> values(log.relations.size(), 0.0);
+      for (std::size_t row = 0; row < values.size(); ++row)
+        for (const auto event : prefixes[row])
+          if (log.events[event].activity == activity) values[row] += 1.0;
+      builder.add("@@ev_obj_pref_act_" + activity, std::move(values));
+    }
+  }
+}
+
 }  // namespace
 
 const char* ocel_feature_variant_name(OcelFeatureVariant variant) noexcept {
@@ -830,6 +877,14 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     throw std::invalid_argument(
         "OCEL related-event and neighbor features apply only to the objects variant");
   }
+  const bool prefix_control_disabled =
+      !options.include_prefix_features ||
+      !options.include_prefix_length_features ||
+      !options.include_prefix_timediff_features ||
+      !options.include_prefix_one_hot_features;
+  if (variant != OcelFeatureVariant::kEventsObjects && prefix_control_disabled)
+    throw std::invalid_argument(
+        "OCEL prefix features apply only to the events_objects variant");
   const bool lifecycle_object_control_disabled =
       !options.include_lifecycle_length_features ||
       !options.include_lifecycle_unique_activity_features ||
@@ -947,6 +1002,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   };
   project(event_table, true);
   project(object_table, false);
+  add_prefix_columns(builder, log, options, activities, event_index, object_index,
+                     times);
   std::vector<std::string> row_ids, row_types;
   row_ids.reserve(row_count);
   row_types.reserve(row_count);

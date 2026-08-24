@@ -42,6 +42,12 @@ struct OcelFeatureOptions {
   bool include_related_events_features = false;
   bool include_related_activities_features = false;
   bool include_obj_con_in_graph_features = false;
+  // Relation-prefix columns are available only for EVENTS_OBJECTS. They are
+  // enabled by default there and describe each relation's object-local past.
+  bool include_prefix_features = true;
+  bool include_prefix_length_features = true;
+  bool include_prefix_timediff_features = true;
+  bool include_prefix_one_hot_features = true;
   std::vector<std::string> numeric_event_attributes;
   std::vector<std::string> string_event_attributes;
   std::vector<std::string> numeric_object_attributes;

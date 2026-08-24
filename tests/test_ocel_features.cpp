@@ -601,10 +601,17 @@ int main() {
   assert(rejected_events_objects);
 
   auto exploded_log = log;
+  // Keep this projection assertion focused on the shared event/object
+  // columns; relation-prefix columns are tested separately below.
+  auto exploded_options = options;
+  exploded_options.include_prefix_features = false;
+  exploded_options.include_prefix_length_features = false;
+  exploded_options.include_prefix_timediff_features = false;
+  exploded_options.include_prefix_one_hot_features = false;
   exploded_log.relations.insert(exploded_log.relations.begin() + 1,
                                 {"e1", "o1", "duplicate"});
   const auto exploded = minera::extract_ocel_features(
-      exploded_log, minera::OcelFeatureVariant::kEventsObjects, options);
+      exploded_log, minera::OcelFeatureVariant::kEventsObjects, exploded_options);
   assert(exploded.row_ids.size() == exploded_log.relations.size());
   assert(exploded.row_ids[0] == "e1::o1" &&
          exploded.row_ids[1] == "e1::o1#2" &&
@@ -681,11 +688,84 @@ int main() {
   disabled.include_attribute_counts = false;
   disabled.include_interaction_features = false;
   disabled.include_lifecycle_features = false;
+  disabled.include_prefix_features = false;
+  disabled.include_prefix_length_features = false;
+  disabled.include_prefix_timediff_features = false;
+  disabled.include_prefix_one_hot_features = false;
   const auto disabled_exploded = minera::extract_ocel_features(
       log, minera::OcelFeatureVariant::kEventsObjects, disabled);
   assert(disabled_exploded.row_ids.size() == log.relations.size());
   assert(disabled_exploded.feature_names.empty());
   for (const auto& row : disabled_exploded.values) assert(row.empty());
+
+  auto prefix_options = minera::OcelFeatureOptions{};
+  const auto prefixes = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEventsObjects, prefix_options);
+  const auto prefix_column = [&](const std::string& name) {
+    const auto it = std::find(prefixes.feature_names.begin(),
+                              prefixes.feature_names.end(), name);
+    assert(it != prefixes.feature_names.end());
+    return static_cast<std::size_t>(it - prefixes.feature_names.begin());
+  };
+  const auto prefix_length = prefix_column("@@ev_obj_pref_length");
+  const auto prefix_timediff = prefix_column("@@ev_obj_pref_timediff");
+  const auto prefix_create = prefix_column("@@ev_obj_pref_act_Create");
+  const auto prefix_ship = prefix_column("@@ev_obj_pref_act_Ship");
+  assert(prefixes.values[0][prefix_length] == 0.0 &&
+         prefixes.values[2][prefix_length] == 1.0 &&
+         prefixes.values[4][prefix_length] == 2.0);
+  assert(prefixes.values[2][prefix_timediff] == 3600.0 &&
+         prefixes.values[4][prefix_timediff] == 7200.0);
+  assert(prefixes.values[2][prefix_create] == 1.0 &&
+         prefixes.values[2][prefix_ship] == 0.0 &&
+         prefixes.values[4][prefix_create] == 1.0 &&
+         prefixes.values[4][prefix_ship] == 1.0);
+
+  auto duplicate_prefix_log = log;
+  duplicate_prefix_log.relations.insert(duplicate_prefix_log.relations.begin() + 1,
+                                         {"e1", "o1", "duplicate"});
+  const auto duplicate_prefixes = minera::extract_ocel_features(
+      duplicate_prefix_log, minera::OcelFeatureVariant::kEventsObjects,
+      prefix_options);
+  const auto duplicate_length = static_cast<std::size_t>(
+      std::find(duplicate_prefixes.feature_names.begin(),
+                duplicate_prefixes.feature_names.end(), "@@ev_obj_pref_length") -
+      duplicate_prefixes.feature_names.begin());
+  const auto duplicate_create = static_cast<std::size_t>(
+      std::find(duplicate_prefixes.feature_names.begin(),
+                duplicate_prefixes.feature_names.end(), "@@ev_obj_pref_act_Create") -
+      duplicate_prefixes.feature_names.begin());
+  assert(duplicate_prefixes.values[0][duplicate_length] == 0.0 &&
+         duplicate_prefixes.values[1][duplicate_length] == 1.0 &&
+         duplicate_prefixes.values[2][duplicate_length] == 0.0);
+  assert(duplicate_prefixes.values[1][duplicate_create] == 1.0);
+
+  auto no_prefix = prefix_options;
+  no_prefix.include_prefix_features = false;
+  no_prefix.include_prefix_length_features = false;
+  no_prefix.include_prefix_timediff_features = false;
+  no_prefix.include_prefix_one_hot_features = false;
+  const auto no_prefix_table = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEventsObjects, no_prefix);
+  assert(std::find(no_prefix_table.feature_names.begin(),
+                   no_prefix_table.feature_names.end(), "@@ev_obj_pref_length") ==
+         no_prefix_table.feature_names.end());
+  bool rejected_prefix_controls = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kEvents, no_prefix);
+  } catch (const std::invalid_argument&) {
+    rejected_prefix_controls = true;
+  }
+  assert(rejected_prefix_controls);
+  auto parent_only_disabled = prefix_options;
+  parent_only_disabled.include_prefix_features = false;
+  const auto parent_only_disabled_table = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEventsObjects, parent_only_disabled);
+  assert(std::find(parent_only_disabled_table.feature_names.begin(),
+                   parent_only_disabled_table.feature_names.end(),
+                   "@@ev_obj_pref_length") ==
+         parent_only_disabled_table.feature_names.end());
 
   bool rejected = false;
   try {
