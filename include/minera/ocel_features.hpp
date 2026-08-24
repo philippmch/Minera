@@ -22,9 +22,21 @@ struct OcelFeatureOptions {
   bool include_activity_features = true;
   bool include_timestamp_features = true;
   bool include_relation_features = true;
+  // Event relation-count components inherit include_relation_features when
+  // unset, while allowing callers to select the overall and per-type counts
+  // independently.
+  std::optional<bool> include_event_num_rel_objs_features;
+  std::optional<bool> include_event_num_rel_objs_type_features;
   bool include_endpoint_features = true;
+  // Event lifecycle endpoint components inherit include_endpoint_features
+  // when unset and can be selected independently.
+  std::optional<bool> include_event_start_ot_features;
+  std::optional<bool> include_event_end_ot_features;
   bool include_attribute_counts = true;
   bool include_interaction_features = true;
+  // Event newly-observed interactions inherit include_interaction_features
+  // when unset and can be selected independently.
+  std::optional<bool> include_new_interactions_features;
   // Normalized object interaction-graph degree. When unset, this follows the
   // legacy interaction toggle; an explicit value enables independent control.
   // The control applies only to OBJECTS.

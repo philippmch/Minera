@@ -238,9 +238,10 @@ object-count bound. The `minera_ocel --split` CLI, multipart local
 
 OCEL feature evidence: `extract_ocel_features` provides deterministic numeric
 tables for event rows, object rows, and exploded event-object rows. Event
-features cover activity indicators, timestamps/calendar parts, related-object
-counts by type, lifecycle endpoints, attribute counts, custom numeric/string
-attributes, newly observed interactions, and opt-in min/max aggregation of the
+features cover activity indicators, timestamps/calendar parts, independently
+selectable overall and per-type related-object counts, independently selectable
+lifecycle starts and ends, attribute counts, custom numeric/string attributes,
+newly observed interactions, and opt-in min/max aggregation of the
 selected object feature vector over each event's related objects. Object features cover type
 indicators, lifecycle length/duration/endpoints, activity/path counts, custom
 attributes, work-in-progress, normalized interaction-graph degree, and optional

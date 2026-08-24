@@ -4545,9 +4545,14 @@ export interface OcelFeatureOptions {
   include_activity_features?: boolean;
   include_timestamp_features?: boolean;
   include_relation_features?: boolean;
+  include_event_num_rel_objs_features?: boolean;
+  include_event_num_rel_objs_type_features?: boolean;
   include_endpoint_features?: boolean;
+  include_event_start_ot_features?: boolean;
+  include_event_end_ot_features?: boolean;
   include_attribute_counts?: boolean;
   include_interaction_features?: boolean;
+  include_new_interactions_features?: boolean;
   include_degree_centrality_features?: boolean;
   include_interaction_by_type_features?: boolean;
   include_general_interaction_features?: boolean;
@@ -4603,6 +4608,13 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     options.include_lifecycle_path_features !== undefined;
   if (options.include_related_objects_features !== undefined && options.variant !== "events")
     throw new Error("include_related_objects_features applies only to events");
+  const eventControl = options.include_event_num_rel_objs_features !== undefined ||
+    options.include_event_num_rel_objs_type_features !== undefined ||
+    options.include_event_start_ot_features !== undefined ||
+    options.include_event_end_ot_features !== undefined ||
+    options.include_new_interactions_features !== undefined;
+  if (eventControl && options.variant !== "events")
+    throw new Error("independent event feature controls apply only to events");
   const prefixControl = options.include_prefix_features !== undefined ||
     options.include_prefix_length_features !== undefined ||
     options.include_prefix_timediff_features !== undefined ||
@@ -4625,9 +4637,14 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_activity_features", options.include_activity_features);
   addBoolean("include_timestamp_features", options.include_timestamp_features);
   addBoolean("include_relation_features", options.include_relation_features);
+  addBoolean("include_event_num_rel_objs_features", options.include_event_num_rel_objs_features);
+  addBoolean("include_event_num_rel_objs_type_features", options.include_event_num_rel_objs_type_features);
   addBoolean("include_endpoint_features", options.include_endpoint_features);
+  addBoolean("include_event_start_ot_features", options.include_event_start_ot_features);
+  addBoolean("include_event_end_ot_features", options.include_event_end_ot_features);
   addBoolean("include_attribute_counts", options.include_attribute_counts);
   addBoolean("include_interaction_features", options.include_interaction_features);
+  addBoolean("include_new_interactions_features", options.include_new_interactions_features);
   addBoolean("include_degree_centrality_features", options.include_degree_centrality_features);
   addBoolean("include_interaction_by_type_features", options.include_interaction_by_type_features);
   addBoolean("include_general_interaction_features", options.include_general_interaction_features);

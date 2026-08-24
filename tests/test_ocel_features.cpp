@@ -123,6 +123,43 @@ int main() {
                       [](const auto& name) {
                         return name.find("@@rel_obj_fea_") == 0;
                       }) == events.feature_names.end());
+
+  // Event feature groups can be selected independently while the legacy
+  // relation, endpoint, and interaction switches remain backward compatible.
+  auto event_controls = minera::OcelFeatureOptions{};
+  event_controls.include_activity_features = false;
+  event_controls.include_timestamp_features = false;
+  event_controls.include_relation_features = false;
+  event_controls.include_endpoint_features = false;
+  event_controls.include_attribute_counts = false;
+  event_controls.include_interaction_features = false;
+  event_controls.include_event_num_rel_objs_features = true;
+  event_controls.include_event_num_rel_objs_type_features = false;
+  event_controls.include_event_start_ot_features = true;
+  event_controls.include_event_end_ot_features = false;
+  event_controls.include_new_interactions_features = true;
+  const auto selected_event_features = minera::extract_ocel_features(
+      log, minera::OcelFeatureVariant::kEvents, event_controls);
+  const auto has_feature = [&](const char* name) {
+    return std::find(selected_event_features.feature_names.begin(),
+                     selected_event_features.feature_names.end(), name) !=
+           selected_event_features.feature_names.end();
+  };
+  assert(has_feature("@@event_num_rel_objs"));
+  assert(!has_feature("@@event_num_rel_objs_type_item"));
+  assert(has_feature("@@event_start_item"));
+  assert(!has_feature("@@event_end_item"));
+  assert(has_feature("@@event_new_interactions"));
+  assert(!has_feature("@@event_num_e2e_out"));
+  assert(selected_event_features.values[0][0] == 2.0);
+  bool rejected_event_control_variant = false;
+  try {
+    (void)minera::extract_ocel_features(
+        log, minera::OcelFeatureVariant::kObjects, event_controls);
+  } catch (const std::invalid_argument&) {
+    rejected_event_control_variant = true;
+  }
+  assert(rejected_event_control_variant);
   const auto events_json = minera::serialize_ocel_features_json(events);
   assert(events_json.find("\"family\":\"OCEL_FEATURES\"") != std::string::npos);
   assert(events_json.find("\"variant\":\"EVENTS\"") != std::string::npos);
