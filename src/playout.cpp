@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -317,8 +318,11 @@ ReplayResult replay_trace(
 
 }  // namespace
 
-EventLog stochastic_playout(const PetriNet& net,
-                            const StochasticPlayoutOptions& options) {
+namespace {
+
+EventLog stochastic_playout_impl(const PetriNet& net,
+                                 const StochasticPlayoutOptions& options,
+                                 PlayoutVisitedResult* visited_result) {
   const auto& transitions = net.transitions();
   const auto places = net.place_count();
   if (net.source() >= places || net.sink() >= places) {
@@ -369,6 +373,7 @@ EventLog stochastic_playout(const PetriNet& net,
   std::mt19937_64 rng(options.seed);
   EventLog log;
   log.traces.reserve(options.traces);
+  if (visited_result) visited_result->traces.reserve(options.traces);
   std::vector<std::uint64_t> marking(places, 0);
   const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
                                    std::size_t boundary,
@@ -397,8 +402,23 @@ EventLog stochastic_playout(const PetriNet& net,
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
     trace.case_id = "case_" + std::to_string(c + 1);
+    PlayoutVisitedTrace visited;
+    if (visited_result) {
+      visited.reserve(options.max_steps * 2 + 1);
+      visited.push_back({PlayoutVisitedElementKind::MARKING, {}, 0});
+    }
     double now = options.start + static_cast<double>(c) * options.case_interval;
     marking = initial_marking;
+    if (visited_result) {
+      auto& initial = visited.front().marking;
+      initial.reserve(marking.size());
+      for (const auto value : marking) {
+        if (value > std::numeric_limits<std::uint32_t>::max())
+          throw std::invalid_argument(
+              "stochastic visited marking exceeds uint32 range");
+        initial.push_back(static_cast<std::uint32_t>(value));
+      }
+    }
 
     for (std::size_t step = 0; step < options.max_steps; ++step) {
       if (options.stop_at_final && is_final(marking)) break;
@@ -436,6 +456,20 @@ EventLog stochastic_playout(const PetriNet& net,
 
       const auto& fired = transitions[selected];
       fire_petri_transition(fired, marking);
+      if (visited_result) {
+        visited.push_back(
+            {PlayoutVisitedElementKind::TRANSITION, {}, selected});
+        PlayoutVisitedElement element;
+        element.kind = PlayoutVisitedElementKind::MARKING;
+        element.marking.reserve(marking.size());
+        for (const auto value : marking) {
+          if (value > std::numeric_limits<std::uint32_t>::max())
+            throw std::invalid_argument(
+                "stochastic visited marking exceeds uint32 range");
+          element.marking.push_back(static_cast<std::uint32_t>(value));
+        }
+        visited.push_back(std::move(element));
+      }
       if (!fired.silent()) {
         Event event;
         event.case_id = trace.case_id;
@@ -448,8 +482,33 @@ EventLog stochastic_playout(const PetriNet& net,
     }
 
     log.traces.push_back(std::move(trace));
+    if (visited_result) visited_result->traces.push_back(std::move(visited));
   }
   return log;
+}
+
+}  // namespace
+
+EventLog stochastic_playout(const PetriNet& net,
+                            const StochasticPlayoutOptions& options) {
+  return stochastic_playout_impl(net, options, nullptr);
+}
+
+PlayoutVisitedResult stochastic_playout_visited(
+    const PetriNet& net, const StochasticPlayoutOptions& options) {
+  PlayoutVisitedResult result;
+  (void)stochastic_playout_impl(net, options, &result);
+  return result;
+}
+
+PlayoutVisitedResult stochastic_playout_visited(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options) {
+  auto fitted = options;
+  if (fitted.transition_weights.empty())
+    fitted.transition_weights =
+        fit_stochastic_transition_weights(net, source_log, options);
+  return stochastic_playout_visited(net, fitted);
 }
 
 std::vector<double> fit_stochastic_transition_weights(

@@ -198,6 +198,7 @@ void reject_unknown_stochastic_params(const httplib::Request& request) {
       "miner", "mode", "stochastic_traces", "stochastic_max_steps",
       "stochastic_seed", "stochastic_transition_weights",
       "stochastic_fit_from_log", "stochastic_stop_at_final",
+      "stochastic_return_visited_elements",
       "stochastic_start", "stochastic_case_interval",
       "stochastic_event_interval", "stochastic_initial_marking",
       "stochastic_final_marking"};
@@ -4587,12 +4588,25 @@ void handle_playout(const httplib::Request& request,
                "safety limit");
         return;
       }
-      const auto log = options.fit_from_log
-                           ? minera::stochastic_playout(it->second,
-                                                       session->log, options)
-                           : minera::stochastic_playout(it->second, options);
-      response.set_content(minera::to_xes(log, selected_miner + " stochastic playout"),
-                           "application/xml");
+      if (options.return_visited_elements) {
+        const auto visited = options.fit_from_log
+                                 ? minera::stochastic_playout_visited(
+                                       it->second, session->log, options)
+                                 : minera::stochastic_playout_visited(
+                                       it->second, options);
+        response.set_content(
+            minera::serialize_stochastic_playout_visited_json(it->second,
+                                                                visited),
+            "application/json");
+      } else {
+        const auto log = options.fit_from_log
+                             ? minera::stochastic_playout(it->second,
+                                                         session->log, options)
+                             : minera::stochastic_playout(it->second, options);
+        response.set_content(
+            minera::to_xes(log, selected_miner + " stochastic playout"),
+            "application/xml");
+      }
     } catch (const std::exception& error) {
       reject(error.what());
     }

@@ -101,6 +101,15 @@ and typed frontend helper expose the deterministic JSON envelope
 `PROCESS_TREE_PLAYOUT` with sorted activity arrays. The option is restricted
 to `EXTENSIVE` and rejects malformed or non-extensive requests.
 
+Stochastic Petri playout keeps its default XES/EventLog output unchanged and
+adds an opt-in `stochastic_return_visited_elements` control. The structured
+`STOCHASTIC_PLAYOUT` envelope records alternating initial/follow-up markings
+and fired transition indices, including silent transitions, with explicit
+initial/final markings, seeds, and step bounds respected. The marking reached
+after the final allowed firing is included; a case that begins at its final
+marking contains only its initial marking. Native, request, standalone CLI,
+local-server, and typed frontend helpers expose the same JSON contract.
+
 Alpha discovery defaults evidence: omitted `alpha_variant` selects classic
 Alpha consistently across native options, strict request parsing, CLI, and the
 frontend. The short-loop-aware Alpha+ implementation remains available through

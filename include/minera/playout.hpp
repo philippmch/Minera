@@ -74,6 +74,10 @@ struct StochasticPlayoutOptions {
   bool fit_from_log = false;
   // Bound deterministic replay states per source trace while fitting.
   std::size_t fitting_max_states = 200000;
+  // Opt-in structured output for stochastic playout adapters. The ordinary
+  // stochastic_playout API continues to return an EventLog. Appended to keep
+  // existing positional aggregate initialization source-compatible.
+  bool return_visited_elements = false;
 };
 
 // Plays out a workflow net into a synthetic event log: each case starts from
@@ -119,6 +123,17 @@ struct PlayoutVisitedResult {
 // route tokens without appending events, and max_steps bounds every firing.
 [[nodiscard]] EventLog stochastic_playout(
     const PetriNet& net, const StochasticPlayoutOptions& options = {});
+
+// Returns alternating markings and fired transitions for stochastic playout.
+// The initial marking is always included; each fired transition, including a
+// silent transition, is followed by its resulting marking. The final marking
+// reached after the last allowed firing is included, even when max_steps is
+// the stopping condition.
+[[nodiscard]] PlayoutVisitedResult stochastic_playout_visited(
+    const PetriNet& net, const StochasticPlayoutOptions& options = {});
+[[nodiscard]] PlayoutVisitedResult stochastic_playout_visited(
+    const PetriNet& net, const EventLog& source_log,
+    const StochasticPlayoutOptions& options = {});
 
 // Replays a source log deterministically against the net and returns one
 // activation weight per transition. Silent transitions and duplicate labels

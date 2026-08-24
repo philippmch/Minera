@@ -959,6 +959,7 @@ int usage(const char* program) {
                "  --stochastic-transition-weights <w,...> Transition weights\n"
                "  --stochastic-fit-from-log <bool> Fit weights from input log\n"
                "  --stochastic-stop-at-final <bool> Stop at final marking\n"
+               "  --stochastic-return-visited-elements <bool> Emit visited markings/transitions as JSON\n"
                "  --stochastic-initial-marking <n,...> Initial marker vector\n"
                "  --stochastic-final-marking <n,...> Final marker vector\n"
                "  --monte-carlo-simulations <n> Virtual-time cases\n"
@@ -2622,7 +2623,9 @@ int main(int argc, char** argv) {
         arg == "--stochastic-seed" ||
         arg == "--stochastic-transition-weights" ||
         arg == "--stochastic-fit-from-log" ||
-        arg == "--stochastic-stop-at-final" || arg == "--stochastic-start" ||
+        arg == "--stochastic-stop-at-final" ||
+        arg == "--stochastic-return-visited-elements" ||
+        arg == "--stochastic-start" ||
         arg == "--stochastic-case-interval" ||
         arg == "--stochastic-event-interval" ||
         arg == "--stochastic-initial-marking" ||
@@ -5451,6 +5454,13 @@ int main(int argc, char** argv) {
       if (selected != nullptr && basic_playout_options.return_visited_elements)
         generated_json = minera::serialize_playout_visited_json(
             *selected, minera::playout_visited(*selected, basic_playout_options));
+      if (selected != nullptr && stochastic_playout_options.return_visited_elements)
+        generated_json = minera::serialize_stochastic_playout_visited_json(
+            *selected, stochastic_playout_options.fit_from_log
+                             ? minera::stochastic_playout_visited(
+                                   *selected, log, stochastic_playout_options)
+                             : minera::stochastic_playout_visited(
+                                   *selected, stochastic_playout_options));
       if (generated_json) {
         // JSON is the explicit return-variants representation; no XES
         // conversion is performed for that request.
