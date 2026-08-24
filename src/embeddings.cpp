@@ -73,6 +73,9 @@ std::vector<std::string> tokens(std::string_view text) {
 }
 
 void validate_options(const EmbeddingOptions& options) {
+  if (options.provider != EmbeddingProvider::HASHING &&
+      options.provider != EmbeddingProvider::TRANSFORMER)
+    throw std::invalid_argument("embeddings: unknown provider");
   if (options.embedding_model.empty())
     throw std::invalid_argument("embeddings: embedding_model must not be empty");
   if (options.attribute_key.empty())
@@ -97,6 +100,25 @@ EncoderProfile encoder_profile(std::string_view model) {
   if (model == "hashing-v2")
     return {fnv1a(model), true};
   return {fnv1a(model), false};
+}
+
+std::vector<double> mock_transformer(std::string_view text,
+                                     std::string_view model,
+                                     std::size_t dimensions) {
+  std::vector<double> values(dimensions, 0.0);
+  const auto seed = fnv1a("mock-transformer:") ^ fnv1a(model);
+  for (const auto& token : tokens(text)) {
+    const auto hash = mix_hash(seed, token);
+    const auto bucket = static_cast<std::size_t>(hash % dimensions);
+    values[bucket] += (hash & 1ULL) == 0ULL ? 1.0 : -1.0;
+  }
+  double norm = 0.0;
+  for (const auto value : values) norm += value * value;
+  if (norm > 0.0) {
+    const auto scale = 1.0 / std::sqrt(norm);
+    for (auto& value : values) value *= scale;
+  }
+  return values;
 }
 
 double cosine(const std::vector<double>& left,
@@ -136,11 +158,37 @@ std::string variant_name(EmbeddingVariant variant) {
              : "cases_transformers";
 }
 
+std::string provider_name(EmbeddingProvider provider) {
+  return provider == EmbeddingProvider::TRANSFORMER ? "transformer"
+                                                    : "hashing";
+}
+
 }  // namespace
 
 std::vector<double> embed_text(std::string_view text,
                                const EmbeddingOptions& options) {
   validate_options(options);
+  if (options.provider == EmbeddingProvider::TRANSFORMER) {
+    std::vector<double> values;
+    if (options.transformer_callback) {
+      values = options.transformer_callback(text, options.embedding_model,
+                                             options.dimensions);
+    } else if (options.embedding_model == "mock_transformer") {
+      values = mock_transformer(text, options.embedding_model,
+                                options.dimensions);
+    } else {
+      throw std::invalid_argument(
+          "embeddings: transformer provider requires transformer_callback");
+    }
+    if (values.size() != options.dimensions)
+      throw std::invalid_argument(
+          "embeddings: transformer callback returned the wrong dimension");
+    if (!std::all_of(values.begin(), values.end(),
+                     [](const double value) { return std::isfinite(value); }))
+      throw std::invalid_argument(
+          "embeddings: transformer callback returned a non-finite value");
+    return values;
+  }
   const auto profile = encoder_profile(options.embedding_model);
   std::vector<double> values(options.dimensions, 0.0);
   for (const auto& token : tokens(text)) {
@@ -180,6 +228,7 @@ EmbeddingResult to_embeddings(const EventLog& log,
   validate_options(options);
   EmbeddingResult result;
   result.variant = options.variant;
+  result.provider = options.provider;
   result.embedding_model = options.embedding_model;
   result.attribute_key = options.attribute_key;
   result.dimensions = options.dimensions;
@@ -230,6 +279,8 @@ std::vector<EmbeddingSimilarity> embedding_similarity(
       result.embedding_model != options.embedding_model)
     throw std::invalid_argument(
         "embeddings: result embedding_model does not match options");
+  if (result.provider != options.provider)
+    throw std::invalid_argument("embeddings: result provider does not match options");
   const auto target = embed_text(target_text, options);
   std::vector<EmbeddingSimilarity> matches;
   matches.reserve(result.items.size());
@@ -294,6 +345,8 @@ std::string serialize_embeddings_json(const EmbeddingResult& result) {
   out << std::setprecision(17);
   out << "{\"family\":\"TO_EMBEDDINGS\",\"variant\":";
   write_json_string(out, variant_name(result.variant));
+  out << ",\"embedding_provider\":";
+  write_json_string(out, provider_name(result.provider));
   out << ",\"embedding_model\":";
   write_json_string(out, result.embedding_model);
   out << ",\"attribute_key\":";
@@ -321,6 +374,8 @@ std::string serialize_embedding_similarity_json(
   out << std::setprecision(17);
   out << "{\"family\":\"TO_EMBEDDINGS_SIMILARITY\",\"variant\":";
   write_json_string(out, variant_name(result.variant));
+  out << ",\"embedding_provider\":";
+  write_json_string(out, provider_name(result.provider));
   out << ",\"target\":";
   write_json_string(out, target_text);
   out << ",\"embedding_model\":";

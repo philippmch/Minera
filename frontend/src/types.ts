@@ -642,10 +642,13 @@ export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
 }
 
 export type EmbeddingVariant = "cases_transformers" | "events_transformers";
+export type EmbeddingProvider = "hashing" | "transformer";
 export interface EmbeddingItem { id: string; embedding: number[]; }
 export interface EmbeddingResult {
   family: "TO_EMBEDDINGS";
   variant: EmbeddingVariant;
+  /** Echoed by newer backends; absent means the legacy hashing provider. */
+  embedding_provider?: EmbeddingProvider;
   embedding_model: string;
   attribute_key: string;
   dimensions: number;
@@ -656,6 +659,8 @@ export interface EmbeddingSimilarityResult {
   family: "TO_EMBEDDINGS_SIMILARITY";
   variant: EmbeddingVariant;
   target: string;
+  /** Echoed by newer backends; optional for backwards-compatible payloads. */
+  embedding_provider?: EmbeddingProvider;
   /** Echoed by newer backends; optional for backwards-compatible payloads. */
   embedding_model?: string;
   dimensions?: number;
@@ -669,6 +674,7 @@ export function isEmbeddingResult(value: unknown): value is EmbeddingResult {
   const dimensions = c.dimensions;
   return c.family === "TO_EMBEDDINGS"
     && (c.variant === "cases_transformers" || c.variant === "events_transformers")
+    && (c.embedding_provider === undefined || c.embedding_provider === "hashing" || c.embedding_provider === "transformer")
     && typeof c.embedding_model === "string" && typeof c.attribute_key === "string"
     && typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0
     && Array.isArray(c.items) && c.items.every((item) => !!item && typeof item === "object"
@@ -685,6 +691,7 @@ export function isEmbeddingSimilarityResult(value: unknown): value is EmbeddingS
   return c.family === "TO_EMBEDDINGS_SIMILARITY"
     && (c.variant === "cases_transformers" || c.variant === "events_transformers")
     && typeof c.target === "string"
+    && (c.embedding_provider === undefined || c.embedding_provider === "hashing" || c.embedding_provider === "transformer")
     && (c.embedding_model === undefined || typeof c.embedding_model === "string")
     && (dimensions === undefined || (typeof dimensions === "number" && Number.isInteger(dimensions) && dimensions > 0 && dimensions <= 4096))
     && typeof topK === "number" && Number.isInteger(topK) && topK >= 0

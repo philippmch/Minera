@@ -609,6 +609,7 @@ int usage(const char* program) {
                "  --features-window-seconds <f> Temporal bucket width\n"
                "  --embeddings              Emit case/event embeddings JSON\n"
                "  --embedding-variant <id>  cases (default) or events\n"
+               "  --embedding-provider <id> hashing (default) or transformer (mock_transformer model for CLI)\n"
                "  --embedding-model <name>  Deterministic encoder label\n"
                "  --embedding-attribute-key <name> Text attribute\n"
                "  --embedding-event-id-key <name> Optional event id attribute\n"
@@ -2273,7 +2274,7 @@ int main(int argc, char** argv) {
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
-          "embedding_variant", "embedding_model", "embedding_attribute_key",
+          "embedding_variant", "embedding_provider", "embedding_model", "embedding_attribute_key",
           "embedding_event_id_key", "embedding_dimensions",
           "embedding_max_items", "embedding_keep_cases"};
       if (!names.contains(key)) return usage(argv[0]);

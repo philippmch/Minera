@@ -28,6 +28,7 @@ import {
   type LogToFeaturesResult,
   type LogUtilityResult,
   type EmbeddingVariant,
+  type EmbeddingProvider,
   type EmbeddingApiResult,
   type LabelSplittingResult,
   type TrieResult,
@@ -3587,6 +3588,7 @@ export async function requestLogToFeatures(options: LogToFeaturesOptions = {}): 
 
 export interface EmbeddingOptions {
   embedding_variant?: EmbeddingVariant;
+  embedding_provider?: EmbeddingProvider;
   embedding_model?: string;
   embedding_attribute_key?: string;
   embedding_event_id_key?: string;

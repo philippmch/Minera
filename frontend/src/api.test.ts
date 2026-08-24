@@ -846,6 +846,8 @@ describe("embedding API", () => {
       embedding_target: "Approve Ship", embedding_top_k: 2,
       embedding_keep_cases: true,
     })).toBe("embedding_dimensions=32&embedding_keep_cases=true&embedding_target=Approve+Ship&embedding_top_k=2&embedding_variant=events_transformers");
+    expect(embeddingsQuery({ embedding_provider: "transformer", embedding_model: "mock_transformer" }))
+      .toBe("embedding_model=mock_transformer&embedding_provider=transformer");
   });
 
   it("rejects malformed embedding responses", async () => {
