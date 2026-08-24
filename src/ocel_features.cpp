@@ -469,7 +469,11 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
   }
 
-  if (options.include_interaction_features ||
+  const bool include_degree_centrality_features =
+      options.include_degree_centrality_features.value_or(
+          options.include_interaction_features);
+  if (include_degree_centrality_features ||
+      options.include_interaction_features ||
       options.include_interaction_by_type_features) {
     std::set<std::pair<std::size_t, std::size_t>> interactions;
     for (const auto& objects : event_objects) {
@@ -492,7 +496,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       neighbors[edge.first].insert(edge.second);
       neighbors[edge.second].insert(edge.first);
     }
-    if (options.include_interaction_features) {
+    if (include_degree_centrality_features) {
       std::vector<double> degree(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < neighbors.size(); ++row)
         degree[row] = static_cast<double>(neighbors[row].size());
@@ -861,6 +865,11 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       variant != OcelFeatureVariant::kObjects) {
     throw std::invalid_argument(
         "OCEL interaction-by-type features apply only to the objects variant");
+  }
+  if (options.include_degree_centrality_features.has_value() &&
+      variant != OcelFeatureVariant::kObjects) {
+    throw std::invalid_argument(
+        "OCEL degree centrality features apply only to the objects variant");
   }
   if ((options.include_general_interaction_features ||
        options.include_general_descendants_features ||

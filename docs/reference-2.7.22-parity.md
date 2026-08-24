@@ -242,8 +242,11 @@ features cover activity indicators, timestamps/calendar parts, related-object
 counts by type, lifecycle endpoints, attribute counts, custom numeric/string
 attributes, and newly observed interactions. Object features cover type
 indicators, lifecycle length/duration/endpoints, activity/path counts, custom
-attributes, work-in-progress, interaction degree, and optional per-object-type
-interaction counts. Lifecycle length, unique-activity, duration/endpoints,
+attributes, work-in-progress, normalized interaction-graph degree, and optional
+per-object-type interaction counts. Degree centrality is independently
+selectable from the interaction feature group, so OBJECTS callers can request
+degree alone or interaction-by-type columns without degree. Lifecycle length,
+unique-activity, duration/endpoints,
 activity, path, and work-in-progress columns can be enabled independently
 while the legacy lifecycle switch remains a group-level override. Optional
 OBJECTS-only graph columns cover general
@@ -267,6 +270,12 @@ order, retain each earlier event at most once per object, and use zero for
 missing timestamps; length, timediff, and activity groups can be disabled
 independently through native, server, CLI, and typed frontend options that are
 strictly limited to the exploded variant.
+The `include_degree_centrality_features` control and its
+`--features-no-degree-centrality` CLI counterpart are strictly limited to
+OBJECTS; the server and typed frontend reject this control for event and
+exploded variants. When omitted, native callers retain the historical behavior
+where degree follows `include_interaction_features`; the default remains
+enabled.
 Strict feature-count, selector, and relation-id validation is shared by
 `minera_ocel --features`, multipart local `POST /api/ocel/features`, and the
 typed frontend query/response adapter.

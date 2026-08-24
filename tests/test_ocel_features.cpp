@@ -440,6 +440,50 @@ int main() {
       interactions, minera::OcelFeatureVariant::kObjects, no_by_type);
   assert(ordinary_interactions.feature_names.size() == 1 &&
          ordinary_interactions.feature_names[0] == "@@object_degree_centrality");
+  auto degree_only = interaction_options;
+  degree_only.include_interaction_features = false;
+  degree_only.include_degree_centrality_features = true;
+  degree_only.include_interaction_by_type_features = false;
+  const auto degree_only_table = minera::extract_ocel_features(
+      interactions, minera::OcelFeatureVariant::kObjects, degree_only);
+  assert(degree_only_table.feature_names.size() == 1 &&
+         degree_only_table.feature_names[0] == "@@object_degree_centrality");
+  auto interaction_only = interaction_options;
+  interaction_only.include_degree_centrality_features = false;
+  const auto interaction_only_table = minera::extract_ocel_features(
+      interactions, minera::OcelFeatureVariant::kObjects, interaction_only);
+  assert(std::find(interaction_only_table.feature_names.begin(),
+                   interaction_only_table.feature_names.end(),
+                   "@@object_degree_centrality") ==
+         interaction_only_table.feature_names.end());
+  assert(std::find(interaction_only_table.feature_names.begin(),
+                   interaction_only_table.feature_names.end(),
+                   "@@object_interaction_graph_ot_item") !=
+         interaction_only_table.feature_names.end());
+  minera::Ocel singleton;
+  singleton.objects = {{"only", "item", {}}};
+  auto degree_scalar_options = minera::OcelFeatureOptions{};
+  degree_scalar_options.include_activity_features = false;
+  degree_scalar_options.include_timestamp_features = false;
+  degree_scalar_options.include_relation_features = false;
+  degree_scalar_options.include_endpoint_features = false;
+  degree_scalar_options.include_attribute_counts = false;
+  degree_scalar_options.include_interaction_features = false;
+  degree_scalar_options.include_degree_centrality_features = true;
+  degree_scalar_options.include_lifecycle_features = false;
+  const auto singleton_table = minera::extract_ocel_features(
+      singleton, minera::OcelFeatureVariant::kObjects, degree_scalar_options);
+  assert(singleton_table.feature_names.size() == 1 &&
+         singleton_table.feature_names[0] == "@@object_degree_centrality" &&
+         singleton_table.values.size() == 1 &&
+         singleton_table.values[0].size() == 1 &&
+         singleton_table.values[0][0] == 0.0);
+  const auto empty_table = minera::extract_ocel_features(
+      minera::Ocel{}, minera::OcelFeatureVariant::kObjects,
+      degree_scalar_options);
+  assert(empty_table.feature_names.size() == 1 &&
+         empty_table.feature_names[0] == "@@object_degree_centrality" &&
+         empty_table.values.empty());
   auto capped = interaction_options;
   capped.include_interaction_features = false;
   capped.max_features = 2;
@@ -469,6 +513,25 @@ int main() {
     rejected_interaction_events_objects = true;
   }
   assert(rejected_interaction_events_objects);
+  auto degree_disabled = minera::OcelFeatureOptions{};
+  degree_disabled.include_degree_centrality_features = false;
+  bool rejected_degree_events = false;
+  try {
+    (void)minera::extract_ocel_features(
+        interactions, minera::OcelFeatureVariant::kEvents, degree_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_degree_events = true;
+  }
+  assert(rejected_degree_events);
+  bool rejected_degree_events_objects = false;
+  try {
+    (void)minera::extract_ocel_features(
+        interactions, minera::OcelFeatureVariant::kEventsObjects,
+        degree_disabled);
+  } catch (const std::invalid_argument&) {
+    rejected_degree_events_objects = true;
+  }
+  assert(rejected_degree_events_objects);
 
   auto graph_options = minera::OcelFeatureOptions{};
   graph_options.include_activity_features = false;
