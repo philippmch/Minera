@@ -1151,6 +1151,15 @@ describe("OCEL API", () => {
       include_obj_con_in_graph_features: true,
       include_lifecycle_path_features: false,
     })).toBe("variant=objects&include_related_events_features=true&include_related_activities_features=true&include_obj_con_in_graph_features=true&include_lifecycle_path_features=false");
+    expect(ocelFeaturesQuery({
+      variant: "events_objects", include_prefix_features: true,
+      include_prefix_length_features: true,
+      include_prefix_timediff_features: false,
+      include_prefix_one_hot_features: true,
+    })).toBe("variant=events_objects&include_prefix_features=true&include_prefix_length_features=true&include_prefix_timediff_features=false&include_prefix_one_hot_features=true");
+    expect(ocelFeaturesQuery({
+      variant: "events_objects", include_prefix_features: false,
+    })).toBe("variant=events_objects&include_prefix_features=false");
     expect(ocelFeaturesQuery({ variant: "events", filter_per_type: "" }))
       .toBe("variant=events&ocel_features_filter_per_type=");
     expect(() => ocelFeaturesQuery({ variant: "events", include_interaction_by_type_features: true }))
@@ -1165,6 +1174,8 @@ describe("OCEL API", () => {
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_path_features: true }))
       .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "objects", include_prefix_features: false }))
+      .toThrow(/events_objects/);
     expect(ocelStatisticsQuery({ variant: "activity_associations", prefilter: "start" }))
       .toBe("variant=activity_associations&prefilter=start");
     expect(ocelStatisticsQuery({

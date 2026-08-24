@@ -1580,6 +1580,8 @@ void handle_ocel_features(const httplib::Request& request,
         "include_related_events_features",
         "include_related_activities_features",
         "include_obj_con_in_graph_features",
+        "include_prefix_features", "include_prefix_length_features",
+        "include_prefix_timediff_features", "include_prefix_one_hot_features",
         "include_lifecycle_path_features",
         "ocel_features_filter_per_type",
         "numeric_event_attributes", "string_event_attributes",
@@ -1665,6 +1667,17 @@ void handle_ocel_features(const httplib::Request& request,
     options.include_obj_con_in_graph_features = ocel_query_bool(
         request, "include_obj_con_in_graph_features",
         options.include_obj_con_in_graph_features);
+    options.include_prefix_features = ocel_query_bool(
+        request, "include_prefix_features", options.include_prefix_features);
+    options.include_prefix_length_features = ocel_query_bool(
+        request, "include_prefix_length_features",
+        options.include_prefix_length_features);
+    options.include_prefix_timediff_features = ocel_query_bool(
+        request, "include_prefix_timediff_features",
+        options.include_prefix_timediff_features);
+    options.include_prefix_one_hot_features = ocel_query_bool(
+        request, "include_prefix_one_hot_features",
+        options.include_prefix_one_hot_features);
     const auto object_only_control_supplied =
         request.has_param("include_related_events_features") ||
         request.has_param("include_related_activities_features") ||
@@ -1678,6 +1691,14 @@ void handle_ocel_features(const httplib::Request& request,
     if (object_only_control_supplied && variant != minera::OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
           "related-event, neighbor, and lifecycle metric options apply only to the objects variant");
+    const auto prefix_control_supplied =
+        request.has_param("include_prefix_features") ||
+        request.has_param("include_prefix_length_features") ||
+        request.has_param("include_prefix_timediff_features") ||
+        request.has_param("include_prefix_one_hot_features");
+    if (prefix_control_supplied && variant != minera::OcelFeatureVariant::kEventsObjects)
+      throw std::invalid_argument(
+          "prefix features apply only to the events_objects variant");
     options.numeric_event_attributes =
         ocel_query_list(request, "numeric_event_attributes");
     options.string_event_attributes =

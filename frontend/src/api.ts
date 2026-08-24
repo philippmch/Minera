@@ -4557,6 +4557,10 @@ export interface OcelFeatureOptions {
   include_related_events_features?: boolean;
   include_related_activities_features?: boolean;
   include_obj_con_in_graph_features?: boolean;
+  include_prefix_features?: boolean;
+  include_prefix_length_features?: boolean;
+  include_prefix_timediff_features?: boolean;
+  include_prefix_one_hot_features?: boolean;
   include_lifecycle_features?: boolean;
   include_lifecycle_length_features?: boolean;
   include_lifecycle_unique_activity_features?: boolean;
@@ -4588,6 +4592,12 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     options.include_lifecycle_activity_features !== undefined ||
     options.include_lifecycle_wip_features !== undefined ||
     options.include_lifecycle_path_features !== undefined;
+  const prefixControl = options.include_prefix_features !== undefined ||
+    options.include_prefix_length_features !== undefined ||
+    options.include_prefix_timediff_features !== undefined ||
+    options.include_prefix_one_hot_features !== undefined;
+  if (prefixControl && options.variant !== "events_objects")
+    throw new Error("prefix features apply only to events_objects");
   if (objectOnlyFeatureControl && options.variant !== "objects")
     throw new Error("related-event, neighbor, and lifecycle-path features apply only to objects");
   const query = new URLSearchParams();
@@ -4615,6 +4625,10 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   addBoolean("include_related_events_features", options.include_related_events_features);
   addBoolean("include_related_activities_features", options.include_related_activities_features);
   addBoolean("include_obj_con_in_graph_features", options.include_obj_con_in_graph_features);
+  addBoolean("include_prefix_features", options.include_prefix_features);
+  addBoolean("include_prefix_length_features", options.include_prefix_length_features);
+  addBoolean("include_prefix_timediff_features", options.include_prefix_timediff_features);
+  addBoolean("include_prefix_one_hot_features", options.include_prefix_one_hot_features);
   addBoolean("include_lifecycle_features", options.include_lifecycle_features);
   addBoolean("include_lifecycle_length_features", options.include_lifecycle_length_features);
   addBoolean("include_lifecycle_unique_activity_features", options.include_lifecycle_unique_activity_features);
