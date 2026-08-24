@@ -2143,6 +2143,9 @@ function profileAttributeList(values: string[] | undefined, name: string): strin
   return values.map((value) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,")).join(",");
 }
 export function profileClusteringQuery(options: ProfileClusteringOptions = {}): string {
+  if (options.profile_variant !== undefined && options.profile_variant !== "sklearn_profiles") {
+    throw new Error("profile_variant must be sklearn_profiles");
+  }
   const positive = [
     ["profile_cluster_count", options.profile_cluster_count],
     ["profile_max_iterations", options.profile_max_iterations],
@@ -2158,6 +2161,7 @@ export function profileClusteringQuery(options: ProfileClusteringOptions = {}): 
   if (options.profile_tolerance !== undefined && (!Number.isFinite(options.profile_tolerance) || options.profile_tolerance < 0))
     throw new Error("profile_tolerance must be finite and non-negative");
   const values: Record<string, string | undefined> = {
+    profile_variant: options.profile_variant,
     profile_cluster_count: options.profile_cluster_count === undefined ? undefined : String(options.profile_cluster_count),
     profile_event_numeric_attributes: profileAttributeList(options.profile_event_numeric_attributes, "profile_event_numeric_attributes"),
     profile_event_string_attributes: profileAttributeList(options.profile_event_string_attributes, "profile_event_string_attributes"),

@@ -776,7 +776,7 @@ describe("isClusteringResult", () => {
 
 describe("isProfileClusteringResult", () => {
   const valid = {
-    family: "PROFILE_CLUSTERING", labels: [0, 1], clusters: [[0], [1]],
+    family: "PROFILE_CLUSTERING", variant: "sklearn_profiles", labels: [0, 1], clusters: [[0], [1]],
     feature_names: ["event:concept:name@A"], inertia: 0,
     diagnostics: { computed: true, converged: true, trace_count: 2,
       feature_count: 1, cluster_count: 2, iterations: 1, message: "converged" },
@@ -784,6 +784,7 @@ describe("isProfileClusteringResult", () => {
   it("accepts deterministic labels and diagnostics", () => expect(isProfileClusteringResult(valid)).toBe(true));
   it("rejects negative or non-finite metrics", () => {
     expect(isProfileClusteringResult({ ...valid, inertia: -1 })).toBe(false);
+    expect(isProfileClusteringResult({ ...valid, variant: "other" })).toBe(false);
     expect(isProfileClusteringResult({ ...valid, diagnostics: { ...valid.diagnostics, iterations: -1 } })).toBe(false);
   });
 });

@@ -63,7 +63,13 @@ struct TraceAttributeClusteringResult {
 // Deterministic native equivalent of profile-based trace clustering. The
 // default representation contains activity and adjacent-activity one-hot
 // features; explicit attribute lists add trace/event profile dimensions.
+enum class ProfileClusteringVariant {
+  kSklearnProfiles,
+  SKLEARN_PROFILES = kSklearnProfiles,
+};
+
 struct ProfileClusteringOptions {
+  ProfileClusteringVariant variant = ProfileClusteringVariant::kSklearnProfiles;
   std::size_t cluster_count = 2;
   std::size_t max_iterations = 100;
   std::size_t max_traces = 100000;
@@ -90,6 +96,7 @@ struct ProfileClusteringDiagnostics {
 };
 
 struct ProfileClusteringResult {
+  ProfileClusteringVariant variant = ProfileClusteringVariant::kSklearnProfiles;
   std::vector<int> labels;
   std::vector<std::vector<std::size_t>> clusters;
   std::vector<std::vector<double>> centroids;

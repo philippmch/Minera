@@ -57,9 +57,11 @@ int main() {
   assert(dmm_result.tree.distance > 0.19 && dmm_result.tree.distance < 0.21);
   ProfileClusteringOptions profile_options;
   profile_options.cluster_count = 2;
+  profile_options.variant = ProfileClusteringVariant::SKLEARN_PROFILES;
   const auto profile_result = discover_profile_clustering(l, profile_options);
   const auto profile_repeat = discover_profile_clustering(l, profile_options);
   assert(profile_result.diagnostics.computed);
+  assert(profile_result.variant == ProfileClusteringVariant::kSklearnProfiles);
   assert(profile_result.labels.size() == l.traces.size());
   assert(profile_result.clusters.size() == 2);
   assert(!profile_result.feature_names.empty());
@@ -68,7 +70,11 @@ int main() {
   assert(std::find(profile_result.feature_names.begin(), profile_result.feature_names.end(),
                    "succession:concept:name@A#B") != profile_result.feature_names.end());
   assert(profile_result.labels == profile_repeat.labels);
+  for (const auto& cluster : profile_result.clusters)
+    assert(std::is_sorted(cluster.begin(), cluster.end()));
   assert(profile_clustering_json(profile_result) == profile_clustering_json(profile_repeat));
+  assert(profile_clustering_json(profile_result).find(
+             "\"variant\":\"sklearn_profiles\"") != std::string::npos);
 
   ProfileClusteringOptions numeric_options;
   numeric_options.cluster_count = 2;
@@ -93,4 +99,15 @@ int main() {
   assert(profile_threw);
   const auto empty_profile = discover_profile_clustering(EventLog{});
   assert(empty_profile.diagnostics.computed && empty_profile.labels.empty());
+  assert(empty_profile.variant == ProfileClusteringVariant::kSklearnProfiles);
+
+  bool invalid_variant = false;
+  try {
+    auto bad = profile_options;
+    bad.variant = static_cast<ProfileClusteringVariant>(99);
+    (void)discover_profile_clustering(l, bad);
+  } catch (const std::invalid_argument&) {
+    invalid_variant = true;
+  }
+  assert(invalid_variant);
 }

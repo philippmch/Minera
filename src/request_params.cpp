@@ -3850,6 +3850,17 @@ ProfileClusteringOptions parse_profile_clustering_params(
       throw std::invalid_argument(std::string(name) + ": expected a value");
     return value;
   };
+  if (supplied("profile_variant")) {
+    std::string variant(require("profile_variant"));
+    std::transform(variant.begin(), variant.end(), variant.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (variant != "sklearn_profiles")
+      throw std::invalid_argument(
+          "profile_variant: expected sklearn_profiles");
+    options.variant = ProfileClusteringVariant::kSklearnProfiles;
+  }
   if (supplied("profile_cluster_count"))
     options.cluster_count = parse_positive_size(
         require("profile_cluster_count"), "profile_cluster_count");

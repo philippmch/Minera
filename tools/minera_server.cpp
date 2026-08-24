@@ -2191,7 +2191,7 @@ void handle_profile_clustering(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
+        "profile_variant", "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
         "profile_max_features", "profile_seed", "profile_tolerance",
         "profile_include_activity", "profile_include_succession",
         "profile_trace_string_attributes", "profile_event_string_attributes",

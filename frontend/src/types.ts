@@ -368,6 +368,7 @@ export const isClusteringResult = (value: unknown): value is ClusteringResult =>
     typeof d.message === "string";
 };
 export interface ProfileClusteringOptions {
+  profile_variant?: "sklearn_profiles";
   profile_cluster_count?: number;
   profile_max_iterations?: number;
   profile_max_traces?: number;
@@ -384,6 +385,7 @@ export interface ProfileClusteringOptions {
 }
 export interface ProfileClusteringResult {
   family: "PROFILE_CLUSTERING";
+  variant?: "sklearn_profiles";
   labels: number[];
   clusters: number[][];
   feature_names: string[];
@@ -402,7 +404,9 @@ export function isProfileClusteringResult(value: unknown): value is ProfileClust
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Partial<ProfileClusteringResult>;
   const diagnostics = candidate.diagnostics;
-  if (candidate.family !== "PROFILE_CLUSTERING" || !Array.isArray(candidate.labels) ||
+  if (candidate.family !== "PROFILE_CLUSTERING" ||
+      (candidate.variant !== undefined && candidate.variant !== "sklearn_profiles") ||
+      !Array.isArray(candidate.labels) ||
       !candidate.labels.every((label) => Number.isSafeInteger(label) && label >= 0) ||
       !Array.isArray(candidate.clusters) ||
       !candidate.clusters.every((cluster) => Array.isArray(cluster) &&
