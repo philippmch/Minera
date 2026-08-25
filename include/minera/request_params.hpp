@@ -34,6 +34,7 @@
 #include "minera/process_tree_playout.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
+#include "minera/stochastic_petri.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/concept_drift.hpp"
@@ -205,6 +206,7 @@ using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
 using ExtensivePlayoutParams = ExtensivePlayoutOptions;
 using DfgPlayoutParams = DfgPlayoutOptions;
 using StochasticPlayoutParams = StochasticPlayoutOptions;
+using StochasticPetriParams = StochasticPetriOptions;
 using MonteCarloParams = MonteCarloOptions;
 
 // A lookup returning a form field's value, or "" when the field is absent.
@@ -437,6 +439,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
     const FieldLookup& field);
 [[nodiscard]] StochasticPlayoutParams parse_stochastic_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] StochasticPetriParams parse_stochastic_petri_params(
+    const FieldLookup& field);
+[[nodiscard]] StochasticPetriParams parse_stochastic_petri_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parses bounded virtual-time Monte Carlo settings. Wire fields use the

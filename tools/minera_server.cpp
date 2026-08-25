@@ -209,6 +209,18 @@ void reject_unknown_stochastic_params(const httplib::Request& request) {
   }
 }
 
+void reject_unknown_stochastic_petri_params(const httplib::Request& request) {
+  static const std::set<std::string> allowed = {
+      "miner", "stochastic_petri_rates", "stochastic_petri_initial_marking",
+      "stochastic_petri_immediate_transitions",
+      "stochastic_petri_max_states"};
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (!allowed.contains(key))
+      throw std::invalid_argument("unknown stochastic Petri parameter: " + key);
+  }
+}
+
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
   return request.has_file(name) ? request.get_file_value(name).content
@@ -4468,6 +4480,53 @@ void handle_data_petri_net(const httplib::Request& request,
 // stochastic_transition_weights, stochastic_fit_from_log, and timing controls;
 // mode=monte_carlo selects
 // the bounded virtual-time simulator and accepts monte_carlo_* controls.
+void handle_stochastic_petri(const httplib::Request& request,
+                             httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  const std::string miner = request.has_param("miner")
+                                ? request.get_param_value("miner")
+                                : std::string("inductive");
+  const auto it = session->nets.find(miner);
+  if (it == session->nets.end()) {
+    response.status = 400;
+    response.set_content(error_json("unknown miner: " + miner),
+                         "application/json");
+    return;
+  }
+  try {
+    reject_unknown_stochastic_petri_params(request);
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    auto options = minera::parse_stochastic_petri_params(lookup, present);
+    if (options.max_states > minera::kStochasticPetriMaxGeneratorStates)
+      throw std::invalid_argument(
+          "stochastic Petri max_states exceeds the dense generator safety limit");
+    response.set_content(
+        minera::serialize_stochastic_petri_json(
+            minera::stochastic_petri_reachability(it->second, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_playout(const httplib::Request& request,
                     httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -5715,6 +5774,7 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Get("/api/playout", handle_playout);
+  server.Get("/api/stochastic-petri", handle_stochastic_petri);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {

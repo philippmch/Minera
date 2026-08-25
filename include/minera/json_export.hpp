@@ -33,6 +33,7 @@
 #include "minera/case_statistics.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/stochastic_petri.hpp"
 #include "minera/playout.hpp"
 #include "minera/powl.hpp"
 #include "minera/process_tree.hpp"
@@ -291,6 +292,8 @@ void write_analysis_json(std::ostream& out,
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_extensive_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
+[[nodiscard]] std::string serialize_stochastic_petri_json(
+    const StochasticPetriResult& result);
 [[nodiscard]] std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result);
 

@@ -3758,6 +3758,45 @@ std::string serialize_extensive_playout_visited_json(
                                                 "EXTENSIVE_PLAYOUT");
 }
 
+std::string serialize_stochastic_petri_json(
+    const StochasticPetriResult& result) {
+  std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  out << "{\"family\":\"STOCHASTIC_PETRI\",\"variant\":\"TANGIBLE_CTMC\",\"exhausted\":"
+      << (result.exhausted ? "true" : "false") << ",\"diagnostic\":";
+  write_json_string(out, result.diagnostic);
+  out << ",\"states\":[";
+  for (std::size_t i = 0; i < result.states.size(); ++i) {
+    if (i) out << ',';
+    out << "[";
+    for (std::size_t p = 0; p < result.states[i].marking.size(); ++p) {
+      if (p) out << ',';
+      out << result.states[i].marking[p];
+    }
+    out << "]";
+  }
+  out << "],\"edges\":[";
+  for (std::size_t i = 0; i < result.edges.size(); ++i) {
+    if (i) out << ',';
+    const auto& edge = result.edges[i];
+    out << "{\"source\":" << edge.source << ",\"target\":"
+        << edge.target << ",\"transition\":" << edge.transition
+        << ",\"rate\":" << edge.rate << '}';
+  }
+  out << "],\"generator\":[";
+  for (std::size_t i = 0; i < result.generator.size(); ++i) {
+    if (i) out << ',';
+    out << '[';
+    for (std::size_t j = 0; j < result.generator[i].size(); ++j) {
+      if (j) out << ',';
+      out << result.generator[i][j];
+    }
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result) {
   std::ostringstream out;

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fetchExtensivePlayoutVisited } from "./api";
+import { fetchStochasticPetri, stochasticPetriQuery } from "./api";
 import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
 
 describe("Petri usage comparison API", () => {
@@ -103,6 +104,31 @@ describe("DFG playout API", () => {
 });
 
 describe("basic Petri playout API", () => {
+  it("serializes and fetches the tangible stochastic Petri result", async () => {
+    expect(stochasticPetriQuery({
+      transition_rates: [2, 3], initial_marking: [1, 0],
+      immediate_transitions: [0], max_states: 8,
+    })).toBe("stochastic_petri_rates=2%2C3&stochastic_petri_initial_marking=1%2C0&stochastic_petri_immediate_transitions=0&stochastic_petri_max_states=8");
+    const payload = {
+      family: "STOCHASTIC_PETRI", variant: "TANGIBLE_CTMC", exhausted: false,
+      diagnostic: "", states: [[0, 1], [1, 0]],
+      edges: [{ source: 1, target: 0, transition: 0, rate: 2 }],
+      generator: [[0, 0], [2, -2]],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/stochastic-petri?miner=inductive");
+      expect(path).toContain("stochastic_petri_max_states=8");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchStochasticPetri("inductive", { max_states: 8 }))
+      .resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+    expect(() => stochasticPetriQuery({ max_states: 0 })).toThrow(/positive/);
+    expect(() => stochasticPetriQuery({ max_states: 2001 })).toThrow(/2000/);
+    expect(() => stochasticPetriQuery({ transition_rates: [Number.NaN] }))
+      .toThrow(/finite/);
+  });
+
   it("uses the generic Petri route for basic-only controls", async () => {
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
       expect(path).toContain("/api/playout?miner=inductive");

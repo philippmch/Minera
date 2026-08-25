@@ -2975,6 +2975,46 @@ export interface StochasticPlayoutOptions {
   return_visited_elements?: boolean;
 }
 
+export interface StochasticPetriOptions {
+  transition_rates?: number[];
+  initial_marking?: number[];
+  immediate_transitions?: number[];
+  max_states?: number;
+}
+
+export interface StochasticPetriResult {
+  family: "STOCHASTIC_PETRI";
+  variant: "TANGIBLE_CTMC";
+  exhausted: boolean;
+  diagnostic: string;
+  states: number[][];
+  edges: Array<{ source: number; target: number; transition: number; rate: number }>;
+  generator: number[][];
+}
+
+export function isStochasticPetriResult(
+  value: unknown,
+): value is StochasticPetriResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<StochasticPetriResult>;
+  if (result.family !== "STOCHASTIC_PETRI" ||
+      result.variant !== "TANGIBLE_CTMC" ||
+      typeof result.exhausted !== "boolean" ||
+      typeof result.diagnostic !== "string" ||
+      !Array.isArray(result.states) || !Array.isArray(result.edges) ||
+      !Array.isArray(result.generator)) return false;
+  if (!result.states.every((state) => Array.isArray(state) &&
+      state.every((token) => Number.isSafeInteger(token) && token >= 0))) return false;
+  if (!result.edges.every((edge) => edge && Number.isSafeInteger(edge.source) &&
+      Number.isSafeInteger(edge.target) && Number.isSafeInteger(edge.transition) &&
+      edge.source >= 0 && edge.target >= 0 &&
+      edge.source < result.states!.length && edge.target < result.states!.length &&
+      Number.isFinite(edge.rate) && edge.rate >= 0)) return false;
+  return result.generator.length === result.states.length &&
+    result.generator.every((row) => Array.isArray(row) &&
+    row.length === result.states!.length && row.every(Number.isFinite));
+}
+
 /** Controls bounded virtual-time Petri-net Monte Carlo simulation. */
 export interface MonteCarloOptions {
   simulations?: number;
