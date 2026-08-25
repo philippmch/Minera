@@ -2622,6 +2622,51 @@ StochasticPlayoutParams parse_stochastic_playout_params(
   return params;
 }
 
+StochasticPetriParams parse_stochastic_petri_params(
+    const FieldLookup& field) {
+  return parse_stochastic_petri_params(field, {});
+}
+
+StochasticPetriParams parse_stochastic_petri_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  StochasticPetriParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("stochastic_petri_rates")) {
+    for (const auto& token : split_csv(require("stochastic_petri_rates"))) {
+      const auto rate = parse_finite_double(token, "stochastic_petri_rates");
+      if (rate < 0.0)
+        throw std::invalid_argument(
+            "stochastic_petri_rates must be non-negative");
+      params.transition_rates.push_back(rate);
+    }
+    if (params.transition_rates.empty())
+      throw std::invalid_argument("stochastic_petri_rates: expected values");
+  }
+  if (supplied("stochastic_petri_initial_marking"))
+    params.initial_marking = parse_uint32_marking(
+        require("stochastic_petri_initial_marking"),
+        "stochastic_petri_initial_marking");
+  if (supplied("stochastic_petri_immediate_transitions")) {
+    for (const auto& token :
+         split_csv(require("stochastic_petri_immediate_transitions")))
+      params.immediate_transitions.push_back(parse_nonnegative_size(
+          token, "stochastic_petri_immediate_transitions"));
+  }
+  if (supplied("stochastic_petri_max_states"))
+    params.max_states = parse_positive_size(
+        require("stochastic_petri_max_states"),
+        "stochastic_petri_max_states");
+  return params;
+}
+
 MonteCarloParams parse_monte_carlo_params(const FieldLookup& field) {
   return parse_monte_carlo_params(field, {});
 }

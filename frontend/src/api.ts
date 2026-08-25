@@ -144,6 +144,8 @@ import {
   type StochasticPlayoutOptions,
   type StochasticPlayoutVisitedResult,
   type ExtensivePlayoutVisitedResult,
+  type StochasticPetriOptions,
+  type StochasticPetriResult,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -192,6 +194,7 @@ import {
   isBasicPlayoutVisitedResult,
   isStochasticPlayoutVisitedResult,
   isExtensivePlayoutVisitedResult,
+  isStochasticPetriResult,
   isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
@@ -3553,6 +3556,56 @@ export async function fetchExtensivePlayoutVisited(
   }
   if (!isExtensivePlayoutVisitedResult(payload))
     throw new Error("the Minera backend returned an invalid extensive visited playout");
+  return payload;
+}
+
+export function stochasticPetriQuery(
+  options: StochasticPetriOptions = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.transition_rates !== undefined) {
+    if (!Array.isArray(options.transition_rates) ||
+        options.transition_rates.length === 0 ||
+        options.transition_rates.some((rate) => !Number.isFinite(rate) || rate < 0))
+      throw new Error("transition_rates must be a non-empty finite non-negative list");
+    params.set("stochastic_petri_rates", options.transition_rates.join(","));
+  }
+  for (const name of ["initial_marking", "immediate_transitions"] as const) {
+    const value = options[name];
+    if (value === undefined) continue;
+    if (!Array.isArray(value) || value.length === 0 ||
+        value.some((entry) => !Number.isSafeInteger(entry) || entry < 0))
+      throw new Error(`${name} must be a non-empty list of non-negative integers`);
+    params.set(`stochastic_petri_${name}`, value.join(","));
+  }
+  if (options.max_states !== undefined) {
+    validatePlayoutInteger("max_states", options.max_states, true);
+    if (options.max_states > 2000)
+      throw new Error("max_states must not exceed 2000 for the dense generator");
+    params.set("stochastic_petri_max_states", String(options.max_states));
+  }
+  return params.toString();
+}
+
+export async function fetchStochasticPetri(
+  miner = "inductive",
+  options: StochasticPetriOptions = {},
+): Promise<StochasticPetriResult> {
+  const query = stochasticPetriQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isStochasticPetriResult(payload))
+    throw new Error("the Minera backend returned an invalid stochastic Petri result");
   return payload;
 }
 

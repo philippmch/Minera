@@ -2497,6 +2497,30 @@ void parse_extensive_playout_params_maps_controls_and_rejects_zero() {
   assert(rejected);
 }
 
+void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
+  const auto parsed = minera::parse_stochastic_petri_params(fields({
+      {"stochastic_petri_rates", "2, 3.5"},
+      {"stochastic_petri_initial_marking", "1,0"},
+      {"stochastic_petri_immediate_transitions", "0,2"},
+      {"stochastic_petri_max_states", "12"}}));
+  assert(parsed.transition_rates.size() == 2);
+  assert(parsed.transition_rates[1] == 3.5);
+  assert(parsed.initial_marking == std::vector<std::uint32_t>({1, 0}));
+  assert(parsed.immediate_transitions == std::vector<std::size_t>({0, 2}));
+  assert(parsed.max_states == 12);
+  for (const auto& item : {std::pair{"stochastic_petri_rates", "-1"},
+                           std::pair{"stochastic_petri_rates", "nan"},
+                           std::pair{"stochastic_petri_max_states", "0"}}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_stochastic_petri_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+}
+
 void parse_dfg_playout_params_maps_controls_and_aliases() {
   const auto parsed = minera::parse_dfg_playout_params(fields({
       {"dfg_playout_variant", "performance"},
@@ -3059,6 +3083,7 @@ int main() {
   parse_process_tree_playout_params_maps_variants_and_limits();
   parse_process_tree_playout_params_rejects_bad_values();
   parse_extensive_playout_params_maps_controls_and_rejects_zero();
+  parse_stochastic_petri_params_maps_and_rejects_bad_values();
   parse_dfg_playout_params_maps_controls_and_aliases();
   parse_dfg_playout_params_rejects_invalid_bounds();
   parse_stochastic_playout_params_maps_controls();

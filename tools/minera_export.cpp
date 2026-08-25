@@ -966,6 +966,11 @@ int usage(const char* program) {
                "  --stochastic-return-visited-elements <bool> Emit visited markings/transitions as JSON\n"
                "  --stochastic-initial-marking <n,...> Initial marker vector\n"
                "  --stochastic-final-marking <n,...> Final marker vector\n"
+               "  --stochastic-petri <bool> Emit tangible CTMC JSON with --playout\n"
+               "  --stochastic-petri-rates <r,...> Exponential transition rates\n"
+               "  --stochastic-petri-initial-marking <n,...> Initial marking\n"
+               "  --stochastic-petri-immediate-transitions <n,...> Immediate indices\n"
+               "  --stochastic-petri-max-states <n> Reachability state cap\n"
                "  --monte-carlo-simulations <n> Virtual-time cases\n"
                "  --monte-carlo-max-steps <n> Firing cap per case\n"
                "  --monte-carlo-seed <u64> RNG seed\n"
@@ -1258,6 +1263,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> stochastic_playout_fields;
   bool stochastic_playout_requested = false;
   minera::StochasticPlayoutOptions stochastic_playout_options;
+  std::map<std::string, std::string> stochastic_petri_fields;
+  bool stochastic_petri_requested = false;
+  minera::StochasticPetriOptions stochastic_petri_options;
   std::map<std::string, std::string> monte_carlo_fields;
   bool monte_carlo_requested = false;
   bool monte_carlo_json_requested = false;
@@ -2670,6 +2678,32 @@ int main(int argc, char** argv) {
       stochastic_playout_requested = true;
       continue;
     }
+    if (arg == "--stochastic-petri" ||
+        arg == "--stochastic-petri-rates" ||
+        arg == "--stochastic-petri-initial-marking" ||
+        arg == "--stochastic-petri-immediate-transitions" ||
+        arg == "--stochastic-petri-max-states") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--stochastic-petri") {
+        if (std::string_view(value) != "true" &&
+            std::string_view(value) != "false" &&
+            std::string_view(value) != "1" &&
+            std::string_view(value) != "0") {
+          std::cerr << "error: --stochastic-petri expects true or false\n";
+          return 2;
+        }
+        if (std::string_view(value) == "true" ||
+            std::string_view(value) == "1")
+          stochastic_petri_requested = true;
+      } else {
+        std::string key(arg.substr(2));
+        std::replace(key.begin(), key.end(), '-', '_');
+        stochastic_petri_fields.insert_or_assign(std::move(key), value);
+        stochastic_petri_requested = true;
+      }
+      continue;
+    }
     if (arg == "--monte-carlo") {
       monte_carlo_requested = true;
       playout_miner = "monte_carlo";
@@ -4066,6 +4100,17 @@ int main(int argc, char** argv) {
     std::cerr << "error: Monte Carlo and stochastic playout options cannot be combined\n";
     return 2;
   }
+  if (stochastic_petri_requested && playout_output.empty()) {
+    std::cerr << "error: --stochastic-petri requires --playout <path>\n";
+    return 2;
+  }
+  if (stochastic_petri_requested &&
+      (playout_miner == "declare" || playout_miner == "process_tree" ||
+       playout_miner == "dfg" || playout_miner == "stochastic" ||
+       playout_miner == "monte_carlo")) {
+    std::cerr << "error: --stochastic-petri requires a Petri model miner\n";
+    return 2;
+  }
   if (monte_carlo_requested &&
       (playout_miner == "declare" || playout_miner == "process_tree" ||
        playout_miner == "dfg")) {
@@ -4087,6 +4132,28 @@ int main(int argc, char** argv) {
       std::cerr << "error: " << error.what() << '\n';
       return 2;
     }
+  }
+  if (stochastic_petri_requested) {
+    const auto lookup = [&](std::string_view name) {
+      const auto it = stochastic_petri_fields.find(std::string(name));
+      return it == stochastic_petri_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&](std::string_view name) {
+      return stochastic_petri_fields.contains(std::string(name));
+    };
+    try {
+      stochastic_petri_options =
+          minera::parse_stochastic_petri_params(lookup, present);
+    } catch (const std::invalid_argument& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
+  if (stochastic_petri_requested &&
+      (petri_playout_mode != "basic" || basic_playout_options_used ||
+       extensive_playout_options_used || stochastic_playout_requested)) {
+    std::cerr << "error: --stochastic-petri cannot be combined with other Petri playout controls\n";
+    return 2;
   }
   if (monte_carlo_requested) {
     const auto lookup = [&](std::string_view name) {
@@ -5538,6 +5605,11 @@ int main(int argc, char** argv) {
           generated = minera::extensive_playout(
               *selected, extensive_playout_options);
         }
+      }
+      if (selected != nullptr && stochastic_petri_requested) {
+        generated_json = minera::serialize_stochastic_petri_json(
+            minera::stochastic_petri_reachability(
+                *selected, stochastic_petri_options));
       }
       if (selected != nullptr && petri_playout_mode == "basic" &&
           basic_playout_options.return_visited_elements)

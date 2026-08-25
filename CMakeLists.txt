@@ -117,6 +117,7 @@ add_library(minera_core
   src/petri_net.cpp
   src/petri_usage_comparison.cpp
   src/playout.cpp
+  src/stochastic_petri.cpp
   src/pripel.cpp
   src/process_tree_alignment.cpp
   src/random_tree.cpp
@@ -674,6 +675,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_playout_tests PRIVATE cxx_std_20)
   target_compile_options(minera_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_playout_tests COMMAND minera_playout_tests)
+
+  add_executable(minera_stochastic_petri_tests
+    tests/test_stochastic_petri.cpp
+  )
+  target_link_libraries(minera_stochastic_petri_tests PRIVATE minera::core)
+  target_compile_features(minera_stochastic_petri_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_stochastic_petri_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_stochastic_petri_tests COMMAND minera_stochastic_petri_tests)
 
   add_executable(minera_monte_carlo_tests
     tests/test_monte_carlo.cpp

@@ -64,7 +64,12 @@ int usage(const char* program) {
                "  --monte-carlo-seed <u64> RNG seed\n"
                "  --monte-carlo-case-arrival-seconds <f> Arrival interval\n"
                "  --monte-carlo-default-duration-seconds <f> Default duration\n"
-               "  --monte-carlo-transition-durations <d:v,...> Durations\n";
+               "  --monte-carlo-transition-durations <d:v,...> Durations\n"
+               "  --stochastic-petri      Emit tangible CTMC JSON\n"
+               "  --stochastic-petri-rates <r,...> Exponential rates\n"
+               "  --stochastic-petri-initial-marking <n,...> Initial marking\n"
+               "  --stochastic-petri-immediate-transitions <n,...> Immediate indices\n"
+               "  --stochastic-petri-max-states <n> Reachability state cap\n";
   return 2;
 }
 
@@ -79,6 +84,8 @@ int main(int argc, char** argv) {
   bool extensive_control_used = false;
   bool dfg = false;
   bool monte_carlo = false;
+  bool stochastic_petri = false;
+  std::map<std::string, std::string> stochastic_petri_fields;
   std::map<std::string, std::string> dfg_fields;
   std::map<std::string, std::string> monte_carlo_fields;
   const auto parse_marking = [](const char* value, const char* option) {
@@ -135,6 +142,18 @@ int main(int argc, char** argv) {
       dfg = true;
     } else if (arg == "--monte-carlo") {
       monte_carlo = true;
+    } else if (arg == "--stochastic-petri") {
+      stochastic_petri = true;
+    } else if (arg == "--stochastic-petri-rates" ||
+               arg == "--stochastic-petri-initial-marking" ||
+               arg == "--stochastic-petri-immediate-transitions" ||
+               arg == "--stochastic-petri-max-states") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      stochastic_petri_fields[key] = value;
+      stochastic_petri = true;
     } else if (arg.rfind("--monte-carlo-", 0) == 0) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -228,6 +247,27 @@ int main(int argc, char** argv) {
       extensive_options.max_length == 0) {
     return usage(argv[0]);
   }
+  if (stochastic_petri && (dfg || monte_carlo || extensive)) {
+    std::cerr << "error: --stochastic-petri cannot be combined with another playout mode\n";
+    return 2;
+  }
+  minera::StochasticPetriOptions stochastic_petri_options;
+  if (stochastic_petri) {
+    const auto lookup = [&stochastic_petri_fields](std::string_view name) {
+      const auto it = stochastic_petri_fields.find(std::string(name));
+      return it == stochastic_petri_fields.end() ? std::string{} : it->second;
+    };
+    const auto present = [&stochastic_petri_fields](std::string_view name) {
+      return stochastic_petri_fields.contains(std::string(name));
+    };
+    try {
+      stochastic_petri_options =
+          minera::parse_stochastic_petri_params(lookup, present);
+    } catch (const std::exception& error) {
+      std::cerr << "error: " << error.what() << '\n';
+      return 2;
+    }
+  }
   if (extensive_control_used && !extensive) {
     std::cerr << "error: extensive controls require --extensive\n";
     return 2;
@@ -283,6 +323,17 @@ int main(int argc, char** argv) {
         : input.extension() == ".ptml"
             ? minera::to_petri_net(minera::import_ptml(input))
             : minera::import_pnml(input);
+    if (stochastic_petri) {
+      const auto json = minera::serialize_stochastic_petri_json(
+          minera::stochastic_petri_reachability(net, stochastic_petri_options));
+      if (output.empty()) std::cout << json << '\n';
+      else {
+        std::ofstream file(output);
+        if (!file) throw std::runtime_error("cannot open output file");
+        file << json << '\n';
+      }
+      return 0;
+    }
     minera::EventLog log;
     if (monte_carlo) {
       if (!monte_carlo_fields.contains("monte_carlo_simulations"))

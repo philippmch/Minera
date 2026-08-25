@@ -191,6 +191,18 @@ can retain only cases that reach the final marking and optionally accept
 markings that contain it. The native API, `--petri-playout-*` export options,
 generic `/api/playout` parameters, and typed frontend query serialize these
 controls with matching validation.
+The stochastic Petri analysis endpoint adds a first-class tangible-state
+reachability view at `/api/stochastic-petri` and the corresponding
+`--stochastic-petri` export mode. Ordinary arcs are enumerated in deterministic
+marking order under a positive `max_states` cap (at most 2,000 states for the
+dense generator); finite non-negative
+per-transition exponential rates form a CTMC generator, duplicate target
+transitions are summed, and immediate-transition metadata removes states with
+enabled immediate firings plus incident immediate edges. Unsupported extended
+arcs, malformed rates, markings, indices, and caps are rejected explicitly.
+The JSON envelope is `STOCHASTIC_PETRI`/`TANGIBLE_CTMC` with deterministic
+states, transition edges, generator rows, and exhaustion diagnostics; no
+transient or steady-state solver is implied by this bounded slice.
 Basic Petri sampling can also opt into a structured visitation response: each
 trace alternates marking snapshots with fired transition indices (including
 silent transitions), with transition activity labels where available. The
