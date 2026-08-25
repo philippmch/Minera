@@ -655,16 +655,72 @@ std::vector<std::vector<double>> invariant_basis(const PetriNet& net) {
 }
 
 std::vector<std::vector<std::size_t>> invariant_supports(
-    const std::vector<std::vector<double>>& basis) {
+    const std::vector<std::vector<double>>& basis, const PetriNet& net) {
   std::vector<std::vector<std::size_t>> supports;
   for (const auto& invariant : basis) {
     std::vector<std::size_t> support;
     for (std::size_t p = 0; p < invariant.size(); ++p)
       if (invariant[p] > kEps) support.push_back(p);
     if (support.empty()) continue;
-    if (std::find(supports.begin(), supports.end(), support) == supports.end())
-      supports.push_back(std::move(support));
+
+    std::vector<bool> in_support(net.place_count(), false);
+    for (const auto place : support) in_support[place] = true;
+    std::vector<std::vector<std::size_t>> adjacency(net.place_count());
+    std::vector<bool> touched(net.place_count(), false);
+    bool state_machine = true;
+    for (const auto& transition : net.transitions()) {
+      std::vector<std::size_t> inputs;
+      std::vector<std::size_t> outputs;
+      for (const auto place : transition.inputs)
+        if (place < in_support.size() && in_support[place]) inputs.push_back(place);
+      for (const auto place : transition.outputs)
+        if (place < in_support.size() && in_support[place]) outputs.push_back(place);
+      if (inputs.empty() && outputs.empty()) continue;
+      // An S-component is a state-machine subnet: every participating
+      // transition has exactly one supported input and output place.
+      if (transition.has_extended_arcs() || inputs.size() != 1 ||
+          outputs.size() != 1) {
+        state_machine = false;
+        break;
+      }
+      const auto input = inputs.front();
+      const auto output = outputs.front();
+      touched[input] = true;
+      touched[output] = true;
+      if (input != output) {
+        adjacency[input].push_back(output);
+        adjacency[output].push_back(input);
+      }
+    }
+    if (!state_machine) continue;
+    if (std::any_of(support.begin(), support.end(),
+                    [&](const auto place) { return !touched[place]; }))
+      continue;
+
+    // Split a valid support into connected state-machine components.  A
+    // single positive invariant can cover several disconnected cycles, but
+    // Woflan's S-component diagnostic names each connected subnet separately.
+    std::set<std::size_t> remaining(support.begin(), support.end());
+    while (!remaining.empty()) {
+      const auto root = *remaining.begin();
+      remaining.erase(remaining.begin());
+      std::vector<std::size_t> component;
+      std::queue<std::size_t> queue;
+      queue.push(root);
+      while (!queue.empty()) {
+        const auto place = queue.front();
+        queue.pop();
+        component.push_back(place);
+        for (const auto next : adjacency[place]) {
+          if (remaining.erase(next) != 0) queue.push(next);
+        }
+      }
+      std::sort(component.begin(), component.end());
+      if (std::find(supports.begin(), supports.end(), component) == supports.end())
+        supports.push_back(std::move(component));
+    }
   }
+  std::sort(supports.begin(), supports.end());
   return supports;
 }
 
@@ -675,8 +731,26 @@ bool same_vector(const std::vector<double>& lhs,
                     [](double a, double b) { return std::abs(a - b) <= 1e-6; });
 }
 
+bool satisfies_place_invariant(
+    const std::vector<double>& invariant,
+    const std::vector<std::vector<double>>& matrix) {
+  if (invariant.size() != matrix.size()) return false;
+  if (matrix.empty()) return false;
+  const auto transition_count = matrix.front().size();
+  for (const auto& row : matrix)
+    if (row.size() != transition_count) return false;
+  for (std::size_t t = 0; t < transition_count; ++t) {
+    double balance = 0.0;
+    for (std::size_t p = 0; p < invariant.size(); ++p)
+      balance += invariant[p] * matrix[p][t];
+    if (std::abs(balance) > 1e-6) return false;
+  }
+  return true;
+}
+
 std::vector<std::vector<double>> uniform_invariants(
-    const std::vector<std::vector<double>>& basis) {
+    const std::vector<std::vector<double>>& basis,
+    const std::vector<std::vector<double>>& matrix) {
   std::vector<std::vector<double>> result;
   for (const auto& invariant : basis) {
     std::vector<double> uniform(invariant.size(), 0.0);
@@ -685,6 +759,11 @@ std::vector<std::vector<double>> uniform_invariants(
     if (std::none_of(uniform.begin(), uniform.end(),
                      [](double value) { return value > kEps; }))
       continue;
+    // A weighted invariant's support is not automatically a unit-weight
+    // invariant.  Keep the uniform family honest by checking the incidence
+    // equation after binarization instead of treating every support as a
+    // valid state-machine candidate.
+    if (!satisfies_place_invariant(uniform, matrix)) continue;
     if (std::none_of(result.begin(), result.end(),
                      [&](const auto& existing) {
                        return same_vector(existing, uniform);
@@ -695,7 +774,8 @@ std::vector<std::vector<double>> uniform_invariants(
 }
 
 std::vector<std::vector<double>> weighted_invariants(
-    const std::vector<std::vector<double>>& basis) {
+    const std::vector<std::vector<double>>& basis,
+    const std::vector<std::vector<double>>& matrix) {
   std::vector<std::vector<double>> result;
   for (const auto& invariant : basis) {
     double minimum = std::numeric_limits<double>::infinity();
@@ -709,6 +789,15 @@ std::vector<std::vector<double>> weighted_invariants(
       const auto nearest = std::round(weighted[p]);
       if (std::abs(weighted[p] - nearest) <= 1e-6) weighted[p] = nearest;
     }
+    if (!satisfies_place_invariant(weighted, matrix)) {
+      // Rounding a near-integer certificate can introduce a real balance
+      // error on weighted arcs.  Retain the normalized floating certificate
+      // when it still satisfies the equation; otherwise omit the vector.
+      weighted.assign(invariant.size(), 0.0);
+      for (std::size_t p = 0; p < invariant.size(); ++p)
+        if (invariant[p] > kEps) weighted[p] = invariant[p] / minimum;
+    }
+    if (!satisfies_place_invariant(weighted, matrix)) continue;
     if (std::none_of(result.begin(), result.end(),
                      [&](const auto& existing) {
                        return same_vector(existing, weighted);
@@ -1489,19 +1578,21 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   const PetriNet* structural_net = short_circuited ? &*short_circuited : &net;
   if (validation_error.empty()) {
+    const auto structural_incidence = incidence(*structural_net);
     result.place_invariant_basis = invariant_basis(*structural_net);
     result.uncovered_places = uncovered_from_vectors(
         result.place_invariant_basis, structural_net->place_count());
     result.uniform_place_invariants =
-        uniform_invariants(result.place_invariant_basis);
+        uniform_invariants(result.place_invariant_basis, structural_incidence);
     result.uncovered_places_uniform = uncovered_from_vectors(
         result.uniform_place_invariants, structural_net->place_count());
     result.weighted_place_invariants =
-        weighted_invariants(result.place_invariant_basis);
+        weighted_invariants(result.place_invariant_basis, structural_incidence);
     result.uncovered_places_weighted = uncovered_from_vectors(
         result.weighted_place_invariants, structural_net->place_count());
     if (result.workflow.valid) {
-      result.s_components = invariant_supports(result.uniform_place_invariants);
+      result.s_components = invariant_supports(result.uniform_place_invariants,
+                                               *structural_net);
       result.uncovered_places_s_component = uncovered_from_supports(
           *result.s_components, structural_net->place_count());
     }

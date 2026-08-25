@@ -182,6 +182,17 @@ int main() {
   assert(multiple_redo.children()[1].kind() == PowlNodeKind::kXor);
   assert(multiple_redo.children()[1].children().size() == 2);
 
+  // Disconnected redo components are merged without losing the common do
+  // boundary: both return paths become alternatives inside one loop redo.
+  const auto disconnected_redo =
+      discover_powl(log({{"A", "X", "A"}, {"A", "Y", "A"}}), tree);
+  assert(disconnected_redo.kind() == PowlNodeKind::kLoop);
+  assert(disconnected_redo.children()[0].label() == "A");
+  assert(disconnected_redo.children()[1].kind() == PowlNodeKind::kXor);
+  assert(disconnected_redo.children()[1].children().size() == 2);
+  assert(disconnected_redo.children()[1].children()[0].label() == "X");
+  assert(disconnected_redo.children()[1].children()[1].label() == "Y");
+
   // A single closed variant is a normal LOOP(do, redo), not a tau-loop
   // fall-through with a different language.
   const auto single_closed = discover_powl(log({{"A", "B", "A"}}), tree);

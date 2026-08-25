@@ -144,6 +144,55 @@ describe("basic Petri playout API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("serializes and validates basic POWL visited playout", async () => {
+    const payload = {
+      family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+      traces: [[
+        { kind: "marking", marking: [1, 0] },
+        { kind: "transition", transition: 0, activity: "finish" },
+        { kind: "marking", marking: [0, 1] },
+      ]],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/playout?miner=powl");
+      expect(path).toContain("mode=basic");
+      expect(path).toContain("traces=2");
+      expect(path).toContain("max_steps=7");
+      expect(path).toContain("initial_marking=1%2C0");
+      expect(path).toContain("final_marking=0%2C1");
+      expect(path).toContain("return_visited_elements=true");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchBasicPlayoutVisited("powl", {
+      mode: "basic", traces: 2, max_steps: 7,
+      initial_marking: [1, 0], final_marking: [0, 1],
+    })).resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+  });
+
+  it("serializes and validates extensive POWL visited playout", async () => {
+    const payload = {
+      family: "PETRI_PLAYOUT_VISITED", variant: "EXTENSIVE_PLAYOUT",
+      traces: [[
+        { kind: "marking", marking: [1, 0] },
+        { kind: "transition", transition: 0, activity: null },
+        { kind: "marking", marking: [0, 1] },
+      ]],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/playout?miner=powl");
+      expect(path).toContain("mode=extensive");
+      expect(path).toContain("max_length=3");
+      expect(path).toContain("max_marking_occ=2");
+      expect(path).toContain("return_elements=true");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchExtensivePlayoutVisited("powl", {
+      max_length: 3, max_marking_occ: 2,
+    })).resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+  });
+
   it("serializes transient controls and decodes probability distributions", async () => {
     const options = {
       analysis: "transient" as const, time_seconds: 1.5,

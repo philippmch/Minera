@@ -734,8 +734,12 @@ include a compact omega-marking graph, while bounded exploration exposes its
 deterministic reachability markings and transition edges. Positive invariant
 diagnostics expose the original, uniform-support, and relative-weight families
 separately, including coverage gaps for each family and for S-components. These
-projections are serialized by the CLI, local server, and frontend contracts; a
-complete black-box edge matrix remains open before this row can claim full parity.
+projections are serialized by the CLI, local server, and frontend contracts.
+Uniform-support vectors are retained only after rechecking the incidence
+equation, weighted vectors remain valid after normalization, and S-components
+are restricted to connected state-machine subnets rather than arbitrary
+positive supports. A complete black-box edge matrix remains open before this
+row can claim full parity.
 
 ## Extended Petri-arc evidence
 
@@ -935,6 +939,12 @@ validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless
 CLI/server smoke checks.
+
+The frontend conformance surface also exposes ordinary Petri-net playout for
+every discovered workflow-net selector, including POWL, with basic sampling,
+extensive enumeration, explicit markings, bounded steps/length, seeds, and
+optional visited-element JSON downloads. The basic and extensive POWL request
+paths share the strict native response guards and deterministic API tests.
 
 POWL-to-process-tree conversion is available through the native conversion API
 and the headless `--powl-ptml` export. Direct native conversion retains its

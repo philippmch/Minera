@@ -290,6 +290,42 @@ void positive_invariant_diagnostics() {
   }
 }
 
+void weighted_invariant_contract() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source}, {sink, sink});
+
+  const auto result = analyze_soundness(net, {.diagnostics = true});
+  assert(result.workflow.valid);
+  assert(result.place_invariant_basis.size() == 1);
+  assert(result.uniform_place_invariants.empty());
+  assert(result.uncovered_places_uniform == std::vector<std::size_t>({0, 1}));
+  assert(result.s_components.has_value() && result.s_components->empty());
+  assert(result.uncovered_places_s_component ==
+         std::vector<std::size_t>({0, 1}));
+  assert(result.weighted_place_invariants.size() == 1);
+  const auto& weighted = result.weighted_place_invariants.front();
+  assert(weighted.size() == 2);
+  assert(std::abs(weighted[0] - 2.0 * weighted[1]) < 1e-7);
+  double balance = 0.0;
+  for (const auto place : net.transitions().front().inputs)
+    balance -= weighted[place];
+  for (const auto place : net.transitions().front().outputs)
+    balance += weighted[place];
+  assert(std::abs(balance) < 1e-7);
+
+  SoundnessOptions woflan;
+  woflan.variant = SoundnessVariant::kWoflan;
+  const auto woflan_result = analyze_soundness(net, woflan);
+  assert(woflan_result.s_components.has_value() &&
+         woflan_result.s_components->empty());
+  assert(!woflan_result.left.has_value() || !*woflan_result.left);
+}
+
 void structural_pair_diagnostics() {
   const auto result = analyze_soundness(branching_pair_net(), {.diagnostics = true});
   assert(result.workflow.valid);
@@ -579,6 +615,7 @@ int main() {
   workflow_structure();
   sound_models();
   positive_invariant_diagnostics();
+  weighted_invariant_contract();
   structural_pair_diagnostics();
   woflan_short_circuit_diagnostics();
   woflan_restricted_tree_artifacts();
