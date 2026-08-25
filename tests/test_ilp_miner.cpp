@@ -104,16 +104,69 @@ int main() {
   }
   assert(rejected);
 
-  // Exponential signature growth is rejected before matrix allocation.
+  // Larger alphabets use lazy bounded region generation instead of an
+  // arbitrary fixed-width rejection.  The no-boundary form keeps the
+  // candidate count focused on the nine visible activities.
   std::vector<std::vector<std::string>> many(1);
   for (int i = 0; i < 9; ++i) many[0].push_back("activity_" + std::to_string(i));
-  bool high_cardinality_rejected = false;
-  try {
-    (void)mine_ilp(log_of(many));
-  } catch (const std::invalid_argument&) {
-    high_cardinality_rejected = true;
+  ILPMinerOptions high_cardinality;
+  high_cardinality.artificial_start_activity.clear();
+  high_cardinality.artificial_end_activity.clear();
+  const auto nine = mine_ilp(log_of(many), high_cardinality);
+  assert(nine.diagnostics.computed);
+  assert(nine.net.activities().size() == 9);
+  assert(check_workflow_net(nine.net).valid);
+  const auto nine_again = mine_ilp(log_of(many), high_cardinality);
+  assert(nine.net.place_count() == nine_again.net.place_count());
+  assert(nine.diagnostics.visited_nodes == nine_again.diagnostics.visited_nodes);
+
+  std::vector<std::vector<std::string>> twelve(1);
+  for (int i = 0; i < 12; ++i) twelve[0].push_back("activity_" + std::to_string(i));
+  ILPMinerOptions bounded_high = high_cardinality;
+  bounded_high.max_nodes = 8;
+  const auto twelve_result = mine_ilp(log_of(twelve), bounded_high);
+  assert(twelve_result.diagnostics.exhausted);
+  assert(twelve_result.diagnostics.visited_nodes <= bounded_high.max_nodes);
+  assert(twelve_result.net.activities().size() == 12);
+
+  // The dynamic signature crosses a machine-word boundary without changing
+  // activity identity or the requested causal arc.
+  std::vector<std::vector<std::string>> wide_rows(1);
+  for (int i = 0; i < 65; ++i) {
+    const auto index = i < 10 ? "0" + std::to_string(i) : std::to_string(i);
+    wide_rows[0].push_back("wide_" + index);
   }
-  assert(high_cardinality_rejected);
+  ILPMinerOptions wide_options = high_cardinality;
+  wide_options.causal_relation = {{"wide_63", "wide_64"}};
+  wide_options.max_nodes = 16;
+  const auto wide_result = mine_ilp(log_of(wide_rows), wide_options);
+  assert(wide_result.diagnostics.computed);
+  assert(wide_result.net.activities().size() == 65);
+  const auto wide_from = static_cast<std::size_t>(std::distance(
+      wide_result.net.activities().begin(),
+      std::find(wide_result.net.activities().begin(),
+                wide_result.net.activities().end(), "wide_63")));
+  const auto wide_to = static_cast<std::size_t>(std::distance(
+      wide_result.net.activities().begin(),
+      std::find(wide_result.net.activities().begin(),
+                wide_result.net.activities().end(), "wide_64")));
+  assert(wide_from < wide_result.net.activities().size());
+  assert(wide_to < wide_result.net.activities().size());
+  assert(has_arc(wide_result.net, wide_from, wide_to));
+  assert(wide_result.diagnostics.visited_nodes <= wide_options.max_nodes);
+
+  // Sparse large alphabets still respect the candidate budget before the
+  // lazy depth-first search can materialize an exponential suffix.
+  std::vector<std::vector<std::string>> sparse_wide_rows;
+  sparse_wide_rows.push_back({"sparse_00", "sparse_01"});
+  for (int i = 2; i < 24; ++i)
+    sparse_wide_rows.push_back({"sparse_" + std::to_string(i)});
+  ILPMinerOptions sparse_wide_options = high_cardinality;
+  sparse_wide_options.max_nodes = 26;
+  const auto sparse_wide = mine_ilp(log_of(sparse_wide_rows), sparse_wide_options);
+  assert(sparse_wide.diagnostics.exhausted);
+  assert(sparse_wide.diagnostics.visited_nodes == sparse_wide_options.max_nodes);
+  assert(sparse_wide.net.activities().size() == 24);
 
   // Artificial boundaries are represented as silent transitions and are not
   // leaked into the visible activity alphabet.
