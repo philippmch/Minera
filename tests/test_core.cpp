@@ -228,6 +228,58 @@ void minimum_self_distance_discovers_distances_and_witnesses() {
   assert(minera::discover_minimum_self_distances({}).empty());
 }
 
+void minimum_self_distance_supports_custom_activity_and_case_columns() {
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "native-trace";
+  trace.events = {
+      {"c1", "native-a", "", "", 0, {{"phase", "A"}, {"case_ref", "c1"}}},
+      {"c2", "native-x", "", "", 1, {{"phase", "X"}, {"case_ref", "c2"}}},
+      {"c1", "native-y", "", "", 2, {{"phase", "Y"}, {"case_ref", "c1"}}},
+      {"c1", "native-a", "", "", 3, {{"phase", "A"}, {"case_ref", "c1"}}},
+      {"c2", "native-q", "", "", 4, {{"phase", "Q"}, {"case_ref", "c2"}}},
+      {"c1", "native-z", "", "", 5, {{"phase", "Z"}, {"case_ref", "c1"}}},
+      {"c1", "native-a", "", "", 6, {{"phase", "A"}, {"case_ref", "c1"}}},
+  };
+  log.traces.push_back(trace);
+  minera::MinimumSelfDistanceOptions custom;
+  custom.activity_key = "phase";
+  custom.case_id_key = "case_ref";
+  const auto expected =
+      minera::discover_minimum_self_distances(log, custom);
+  assert(expected.size() == 1);
+  assert(expected.front().activity == "A");
+  assert(expected.front().distance == 1);
+  assert((expected.front().witnesses ==
+          std::vector<std::string>{"Y", "Z"}));
+  for (const auto variant : {minera::MinimumSelfDistanceVariant::kPandas,
+                             minera::MinimumSelfDistanceVariant::kPolars}) {
+    custom.variant = variant;
+    const auto actual = minera::discover_minimum_self_distances(log, custom);
+    assert(actual.size() == expected.size());
+    assert(actual.front().activity == expected.front().activity &&
+           actual.front().distance == expected.front().distance &&
+           actual.front().witnesses == expected.front().witnesses);
+  }
+
+  trace.events[2].attributes = {{"phase", "A"}, {"case_ref", "c1"}};
+  trace.events[3].attributes = {{"phase", "A"}, {"case_ref", "c1"}};
+  log.traces.front() = trace;
+  custom.variant = minera::MinimumSelfDistanceVariant::kLog;
+  const auto zero = minera::discover_minimum_self_distances(log, custom);
+  assert(zero.size() == 1 && zero.front().distance == 0 &&
+         zero.front().witnesses.empty());
+
+  custom.activity_key = "missing";
+  bool threw = false;
+  try {
+    (void)minera::discover_minimum_self_distances(log, custom);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void minimum_self_distance_json_resolves_ids_and_validates_before_writing() {
   minera::EventLog log;
   log.traces = {{"t", {{"", "A", "", "", 0}, {"", "B", "", "", 1},
@@ -5519,6 +5571,7 @@ int main() {
   process_tree_alignment_json_carries_failure_and_moves();
   temporal_profile_discovers_all_pairs_and_stats();
   minimum_self_distance_discovers_distances_and_witnesses();
+  minimum_self_distance_supports_custom_activity_and_case_columns();
   minimum_self_distance_json_resolves_ids_and_validates_before_writing();
   temporal_profile_scales_to_many_activities();
   temporal_profile_skips_bad_timestamps_and_checks_deviations();

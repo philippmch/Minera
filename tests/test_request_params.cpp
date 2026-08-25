@@ -2233,6 +2233,8 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"batch_min_size", "3"},
       {"batch_start_timestamp_attribute", "started_at"},
       {"minimum_self_distance_variant", "polars"},
+      {"minimum_self_distance_activity_key", "phase"},
+      {"minimum_self_distance_case_id_key", "case_ref"},
   }));
   assert((params.spectrum_activities == std::vector<std::string>{"A", "B"}));
   assert(params.spectrum.variant == minera::PerformanceSpectrumVariant::kDisconnected);
@@ -2248,6 +2250,8 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.batch_options.start_timestamp_attribute == "started_at");
   assert(params.minimum_self_distance.variant ==
          minera::MinimumSelfDistanceVariant::kPolars);
+  assert(params.minimum_self_distance.activity_key == "phase");
+  assert(params.minimum_self_distance.case_id_key == "case_ref");
 }
 
 void parse_mine_params_maps_overlap_options() {
@@ -2298,6 +2302,24 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
       threw = true;
     }
     assert(threw);
+  }
+  for (const auto& name : {std::string("minimum_self_distance_activity_key"),
+                           std::string("minimum_self_distance_case_id_key")}) {
+    const std::map<std::string, std::string> empty_value = {{name, ""}};
+    const auto lookup = [&empty_value](std::string_view key) -> std::string {
+      const auto it = empty_value.find(std::string(key));
+      return it == empty_value.end() ? std::string{} : it->second;
+    };
+    const auto present = [&empty_value](std::string_view key) {
+      return empty_value.contains(std::string(key));
+    };
+    bool empty_threw = false;
+    try {
+      (void)minera::parse_mine_params(lookup, present);
+    } catch (const std::invalid_argument&) {
+      empty_threw = true;
+    }
+    assert(empty_threw);
   }
   const std::map<std::string, std::string> empty = {{"spectrum_activities", ""}};
   const auto lookup = [&empty](std::string_view key) -> std::string {

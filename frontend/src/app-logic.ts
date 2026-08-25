@@ -112,6 +112,8 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       || spectrumActive
       || (options.batches === true)
       || (options.minimumSelfDistanceVariant && options.minimumSelfDistanceVariant !== "log")
+      || Boolean(options.minimumSelfDistanceActivityKey?.trim())
+      || Boolean(options.minimumSelfDistanceCaseIdKey?.trim())
       || (options.overlap === true)
   );
 }

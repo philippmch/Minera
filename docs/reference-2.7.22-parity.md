@@ -1623,7 +1623,10 @@ number of member events and retains trace/event identities so duplicate
 timestamp/case tuples are not collapsed.
 
 Minimum self-distance discovery exposes LOG, PANDAS, and POLARS selectors
-through the same deterministic witness calculation. The selector is carried
+through the same deterministic witness calculation. Configurable activity and
+case-id columns are resolved from native fields or event/trace attributes;
+interleaved case values are grouped by the selected case column, while witness
+events remain limited to that case. The selector and columns are carried
 through strict request parsing, CLI, local server, JSON metadata, and the
 frontend controls; all three adapters preserve the activity, distance, and
 witness contract.

@@ -19,6 +19,10 @@ enum class MinimumSelfDistanceVariant {
 
 struct MinimumSelfDistanceOptions {
   MinimumSelfDistanceVariant variant = MinimumSelfDistanceVariant::kLog;
+  // Event activity and case-id selectors. Built-in aliases use the native
+  // first-class fields; other names resolve typed event/trace attributes.
+  std::string activity_key = "concept:name";
+  std::string case_id_key = "case:concept:name";
 };
 
 struct MinimumSelfDistance {
