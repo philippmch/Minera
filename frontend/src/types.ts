@@ -3308,8 +3308,12 @@ export interface PetriAnalysisResult {
   uncovered_places_uniform?: number[];
   uncovered_places_weighted?: number[];
   uncovered_places_s_component?: number[];
+  left?: boolean | null;
   coverability_markings?: number[][];
   coverability_edges?: number[][];
+  restricted_coverability_tree_exhausted?: boolean;
+  restricted_coverability_markings?: number[][];
+  restricted_coverability_edges?: number[][];
   reachability_markings?: number[][];
   reachability_edges?: number[][];
   short_circuit_valid?: boolean;
@@ -3351,6 +3355,11 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if ("short_circuit_reachability_strongly_connected" in value &&
       value.short_circuit_reachability_strongly_connected !== undefined &&
       typeof value.short_circuit_reachability_strongly_connected !== "boolean") return false;
+  if ("left" in value && value.left !== undefined && value.left !== null &&
+      typeof value.left !== "boolean") return false;
+  if ("restricted_coverability_tree_exhausted" in value &&
+      value.restricted_coverability_tree_exhausted !== undefined &&
+      typeof value.restricted_coverability_tree_exhausted !== "boolean") return false;
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;
@@ -3363,6 +3372,8 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     uncovered_places?: unknown; uncovered_places_uniform?: unknown;
     uncovered_places_weighted?: unknown; uncovered_places_s_component?: unknown;
     coverability_markings?: unknown; coverability_edges?: unknown;
+    restricted_coverability_markings?: unknown;
+    restricted_coverability_edges?: unknown;
     reachability_markings?: unknown; reachability_edges?: unknown;
     short_circuit_diagnostic_messages?: unknown;
     short_circuit_reachability_markings?: unknown;
@@ -3406,8 +3417,10 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     validPlaces(result.uncovered_places_weighted) &&
     validPlaces(result.uncovered_places_s_component) &&
     validMarkings(result.coverability_markings, true) &&
+    validMarkings(result.restricted_coverability_markings, true) &&
     validMarkings(result.reachability_markings, false) &&
     validGraphEdges(result.coverability_edges) &&
+    validGraphEdges(result.restricted_coverability_edges) &&
     validGraphEdges(result.reachability_edges) && validMessages &&
     validMarkings(result.short_circuit_reachability_markings, false) &&
     validGraphEdges(result.short_circuit_reachability_edges);

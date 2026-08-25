@@ -693,6 +693,13 @@ Bounded exploration also returns every shortest path to a marking that cannot
 reach the final marking as `locking_scenarios`, alongside the compact first
 witness and the `dead_tasks` alias for never-enabled transitions. Every pair
 coordinate also has a stable place/transition input-output label for renderers.
+Woflan now also exposes its `left` decision and a deterministic restricted
+coverability-tree projection. The tree preserves one first-seen edge per
+transition at each node, accelerates only against ancestors using the omega
+marker `-1`, reports explicit state-cap exhaustion, and is kept separate from
+the minimal coverability graph. These artifacts are available in the native
+result, JSON envelope, and frontend response guard for both bounded and
+unbounded workflow diagnostics.
 The extended equation keeps trace events in
 ordered segments, assigns each event to a synchronous or log move, constrains
 segment-boundary markings, and solves the resulting integer state equation with
