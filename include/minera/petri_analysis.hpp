@@ -155,11 +155,21 @@ struct SoundnessResult {
   std::vector<std::vector<double>> weighted_place_invariants;
   std::vector<std::size_t> uncovered_places_weighted;
   std::vector<std::size_t> uncovered_places_s_component;
+  // Woflan's left diagnostic records whether the structural/invariant
+  // checks permit continuing to behavioral soundness analysis.  It is
+  // disengaged when the Woflan pipeline cannot reach that step.
+  std::optional<bool> left;
   // Compact graph projections used by soundness diagnostics.  Coverability
   // markings use -1 for an omega coordinate; graph edges are
   // [source_node, target_node, transition_id].
   std::vector<Marking> coverability_markings;
   std::vector<std::vector<std::size_t>> coverability_edges;
+  // Restricted coverability tree used by Woflan to expose shortest paths to
+  // unbounded or improper regions.  Markings use the same -1 omega encoding
+  // as the minimal coverability projection above.
+  bool restricted_coverability_tree_exhausted = false;
+  std::vector<Marking> restricted_coverability_markings;
+  std::vector<std::vector<std::size_t>> restricted_coverability_edges;
   std::vector<Marking> reachability_markings;
   std::vector<std::vector<std::size_t>> reachability_edges;
   // For workflow nets, supports of the positive P-invariants above.  The

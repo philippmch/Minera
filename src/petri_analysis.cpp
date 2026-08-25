@@ -982,6 +982,147 @@ CoverabilityResult coverability_search(const PetriNet& net,
   return result;
 }
 
+// Woflan also exposes a restricted coverability tree.  It deliberately keeps
+// one outgoing edge per transition at each tree node and suppresses markings
+// already seen anywhere in the tree.  This differs from the minimal
+// coverability projection above: the tree preserves a deterministic witness
+// branch for each first-seen transition and accelerates only against its
+// ancestors.
+struct RestrictedCoverabilityResult {
+  bool exhausted = false;
+  std::vector<Marking> markings;
+  std::vector<std::vector<std::size_t>> edges;
+};
+
+bool restricted_marking_leq(const Marking& lhs, const Marking& rhs) {
+  if (lhs.size() != rhs.size()) return false;
+  for (std::size_t place = 0; place < lhs.size(); ++place) {
+    if (rhs[place] == kOmega) continue;
+    if (lhs[place] == kOmega || lhs[place] > rhs[place]) return false;
+  }
+  return true;
+}
+
+bool restricted_fire(const Marking& marking, const PetriTransition& transition,
+                     Marking& next) {
+  // The graph construction in the reference is defined for ordinary arcs.
+  // Extended arcs are reported as an unavailable tree rather than being
+  // silently interpreted with ordinary incidence semantics.
+  if (!transition.reset_inputs.empty() || !transition.inhibitor_inputs.empty())
+    return false;
+  std::vector<std::size_t> required(marking.size(), 0);
+  for (const auto place : transition.inputs) {
+    if (place >= marking.size()) return false;
+    if (marking[place] != kOmega) {
+      ++required[place];
+      if (marking[place] < static_cast<std::int64_t>(required[place]))
+        return false;
+    }
+  }
+  next = marking;
+  for (const auto place : transition.inputs)
+    if (next[place] != kOmega) --next[place];
+  for (const auto place : transition.outputs) {
+    if (next[place] == kOmega) continue;
+    if (next[place] == std::numeric_limits<std::int64_t>::max()) return false;
+    ++next[place];
+  }
+  return true;
+}
+
+RestrictedCoverabilityResult restricted_coverability_search(
+    const PetriNet& net, const Marking& initial, std::size_t max_nodes) {
+  RestrictedCoverabilityResult result;
+  if (net.has_extended_arcs()) {
+    result.exhausted = true;
+    return result;
+  }
+
+  struct Node {
+    Marking marking;
+    std::size_t parent;
+    std::size_t transition;
+  };
+  std::vector<Node> nodes{{initial, std::numeric_limits<std::size_t>::max(),
+                           std::numeric_limits<std::size_t>::max()}};
+  std::map<Marking, std::size_t> seen{{initial, 0}};
+  std::vector<std::vector<std::pair<std::size_t, std::size_t>>> edges(1);
+
+  const auto snapshot = [&]() {
+    result.markings.clear();
+    result.markings.reserve(nodes.size());
+    for (const auto& node : nodes) result.markings.push_back(node.marking);
+    result.edges.clear();
+    for (std::size_t from = 0; from < edges.size(); ++from)
+      for (const auto [to, transition] : edges[from])
+        result.edges.push_back({from, to, transition});
+  };
+
+  bool new_arc = true;
+  while (new_arc) {
+    new_arc = false;
+    std::size_t selected_node = std::numeric_limits<std::size_t>::max();
+    std::size_t selected_transition = std::numeric_limits<std::size_t>::max();
+    Marking selected_marking;
+
+    // The reference walks the current node list from the newest node toward
+    // the root and takes the first admissible transition in transition order.
+    for (std::size_t node = nodes.size(); node-- > 0;) {
+      if (std::find(nodes[node].marking.begin(), nodes[node].marking.end(),
+                    kOmega) != nodes[node].marking.end())
+        continue;
+      for (std::size_t transition = 0;
+           transition < net.transitions().size(); ++transition) {
+        Marking next;
+        if (!restricted_fire(nodes[node].marking,
+                             net.transitions()[transition], next))
+          continue;
+        if (seen.find(next) != seen.end()) continue;
+        const bool transition_used = std::any_of(
+            edges[node].begin(), edges[node].end(),
+            [transition](const auto edge) { return edge.second == transition; });
+        if (transition_used) continue;
+        selected_node = node;
+        selected_transition = transition;
+        selected_marking = std::move(next);
+        new_arc = true;
+        break;
+      }
+      if (new_arc) break;
+    }
+    if (!new_arc) break;
+
+    // Mark every coordinate that strictly increases over an ancestor as
+    // omega.  Ancestor order is nearest first, matching the tree contract.
+    for (std::size_t ancestor = nodes[selected_node].parent;
+         ancestor != std::numeric_limits<std::size_t>::max();
+         ancestor = nodes[ancestor].parent) {
+      if (!restricted_marking_leq(nodes[ancestor].marking, selected_marking))
+        continue;
+      for (std::size_t place = 0; place < selected_marking.size(); ++place) {
+        if (nodes[ancestor].marking[place] != kOmega &&
+            selected_marking[place] != kOmega &&
+            nodes[ancestor].marking[place] < selected_marking[place])
+          selected_marking[place] = kOmega;
+      }
+    }
+
+    if (nodes.size() >= max_nodes) {
+      result.exhausted = true;
+      break;
+    }
+    const auto next_node = nodes.size();
+    nodes.push_back({std::move(selected_marking), selected_node,
+                     selected_transition});
+    edges.emplace_back();
+    edges[selected_node].push_back({next_node, selected_transition});
+    seen[nodes.back().marking] = next_node;
+  }
+
+  snapshot();
+  return result;
+}
+
 }  // namespace
 
 WorkflowMarkings default_workflow_markings(const PetriNet& net) {
@@ -1383,6 +1524,18 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
   result.structural_node_labels = structural_node_labels(*structural_net);
   result.handled_pairs = structural_pair_diagnostics(*structural_net);
+  if (options.variant == SoundnessVariant::kWoflan &&
+      result.s_components.has_value()) {
+    if (result.uncovered_places_s_component.empty()) {
+      result.left = true;
+    } else if (!options.return_asap_when_unsound) {
+      // The structural pair stage is the next Woflan decision point when
+      // invariant coverage is incomplete.  A non-empty diagnostic set keeps
+      // the pipeline on the behavioral path; an empty set proves it cannot.
+      result.left = result.handled_pairs.has_value() &&
+                    !result.handled_pairs->empty();
+    }
+  }
   if (options.max_states == 0)
     throw std::invalid_argument("max_states must be positive");
   const auto markings = woflan_markings
@@ -1415,6 +1568,13 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     }
   }
   const PetriNet* coverability_net = short_circuited ? &*short_circuited : &net;
+  if (options.variant == SoundnessVariant::kWoflan) {
+    const auto restricted = restricted_coverability_search(
+        *coverability_net, markings.initial, options.max_states);
+    result.restricted_coverability_tree_exhausted = restricted.exhausted;
+    result.restricted_coverability_markings = restricted.markings;
+    result.restricted_coverability_edges = restricted.edges;
+  }
   const auto coverability = coverability_search(
       *coverability_net, markings.initial, options.max_states);
   result.coverability_markings = coverability.markings;

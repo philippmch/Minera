@@ -386,6 +386,64 @@ void woflan_short_circuit_diagnostics() {
   assert(invalid_result.status == SoundnessStatus::UNSOUND);
 }
 
+void woflan_restricted_tree_artifacts() {
+  SoundnessOptions options;
+  options.variant = SoundnessVariant::kWoflan;
+  options.diagnostics = true;
+  const auto result = analyze_soundness(chain(), options);
+  assert(result.left.has_value() && *result.left);
+  assert(!result.restricted_coverability_tree_exhausted);
+  const std::vector<Marking> expected_markings = {
+      {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+  const std::vector<std::vector<std::size_t>> expected_edges = {
+      {0, 1, 0}, {1, 2, 1}};
+  assert(result.restricted_coverability_markings == expected_markings);
+  assert(result.restricted_coverability_edges == expected_edges);
+  const auto json = petri_analysis_json(result);
+  assert(json.find("\"left\":true") != std::string::npos);
+  assert(json.find("\"restricted_coverability_markings\"") !=
+         std::string::npos);
+
+  PetriNet growing;
+  growing.set_activities({"start", "grow", "finish"});
+  const auto source = growing.add_place();
+  const auto middle = growing.add_place();
+  const auto sink = growing.add_place();
+  growing.set_source(source);
+  growing.set_sink(sink);
+  growing.add_transition(0, {source}, {middle});
+  growing.add_transition(1, {middle}, {middle, middle});
+  growing.add_transition(2, {middle}, {sink});
+  const auto unbounded = analyze_soundness(growing, options);
+  assert(!unbounded.restricted_coverability_markings.empty());
+  assert(std::any_of(
+      unbounded.restricted_coverability_markings.begin(),
+      unbounded.restricted_coverability_markings.end(), [](const auto& marking) {
+        return std::any_of(marking.begin(), marking.end(),
+                           [](const auto value) { return value == -1; });
+      }));
+
+  SoundnessOptions capped = options;
+  capped.max_states = 2;
+  const auto limited = analyze_soundness(chain(), capped);
+  assert(limited.restricted_coverability_tree_exhausted);
+  assert(limited.restricted_coverability_markings.size() == 2);
+
+  PetriNet extended;
+  extended.set_activities({"A", "B"});
+  const auto ep0 = extended.add_place();
+  const auto ep1 = extended.add_place();
+  const auto ep2 = extended.add_place();
+  extended.set_source(ep0);
+  extended.set_sink(ep2);
+  extended.add_transition(0, {ep0}, {ep1});
+  extended.add_transition(1, {ep1}, {ep2});
+  extended.add_reset_arc(1, ep0);
+  const auto extended_result = analyze_soundness(extended, options);
+  assert(extended_result.restricted_coverability_tree_exhausted);
+  assert(extended_result.restricted_coverability_markings.empty());
+}
+
 void unsound_models() {
   PetriNet improper; improper.set_activities({"A"});
   const auto s = improper.add_place(), extra = improper.add_place(), sink = improper.add_place();
@@ -523,6 +581,7 @@ int main() {
   positive_invariant_diagnostics();
   structural_pair_diagnostics();
   woflan_short_circuit_diagnostics();
+  woflan_restricted_tree_artifacts();
   unsound_models();
   caps_markings_determinism_and_weights();
 }

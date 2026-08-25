@@ -69,6 +69,11 @@ std::string optional_number(const std::optional<std::size_t>& value) {
   return value ? std::to_string(*value) : "null";
 }
 
+std::string optional_bool(const std::optional<bool>& value) {
+  if (!value) return "null";
+  return *value ? "true" : "false";
+}
+
 std::string index_vectors(
     const std::vector<std::vector<std::size_t>>& values) {
   std::ostringstream out;
@@ -253,10 +258,17 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << numbers(result.uncovered_places_weighted)
       << ",\"uncovered_places_s_component\":"
       << numbers(result.uncovered_places_s_component)
+      << ",\"left\":" << optional_bool(result.left)
       << ",\"coverability_markings\":"
       << markings(result.coverability_markings)
       << ",\"coverability_edges\":"
       << index_vectors(result.coverability_edges)
+      << ",\"restricted_coverability_tree_exhausted\":"
+      << (result.restricted_coverability_tree_exhausted ? "true" : "false")
+      << ",\"restricted_coverability_markings\":"
+      << markings(result.restricted_coverability_markings)
+      << ",\"restricted_coverability_edges\":"
+      << index_vectors(result.restricted_coverability_edges)
       << ",\"reachability_markings\":"
       << markings(result.reachability_markings)
       << ",\"reachability_edges\":"

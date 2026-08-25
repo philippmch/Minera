@@ -402,6 +402,10 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
       uncovered_places_uniform: [],
       coverability_markings: [[1, 0], [-1, 0]],
       coverability_edges: [[0, 1, 0]],
+      left: true,
+      restricted_coverability_tree_exhausted: false,
+      restricted_coverability_markings: [[1, 0], [-1, 0]],
+      restricted_coverability_edges: [[0, 1, 0]],
       reachability_markings: [[1, 0], [0, 1]],
       reachability_edges: [[0, 1, 2]],
     })).toBe(true);
@@ -422,6 +426,18 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
     })).toBe(false);
     expect(isPetriAnalysisResult({
       family: "soundness", weighted_place_invariants: [[1, Number.NaN]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "woflan", left: "true",
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "woflan", restricted_coverability_tree_exhausted: "false",
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "woflan", restricted_coverability_markings: [[1, -2]],
+    })).toBe(false);
+    expect(isPetriAnalysisResult({
+      family: "woflan", restricted_coverability_edges: [[0, 1]],
     })).toBe(false);
   });
 
