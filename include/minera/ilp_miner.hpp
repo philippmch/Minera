@@ -29,6 +29,8 @@ struct ILPMinerOptions {
   // Optional ordered causal pairs (source activity, target activity).  When
   // present, these pairs define the bounded candidate region search.
   std::vector<std::pair<std::string, std::string>> causal_relation;
+  // Bounds lazy region candidates rather than imposing a fixed activity
+  // cardinality ceiling; larger alphabets remain usable with a smaller cap.
   std::size_t max_nodes = 100000;
 };
 

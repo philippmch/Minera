@@ -991,7 +991,11 @@ an exhaustive arc list: the bounded search may add compatible producer or
 consumer arcs when a composite region is needed to satisfy all retained trace
 markings. Each supplied pair is optimized independently, with exact duplicate
 regions removed after selection; explicit pair places use zero initial/final
-markings so they survive workflow-net assembly.
+markings so they survive workflow-net assembly. Region signatures use
+arbitrary-width bit vectors and are generated lazily in deterministic depth-
+first order, so nine-or-more activity alphabets no longer fail solely because
+a fixed-width signature table would be too large; `max_nodes` bounds candidate
+work and diagnostics before a large candidate table is allocated.
 
 Strict request parsing, standalone CLI flags, the cached-session local-server
 endpoint, and typed frontend query serialization cover activity/boundary keys,
