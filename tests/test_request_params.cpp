@@ -2611,7 +2611,12 @@ void parse_dfg_playout_params_maps_controls_and_aliases() {
       {"dfg_playout_case_arrival_rate", "1.5"},
       {"dfg_playout_seed", "7"},
       {"dfg_playout_max_steps", "99"},
-      {"dfg_playout_start_time", "2026-01-01T00:00:00Z"}}));
+      {"dfg_playout_start_time", "2026-01-01T00:00:00Z"},
+      {"dfg_playout_activity_key", "event:name"},
+      {"dfg_playout_timestamp_key", "event:when"},
+      {"dfg_playout_case_id_key", "case:external_id"},
+      {"dfg_playout_artificial_start_activity", "BEGIN"},
+      {"dfg_playout_artificial_end_activity", "FINISH"}}));
   assert(parsed.variant == minera::DfgPlayoutVariant::kPerformance);
   assert(parsed.max_variants == 12 && parsed.min_weighted_probability == 0.25);
   assert(parsed.max_occurrences_per_activity == 4 &&
@@ -2622,6 +2627,11 @@ void parse_dfg_playout_params_maps_controls_and_aliases() {
   assert(parsed.traces == 20 && parsed.case_arrival_rate == 1.5 &&
          parsed.seed == 7 && parsed.max_events_per_trace == 99);
   assert(parsed.start_time == "2026-01-01T00:00:00Z");
+  assert(parsed.activity_key == "event:name" &&
+         parsed.timestamp_key == "event:when" &&
+         parsed.case_id_key == "case:external_id");
+  assert(parsed.artificial_start_activity == "BEGIN" &&
+         parsed.artificial_end_activity == "FINISH");
 }
 
 void parse_dfg_playout_params_rejects_invalid_bounds() {
@@ -2634,6 +2644,18 @@ void parse_dfg_playout_params_rejects_invalid_bounds() {
     bool threw = false;
     try {
       (void)minera::parse_dfg_playout_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  for (const auto& name : {std::string("dfg_playout_activity_key"),
+                           std::string("dfg_playout_artificial_end_activity")}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_dfg_playout_params(
+          fields({{name, ""}}),
+          [&](std::string_view field) { return field == name; });
     } catch (const std::invalid_argument&) {
       threw = true;
     }

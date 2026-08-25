@@ -269,6 +269,92 @@ void classic_completion_flag_controls_early_stop() {
   assert(stopped.counts.size() < all.counts.size());
 }
 
+void custom_attribute_keys_are_emitted_for_both_variants() {
+  DfgFrequency dfg{{{"A", "B"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}};
+  minera::DfgPlayoutOptions options;
+  options.max_variants = 1;
+  options.activity_key = "event:name";
+  options.timestamp_key = "event:when";
+  options.case_id_key = "case:external_id";
+  options.artificial_start_activity = "BEGIN";
+  options.artificial_end_activity = "FINISH";
+  const auto classic = minera::dfg_playout(dfg, starts, ends, options);
+  assert(classic.traces.size() == 1);
+  assert(classic.traces.front().attribute("case:external_id") != nullptr);
+  const auto& event = classic.traces.front().events.front();
+  assert(event.attribute("event:name") != nullptr);
+  assert(*event.attribute("event:name") == "A");
+  assert(event.attribute("event:when") != nullptr);
+  assert(*event.attribute("event:when") == event.timestamp);
+
+  minera::DfgPerformance performance;
+  minera::DfgPerformanceStatistics statistics;
+  statistics.summary.mean = 0.0;
+  statistics.value = 0.0;
+  performance[{"A", "B"}] = statistics;
+  options.variant = minera::DfgPlayoutVariant::kPerformance;
+  options.traces = 2;
+  options.max_events_per_trace = 2;
+  const auto sampled =
+      minera::dfg_playout(dfg, starts, ends, options, &performance);
+  assert(sampled.traces.size() == 2);
+  assert(sampled.traces.front().attribute("case:external_id") != nullptr);
+  assert(sampled.traces.front().events.size() == 2);
+  assert(sampled.traces.front().events.back().attribute("event:name") !=
+         nullptr);
+}
+
+void performance_boundary_labels_are_collision_safe() {
+  DfgFrequency dfg{{{"▶", "■"}, 1}};
+  DfgActivityCounts starts{{"▶", 1}};
+  DfgActivityCounts ends{{"■", 1}};
+  minera::DfgPerformance performance;
+  minera::DfgPerformanceStatistics statistics;
+  statistics.summary.mean = 0.0;
+  statistics.value = 0.0;
+  performance[{"▶", "■"}] = statistics;
+  minera::DfgPlayoutOptions options;
+  options.variant = minera::DfgPlayoutVariant::kPerformance;
+  options.traces = 3;
+  options.max_events_per_trace = 3;
+  options.artificial_start_activity = "▶";
+  options.artificial_end_activity = "▶";
+  const auto log =
+      minera::dfg_playout(dfg, starts, ends, options, &performance);
+  assert(log.traces.size() == 3);
+  for (const auto& trace : log.traces) {
+    assert(trace.events.size() == 2);
+    assert(trace.events[0].activity == "▶");
+    assert(trace.events[1].activity == "■");
+  }
+}
+
+void custom_dfg_keys_reject_empty_values() {
+  DfgFrequency dfg{{{"A", "B"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends{{"B", 1}};
+  minera::DfgPlayoutOptions options;
+  options.activity_key.clear();
+  bool threw = false;
+  try {
+    (void)minera::dfg_playout(dfg, starts, ends, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  options = {};
+  options.artificial_end_activity.clear();
+  threw = false;
+  try {
+    (void)minera::dfg_playout(dfg, starts, ends, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -284,4 +370,7 @@ int main() {
   classic_result_complete_only_suppresses_partial_counts();
   performance_result_keeps_legacy_log_without_variant_counts();
   classic_completion_flag_controls_early_stop();
+  custom_attribute_keys_are_emitted_for_both_variants();
+  performance_boundary_labels_are_collision_safe();
+  custom_dfg_keys_reject_empty_values();
 }

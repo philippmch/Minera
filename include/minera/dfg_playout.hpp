@@ -31,6 +31,17 @@ struct DfgPlayoutOptions {
   std::uint64_t seed = 1;
   std::size_t max_events_per_trace = 1000;
   std::string start_time = "2026-01-01T00:00:00Z";
+  // Attribute names used by generated traces/events. The first-class native
+  // fields remain populated for compatibility; non-standard names are also
+  // emitted as typed generic attributes.
+  std::string activity_key = "concept:name";
+  std::string timestamp_key = "time:timestamp";
+  std::string case_id_key = "case:concept:name";
+  // Synthetic boundary labels are kept as distinct internal nodes during
+  // performance sampling, so labels that occur as real activities (or equal
+  // labels) do not change the generated language.
+  std::string artificial_start_activity = "▶";
+  std::string artificial_end_activity = "■";
   // Compatibility spelling accepted by the request adapters.
   std::size_t max_steps = 0;
 };

@@ -65,6 +65,16 @@ double performance_mean(const DfgPerformance* performance,
 
 void validate_options(const DfgPlayoutOptions& options,
                       const DfgPerformance* performance) {
+  if (options.activity_key.empty() || options.timestamp_key.empty() ||
+      options.case_id_key.empty()) {
+    throw std::invalid_argument(
+        "DFG playout attribute keys must not be empty");
+  }
+  if (options.artificial_start_activity.empty() ||
+      options.artificial_end_activity.empty()) {
+    throw std::invalid_argument(
+        "DFG playout artificial boundary labels must not be empty");
+  }
   if (!std::isfinite(options.min_weighted_probability) ||
       options.min_weighted_probability < 0.0 ||
       options.min_weighted_probability > 1.0) {
@@ -111,13 +121,33 @@ void validate_options(const DfgPlayoutOptions& options,
 }
 
 Event make_event(const std::string& case_id, const std::string& activity,
-                 double instant, std::size_t order) {
+                 double instant, std::size_t order,
+                 const DfgPlayoutOptions& options) {
   Event event;
   event.case_id = case_id;
   event.activity = activity;
   event.timestamp = format_timestamp(instant);
   event.input_order = order;
+  if (options.activity_key != "activity" &&
+      options.activity_key != "concept:name") {
+    event.attributes.push_back(
+        {options.activity_key, activity, AttributeKind::kString});
+  }
+  if (options.timestamp_key != "timestamp" &&
+      options.timestamp_key != "time:timestamp") {
+    event.attributes.push_back(
+        {options.timestamp_key, event.timestamp, AttributeKind::kDate});
+  }
   return event;
+}
+
+void add_case_id_attribute(Trace& trace, const DfgPlayoutOptions& options) {
+  if (options.case_id_key == "case_id" ||
+      options.case_id_key == "concept:name") {
+    return;
+  }
+  trace.attributes.push_back(
+      {options.case_id_key, trace.case_id, AttributeKind::kString});
 }
 
 std::uint64_t variant_occurrence_count(double probability,
@@ -264,6 +294,7 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
         Trace trace;
         trace.case_id =
             "case_" + std::to_string(result.log.traces.size() + 1);
+        add_case_id_attribute(trace, options);
         trace.attributes.push_back(
             {"probability", std::to_string(probability), AttributeKind::kFloat});
         trace.attributes.push_back(
@@ -283,7 +314,7 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
                           static_cast<double>(result.log.traces.size());
         for (const auto& activity : state.activities) {
           trace.events.push_back(make_event(trace.case_id, activity, instant,
-                                            trace.events.size()));
+                                            trace.events.size(), options));
           instant += 1.0;
         }
         result.log.traces.push_back(std::move(trace));
@@ -321,17 +352,27 @@ EventLog performance_playout(const DfgFrequency& frequency,
   EventLog log;
   if (options.traces == 0 || options.max_events_per_trace == 0) return log;
   std::mt19937_64 rng(options.seed);
-  std::vector<std::string> start_names;
-  std::vector<double> start_weights;
-  for (const auto& [activity, count] : starts) {
-    if (count == 0) continue;
-    start_names.push_back(activity);
-    start_weights.push_back(static_cast<double>(count));
-  }
-  if (start_names.empty()) return log;
+  // Prefix the boundary labels so they cannot alias real activity names.
+  // The labels still define the two synthetic nodes, matching the public
+  // parameter contract while keeping collision behavior deterministic.
+  const auto boundary_node = [](std::string_view kind,
+                                const std::string& label) {
+    return std::string("\x01minera-dfg-boundary:") + std::string(kind) + ":" +
+           label;
+  };
+  const std::string start_node =
+      boundary_node("start", options.artificial_start_activity);
+  const std::string end_node =
+      boundary_node("end", options.artificial_end_activity);
   std::map<std::string, std::vector<std::pair<std::string, std::uint64_t>>> out;
   for (const auto& [edge, count] : frequency) {
     if (count != 0) out[edge.first].push_back({edge.second, count});
+  }
+  for (const auto& [activity, count] : starts) {
+    if (count != 0) out[start_node].push_back({activity, count});
+  }
+  for (const auto& [activity, count] : ends) {
+    if (count != 0) out[activity].push_back({end_node, count});
   }
   for (auto& [source, choices] : out) {
     (void)source;
@@ -343,13 +384,10 @@ EventLog performance_playout(const DfgFrequency& frequency,
   for (std::size_t trace_index = 0; trace_index < options.traces; ++trace_index) {
     Trace trace;
     trace.case_id = "case_" + std::to_string(trace_index + 1);
+    add_case_id_attribute(trace, options);
     double instant = base + static_cast<double>(trace_index) * options.case_arrival_rate;
-    std::discrete_distribution<std::size_t> pick_start(start_weights.begin(),
-                                                         start_weights.end());
-    std::string current = start_names[pick_start(rng)];
+    std::string current = start_node;
     for (std::size_t step = 0; step < options.max_events_per_trace; ++step) {
-      trace.events.push_back(make_event(trace.case_id, current, instant,
-                                        trace.events.size()));
       const auto it = out.find(current);
       std::vector<std::string> names;
       std::vector<double> weights;
@@ -359,21 +397,18 @@ EventLog performance_playout(const DfgFrequency& frequency,
           weights.push_back(static_cast<double>(count));
         }
       }
-      const auto end_it = ends.find(current);
-      if (end_it != ends.end() && end_it->second != 0) {
-        names.push_back({});
-        weights.push_back(static_cast<double>(end_it->second));
-      }
       if (names.empty()) break;
       std::discrete_distribution<std::size_t> pick(weights.begin(), weights.end());
       const auto selected = pick(rng);
       const std::string next = names[selected];
-      const double mean = next.empty()
+      const double mean = next == end_node
                               ? 0.0
                               : performance_mean(performance, {current, next});
       if (mean > 0.0) instant += std::exponential_distribution<double>(1.0 / mean)(rng);
-      if (next.empty()) break;
+      if (next == end_node || next.empty()) break;
       current = next;
+      trace.events.push_back(make_event(trace.case_id, current, instant,
+                                        trace.events.size(), options));
     }
     log.traces.push_back(std::move(trace));
   }

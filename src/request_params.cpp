@@ -2533,6 +2533,18 @@ DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field,
     params.max_events_per_trace = positive("dfg_playout_max_steps");
   if (supplied("dfg_playout_start_time"))
     params.start_time = require("dfg_playout_start_time");
+  if (supplied("dfg_playout_activity_key"))
+    params.activity_key = require("dfg_playout_activity_key");
+  if (supplied("dfg_playout_timestamp_key"))
+    params.timestamp_key = require("dfg_playout_timestamp_key");
+  if (supplied("dfg_playout_case_id_key"))
+    params.case_id_key = require("dfg_playout_case_id_key");
+  if (supplied("dfg_playout_artificial_start_activity"))
+    params.artificial_start_activity =
+        require("dfg_playout_artificial_start_activity");
+  if (supplied("dfg_playout_artificial_end_activity"))
+    params.artificial_end_activity =
+        require("dfg_playout_artificial_end_activity");
   return params;
 }
 
