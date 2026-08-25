@@ -5392,6 +5392,7 @@ int main(int argc, char** argv) {
           options.initial_marking = request.initial_marking;
           options.final_marking = request.final_marking;
           options.max_states = request.max_states;
+          options.invariant_search_limit = request.invariant_search_limit;
           options.diagnostics = request.diagnostics;
           options.return_asap_when_unsound = request.return_asap_when_unsound;
           result_json = minera::petri_analysis_json(

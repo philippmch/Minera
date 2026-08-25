@@ -2820,6 +2820,7 @@ export interface PetriAnalysisOptions {
   split_indices?: number[];
   max_k?: number;
   max_states?: number;
+  invariant_search_limit?: number;
   full_bootstrap?: boolean;
   diagnostics?: boolean;
   return_asap_when_unsound?: boolean;
@@ -3330,6 +3331,7 @@ export interface PetriAnalysisResult {
   weighted_place_invariants?: number[][];
   uncovered_places?: number[];
   uncovered_places_uniform?: number[];
+  uniform_invariant_search_exhausted?: boolean;
   uncovered_places_weighted?: number[];
   uncovered_places_s_component?: number[];
   left?: boolean | null;
@@ -3376,6 +3378,9 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if ("short_circuit_reachability_exhausted" in value &&
       value.short_circuit_reachability_exhausted !== undefined &&
       typeof value.short_circuit_reachability_exhausted !== "boolean") return false;
+  if ("uniform_invariant_search_exhausted" in value &&
+      value.uniform_invariant_search_exhausted !== undefined &&
+      typeof value.uniform_invariant_search_exhausted !== "boolean") return false;
   if ("short_circuit_reachability_strongly_connected" in value &&
       value.short_circuit_reachability_strongly_connected !== undefined &&
       typeof value.short_circuit_reachability_strongly_connected !== "boolean") return false;

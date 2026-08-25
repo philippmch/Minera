@@ -197,6 +197,7 @@ struct PetriAnalysisParams {
   std::size_t max_k_value = 5;
   bool full_bootstrap_required = true;
   std::size_t max_states = 200000;
+  std::size_t invariant_search_limit = 100000;
   bool diagnostics = false;
   bool return_asap_when_unsound = false;
 };

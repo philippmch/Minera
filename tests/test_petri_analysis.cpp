@@ -326,6 +326,67 @@ void weighted_invariant_contract() {
   assert(!woflan_result.left.has_value() || !*woflan_result.left);
 }
 
+void uniform_invariant_combination() {
+  // The positive cone has two weighted rays, while their shared support is a
+  // valid unit-weight invariant.  A support-only pass over either ray misses
+  // the uniform certificate.
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto first = net.add_place();
+  const auto middle = net.add_place();
+  const auto last = net.add_place();
+  net.set_source(middle);
+  net.set_sink(last);
+  net.add_transition(0, {middle, middle}, {first, last});
+
+  const auto result = analyze_soundness(net, {.diagnostics = true});
+  assert(result.place_invariant_basis.size() >= 2);
+  const std::vector<double> expected{1.0, 1.0, 1.0};
+  assert(std::find(result.uniform_place_invariants.begin(),
+                   result.uniform_place_invariants.end(), expected) !=
+         result.uniform_place_invariants.end());
+  double balance = 0.0;
+  for (const auto place : net.transitions().front().inputs) balance -= expected[place];
+  for (const auto place : net.transitions().front().outputs) balance += expected[place];
+  assert(std::abs(balance) < 1e-7);
+}
+
+void s_component_uses_distinct_places() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source, source}, {sink, sink});
+
+  const auto result = analyze_soundness(net, {.diagnostics = true});
+  const std::vector<std::vector<double>> expected_uniform{{1.0, 1.0}};
+  assert(result.uniform_place_invariants == expected_uniform);
+  assert(result.s_components.has_value());
+  const std::vector<std::vector<std::size_t>> expected_components{{0, 1}};
+  assert(*result.s_components == expected_components);
+  assert(result.uncovered_places_s_component.empty());
+}
+
+void uniform_invariant_search_exhaustion_is_explicit() {
+  SoundnessOptions options;
+  options.variant = SoundnessVariant::kWoflan;
+  options.diagnostics = true;
+  options.invariant_search_limit = 1;
+  const auto result = analyze_soundness(branching_pair_net(), options);
+  assert(result.uniform_invariant_search_exhausted);
+  assert(!result.left.has_value());
+  const auto serialized = petri_analysis_json(result);
+  assert(serialized.find("\"uniform_invariant_search_exhausted\":true") !=
+         std::string::npos);
+  assert(std::any_of(result.diagnostic_messages.begin(),
+                     result.diagnostic_messages.end(), [](const auto& message) {
+                       return message.find("uniform invariant search budget exhausted") !=
+                              std::string::npos;
+                     }));
+}
+
 void structural_pair_diagnostics() {
   const auto result = analyze_soundness(branching_pair_net(), {.diagnostics = true});
   assert(result.workflow.valid);
@@ -616,6 +677,9 @@ int main() {
   sound_models();
   positive_invariant_diagnostics();
   weighted_invariant_contract();
+  uniform_invariant_combination();
+  s_component_uses_distinct_places();
+  uniform_invariant_search_exhaustion_is_explicit();
   structural_pair_diagnostics();
   woflan_short_circuit_diagnostics();
   woflan_restricted_tree_artifacts();

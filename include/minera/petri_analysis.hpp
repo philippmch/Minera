@@ -106,6 +106,10 @@ struct SoundnessOptions {
   Marking initial_marking;
   Marking final_marking;
   std::size_t max_states = 200000;
+  // Global branch-and-bound budget for recovering binary uniform
+  // P-invariants. A positive value is required; exhaustion is reported in
+  // the result instead of being treated as a coverage proof.
+  std::size_t invariant_search_limit = 100000;
   bool diagnostics = false;
   // Stop once a reachable non-final deadlock or improper marking proves the
   // workflow unsound. The partial graph and witness are still returned.
@@ -152,6 +156,7 @@ struct SoundnessResult {
   // deterministic order and are useful for independent coverage diagnostics.
   std::vector<std::vector<double>> uniform_place_invariants;
   std::vector<std::size_t> uncovered_places_uniform;
+  bool uniform_invariant_search_exhausted = false;
   std::vector<std::vector<double>> weighted_place_invariants;
   std::vector<std::size_t> uncovered_places_weighted;
   std::vector<std::size_t> uncovered_places_s_component;
