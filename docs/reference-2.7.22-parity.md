@@ -94,6 +94,16 @@ and frontend controls. Omitted process-tree playout settings select
 closes only the process-tree variants; the broader simulation row remains
 partial because other simulation families are pending.
 
+DFG playout evidence: classic best-first variant extraction and seeded
+performance sampling accept activity, timestamp, and case-id attribute
+selectors. Custom names are emitted as typed event/trace attributes while the
+native first-class fields remain populated. Performance sampling uses distinct
+internal synthetic start/end nodes with configurable labels, so real activities
+that collide with either label (including equal labels) remain separate and
+deterministic. The selectors and labels are available through strict request
+parsing, standalone CLI flags, the local playout endpoint, and typed frontend
+controls.
+
 Extensive process-tree playout also supports an opt-in set-string result. The
 native result helper returns the deduplicated activity-word set while the
 legacy EventLog API remains unchanged; the export CLI, cached local server,

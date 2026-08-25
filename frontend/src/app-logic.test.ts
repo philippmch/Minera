@@ -372,15 +372,25 @@ describe("DFG playout contract", () => {
       variant: "performance", traces: 12, max_variants: 8,
       min_weighted_probability: 0.25, max_events_per_trace: 99,
       interrupt_when_dfg_complete: true, return_variants: true,
+      activity_key: "event:name", timestamp_key: "event:when",
+      case_id_key: "case:external_id",
+      artificial_start_activity: "BEGIN", artificial_end_activity: "FINISH",
     }));
     expect(params.get("dfg_playout_variant")).toBe("performance");
     expect(params.get("dfg_playout_max_events_per_trace")).toBe("99");
     expect(params.get("dfg_playout_interrupt_when_dfg_complete")).toBe("true");
+    expect(params.get("dfg_playout_activity_key")).toBe("event:name");
+    expect(params.get("dfg_playout_timestamp_key")).toBe("event:when");
+    expect(params.get("dfg_playout_case_id_key")).toBe("case:external_id");
+    expect(params.get("dfg_playout_artificial_start_activity")).toBe("BEGIN");
+    expect(params.get("dfg_playout_artificial_end_activity")).toBe("FINISH");
   });
   it("rejects invalid bounds", () => {
     expect(() => dfgPlayoutQuery({ traces: 0 })).toThrow(/positive/);
     expect(() => dfgPlayoutQuery({ min_weighted_probability: 2 })).toThrow(/between/);
     expect(() => dfgPlayoutQuery({ case_arrival_rate: -1 })).toThrow(/non-negative/);
+    expect(() => dfgPlayoutQuery({ activity_key: " " })).toThrow(/must not be empty/);
+    expect(() => dfgPlayoutQuery({ artificial_end_activity: "" })).toThrow(/must not be empty/);
   });
 });
 

@@ -3470,6 +3470,18 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
     if (!options.start_time.trim()) throw new Error("start_time must not be empty");
     params.set("dfg_playout_start_time", options.start_time);
   }
+  for (const [name, value] of [
+    ["activity_key", options.activity_key],
+    ["timestamp_key", options.timestamp_key],
+    ["case_id_key", options.case_id_key],
+    ["artificial_start_activity", options.artificial_start_activity],
+    ["artificial_end_activity", options.artificial_end_activity],
+  ] as const) {
+    if (value !== undefined) {
+      if (!value.trim()) throw new Error(`${name} must not be empty`);
+      params.set(`dfg_playout_${name}`, value);
+    }
+  }
   return params.toString();
 }
 

@@ -1004,6 +1004,11 @@ int usage(const char* program) {
                "  --dfg-playout-case-arrival-rate <f> Performance arrival rate\n"
                "  --dfg-playout-seed <u64> DFG random seed\n"
                "  --dfg-playout-start-time <iso8601> DFG start timestamp\n"
+               "  --dfg-playout-activity-key <key> Generated activity attribute\n"
+               "  --dfg-playout-timestamp-key <key> Generated timestamp attribute\n"
+               "  --dfg-playout-case-id-key <key> Generated case-id attribute\n"
+               "  --dfg-playout-artificial-start-activity <label> Boundary label\n"
+               "  --dfg-playout-artificial-end-activity <label> Boundary label\n"
                "  --declare-playout-traces <n> Declare cases (default: 1000)\n"
                "  --declare-playout-min-length <n> Minimum events (default: 3)\n"
                "  --declare-playout-max-length <n> Maximum events (default: 15)\n"
@@ -2618,6 +2623,11 @@ int main(int argc, char** argv) {
         arg == "--dfg-playout-max-execution-time-ms" ||
         arg == "--dfg-playout-case-arrival-rate" ||
         arg == "--dfg-playout-seed" || arg == "--dfg-playout-start-time" ||
+        arg == "--dfg-playout-activity-key" ||
+        arg == "--dfg-playout-timestamp-key" ||
+        arg == "--dfg-playout-case-id-key" ||
+        arg == "--dfg-playout-artificial-start-activity" ||
+        arg == "--dfg-playout-artificial-end-activity" ||
         arg == "--dfg-playout-min-variant-occurrences" ||
         arg == "--dfg-playout-interrupt-when-dfg-complete" ||
         arg == "--dfg-playout-add-trace-if-takes-new-edges" ||

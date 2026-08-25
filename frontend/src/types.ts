@@ -3260,6 +3260,11 @@ export interface DfgPlayoutOptions {
   max_steps?: number;
   max_events_per_trace?: number;
   start_time?: string;
+  activity_key?: string;
+  timestamp_key?: string;
+  case_id_key?: string;
+  artificial_start_activity?: string;
+  artificial_end_activity?: string;
 }
 
 export type DfgPlayoutResultVariant = "CLASSIC" | "PERFORMANCE";
