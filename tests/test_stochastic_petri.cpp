@@ -172,6 +172,118 @@ void dense_generator_budget_and_precision_are_enforced() {
   assert(json.find("1.2345678901234567") != std::string::npos);
 }
 
+void transient_and_steady_state_are_deterministic() {
+  const auto net = [&] {
+    minera::PetriNet value;
+    const auto source = value.add_place();
+    const auto sink = value.add_place();
+    value.set_source(source);
+    value.set_sink(sink);
+    value.add_transition(std::nullopt, {source}, {sink});
+    return value;
+  }();
+  minera::StochasticPetriOptions options;
+  options.transition_rates = {2.0};
+  const auto graph = minera::stochastic_petri_reachability(net, options);
+  assert(graph.initial_state && *graph.initial_state == 1);
+  const auto at_zero = minera::stochastic_petri_transient(graph, 0.0, 1);
+  assert(at_zero.computed && at_zero.initial_state == 1);
+  assert(at_zero.probabilities == std::vector<double>({0.0, 1.0}));
+  const auto transient = minera::stochastic_petri_transient(graph, 0.5, 1);
+  assert(transient.computed);
+  assert(std::abs(transient.probabilities[0] - (1.0 - std::exp(-1.0))) < 1e-9);
+  assert(std::abs(transient.probabilities[1] - std::exp(-1.0)) < 1e-9);
+  const auto vector = minera::stochastic_petri_transient(
+      graph, 0.5, std::vector<double>({0.0, 1.0}));
+  assert(vector.probabilities == transient.probabilities);
+  const auto steady = minera::stochastic_petri_steady_state(graph);
+  assert(steady.computed && steady.unique);
+  assert(steady.probabilities == std::vector<double>({1.0, 0.0}));
+  assert(minera::serialize_stochastic_petri_distribution_json(steady).find(
+             "STEADY_STATE") != std::string::npos);
+  const auto precise = minera::stochastic_petri_transient(graph, 0.5, 1);
+  const auto precise_json =
+      minera::serialize_stochastic_petri_distribution_json(precise);
+  assert(precise_json.find("0.632120558828") != std::string::npos);
+
+  for (const auto scale : {1e-15, 1e15}) {
+    minera::StochasticPetriResult scaled;
+    scaled.states = {{{0}}, {{1}}};
+    scaled.generator = {{-scale, scale}, {2.0 * scale, -2.0 * scale}};
+    const auto stationary = minera::stochastic_petri_steady_state(scaled);
+    assert(stationary.computed && stationary.unique);
+    assert(std::abs(stationary.probabilities[0] - (2.0 / 3.0)) < 1e-10);
+    assert(std::abs(stationary.probabilities[1] - (1.0 / 3.0)) < 1e-10);
+  }
+}
+
+void probability_inputs_and_non_unique_states_are_rejected_deterministically() {
+  minera::StochasticPetriResult graph;
+  graph.states = {{{0}}, {{1}}};
+  graph.generator = {{-1.0, 1.0}, {1.0, -1.0}};
+  for (const auto time : {-1.0, std::numeric_limits<double>::infinity(),
+                          1'000'001.0}) {
+    bool rejected = false;
+    try {
+      (void)minera::stochastic_petri_transient(graph, time, 0);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  graph.exhausted = true;
+  bool incomplete_rejected = false;
+  try {
+    (void)minera::stochastic_petri_steady_state(graph);
+  } catch (const std::invalid_argument&) {
+    incomplete_rejected = true;
+  }
+  assert(incomplete_rejected);
+  graph.exhausted = false;
+  for (const auto probabilities : {std::vector<double>{0.5},
+                                   std::vector<double>{0.2, 0.2},
+                                   std::vector<double>{-0.1, 1.1}}) {
+    bool rejected = false;
+    try {
+      (void)minera::stochastic_petri_transient(graph, 1.0, probabilities);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  minera::StochasticPetriResult multiple;
+  multiple.states = {{{0}}, {{1}}};
+  multiple.generator = {{0.0, 0.0}, {0.0, 0.0}};
+  const auto steady = minera::stochastic_petri_steady_state(multiple);
+  assert(!steady.computed && !steady.unique);
+  assert(steady.diagnostic.find("multiple recurrent") != std::string::npos);
+  const auto json = minera::serialize_stochastic_petri_distribution_json(steady);
+  assert(json == minera::serialize_stochastic_petri_distribution_json(steady));
+  const auto empty = minera::stochastic_petri_steady_state({});
+  assert(!empty.computed && !empty.unique);
+  assert(empty.diagnostic.find("requires states") != std::string::npos);
+}
+
+void transient_work_budget_rejects_oversized_dense_requests() {
+  constexpr std::size_t count = minera::kStochasticPetriMaxGeneratorStates;
+  minera::StochasticPetriResult graph;
+  graph.states.resize(count);
+  graph.generator.assign(count, std::vector<double>(count, 0.0));
+  for (std::size_t state = 0; state < count; ++state) {
+    graph.states[state].marking = {static_cast<std::uint32_t>(state)};
+    graph.generator[state][state] = -1.0;
+    graph.generator[state][(state + 1) % count] = 1.0;
+  }
+  bool rejected = false;
+  try {
+    (void)minera::stochastic_petri_transient(graph, 1'000'000.0, 0);
+  } catch (const std::invalid_argument& error) {
+    rejected = std::string(error.what()).find("work budget") !=
+               std::string::npos;
+  }
+  assert(rejected);
+}
+
 }  // namespace
 
 int main() {
@@ -180,4 +292,7 @@ int main() {
   invalid_inputs_and_cap_are_reported();
   isolated_states_and_duplicate_output_overflow_are_rejected();
   dense_generator_budget_and_precision_are_enforced();
+  transient_and_steady_state_are_deterministic();
+  probability_inputs_and_non_unique_states_are_rejected_deterministically();
+  transient_work_budget_rejects_oversized_dense_requests();
 }

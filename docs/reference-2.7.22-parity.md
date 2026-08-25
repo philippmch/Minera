@@ -201,8 +201,18 @@ transitions are summed, and immediate-transition metadata removes states with
 enabled immediate firings plus incident immediate edges. Unsupported extended
 arcs, malformed rates, markings, indices, and caps are rejected explicitly.
 The JSON envelope is `STOCHASTIC_PETRI`/`TANGIBLE_CTMC` with deterministic
-states, transition edges, generator rows, and exhaustion diagnostics; no
-transient or steady-state solver is implied by this bounded slice.
+states, transition edges, generator rows, and exhaustion diagnostics. The same
+endpoint and CLI now accept `stochastic_petri_analysis=transient` or
+`steady_state`: transient propagation uses a dependency-free uniformization
+series with finite non-negative time and unit-mass validation, while
+steady-state analysis reports a deterministic distribution for one recurrent
+class and an explicit non-unique diagnostic for multiple recurrent classes.
+The retained projected initial marking is used when no transient source is
+provided; if projection removes it, callers must provide a probability vector.
+Dense propagation has a bounded work budget and a one-million-second wire-time
+limit so requests fail deterministically instead of exhausting the host.
+Probability envelopes use `STOCHASTIC_PETRI_DISTRIBUTION` with deterministic
+state ordering, diagnostics, and finite-or-null JSON number handling.
 Basic Petri sampling can also opt into a structured visitation response: each
 trace alternates marking snapshots with fired transition indices (including
 silent transitions), with transition activity labels where available. The
