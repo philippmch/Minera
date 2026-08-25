@@ -1450,6 +1450,51 @@ void handle_ocel_enrichment(const httplib::Request& request,
   }
 }
 
+void handle_ocel_graph(const httplib::Request& request,
+                       httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"variant"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown OCEL graph parameter: " + key);
+    }
+    const auto value = request.has_param("variant")
+                           ? request.get_param_value("variant")
+                           : std::string("interaction");
+    minera::OcelEnrichmentGraph graph;
+    if (value == "interaction" || value == "object_interaction_graph" ||
+        value == "INTERACTION") {
+      graph = minera::OcelEnrichmentGraph::kInteraction;
+    } else if (value == "descendants" ||
+               value == "object_descendants_graph" || value == "DESCENDANTS") {
+      graph = minera::OcelEnrichmentGraph::kDescendants;
+    } else if (value == "inheritance" ||
+               value == "object_inheritance_graph" || value == "INHERITANCE") {
+      graph = minera::OcelEnrichmentGraph::kInheritance;
+    } else if (value == "cobirth" || value == "object_cobirth_graph" ||
+               value == "COBIRTH") {
+      graph = minera::OcelEnrichmentGraph::kCobirth;
+    } else if (value == "codeath" || value == "object_codeath_graph" ||
+               value == "CODEATH") {
+      graph = minera::OcelEnrichmentGraph::kCodeath;
+    } else {
+      throw std::invalid_argument(
+          "variant expects interaction, descendants, inheritance, cobirth, or codeath");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    response.set_content(
+        minera::serialize_ocel_object_graph_json(
+            minera::discover_ocel_object_graph(minera::parse_ocel_json(body),
+                                                graph)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -5738,6 +5783,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/discover", preflight);
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/enrich", preflight);
+  server.Options("/api/ocel/graph", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
@@ -5821,6 +5867,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/discover", handle_ocel_discovery);
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/enrich", handle_ocel_enrichment);
+  server.Post("/api/ocel/graph", handle_ocel_graph);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);

@@ -123,6 +123,53 @@ void enrichment_contract() {
              "\"graphs\":[]") != std::string::npos);
 }
 
+void object_graph_contract() {
+  const auto log = sample();
+  const auto interaction = minera::discover_ocel_object_graph(
+      log, minera::OcelEnrichmentGraph::kInteraction);
+  assert(interaction.object_ids.size() == log.objects.size());
+  assert(interaction.object_ids.back() == "o2");
+  const std::vector<std::pair<std::string, std::string>> expected_interaction = {
+      {"i1", "o1"}, {"i1", "o2"}, {"i2", "o2"}, {"i3", "i4"}};
+  assert(interaction.edges == expected_interaction);
+  const auto descendants = minera::discover_ocel_object_graph(
+      log, minera::OcelEnrichmentGraph::kDescendants);
+  const std::vector<std::pair<std::string, std::string>> expected_descendants = {
+      {"i1", "o2"}, {"o2", "i2"}};
+  assert(descendants.edges == expected_descendants);
+  const auto inheritance = minera::discover_ocel_object_graph(
+      log, minera::OcelEnrichmentGraph::kInheritance);
+  const std::vector<std::pair<std::string, std::string>> expected_inheritance = {
+      {"i1", "o2"}, {"o1", "i1"}, {"o2", "i2"}};
+  assert(inheritance.edges == expected_inheritance);
+  const auto cobirth = minera::discover_ocel_object_graph(
+      log, minera::OcelEnrichmentGraph::kCobirth);
+  const std::vector<std::pair<std::string, std::string>> expected_cobirth = {
+      {"i1", "o1"}, {"i3", "i4"}};
+  assert(cobirth.edges == expected_cobirth);
+  const auto codeath = minera::discover_ocel_object_graph(
+      log, minera::OcelEnrichmentGraph::kCodeath);
+  const std::vector<std::pair<std::string, std::string>> expected_codeath = {
+      {"i2", "o2"}, {"i3", "i4"}};
+  assert(codeath.edges == expected_codeath);
+  const auto json = minera::serialize_ocel_object_graph_json(interaction);
+  assert(json.find("\"family\":\"OCEL_OBJECT_GRAPH\"") !=
+         std::string::npos);
+  assert(json.find("\"object_ids\"") != std::string::npos);
+  assert(json.find("[\"i1\",\"o1\"]") != std::string::npos);
+
+  minera::Ocel malformed = log;
+  malformed.objects.push_back({"o1", "duplicate", {}});
+  bool threw = false;
+  try {
+    (void)minera::discover_ocel_object_graph(
+        malformed, minera::OcelEnrichmentGraph::kInteraction);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -130,4 +177,5 @@ int main() {
   ancestors_descendants_contract();
   validation_contract();
   enrichment_contract();
+  object_graph_contract();
 }

@@ -249,6 +249,12 @@ graph does not add a new edge. The standalone `minera_ocel --enrich` mode,
 multipart local `POST /api/ocel/enrich`, and typed frontend adapter expose the
 same bounded selection and `OCEL_ENRICHMENT` envelope.
 
+Direct object-graph evidence: `discover_ocel_object_graph` exposes each of the
+five relations without synthetic O2O materialization, retaining isolated object
+ids and deterministic lexical edge ordering. The `minera_ocel --graph` selector,
+multipart local `POST /api/ocel/graph`, and typed frontend adapter share the
+`OCEL_OBJECT_GRAPH` envelope and accept the same relation names.
+
 OTG conformance threshold evidence: the scalar `otg_theta` remains the fallback
 for every relation, while the standalone OCEL CLI, multipart local conformance
 route, and typed frontend query expose strict non-negative relation overrides
