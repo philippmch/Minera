@@ -2729,6 +2729,129 @@ StochasticPetriParams parse_stochastic_petri_params(
   return params;
 }
 
+StochasticMapParams parse_stochastic_map_params(const FieldLookup& field) {
+  return parse_stochastic_map_params(field, {});
+}
+
+StochasticMapParams parse_stochastic_map_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  StochasticMapParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  const auto parse_distribution = [](std::string_view value) {
+    if (value == "deterministic") return StochasticMapDistribution::kDeterministic;
+    if (value == "exponential") return StochasticMapDistribution::kExponential;
+    if (value == "constant0" || value == "constant_zero")
+      return StochasticMapDistribution::kConstant0;
+    if (value == "immediate") return StochasticMapDistribution::kImmediate;
+    if (value == "normal") return StochasticMapDistribution::kNormal;
+    if (value == "uniform") return StochasticMapDistribution::kUniform;
+    if (value == "lognormal" || value == "log_normal")
+      return StochasticMapDistribution::kLogNormal;
+    if (value == "gamma") return StochasticMapDistribution::kGamma;
+    throw std::invalid_argument(
+        "stochastic_map_distribution: expected deterministic, exponential, "
+        "constant0, immediate, normal, uniform, lognormal, or gamma");
+  };
+  if (supplied("stochastic_map_source")) {
+    const auto value = require("stochastic_map_source");
+    if (value == "log" || value == "fit")
+      params.source = StochasticMapSource::kLog;
+    else if (value == "performance_dfg" || value == "dfg")
+      params.source = StochasticMapSource::kPerformanceDfg;
+    else
+      throw std::invalid_argument(
+          "stochastic_map_source: expected log or performance_dfg");
+  }
+  if (supplied("stochastic_map_distribution")) {
+    const auto distribution =
+        parse_distribution(require("stochastic_map_distribution"));
+    params.fit.distribution = distribution;
+    params.performance.distribution = distribution;
+  }
+  if (supplied("stochastic_map_default_parameter")) {
+    const auto value = parse_finite_double(
+        require("stochastic_map_default_parameter"),
+        "stochastic_map_default_parameter");
+    if (value < 0.0)
+      throw std::invalid_argument(
+          "stochastic_map_default_parameter must be non-negative");
+    params.fit.default_parameter = value;
+    params.performance.default_parameter = value;
+  }
+  if ((params.fit.distribution == StochasticMapDistribution::kExponential) &&
+      params.fit.default_parameter <= 0.0)
+    throw std::invalid_argument(
+        "stochastic_map_default_parameter must be positive for exponential maps");
+  if ((params.fit.distribution == StochasticMapDistribution::kGamma) &&
+      params.fit.default_parameter <= 0.0)
+    throw std::invalid_argument(
+        "stochastic_map_default_parameter must be positive for gamma maps");
+  if (supplied("stochastic_map_silent_transitions_immediate"))
+    params.fit.silent_transitions_immediate = parse_boolean(
+        require("stochastic_map_silent_transitions_immediate"),
+        "stochastic_map_silent_transitions_immediate");
+  if (supplied("stochastic_map_zero_duration_immediate")) {
+    const auto value = parse_boolean(
+        require("stochastic_map_zero_duration_immediate"),
+        "stochastic_map_zero_duration_immediate");
+    params.fit.zero_duration_immediate = value;
+    params.performance.zero_duration_immediate = value;
+  }
+  if (supplied("stochastic_map_fit_activation_weights"))
+    params.fit.fit_activation_weights = parse_boolean(
+        require("stochastic_map_fit_activation_weights"),
+        "stochastic_map_fit_activation_weights");
+  if (supplied("stochastic_map_fit_timing"))
+    params.fit.fit_timing = parse_boolean(
+        require("stochastic_map_fit_timing"), "stochastic_map_fit_timing");
+  if (supplied("stochastic_map_default_activation_weight")) {
+    const auto value = parse_finite_double(
+        require("stochastic_map_default_activation_weight"),
+        "stochastic_map_default_activation_weight");
+    if (value < 0.0)
+      throw std::invalid_argument(
+          "stochastic_map_default_activation_weight must be non-negative");
+    params.performance.default_activation_weight = value;
+  }
+  if (supplied("stochastic_map_frequency_activation_weights"))
+    params.performance.frequency_activation_weights = parse_boolean(
+        require("stochastic_map_frequency_activation_weights"),
+        "stochastic_map_frequency_activation_weights");
+  if (supplied("stochastic_map_conversion_variant")) {
+    const auto value = require("stochastic_map_conversion_variant");
+    if (value == "activity_defines_place" || value == "activity")
+      params.performance.conversion.variant =
+          DfgPetriConversionVariant::kActivityDefinesPlace;
+    else if (value == "invisibles_no_duplicates" || value == "invisibles")
+      params.performance.conversion.variant =
+          DfgPetriConversionVariant::kInvisiblesNoDuplicates;
+    else
+      throw std::invalid_argument(
+          "stochastic_map_conversion_variant: expected activity_defines_place or "
+          "invisibles_no_duplicates");
+  }
+  if (supplied("stochastic_map_max_states")) {
+    params.max_states = parse_positive_size(
+        require("stochastic_map_max_states"), "stochastic_map_max_states");
+    if (params.max_states > kStochasticPetriMaxGeneratorStates)
+      throw std::invalid_argument(
+          "stochastic_map_max_states exceeds the dense generator safety limit");
+  }
+  if (supplied("stochastic_map_initial_marking"))
+    params.initial_marking = parse_uint32_marking(
+        require("stochastic_map_initial_marking"),
+        "stochastic_map_initial_marking");
+  return params;
+}
+
 MonteCarloParams parse_monte_carlo_params(const FieldLookup& field) {
   return parse_monte_carlo_params(field, {});
 }

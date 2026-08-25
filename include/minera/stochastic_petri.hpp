@@ -29,6 +29,13 @@ struct StochasticPetriOptions {
   std::vector<double> transition_rates;
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::size_t> immediate_transitions;
+  // Optional activation weights for immediate transitions. Empty means equal
+  // weight for every eligible transition.
+  std::vector<double> immediate_weights;
+  // Optional per-transition priority for immediate firings. When multiple
+  // enabled immediate transitions are present, only those at the highest
+  // priority are eligible. Empty uses priority zero for every transition.
+  std::vector<int> transition_priorities;
   std::size_t max_states = kStochasticPetriMaxGeneratorStates;
   // Adapter-only analysis selector. Native reachability ignores this field;
   // adapters dispatch to the explicit probability APIs below.
@@ -57,6 +64,9 @@ struct StochasticPetriResult {
   // Index of the projected initial marking when it remains a tangible state.
   // A missing value means the initial marking was removed by projection.
   std::optional<std::size_t> initial_state;
+  // Initial probability mass after immediate-state projection, aligned with
+  // states. A single nonzero entry is also exposed through initial_state.
+  std::vector<double> initial_probabilities;
   bool exhausted = false;
   std::string diagnostic;
 };

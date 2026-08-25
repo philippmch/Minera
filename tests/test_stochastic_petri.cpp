@@ -1,4 +1,5 @@
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -76,6 +77,102 @@ void immediate_states_and_duplicate_targets_are_handled() {
   assert(combined.edges.size() == 2);
   assert(combined.generator[1][0] == 5.0);
   assert(combined.generator[1][1] == -5.0);
+}
+
+void immediate_priorities_select_only_highest_enabled_firings() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto preferred = net.add_place();
+  const auto suppressed = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  const auto high = net.add_transition(std::nullopt, {source}, {preferred});
+  const auto low = net.add_transition(std::nullopt, {source}, {suppressed});
+  net.add_transition(std::nullopt, {preferred}, {sink});
+  net.add_transition(std::nullopt, {suppressed}, {sink});
+
+  minera::StochasticPetriOptions options;
+  options.immediate_transitions = {high, low};
+  options.transition_priorities = {4, 1, 0, 0};
+  const auto result = minera::stochastic_petri_reachability(net, options);
+  for (const auto& state : result.states)
+    assert(state.marking != std::vector<std::uint32_t>({0, 0, 1, 0}));
+  assert(result.states.size() == 2);
+
+  options.transition_priorities = {4, 1};
+  bool rejected = false;
+  try {
+    (void)minera::stochastic_petri_reachability(net, options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
+void immediate_closure_projects_timed_successors_and_weighted_initials() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto vanishing = net.add_place();
+  const auto left = net.add_place();
+  const auto right = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(std::nullopt, {source}, {vanishing});
+  const auto left_choice =
+      net.add_transition(std::nullopt, {vanishing}, {left});
+  const auto right_choice =
+      net.add_transition(std::nullopt, {vanishing}, {right});
+  net.add_transition(std::nullopt, {left}, {sink});
+  net.add_transition(std::nullopt, {right}, {sink});
+
+  minera::StochasticPetriOptions options;
+  options.transition_rates = {5.0, 1.0, 1.0, 2.0, 3.0};
+  options.immediate_transitions = {left_choice, right_choice};
+  options.immediate_weights = {0.0, 2.0, 1.0, 1.0, 1.0};
+  const auto result = minera::stochastic_petri_reachability(net, options);
+  assert(result.initial_state);
+  assert(result.initial_probabilities.size() == result.states.size());
+  assert(result.initial_probabilities[*result.initial_state] == 1.0);
+  const auto source_state = *result.initial_state;
+  std::vector<double> projected_rates;
+  for (const auto& edge : result.edges) {
+    if (edge.source != source_state) continue;
+    projected_rates.push_back(edge.rate);
+  }
+  assert(projected_rates.size() == 2);
+  std::sort(projected_rates.begin(), projected_rates.end());
+  assert(std::abs(projected_rates[0] - 5.0 / 3.0) < 1e-12);
+  assert(std::abs(projected_rates[1] - 10.0 / 3.0) < 1e-12);
+
+  // Starting directly in the vanishing marking must retain a usable
+  // probability distribution over its tangible closure.
+  options.initial_marking = {0, 1, 0, 0, 0};
+  const auto vanishing_result =
+      minera::stochastic_petri_reachability(net, options);
+  assert(!vanishing_result.initial_state);
+  assert(vanishing_result.initial_probabilities.size() ==
+         vanishing_result.states.size());
+  double initial_mass = 0.0;
+  std::size_t nonzero = 0;
+  for (const auto probability : vanishing_result.initial_probabilities) {
+    initial_mass += probability;
+    if (probability > 1e-12) ++nonzero;
+  }
+  assert(nonzero == 2);
+  assert(std::abs(initial_mass - 1.0) < 1e-12);
+
+  options.max_states = 1;
+  const auto capped_vanishing =
+      minera::stochastic_petri_reachability(net, options);
+  assert(capped_vanishing.exhausted);
+
+  options.max_states = 2;
+  const auto capped_split =
+      minera::stochastic_petri_reachability(net, options);
+  assert(capped_split.exhausted);
+  assert(capped_split.initial_probabilities.empty());
 }
 
 void invalid_inputs_and_cap_are_reported() {
@@ -289,6 +386,8 @@ void transient_work_budget_rejects_oversized_dense_requests() {
 int main() {
   branching_states_and_generator_are_deterministic();
   immediate_states_and_duplicate_targets_are_handled();
+  immediate_priorities_select_only_highest_enabled_firings();
+  immediate_closure_projects_timed_successors_and_weighted_initials();
   invalid_inputs_and_cap_are_reported();
   isolated_states_and_duplicate_output_overflow_are_rejected();
   dense_generator_budget_and_precision_are_enforced();

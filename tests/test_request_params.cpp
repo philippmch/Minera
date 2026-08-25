@@ -2539,6 +2539,62 @@ void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
   assert(mismatch);
 }
 
+void parse_stochastic_map_params_maps_and_rejects_bad_values() {
+  const auto parsed = minera::parse_stochastic_map_params(fields({
+      {"stochastic_map_source", "performance_dfg"},
+      {"stochastic_map_distribution", "exponential"},
+      {"stochastic_map_default_parameter", "2"},
+      {"stochastic_map_conversion_variant", "invisibles"},
+      {"stochastic_map_default_activation_weight", "0.5"},
+      {"stochastic_map_frequency_activation_weights", "false"},
+      {"stochastic_map_max_states", "17"},
+      {"stochastic_map_initial_marking", "1,0"}}));
+  assert(parsed.source == minera::StochasticMapSource::kPerformanceDfg);
+  assert(parsed.performance.distribution ==
+         minera::StochasticMapDistribution::kExponential);
+  assert(parsed.performance.default_parameter == 2.0);
+  assert(parsed.performance.conversion.variant ==
+         minera::DfgPetriConversionVariant::kInvisiblesNoDuplicates);
+  assert(parsed.performance.default_activation_weight == 0.5);
+  assert(!parsed.performance.frequency_activation_weights);
+  assert(parsed.max_states == 17 && parsed.initial_marking.size() == 2);
+
+  bool threw = false;
+  try {
+    (void)minera::parse_stochastic_map_params(fields({
+        {"stochastic_map_source", "other"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_stochastic_map_params(fields({
+        {"stochastic_map_distribution", "exponential"},
+        {"stochastic_map_default_parameter", "0"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_stochastic_map_params(fields({
+        {"stochastic_map_distribution", "gamma"},
+        {"stochastic_map_default_parameter", "0"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)minera::parse_stochastic_map_params(fields({
+        {"stochastic_map_max_states", "0"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_dfg_playout_params_maps_controls_and_aliases() {
   const auto parsed = minera::parse_dfg_playout_params(fields({
       {"dfg_playout_variant", "performance"},
@@ -3102,6 +3158,7 @@ int main() {
   parse_process_tree_playout_params_rejects_bad_values();
   parse_extensive_playout_params_maps_controls_and_rejects_zero();
   parse_stochastic_petri_params_maps_and_rejects_bad_values();
+  parse_stochastic_map_params_maps_and_rejects_bad_values();
   parse_dfg_playout_params_maps_controls_and_aliases();
   parse_dfg_playout_params_rejects_invalid_bounds();
   parse_stochastic_playout_params_maps_controls();

@@ -338,24 +338,35 @@ int main(int argc, char** argv) {
       if (stochastic_petri_options.analysis ==
           minera::StochasticPetriAnalysisVariant::kReachability) {
         json = minera::serialize_stochastic_petri_json(reachability);
-        } else if (stochastic_petri_options.analysis ==
-                   minera::StochasticPetriAnalysisVariant::kTransient) {
-          const auto initial_state =
-              stochastic_petri_options.analysis_initial_state.has_value()
-                  ? stochastic_petri_options.analysis_initial_state
-                  : reachability.initial_state;
-          if (stochastic_petri_options.analysis_initial_probabilities.empty() &&
-              !initial_state.has_value())
-            throw std::invalid_argument(
-                "stochastic Petri transient analysis could not retain the initial state; provide an initial probability vector");
-          const auto distribution =
-              stochastic_petri_options.analysis_initial_probabilities.empty()
-                  ? minera::stochastic_petri_transient(
-                      reachability, stochastic_petri_options.analysis_time_seconds,
-                      *initial_state)
-                  : minera::stochastic_petri_transient(
-                      reachability, stochastic_petri_options.analysis_time_seconds,
-                      stochastic_petri_options.analysis_initial_probabilities);
+      } else if (stochastic_petri_options.analysis ==
+                 minera::StochasticPetriAnalysisVariant::kTransient) {
+        const auto initial_state =
+            stochastic_petri_options.analysis_initial_state.has_value()
+                ? stochastic_petri_options.analysis_initial_state
+                : reachability.initial_state;
+        const auto& derived_probabilities = reachability.initial_probabilities;
+        const bool has_derived_probabilities =
+            !derived_probabilities.empty() &&
+            derived_probabilities.size() == reachability.states.size();
+        if (stochastic_petri_options.analysis_initial_probabilities.empty() &&
+            !initial_state.has_value() && !has_derived_probabilities)
+          throw std::invalid_argument(
+              "stochastic Petri transient analysis could not retain the initial state; provide an initial probability vector");
+        const auto distribution =
+            !stochastic_petri_options.analysis_initial_probabilities.empty()
+                ? minera::stochastic_petri_transient(
+                      reachability,
+                      stochastic_petri_options.analysis_time_seconds,
+                      stochastic_petri_options.analysis_initial_probabilities)
+                : initial_state.has_value()
+                      ? minera::stochastic_petri_transient(
+                            reachability,
+                            stochastic_petri_options.analysis_time_seconds,
+                            *initial_state)
+                      : minera::stochastic_petri_transient(
+                            reachability,
+                            stochastic_petri_options.analysis_time_seconds,
+                            derived_probabilities);
         json = minera::serialize_stochastic_petri_distribution_json(distribution);
       } else {
         json = minera::serialize_stochastic_petri_distribution_json(

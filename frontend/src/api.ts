@@ -147,6 +147,8 @@ import {
   type StochasticPetriOptions,
   type StochasticPetriResult,
   type StochasticPetriDistributionResult,
+  type StochasticMapOptions,
+  type StochasticMapResult,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -197,6 +199,7 @@ import {
   isExtensivePlayoutVisitedResult,
   isStochasticPetriResult,
   isStochasticPetriDistributionResult,
+  isStochasticMapResult,
   isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
@@ -3664,6 +3667,88 @@ export async function fetchStochasticPetriDistribution(
   }
   if (!isStochasticPetriDistributionResult(payload))
     throw new Error("the Minera backend returned an invalid stochastic Petri distribution");
+  return payload;
+}
+
+export function stochasticMapQuery(options: StochasticMapOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.source !== undefined) {
+    if (options.source !== "log" && options.source !== "performance_dfg")
+      throw new Error("source must be log or performance_dfg");
+    params.set("stochastic_map_source", options.source);
+  }
+  if (options.distribution !== undefined) {
+    const distributions = ["deterministic", "exponential", "constant0",
+      "immediate", "normal", "uniform", "lognormal", "gamma"];
+    if (!distributions.includes(options.distribution))
+      throw new Error("distribution is not supported");
+    params.set("stochastic_map_distribution", options.distribution);
+  }
+  if (options.default_parameter !== undefined) {
+    if (!Number.isFinite(options.default_parameter) || options.default_parameter < 0)
+      throw new Error("default_parameter must be finite and non-negative");
+    if (options.distribution === "exponential" && options.default_parameter <= 0)
+      throw new Error("default_parameter must be positive for exponential maps");
+    if (options.distribution === "gamma" && options.default_parameter <= 0)
+      throw new Error("default_parameter must be positive for gamma maps");
+    params.set("stochastic_map_default_parameter", String(options.default_parameter));
+  }
+  const booleans = ["silent_transitions_immediate", "zero_duration_immediate",
+    "fit_activation_weights", "fit_timing", "frequency_activation_weights"] as const;
+  for (const name of booleans) {
+    const value = options[name];
+    if (value !== undefined) {
+      if (typeof value !== "boolean") throw new Error(`${name} must be boolean`);
+      params.set(`stochastic_map_${name}`, value ? "true" : "false");
+    }
+  }
+  if (options.default_activation_weight !== undefined) {
+    if (!Number.isFinite(options.default_activation_weight) ||
+        options.default_activation_weight < 0)
+      throw new Error("default_activation_weight must be finite and non-negative");
+    params.set("stochastic_map_default_activation_weight",
+      String(options.default_activation_weight));
+  }
+  if (options.conversion_variant !== undefined) {
+    if (options.conversion_variant !== "activity_defines_place" &&
+        options.conversion_variant !== "invisibles_no_duplicates")
+      throw new Error("conversion_variant is not supported");
+    params.set("stochastic_map_conversion_variant", options.conversion_variant);
+  }
+  if (options.initial_marking !== undefined) {
+    if (!Array.isArray(options.initial_marking) || options.initial_marking.length === 0 ||
+        options.initial_marking.some((entry) =>
+          !Number.isSafeInteger(entry) || entry < 0))
+      throw new Error("initial_marking must be a non-empty list of non-negative integers");
+    params.set("stochastic_map_initial_marking", options.initial_marking.join(","));
+  }
+  if (options.max_states !== undefined) {
+    validatePlayoutInteger("max_states", options.max_states, true);
+    if (options.max_states > 2000)
+      throw new Error("max_states must not exceed 2000 for the dense generator");
+    params.set("stochastic_map_max_states", String(options.max_states));
+  }
+  return params.toString();
+}
+
+export async function fetchStochasticMap(
+  miner = "inductive", options: StochasticMapOptions = {},
+): Promise<StochasticMapResult> {
+  const query = stochasticMapQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/stochastic-map?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isStochasticMapResult(payload))
+    throw new Error("the Minera backend returned an invalid stochastic map result");
   return payload;
 }
 

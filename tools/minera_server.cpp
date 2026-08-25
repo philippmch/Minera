@@ -115,6 +115,7 @@
 #include "minera/process_tree_playout.hpp"
 #include "minera/process_tree_alignment.hpp"
 #include "minera/request_params.hpp"
+#include "minera/stochastic_map.hpp"
 #include "minera/segment_filter.hpp"
 #include "minera/streaming_dfg.hpp"
 #include "minera/streaming_footprints.hpp"
@@ -220,6 +221,24 @@ void reject_unknown_stochastic_petri_params(const httplib::Request& request) {
     (void)value;
     if (!allowed.contains(key))
       throw std::invalid_argument("unknown stochastic Petri parameter: " + key);
+  }
+}
+
+void reject_unknown_stochastic_map_params(const httplib::Request& request) {
+  static const std::set<std::string> allowed = {
+      "miner", "stochastic_map_source", "stochastic_map_distribution",
+      "stochastic_map_default_parameter",
+      "stochastic_map_silent_transitions_immediate",
+      "stochastic_map_zero_duration_immediate",
+      "stochastic_map_fit_activation_weights", "stochastic_map_fit_timing",
+      "stochastic_map_default_activation_weight",
+      "stochastic_map_frequency_activation_weights",
+      "stochastic_map_conversion_variant", "stochastic_map_max_states",
+      "stochastic_map_initial_marking"};
+  for (const auto& [key, value] : request.params) {
+    (void)value;
+    if (!allowed.contains(key))
+      throw std::invalid_argument("unknown stochastic map parameter: " + key);
   }
 }
 
@@ -4530,19 +4549,26 @@ void handle_stochastic_petri(const httplib::Request& request,
           options.analysis_initial_state.has_value()
               ? options.analysis_initial_state
               : reachability.initial_state;
+      const auto& derived_probabilities = reachability.initial_probabilities;
+      const bool has_derived_probabilities =
+          !derived_probabilities.empty() &&
+          derived_probabilities.size() == reachability.states.size();
       if (options.analysis_initial_probabilities.empty() &&
-          !initial_state.has_value())
+          !initial_state.has_value() && !has_derived_probabilities)
         throw std::invalid_argument(
             "stochastic Petri transient analysis could not retain the initial state; provide an initial probability vector");
-      const auto distribution = options.analysis_initial_probabilities.empty()
-                                    ? minera::stochastic_petri_transient(
-                                          reachability,
-                                          options.analysis_time_seconds,
-                                          *initial_state)
-                                    : minera::stochastic_petri_transient(
-                                          reachability,
-                                          options.analysis_time_seconds,
-                                          options.analysis_initial_probabilities);
+      const auto distribution =
+          !options.analysis_initial_probabilities.empty()
+              ? minera::stochastic_petri_transient(
+                    reachability, options.analysis_time_seconds,
+                    options.analysis_initial_probabilities)
+              : initial_state.has_value()
+                    ? minera::stochastic_petri_transient(
+                          reachability, options.analysis_time_seconds,
+                          *initial_state)
+                    : minera::stochastic_petri_transient(
+                          reachability, options.analysis_time_seconds,
+                          derived_probabilities);
       response.set_content(
           minera::serialize_stochastic_petri_distribution_json(distribution),
           "application/json");
@@ -4551,6 +4577,80 @@ void handle_stochastic_petri(const httplib::Request& request,
                                minera::stochastic_petri_steady_state(reachability)),
                            "application/json");
     }
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+void handle_stochastic_map(const httplib::Request& request,
+                           httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    reject_unknown_stochastic_map_params(request);
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto params = minera::parse_stochastic_map_params(lookup, present);
+    const auto miner = request.has_param("miner")
+                           ? request.get_param_value("miner")
+                           : std::string("inductive");
+    std::optional<minera::PetriNet> owned_net;
+    minera::StochasticMap map;
+    std::size_t replayed = 0;
+    std::size_t skipped = 0;
+    std::string net_json;
+    if (params.source == minera::StochasticMapSource::kLog) {
+      const auto it = session->nets.find(miner);
+      if (it == session->nets.end())
+        throw std::invalid_argument("unknown miner: " + miner);
+      const auto report = minera::fit_stochastic_map_with_report(
+          session->log, it->second, params.fit);
+      map = report.map;
+      replayed = report.replayed_traces;
+      skipped = report.skipped_traces;
+      owned_net = it->second;
+    } else {
+      const auto performance = minera::discover_performance_dfg(session->log);
+      const auto model = minera::stochastic_map_from_performance_dfg(
+          session->graph, performance, params.performance);
+      map = model.map;
+      owned_net = model.net;
+      net_json = minera::serialize_dfg_petri_net_json(
+          model.net, params.performance.conversion.variant);
+    }
+    const auto stochastic_options = minera::stochastic_map_to_options(
+        map, params.initial_marking, params.max_states);
+    const auto reachability = minera::stochastic_petri_reachability(
+        *owned_net, stochastic_options);
+    std::ostringstream out;
+    out << "{\"family\":\"STOCHASTIC_MAP\",\"source\":\""
+        << (params.source == minera::StochasticMapSource::kLog ? "log"
+                                                               : "performance_dfg")
+        << "\",\"map\":"
+        << minera::serialize_stochastic_map_json(map);
+    if (!net_json.empty()) out << ",\"net\":" << net_json;
+    if (params.source == minera::StochasticMapSource::kLog)
+      out << ",\"diagnostics\":{\"replayed_traces\":"
+          << replayed << ",\"skipped_traces\":" << skipped << '}';
+    out << ",\"reachability\":"
+        << minera::serialize_stochastic_petri_json(reachability) << '}';
+    response.set_content(out.str(), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -5805,6 +5905,7 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Get("/api/playout", handle_playout);
   server.Get("/api/stochastic-petri", handle_stochastic_petri);
+  server.Get("/api/stochastic-map", handle_stochastic_map);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {

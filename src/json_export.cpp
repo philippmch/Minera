@@ -3765,6 +3765,18 @@ std::string serialize_stochastic_petri_json(
   out << "{\"family\":\"STOCHASTIC_PETRI\",\"variant\":\"TANGIBLE_CTMC\",\"exhausted\":"
       << (result.exhausted ? "true" : "false") << ",\"diagnostic\":";
   write_json_string(out, result.diagnostic);
+  out << ",\"initial_state\":";
+  if (result.initial_state)
+    out << *result.initial_state;
+  else
+    out << "null";
+  out << ",\"initial_probabilities\":[";
+  for (std::size_t index = 0; index < result.initial_probabilities.size();
+       ++index) {
+    if (index) out << ',';
+    write_finite_or_null(out, result.initial_probabilities[index]);
+  }
+  out << ']';
   out << ",\"states\":[";
   for (std::size_t i = 0; i < result.states.size(); ++i) {
     if (i) out << ',';
