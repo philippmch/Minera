@@ -2231,6 +2231,20 @@ MineParams parse_mine_params(const FieldLookup& field,
           "minimum_self_distance_variant: expected log, pandas, or polars");
     }
   }
+  if (const auto value = field("minimum_self_distance_activity_key");
+      present ? present("minimum_self_distance_activity_key") : !value.empty()) {
+    if (value.empty())
+      throw std::invalid_argument(
+          "minimum_self_distance_activity_key: expected a value");
+    params.minimum_self_distance.activity_key = value;
+  }
+  if (const auto value = field("minimum_self_distance_case_id_key");
+      present ? present("minimum_self_distance_case_id_key") : !value.empty()) {
+    if (value.empty())
+      throw std::invalid_argument(
+          "minimum_self_distance_case_id_key: expected a value");
+    params.minimum_self_distance.case_id_key = value;
+  }
   const auto batches_supplied = present ? present("batches") : !field("batches").empty();
   for (const auto name : {std::string_view{"batch_variant"},
                           std::string_view{"batch_merge_distance_seconds"},

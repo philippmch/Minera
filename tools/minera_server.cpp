@@ -488,6 +488,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(
             log, params.minimum_self_distance);
+    // Selected activity columns can produce labels that are absent from the
+    // native activity graph; register them before the JSON adapter resolves
+    // minimum-self-distance ids.
+    for (const auto& result : minimum_self_distances) {
+      graph.ensure_activity(result.activity);
+      for (const auto& witness : result.witnesses) {
+        graph.ensure_activity(witness);
+      }
+    }
     const auto transition_system =
         minera::discover_transition_system(log, params.transition_system);
     const auto tree = minera::discover_process_tree(log, params.inductive);

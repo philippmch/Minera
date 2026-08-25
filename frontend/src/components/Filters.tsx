@@ -530,6 +530,10 @@ export function Filters({
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
   const [minimumSelfDistanceVariant, setMinimumSelfDistanceVariant] =
     useState<"log" | "pandas" | "polars">("log");
+  const [minimumSelfDistanceActivityKey, setMinimumSelfDistanceActivityKey] =
+    useState("");
+  const [minimumSelfDistanceCaseIdKey, setMinimumSelfDistanceCaseIdKey] =
+    useState("");
   const [overlap, setOverlap] = useState(false);
   const [overlapActivityAttribute, setOverlapActivityAttribute] = useState("");
   const [overlapStartAttribute, setOverlapStartAttribute] = useState("");
@@ -1038,6 +1042,10 @@ export function Filters({
       batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
       minimumSelfDistanceVariant: minimumSelfDistanceVariant !== "log"
         ? minimumSelfDistanceVariant : undefined,
+      minimumSelfDistanceActivityKey:
+        minimumSelfDistanceActivityKey.trim() || undefined,
+      minimumSelfDistanceCaseIdKey:
+        minimumSelfDistanceCaseIdKey.trim() || undefined,
       overlap: overlap || undefined,
       overlapActivityAttribute: overlap ? overlapActivityAttribute.trim() || undefined : undefined,
       overlapStartAttribute: overlap ? overlapStartAttribute.trim() || undefined : undefined,
@@ -1179,6 +1187,8 @@ export function Filters({
     setBatchMinSize("2");
     setBatchStartTimestampAttribute("");
     setMinimumSelfDistanceVariant("log");
+    setMinimumSelfDistanceActivityKey("");
+    setMinimumSelfDistanceCaseIdKey("");
     setOverlap(false);
     setOverlapActivityAttribute("");
     setOverlapStartAttribute("");
@@ -1320,7 +1330,9 @@ export function Filters({
   const correlationDirty = correlationVariants.size > 0;
   const spectrumActive = spectrumActivities.trim() !== "";
   const temporalDirty =
-    spectrumActive || batches || minimumSelfDistanceVariant !== "log" || overlap;
+    spectrumActive || batches || minimumSelfDistanceVariant !== "log" ||
+    minimumSelfDistanceActivityKey.trim() !== "" ||
+    minimumSelfDistanceCaseIdKey.trim() !== "" || overlap;
   const formDirty = dirty || powlDirty || tokenReplayDirty || logSkeletonDirty ||
     declareDirty || footprintsDirty || dfgDirty || correlationDirty || temporalDirty || ltlDirty;
 
@@ -3092,6 +3104,24 @@ export function Filters({
                 <option value="pandas">pandas</option>
                 <option value="polars">polars</option>
               </select>
+            </label>
+            <label className="filters-field">
+              <span>Self-distance activity attribute</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={minimumSelfDistanceActivityKey}
+                onChange={(e) => setMinimumSelfDistanceActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Self-distance case-id attribute</span>
+              <input
+                type="text"
+                placeholder="case:concept:name"
+                value={minimumSelfDistanceCaseIdKey}
+                onChange={(e) => setMinimumSelfDistanceCaseIdKey(e.target.value)}
+              />
             </label>
             <label className="filters-field">
               <span>Batch merge distance (seconds)</span>

@@ -483,6 +483,8 @@ export interface MinerOptions {
   batchStartTimestampAttribute?: string;
   /** Minimum self-distance adapter selector included in the analysis export. */
   minimumSelfDistanceVariant?: "log" | "pandas" | "polars";
+  minimumSelfDistanceActivityKey?: string;
+  minimumSelfDistanceCaseIdKey?: string;
   /** Optional overlap statistics (interval events, cases, concurrent activities). */
   overlap?: boolean;
   overlapActivityAttribute?: string;
@@ -1105,6 +1107,10 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       options.minimumSelfDistanceVariant !== "log") {
     add("minimum_self_distance_variant", options.minimumSelfDistanceVariant);
   }
+  if (options.minimumSelfDistanceActivityKey?.trim())
+    add("minimum_self_distance_activity_key", options.minimumSelfDistanceActivityKey.trim());
+  if (options.minimumSelfDistanceCaseIdKey?.trim())
+    add("minimum_self_distance_case_id_key", options.minimumSelfDistanceCaseIdKey.trim());
   if (options.overlap) {
     add("overlap", "true");
     if (options.overlapActivityAttribute?.trim())

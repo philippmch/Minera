@@ -676,6 +676,8 @@ int usage(const char* program) {
                "  --batches                 Discover temporal event batches\n"
                "  --batch-variant <id>      log (default), pandas, or polars\n"
                "  --minimum-self-distance-variant <id> log (default), pandas, or polars\n"
+               "  --minimum-self-distance-activity-key <name> Activity attribute\n"
+               "  --minimum-self-distance-case-id-key <name> Case-id attribute\n"
                "  --overlap                 Compute interval/case/concurrent overlap statistics\n"
                "  --overlap-activity-attribute <name> Optional concurrent activity attribute\n"
                "  --overlap-start-attribute <name> Optional interval start timestamp attribute\n"
@@ -1578,6 +1580,16 @@ int main(int argc, char** argv) {
         std::cerr << "error: --minimum-self-distance-variant expects log, pandas, or polars\n";
         return 2;
       }
+      continue;
+    }
+    if (arg == "--minimum-self-distance-activity-key" ||
+        arg == "--minimum-self-distance-case-id-key") {
+      const auto* value = next();
+      if (!value || std::string_view(value).empty()) return usage(argv[0]);
+      if (arg == "--minimum-self-distance-activity-key")
+        minimum_self_distance_options.activity_key = value;
+      else
+        minimum_self_distance_options.case_id_key = value;
       continue;
     }
     if (arg == "--trace-patterns" || arg == "--trace-pattern") {
@@ -5108,6 +5120,15 @@ int main(int argc, char** argv) {
     const auto minimum_self_distances =
         minera::discover_minimum_self_distances(
             log, minimum_self_distance_options);
+    // Selected activity columns can produce labels that are absent from the
+    // native activity graph; register them before the JSON adapter resolves
+    // minimum-self-distance ids.
+    for (const auto& result : minimum_self_distances) {
+      graph.ensure_activity(result.activity);
+      for (const auto& witness : result.witnesses) {
+        graph.ensure_activity(witness);
+      }
+    }
     const auto transition_system =
         minera::discover_transition_system(log, transition_options);
     const auto tree = minera::discover_process_tree(log, inductive_options);
