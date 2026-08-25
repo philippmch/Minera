@@ -4,6 +4,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "minera/ocel.hpp"
@@ -46,6 +47,23 @@ struct OcelEnrichmentOptions {
 
 [[nodiscard]] std::string serialize_ocel_enrichment_json(
     const Ocel& log, const OcelEnrichmentOptions& options = {});
+
+// Direct object-graph discovery exposes the five deterministic graph
+// relations used by OCEL enrichment without materializing synthetic O2O
+// records.  Undirected relations are returned once in lexical pair order;
+// directed relations retain their source/target orientation.  object_ids
+// includes isolated declared objects so callers can render complete graphs.
+struct OcelObjectGraph {
+  OcelEnrichmentGraph graph = OcelEnrichmentGraph::kInteraction;
+  std::vector<std::string> object_ids;
+  std::vector<std::pair<std::string, std::string>> edges;
+};
+
+[[nodiscard]] OcelObjectGraph discover_ocel_object_graph(
+    const Ocel& log, OcelEnrichmentGraph graph);
+
+[[nodiscard]] std::string serialize_ocel_object_graph_json(
+    const OcelObjectGraph& graph);
 
 struct OcelSplitOptions {
   OcelSplitVariant variant = OcelSplitVariant::kConnectedComponents;

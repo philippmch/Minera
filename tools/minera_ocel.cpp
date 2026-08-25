@@ -28,10 +28,10 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--conformance etot|ocdfg|otg --normative MODEL.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences] [--conformance etot|ocdfg|otg --normative MODEL.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
       return 2;
     }
-    std::string format = "classic", describe, features, discover, enrich, split, conformance,
+    std::string format = "classic", describe, features, discover, enrich, graph, split, conformance,
                         statistics, statistics_prefilter = "none",
                         split_object_type, normative_path, csv_objects_path,
                         normative_csv_objects_path;
@@ -97,6 +97,20 @@ int main(int argc, char** argv) {
         begin = end + 1;
       }
       return result;
+    };
+    const auto object_graph_variant = [](const std::string& value) {
+      if (value == "interaction" || value == "object_interaction_graph")
+        return minera::OcelEnrichmentGraph::kInteraction;
+      if (value == "descendants" || value == "object_descendants_graph")
+        return minera::OcelEnrichmentGraph::kDescendants;
+      if (value == "inheritance" || value == "object_inheritance_graph")
+        return minera::OcelEnrichmentGraph::kInheritance;
+      if (value == "cobirth" || value == "object_cobirth_graph")
+        return minera::OcelEnrichmentGraph::kCobirth;
+      if (value == "codeath" || value == "object_codeath_graph")
+        return minera::OcelEnrichmentGraph::kCodeath;
+      throw std::invalid_argument(
+          "graph expects interaction, descendants, inheritance, cobirth, or codeath");
     };
     const auto marker = [](const std::string& value, const char* option) {
       const auto separator = value.find(':');
@@ -318,12 +332,13 @@ int main(int argc, char** argv) {
         statistics_business_hour_slots = business_slots(argv[++i]);
         statistics_business_hours = true;
       } else if ((option == "--format" || option == "--features" ||
-           option == "--discover" ||
+           option == "--discover" || option == "--graph" ||
            option == "--split") && i + 1 < argc) {
         auto& target = option == "--format" ? format
                       : option == "--features" ? features
                       : option == "--discover" ? discover
-                                                 : split;
+                      : option == "--graph" ? graph
+                                             : split;
         target = argv[++i];
       } else if (option == "--features-max" && i + 1 < argc) {
         const auto parsed = number(argv[++i], "--features-max");
@@ -693,6 +708,10 @@ int main(int argc, char** argv) {
     if (!sqlite_output_path.empty() && format != "sqlite")
       throw std::invalid_argument(
           "--sqlite-output requires --format sqlite");
+    if (!graph.empty() && format != "classic")
+      throw std::invalid_argument(
+          "--graph emits the OCEL_OBJECT_GRAPH JSON envelope and requires the default format");
+    if (!graph.empty()) (void)object_graph_variant(graph);
     if (!enrich.empty() && format != "classic")
       throw std::invalid_argument(
           "--enrich emits the OCEL_ENRICHMENT JSON envelope and requires the default format");
@@ -867,20 +886,23 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
     if (!conformance.empty() &&
-        (!discover.empty() || !enrich.empty() || !split.empty() || !features.empty() ||
-         !statistics.empty() ||
+        (!discover.empty() || !enrich.empty() || !graph.empty() ||
+         !split.empty() || !features.empty() || !statistics.empty() ||
          ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
-          "--conformance cannot be combined with discovery, enrichment, or split");
+          "--conformance cannot be combined with discovery, enrichment, graph, or split");
     if ((!discover.empty() && !split.empty()) ||
         (!discover.empty() && !enrich.empty()) ||
-        (!split.empty() && !enrich.empty()))
+        (!split.empty() && !enrich.empty()) ||
+        (!graph.empty() && (!discover.empty() || !enrich.empty() ||
+                            !split.empty())))
       throw std::invalid_argument(
-          "--discover, --enrich, and --split are mutually exclusive");
+          "--discover, --enrich, --graph, and --split are mutually exclusive");
     if ((ocpn_playout || oc_causal_net_playout) &&
-        (!discover.empty() || !enrich.empty() || !split.empty()))
+        (!discover.empty() || !enrich.empty() || !graph.empty() ||
+         !split.empty()))
       throw std::invalid_argument(
-          "object-centric playout cannot be combined with discovery, enrichment, or split");
+          "object-centric playout cannot be combined with discovery, enrichment, graph, or split");
     if (ocpn_event_binding_used && !ocpn_playout && !oc_causal_net_playout)
       throw std::invalid_argument(
           "--ocpn-event-binding requires --ocpn-playout or --oc-causal-net");
@@ -891,13 +913,15 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "--ocpn-branching-activities requires --oc-causal-net");
     if (!describe.empty() &&
-        (!discover.empty() || !enrich.empty() || !split.empty() || !features.empty() ||
+        (!discover.empty() || !enrich.empty() || !graph.empty() ||
+         !split.empty() || !features.empty() ||
          !statistics.empty() || !conformance.empty() ||
          ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
-          "--describe cannot be combined with discovery, enrichment, split, or conformance");
+          "--describe cannot be combined with discovery, enrichment, graph, split, or conformance");
     if (!statistics.empty() &&
-        (!discover.empty() || !enrich.empty() || !split.empty() || !features.empty() ||
+        (!discover.empty() || !enrich.empty() || !graph.empty() ||
+         !split.empty() || !features.empty() ||
          !conformance.empty() || ocpn_playout || oc_causal_net_playout ||
          !describe.empty()))
       throw std::invalid_argument(
@@ -1010,10 +1034,18 @@ int main(int argc, char** argv) {
       log = minera::filter_ocel_cc_activity(log, filter_cc_activity);
     }
     if (!features.empty() &&
-        (!discover.empty() || !enrich.empty() || !split.empty() || !conformance.empty() ||
+        (!discover.empty() || !enrich.empty() || !graph.empty() ||
+         !split.empty() || !conformance.empty() ||
          !statistics.empty() || ocpn_playout || oc_causal_net_playout))
       throw std::invalid_argument(
-          "--features cannot be combined with discovery, enrichment, split, conformance, or playout");
+          "--features cannot be combined with discovery, enrichment, graph, split, conformance, or playout");
+    if (!graph.empty()) {
+      std::cout << minera::serialize_ocel_object_graph_json(
+                       minera::discover_ocel_object_graph(
+                           log, object_graph_variant(graph)))
+                << '\n';
+      return 0;
+    }
     if (!statistics.empty()) {
       const auto prefilter = statistics_prefilter == "start"
                                  ? minera::OcelAssociationPrefilter::kStart

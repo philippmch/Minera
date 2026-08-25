@@ -48,6 +48,7 @@ import {
   type OcelSplitResult,
   type OcelEnrichmentGraph,
   type OcelEnrichmentResult,
+  type OcelObjectGraphResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelInteractionGraphSource,
@@ -89,6 +90,7 @@ import {
   isOcelExchangeResult,
   isOcelSplitResult,
   isOcelEnrichmentResult,
+  isOcelObjectGraphResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
   isOcelStatisticsResult,
@@ -4699,6 +4701,42 @@ export async function requestOcelEnrichment(
   const payload: unknown = await response.json();
   if (!isOcelEnrichmentResult(payload))
     throw new Error("the Minera backend returned an invalid OCEL enrichment");
+  return payload;
+}
+
+export interface OcelObjectGraphOptions {
+  variant?: OcelEnrichmentGraph;
+}
+
+export function ocelObjectGraphQuery(options: OcelObjectGraphOptions = {}): string {
+  const query = new URLSearchParams();
+  if (options.variant !== undefined) {
+    if (!["object_interaction_graph", "object_descendants_graph",
+      "object_inheritance_graph", "object_cobirth_graph",
+      "object_codeath_graph"].includes(options.variant)) {
+      throw new Error("OCEL object graph variant is invalid");
+    }
+    query.set("variant", options.variant);
+  }
+  return query.toString();
+}
+
+export async function requestOcelObjectGraph(
+  log: Blob,
+  options: OcelObjectGraphOptions = {},
+): Promise<OcelObjectGraphResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelObjectGraphQuery(options);
+  const response = await fetch(`/api/ocel/graph${query ? `?${query}` : ""}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelObjectGraphResult(payload))
+    throw new Error("the Minera backend returned an invalid OCEL object graph");
   return payload;
 }
 

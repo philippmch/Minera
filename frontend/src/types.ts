@@ -1081,6 +1081,13 @@ export interface OcelEnrichmentResult {
   lifecycle_qualifiers: boolean;
   log: Record<string, unknown>;
 }
+export type OcelObjectGraphVariant = OcelEnrichmentGraph;
+export interface OcelObjectGraphResult {
+  family: "OCEL_OBJECT_GRAPH";
+  variant: OcelObjectGraphVariant;
+  object_ids: string[];
+  edges: Array<[string, string]>;
+}
 export type OcelPlayoutVariant = "EXTENSIVE";
 export interface OcelPlayoutBinding {
   activity: string;
@@ -1194,6 +1201,18 @@ export function isOcelEnrichmentResult(value: unknown): value is OcelEnrichmentR
       !isOcelRecord(value.log)) return false;
   return isOcelRecord(value.log["ocel:events"]) &&
     isOcelRecord(value.log["ocel:objects"]);
+}
+export function isOcelObjectGraphResult(value: unknown): value is OcelObjectGraphResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_OBJECT_GRAPH" ||
+      ![
+        "object_interaction_graph", "object_descendants_graph",
+        "object_inheritance_graph", "object_cobirth_graph",
+        "object_codeath_graph",
+      ].includes(String(value.variant)) || !Array.isArray(value.object_ids) ||
+      !value.object_ids.every((id) => typeof id === "string") ||
+      !Array.isArray(value.edges)) return false;
+  return value.edges.every((edge) => Array.isArray(edge) && edge.length === 2 &&
+    edge.every((id) => typeof id === "string"));
 }
 export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult {
   if (!isOcelRecord(value) ||

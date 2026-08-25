@@ -512,6 +512,64 @@ std::string serialize_ocel_enrichment_json(const Ocel& log,
   return out.str();
 }
 
+OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
+                                           OcelEnrichmentGraph graph) {
+  const auto index = make_enrichment_index(log);
+  OcelObjectGraph result;
+  result.graph = graph;
+  result.object_ids.reserve(log.objects.size());
+  for (const auto& object : log.objects) result.object_ids.push_back(object.id);
+  std::sort(result.object_ids.begin(), result.object_ids.end());
+  result.object_ids.erase(
+      std::unique(result.object_ids.begin(), result.object_ids.end()),
+      result.object_ids.end());
+
+  std::set<ObjectPair> edges;
+  switch (graph) {
+    case OcelEnrichmentGraph::kInteraction:
+      edges = enrichment_interaction_graph(index);
+      break;
+    case OcelEnrichmentGraph::kDescendants:
+      edges = enrichment_descendants_graph(index);
+      break;
+    case OcelEnrichmentGraph::kInheritance:
+      edges = enrichment_inheritance_graph(index);
+      break;
+    case OcelEnrichmentGraph::kCobirth:
+      edges = enrichment_cobirth_graph(index);
+      break;
+    case OcelEnrichmentGraph::kCodeath:
+      edges = enrichment_codeath_graph(index);
+      break;
+    default:
+      throw std::invalid_argument("unknown OCEL object graph");
+  }
+  result.edges.assign(edges.begin(), edges.end());
+  return result;
+}
+
+std::string serialize_ocel_object_graph_json(const OcelObjectGraph& graph) {
+  std::ostringstream out;
+  out << "{\"family\":\"OCEL_OBJECT_GRAPH\",\"variant\":";
+  write_json_string(out, enrichment_graph_name(graph.graph));
+  out << ",\"object_ids\":[";
+  for (std::size_t index = 0; index < graph.object_ids.size(); ++index) {
+    if (index != 0) out << ',';
+    write_json_string(out, graph.object_ids[index]);
+  }
+  out << "],\"edges\":[";
+  for (std::size_t index = 0; index < graph.edges.size(); ++index) {
+    if (index != 0) out << ',';
+    out << '[';
+    write_json_string(out, graph.edges[index].first);
+    out << ',';
+    write_json_string(out, graph.edges[index].second);
+    out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
 OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
   if (options.variant != OcelSplitVariant::kConnectedComponents &&
       options.variant != OcelSplitVariant::kAncestorsDescendants) {
