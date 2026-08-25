@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,13 @@ namespace minera {
 inline constexpr std::size_t kStochasticPetriMaxGeneratorStates = 2000;
 inline constexpr std::size_t kStochasticPetriMaxGeneratorEntries =
     kStochasticPetriMaxGeneratorStates * kStochasticPetriMaxGeneratorStates;
+inline constexpr double kStochasticPetriMaxTransientTimeSeconds = 1'000'000.0;
+
+enum class StochasticPetriAnalysisVariant {
+  kReachability,
+  kTransient,
+  kSteadyState,
+};
 
 // Reachability controls for a finite-state ordinary Petri-net CTMC view.
 // Empty transition_rates assigns rate 1.0 to every transition.
@@ -22,6 +30,13 @@ struct StochasticPetriOptions {
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::size_t> immediate_transitions;
   std::size_t max_states = kStochasticPetriMaxGeneratorStates;
+  // Adapter-only analysis selector. Native reachability ignores this field;
+  // adapters dispatch to the explicit probability APIs below.
+  StochasticPetriAnalysisVariant analysis =
+      StochasticPetriAnalysisVariant::kReachability;
+  double analysis_time_seconds = 0.0;
+  std::optional<std::size_t> analysis_initial_state;
+  std::vector<double> analysis_initial_probabilities;
 };
 
 struct StochasticPetriState {
@@ -39,11 +54,36 @@ struct StochasticPetriResult {
   std::vector<StochasticPetriState> states;
   std::vector<StochasticPetriEdge> edges;
   std::vector<std::vector<double>> generator;
+  // Index of the projected initial marking when it remains a tangible state.
+  // A missing value means the initial marking was removed by projection.
+  std::optional<std::size_t> initial_state;
   bool exhausted = false;
+  std::string diagnostic;
+};
+
+struct StochasticPetriDistributionResult {
+  StochasticPetriAnalysisVariant variant =
+      StochasticPetriAnalysisVariant::kTransient;
+  std::vector<double> probabilities;
+  double time_seconds = 0.0;
+  std::optional<std::size_t> initial_state;
+  bool computed = false;
+  bool unique = true;
   std::string diagnostic;
 };
 
 [[nodiscard]] StochasticPetriResult stochastic_petri_reachability(
     const PetriNet& net, const StochasticPetriOptions& options = {});
+
+[[nodiscard]] StochasticPetriDistributionResult stochastic_petri_transient(
+    const StochasticPetriResult& result, double time_seconds,
+    std::size_t initial_state);
+
+[[nodiscard]] StochasticPetriDistributionResult stochastic_petri_transient(
+    const StochasticPetriResult& result, double time_seconds,
+    const std::vector<double>& initial_probabilities);
+
+[[nodiscard]] StochasticPetriDistributionResult stochastic_petri_steady_state(
+    const StochasticPetriResult& result);
 
 }  // namespace minera

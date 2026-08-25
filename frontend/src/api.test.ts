@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fetchExtensivePlayoutVisited } from "./api";
-import { fetchStochasticPetri, stochasticPetriQuery } from "./api";
+import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery } from "./api";
 import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
 
 describe("Petri usage comparison API", () => {
@@ -141,6 +141,39 @@ describe("basic Petri playout API", () => {
       add_only_if_fm_is_reached: true,
     })).resolves.toBe("<log/>");
     vi.unstubAllGlobals();
+  });
+
+  it("serializes transient controls and decodes probability distributions", async () => {
+    const options = {
+      analysis: "transient" as const, time_seconds: 1.5,
+      initial_state: 1, max_states: 8,
+    };
+    const query = stochasticPetriQuery(options);
+    expect(query).toContain("stochastic_petri_analysis=transient");
+    expect(query).toContain("stochastic_petri_time=1.5");
+    expect(query).toContain("stochastic_petri_initial_state=1");
+    const payload = {
+      family: "STOCHASTIC_PETRI_DISTRIBUTION",
+      variant: "TRANSIENT", computed: true, unique: true,
+      diagnostic: "", time_seconds: 1.5, initial_state: 1,
+      probabilities: [0.25, 0.75],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("stochastic_petri_analysis=transient");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchStochasticPetriDistribution("inductive", options))
+      .resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+    expect(() => stochasticPetriQuery({ time_seconds: 1 })).toThrow(/requires transient/);
+    expect(() => stochasticPetriQuery({ analysis: "transient", time_seconds: 1_000_001 }))
+      .toThrow(/safety limit/);
+    expect(() => stochasticPetriQuery({
+      analysis: "transient", initial_probabilities: [0.2, 0.2],
+    })).toThrow(/unit mass/);
+    expect(() => stochasticPetriQuery({
+      analysis: "steady_state", initial_state: 0,
+    })).toThrow(/requires transient/);
   });
 
   it("decodes structured visited markings and transitions", async () => {

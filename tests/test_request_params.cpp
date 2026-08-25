@@ -2502,15 +2502,25 @@ void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
       {"stochastic_petri_rates", "2, 3.5"},
       {"stochastic_petri_initial_marking", "1,0"},
       {"stochastic_petri_immediate_transitions", "0,2"},
-      {"stochastic_petri_max_states", "12"}}));
+      {"stochastic_petri_max_states", "12"},
+      {"stochastic_petri_analysis", "transient"},
+      {"stochastic_petri_time", "1.5"},
+      {"stochastic_petri_initial_state", "1"}}));
   assert(parsed.transition_rates.size() == 2);
   assert(parsed.transition_rates[1] == 3.5);
   assert(parsed.initial_marking == std::vector<std::uint32_t>({1, 0}));
   assert(parsed.immediate_transitions == std::vector<std::size_t>({0, 2}));
   assert(parsed.max_states == 12);
+  assert(parsed.analysis == minera::StochasticPetriAnalysisVariant::kTransient);
+  assert(parsed.analysis_time_seconds == 1.5);
+  assert(parsed.analysis_initial_state && *parsed.analysis_initial_state == 1);
   for (const auto& item : {std::pair{"stochastic_petri_rates", "-1"},
                            std::pair{"stochastic_petri_rates", "nan"},
-                           std::pair{"stochastic_petri_max_states", "0"}}) {
+                           std::pair{"stochastic_petri_max_states", "0"},
+                           std::pair{"stochastic_petri_analysis", "bad"},
+                           std::pair{"stochastic_petri_time", "-1"},
+                           std::pair{"stochastic_petri_time", "1000001"},
+                           std::pair{"stochastic_petri_initial_probabilities", "0.2,0.2"}}) {
     bool rejected = false;
     try {
       (void)minera::parse_stochastic_petri_params(fields({item}));
@@ -2519,6 +2529,14 @@ void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
     }
     assert(rejected);
   }
+  bool mismatch = false;
+  try {
+    (void)minera::parse_stochastic_petri_params(fields({
+        {"stochastic_petri_initial_state", "0"}}));
+  } catch (const std::invalid_argument&) {
+    mismatch = true;
+  }
+  assert(mismatch);
 }
 
 void parse_dfg_playout_params_maps_controls_and_aliases() {

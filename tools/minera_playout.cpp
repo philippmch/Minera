@@ -69,7 +69,11 @@ int usage(const char* program) {
                "  --stochastic-petri-rates <r,...> Exponential rates\n"
                "  --stochastic-petri-initial-marking <n,...> Initial marking\n"
                "  --stochastic-petri-immediate-transitions <n,...> Immediate indices\n"
-               "  --stochastic-petri-max-states <n> Reachability state cap\n";
+               "  --stochastic-petri-max-states <n> Reachability state cap\n"
+               "  --stochastic-petri-analysis <name> reachability, transient, or steady_state\n"
+               "  --stochastic-petri-time <f> Transient time in seconds\n"
+               "  --stochastic-petri-initial-state <n> Transient source state\n"
+               "  --stochastic-petri-initial-probabilities <p,...> Transient vector\n";
   return 2;
 }
 
@@ -147,7 +151,11 @@ int main(int argc, char** argv) {
     } else if (arg == "--stochastic-petri-rates" ||
                arg == "--stochastic-petri-initial-marking" ||
                arg == "--stochastic-petri-immediate-transitions" ||
-               arg == "--stochastic-petri-max-states") {
+               arg == "--stochastic-petri-max-states" ||
+               arg == "--stochastic-petri-analysis" ||
+               arg == "--stochastic-petri-time" ||
+               arg == "--stochastic-petri-initial-state" ||
+               arg == "--stochastic-petri-initial-probabilities") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
@@ -324,8 +332,35 @@ int main(int argc, char** argv) {
             ? minera::to_petri_net(minera::import_ptml(input))
             : minera::import_pnml(input);
     if (stochastic_petri) {
-      const auto json = minera::serialize_stochastic_petri_json(
-          minera::stochastic_petri_reachability(net, stochastic_petri_options));
+      const auto reachability =
+          minera::stochastic_petri_reachability(net, stochastic_petri_options);
+      std::string json;
+      if (stochastic_petri_options.analysis ==
+          minera::StochasticPetriAnalysisVariant::kReachability) {
+        json = minera::serialize_stochastic_petri_json(reachability);
+        } else if (stochastic_petri_options.analysis ==
+                   minera::StochasticPetriAnalysisVariant::kTransient) {
+          const auto initial_state =
+              stochastic_petri_options.analysis_initial_state.has_value()
+                  ? stochastic_petri_options.analysis_initial_state
+                  : reachability.initial_state;
+          if (stochastic_petri_options.analysis_initial_probabilities.empty() &&
+              !initial_state.has_value())
+            throw std::invalid_argument(
+                "stochastic Petri transient analysis could not retain the initial state; provide an initial probability vector");
+          const auto distribution =
+              stochastic_petri_options.analysis_initial_probabilities.empty()
+                  ? minera::stochastic_petri_transient(
+                      reachability, stochastic_petri_options.analysis_time_seconds,
+                      *initial_state)
+                  : minera::stochastic_petri_transient(
+                      reachability, stochastic_petri_options.analysis_time_seconds,
+                      stochastic_petri_options.analysis_initial_probabilities);
+        json = minera::serialize_stochastic_petri_distribution_json(distribution);
+      } else {
+        json = minera::serialize_stochastic_petri_distribution_json(
+            minera::stochastic_petri_steady_state(reachability));
+      }
       if (output.empty()) std::cout << json << '\n';
       else {
         std::ofstream file(output);

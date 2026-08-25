@@ -294,6 +294,8 @@ void write_analysis_json(std::ostream& out,
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_petri_json(
     const StochasticPetriResult& result);
+[[nodiscard]] std::string serialize_stochastic_petri_distribution_json(
+    const StochasticPetriDistributionResult& result);
 [[nodiscard]] std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result);
 

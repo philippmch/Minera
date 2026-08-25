@@ -146,6 +146,7 @@ import {
   type ExtensivePlayoutVisitedResult,
   type StochasticPetriOptions,
   type StochasticPetriResult,
+  type StochasticPetriDistributionResult,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -195,6 +196,7 @@ import {
   isStochasticPlayoutVisitedResult,
   isExtensivePlayoutVisitedResult,
   isStochasticPetriResult,
+  isStochasticPetriDistributionResult,
   isProcessTreePlayoutSetResult,
   isChaoticActivitiesResult,
   isPassedTimeResult,
@@ -3584,6 +3586,43 @@ export function stochasticPetriQuery(
       throw new Error("max_states must not exceed 2000 for the dense generator");
     params.set("stochastic_petri_max_states", String(options.max_states));
   }
+  if (options.analysis !== undefined) {
+    if (!["reachability", "transient", "steady_state"].includes(options.analysis))
+      throw new Error("analysis must be reachability, transient, or steady_state");
+    params.set("stochastic_petri_analysis", options.analysis);
+  }
+  if (options.time_seconds !== undefined) {
+    if (!Number.isFinite(options.time_seconds) || options.time_seconds < 0)
+      throw new Error("time_seconds must be finite and non-negative");
+    if (options.time_seconds > 1_000_000)
+      throw new Error("time_seconds exceeds the transient safety limit");
+    if ((options.analysis ?? "reachability") !== "transient")
+      throw new Error("time_seconds requires transient analysis");
+    params.set("stochastic_petri_time", String(options.time_seconds));
+  }
+  if (options.initial_state !== undefined) {
+    if (!Number.isSafeInteger(options.initial_state) || options.initial_state < 0)
+      throw new Error("initial_state must be a non-negative integer");
+    if ((options.analysis ?? "reachability") !== "transient")
+      throw new Error("initial_state requires transient analysis");
+    if (options.initial_probabilities !== undefined)
+      throw new Error("initial_state and initial_probabilities are mutually exclusive");
+    params.set("stochastic_petri_initial_state", String(options.initial_state));
+  }
+  if (options.initial_probabilities !== undefined) {
+    if (!Array.isArray(options.initial_probabilities) ||
+        options.initial_probabilities.length === 0 ||
+        options.initial_probabilities.some((probability) =>
+          !Number.isFinite(probability) || probability < 0))
+      throw new Error("initial_probabilities must be a non-empty finite non-negative list");
+    const mass = options.initial_probabilities.reduce((sum, probability) => sum + probability, 0);
+    if (!Number.isFinite(mass) || Math.abs(mass - 1) > 1e-10)
+      throw new Error("initial_probabilities must have unit mass");
+    if ((options.analysis ?? "reachability") !== "transient")
+      throw new Error("initial_probabilities requires transient analysis");
+    params.set("stochastic_petri_initial_probabilities",
+      options.initial_probabilities.join(","));
+  }
   return params.toString();
 }
 
@@ -3606,6 +3645,25 @@ export async function fetchStochasticPetri(
   }
   if (!isStochasticPetriResult(payload))
     throw new Error("the Minera backend returned an invalid stochastic Petri result");
+  return payload;
+}
+
+export async function fetchStochasticPetriDistribution(
+  miner = "inductive",
+  options: StochasticPetriOptions = {},
+): Promise<StochasticPetriDistributionResult> {
+  if (options.analysis !== "transient" && options.analysis !== "steady_state")
+    throw new Error("analysis must be transient or steady_state for distribution analysis");
+  const query = stochasticPetriQuery(options);
+  const response = await fetch(`/api/stochastic-petri?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isStochasticPetriDistributionResult(payload))
+    throw new Error("the Minera backend returned an invalid stochastic Petri distribution");
   return payload;
 }
 

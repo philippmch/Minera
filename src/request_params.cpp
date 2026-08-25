@@ -2664,6 +2664,68 @@ StochasticPetriParams parse_stochastic_petri_params(
     params.max_states = parse_positive_size(
         require("stochastic_petri_max_states"),
         "stochastic_petri_max_states");
+  if (supplied("stochastic_petri_analysis")) {
+    const auto value = require("stochastic_petri_analysis");
+    if (value == "reachability")
+      params.analysis = StochasticPetriAnalysisVariant::kReachability;
+    else if (value == "transient")
+      params.analysis = StochasticPetriAnalysisVariant::kTransient;
+    else if (value == "steady_state")
+      params.analysis = StochasticPetriAnalysisVariant::kSteadyState;
+    else
+      throw std::invalid_argument(
+          "stochastic_petri_analysis must be reachability, transient, or steady_state");
+  }
+  if (supplied("stochastic_petri_time")) {
+    params.analysis_time_seconds =
+        parse_finite_double(require("stochastic_petri_time"),
+                            "stochastic_petri_time");
+    if (params.analysis_time_seconds < 0.0)
+      throw std::invalid_argument(
+          "stochastic_petri_time must be non-negative");
+    if (params.analysis_time_seconds > kStochasticPetriMaxTransientTimeSeconds)
+      throw std::invalid_argument(
+          "stochastic_petri_time exceeds the transient safety limit");
+  }
+  if (supplied("stochastic_petri_initial_state"))
+    params.analysis_initial_state = parse_nonnegative_size(
+        require("stochastic_petri_initial_state"),
+        "stochastic_petri_initial_state");
+  if (supplied("stochastic_petri_initial_probabilities")) {
+    for (const auto& token : split_csv(
+             require("stochastic_petri_initial_probabilities"))) {
+      const auto probability = parse_finite_double(
+          token, "stochastic_petri_initial_probabilities");
+      if (probability < 0.0)
+        throw std::invalid_argument(
+            "stochastic_petri_initial_probabilities must be non-negative");
+      params.analysis_initial_probabilities.push_back(probability);
+    }
+    if (params.analysis_initial_probabilities.empty())
+      throw std::invalid_argument(
+          "stochastic_petri_initial_probabilities: expected values");
+    double mass = 0.0;
+    for (const auto probability : params.analysis_initial_probabilities)
+      mass += probability;
+    if (!std::isfinite(mass) || std::abs(mass - 1.0) > 1e-10)
+      throw std::invalid_argument(
+          "stochastic_petri_initial_probabilities must have unit mass");
+  }
+  if (params.analysis_initial_state &&
+      !params.analysis_initial_probabilities.empty())
+    throw std::invalid_argument(
+        "stochastic Petri analysis accepts an initial state or probability vector, not both");
+  const bool transient_controls = supplied("stochastic_petri_time") ||
+                                  params.analysis_initial_state.has_value() ||
+                                  !params.analysis_initial_probabilities.empty();
+  if (params.analysis == StochasticPetriAnalysisVariant::kReachability &&
+      transient_controls)
+    throw std::invalid_argument(
+        "stochastic Petri transient controls require analysis=transient");
+  if (params.analysis == StochasticPetriAnalysisVariant::kSteadyState &&
+      transient_controls)
+    throw std::invalid_argument(
+        "stochastic Petri steady_state does not accept transient controls");
   return params;
 }
 

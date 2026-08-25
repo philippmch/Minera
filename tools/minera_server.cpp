@@ -213,7 +213,9 @@ void reject_unknown_stochastic_petri_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
       "miner", "stochastic_petri_rates", "stochastic_petri_initial_marking",
       "stochastic_petri_immediate_transitions",
-      "stochastic_petri_max_states"};
+      "stochastic_petri_max_states", "stochastic_petri_analysis",
+      "stochastic_petri_time", "stochastic_petri_initial_state",
+      "stochastic_petri_initial_probabilities"};
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key))
@@ -4517,10 +4519,38 @@ void handle_stochastic_petri(const httplib::Request& request,
     if (options.max_states > minera::kStochasticPetriMaxGeneratorStates)
       throw std::invalid_argument(
           "stochastic Petri max_states exceeds the dense generator safety limit");
-    response.set_content(
-        minera::serialize_stochastic_petri_json(
-            minera::stochastic_petri_reachability(it->second, options)),
-        "application/json");
+    const auto reachability =
+        minera::stochastic_petri_reachability(it->second, options);
+    if (options.analysis == minera::StochasticPetriAnalysisVariant::kReachability) {
+      response.set_content(minera::serialize_stochastic_petri_json(reachability),
+                           "application/json");
+    } else if (options.analysis ==
+               minera::StochasticPetriAnalysisVariant::kTransient) {
+      const auto initial_state =
+          options.analysis_initial_state.has_value()
+              ? options.analysis_initial_state
+              : reachability.initial_state;
+      if (options.analysis_initial_probabilities.empty() &&
+          !initial_state.has_value())
+        throw std::invalid_argument(
+            "stochastic Petri transient analysis could not retain the initial state; provide an initial probability vector");
+      const auto distribution = options.analysis_initial_probabilities.empty()
+                                    ? minera::stochastic_petri_transient(
+                                          reachability,
+                                          options.analysis_time_seconds,
+                                          *initial_state)
+                                    : minera::stochastic_petri_transient(
+                                          reachability,
+                                          options.analysis_time_seconds,
+                                          options.analysis_initial_probabilities);
+      response.set_content(
+          minera::serialize_stochastic_petri_distribution_json(distribution),
+          "application/json");
+    } else {
+      response.set_content(minera::serialize_stochastic_petri_distribution_json(
+                               minera::stochastic_petri_steady_state(reachability)),
+                           "application/json");
+    }
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

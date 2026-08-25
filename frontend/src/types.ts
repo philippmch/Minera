@@ -2980,6 +2980,10 @@ export interface StochasticPetriOptions {
   initial_marking?: number[];
   immediate_transitions?: number[];
   max_states?: number;
+  analysis?: "reachability" | "transient" | "steady_state";
+  time_seconds?: number;
+  initial_state?: number;
+  initial_probabilities?: number[];
 }
 
 export interface StochasticPetriResult {
@@ -2990,6 +2994,17 @@ export interface StochasticPetriResult {
   states: number[][];
   edges: Array<{ source: number; target: number; transition: number; rate: number }>;
   generator: number[][];
+}
+
+export interface StochasticPetriDistributionResult {
+  family: "STOCHASTIC_PETRI_DISTRIBUTION";
+  variant: "TRANSIENT" | "STEADY_STATE";
+  computed: boolean;
+  unique: boolean;
+  diagnostic: string;
+  time_seconds: number;
+  initial_state: number | null;
+  probabilities: number[];
 }
 
 export function isStochasticPetriResult(
@@ -3013,6 +3028,25 @@ export function isStochasticPetriResult(
   return result.generator.length === result.states.length &&
     result.generator.every((row) => Array.isArray(row) &&
     row.length === result.states!.length && row.every(Number.isFinite));
+}
+
+export function isStochasticPetriDistributionResult(
+  value: unknown,
+): value is StochasticPetriDistributionResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<StochasticPetriDistributionResult>;
+  if (result.family !== "STOCHASTIC_PETRI_DISTRIBUTION" ||
+      (result.variant !== "TRANSIENT" && result.variant !== "STEADY_STATE") ||
+      typeof result.computed !== "boolean" || typeof result.unique !== "boolean" ||
+      typeof result.diagnostic !== "string" || !Number.isFinite(result.time_seconds) ||
+      (result.initial_state !== null &&
+       !(typeof result.initial_state === "number" &&
+         Number.isSafeInteger(result.initial_state) && result.initial_state >= 0)) ||
+      !Array.isArray(result.probabilities) ||
+      !result.probabilities.every((probability) =>
+        Number.isFinite(probability) && probability >= 0)) return false;
+  const mass = result.probabilities.reduce((sum, probability) => sum + probability, 0);
+  return !result.computed || (Number.isFinite(mass) && Math.abs(mass - 1) <= 1e-8);
 }
 
 /** Controls bounded virtual-time Petri-net Monte Carlo simulation. */

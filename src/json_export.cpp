@@ -3797,6 +3797,42 @@ std::string serialize_stochastic_petri_json(
   return out.str();
 }
 
+std::string serialize_stochastic_petri_distribution_json(
+    const StochasticPetriDistributionResult& result) {
+  const auto variant = [&]() -> std::string_view {
+    switch (result.variant) {
+      case StochasticPetriAnalysisVariant::kTransient:
+        return "TRANSIENT";
+      case StochasticPetriAnalysisVariant::kSteadyState:
+        return "STEADY_STATE";
+      case StochasticPetriAnalysisVariant::kReachability:
+        return "REACHABILITY";
+    }
+    return "UNKNOWN";
+  }();
+  std::ostringstream out;
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
+  out << "{\"family\":\"STOCHASTIC_PETRI_DISTRIBUTION\",\"variant\":\""
+      << variant << "\",\"computed\":" << (result.computed ? "true" : "false")
+      << ",\"unique\":" << (result.unique ? "true" : "false")
+      << ",\"time_seconds\":";
+  write_finite_or_null(out, result.time_seconds);
+  out << ",\"diagnostic\":";
+  write_json_string(out, result.diagnostic);
+  out << ",\"initial_state\":";
+  if (result.initial_state)
+    out << *result.initial_state;
+  else
+    out << "null";
+  out << ",\"probabilities\":[";
+  for (std::size_t index = 0; index < result.probabilities.size(); ++index) {
+    if (index) out << ',';
+    write_finite_or_null(out, result.probabilities[index]);
+  }
+  out << "]}";
+  return out.str();
+}
+
 std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result) {
   std::ostringstream out;
