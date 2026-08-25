@@ -2994,6 +2994,8 @@ export interface StochasticPetriResult {
   states: number[][];
   edges: Array<{ source: number; target: number; transition: number; rate: number }>;
   generator: number[][];
+  initial_state?: number | null;
+  initial_probabilities?: number[];
 }
 
 export interface StochasticPetriDistributionResult {
@@ -3005,6 +3007,103 @@ export interface StochasticPetriDistributionResult {
   time_seconds: number;
   initial_state: number | null;
   probabilities: number[];
+}
+
+export interface StochasticMapOptions {
+  source?: "log" | "performance_dfg";
+  distribution?: "deterministic" | "exponential" | "constant0" | "immediate" |
+    "normal" | "uniform" | "lognormal" | "gamma";
+  default_parameter?: number;
+  silent_transitions_immediate?: boolean;
+  zero_duration_immediate?: boolean;
+  fit_activation_weights?: boolean;
+  fit_timing?: boolean;
+  default_activation_weight?: number;
+  frequency_activation_weights?: boolean;
+  conversion_variant?: "activity_defines_place" | "invisibles_no_duplicates";
+  initial_marking?: number[];
+  max_states?: number;
+}
+
+export type StochasticMapDistribution =
+  NonNullable<StochasticMapOptions["distribution"]>;
+
+export interface StochasticMapTransition {
+  transition: number;
+  timing: "timed" | "immediate";
+  distribution: StochasticMapDistribution;
+  parameter: number;
+  secondary_parameter: number;
+  tertiary_parameter: number;
+  activation_weight: number;
+  priority: number;
+}
+
+export interface StochasticMapResult {
+  family: "STOCHASTIC_MAP";
+  source: "log" | "performance_dfg";
+  map: { family: "STOCHASTIC_MAP"; transitions: StochasticMapTransition[] };
+  net?: Record<string, unknown>;
+  diagnostics?: { replayed_traces: number; skipped_traces: number };
+  reachability: StochasticPetriResult;
+}
+
+export function isStochasticMapResult(
+  value: unknown,
+): value is StochasticMapResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<StochasticMapResult>;
+  if ((result.family !== "STOCHASTIC_MAP") ||
+      (result.source !== "log" && result.source !== "performance_dfg") ||
+      !result.map || typeof result.map !== "object" ||
+      (result.map as { family?: unknown }).family !== "STOCHASTIC_MAP" ||
+      !Array.isArray((result.map as { transitions?: unknown }).transitions) ||
+      !isStochasticPetriResult(result.reachability)) return false;
+  const transitions = (result.map as { transitions: unknown[] }).transitions;
+  if (!transitions.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const transition = item as Partial<StochasticMapTransition>;
+    const distribution = transition.distribution;
+    const distributions: StochasticMapDistribution[] = [
+      "deterministic", "exponential", "constant0", "immediate", "normal",
+      "uniform", "lognormal", "gamma",
+    ];
+    if (!distributions.includes(distribution as StochasticMapDistribution))
+      return false;
+    return Number.isSafeInteger(transition.transition) &&
+      (transition.transition as number) >= 0 &&
+      (transition.timing === "timed" || transition.timing === "immediate") &&
+      Number.isFinite(transition.parameter) &&
+      Number.isFinite(transition.secondary_parameter) &&
+      (transition.secondary_parameter as number) >= 0 &&
+      Number.isFinite(transition.tertiary_parameter) &&
+      (transition.tertiary_parameter as number) >= 0 &&
+      Number.isFinite(transition.activation_weight) &&
+      (transition.activation_weight as number) >= 0 &&
+      Number.isSafeInteger(transition.priority) &&
+      (distribution === "lognormal" ||
+       (transition.parameter as number) >= 0) &&
+      (distribution !== "exponential" || transition.timing === "immediate" ||
+       (transition.parameter as number) > 0) &&
+      (distribution !== "uniform" ||
+       (transition.secondary_parameter as number) >=
+         (transition.parameter as number)) &&
+      (distribution !== "gamma" ||
+       ((transition.parameter as number) > 0 &&
+        (transition.secondary_parameter as number) > 0)) &&
+      ((distribution !== "constant0" && distribution !== "immediate") ||
+       ((transition.parameter as number) === 0 &&
+        (transition.secondary_parameter as number) === 0 &&
+        (transition.tertiary_parameter as number) === 0));
+  })) return false;
+  if (result.diagnostics !== undefined) {
+    if (!Number.isSafeInteger(result.diagnostics.replayed_traces) ||
+        !Number.isSafeInteger(result.diagnostics.skipped_traces) ||
+        result.diagnostics.replayed_traces < 0 ||
+        result.diagnostics.skipped_traces < 0) return false;
+  }
+  return transitions.every((item, index) =>
+    (item as StochasticMapTransition).transition === index);
 }
 
 export function isStochasticPetriResult(
@@ -3025,6 +3124,21 @@ export function isStochasticPetriResult(
       edge.source >= 0 && edge.target >= 0 &&
       edge.source < result.states!.length && edge.target < result.states!.length &&
       Number.isFinite(edge.rate) && edge.rate >= 0)) return false;
+  if (result.initial_state !== undefined && result.initial_state !== null &&
+      !(Number.isSafeInteger(result.initial_state) && result.initial_state >= 0 &&
+        result.initial_state < result.states.length))
+    return false;
+  if (result.initial_probabilities !== undefined) {
+    if (!Array.isArray(result.initial_probabilities) ||
+        (result.initial_probabilities.length !== result.states.length &&
+         !(result.exhausted && result.initial_probabilities.length === 0)) ||
+        !result.initial_probabilities.every((probability) =>
+          Number.isFinite(probability) && probability >= 0)) return false;
+    const mass = result.initial_probabilities.reduce(
+      (sum, probability) => sum + probability, 0);
+    if (result.initial_probabilities.length > 0 &&
+        (!Number.isFinite(mass) || Math.abs(mass - 1) > 1e-8)) return false;
+  }
   return result.generator.length === result.states.length &&
     result.generator.every((row) => Array.isArray(row) &&
     row.length === result.states!.length && row.every(Number.isFinite));

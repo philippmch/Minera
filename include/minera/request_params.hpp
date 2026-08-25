@@ -35,6 +35,7 @@
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
 #include "minera/stochastic_petri.hpp"
+#include "minera/stochastic_map.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/concept_drift.hpp"
@@ -208,6 +209,16 @@ using DfgPlayoutParams = DfgPlayoutOptions;
 using StochasticPlayoutParams = StochasticPlayoutOptions;
 using StochasticPetriParams = StochasticPetriOptions;
 using MonteCarloParams = MonteCarloOptions;
+
+enum class StochasticMapSource { kLog, kPerformanceDfg };
+
+struct StochasticMapParams {
+  StochasticMapSource source = StochasticMapSource::kLog;
+  StochasticMapFitOptions fit;
+  StochasticMapPerformanceOptions performance;
+  std::vector<std::uint32_t> initial_marking;
+  std::size_t max_states = kStochasticPetriMaxGeneratorStates;
+};
 
 // A lookup returning a form field's value, or "" when the field is absent.
 using FieldLookup = std::function<std::string(std::string_view)>;
@@ -444,6 +455,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] StochasticPetriParams parse_stochastic_petri_params(
     const FieldLookup& field);
 [[nodiscard]] StochasticPetriParams parse_stochastic_petri_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] StochasticMapParams parse_stochastic_map_params(
+    const FieldLookup& field);
+[[nodiscard]] StochasticMapParams parse_stochastic_map_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parses bounded virtual-time Monte Carlo settings. Wire fields use the

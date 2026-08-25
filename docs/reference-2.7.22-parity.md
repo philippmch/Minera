@@ -213,6 +213,18 @@ Dense propagation has a bounded work budget and a one-million-second wire-time
 limit so requests fail deterministically instead of exhausting the host.
 Probability envelopes use `STOCHASTIC_PETRI_DISTRIBUTION` with deterministic
 state ordering, diagnostics, and finite-or-null JSON number handling.
+A reusable stochastic-map layer now fits deterministic, exponential, constant,
+immediate, normal, uniform, lognormal, and gamma transition records from a
+replayed event log, retaining activation weights and priority metadata. A
+performance DFG can be converted to either classic workflow-net construction
+with rates derived from edge means or the no-duplicate-activity construction;
+silent routing is represented as immediate when its duration is zero. The
+native map converts back to the existing tangible CTMC options, and
+`minera_export --stochastic-map`, `/api/stochastic-map`, strict request parsing,
+and typed frontend helpers share a `STOCHASTIC_MAP` envelope containing the
+map, optional converted net, replay diagnostics, and reachability graph. The
+CTMC projection eliminates priority-filtered silent routing with normalized
+activation weights and exposes the projected initial probability vector.
 Basic Petri sampling can also opt into a structured visitation response: each
 trace alternates marking snapshots with fired transition indices (including
 silent transitions), with transition activity labels where available. The
@@ -460,7 +472,7 @@ export CLI, the cached local server route, and typed frontend controls.
 |---|---|---|
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object and event-to-event relations, o2o links, object changes, scalar globals, classic/standard JSON/XML, declared event/object type catalogs with empty-type schemas, and a typed OCEL 2 relational SQLite projection are present; remaining schema coverage remains |
-| Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; equation-based diagnostics explicitly report the nonlinear arc limitation, while object-centric, trie, and stochastic model families remain |
+| Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; reusable stochastic maps now round-trip distribution/rate metadata and derive tangible CTMC options, while object-centric, trie, and broader stochastic model-family coverage remains |
 | Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, and trie-to-Petri conversion to workflow nets, tree to POWL, and tree/net to BPMN; remaining object-centric and adapter conversions are absent |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, including empty types and declared attributes without observed values, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite persists the exact declared schemas alongside inferred type-table columns, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |

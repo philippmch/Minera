@@ -4,6 +4,7 @@
 #include <cmath>
 #include <deque>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -19,6 +20,169 @@ struct MarkingHash {
     return hash;
   }
 };
+
+using Marking = std::vector<std::uint32_t>;
+
+void fire_checked(const PetriTransition& transition, Marking& marking);
+
+struct ImmediateChoice {
+  std::size_t transition = 0;
+  double probability = 0.0;
+};
+
+[[nodiscard]] std::vector<ImmediateChoice> enabled_immediate_transitions(
+    const PetriNet& net, const Marking& marking,
+    const std::vector<bool>& immediate, const std::vector<int>& priorities,
+    const std::vector<double>& weights) {
+  std::optional<int> highest;
+  for (std::size_t transition = 0; transition < net.transitions().size();
+       ++transition) {
+    if (!immediate[transition] ||
+        !petri_transition_enabled(net.transitions()[transition], marking))
+      continue;
+    if (!highest || priorities[transition] > *highest)
+      highest = priorities[transition];
+  }
+  if (!highest) return {};
+  double total = 0.0;
+  std::vector<ImmediateChoice> choices;
+  for (std::size_t transition = 0; transition < net.transitions().size();
+       ++transition) {
+    if (!immediate[transition] || priorities[transition] != *highest ||
+        !petri_transition_enabled(net.transitions()[transition], marking))
+      continue;
+    total += weights[transition];
+    choices.push_back({transition, 0.0});
+  }
+  if (!std::isfinite(total))
+    throw std::invalid_argument(
+        "stochastic Petri immediate activation weights must be finite");
+  if (total <= 0.0) {
+    const auto probability = 1.0 / static_cast<double>(choices.size());
+    for (auto& choice : choices) choice.probability = probability;
+  } else {
+    for (auto& choice : choices)
+      choice.probability = weights[choice.transition] / total;
+  }
+  return choices;
+}
+
+struct ImmediateClosure {
+  std::vector<std::size_t> tangible_states;
+  std::vector<std::vector<double>> probabilities;
+  bool incomplete = false;
+};
+
+[[nodiscard]] ImmediateClosure calculate_immediate_closure(
+    const PetriNet& net, const std::vector<Marking>& reachable,
+    const std::unordered_map<Marking, std::size_t, MarkingHash>& index,
+    const std::vector<bool>& tangible, const std::vector<bool>& immediate,
+    const std::vector<int>& priorities, const std::vector<double>& weights,
+    bool exhausted) {
+  ImmediateClosure closure;
+  for (std::size_t state = 0; state < reachable.size(); ++state)
+    if (tangible[state]) closure.tangible_states.push_back(state);
+  const auto tangible_count = closure.tangible_states.size();
+  closure.probabilities.assign(
+      reachable.size(), std::vector<double>(tangible_count, 0.0));
+  std::vector<std::size_t> vanishing;
+  std::vector<std::size_t> tangible_column(reachable.size(),
+                                           std::numeric_limits<std::size_t>::max());
+  for (std::size_t column = 0; column < tangible_count; ++column) {
+    const auto state = closure.tangible_states[column];
+    tangible_column[state] = column;
+    closure.probabilities[state][column] = 1.0;
+  }
+  for (std::size_t state = 0; state < reachable.size(); ++state)
+    if (!tangible[state]) vanishing.push_back(state);
+  if (vanishing.empty()) return closure;
+
+  const auto count = vanishing.size();
+  std::vector<std::vector<double>> matrix(
+      count, std::vector<double>(count + tangible_count, 0.0));
+  std::vector<std::size_t> vanishing_row(reachable.size(),
+                                         std::numeric_limits<std::size_t>::max());
+  std::vector<bool> unresolved(count, false);
+  for (std::size_t row = 0; row < count; ++row)
+    vanishing_row[vanishing[row]] = row;
+  for (std::size_t row = 0; row < count; ++row) {
+    const auto state = vanishing[row];
+    matrix[row][row] = 1.0;
+    for (const auto choice : enabled_immediate_transitions(
+             net, reachable[state], immediate, priorities, weights)) {
+      auto next = reachable[state];
+      fire_checked(net.transitions()[choice.transition], next);
+      const auto found = index.find(next);
+      if (found == index.end()) {
+        if (!exhausted)
+          throw std::invalid_argument(
+              "stochastic Petri immediate closure reached an unknown marking");
+        unresolved[row] = true;
+        closure.incomplete = true;
+        continue;
+      }
+      if (tangible[found->second]) {
+        matrix[row][count + tangible_column[found->second]] +=
+            choice.probability;
+      } else {
+        matrix[row][vanishing_row[found->second]] -= choice.probability;
+      }
+    }
+  }
+  // Complete the vanishing-state linear system. A singular system denotes a
+  // closed immediate cycle with no well-defined tangible projection.
+  for (std::size_t column = 0; column < count; ++column) {
+    std::size_t pivot = column;
+    for (std::size_t row = column + 1; row < count; ++row)
+      if (std::abs(matrix[row][column]) >
+          std::abs(matrix[pivot][column]))
+        pivot = row;
+    if (std::abs(matrix[pivot][column]) <= 1e-12)
+      throw std::invalid_argument(
+          "stochastic Petri immediate closure has no tangible resolution");
+    std::swap(matrix[pivot], matrix[column]);
+    const auto divisor = matrix[column][column];
+    for (std::size_t entry = column; entry < matrix[column].size(); ++entry)
+      matrix[column][entry] /= divisor;
+    for (std::size_t row = 0; row < count; ++row) {
+      if (row == column) continue;
+      const auto factor = matrix[row][column];
+      if (factor == 0.0) continue;
+      for (std::size_t entry = column; entry < matrix[row].size(); ++entry)
+        matrix[row][entry] -= factor * matrix[column][entry];
+    }
+  }
+  for (std::size_t row = 0; row < count; ++row) {
+    if (unresolved[row]) continue;
+    double mass = 0.0;
+    for (std::size_t column = 0; column < tangible_count; ++column) {
+      auto probability = matrix[row][count + column];
+      if (probability < 0.0 && probability > -1e-10) probability = 0.0;
+      if (!std::isfinite(probability) || probability < 0.0)
+        throw std::invalid_argument(
+            "stochastic Petri immediate closure produced invalid probabilities");
+      closure.probabilities[vanishing[row]][column] = probability;
+      mass += probability;
+    }
+    if (!std::isfinite(mass) || mass <= 1e-12) {
+      if (exhausted) {
+        closure.incomplete = true;
+        continue;
+      }
+      throw std::invalid_argument(
+          "stochastic Petri immediate closure has no tangible resolution");
+    }
+    if (exhausted && mass < 1.0 - 1e-10) {
+      // Keep the surviving sub-probability mass. Renormalizing it would turn
+      // a capped partial branch into a false complete distribution.
+      closure.incomplete = true;
+      continue;
+    }
+    for (std::size_t column = 0; column < tangible_count; ++column)
+      closure.probabilities[vanishing[row]][column] /= mass;
+  }
+  return closure;
+}
 
 bool marking_less(const std::vector<std::uint32_t>& left,
                   const std::vector<std::uint32_t>& right) {
@@ -346,12 +510,34 @@ StochasticPetriResult stochastic_petri_reachability(
       throw std::invalid_argument(
           "stochastic Petri transition rates must be finite and non-negative");
   }
+  if (!options.transition_priorities.empty() &&
+      options.transition_priorities.size() != net.transitions().size()) {
+    throw std::invalid_argument(
+        "stochastic Petri transition priorities must match the transition count");
+  }
+  std::vector<int> priorities(net.transitions().size(), 0);
+  if (!options.transition_priorities.empty())
+    priorities = options.transition_priorities;
   std::vector<bool> immediate(net.transitions().size(), false);
   for (const auto transition : options.immediate_transitions) {
     if (transition >= immediate.size())
       throw std::invalid_argument(
           "stochastic Petri immediate transition index is invalid");
     immediate[transition] = true;
+  }
+
+  std::vector<double> immediate_weights(net.transitions().size(), 1.0);
+  if (!options.immediate_weights.empty() &&
+      options.immediate_weights.size() != net.transitions().size()) {
+    throw std::invalid_argument(
+        "stochastic Petri immediate weights must match the transition count");
+  }
+  if (!options.immediate_weights.empty())
+    immediate_weights = options.immediate_weights;
+  for (const auto weight : immediate_weights) {
+    if (!std::isfinite(weight) || weight < 0.0)
+      throw std::invalid_argument(
+          "stochastic Petri immediate weights must be finite and non-negative");
   }
 
   const auto start = initial_marking(net, options);
@@ -367,8 +553,19 @@ StochasticPetriResult stochastic_petri_reachability(
   while (!queue.empty()) {
     const auto marking = std::move(queue.front());
     queue.pop_front();
-    for (const auto& transition : net.transitions()) {
+    const auto choices = enabled_immediate_transitions(
+        net, marking, immediate, priorities, immediate_weights);
+    std::vector<bool> eligible(net.transitions().size(), false);
+    for (const auto choice : choices) eligible[choice.transition] = true;
+    for (std::size_t transition_index = 0;
+         transition_index < net.transitions().size(); ++transition_index) {
+      const auto& transition = net.transitions()[transition_index];
       if (!petri_transition_enabled(transition, marking)) continue;
+      if (!choices.empty()) {
+        if (!eligible[transition_index]) continue;
+      } else if (immediate[transition_index]) {
+        continue;
+      }
       auto next = marking;
       fire_checked(transition, next);
       if (index.contains(next)) continue;
@@ -400,10 +597,18 @@ StochasticPetriResult stochastic_petri_reachability(
       }
     }
   }
-  // Removing an immediate state also removes every incident edge. A tangible
-  // state left with no incident edge is then removed as an isolated vertex.
+  const auto closure = calculate_immediate_closure(
+      net, reachable, index, tangible, immediate, priorities,
+      immediate_weights, exhausted);
+  struct EffectiveEdge {
+    std::size_t source = 0;
+    std::size_t target = 0;
+    std::size_t transition = 0;
+    double rate = 0.0;
+  };
+  std::vector<EffectiveEdge> effective_edges;
   std::vector<bool> incident(reachable.size(), false);
-  for (std::size_t source = 0; source < reachable.size(); ++source) {
+  for (const auto source : closure.tangible_states) {
     if (!tangible[source]) continue;
     for (std::size_t transition = 0; transition < net.transitions().size();
          ++transition) {
@@ -415,15 +620,34 @@ StochasticPetriResult stochastic_petri_reachability(
       fire_checked(net.transitions()[transition], next);
       const auto found = index.find(next);
       if (found == index.end()) {
-        // A state beyond an explicit cap is still evidence that the current
-        // tangible state is not isolated; retain the partial source graph.
         if (exhausted) incident[source] = true;
         continue;
       }
-      if (!tangible[found->second]) continue;
-      incident[source] = true;
-      incident[found->second] = true;
+      for (std::size_t target_column = 0;
+           target_column < closure.tangible_states.size(); ++target_column) {
+        const auto probability = closure.probabilities[found->second][target_column];
+        if (probability <= 1e-12) continue;
+        const auto target = closure.tangible_states[target_column];
+        const auto rate = rates[transition] * probability;
+        if (!std::isfinite(rate))
+          throw std::invalid_argument(
+              "stochastic Petri effective rate is not finite");
+        effective_edges.push_back({source, target, transition, rate});
+        if (target != source) {
+          incident[source] = true;
+          incident[target] = true;
+        }
+      }
     }
+  }
+  const auto start_index = index.find(start);
+  const auto start_is_vanishing =
+      start_index != index.end() && !tangible[start_index->second];
+  if (start_is_vanishing) {
+    for (std::size_t column = 0; column < closure.tangible_states.size();
+         ++column)
+      if (closure.probabilities[start_index->second][column] > 1e-12)
+        incident[closure.tangible_states[column]] = true;
   }
   std::vector<std::size_t> order;
   for (std::size_t state = 0; state < reachable.size(); ++state)
@@ -439,10 +663,30 @@ StochasticPetriResult stochastic_petri_reachability(
     projected[order[state]] = state;
     result.states.push_back({reachable[order[state]]});
   }
-  const auto initial = index.find(start);
-  if (initial != index.end() && projected[initial->second] !=
-                                    std::numeric_limits<std::size_t>::max())
-    result.initial_state = projected[initial->second];
+  if (start_index != index.end() && !closure.incomplete) {
+    result.initial_probabilities.assign(order.size(), 0.0);
+    if (tangible[start_index->second]) {
+      const auto projected_start = projected[start_index->second];
+      if (projected_start != std::numeric_limits<std::size_t>::max())
+        result.initial_probabilities[projected_start] = 1.0;
+    } else {
+      for (std::size_t column = 0; column < closure.tangible_states.size();
+           ++column) {
+        const auto projected_target =
+            projected[closure.tangible_states[column]];
+        if (projected_target != std::numeric_limits<std::size_t>::max())
+          result.initial_probabilities[projected_target] =
+              closure.probabilities[start_index->second][column];
+      }
+    }
+    for (std::size_t state = 0; state < result.initial_probabilities.size();
+         ++state) {
+      if (result.initial_probabilities[state] > 1.0 - 1e-12) {
+        result.initial_state = state;
+        break;
+      }
+    }
+  }
   if (result.states.size() != 0 &&
       result.states.size() >
           kStochasticPetriMaxGeneratorEntries / result.states.size()) {
@@ -451,23 +695,24 @@ StochasticPetriResult stochastic_petri_reachability(
   }
   result.generator.assign(result.states.size(),
                           std::vector<double>(result.states.size(), 0.0));
+  for (const auto& edge : effective_edges) {
+    const auto source = projected[edge.source];
+    const auto target = projected[edge.target];
+    if (source == std::numeric_limits<std::size_t>::max() ||
+        target == std::numeric_limits<std::size_t>::max() || source == target)
+      continue;
+    result.edges.push_back({source, target, edge.transition, edge.rate});
+    result.generator[source][target] += edge.rate;
+  }
+  std::sort(result.edges.begin(), result.edges.end(),
+            [](const auto& left, const auto& right) {
+              if (left.source != right.source) return left.source < right.source;
+              if (left.target != right.target) return left.target < right.target;
+              if (left.transition != right.transition)
+                return left.transition < right.transition;
+              return left.rate < right.rate;
+            });
   for (std::size_t source = 0; source < order.size(); ++source) {
-    const auto original = order[source];
-    for (std::size_t transition = 0; transition < net.transitions().size();
-         ++transition) {
-      if (immediate[transition] ||
-          !petri_transition_enabled(net.transitions()[transition],
-                                    reachable[original]))
-        continue;
-      auto next = reachable[original];
-      fire_checked(net.transitions()[transition], next);
-      const auto found = index.find(next);
-      if (found == index.end() || !tangible[found->second]) continue;
-      const auto target = projected[found->second];
-      if (target == source) continue;
-      result.edges.push_back({source, target, transition, rates[transition]});
-      result.generator[source][target] += rates[transition];
-    }
     double outgoing = 0.0;
     for (std::size_t target = 0; target < result.states.size(); ++target)
       if (target != source) outgoing += result.generator[source][target];

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fetchExtensivePlayoutVisited } from "./api";
-import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery } from "./api";
+import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery, fetchStochasticMap, stochasticMapQuery } from "./api";
+import { isStochasticMapResult } from "./types";
 import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
 
 describe("Petri usage comparison API", () => {
@@ -174,6 +175,70 @@ describe("basic Petri playout API", () => {
     expect(() => stochasticPetriQuery({
       analysis: "steady_state", initial_state: 0,
     })).toThrow(/requires transient/);
+  });
+
+  it("fetches a fitted stochastic map and its tangible reachability", async () => {
+    const options = {
+      source: "performance_dfg" as const,
+      distribution: "exponential" as const,
+      conversion_variant: "invisibles_no_duplicates" as const,
+      max_states: 8,
+    };
+    const query = stochasticMapQuery(options);
+    expect(query).toContain("stochastic_map_source=performance_dfg");
+    expect(query).toContain("stochastic_map_conversion_variant=invisibles_no_duplicates");
+    const payload = {
+      family: "STOCHASTIC_MAP", source: "performance_dfg",
+      map: { family: "STOCHASTIC_MAP", transitions: [{
+        transition: 0, timing: "timed", distribution: "exponential",
+        parameter: 2, secondary_parameter: 0, tertiary_parameter: 0,
+        activation_weight: 1, priority: 0,
+      }] },
+      reachability: {
+        family: "STOCHASTIC_PETRI", variant: "TANGIBLE_CTMC", exhausted: false,
+        diagnostic: "", states: [[1]], edges: [], generator: [[0]],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/stochastic-map?miner=inductive");
+      expect(path).toContain("stochastic_map_max_states=8");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchStochasticMap("inductive", options)).resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+    expect(() => stochasticMapQuery({ max_states: 2001 })).toThrow(/2000/);
+    expect(() => stochasticMapQuery({ distribution: "exponential", default_parameter: 0 }))
+      .toThrow(/positive/);
+    expect(() => stochasticMapQuery({ distribution: "gamma", default_parameter: 0 }))
+      .toThrow(/positive/);
+    const lognormal = {
+      ...payload,
+      map: { ...payload.map, transitions: [{
+        ...payload.map.transitions[0], distribution: "lognormal",
+        parameter: -1, secondary_parameter: 0,
+      }] },
+    };
+    expect(isStochasticMapResult(lognormal)).toBe(true);
+    expect(isStochasticMapResult({
+      ...lognormal,
+      map: { ...lognormal.map, transitions: [{
+        ...lognormal.map.transitions[0], distribution: "unsupported",
+      }] },
+    })).toBe(false);
+    expect(isStochasticMapResult({
+      ...payload,
+      reachability: { ...payload.reachability, initial_state: 1 },
+    })).toBe(false);
+    expect(isStochasticMapResult({
+      ...payload,
+      reachability: { ...payload.reachability, initial_probabilities: [] },
+    })).toBe(false);
+    expect(isStochasticMapResult({
+      ...payload,
+      reachability: {
+        ...payload.reachability, exhausted: true, initial_probabilities: [],
+      },
+    })).toBe(true);
   });
 
   it("decodes structured visited markings and transitions", async () => {
