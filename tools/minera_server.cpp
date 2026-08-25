@@ -4037,6 +4037,7 @@ void handle_petri_analysis(const httplib::Request& request,
         options.initial_marking = params.initial_marking;
         options.final_marking = params.final_marking;
         options.max_states = params.max_states;
+        options.invariant_search_limit = params.invariant_search_limit;
         options.diagnostics = params.diagnostics;
         options.return_asap_when_unsound = params.return_asap_when_unsound;
         response.set_content(

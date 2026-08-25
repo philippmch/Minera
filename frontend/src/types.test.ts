@@ -395,6 +395,7 @@ describe("isPetriAnalysisResult structural diagnostics", () => {
       handled_pairs: [[1, 12]], not_well_handled_pairs: null,
     })).toBe(true);
     expect(isPetriAnalysisResult({ family: "soundness", status: "sound", handled_pairs: null })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", uniform_invariant_search_exhausted: true })).toBe(true);
     expect(isPetriAnalysisResult({ family: "soundness", dead_tasks: [0, 2], locking_scenarios: [[1], [0, 2]] })).toBe(true);
     expect(isPetriAnalysisResult({ family: "soundness", structural_node_labels: ["place:0:in", "transition:0:A:in"] })).toBe(true);
   });

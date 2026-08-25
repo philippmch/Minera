@@ -2350,6 +2350,10 @@ PetriAnalysisParams parse_petri_analysis_params(const FieldLookup& field,
   if (supplied("petri_analysis_max_states"))
     params.max_states = parse_positive_size(
         require("petri_analysis_max_states"), "petri_analysis_max_states");
+  if (supplied("petri_analysis_invariant_search_limit"))
+    params.invariant_search_limit = parse_positive_size(
+        require("petri_analysis_invariant_search_limit"),
+        "petri_analysis_invariant_search_limit");
   if (supplied("petri_analysis_full_bootstrap"))
     params.full_bootstrap_required = parse_boolean(
         require("petri_analysis_full_bootstrap"),

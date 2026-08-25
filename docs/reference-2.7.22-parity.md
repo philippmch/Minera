@@ -736,10 +736,14 @@ diagnostics expose the original, uniform-support, and relative-weight families
 separately, including coverage gaps for each family and for S-components. These
 projections are serialized by the CLI, local server, and frontend contracts.
 Uniform-support vectors are retained only after rechecking the incidence
-equation, weighted vectors remain valid after normalization, and S-components
-are restricted to connected state-machine subnets rather than arbitrary
-positive supports. A complete black-box edge matrix remains open before this
-row can claim full parity.
+equation; when a single weighted certificate is not uniform, a bounded binary
+invariant search recovers valid combinations of weighted rays. Weighted vectors
+remain valid after normalization, and S-components retain the complete support
+of each valid state-machine invariant (including a disconnected support when
+the invariant itself spans it). The search has a shared caller-configurable
+budget and reports exhaustion explicitly; an exhausted search never drives the
+Woflan structural branch decision. A complete black-box edge matrix remains
+open before this row can claim full parity.
 
 ## Extended Petri-arc evidence
 

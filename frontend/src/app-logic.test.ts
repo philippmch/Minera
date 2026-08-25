@@ -245,11 +245,13 @@ describe("evaluation adapters", () => {
       family: "extended_marking_equation", miner: "powl", trace_index: 2,
       initial_marking: [1, 0], final_marking: [0, 1], transition_costs: [3.5, 4],
       model_costs: [5, 6], sync_costs: [0, 1], log_costs: [9], split_indices: [1, 3],
-      max_k: 2, max_states: 100, full_bootstrap: false, diagnostics: true,
+      max_k: 2, max_states: 100, invariant_search_limit: 77,
+      full_bootstrap: false, diagnostics: true,
     }));
     expect(query.get("petri_analysis_family")).toBe("extended_marking_equation");
     expect(query.get("petri_analysis_model_costs")).toBe("5,6");
     expect(query.get("petri_analysis_split_indices")).toBe("1,3");
+    expect(query.get("petri_analysis_invariant_search_limit")).toBe("77");
     expect(query.get("petri_analysis_full_bootstrap")).toBe("false");
     expect(new URLSearchParams(petriAnalysisQuery({ family: "woflan" }))
       .get("petri_analysis_family")).toBe("woflan");
@@ -257,6 +259,7 @@ describe("evaluation adapters", () => {
       family: "woflan", return_asap_when_unsound: true,
     })).get("petri_analysis_return_asap_when_unsound")).toBe("true");
     expect(() => petriAnalysisQuery({ max_states: 0 })).toThrow(/valid/);
+    expect(() => petriAnalysisQuery({ invariant_search_limit: 0 })).toThrow(/valid/);
     expect(() => petriAnalysisQuery({ model_costs: [-1] })).toThrow(/costs/);
     expect(isPetriAnalysisResult({ family: "soundness", status: "sound" })).toBe(true);
     expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", status: "sound", returned_asap: true })).toBe(true);

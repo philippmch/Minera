@@ -1434,9 +1434,10 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   if (options.miner !== undefined && options.miner.trim() === "") throw new Error("petri analysis miner must not be empty");
   for (const [name, value] of [
     ["trace_index", options.trace_index], ["max_k", options.max_k], ["max_states", options.max_states],
+    ["invariant_search_limit", options.invariant_search_limit],
   ] as const) {
-    if (value !== undefined && (!Number.isInteger(value) || value < (name === "max_states" ? 1 : 0))) {
-      throw new Error(`${name} must be a valid non-negative integer`);
+    if (value !== undefined && (!Number.isInteger(value) || value < (name === "max_states" || name === "invariant_search_limit" ? 1 : 0))) {
+      throw new Error(`${name} must be a valid integer`);
     }
   }
   for (const [name, value] of [
@@ -1467,6 +1468,7 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   add("split_indices", options.split_indices);
   add("max_k", options.max_k);
   add("max_states", options.max_states);
+  add("invariant_search_limit", options.invariant_search_limit);
   add("full_bootstrap", options.full_bootstrap);
   add("diagnostics", options.diagnostics);
   add("return_asap_when_unsound", options.return_asap_when_unsound);

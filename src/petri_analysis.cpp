@@ -472,6 +472,7 @@ class Simplex {
 struct IntegerProgramResult {
   bool feasible = false;
   bool exhausted = false;
+  std::size_t nodes_explored = 0;
   double objective = 0.0;
   double root_lower_bound = 0.0;
   std::vector<double> solution;
@@ -488,7 +489,8 @@ IntegerProgramResult solve_integer_program(
   std::vector<Node> stack(1);
   std::size_t explored = 0;
   while (!stack.empty()) {
-    if (explored++ >= node_limit) { result.exhausted = true; break; }
+    if (explored >= node_limit) { result.exhausted = true; break; }
+    ++explored;
     auto node = std::move(stack.back()); stack.pop_back();
     auto a = base_a; auto b = base_b;
     for (const auto& bound : node.bounds) {
@@ -521,6 +523,7 @@ IntegerProgramResult solve_integer_program(
     stack.push_back(std::move(lower_branch));
     stack.push_back(std::move(node));
   }
+  result.nodes_explored = explored;
   if (result.feasible) result.objective = incumbent;
   return result;
 }
@@ -665,16 +668,14 @@ std::vector<std::vector<std::size_t>> invariant_supports(
 
     std::vector<bool> in_support(net.place_count(), false);
     for (const auto place : support) in_support[place] = true;
-    std::vector<std::vector<std::size_t>> adjacency(net.place_count());
-    std::vector<bool> touched(net.place_count(), false);
     bool state_machine = true;
     for (const auto& transition : net.transitions()) {
-      std::vector<std::size_t> inputs;
-      std::vector<std::size_t> outputs;
+      std::set<std::size_t> inputs;
+      std::set<std::size_t> outputs;
       for (const auto place : transition.inputs)
-        if (place < in_support.size() && in_support[place]) inputs.push_back(place);
+        if (place < in_support.size() && in_support[place]) inputs.insert(place);
       for (const auto place : transition.outputs)
-        if (place < in_support.size() && in_support[place]) outputs.push_back(place);
+        if (place < in_support.size() && in_support[place]) outputs.insert(place);
       if (inputs.empty() && outputs.empty()) continue;
       // An S-component is a state-machine subnet: every participating
       // transition has exactly one supported input and output place.
@@ -683,42 +684,13 @@ std::vector<std::vector<std::size_t>> invariant_supports(
         state_machine = false;
         break;
       }
-      const auto input = inputs.front();
-      const auto output = outputs.front();
-      touched[input] = true;
-      touched[output] = true;
-      if (input != output) {
-        adjacency[input].push_back(output);
-        adjacency[output].push_back(input);
-      }
     }
     if (!state_machine) continue;
-    if (std::any_of(support.begin(), support.end(),
-                    [&](const auto place) { return !touched[place]; }))
-      continue;
-
-    // Split a valid support into connected state-machine components.  A
-    // single positive invariant can cover several disconnected cycles, but
-    // Woflan's S-component diagnostic names each connected subnet separately.
-    std::set<std::size_t> remaining(support.begin(), support.end());
-    while (!remaining.empty()) {
-      const auto root = *remaining.begin();
-      remaining.erase(remaining.begin());
-      std::vector<std::size_t> component;
-      std::queue<std::size_t> queue;
-      queue.push(root);
-      while (!queue.empty()) {
-        const auto place = queue.front();
-        queue.pop();
-        component.push_back(place);
-        for (const auto next : adjacency[place]) {
-          if (remaining.erase(next) != 0) queue.push(next);
-        }
-      }
-      std::sort(component.begin(), component.end());
-      if (std::find(supports.begin(), supports.end(), component) == supports.end())
-        supports.push_back(std::move(component));
-    }
+    // Keep the invariant support intact.  The reference diagnostic treats a
+    // disconnected positive invariant as one S-component; connectivity is
+    // not an additional criterion after the state-machine test.
+    if (std::find(supports.begin(), supports.end(), support) == supports.end())
+      supports.push_back(std::move(support));
   }
   std::sort(supports.begin(), supports.end());
   return supports;
@@ -735,7 +707,7 @@ bool satisfies_place_invariant(
     const std::vector<double>& invariant,
     const std::vector<std::vector<double>>& matrix) {
   if (invariant.size() != matrix.size()) return false;
-  if (matrix.empty()) return false;
+  if (matrix.empty()) return invariant.empty();
   const auto transition_count = matrix.front().size();
   for (const auto& row : matrix)
     if (row.size() != transition_count) return false;
@@ -748,28 +720,132 @@ bool satisfies_place_invariant(
   return true;
 }
 
+void append_uniform_candidate(std::vector<std::vector<double>>& result,
+                              std::vector<double> candidate,
+                              const std::vector<std::vector<double>>& matrix) {
+  if (candidate.empty() ||
+      std::none_of(candidate.begin(), candidate.end(),
+                   [](double value) { return value > kEps; }))
+    return;
+  for (auto& value : candidate) {
+    if (std::abs(value) <= 1e-7) value = 0.0;
+    if (std::abs(value - 1.0) <= 1e-7) value = 1.0;
+  }
+  if (std::any_of(candidate.begin(), candidate.end(),
+                  [](double value) { return value < -kEps || value > 1.0 + kEps; }))
+    return;
+  if (!satisfies_place_invariant(candidate, matrix)) return;
+  if (std::none_of(result.begin(), result.end(),
+                   [&](const auto& existing) {
+                     return same_vector(existing, candidate);
+                   }))
+    result.push_back(std::move(candidate));
+}
+
+struct UniformInvariantSearch {
+  std::optional<std::vector<double>> candidate;
+  bool exhausted = false;
+  std::size_t nodes_explored = 0;
+};
+
+UniformInvariantSearch find_uniform_invariant(
+    const std::vector<std::vector<double>>& matrix, std::size_t target,
+    std::size_t node_limit) {
+  const std::size_t places = matrix.size();
+  if (target >= places) return {};
+
+  // Solve C^T z = 0 with 0 <= z <= 1, z[target] = 1.  The integer solver
+  // searches the finite binary polytope directly, so a valid support can be
+  // found even when no individual weighted certificate has unit coefficients.
+  std::vector<std::vector<double>> constraints;
+  std::vector<double> bounds;
+  const std::size_t transitions = places == 0 ? 0 : matrix.front().size();
+  constraints.reserve(2 * transitions + places + 1);
+  bounds.reserve(constraints.capacity());
+  for (std::size_t t = 0; t < transitions; ++t) {
+    std::vector<double> row(places, 0.0);
+    for (std::size_t p = 0; p < places; ++p) row[p] = matrix[p][t];
+    constraints.push_back(row);
+    bounds.push_back(0.0);
+    for (auto& value : row) value = -value;
+    constraints.push_back(std::move(row));
+    bounds.push_back(0.0);
+  }
+  for (std::size_t p = 0; p < places; ++p) {
+    std::vector<double> row(places, 0.0);
+    row[p] = 1.0;
+    constraints.push_back(std::move(row));
+    bounds.push_back(1.0);
+  }
+  std::vector<double> required(places, 0.0);
+  required[target] = -1.0;
+  constraints.push_back(std::move(required));
+  bounds.push_back(-1.0);
+
+  if (node_limit == 0) return {.candidate = std::nullopt, .exhausted = true};
+  const auto solution = solve_integer_program(
+      constraints, bounds, std::vector<double>(places, 1.0), node_limit);
+  UniformInvariantSearch result;
+  result.exhausted = solution.exhausted;
+  result.nodes_explored = solution.nodes_explored;
+  if (!solution.feasible || solution.solution.size() != places) return result;
+  std::vector<double> candidate(places, 0.0);
+  for (std::size_t p = 0; p < places; ++p) {
+    const auto rounded = std::round(solution.solution[p]);
+    if (std::abs(solution.solution[p] - rounded) > 1e-7 ||
+        rounded < 0.0 || rounded > 1.0)
+      return result;
+    candidate[p] = rounded;
+  }
+  if (candidate[target] < 1.0 - kEps ||
+      !satisfies_place_invariant(candidate, matrix))
+    return result;
+  result.candidate = std::move(candidate);
+  return result;
+}
+
 std::vector<std::vector<double>> uniform_invariants(
     const std::vector<std::vector<double>>& basis,
-    const std::vector<std::vector<double>>& matrix) {
+    const std::vector<std::vector<double>>& matrix,
+    std::size_t search_budget, bool& search_exhausted) {
   std::vector<std::vector<double>> result;
+  search_exhausted = false;
+  // Preserve valid supports already exposed by the positive basis, then use
+  // one bounded binary search per uncovered place to recover combinations of
+  // weighted basis vectors.  The latter is the important distinction from a
+  // simple support-binarization pass.
   for (const auto& invariant : basis) {
     std::vector<double> uniform(invariant.size(), 0.0);
     for (std::size_t p = 0; p < invariant.size(); ++p)
       if (invariant[p] > kEps) uniform[p] = 1.0;
-    if (std::none_of(uniform.begin(), uniform.end(),
-                     [](double value) { return value > kEps; }))
-      continue;
-    // A weighted invariant's support is not automatically a unit-weight
-    // invariant.  Keep the uniform family honest by checking the incidence
-    // equation after binarization instead of treating every support as a
-    // valid state-machine candidate.
-    if (!satisfies_place_invariant(uniform, matrix)) continue;
-    if (std::none_of(result.begin(), result.end(),
-                     [&](const auto& existing) {
-                       return same_vector(existing, uniform);
-                     }))
-      result.push_back(std::move(uniform));
+    append_uniform_candidate(result, std::move(uniform), matrix);
   }
+  std::size_t remaining_budget = search_budget;
+  for (std::size_t target = 0; target < matrix.size(); ++target) {
+    bool covered = false;
+    for (const auto& invariant : result)
+      if (target < invariant.size() && invariant[target] > kEps) {
+        covered = true;
+        break;
+      }
+    if (covered) continue;
+    if (remaining_budget == 0) {
+      search_exhausted = true;
+      break;
+    }
+    const auto search = find_uniform_invariant(matrix, target, remaining_budget);
+    if (search.nodes_explored >= remaining_budget)
+      remaining_budget = 0;
+    else
+      remaining_budget -= search.nodes_explored;
+    if (search.candidate)
+      append_uniform_candidate(result, *search.candidate, matrix);
+    if (search.exhausted) {
+      search_exhausted = true;
+      break;
+    }
+  }
+  std::sort(result.begin(), result.end());
   return result;
 }
 
@@ -1583,7 +1659,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     result.uncovered_places = uncovered_from_vectors(
         result.place_invariant_basis, structural_net->place_count());
     result.uniform_place_invariants =
-        uniform_invariants(result.place_invariant_basis, structural_incidence);
+        uniform_invariants(result.place_invariant_basis, structural_incidence,
+                           options.invariant_search_limit,
+                           result.uniform_invariant_search_exhausted);
     result.uncovered_places_uniform = uncovered_from_vectors(
         result.uniform_place_invariants, structural_net->place_count());
     result.weighted_place_invariants =
@@ -1609,6 +1687,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       if (!result.uncovered_places.empty())
         result.diagnostic_messages.push_back(
             "positive place-invariant coverage is missing for one or more places");
+      if (result.uniform_invariant_search_exhausted)
+        result.diagnostic_messages.push_back(
+            "uniform invariant search budget exhausted; uniform coverage is incomplete");
     }
     return result;
   }
@@ -1617,7 +1698,11 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   result.handled_pairs = structural_pair_diagnostics(*structural_net);
   if (options.variant == SoundnessVariant::kWoflan &&
       result.s_components.has_value()) {
-    if (result.uncovered_places_s_component.empty()) {
+    if (result.uniform_invariant_search_exhausted) {
+      // Incomplete binary support search is not evidence for or against the
+      // Woflan structural branch. Leave the decision disengaged and continue
+      // with behavioral diagnostics.
+    } else if (result.uncovered_places_s_component.empty()) {
       result.left = true;
     } else if (!options.return_asap_when_unsound) {
       // The structural pair stage is the next Woflan decision point when
@@ -1629,6 +1714,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   if (options.max_states == 0)
     throw std::invalid_argument("max_states must be positive");
+  if (options.invariant_search_limit == 0)
+    throw std::invalid_argument("invariant_search_limit must be positive");
   const auto markings = woflan_markings
                             ? *woflan_markings
                             : resolved_markings(net, options.initial_marking,
@@ -1693,6 +1780,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       if (!result.uncovered_places_uniform.empty())
         result.diagnostic_messages.push_back(
             "uniform invariant coverage is missing for one or more places");
+      if (result.uniform_invariant_search_exhausted)
+        result.diagnostic_messages.push_back(
+            "uniform invariant search budget exhausted; uniform coverage is incomplete");
       if (!result.uncovered_places_weighted.empty())
         result.diagnostic_messages.push_back(
             "weighted invariant coverage is missing for one or more places");
@@ -1843,6 +1933,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (!result.uncovered_places_uniform.empty())
       result.diagnostic_messages.push_back(
           "uniform invariant coverage is missing for one or more places");
+    if (result.uniform_invariant_search_exhausted)
+      result.diagnostic_messages.push_back(
+          "uniform invariant search budget exhausted; uniform coverage is incomplete");
     if (!result.uncovered_places_weighted.empty())
       result.diagnostic_messages.push_back(
           "weighted invariant coverage is missing for one or more places");

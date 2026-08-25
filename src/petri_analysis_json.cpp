@@ -254,6 +254,8 @@ std::string petri_analysis_json(const SoundnessResult& result) {
   out << "]"
       << ",\"uncovered_places_uniform\":"
       << numbers(result.uncovered_places_uniform)
+      << ",\"uniform_invariant_search_exhausted\":"
+      << (result.uniform_invariant_search_exhausted ? "true" : "false")
       << ",\"uncovered_places_weighted\":"
       << numbers(result.uncovered_places_weighted)
       << ",\"uncovered_places_s_component\":"

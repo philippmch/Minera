@@ -2394,6 +2394,7 @@ void parse_petri_analysis_params_maps_all_families_and_settings() {
       {"petri_analysis_split_indices", "1, 3"},
       {"petri_analysis_max_k", "2"},
       {"petri_analysis_max_states", "42"},
+      {"petri_analysis_invariant_search_limit", "77"},
       {"petri_analysis_full_bootstrap", "false"},
       {"petri_analysis_diagnostics", "true"},
       {"petri_analysis_return_asap_when_unsound", "true"}}));
@@ -2405,7 +2406,8 @@ void parse_petri_analysis_params_maps_all_families_and_settings() {
   assert(parsed.synchronous_transition_costs == std::vector<double>({0, 1}));
   assert(parsed.log_move_costs == std::vector<double>({9, 10}));
   assert(parsed.split_indices == std::vector<std::size_t>({1, 3}));
-  assert(parsed.max_k_value == 2 && parsed.max_states == 42);
+  assert(parsed.max_k_value == 2 && parsed.max_states == 42 &&
+         parsed.invariant_search_limit == 77);
   assert(!parsed.full_bootstrap_required && parsed.diagnostics &&
          parsed.return_asap_when_unsound);
 }
@@ -2414,6 +2416,7 @@ void parse_petri_analysis_params_rejects_bad_values() {
   for (const auto& item : {
            std::pair{"petri_analysis_family", "bad"},
            std::pair{"petri_analysis_max_states", "0"},
+           std::pair{"petri_analysis_invariant_search_limit", "0"},
            std::pair{"petri_analysis_model_costs", "1,-1"},
            std::pair{"petri_analysis_return_asap_when_unsound", "maybe"}}) {
     bool threw = false;
