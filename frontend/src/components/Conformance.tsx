@@ -33,6 +33,9 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type ProcessTreePlayoutOptions,
+  type BasicPlayoutOptions,
+  type BasicPlayoutVisitedResult,
+  type ExtensivePlayoutVisitedResult,
   type StochasticPlayoutOptions,
   type MonteCarloOptions,
   type DfgPlayoutOptions,
@@ -40,7 +43,7 @@ import {
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchDfgPlayout, fetchPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
+import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -184,6 +187,12 @@ export function Conformance({
   // carries the extended registry, so the result panels resolve every id.
   const viewData =
     isImported && currentImported ? { ...data, activities: currentImported.activities } : data;
+  const petriMiners = [
+    data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
+    data.petri_net ? { id: "alpha", label: "Alpha" } : null,
+    data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
+    data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
+  ].filter((candidate): candidate is { id: string; label: string } => candidate !== null);
 
   return (
     <div className="miner-flow reveal">
@@ -339,26 +348,9 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
       <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} />
-      <StochasticPetriPlayoutPanel
-        key={`stochastic-playout-${analysisId}`}
-        dataset={data.dataset}
-        miners={[
-          data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
-          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
-          data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
-          data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
-        ].filter((miner): miner is { id: string; label: string } => miner !== null)}
-      />
-      <MonteCarloPlayoutPanel
-        key={`monte-carlo-playout-${analysisId}`}
-        dataset={data.dataset}
-        miners={[
-          data.inductive_petri_net ? { id: "inductive", label: "Inductive" } : null,
-          data.petri_net ? { id: "alpha", label: "Alpha" } : null,
-          data.heuristic_petri_net ? { id: "heuristic", label: "Heuristic" } : null,
-          data.powl_petri_net ? { id: "powl", label: "POWL" } : null,
-        ].filter((miner): miner is { id: string; label: string } => miner !== null)}
-      />
+      <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
+      <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
+      <MonteCarloPlayoutPanel key={`monte-carlo-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} />
       <DfgPlayoutPanel dataset={data.dataset} available={data.edges.length > 0} />
       <PetriUsageComparisonPanel />
       <ConceptDriftPanel key={`concept-drift-${analysisId}`} onRequest={onRequestConceptDrift} />
@@ -466,6 +458,76 @@ function ProcessTreePlayoutPanel({ dataset, available }: { dataset: string; avai
       </div>
       <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
+    </>}
+  </section>;
+}
+
+function PetriPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
+  type VisitedResult = BasicPlayoutVisitedResult | ExtensivePlayoutVisitedResult;
+  const [mode, setMode] = useState<"basic" | "extensive">("basic");
+  const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
+  const [options, setOptions] = useState<BasicPlayoutOptions>({ traces: 100, max_steps: 1000, max_length: 8 });
+  const [initialText, setInitialText] = useState("");
+  const [finalText, setFinalText] = useState("");
+  const [returnVisited, setReturnVisited] = useState(false);
+  const [visited, setVisited] = useState<VisitedResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true); setError(null); setVisited(null);
+    try {
+      const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
+      const common: BasicPlayoutOptions = {
+        traces: options.traces,
+        initial_marking: parseMarkingInput(initialText),
+        final_marking: parseMarkingInput(finalText),
+        ...(mode === "basic" ? { mode, max_steps: options.max_steps, seed: options.seed } : {
+          mode, max_length: options.max_length, max_marking_occ: options.max_marking_occ,
+        }),
+      };
+      if (returnVisited) {
+        const result = mode === "basic"
+          ? await fetchBasicPlayoutVisited(selectedMiner, common)
+          : await fetchExtensivePlayoutVisited(selectedMiner, common);
+        setVisited(result);
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+        const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+        anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.json`; anchor.click();
+        URL.revokeObjectURL(anchor.href);
+      } else {
+        const xes = await fetchPlayout(selectedMiner, common);
+        const blob = new Blob([xes], { type: "application/xml" });
+        const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
+        anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.xes`; anchor.click();
+        URL.revokeObjectURL(anchor.href);
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const number = (name: keyof BasicPlayoutOptions, value: string) =>
+    setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  return <section className="panel conf-panel other-alignments">
+    <div className="panel-head"><h2>Petri-net playout</h2><span className="panel-meta">Basic sampling or extensive enumeration from a cached model</span></div>
+    {miners.length === 0 ? <p className="conf-inline-note">No Petri net is present in this analysis.</p> : <>
+      <div className="align-settings-grid">
+        <label>Miner<select value={miner} onChange={e => setMiner(e.target.value)}>{miners.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>
+        <label>Mode<select value={mode} onChange={e => { setMode(e.target.value as "basic" | "extensive"); setVisited(null); setError(null); }}><option value="basic">Basic sampling</option><option value="extensive">Extensive enumeration</option></select></label>
+        <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
+        {mode === "basic" ? <>
+          <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
+          <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
+        </> : <>
+          <label>Max length<input type="number" min={0} value={options.max_length ?? ""} onChange={e => number("max_length", e.target.value)} /></label>
+          <label>Max marking occurrences<input type="number" min={1} value={options.max_marking_occ ?? ""} onChange={e => number("max_marking_occ", e.target.value)} /></label>
+        </>}
+        <label>Initial marking<input value={initialText} placeholder="optional: 1,0" onChange={e => setInitialText(e.target.value)} /></label>
+        <label>Final marking<input value={finalText} placeholder="optional: 0,1" onChange={e => setFinalText(e.target.value)} /></label>
+        <label><input type="checkbox" checked={returnVisited} onChange={e => setReturnVisited(e.target.checked)} /> Return visited elements</label>
+      </div>
+      <button className="button" disabled={busy} onClick={() => void run()}>{busy ? "Generating…" : returnVisited ? "Download visited playout" : "Download Petri playout"}</button>
+      {error && <p className="conf-inline-note">{error}</p>}
+      {visited && <details className="json-preview"><summary>Show visited elements</summary><pre>{JSON.stringify(visited, null, 2)}</pre></details>}
     </>}
   </section>;
 }
