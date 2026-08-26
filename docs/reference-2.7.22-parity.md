@@ -1883,7 +1883,7 @@ adapters.
 ## Process-tree alignment parity evidence
 
 The four selectable process-tree variants are implemented in the native
-`include/minera/process_tree_alignment.hpp` / `src/process_tree_alignment.cpp`
+`include/minera/process_tree_alignment.hpp` / `src/backend/process_tree_alignment.cpp`
 pair and exposed by the strict request parser, `minera_export`, the local
 server, and the frontend's **Other alignments** panel. They are deterministic,
 collision-free clean-room implementations with dependency-free exact residual
@@ -1936,7 +1936,7 @@ rendered explanation sums to the reported cost.
 Focused validation is in `tests/test_process_tree_alignment.cpp`, with request
 mapping/rejection coverage in `tests/test_request_params.cpp`, JSON checks in
 `tests/test_core.cpp`, and frontend query/result checks in
-`frontend/src/app-logic.test.ts`. Tests cover all four variants, exact
+`src/frontend/src/app-logic.test.ts`. Tests cover all four variants, exact
 sequence/XOR/parallel/loop behavior, repeated traces and DP cache batches,
 approximation thresholds and loop fallback diagnostics, timeout/state
 completion flags, empty-denominator fitness, n-ary normalization, and MILP's
