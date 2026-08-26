@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeTreeLayout } from "./tree-layout";
-import { type ActivityStat, type MineraExport, type ProcessTreeNode } from "./types";
+import { computeTreeLayout } from "../src/tree-layout";
+import { type ActivityStat, type MineraExport, type ProcessTreeNode } from "../src/types";
 
 const act = (name: string): ActivityStat => ({
   name,

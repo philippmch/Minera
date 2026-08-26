@@ -737,7 +737,10 @@ void export_ocel_csv(const Ocel& log, const std::filesystem::path& event_path,
                      const OcelCsvExportOptions& options) {
   std::ofstream events(event_path, std::ios::binary);
   if (!events) throw std::runtime_error("Unable to create OCEL event CSV: " + event_path.string());
-  write_event_table(events, log, options, true);
+  // When the object table is suppressed, object attributes have no lossless
+  // representation.  Let the normal lossiness validation reject that case
+  // instead of silently discarding them from a two-file export.
+  write_event_table(events, log, options, options.emit_objects);
   if (options.emit_objects) {
     std::ofstream objects(object_path, std::ios::binary);
     if (!objects) throw std::runtime_error("Unable to create OCEL object CSV: " + object_path.string());

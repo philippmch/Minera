@@ -1,4 +1,5 @@
-// Tests for the server's request-parsing layer (tools/minera_server feeds these
+// Tests for the server's request-parsing layer (src/backend/tools/minera_server
+// feeds these
 // the raw form fields). Kept httplib-free so the parsing — importer selection,
 // CSV-list splitting, error escaping, and option mapping — can be exercised
 // directly without standing up an HTTP server.
@@ -3144,12 +3145,14 @@ void link_analysis_params_contract() {
       {"link_analysis_out_column", "source_id"},
       {"link_analysis_in_column", "target_id"},
       {"link_analysis_sorting_column", "started_at"},
+      {"link_analysis_index_column", "row_id"},
       {"link_analysis_look_forward", "false"},
       {"link_analysis_keep_first_occurrence", "true"},
       {"link_analysis_propagate", "true"},
       {"link_analysis_max_links", "17"}}));
   assert(parsed.out_column == "source_id" && parsed.in_column == "target_id" &&
-         parsed.sorting_column == "started_at");
+         parsed.sorting_column == "started_at" &&
+         parsed.index_column == "row_id");
   assert(!parsed.look_forward && parsed.keep_first_occurrence &&
          parsed.propagate && parsed.max_links == 17);
   for (const auto& item : {

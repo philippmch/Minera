@@ -2,9 +2,15 @@
 
 The implementation is split into two independently buildable surfaces:
 
-- `backend/` contains the C++ process-mining library and its native tools.
+- `backend/` contains the C++ process-mining library.
+- `backend/tools/` contains native command-line and local-server entry points.
+- `backend/tests/` contains the C++ unit and integration tests (and their
+  fixtures).
 - `frontend/` contains the React/TypeScript desktop UI and its Vite tooling.
+- `frontend/tests/` contains the frontend unit tests, separate from production
+  modules in `frontend/src/`.
 
-Public C++ headers remain under `include/minera/`; tests and command-line
-entry points remain under `tests/` and `tools/` so they can exercise either
-surface without depending on internal source paths.
+The remaining repository-level directories have deliberately different
+ownership: `include/minera/` is the installed public C++ API, `third_party/`
+contains vendored dependencies, `scripts/` contains repository automation,
+`docs/` contains design and parity notes, and `data/` contains sample inputs.

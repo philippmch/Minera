@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestDecisionTables } from "./api";
+import { requestDecisionTables } from "../src/api";
 
 describe("decision table API", () => {
   const payload = {

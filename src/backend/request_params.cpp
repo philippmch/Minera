@@ -3383,6 +3383,7 @@ LinkAnalysisParams parse_link_analysis_params(const FieldLookup& field,
   assign_string("link_analysis_out_column", params.out_column);
   assign_string("link_analysis_in_column", params.in_column);
   assign_string("link_analysis_sorting_column", params.sorting_column);
+  assign_string("link_analysis_index_column", params.index_column);
   if (supplied("link_analysis_look_forward"))
     params.look_forward = parse_boolean(
         require("link_analysis_look_forward"), "link_analysis_look_forward");

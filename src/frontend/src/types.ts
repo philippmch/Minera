@@ -885,6 +885,7 @@ export interface LinkAnalysisResult {
   out_column: string;
   in_column: string;
   sorting_column: string;
+  index_column?: string;
   look_forward: boolean;
   keep_first_occurrence: boolean;
   propagate: boolean;
@@ -905,6 +906,7 @@ export function isLinkAnalysisResult(value: unknown): value is LinkAnalysisResul
   return result.family === "LINK_ANALYSIS" && result.variant === "CLASSIC" &&
     typeof result.out_column === "string" && typeof result.in_column === "string" &&
     typeof result.sorting_column === "string" && typeof result.look_forward === "boolean" &&
+    (result.index_column === undefined || typeof result.index_column === "string") &&
     typeof result.keep_first_occurrence === "boolean" && typeof result.propagate === "boolean" &&
     typeof result.event_count === "number" && Number.isInteger(result.event_count) && result.event_count >= 0 &&
     Array.isArray(result.links) && result.links.every((link) => !!link &&

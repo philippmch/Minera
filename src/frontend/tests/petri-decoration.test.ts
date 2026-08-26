@@ -5,8 +5,8 @@ import {
   placeTooltip,
   placeWaitLabel,
   transitionCountLabel,
-} from "./petri-decoration";
-import { type DurationStats, type PetriDecoration } from "./types";
+} from "../src/petri-decoration";
+import { type DurationStats, type PetriDecoration } from "../src/types";
 
 const wait = (overrides: Partial<DurationStats> = {}): DurationStats => ({
   count: 0,

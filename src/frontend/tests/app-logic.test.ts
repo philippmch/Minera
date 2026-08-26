@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, type FilterOptions } from "./api";
+import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, type FilterOptions } from "../src/api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -9,8 +9,8 @@ import {
   isJsonExport,
   logLifecycles,
   maxEdgeCount,
-} from "./app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "./types";
+} from "../src/app-logic";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
 
 describe("native alignment adapters", () => {
   it("serializes opt-in overlap controls and marks them active", () => {
@@ -454,7 +454,7 @@ import {
   alignmentMoveLabel,
   cleanAlignmentOptions,
   isInvalidAlignmentOptions,
-} from "./components/Conformance";
+} from "../src/components/Conformance";
 
 function exp(over: Partial<MineraExport> = {}): MineraExport {
   return {

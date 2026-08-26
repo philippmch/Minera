@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeLayout, edgeKey } from "./layout";
-import { END, START, type ActivityStat, type EdgeStat, type MineraExport } from "./types";
+import { computeLayout, edgeKey } from "../src/layout";
+import { END, START, type ActivityStat, type EdgeStat, type MineraExport } from "../src/types";
 
 function act(name: string, count: number, start = 0, end = 0): ActivityStat {
   return { name, count, start_count: start, end_count: end };

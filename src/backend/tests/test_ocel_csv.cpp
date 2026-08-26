@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 
@@ -58,6 +59,54 @@ int main() {
   assert(std::get<std::string>(round.objects[2].attributes[0].value) ==
          "open");
 
+  minera::OcelCsvImportOptions custom_import;
+  custom_import.event_id_column = "event_id";
+  custom_import.activity_column = "activity_name";
+  custom_import.timestamp_column = "occurred_at";
+  custom_import.object_type_prefix = "ref.";
+  custom_import.object_id_column = "object_id";
+  custom_import.object_type_column = "object_kind";
+  custom_import.delimiter = ';';
+  const auto custom = minera::parse_ocel_csv(
+      "event_id;activity_name;occurred_at;ref.item;score\n"
+      " e1 ; Pick ; 2024-01-01T00:00:00Z ; [i1] ; 4 \n",
+      "object_id;object_kind;state\n"
+      "i1;item;ready\n",
+      custom_import);
+  assert(custom.events.size() == 1 && custom.events[0].id == "e1");
+  assert(custom.events[0].activity == "Pick");
+  assert(custom.objects.size() == 1 && custom.objects[0].id == "i1");
+  assert(custom.relations.size() == 1);
+
+  minera::OcelCsvExportOptions custom_export;
+  custom_export.event_id_column = custom_import.event_id_column;
+  custom_export.activity_column = custom_import.activity_column;
+  custom_export.timestamp_column = custom_import.timestamp_column;
+  custom_export.object_type_prefix = custom_import.object_type_prefix;
+  custom_export.object_id_column = custom_import.object_id_column;
+  custom_export.object_type_column = custom_import.object_type_column;
+  custom_export.delimiter = custom_import.delimiter;
+  custom_export.allow_lossy = true;
+  const auto custom_events = minera::serialize_ocel_csv(custom, custom_export);
+  const auto custom_objects = minera::serialize_ocel_objects_csv(custom, custom_export);
+  assert(custom_events.rfind("event_id;activity_name;occurred_at;ref.item", 0) == 0);
+  assert(custom_objects.rfind("object_id;object_kind;state", 0) == 0);
+  const auto custom_roundtrip =
+      minera::parse_ocel_csv(custom_events, custom_objects, custom_import);
+  assert(custom_roundtrip.events[0].id == "e1");
+  assert(custom_roundtrip.objects[0].type == "item");
+
+  throws([&] {
+    auto invalid = custom_import;
+    invalid.delimiter = '"';
+    (void)minera::parse_ocel_csv("event_id;activity_name;occurred_at\n", invalid);
+  });
+  throws([&] {
+    auto invalid = custom_import;
+    invalid.delimiter = '\n';
+    (void)minera::parse_ocel_csv("event_id;activity_name;occurred_at\n", invalid);
+  });
+
   const std::string synthesized =
       "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order\n"
       "e1,A,2024-01-01T00:00:00Z,[o9]\n";
@@ -99,6 +148,22 @@ int main() {
     invalid.e2e.push_back({"e1", "e2", "precedes"});
     (void)minera::serialize_ocel_csv(invalid);
   });
+
+  // A two-file export must not accept suppressed object output when object
+  // attributes would otherwise disappear without an error.
+  const auto event_path = std::filesystem::temp_directory_path() /
+                          "minera_ocel_csv_emit_objects_false_events.csv";
+  const auto object_path = std::filesystem::temp_directory_path() /
+                           "minera_ocel_csv_emit_objects_false_objects.csv";
+  std::filesystem::remove(event_path);
+  std::filesystem::remove(object_path);
+  auto suppressed_objects = minera::OcelCsvExportOptions{};
+  suppressed_objects.emit_objects = false;
+  throws([&] {
+    minera::export_ocel_csv(log, event_path, object_path, suppressed_objects);
+  });
+  std::filesystem::remove(event_path);
+  std::filesystem::remove(object_path);
 
   return 0;
 }

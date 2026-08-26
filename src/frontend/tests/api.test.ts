@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchExtensivePlayoutVisited } from "./api";
-import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery, fetchStochasticMap, stochasticMapQuery } from "./api";
-import { isStochasticMapResult } from "./types";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "./api";
+import { fetchExtensivePlayoutVisited } from "../src/api";
+import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery, fetchStochasticMap, stochasticMapQuery } from "../src/api";
+import { isStochasticMapResult } from "../src/types";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
 
 describe("Petri usage comparison API", () => {
   it("serializes explicit replay markings in the multipart request", async () => {
@@ -1602,6 +1602,18 @@ describe("OCEL API", () => {
   it("round-trips classic and standard OCEL JSON/XML through the exchange adapter", async () => {
     expect(ocelExchangeQuery("xml_standard", "import"))
       .toBe("format=xml_standard&mode=import");
+    expect(ocelExchangeQuery("csv", "import", {
+      ocel_csv_event_id_column: "event_id",
+      ocel_csv_activity_column: "activity_name",
+      ocel_csv_timestamp_column: "started_at",
+      ocel_csv_object_type_prefix: "type:",
+      ocel_csv_object_id_column: "object_id",
+      ocel_csv_object_type_column: "object_type",
+      ocel_csv_delimiter: ";",
+      ocel_csv_trim_fields: false,
+      ocel_csv_sort_events_by_timestamp: false,
+      ocel_csv_reject_unsupported: false,
+    })).toBe("format=csv&mode=import&ocel_csv_event_id_column=event_id&ocel_csv_activity_column=activity_name&ocel_csv_timestamp_column=started_at&ocel_csv_object_type_prefix=type%3A&ocel_csv_object_id_column=object_id&ocel_csv_object_type_column=object_type&ocel_csv_delimiter=%3B&ocel_csv_trim_fields=false&ocel_csv_sort_events_by_timestamp=false&ocel_csv_reject_unsupported=false");
     const imported = {
       family: "OCEL_IO", variant: "IMPORT_XML_STANDARD",
       log: { "ocel:events": {}, "ocel:objects": {} },
@@ -1635,7 +1647,7 @@ describe("OCEL API", () => {
       log: { "ocel:events": {}, "ocel:objects": {} },
     };
     vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
-      expect(path).toBe("/api/ocel/io?format=csv&mode=import");
+      expect(path).toBe("/api/ocel/io?format=csv&mode=import&ocel_csv_delimiter=%3B&ocel_csv_trim_fields=true");
       expect(init?.body).toBeInstanceOf(FormData);
       return { ok: true, json: async () => imported };
     }));
@@ -1643,15 +1655,19 @@ describe("OCEL API", () => {
       new File(["ocel:eid,ocel:activity,ocel:timestamp\n"], "events.csv"),
       "csv",
       new File(["ocel:oid,ocel:type\n"], "objects.csv"),
+      { ocel_csv_delimiter: ";", ocel_csv_trim_fields: true },
     )).resolves.toMatchObject({ family: "OCEL_IO", variant: "IMPORT_CSV" });
     vi.unstubAllGlobals();
 
     const csv = new Blob(["ocel:eid,ocel:activity,ocel:timestamp\n"], { type: "text/csv" });
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
-      expect(path).toBe("/api/ocel/io?format=csv_objects&mode=export");
+      expect(path).toBe("/api/ocel/io?format=csv_objects&mode=export&ocel_csv_delimiter=%3B&ocel_csv_allow_lossy=true");
       return { ok: true, blob: async () => csv };
     }));
-    await expect(requestOcelExchangeExport({}, "csv_objects")).resolves.toBe(csv);
+    await expect(requestOcelExchangeExport({}, "csv_objects", {
+      ocel_csv_delimiter: ";",
+      ocel_csv_allow_lossy: true,
+    })).resolves.toBe(csv);
     vi.unstubAllGlobals();
   });
 
@@ -1834,11 +1850,12 @@ describe("link-analysis API", () => {
       link_analysis_out_column: "source_id",
       link_analysis_in_column: "target_id",
       link_analysis_sorting_column: "started_at",
+      link_analysis_index_column: "row_id",
       link_analysis_look_forward: false,
       link_analysis_keep_first_occurrence: true,
       link_analysis_propagate: true,
       link_analysis_max_links: 12,
-    })).toBe("link_analysis_out_column=source_id&link_analysis_in_column=target_id&link_analysis_sorting_column=started_at&link_analysis_look_forward=false&link_analysis_keep_first_occurrence=true&link_analysis_propagate=true&link_analysis_max_links=12");
+    })).toBe("link_analysis_out_column=source_id&link_analysis_in_column=target_id&link_analysis_sorting_column=started_at&link_analysis_index_column=row_id&link_analysis_look_forward=false&link_analysis_keep_first_occurrence=true&link_analysis_propagate=true&link_analysis_max_links=12");
   });
 
   it("validates the cached-session response shape", async () => {

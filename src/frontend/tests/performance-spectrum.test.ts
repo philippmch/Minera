@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildSpectrum, serverSpectrumToSpectrum } from "./performance-spectrum";
-import { type Trace } from "./types";
+import { buildSpectrum, serverSpectrumToSpectrum } from "../src/performance-spectrum";
+import { type Trace } from "../src/types";
 
 const trace = (
   caseId: string,

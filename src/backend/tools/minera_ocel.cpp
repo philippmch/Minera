@@ -28,13 +28,21 @@
 int main(int argc, char** argv) {
   try {
     if (argc < 2) {
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|xml|xml_standard|sqlite] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "OCEL CSV controls: --format csv [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] "
+                   "--ocel-csv-event-id-column NAME --ocel-csv-activity-column NAME "
+                   "--ocel-csv-timestamp-column NAME --ocel-csv-object-type-prefix PREFIX "
+                   "--ocel-csv-object-id-column NAME --ocel-csv-object-type-column NAME "
+                   "--ocel-csv-delimiter CHAR --ocel-csv-trim-fields BOOL "
+                   "--ocel-csv-sort-events-by-timestamp BOOL --ocel-csv-reject-unsupported BOOL "
+                   "--ocel-csv-emit-objects BOOL --ocel-csv-allow-lossy BOOL\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, enrich, graph, split, conformance,
                         statistics, statistics_prefilter = "none",
                         split_object_type, normative_path, csv_objects_path,
-                        normative_csv_objects_path;
+                        normative_csv_objects_path, csv_output_path,
+                        csv_objects_output_path;
     std::map<std::string, std::size_t> filter_object_counts;
     std::vector<std::string> filter_object_types, filter_object_ids;
     std::size_t filter_object_level = 1;
@@ -46,6 +54,8 @@ int main(int argc, char** argv) {
     bool filter_cc_object_type_negative = false;
     bool csv_input = false, xml_input = false, sqlite_input = false;
     std::string sqlite_output_path;
+    minera::OcelCsvImportOptions csv_import_options;
+    minera::OcelCsvExportOptions csv_export_options;
     minera::Ocel log;
     bool ocpn_playout = false;
     bool oc_causal_net_playout = false;
@@ -83,6 +93,19 @@ int main(int argc, char** argv) {
           result < 0.0)
         throw std::invalid_argument(std::string(option) + " expects a finite non-negative number");
       return result;
+    };
+    const auto boolean = [](const std::string& value, const char* option) {
+      if (value == "true" || value == "1" || value == "yes" || value == "on")
+        return true;
+      if (value == "false" || value == "0" || value == "no" || value == "off")
+        return false;
+      throw std::invalid_argument(std::string(option) +
+                                  " expects true or false");
+    };
+    const auto required_value = [&](int& index, const char* option) {
+      if (index + 1 >= argc || std::string(argv[index + 1]).empty())
+        throw std::invalid_argument(std::string(option) + " expects a value");
+      return std::string(argv[++index]);
     };
     const auto list = [](const std::string& value) {
       std::vector<std::string> result;
@@ -203,6 +226,63 @@ int main(int argc, char** argv) {
         csv_input = true;
       } else if (option == "--normative-csv-objects" && i + 1 < argc) {
         normative_csv_objects_path = argv[++i];
+      } else if (option == "--ocel-csv-output") {
+        csv_output_path = required_value(i, "--ocel-csv-output");
+        format = "csv";
+      } else if (option == "--ocel-csv-objects-output") {
+        csv_objects_output_path = required_value(i, "--ocel-csv-objects-output");
+        format = "csv";
+      } else if (option == "--ocel-csv-event-id-column" ||
+                 option == "--ocel-csv-activity-column" ||
+                 option == "--ocel-csv-timestamp-column" ||
+                 option == "--ocel-csv-object-type-prefix" ||
+                 option == "--ocel-csv-object-id-column" ||
+                 option == "--ocel-csv-object-type-column") {
+        const auto value = required_value(i, option.c_str());
+        if (option == "--ocel-csv-event-id-column") {
+          csv_import_options.event_id_column = value;
+          csv_export_options.event_id_column = value;
+        } else if (option == "--ocel-csv-activity-column") {
+          csv_import_options.activity_column = value;
+          csv_export_options.activity_column = value;
+        } else if (option == "--ocel-csv-timestamp-column") {
+          csv_import_options.timestamp_column = value;
+          csv_export_options.timestamp_column = value;
+        } else if (option == "--ocel-csv-object-type-prefix") {
+          csv_import_options.object_type_prefix = value;
+          csv_export_options.object_type_prefix = value;
+        } else if (option == "--ocel-csv-object-id-column") {
+          csv_import_options.object_id_column = value;
+          csv_export_options.object_id_column = value;
+        } else {
+          csv_import_options.object_type_column = value;
+          csv_export_options.object_type_column = value;
+        }
+      } else if (option == "--ocel-csv-delimiter") {
+        const auto value = required_value(i, "--ocel-csv-delimiter");
+        if (value.size() != 1 || value.front() == '"' ||
+            value.front() == '\r' || value.front() == '\n')
+          throw std::invalid_argument(
+              "--ocel-csv-delimiter expects one character other than quote or newline");
+        csv_import_options.delimiter = value.front();
+        csv_export_options.delimiter = value.front();
+      } else if (option == "--ocel-csv-trim-fields" ||
+                 option == "--ocel-csv-sort-events-by-timestamp" ||
+                 option == "--ocel-csv-reject-unsupported" ||
+                 option == "--ocel-csv-emit-objects" ||
+                 option == "--ocel-csv-allow-lossy") {
+        const auto value = required_value(i, option.c_str());
+        const auto parsed = boolean(value, option.c_str());
+        if (option == "--ocel-csv-trim-fields")
+          csv_import_options.trim_fields = parsed;
+        else if (option == "--ocel-csv-sort-events-by-timestamp")
+          csv_import_options.sort_events_by_timestamp = parsed;
+        else if (option == "--ocel-csv-reject-unsupported")
+          csv_import_options.reject_unsupported = parsed;
+        else if (option == "--ocel-csv-emit-objects")
+          csv_export_options.emit_objects = parsed;
+        else
+          csv_export_options.allow_lossy = parsed;
       } else if (option == "--filter-object-count" && i + 1 < argc) {
         const std::string spec = argv[++i];
         const auto separator = spec.find(':');
@@ -699,10 +779,10 @@ int main(int argc, char** argv) {
         include_description_timestamps = false;
       } else throw std::invalid_argument("unknown option: " + option);
     }
-    if (format != "classic" && format != "standard" && format != "xml" &&
+    if (format != "classic" && format != "standard" && format != "csv" && format != "xml" &&
         format != "xml_standard" && format != "sqlite") {
       throw std::invalid_argument(
-          "format must be classic, standard, xml, xml_standard, or sqlite");
+          "format must be classic, standard, csv, xml, xml_standard, or sqlite");
     }
     if (format == "sqlite" && sqlite_output_path.empty())
       throw std::invalid_argument(
@@ -710,6 +790,15 @@ int main(int argc, char** argv) {
     if (!sqlite_output_path.empty() && format != "sqlite")
       throw std::invalid_argument(
           "--sqlite-output requires --format sqlite");
+    if (!csv_output_path.empty() && format != "csv")
+      throw std::invalid_argument(
+          "--ocel-csv-output requires --format csv");
+    if (!csv_objects_output_path.empty() && format != "csv")
+      throw std::invalid_argument(
+          "--ocel-csv-objects-output requires --format csv");
+    if (!csv_objects_output_path.empty() && csv_output_path.empty())
+      throw std::invalid_argument(
+          "--ocel-csv-objects-output requires --ocel-csv-output");
     if (!graph.empty() && format != "classic")
       throw std::invalid_argument(
           "--graph emits the OCEL_OBJECT_GRAPH JSON envelope and requires the default format");
@@ -963,14 +1052,13 @@ int main(int argc, char** argv) {
           "--normative-csv-objects requires a CSV normative log");
     }
     {
-      minera::OcelCsvImportOptions csv_options;
       if (csv_input) {
         if (!csv_objects_path.empty()) {
           log = minera::import_ocel_csv(input_path,
                                         std::filesystem::path(csv_objects_path),
-                                        csv_options);
+                                        csv_import_options);
         } else {
-          log = minera::import_ocel_csv(input_path, csv_options);
+          log = minera::import_ocel_csv(input_path, csv_import_options);
         }
       } else if (xml_input) {
         log = minera::import_ocel_xml(input_path);
@@ -1156,10 +1244,10 @@ int main(int argc, char** argv) {
       if (normative_extension == ".csv") {
         if (!normative_csv_objects_path.empty()) {
           normative = minera::import_ocel_csv(
-              normative_file,
-              std::filesystem::path(normative_csv_objects_path));
+              normative_file, std::filesystem::path(normative_csv_objects_path),
+              csv_import_options);
         } else {
-          normative = minera::import_ocel_csv(normative_file);
+          normative = minera::import_ocel_csv(normative_file, csv_import_options);
         }
       } else if (normative_extension == ".xml" || normative_extension == ".xmlocel") {
         normative = minera::import_ocel_xml(normative_file);
@@ -1298,6 +1386,17 @@ int main(int argc, char** argv) {
         throw std::invalid_argument(
             "--format sqlite requires --sqlite-output OUTPUT.sqlite");
       minera::export_ocel_sqlite(log, std::filesystem::path(sqlite_output_path));
+    } else if (format == "csv") {
+      if (!csv_output_path.empty() && !csv_objects_output_path.empty()) {
+        minera::export_ocel_csv(
+            log, std::filesystem::path(csv_output_path),
+            std::filesystem::path(csv_objects_output_path), csv_export_options);
+      } else if (!csv_output_path.empty()) {
+        minera::export_ocel_csv(log, std::filesystem::path(csv_output_path),
+                                csv_export_options);
+      } else {
+        std::cout << minera::serialize_ocel_csv(log, csv_export_options);
+      }
     } else if (format == "xml" || format == "xml_standard") {
       minera::OcelXmlExportOptions options;
       options.format = format == "xml_standard"

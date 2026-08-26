@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "./Filters";
+import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,

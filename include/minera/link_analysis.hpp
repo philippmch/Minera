@@ -15,6 +15,10 @@ struct LinkAnalysisOptions {
   std::string out_column = "case_id";
   std::string in_column = "case_id";
   std::string sorting_column = "timestamp";
+  // Name of the generated stable row-index field. JSON link endpoints retain
+  // the legacy `index` field and also expose this configured name when it
+  // differs, so callers can consume either contract.
+  std::string index_column = "@@index";
   bool look_forward = true;
   bool keep_first_occurrence = false;
   bool propagate = false;

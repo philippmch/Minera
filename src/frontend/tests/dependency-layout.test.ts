@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { computeDependencyLayout } from "./dependency-layout";
-import { edgeKey } from "./layout";
-import { type ActivityStat, type HeuristicsNet, type MineraExport } from "./types";
+import { computeDependencyLayout } from "../src/dependency-layout";
+import { edgeKey } from "../src/layout";
+import { type ActivityStat, type HeuristicsNet, type MineraExport } from "../src/types";
 
 function data(activities: ActivityStat[]): MineraExport {
   return {

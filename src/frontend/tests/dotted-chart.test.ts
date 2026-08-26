@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Trace } from "./types";
-import { buildDottedChart, parseInstant } from "./dotted-chart";
+import type { Trace } from "../src/types";
+import { buildDottedChart, parseInstant } from "../src/dotted-chart";
 
 const trace = (caseId: string, events: [number, string][]): Trace => ({
   case_id: caseId,
