@@ -58,7 +58,7 @@ are reconciled.
 |---|---|---|
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics, explicit Woflan selection, short-circuit construction, reachability liveness projection, strong-connectivity diagnostics, single-place marking validation, early unsound-witness return, and strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
-| Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering and the same adapters; broader differential review remains |
+| Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings and extended arcs; broader differential semantics remain |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial** — the explicit `BOSE` selector, seeded permutation windows, timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
@@ -1132,10 +1132,12 @@ and convergence diagnostics without opening a GUI.
 
 Trace-attribute clustering keeps the input order of attribute groups and of
 equal-frequency variants before applying the five named distance families.
-This preserves deterministic nearest-variant ties for the DMM forms and keeps
-the hierarchy's leaf order stable across repeated native, JSON, CLI, server,
-and frontend calls. Focused Release coverage exercises first-seen group order
-and repeated serialization; broader numerical differential fixtures remain.
+DMM vector matching computes activity and succession similarities separately
+before applying `alpha`; empty succession vectors have maximal distance, and
+traces without the selected grouping attribute are excluded. Linkage children
+retain merge order while labels remain deterministic. Focused Release coverage
+exercises these numerical and ordering rules plus repeated serialization;
+broader differential fixtures remain.
 
 ## Evaluation parity evidence
 

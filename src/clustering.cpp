@@ -57,8 +57,9 @@ Counts activity_counts(const Sequence& seq) {
 Counts succession_counts(const Sequence& seq) {
   Counts c; for (std::size_t i = 1; i < seq.size(); ++i) ++c[seq[i - 1] + "\x1f" + seq[i]]; return c;
 }
-double cosine_distance(const Counts& a, const Counts& b) {
-  if (a.empty() && b.empty()) return 0.0;
+double cosine_distance(const Counts& a, const Counts& b,
+                       bool empty_pair_is_distance = false) {
+  if (a.empty() && b.empty()) return empty_pair_is_distance ? 1.0 : 0.0;
   double aa = 0, bb = 0, ab = 0;
   auto i = a.begin(), j = b.begin();
   while (i != a.end() || j != b.end()) {
@@ -66,10 +67,72 @@ double cosine_distance(const Counts& a, const Counts& b) {
     else if (i == a.end() || j->first < i->first) { bb += j->second*j->second; ++j; }
     else { aa += i->second*i->second; bb += j->second*j->second; ab += i->second*j->second; ++i; ++j; }
   }
-  if (aa == 0.0 && bb == 0.0) return 0.0;
+  if (aa == 0.0 && bb == 0.0)
+    return empty_pair_is_distance ? 1.0 : 0.0;
   if (aa == 0.0 || bb == 0.0) return 1.0;
   const double sim = ab / std::sqrt(aa * bb);
   return std::clamp(1.0 - sim, 0.0, 1.0);
+}
+
+template <typename Distance>
+double dmm_distance(const Profile& a, const Profile& b, Distance distance) {
+  if (a.empty() || b.empty()) return a.empty() == b.empty() ? 0.0 : 1.0;
+
+  const Profile* max_profile = &a;
+  const Profile* min_profile = &b;
+  if (a.size() < b.size()) {
+    max_profile = &b;
+    min_profile = &a;
+  }
+
+  std::vector<std::vector<double>> distances(
+      max_profile->size(), std::vector<double>(min_profile->size(), 1.0));
+  for (std::size_t i = 0; i < max_profile->size(); ++i) {
+    for (std::size_t j = 0; j < min_profile->size(); ++j)
+      distances[i][j] = distance((*max_profile)[i], (*min_profile)[j]);
+  }
+
+  std::vector<bool> matched(min_profile->size(), false);
+  double sum = 0.0;
+  double weight = 0.0;
+  for (std::size_t i = 0; i < max_profile->size(); ++i) {
+    std::size_t best_index = 0;
+    double best = distances[i][0];
+    for (std::size_t j = 1; j < min_profile->size(); ++j) {
+      if (distances[i][j] < best) {
+        best = distances[i][j];
+        best_index = j;
+      }
+    }
+    const double pair_weight =
+        static_cast<double>((*max_profile)[i].count) *
+        static_cast<double>((*min_profile)[best_index].count);
+    if (best <= 1e-8) {
+      matched[best_index] = true;
+      weight += pair_weight * 2.0;
+      sum += best * pair_weight * 2.0;
+    } else {
+      weight += pair_weight;
+      sum += best * pair_weight;
+    }
+  }
+  for (std::size_t j = 0; j < min_profile->size(); ++j) {
+    if (matched[j]) continue;
+    std::size_t best_index = 0;
+    double best = distances[0][j];
+    for (std::size_t i = 1; i < max_profile->size(); ++i) {
+      if (distances[i][j] < best) {
+        best = distances[i][j];
+        best_index = i;
+      }
+    }
+    const double pair_weight =
+        static_cast<double>((*max_profile)[best_index].count) *
+        static_cast<double>((*min_profile)[j].count);
+    weight += pair_weight;
+    sum += best * pair_weight;
+  }
+  return weight > 0.0 ? std::clamp(sum / weight, 0.0, 1.0) : 0.0;
 }
 
 Profile profile(const std::vector<const Trace*>& traces, double percent) {
@@ -107,11 +170,19 @@ Profile profile(const std::vector<const Trace*>& traces, double percent) {
 double pair_distance(const Profile& a, const Profile& b,
                      TraceAttributeClusteringVariant variant, double alpha) {
   if (a.empty() || b.empty()) return a.empty() == b.empty() ? 0.0 : 1.0;
+  auto vector_component = [&](const Variant& x, const Variant& y,
+                              bool succession) {
+    if (succession) {
+      return cosine_distance(succession_counts(x.seq),
+                              succession_counts(y.seq), true);
+    }
+    return cosine_distance(activity_counts(x.seq), activity_counts(y.seq));
+  };
   auto one = [&](const Variant& x, const Variant& y) {
     if (variant == TraceAttributeClusteringVariant::kAvgLeven || variant == TraceAttributeClusteringVariant::kDmmLeven)
       return levenshtein(x.seq, y.seq);
-    const auto act = cosine_distance(activity_counts(x.seq), activity_counts(y.seq));
-    const auto suc = cosine_distance(succession_counts(x.seq), succession_counts(y.seq));
+    const auto act = vector_component(x, y, false);
+    const auto suc = vector_component(x, y, true);
     return std::clamp(act * alpha + suc * (1.0 - alpha), 0.0, 1.0);
   };
   const bool dmm = variant == TraceAttributeClusteringVariant::kDmmLeven || variant == TraceAttributeClusteringVariant::kDmmVec;
@@ -119,9 +190,17 @@ double pair_distance(const Profile& a, const Profile& b,
     double act = 0, suc = 0; Counts ac, bc, as, bs;
     for (const auto& x : a) { for (const auto& [k,v] : activity_counts(x.seq)) ac[k] += v*x.count; for (const auto& [k,v] : succession_counts(x.seq)) as[k] += v*x.count; }
     for (const auto& x : b) { for (const auto& [k,v] : activity_counts(x.seq)) bc[k] += v*x.count; for (const auto& [k,v] : succession_counts(x.seq)) bs[k] += v*x.count; }
-    act = cosine_distance(ac, bc); suc = cosine_distance(as, bs); return std::clamp(act*alpha + suc*(1-alpha),0.0,1.0);
+    act = cosine_distance(ac, bc); suc = cosine_distance(as, bs, true); return std::clamp(act*alpha + suc*(1-alpha),0.0,1.0);
   }
-  double sum = 0, weight = 0;
+  if (variant == TraceAttributeClusteringVariant::kDmmVec) {
+    const auto act = dmm_distance(a, b, [&](const Variant& x, const Variant& y) {
+      return vector_component(x, y, false);
+    });
+    const auto suc = dmm_distance(a, b, [&](const Variant& x, const Variant& y) {
+      return vector_component(x, y, true);
+    });
+    return std::clamp(act * alpha + suc * (1.0 - alpha), 0.0, 1.0);
+  }
   if (dmm) {
     // The directional minimum-matching distance first matches every variant
     // on the larger side to its nearest variant on the smaller side. Exact
@@ -129,59 +208,16 @@ double pair_distance(const Profile& a, const Profile& b,
     // only unmatched smaller-side variants are then matched in reverse. This
     // keeps duplicate exact variants from being counted as two independent
     // penalties while preserving the reference frequency weighting.
-    const Profile* max_profile = &a;
-    const Profile* min_profile = &b;
-    if (a.size() < b.size()) {
-      max_profile = &b;
-      min_profile = &a;
-    }
-    std::vector<std::vector<double>> distances(
-        max_profile->size(), std::vector<double>(min_profile->size(), 1.0));
-    for (std::size_t i = 0; i < max_profile->size(); ++i) {
-      for (std::size_t j = 0; j < min_profile->size(); ++j)
-        distances[i][j] = one((*max_profile)[i], (*min_profile)[j]);
-    }
-    std::vector<bool> matched(min_profile->size(), false);
-    for (std::size_t i = 0; i < max_profile->size(); ++i) {
-      std::size_t best_index = 0;
-      double best = distances[i].empty() ? 1.0 : distances[i][0];
-      for (std::size_t j = 1; j < min_profile->size(); ++j) {
-        if (distances[i][j] < best) {
-          best = distances[i][j];
-          best_index = j;
-        }
-      }
-      if (min_profile->empty()) continue;
-      const double pair_weight = static_cast<double>((*max_profile)[i].count) *
-                                 static_cast<double>((*min_profile)[best_index].count);
-      if (best <= 1e-8) {
-        matched[best_index] = true;
-        weight += pair_weight * 2.0;
-        sum += best * pair_weight * 2.0;
-      } else {
-        weight += pair_weight;
-        sum += best * pair_weight;
-      }
-    }
-    for (std::size_t j = 0; j < min_profile->size(); ++j) {
-      if (matched[j] || max_profile->empty()) continue;
-      std::size_t best_index = 0;
-      double best = distances[0][j];
-      for (std::size_t i = 1; i < max_profile->size(); ++i) {
-        if (distances[i][j] < best) {
-          best = distances[i][j];
-          best_index = i;
-        }
-      }
-      const double pair_weight = static_cast<double>((*max_profile)[best_index].count) *
-                                 static_cast<double>((*min_profile)[j].count);
-      weight += pair_weight;
-      sum += best * pair_weight;
-    }
+    return dmm_distance(a, b, one);
   } else {
-    for (const auto& x : a) for (const auto& y : b) { sum += one(x,y)*x.count*y.count; weight += static_cast<double>(x.count)*y.count; }
+    double sum = 0.0;
+    double weight = 0.0;
+    for (const auto& x : a) for (const auto& y : b) {
+      sum += one(x,y)*x.count*y.count;
+      weight += static_cast<double>(x.count)*y.count;
+    }
+    return weight > 0 ? std::clamp(sum / weight, 0.0, 1.0) : 0.0;
   }
-  return weight > 0 ? std::clamp(sum / weight, 0.0, 1.0) : 0.0;
 }
 
 struct Cluster { std::vector<std::size_t> members; std::string name; TraceAttributeClusteringNode node; };
@@ -208,7 +244,8 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     const auto* v = case_id_selector ? &t.case_id : t.attribute(o.trace_attribute);
     if (!v) v = t.attribute(key);
     if (!v && o.trace_attribute.rfind("case:", 0) != 0) v = t.attribute("case:" + o.trace_attribute);
-    const std::string name = v ? *v : std::string{};
+    if (!v) continue;
+    const std::string name = *v;
     const auto [it, inserted] = group_indices.emplace(name, groups.size());
     if (inserted) groups.push_back({name, {}});
     groups[it->second].traces.push_back(&t);
@@ -249,9 +286,7 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     std::size_t bi=0,bj=1; double bd=std::numeric_limits<double>::infinity();
     for (std::size_t i=0;i<cs.size();++i) for (std::size_t j=i+1;j<cs.size();++j) {
       const double x = d[i][j];
-      if (x < bd - 1e-12 ||
-          (std::abs(x - bd) <= 1e-12 &&
-           std::pair{i, j} < std::pair{bi, bj})) {
+      if (x < bd) {
         bd=x;bi=i;bj=j;
       }
     }
@@ -286,8 +321,6 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     merged.node.distance = bd;
     merged.node.size = cs[bi].node.size + cs[bj].node.size;
     merged.node.children = {std::move(cs[bi].node), std::move(cs[bj].node)};
-    std::sort(merged.node.children.begin(), merged.node.children.end(),
-              [](const auto& x, const auto& y) { return x.name < y.name; });
     merged.node.leaf = false;
     std::vector<std::size_t> survivors;
     survivors.reserve(old_size - 2);
