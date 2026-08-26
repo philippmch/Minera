@@ -225,6 +225,117 @@ int main() {
   }
 
   {
+    // An unrelated extended guard must survive while an ordinary silent chain
+    // is reduced.  The guarded place is retained and remapped deterministically.
+    PetriNet net;
+    net.set_activities({"a"});
+    const auto source = net.add_place();
+    const auto entry = net.add_place();
+    const auto exit = net.add_place();
+    const auto sink = net.add_place();
+    const auto guard = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {entry});
+    net.add_transition(std::nullopt, {entry}, {exit});
+    const auto visible = net.add_transition(0, {exit}, {sink});
+    net.add_inhibitor_arc(visible, guard);
+    PetriNetReductionOptions options;
+    options.initial_marking = {1, 0, 0, 0, 0};
+    options.final_marking = {0, 0, 0, 1, 0};
+    const auto result = reduce_petri_net(net, options);
+    assert(result.changed);
+    assert(result.net.place_count() == 4);
+    assert(result.net.transitions().size() == 2);
+    assert((result.old_to_new_place ==
+            std::vector<std::size_t>{0, kRemovedPlace, 1, 2, 3}));
+    assert(result.net.transitions()[1].inhibitor_inputs ==
+           std::vector<std::size_t>{3});
+    assert((result.markings.initial == std::vector<std::int64_t>{1, 0, 0, 0}));
+    assert((result.markings.final == std::vector<std::int64_t>{0, 0, 1, 0}));
+  }
+
+  {
+    // Series-place fusion handles a private silent place with multiple
+    // producers and a shared output place with multiple consumers.
+    PetriNet net;
+    net.set_activities({"a", "b", "c", "d"});
+    const auto source = net.add_place();
+    const auto private_place = net.add_place();
+    const auto shared = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {private_place});
+    net.add_transition(1, {source}, {private_place});
+    net.add_transition(std::nullopt, {private_place}, {shared});
+    net.add_transition(2, {shared}, {sink});
+    net.add_transition(3, {shared}, {sink});
+    const auto result = reduce_petri_net(net);
+    assert(result.changed);
+    assert(result.net.place_count() == 3);
+    assert(result.net.transitions().size() == 4);
+    assert((result.old_to_new_place ==
+            std::vector<std::size_t>{0, kRemovedPlace, 1, 2}));
+    assert(result.net.transitions()[0].outputs ==
+           std::vector<std::size_t>{1});
+    assert(result.net.transitions()[1].outputs ==
+           std::vector<std::size_t>{1});
+    assert(result.net.transitions()[2].inputs ==
+           std::vector<std::size_t>{1});
+    assert(result.net.transitions()[3].inputs ==
+           std::vector<std::size_t>{1});
+  }
+
+  {
+    // Duplicate silent transitions are behaviorally identical and can be
+    // fused even when their boundary place is protected.
+    PetriNet net;
+    net.set_activities({"a", "b"});
+    const auto source = net.add_place();
+    const auto middle = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(std::nullopt, {source}, {middle});
+    net.add_transition(std::nullopt, {source}, {middle});
+    net.add_transition(0, {middle}, {sink});
+    net.add_transition(1, {middle}, {sink});
+    const auto result = reduce_petri_net(net);
+    assert(result.changed);
+    assert(result.net.place_count() == 3);
+    assert(result.net.transitions().size() == 3);
+    assert(result.net.transitions()[0].activity == std::nullopt);
+    assert(result.net.transitions()[1].activity ==
+           std::optional<std::size_t>(0));
+    assert(result.net.transitions()[2].activity ==
+           std::optional<std::size_t>(1));
+  }
+
+  {
+    // An ordinary silent self-loop has no observable effect once another
+    // transition produces the loop place.
+    PetriNet net;
+    net.set_activities({"a", "b"});
+    const auto source = net.add_place();
+    const auto middle = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {middle});
+    net.add_transition(std::nullopt, {middle}, {middle});
+    net.add_transition(1, {middle}, {sink});
+    const auto result = reduce_petri_net(net);
+    assert(result.changed);
+    assert(result.net.place_count() == 3);
+    assert(result.net.transitions().size() == 2);
+    assert(result.net.transitions()[0].activity ==
+           std::optional<std::size_t>(0));
+    assert(result.net.transitions()[1].activity ==
+           std::optional<std::size_t>(1));
+  }
+
+  {
     bool threw = false;
     try {
       PetriNetReductionOptions options;

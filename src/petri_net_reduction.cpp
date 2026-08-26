@@ -16,6 +16,8 @@ struct WorkingTransition {
   std::optional<std::size_t> activity;
   std::vector<std::size_t> inputs;
   std::vector<std::size_t> outputs;
+  std::vector<std::size_t> reset_inputs;
+  std::vector<std::size_t> inhibitor_inputs;
 };
 
 struct WorkingNet {
@@ -35,6 +37,42 @@ bool only_place(const std::vector<std::size_t>& values,
   return !values.empty() &&
          std::all_of(values.begin(), values.end(),
                      [&](std::size_t value) { return value == expected; });
+}
+
+bool has_extended_arcs(const WorkingTransition& transition) {
+  return !transition.reset_inputs.empty() ||
+         !transition.inhibitor_inputs.empty();
+}
+
+bool mentions_extended_place(const WorkingNet& net, std::size_t place) {
+  for (const auto& transition : net.transitions) {
+    if (contains(transition.reset_inputs, place) ||
+        contains(transition.inhibitor_inputs, place))
+      return true;
+  }
+  return false;
+}
+
+std::vector<std::size_t> ordinary_producers(const WorkingNet& net,
+                                             std::size_t place) {
+  std::vector<std::size_t> result;
+  for (std::size_t transition = 0; transition < net.transitions.size();
+       ++transition) {
+    if (contains(net.transitions[transition].outputs, place))
+      result.push_back(transition);
+  }
+  return result;
+}
+
+std::vector<std::size_t> ordinary_consumers(const WorkingNet& net,
+                                            std::size_t place) {
+  std::vector<std::size_t> result;
+  for (std::size_t transition = 0; transition < net.transitions.size();
+       ++transition) {
+    if (contains(net.transitions[transition].inputs, place))
+      result.push_back(transition);
+  }
+  return result;
 }
 
 void erase_place(std::vector<std::size_t>& values, std::size_t place) {
@@ -86,12 +124,15 @@ bool reduce_single_entry(WorkingNet& net, std::vector<bool>& place_alive,
                          const PetriNetReductionOptions& options) {
   for (std::size_t silent = 0; silent < net.transitions.size(); ++silent) {
     const auto& transition = net.transitions[silent];
-    if (transition.activity.has_value() || transition.inputs.empty()) continue;
+    if (transition.activity.has_value() || transition.inputs.empty() ||
+        has_extended_arcs(transition))
+      continue;
 
     const auto entry = transition.inputs.front();
     if (!only_place(transition.inputs, entry) ||
         entry >= place_alive.size() || !place_alive[entry] ||
-        is_protected_place(entry, net, options))
+        is_protected_place(entry, net, options) ||
+        mentions_extended_place(net, entry))
       continue;
 
     std::size_t producer = std::numeric_limits<std::size_t>::max();
@@ -134,12 +175,15 @@ bool reduce_single_exit(WorkingNet& net, std::vector<bool>& place_alive,
                         const PetriNetReductionOptions& options) {
   for (std::size_t silent = 0; silent < net.transitions.size(); ++silent) {
     const auto& transition = net.transitions[silent];
-    if (transition.activity.has_value() || transition.outputs.empty()) continue;
+    if (transition.activity.has_value() || transition.outputs.empty() ||
+        has_extended_arcs(transition))
+      continue;
 
     const auto exit = transition.outputs.front();
     if (!only_place(transition.outputs, exit) ||
         exit >= place_alive.size() || !place_alive[exit] ||
-        is_protected_place(exit, net, options))
+        is_protected_place(exit, net, options) ||
+        mentions_extended_place(net, exit))
       continue;
 
     std::size_t consumer = std::numeric_limits<std::size_t>::max();
@@ -178,6 +222,126 @@ bool reduce_single_exit(WorkingNet& net, std::vector<bool>& place_alive,
   return false;
 }
 
+// Fusion of series places: a silent transition with one input and one output
+// can be removed even when several ordinary transitions feed its private
+// input.  We deliberately reject any extended arc mentioning the removed
+// place, because there is no equivalent place-level rewrite for a reset or
+// inhibitor guard in this compact representation.
+bool reduce_series_place(WorkingNet& net, std::vector<bool>& place_alive,
+                         const PetriNetReductionOptions& options) {
+  for (std::size_t silent = 0; silent < net.transitions.size(); ++silent) {
+    const auto& transition = net.transitions[silent];
+    if (transition.activity.has_value() || has_extended_arcs(transition) ||
+        transition.inputs.size() != 1 || transition.outputs.size() != 1)
+      continue;
+    const auto input = transition.inputs.front();
+    const auto output = transition.outputs.front();
+    if (input == output || input >= place_alive.size() ||
+        output >= place_alive.size() || !place_alive[input] ||
+        !place_alive[output] || is_protected_place(input, net, options) ||
+        mentions_extended_place(net, input))
+      continue;
+
+    const auto consumers = ordinary_consumers(net, input);
+    if (consumers.size() != 1 || consumers.front() != silent) continue;
+    const auto producers = ordinary_producers(net, input);
+    const auto output_producers = ordinary_producers(net, output);
+    bool shared_producer = false;
+    for (const auto producer : producers) {
+      if (std::find(output_producers.begin(), output_producers.end(),
+                    producer) != output_producers.end()) {
+        shared_producer = true;
+        break;
+      }
+    }
+    if (shared_producer) continue;
+
+    // Preserve ordinary arc multiplicity when rewiring every producer.
+    for (const auto producer : producers) {
+      auto& outputs = net.transitions[producer].outputs;
+      const auto count = static_cast<std::size_t>(
+          std::count(outputs.begin(), outputs.end(), input));
+      erase_place(outputs, input);
+      for (std::size_t i = 0; i < count; ++i) outputs.push_back(output);
+    }
+    net.transitions.erase(net.transitions.begin() +
+                          static_cast<std::ptrdiff_t>(silent));
+    place_alive[input] = false;
+    return true;
+  }
+  return false;
+}
+
+bool same_arc_multiset(const std::vector<std::size_t>& lhs,
+                       const std::vector<std::size_t>& rhs) {
+  if (lhs.size() != rhs.size()) return false;
+  auto left = lhs;
+  auto right = rhs;
+  std::sort(left.begin(), left.end());
+  std::sort(right.begin(), right.end());
+  return left == right;
+}
+
+// Fusion of parallel transitions is restricted to silent transitions with
+// exactly equal ordinary and extended arc multisets.  Removing one duplicate
+// cannot change enabledness or marking effects.
+bool reduce_parallel_transitions(WorkingNet& net) {
+  for (std::size_t first = 0; first < net.transitions.size(); ++first) {
+    const auto& lhs = net.transitions[first];
+    if (lhs.activity.has_value()) continue;
+    for (std::size_t second = first + 1; second < net.transitions.size();
+         ++second) {
+      const auto& rhs = net.transitions[second];
+      if (rhs.activity.has_value() ||
+          !same_arc_multiset(lhs.inputs, rhs.inputs) ||
+          !same_arc_multiset(lhs.outputs, rhs.outputs) ||
+          !same_arc_multiset(lhs.reset_inputs, rhs.reset_inputs) ||
+          !same_arc_multiset(lhs.inhibitor_inputs, rhs.inhibitor_inputs))
+        continue;
+      net.transitions.erase(net.transitions.begin() +
+                            static_cast<std::ptrdiff_t>(second));
+      return true;
+    }
+  }
+  return false;
+}
+
+// A silent ordinary self-loop has no observable effect when the place has a
+// different ordinary producer.  The extended-arc check ensures that removing
+// it cannot discard a reset/inhibitor side effect.
+bool eliminate_self_loop(WorkingNet& net) {
+  for (std::size_t transition = 0; transition < net.transitions.size();
+       ++transition) {
+    const auto& candidate = net.transitions[transition];
+    if (candidate.activity.has_value() || has_extended_arcs(candidate) ||
+        candidate.inputs.size() != 1 || candidate.outputs.size() != 1 ||
+        candidate.inputs.front() != candidate.outputs.front())
+      continue;
+    const auto place = candidate.inputs.front();
+    if (ordinary_producers(net, place).size() < 2) continue;
+    net.transitions.erase(net.transitions.begin() +
+                          static_cast<std::ptrdiff_t>(transition));
+    return true;
+  }
+  return false;
+}
+
+// A reset and an inhibitor arc on the same transition/place are redundant:
+// the inhibitor already requires an empty place, so the reset has no effect.
+bool remove_redundant_resets(WorkingNet& net) {
+  for (auto& transition : net.transitions) {
+    const auto before = transition.reset_inputs.size();
+    transition.reset_inputs.erase(
+        std::remove_if(transition.reset_inputs.begin(),
+                       transition.reset_inputs.end(), [&](std::size_t place) {
+                         return contains(transition.inhibitor_inputs, place);
+                       }),
+        transition.reset_inputs.end());
+    if (transition.reset_inputs.size() != before) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 PetriNetReductionResult reduce_petri_net(
@@ -187,10 +351,7 @@ PetriNetReductionResult reduce_petri_net(
   validate_marking(options.final_marking, net.place_count(),
                    "final marking");
 
-  // A rebuild that ignores extended arcs would change token semantics. Keep
-  // these nets intact until matching reduction rules are implemented.
-  if (net.has_extended_arcs() || net.source() >= net.place_count() ||
-      net.sink() >= net.place_count())
+  if (net.source() >= net.place_count() || net.sink() >= net.place_count())
     return unchanged(net, options);
 
   // add_transition intentionally stays lightweight and does not validate its
@@ -204,6 +365,14 @@ PetriNetReductionResult reduce_petri_net(
         std::any_of(transition.outputs.begin(), transition.outputs.end(),
                     [&](std::size_t place) {
                       return place >= net.place_count();
+                    }) ||
+        std::any_of(transition.reset_inputs.begin(),
+                    transition.reset_inputs.end(), [&](std::size_t place) {
+                      return place >= net.place_count();
+                    }) ||
+        std::any_of(transition.inhibitor_inputs.begin(),
+                    transition.inhibitor_inputs.end(), [&](std::size_t place) {
+                      return place >= net.place_count();
                     }))
       return unchanged(net, options);
   }
@@ -216,18 +385,35 @@ PetriNetReductionResult reduce_petri_net(
   working.transitions.reserve(net.transitions().size());
   for (const auto& transition : net.transitions()) {
     working.transitions.push_back(
-        {transition.activity, transition.inputs, transition.outputs});
+        {transition.activity, transition.inputs, transition.outputs,
+         transition.reset_inputs, transition.inhibitor_inputs});
   }
 
   std::vector<bool> place_alive(working.place_count, true);
   bool changed = false;
   for (;;) {
     bool pass_changed = false;
+    while (remove_redundant_resets(working)) {
+      changed = true;
+      pass_changed = true;
+    }
     while (reduce_single_entry(working, place_alive, options)) {
       changed = true;
       pass_changed = true;
     }
     while (reduce_single_exit(working, place_alive, options)) {
+      changed = true;
+      pass_changed = true;
+    }
+    while (reduce_series_place(working, place_alive, options)) {
+      changed = true;
+      pass_changed = true;
+    }
+    while (reduce_parallel_transitions(working)) {
+      changed = true;
+      pass_changed = true;
+    }
+    while (eliminate_self_loop(working)) {
       changed = true;
       pass_changed = true;
     }
@@ -263,8 +449,18 @@ PetriNetReductionResult reduce_petri_net(
           result.old_to_new_place[place] != kRemovedPlace)
         outputs.push_back(result.old_to_new_place[place]);
     }
-    (void)reduced.add_transition(transition.activity, std::move(inputs),
-                                 std::move(outputs));
+    const auto index = reduced.add_transition(
+        transition.activity, std::move(inputs), std::move(outputs));
+    for (const auto place : transition.reset_inputs) {
+      if (place < result.old_to_new_place.size() &&
+          result.old_to_new_place[place] != kRemovedPlace)
+        reduced.add_reset_arc(index, result.old_to_new_place[place]);
+    }
+    for (const auto place : transition.inhibitor_inputs) {
+      if (place < result.old_to_new_place.size() &&
+          result.old_to_new_place[place] != kRemovedPlace)
+        reduced.add_inhibitor_arc(index, result.old_to_new_place[place]);
+    }
   }
   result.net = std::move(reduced);
 
