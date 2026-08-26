@@ -118,6 +118,38 @@ int main() {
   assert((missing_result.leaf_names ==
           std::vector<std::string>{"x", "y"}));
 
+  // DFG distances use complete group sublogs.  The percentage parameter is
+  // accepted consistently across variants but must not alter this distance.
+  EventLog dfg_percent_log;
+  dfg_percent_log.traces.push_back(Trace{
+      "dfg-x-ab", {Event{"dfg-x-ab", "A", "", "", 0, {}, ""},
+                    Event{"dfg-x-ab", "B", "", "", 1, {}, ""}},
+      {{"segment", "dfg-x"}}});
+  dfg_percent_log.traces.push_back(Trace{
+      "dfg-x-cd", {Event{"dfg-x-cd", "C", "", "", 0, {}, ""},
+                    Event{"dfg-x-cd", "D", "", "", 1, {}, ""}},
+      {{"segment", "dfg-x"}}});
+  dfg_percent_log.traces.push_back(Trace{
+      "dfg-y-ab", {Event{"dfg-y-ab", "A", "", "", 0, {}, ""},
+                    Event{"dfg-y-ab", "B", "", "", 1, {}, ""}},
+      {{"segment", "dfg-y"}}});
+  dfg_percent_log.traces.push_back(Trace{
+      "dfg-y-ef", {Event{"dfg-y-ef", "E", "", "", 0, {}, ""},
+                    Event{"dfg-y-ef", "F", "", "", 1, {}, ""}},
+      {{"segment", "dfg-y"}}});
+  auto dfg_percent_options = o;
+  dfg_percent_options.trace_attribute = "segment";
+  dfg_percent_options.variant = TraceAttributeClusteringVariant::kDfg;
+  dfg_percent_options.alpha = 0.5;
+  dfg_percent_options.percent = 1.0;
+  const auto dfg_full = discover_trace_attribute_clustering(
+      dfg_percent_log, dfg_percent_options);
+  dfg_percent_options.percent = 0.5;
+  const auto dfg_partial = discover_trace_attribute_clustering(
+      dfg_percent_log, dfg_percent_options);
+  assert(dfg_full.tree.distance > 0.0);
+  assert(std::abs(dfg_full.tree.distance - dfg_partial.tree.distance) < 1e-12);
+
   // Linkage child order follows the merge order, not lexical leaf names.
   assert(insertion_result.tree.children.size() == 2);
   assert(insertion_result.tree.children[0].name == "z");
