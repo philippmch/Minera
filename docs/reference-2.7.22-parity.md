@@ -397,7 +397,10 @@ OCEL interchange evidence: the native core now parses and writes deterministic
 extended-table CSV (with an optional object table), typed OCEL 2 relational
 SQLite, and bounded classic/standard XML and JSON. Standard JSON/XML emit and
 re-import deterministic object/event type catalogs, including empty types and
-scalar attribute declarations without observed values;
+scalar attribute declarations without observed values. Classic JSON now
+likewise emits and imports the `ocel:eventTypes` and `ocel:objectTypes`
+catalogs; observed attributes fill in missing declarations with deterministic
+scalar types while explicit catalog types are preserved;
 typed values are coerced on import, static object attributes use the epoch
 baseline, and later timed values remain object changes. CSV import validates
 headers, object-list cells, timestamps, ids, and cross-type references; SQLite

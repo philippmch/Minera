@@ -486,5 +486,47 @@ int main() {
          "string");
   assert(catalog_round.object_type_attributes.at("Order").at("amount") ==
          "decimal");
+
+  const std::string classic_metadata = R"json({
+    "ocel:eventTypes":{"Create":{"approved":"boolean","when":"datetime"},"EmptyEvent":{}},
+    "ocel:objectTypes":{"Order":{"amount":"decimal"},"EmptyObject":{}},
+    "ocel:objects":{"o":{"ocel:type":"Order","ocel:ovmap":{"amount":2.5}}},
+    "ocel:events":{"e":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o"],"ocel:vmap":{"approved":true}}}
+  })json";
+  const auto classic_metadata_log = minera::parse_ocel_json(classic_metadata);
+  assert(classic_metadata_log.event_type_attributes.at("Create").at("approved") ==
+         "boolean");
+  assert(classic_metadata_log.event_type_attributes.at("Create").at("when") ==
+         "datetime");
+  assert(classic_metadata_log.event_type_attributes.at("EmptyEvent").empty());
+  assert(classic_metadata_log.object_type_attributes.at("Order").at("amount") ==
+         "decimal");
+  assert(classic_metadata_log.object_type_attributes.at("EmptyObject").empty());
+
+  const auto classic_catalog_json =
+      minera::serialize_ocel_json(catalog, minera::OcelJsonFormat::kClassic);
+  assert(classic_catalog_json.find("\"ocel:eventTypes\"") !=
+             std::string::npos &&
+         classic_catalog_json.find("\"ocel:objectTypes\"") !=
+             std::string::npos);
+  const auto classic_catalog_round =
+      minera::parse_ocel_json(classic_catalog_json);
+  assert(classic_catalog_round.event_type_attributes.at("EmptyEvent").at(
+             "planned_at") == "datetime");
+  assert(classic_catalog_round.event_type_attributes.at("Create").at("count") ==
+         "long");
+  assert(classic_catalog_round.object_type_attributes.at("EmptyObject").at(
+             "label") == "string");
+  assert(classic_catalog_round.object_type_attributes.at("Order").at("amount") ==
+         "decimal");
+
+  bool malformed_classic_catalog = false;
+  try {
+    (void)minera::parse_ocel_json(
+        R"json({"ocel:eventTypes":[],"ocel:objects":{},"ocel:events":{}})json");
+  } catch (...) {
+    malformed_classic_catalog = true;
+  }
+  assert(malformed_classic_catalog);
   return 0;
 }

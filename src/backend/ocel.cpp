@@ -282,6 +282,30 @@ void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
   }
 }
 
+void parse_classic_type_catalog(const Json* raw, OcelTypeCatalog& catalog,
+                                std::string_view field) {
+  if (!raw) return;
+  if (!raw->is_object())
+    throw std::invalid_argument("OCEL " + std::string(field) +
+                                " must be an object");
+  for (const auto& [type, raw_attributes] : raw->object()) {
+    if (type.empty())
+      throw std::invalid_argument("OCEL type name is empty");
+    const auto& attributes = obj(raw_attributes, field);
+    auto& declared = catalog[type];
+    for (const auto& [name, raw_type] : attributes) {
+      if (name.empty())
+        throw std::invalid_argument("OCEL attribute name is empty");
+      const auto attribute_type = str(raw_type, "OCEL attribute type");
+      if (attribute_type.empty())
+        throw std::invalid_argument("OCEL attribute type is empty");
+      const auto [it, inserted] = declared.emplace(name, attribute_type);
+      if (!inserted && it->second != attribute_type)
+        throw std::invalid_argument("conflicting OCEL attribute type");
+    }
+  }
+}
+
 const std::string* standard_attribute_type(const StandardAttributeTypes& types,
                                             std::string_view owner,
                                             std::string_view attribute) {
@@ -363,6 +387,10 @@ bool is_standard_epoch(std::string_view value) {
 
 Ocel parse_classic(const Json::Object& root) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
+  parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
+                             log.object_type_attributes, "ocel:objectTypes");
+  parse_classic_type_catalog(optional(root, "ocel:eventTypes"),
+                             log.event_type_attributes, "ocel:eventTypes");
   const auto& objects = obj(required(root, "ocel:objects"), "ocel:objects");
   for (const auto& [id, raw] : objects) {
     if (!object_ids.insert(id).second) throw std::invalid_argument("duplicate object id");
@@ -565,6 +593,60 @@ void write_value(std::ostringstream& out, const OcelValue& value) {
   }
 }
 void write_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs) { std::map<std::string, const OcelValue*> sorted; for (const auto& a : attrs) sorted[a.key] = &a.value; out << '{'; bool first = true; for (const auto& [k, v] : sorted) { if (!first) out << ','; first = false; write_string(out, k); out << ':'; write_value(out, *v); } out << '}'; }
+
+std::string classic_value_type(const OcelValue& value) {
+  if (std::holds_alternative<bool>(value)) return "boolean";
+  if (std::holds_alternative<std::int64_t>(value)) return "int";
+  if (std::holds_alternative<double>(value)) return "float";
+  return "string";
+}
+
+void collect_classic_types(const Ocel& log, OcelTypeCatalog& object_types,
+                           OcelTypeCatalog& event_types) {
+  object_types = log.object_type_attributes;
+  event_types = log.event_type_attributes;
+  for (const auto& object : log.objects) {
+    auto& attributes = object_types[object.type];
+    for (const auto& attribute : object.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) declared = classic_value_type(attribute.value);
+    }
+  }
+  for (const auto& change : log.object_changes) {
+    auto& declared = object_types[change.object_type][change.field];
+    if (declared.empty()) declared = classic_value_type(change.value);
+  }
+  for (const auto& event : log.events) {
+    auto& attributes = event_types[event.activity];
+    for (const auto& attribute : event.attributes) {
+      auto& declared = attributes[attribute.key];
+      if (declared.empty()) declared = classic_value_type(attribute.value);
+    }
+  }
+}
+
+void write_classic_type_catalog(std::ostringstream& out,
+                                const OcelTypeCatalog& catalog) {
+  out << '{';
+  bool first_type = true;
+  for (const auto& [type, attributes] : catalog) {
+    if (!first_type) out << ',';
+    first_type = false;
+    write_string(out, type);
+    out << ':';
+    out << '{';
+    bool first_attribute = true;
+    for (const auto& [name, declared_type] : attributes) {
+      if (!first_attribute) out << ',';
+      first_attribute = false;
+      write_string(out, name);
+      out << ':';
+      write_string(out, declared_type.empty() ? "string" : declared_type);
+    }
+    out << '}';
+  }
+  out << '}';
+}
 
 std::string standard_value_type(const OcelValue& value) {
   if (std::holds_alternative<bool>(value)) return "boolean";
@@ -943,6 +1025,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     return out.str();
   }
 
+  OcelTypeCatalog classic_object_types;
+  OcelTypeCatalog classic_event_types;
+  collect_classic_types(log, classic_object_types, classic_event_types);
+
   out << "{\"ocel:events\":{";
   bool first = true;
   for (const auto* event : events) {
@@ -976,7 +1062,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     write_attrs(out, event->attributes);
     out << '}';
   }
-  out << '}';
+  out << "},\"ocel:eventTypes\":";
+  write_classic_type_catalog(out, classic_event_types);
+  out << ",\"ocel:objectTypes\":";
+  write_classic_type_catalog(out, classic_object_types);
   if (!log.e2e.empty()) {
     out << ",\"ocel:e2e\":";
     write_e2e(out, log, false);
