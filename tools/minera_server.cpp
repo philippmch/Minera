@@ -5780,7 +5780,7 @@ int usage(const char* program) {
             << " [options]\n"
                "  --port <port>      Listen port (default: 8484)\n"
                "  --frontend <dir>   Static frontend directory"
-               " (default: frontend/dist next to the working directory)\n"
+               " (default: src/frontend/dist next to the working directory)\n"
                "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n";
   return 2;
 }
@@ -5789,7 +5789,7 @@ int usage(const char* program) {
 
 int main(int argc, char** argv) {
   int port = 8484;
-  std::filesystem::path frontend_dir = "frontend/dist";
+  std::filesystem::path frontend_dir = "src/frontend/dist";
   std::string embedding_runtime_url;
 
   for (int i = 1; i < argc; ++i) {

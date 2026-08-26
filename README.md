@@ -306,7 +306,7 @@ and tracks every family as complete, partial, or missing.
 - `minera_dfg` CLI that strictly reads and normalizes classic DFG text (or
   writes it to a requested output path); the same parser is available through
   the local server's `POST /api/dfg` and the typed frontend import helper.
-- A React + TypeScript frontend (`frontend/`) that uploads a CSV event log to
+- A React + TypeScript frontend (`src/frontend/`) that uploads a CSV event log to
   the backend, shows the imported log first, and puts the directly-follows
   graph and the discovered process model one tab away each.
 
@@ -317,6 +317,11 @@ cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+Implementation sources live under `src/backend/`, while the React/Vite
+application is under `src/frontend/`. Public C++ headers stay in
+`include/minera/`; tests and command-line entry points remain in `tests/` and
+`tools/`.
 
 ## Minimal Example
 
@@ -344,7 +349,7 @@ does the mining. Build everything once, then start the server from the repo
 root:
 
 ```sh
-cd frontend && npm install && npm run build && cd ..
+cd src/frontend && npm install && npm run build && cd ../..
 cmake -S . -B build && cmake --build build
 ./build/minera_server        # → open http://localhost:8484
 ```
@@ -423,7 +428,7 @@ proxies `/api` to `localhost:8484`:
 
 ```sh
 ./build/minera_server &
-cd frontend && npm run dev   # → http://localhost:5173
+cd src/frontend && npm run dev   # → http://localhost:5173
 ```
 
 JSON files produced by the `minera_export` CLI open the same way as CSVs:
@@ -570,9 +575,9 @@ The HTTP layer uses the vendored
 
 The bundled sample (`data/sample_event_log.csv`) is produced by the
 `minera_generate_sample` tool; its mined export lives at
-`frontend/public/sample-data.json`:
+`src/frontend/public/sample-data.json`:
 
 ```sh
 ./build/minera_generate_sample data/sample_event_log.csv
-./build/minera_export data/sample_event_log.csv -o frontend/public/sample-data.json
+./build/minera_export data/sample_event_log.csv -o src/frontend/public/sample-data.json
 ```
