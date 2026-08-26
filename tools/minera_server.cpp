@@ -1512,6 +1512,7 @@ void handle_ocel_playout(const httplib::Request& request,
         "branching_factor_bindings", "branching_factor_activities", "max_traces", "max_states", "objects",
         "initial_marking", "final_marking",
         "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
+        "return_traces",
         "seed", "start", "case_interval", "event_interval", "ocpn_variant",
         "double_arc_threshold", "noise_threshold", "ocpn_annotation"};
     for (const auto& [key, value] : request.params) {
@@ -1555,6 +1556,17 @@ void handle_ocel_playout(const httplib::Request& request,
     options.exists_trace = ocel_query_bool(request, "exists_trace", options.exists_trace);
     options.return_sequences = ocel_query_bool(
         request, "return_sequences", options.return_sequences);
+    const auto return_traces_lookup = [&](std::string_view name) {
+      return name == "return_traces" && request.has_param("return_traces")
+                 ? request.get_param_value("return_traces")
+                 : std::string{};
+    };
+    const auto return_traces_present = [&](std::string_view name) {
+      return name == "return_traces" && request.has_param("return_traces");
+    };
+    options.return_traces = minera::parse_ocpn_playout_params(
+                                return_traces_lookup, return_traces_present)
+                                .return_traces;
     if (request.has_param("event_binding")) {
       const auto binding = request.get_param_value("event_binding");
       if (binding == "independent") {

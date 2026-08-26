@@ -59,6 +59,10 @@ struct OcpnPlayoutOptions {
   // that do not request either diagnostic mode.
   bool exists_trace = false;
   bool return_sequences = false;
+  // Include complete visible traces with the concrete transition fired for
+  // every bound object. This remains independent of the legacy sequence
+  // projection and is useful when duplicate visible labels exist in a net.
+  bool return_traces = false;
   std::uint64_t seed = 1;
   double start = 1767225600.0;
   double case_interval = 60.0;
@@ -70,11 +74,25 @@ struct OcpnBinding {
   std::vector<std::pair<std::string, std::string>> objects;
 };
 
+struct OcpnFiredTransition {
+  std::string object_type;
+  std::string object_id;
+  std::size_t transition_index = 0;
+};
+
+struct OcpnTraceEvent {
+  std::string activity;
+  std::vector<std::pair<std::string, std::string>> objects;
+  std::vector<OcpnFiredTransition> transitions;
+};
+
 struct OcpnPlayoutResult {
   Ocel log;
   std::vector<std::vector<OcpnBinding>> sequences;
+  std::vector<std::vector<OcpnTraceEvent>> traces;
   bool exists_trace_requested = false;
   bool return_sequences_requested = false;
+  bool return_traces_requested = false;
   bool trace_exists = false;
 };
 
