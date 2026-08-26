@@ -2111,7 +2111,11 @@ void handle_ocel_conformance(const httplib::Request& request,
           "OCEL conformance requires multipart fields log and normative");
     }
     const auto real = minera::parse_ocel_json(real_body);
-    const auto normative = minera::parse_ocel_json(normative_body);
+    std::optional<minera::Ocel> normative_ocel;
+    const auto normative_log = [&]() -> const minera::Ocel& {
+      if (!normative_ocel) normative_ocel = minera::parse_ocel_json(normative_body);
+      return *normative_ocel;
+    };
     const auto alpha = ocel_query_number(request, "alpha", 1.0);
     const auto beta = ocel_query_number(request, "beta", 1.0);
     const auto gamma = ocel_query_number(request, "gamma", 1.0);
@@ -2123,9 +2127,20 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.gamma = gamma;
       options.theta_relative =
           ocel_query_number(request, "etot_theta", options.theta_relative);
-      payload = minera::etot_conformance_json(minera::compare_etot(
-          minera::discover_etot_classic(real),
-          minera::discover_etot_classic(normative), options));
+      std::optional<minera::EtotGraph> graph;
+      try {
+        graph = minera::parse_etot_json(normative_body);
+      } catch (const std::exception&) {
+        // Multipart normative inputs may also be regular OCEL documents.
+      }
+      if (graph) {
+        payload = minera::etot_conformance_json(
+            minera::compare_etot(real, *graph, options));
+      } else {
+        payload = minera::etot_conformance_json(minera::compare_etot(
+            minera::discover_etot_classic(real),
+            minera::discover_etot_classic(normative_log()), options));
+      }
     } else if (variant == "otg") {
       minera::OtgConformanceOptions options;
       options.alpha = alpha;
@@ -2147,9 +2162,20 @@ void handle_ocel_conformance(const httplib::Request& request,
               ocel_query_number(request, parameter, options.theta);
         }
       }
-      payload = minera::otg_conformance_json(minera::compare_otg(
-          minera::discover_otg_classic(real),
-          minera::discover_otg_classic(normative), options));
+      std::optional<minera::OtgGraph> graph;
+      try {
+        graph = minera::parse_otg_json(normative_body);
+      } catch (const std::exception&) {
+        // Multipart normative inputs may also be regular OCEL documents.
+      }
+      if (graph) {
+        payload = minera::otg_conformance_json(
+            minera::compare_otg(real, *graph, options));
+      } else {
+        payload = minera::otg_conformance_json(minera::compare_otg(
+            minera::discover_otg_classic(real),
+            minera::discover_otg_classic(normative_log()), options));
+      }
     } else {
       minera::OcdfgConformanceOptions options;
       options.alpha = alpha;
@@ -2160,9 +2186,20 @@ void handle_ocel_conformance(const httplib::Request& request,
           request, "ocdfg_theta_activity", options.theta_activity);
       options.theta_flow =
           ocel_query_number(request, "ocdfg_theta_flow", options.theta_flow);
-      payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
-          minera::discover_ocdfg_classic(real, false),
-          minera::discover_ocdfg_classic(normative, false), options));
+      std::optional<minera::OcdfgGraph> graph;
+      try {
+        graph = minera::parse_ocdfg_json(normative_body);
+      } catch (const std::exception&) {
+        // Multipart normative inputs may also be regular OCEL documents.
+      }
+      if (graph) {
+        payload = minera::ocdfg_conformance_json(
+            minera::compare_ocdfg(real, *graph, options));
+      } else {
+        payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
+            minera::discover_ocdfg_classic(real, false),
+            minera::discover_ocdfg_classic(normative_log(), false), options));
+      }
     }
     response.set_content(ocel_conformance_response(variant, std::move(payload)),
                          "application/json");

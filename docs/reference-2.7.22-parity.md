@@ -278,7 +278,10 @@ couples, total-object tuples, performance projections, and the computed flag)
 round-trip through a deterministic parser. The readers reject malformed pair or
 triple shapes, negative frequencies, non-finite performance values, and invalid
 graph envelopes. Direct-OCEL conformance adapters and explicit graph inputs
-therefore share one validated native surface.
+therefore share one validated native surface. The standalone OCEL conformance
+command and local multipart conformance route now accept either an ordinary
+OCEL document or the matching ETOT, OTG, or OCDFG graph JSON as the normative
+input; CSV/XML/SQLite normative imports continue to use the OCEL path.
 
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics
