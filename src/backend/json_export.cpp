@@ -1684,6 +1684,7 @@ void write_emd(std::ostream& out, const EmdResult& result) {
   write_finite_or_null(out, result.distance);
   out << ", \"computed\": " << (result.computed ? "true" : "false")
       << ", \"normalized\": " << (result.normalized ? "true" : "false")
+      << ", \"use_fast_emd\": " << (result.use_fast_emd ? "true" : "false")
       << ", \"error\": ";
   if (result.error.empty()) out << "null";
   else write_json_string(out, result.error);

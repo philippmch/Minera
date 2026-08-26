@@ -288,9 +288,10 @@ describe("evaluation adapters", () => {
 
   it("serializes strict stochastic-language controls", () => {
     expect(emdQuery({ normalize_masses: false, strict_equal_mass: true })).toBe("normalize_masses=false&strict_equal_mass=true");
-    expect(emdQuery({ emd_variant: "pyemd", normalize_masses: true })).toBe("emd_variant=pyemd&normalize_masses=true");
+    expect(emdQuery({ emd_variant: "pyemd", normalize_masses: true, use_fast_emd: false })).toBe("emd_variant=pyemd&normalize_masses=true&use_fast_emd=false");
     expect(() => emdQuery({ emd_variant: "bogus" as "pyemd" })).toThrow(/invalid/);
     expect(() => emdQuery({ normalize_masses: "yes" as unknown as boolean })).toThrow(/boolean/);
+    expect(() => emdQuery({ use_fast_emd: "yes" as unknown as boolean })).toThrow(/boolean/);
   });
 });
 

@@ -1240,7 +1240,10 @@ transport solver. Duplicate trace keys are consolidated in stable order;
 invalid weights, non-finite costs, empty positive-mass inputs, and unequal
 masses under strict mode are rejected deterministically. Normalized unequal
 masses are reported through the result's `normalized` flag, and the selected
-variant is retained in standalone and embedded JSON.
+variant is retained in standalone and embedded JSON. The `use_fast_emd`
+compatibility setting is available through native options, the local server,
+CLI, request query, and frontend controls; native builds preserve the same
+deterministic transport result when the accelerated runtime is unavailable.
 
 ## Token-replay parity evidence
 

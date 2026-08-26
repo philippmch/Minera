@@ -5395,6 +5395,7 @@ void json_export_carries_evaluation_contract() {
   assert(ej.find("\"distance\": null") != std::string::npos);
   assert(ej.find("\"computed\": false") != std::string::npos);
   assert(ej.find("\"normalized\": true") != std::string::npos);
+  assert(ej.find("\"use_fast_emd\": true") != std::string::npos);
 
   minera::ModelEvaluation model;
   model.miner = "miner \"one\"";

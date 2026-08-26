@@ -728,6 +728,7 @@ StochasticLanguage derive_stochastic_language(const EventLog& log,bool normalize
 EmdResult evaluate_emd(const StochasticLanguage& aa,const StochasticLanguage& bb,const EmdOptions& opt) {
   EmdResult out;
   out.variant = opt.variant;
+  out.use_fast_emd = opt.use_fast_emd;
   switch (opt.variant) {
     case EmdVariant::EXACT:
     case EmdVariant::PYEMD:

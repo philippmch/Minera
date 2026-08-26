@@ -1494,6 +1494,7 @@ export function emdQuery(options: EmdOptions = {}): string {
   if (options.emd_variant !== undefined) query.set("emd_variant", options.emd_variant);
   if (options.normalize_masses !== undefined) query.set("normalize_masses", String(options.normalize_masses));
   if (options.strict_equal_mass !== undefined) query.set("strict_equal_mass", String(options.strict_equal_mass));
+  if (options.use_fast_emd !== undefined) query.set("use_fast_emd", String(options.use_fast_emd));
   return query.toString();
 }
 

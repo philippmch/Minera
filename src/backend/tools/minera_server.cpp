@@ -4283,6 +4283,8 @@ void handle_evaluate_emd(const httplib::Request& request,
         parse_boolean("normalize_masses", options.normalize_masses);
     options.strict_equal_mass =
         parse_boolean("strict_equal_mass", options.strict_equal_mass);
+    options.use_fast_emd =
+        parse_boolean("use_fast_emd", options.use_fast_emd);
 
     const auto& file = request.get_file_value("reference_log");
     std::istringstream input(file.content);
