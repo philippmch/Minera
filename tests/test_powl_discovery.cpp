@@ -256,6 +256,24 @@ int main() {
   const auto dp = discover_powl(log({{"A", "B"}, {"B", "C"}, {"A", "C"}}), plain);
   const auto df = discover_powl(log({{"A", "B"}, {"B", "C"}, {"A", "C"}}), frequency);
   assert(!dp.serialize().empty() && !df.serialize().empty());
+  assert(dp.serialize() ==
+         "PO=(nodes={X(tau,T(\"A\")),X(tau,T(\"B\")),"
+         "X(tau,T(\"C\"))},"
+         "order={X(tau,T(\"A\"))-->X(tau,T(\"B\")),"
+         "X(tau,T(\"A\"))-->X(tau,T(\"C\")),"
+         "X(tau,T(\"B\"))-->X(tau,T(\"C\"))})");
+  assert(df.serialize() == dp.serialize());
+
+  // Dynamic clustering coarsens unrelated predecessor activities before
+  // materializing the common successor edge.
+  const auto dynamic_choice =
+      discover_powl(log({{"A", "B"}, {"C", "B"}}), plain);
+  assert(dynamic_choice.kind() == PowlNodeKind::kStrictPartialOrder);
+  assert(dynamic_choice.children().size() == 2);
+  assert(dynamic_choice.has_edge(0, 1));
+  assert(dynamic_choice.children()[0].kind() == PowlNodeKind::kXor);
+  assert(dynamic_choice.children()[0].children().size() == 2);
+  assert(dynamic_choice.children()[1].label() == "B");
   // Plain keeps the two-node bidirectional relation as an unordered PO;
   // frequency uses multiplicity-weighted directional support.
   EventLog ratio_log;
@@ -266,6 +284,18 @@ int main() {
   const auto freq_ratio = discover_powl(ratio_log, frequency);
   assert(plain_ratio.serialize() == "PO=(nodes={T(\"A\"),T(\"B\")},order={})");
   assert(freq_ratio.serialize() == "PO=(nodes={T(\"A\"),T(\"B\")},order={A-->B})");
+
+  // Frequency support is counted once per direction and per trace. Repeating
+  // A inside one trace must not outweigh an equally frequent reverse trace.
+  EventLog repeated_ratio;
+  append_trace(repeated_ratio, {"A", "A", "A", "B"}, 1);
+  append_trace(repeated_ratio, {"B", "A"}, 1);
+  frequency.order_frequency_ratio = 0.75;
+  const auto repeated_ratio_result =
+      discover_powl(repeated_ratio, frequency);
+  assert(repeated_ratio_result.kind() == PowlNodeKind::kStrictPartialOrder);
+  assert(repeated_ratio_result.order().empty());
+  assert(repeated_ratio_result.children().size() == 2);
 
   // Bidirectional cross evidence is accepted as an unordered block by the
   // brute partition validator (A is the sole minimal block).
