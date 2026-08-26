@@ -19,7 +19,11 @@ namespace {
 struct FlattenedTypeLog {
   EventLog log;
   std::vector<std::vector<std::string>> variants;
-  std::vector<std::uint64_t> variant_counts;
+  // The event ids for each object trace are retained separately from the
+  // activity-only variants.  An event can be related to several objects of
+  // this type, so collapsing to activities alone would lose its multiplicity.
+  std::vector<std::vector<std::string>> trace_event_ids;
+  std::vector<std::size_t> trace_variant_indices;
 };
 
 void write_json_string(std::ostringstream& out, const std::string& value) {
@@ -81,18 +85,16 @@ FlattenedTypeLog flatten_type(const Ocel& log, const std::string& type) {
     for (const auto& event : trace.events) variant.push_back(event.activity);
     result.log.traces.push_back(std::move(trace));
     result.variants.push_back(std::move(variant));
+    result.trace_event_ids.push_back(ordered_ids);
   }
 
   std::map<std::vector<std::string>, std::size_t> variant_index;
   std::vector<std::vector<std::string>> unique_variants;
   for (const auto& variant : result.variants) {
-    const auto [it, inserted] = variant_index.emplace(variant, unique_variants.size());
-    if (inserted) {
-      unique_variants.push_back(variant);
-      result.variant_counts.push_back(1);
-    } else {
-      ++result.variant_counts[it->second];
-    }
+    const auto [it, inserted] =
+        variant_index.emplace(variant, unique_variants.size());
+    if (inserted) unique_variants.push_back(variant);
+    result.trace_variant_indices.push_back(it->second);
   }
   result.variants = std::move(unique_variants);
   return result;
@@ -104,19 +106,35 @@ SawNet make_saw_net(const std::string& type, const PetriNet& net,
   result.object_type = type;
   result.net = net;
   const auto firing_sequences = replay_firing_sequences(net, flattened.variants);
-  for (std::size_t variant_index = 0;
-       variant_index < firing_sequences.size(); ++variant_index) {
-    if (!firing_sequences[variant_index]) continue;
-    std::vector<std::size_t> counts(net.transitions().size(), 0);
-    for (const auto& firing_group : *firing_sequences[variant_index]) {
-      for (const auto transition : firing_group) {
-        if (transition < counts.size()) ++counts[transition];
+  // Aggregate by original event id across all object traces before converting
+  // counts into a distribution.  This distinguishes one shared event linked
+  // to two objects (multiplicity 2) from two separate events (multiplicity 1
+  // observed twice).
+  std::vector<std::map<std::string, std::size_t>> event_counts(
+      net.transitions().size());
+  for (std::size_t trace = 0; trace < flattened.trace_event_ids.size(); ++trace) {
+    if (trace >= flattened.trace_variant_indices.size()) continue;
+    const auto variant_index = flattened.trace_variant_indices[trace];
+    if (variant_index >= firing_sequences.size() ||
+        !firing_sequences[variant_index]) {
+      continue;
+    }
+    const auto& event_ids = flattened.trace_event_ids[trace];
+    const auto& groups = *firing_sequences[variant_index];
+    for (std::size_t group_index = 0; group_index < groups.size(); ++group_index) {
+      if (event_ids.empty()) continue;
+      // The final routing group has no event of its own and is attributed to
+      // the trace's final event, matching the replay event association.
+      const auto& event_id = event_ids[std::min(group_index, event_ids.size() - 1)];
+      for (const auto transition : groups[group_index]) {
+        if (transition < event_counts.size()) ++event_counts[transition][event_id];
       }
     }
-    const auto multiplicity = flattened.variant_counts[variant_index];
-    for (std::size_t transition = 0; transition < counts.size(); ++transition) {
-      if (counts[transition] == 0) continue;
-      result.transition_weights[transition][counts[transition]] += multiplicity;
+  }
+  for (std::size_t transition = 0; transition < event_counts.size(); ++transition) {
+    for (const auto& [event_id, count] : event_counts[transition]) {
+      (void)event_id;
+      if (count != 0) result.transition_weights[transition][count]++;
     }
   }
   return result;
@@ -124,7 +142,8 @@ SawNet make_saw_net(const std::string& type, const PetriNet& net,
 
 SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
                      std::map<std::size_t, std::string>& place_types,
-                     std::map<std::size_t, std::string>& silent_types) {
+                     std::map<std::size_t, std::string>& silent_types,
+                     std::map<std::string, std::string>& arc_types) {
   SawNet result;
   result.object_type = "multi";
   std::set<std::string> activities;
@@ -168,12 +187,20 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
         for (const auto place : transition.outputs) outputs.push_back(places[place]);
         merged = result.net.add_transition(activity, std::move(inputs),
                                            std::move(outputs));
+        for (std::size_t arc = 0; arc < transition.inputs.size(); ++arc) {
+          arc_types[std::to_string(merged) + ":input:" + std::to_string(arc)] = type;
+        }
+        for (std::size_t arc = 0; arc < transition.outputs.size(); ++arc) {
+          arc_types[std::to_string(merged) + ":output:" + std::to_string(arc)] = type;
+        }
         if (activity) {
           visible_transitions.emplace(result.net.activities()[*activity], merged);
         } else {
           silent_types[merged] = type;
         }
       } else {
+        const auto input_offset = result.net.transitions()[merged].inputs.size();
+        const auto output_offset = result.net.transitions()[merged].outputs.size();
         std::vector<std::size_t> additional_inputs;
         std::vector<std::size_t> additional_outputs;
         for (const auto place : transition.inputs) {
@@ -186,6 +213,14 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
         }
         result.net.append_transition_arcs(
             merged, std::move(additional_inputs), std::move(additional_outputs));
+        for (std::size_t arc = 0; arc < transition.inputs.size(); ++arc) {
+          arc_types[std::to_string(merged) + ":input:" +
+                    std::to_string(input_offset + arc)] = type;
+        }
+        for (std::size_t arc = 0; arc < transition.outputs.size(); ++arc) {
+          arc_types[std::to_string(merged) + ":output:" +
+                    std::to_string(output_offset + arc)] = type;
+        }
       }
       const auto weights = saw.transition_weights.find(index);
       if (weights != saw.transition_weights.end()) {
@@ -258,7 +293,8 @@ SawNetDiscoveryResult discover_saw_nets(const Ocel& log) {
   }
   result.multi_saw_net = merge_saw_nets(
       result.ot_saw_nets, result.multi_place_object_types,
-      result.multi_silent_transition_object_types);
+      result.multi_silent_transition_object_types,
+      result.multi_arc_object_types);
   return result;
 }
 
@@ -290,6 +326,15 @@ std::string saw_nets_json(const SawNetDiscoveryResult& result) {
     if (!first) out << ',';
     first = false;
     write_json_string(out, std::to_string(transition));
+    out << ':';
+    write_json_string(out, type);
+  }
+  out << "},\"multi_arc_object_types\":{";
+  first = true;
+  for (const auto& [arc, type] : result.multi_arc_object_types) {
+    if (!first) out << ',';
+    first = false;
+    write_json_string(out, arc);
     out << ':';
     write_json_string(out, type);
   }

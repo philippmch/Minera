@@ -11,7 +11,8 @@ namespace minera {
 
 // A stochastic arc-weight distribution records how often a transition used a
 // given positive token multiplicity while replaying one object-centric log.
-// The key is the observed multiplicity and the value is its trace frequency.
+// The key is the observed multiplicity and the value is the number of
+// original events with that multiplicity (shared events are counted once).
 using SawWeightDistribution = std::map<std::size_t, std::uint64_t>;
 
 struct SawNet {
@@ -31,6 +32,10 @@ struct SawNetDiscoveryResult {
   // transitions remain object-type-specific.
   std::map<std::size_t, std::string> multi_place_object_types;
   std::map<std::size_t, std::string> multi_silent_transition_object_types;
+  // Every normal arc in the merged net is identified by its transition,
+  // direction, and position in that transition's arc list.  This keeps
+  // decorations stable even when equal activity transitions are merged.
+  std::map<std::string, std::string> multi_arc_object_types;
 };
 
 // Discovers a classic stochastic-arc-weight net for every object type and a
