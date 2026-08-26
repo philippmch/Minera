@@ -111,9 +111,125 @@ PowlNode flower(const std::vector<std::string>& acts) {
   if (acts.empty()) return PowlNode::silent();
   std::vector<PowlNode> leaves;
   for (const auto& a : acts) leaves.push_back(PowlNode::transition(a));
-  PowlNode redo = leaves.size() == 1 ? std::move(leaves.front())
-                                    : PowlNode::xor_node(std::move(leaves));
-  return PowlNode::loop(PowlNode::silent(), std::move(redo));
+  PowlNode do_node = leaves.size() == 1 ? std::move(leaves.front())
+                                       : PowlNode::xor_node(std::move(leaves));
+  return PowlNode::loop(std::move(do_node), PowlNode::silent());
+}
+
+// Discovery may produce nested partial orders while projecting a cut.  The
+// model's final normalization flattens a nested order when its boundary is
+// unambiguous, while retaining an order with multiple entry/exit choices as
+// one node.  This mirrors the structural simplification used by the model
+// object without changing its language.
+PowlNode simplify_powl(PowlNode node);
+
+PowlNode simplify_powl(PowlNode node) {
+  if (node.kind() == PowlNodeKind::kTransition)
+    return PowlNode::transition(node.label(), node.frequency());
+  if (node.kind() == PowlNodeKind::kSilent) return PowlNode::silent();
+
+  if (node.kind() == PowlNodeKind::kLoop) {
+    return PowlNode::loop(simplify_powl(node.children()[0]),
+                          simplify_powl(node.children()[1]));
+  }
+
+  if (node.kind() == PowlNodeKind::kXor) {
+    std::vector<PowlNode> children;
+    children.reserve(node.children().size());
+    for (const auto& child : node.children()) {
+      auto simplified = simplify_powl(child);
+      if (simplified.kind() == PowlNodeKind::kXor) {
+        for (auto& nested : simplified.children())
+          children.push_back(simplify_powl(nested));
+      } else {
+        children.push_back(std::move(simplified));
+      }
+    }
+    if (children.size() == 2) {
+      const auto merge_optional_loop = [&](const PowlNode& optional,
+                                           const PowlNode& loop) -> std::optional<PowlNode> {
+        if (optional.kind() != PowlNodeKind::kSilent ||
+            loop.kind() != PowlNodeKind::kLoop)
+          return std::nullopt;
+        if (loop.children()[0].kind() == PowlNodeKind::kSilent)
+          return PowlNode::loop(loop.children()[0], loop.children()[1]);
+        if (loop.children()[1].kind() == PowlNodeKind::kSilent)
+          return PowlNode::loop(loop.children()[1], loop.children()[0]);
+        return std::nullopt;
+      };
+      if (auto merged = merge_optional_loop(children[0], children[1]))
+        return std::move(*merged);
+      if (auto merged = merge_optional_loop(children[1], children[0]))
+        return std::move(*merged);
+    }
+    return PowlNode::xor_node(std::move(children));
+  }
+
+  // Strict partial orders are normalized after all children have been
+  // simplified.  A connected nested order can be spliced into its parent
+  // only when it has one start and one end; disconnected orders can always be
+  // flattened because no parent edge needs a boundary representative.
+  std::vector<PowlNode> simplified_children;
+  simplified_children.reserve(node.children().size());
+  for (const auto& child : node.children())
+    simplified_children.push_back(simplify_powl(child));
+
+  struct Placement {
+    std::size_t start = 0;
+    std::size_t end = 0;
+    bool flattened = false;
+  };
+  std::vector<std::pair<std::size_t, std::size_t>> order;
+  std::vector<bool> flatten(node.children().size(), false);
+  for (std::size_t i = 0; i < node.children().size(); ++i) {
+    bool connected = false;
+    for (std::size_t j = 0; j < node.children().size(); ++j)
+      if (i != j && (node.has_edge(i, j) || node.has_edge(j, i))) {
+        connected = true;
+        break;
+      }
+    const auto& child = simplified_children[i];
+    flatten[i] =
+        child.kind() == PowlNodeKind::kStrictPartialOrder &&
+        (!connected || (child.start_nodes().size() == 1 &&
+                        child.end_nodes().size() == 1));
+  }
+
+  // The reference normalization emits retained children first and appends
+  // the children of flattened nested orders afterward.  Keep that ordering so
+  // serialized node indices remain deterministic across equivalent models.
+  std::vector<PowlNode> output_children;
+  output_children.reserve(simplified_children.size());
+  std::vector<Placement> output_placements(node.children().size());
+  for (std::size_t i = 0; i < node.children().size(); ++i) {
+    const auto& child = simplified_children[i];
+    if (!flatten[i]) {
+      const auto index = output_children.size();
+      output_children.push_back(child);
+      output_placements[i] = {index, index, false};
+    }
+  }
+  for (std::size_t i = 0; i < node.children().size(); ++i) {
+    if (!flatten[i]) continue;
+    const auto& child = simplified_children[i];
+    const auto offset = output_children.size();
+    for (const auto& nested : child.children()) output_children.push_back(nested);
+    for (const auto [a, b] : child.order()) order.emplace_back(offset + a, offset + b);
+    const auto starts = child.start_nodes();
+    const auto ends = child.end_nodes();
+    output_placements[i] = {
+        starts.size() == 1 ? offset + starts.front() : offset,
+        ends.size() == 1 ? offset + ends.front() : offset,
+        true};
+  }
+  for (const auto [a, b] : node.order()) {
+    const auto source = output_placements[a].flattened ? output_placements[a].end
+                                                        : output_placements[a].start;
+    const auto target = output_placements[b].flattened ? output_placements[b].start
+                                                        : output_placements[b].start;
+    if (source != target) order.emplace_back(source, target);
+  }
+  return PowlNode::strict_partial_order(std::move(output_children), order);
 }
 
 struct State { PowlDiscoveryOptions opts; std::size_t depth = 0; };
@@ -674,6 +790,20 @@ bool valid_partition(const Relations& r, const std::vector<std::vector<std::size
     if (rel.forward) graph[x].push_back(y);
     if (rel.reverse) graph[y].push_back(x);
   }
+  // The generated relation must itself be a strict partial order.  A DAG is
+  // not sufficient: missing transitive edges would be silently added by the
+  // model constructor and could accept a partition whose evidence does not
+  // support the resulting order.
+  for (std::size_t i = 0; i < graph.size(); ++i) {
+    for (const auto j : graph[i]) {
+      if (i == j) return false;
+      for (const auto k : graph[j]) {
+        if (i == k || std::find(graph[i].begin(), graph[i].end(), k) ==
+                           graph[i].end())
+          return false;
+      }
+    }
+  }
   // Every order-minimal block must contain a DFG start and every
   // order-maximal block a DFG end (the partition validity criterion).
   for (std::size_t i = 0; i < blocks.size(); ++i) {
@@ -913,12 +1043,8 @@ bool remainder_has_normal_cut(const UVCL& log, const State& state) {
   if (activities(log).size() < 2) return false;
   State probe = state;
   if (make_xor(log, probe)) return true;
-  if (state.opts.variant == PowlDiscoveryVariant::kTree ||
-      state.opts.variant == PowlDiscoveryVariant::kBruteForce ||
-      state.opts.variant == PowlDiscoveryVariant::kMaximal) {
-    if (make_sequence(log, probe)) return true;
-    if (make_concurrency(log, probe)) return true;
-  }
+  if (make_sequence(log, probe)) return true;
+  if (make_concurrency(log, probe)) return true;
   if (make_loop(log, probe)) return true;
   return false;
 }
@@ -1094,7 +1220,7 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
       activities(log).size() > options.brute_force_activity_limit) {
     throw std::runtime_error("POWL brute-force activity limit exceeded");
   }
-  return discover_rec(log, state);
+  return simplify_powl(discover_rec(log, state));
 }
 
 }  // namespace minera
