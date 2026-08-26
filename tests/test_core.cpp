@@ -806,15 +806,22 @@ void petri_net_translates_sequence() {
   }
 }
 
-void petri_net_adds_silent_split_and_join_for_parallel() {
+void petri_net_reduces_parallel_routing() {
   const auto tree = tree_from_variants({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}});
   const auto net = minera::to_petri_net(tree);
   std::size_t silent = 0;
+  const minera::PetriTransition* first = nullptr;
+  const minera::PetriTransition* last = nullptr;
   for (const auto& transition : net.transitions()) {
     if (transition.silent()) ++silent;
+    if (transition.activity && *transition.activity == 0) first = &transition;
+    if (transition.activity && *transition.activity == 3) last = &transition;
   }
-  // The parallel block contributes exactly one AND-split and one AND-join.
-  assert(silent == 2);
+  // Ordinary reduction fuses the private split/join routing places into the
+  // surrounding visible transitions while preserving the AND bundles.
+  assert(silent == 0);
+  assert(first != nullptr && first->outputs.size() == 2);
+  assert(last != nullptr && last->inputs.size() == 2);
 }
 
 bool contains(const std::vector<std::size_t>& places, std::size_t place) {
@@ -5599,7 +5606,7 @@ int main() {
   inductive_miner_dfg_filters_noise_on_fallthrough();
   inductive_miner_accepts_direct_dfg_input();
   petri_net_translates_sequence();
-  petri_net_adds_silent_split_and_join_for_parallel();
+  petri_net_reduces_parallel_routing();
   alpha_miner_discovers_a_sequence();
   alpha_miner_shares_a_place_for_exclusive_choice();
   alpha_miner_keeps_parallel_branches_on_separate_places();

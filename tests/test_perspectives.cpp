@@ -400,10 +400,14 @@ void pnml_export_carries_the_net_structure() {
 }
 
 void pnml_export_flags_silent_transitions() {
-  // A parallel block introduces silent AND-split/join transitions, which must be
-  // marked invisible for downstream tools.
-  const auto tree = minera::discover_process_tree(
-      log_from_variants({{"a", "b", "c", "d"}, {"a", "c", "b", "d"}}));
+  // A loop retains explicit silent boundary/redo routing, which must be
+  // marked invisible for downstream tools after ordinary reduction.
+  const auto tree = minera::ProcessTree(
+      {"work", "redo"},
+      minera::ProcessTreeNode{
+          minera::ProcessTreeOperator::kLoop, 0,
+          {minera::ProcessTreeNode::leaf(0),
+           minera::ProcessTreeNode::leaf(1)}});
   const auto net = minera::to_petri_net(tree);
   const auto pnml = minera::to_pnml(net);
   assert(pnml.find("$invisible$") != std::string::npos);
