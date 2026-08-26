@@ -81,7 +81,10 @@ int main() {
   assert(edge.event_couples == expected_couples);
   assert(edge.unique_objects == expected_objects);
   assert(edge.event_objects == expected_triples);
+  assert(edge.total_objects == expected_triples);
   assert(edge.performance.size() == 1);
+  assert(edge.performance_event_couples == edge.performance_total_objects);
+  assert(edge.performance == edge.performance_total_objects);
   const auto business_edges = minera::edge_associations(
       log, minera::OcelEdgeAssociationOptions{.use_business_hours = true});
   assert(business_edges.at("Item").at({"Create", "Ship"}).performance.size() == 1);
@@ -93,6 +96,18 @@ int main() {
                .business_hour_slots = {{0.0, 3600.0}}});
   assert(custom_edges.at("Item").at({"Create", "Ship"}).performance.front() ==
          3600.0);
+
+  auto multiple_paths = log;
+  multiple_paths.objects.push_back({"o4", "Item", {}});
+  multiple_paths.relations.push_back({"e1", "o4", ""});
+  multiple_paths.relations.push_back({"e2", "o4", ""});
+  const auto multiple_edges = minera::edge_associations(multiple_paths);
+  const auto& multiple_edge =
+      multiple_edges.at("Item").at({"Create", "Ship"});
+  assert(multiple_edge.event_couples == expected_couples);
+  assert(multiple_edge.total_objects.size() == 2);
+  assert(multiple_edge.performance_event_couples.size() == 1);
+  assert(multiple_edge.performance_total_objects.size() == 2);
 
   assert(minera::get_object_type_activities(log) == activities);
   assert(minera::ocel_object_type_activities(log) == activities);
@@ -132,6 +147,11 @@ int main() {
   assert(edge_json.find("\"variant\":\"EDGE_ASSOCIATIONS\"") !=
          std::string::npos);
   assert(edge_json.find("\"Create->Ship\":{\"event_couples\"") !=
+         std::string::npos);
+  assert(edge_json.find("\"total_objects\"") != std::string::npos);
+  assert(edge_json.find("\"performance_event_couples\"") !=
+         std::string::npos);
+  assert(edge_json.find("\"performance_total_objects\"") !=
          std::string::npos);
   const auto business_json = minera::serialize_ocel_statistics_json(
       log, minera::OcelStatisticsVariant::kEdgeAssociations,

@@ -497,6 +497,8 @@ describe("isOcelStatisticsResult", () => {
       edges: { item: { "Create->Ship": {
         event_couples: [["e1", "e2"]], unique_objects: ["o1"],
         event_objects: [["e1", "e2", "o1"]], performance: [1],
+        total_objects: [["e1", "e2", "o1"]],
+        performance_event_couples: [1], performance_total_objects: [1],
       } } },
     })).toBe(true);
   });
@@ -512,6 +514,13 @@ describe("isOcelStatisticsResult", () => {
     expect(isOcelStatisticsResult({
       family: "OCEL_STATISTICS", variant: "ACTIVITY_ASSOCIATIONS",
       associations: { Create: [["e1"]] },
+    })).toBe(false);
+    expect(isOcelStatisticsResult({
+      family: "OCEL_STATISTICS", variant: "EDGE_ASSOCIATIONS",
+      edges: { item: { "Create->Ship": {
+        event_couples: [], unique_objects: [], event_objects: [], performance: [],
+        total_objects: [["e1", "e2"]],
+      } } },
     })).toBe(false);
   });
 });

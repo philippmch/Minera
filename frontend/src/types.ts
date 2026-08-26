@@ -1494,6 +1494,10 @@ export interface OcelEdgeAssociationMetric {
   unique_objects: string[];
   event_objects: Array<[string, string, string]>;
   performance: number[];
+  /** Explicit object-centric association aliases emitted by newer exports. */
+  total_objects?: Array<[string, string, string]>;
+  performance_event_couples?: number[];
+  performance_total_objects?: number[];
 }
 export interface OcelStatisticsResult {
   family: "OCEL_STATISTICS";
@@ -1544,7 +1548,17 @@ export function isOcelStatisticsResult(value: unknown): value is OcelStatisticsR
       metric.event_objects.every((triple) => Array.isArray(triple) && triple.length === 3 &&
         triple.every((item) => typeof item === "string")) &&
       Array.isArray(metric.performance) &&
-      metric.performance.every((item) => typeof item === "number" && Number.isFinite(item))));
+      metric.performance.every((item) => typeof item === "number" && Number.isFinite(item)) &&
+      (metric.total_objects === undefined ||
+        (Array.isArray(metric.total_objects) &&
+          metric.total_objects.every((triple) => Array.isArray(triple) && triple.length === 3 &&
+            triple.every((item) => typeof item === "string")))) &&
+      (metric.performance_event_couples === undefined ||
+        (Array.isArray(metric.performance_event_couples) &&
+          metric.performance_event_couples.every((item) => typeof item === "number" && Number.isFinite(item)))) &&
+      (metric.performance_total_objects === undefined ||
+        (Array.isArray(metric.performance_total_objects) &&
+          metric.performance_total_objects.every((item) => typeof item === "number" && Number.isFinite(item))))));
 }
 
 export type OcelDescriptionVariant = "VARIANT1" | "VARIANT2";
