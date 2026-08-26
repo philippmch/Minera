@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -51,6 +53,20 @@ bool mentions_extended_place(const WorkingNet& net, std::size_t place) {
       return true;
   }
   return false;
+}
+
+std::set<std::size_t> extended_consumers(const WorkingNet& net,
+                                         std::size_t place,
+                                         bool reset) {
+  std::set<std::size_t> result;
+  for (std::size_t transition = 0; transition < net.transitions.size();
+       ++transition) {
+    const auto& candidate = net.transitions[transition];
+    const auto& arcs = reset ? candidate.reset_inputs
+                             : candidate.inhibitor_inputs;
+    if (contains(arcs, place)) result.insert(transition);
+  }
+  return result;
 }
 
 std::vector<std::size_t> ordinary_producers(const WorkingNet& net,
@@ -129,7 +145,7 @@ bool reduce_single_entry(WorkingNet& net, std::vector<bool>& place_alive,
       continue;
 
     const auto entry = transition.inputs.front();
-    if (!only_place(transition.inputs, entry) ||
+    if (transition.inputs.size() != 1 || !only_place(transition.inputs, entry) ||
         entry >= place_alive.size() || !place_alive[entry] ||
         is_protected_place(entry, net, options) ||
         mentions_extended_place(net, entry))
@@ -157,6 +173,17 @@ bool reduce_single_entry(WorkingNet& net, std::vector<bool>& place_alive,
         }))
       continue;
 
+    // The series-transition rule is only valid when the producer and the
+    // removed silent transition do not both produce the same place.  Their
+    // extended post-sets must also agree; with an unguarded private entry
+    // this means the replacement targets cannot carry reset/inhibitor guards.
+    if (std::any_of(targets.begin(), targets.end(), [&](std::size_t place) {
+          return contains(net.transitions[producer].outputs, place) ||
+                 !extended_consumers(net, place, true).empty() ||
+                 !extended_consumers(net, place, false).empty();
+        }))
+      continue;
+
     // The entry place is only consumed by the silent transition under these
     // conditions. Remove it from its producer and splice in the silent
     // transition's former output arcs, preserving every duplicate arc.
@@ -166,6 +193,75 @@ bool reduce_single_entry(WorkingNet& net, std::vector<bool>& place_alive,
     net.transitions.erase(net.transitions.begin() +
                           static_cast<std::ptrdiff_t>(silent));
     place_alive[entry] = false;
+    return true;
+  }
+  return false;
+}
+
+// Fusion of Series Transitions (FST): remove a silent transition whose only
+// input is a private place produced by one transition.  This is kept as a
+// separate pass because the reference rule also compares reset/inhibitor
+// post-sets of the private place and of every replacement target.
+bool reduce_series_transition(WorkingNet& net,
+                              std::vector<bool>& place_alive,
+                              const PetriNetReductionOptions& options) {
+  for (std::size_t place = 0; place < net.place_count; ++place) {
+    if (!place_alive[place] || is_protected_place(place, net, options) ||
+        mentions_extended_place(net, place))
+      continue;
+    const auto producers = ordinary_producers(net, place);
+    const auto consumers = ordinary_consumers(net, place);
+    if (producers.size() != 1 || consumers.size() != 1 ||
+        producers.front() == consumers.front())
+      continue;
+    const auto producer = producers.front();
+    const auto silent = consumers.front();
+    const auto& transition = net.transitions[silent];
+    if (transition.activity.has_value() || transition.inputs.size() != 1 ||
+        transition.inputs.front() != place || has_extended_arcs(transition) ||
+        std::count(net.transitions[producer].outputs.begin(),
+                   net.transitions[producer].outputs.end(), place) != 1)
+      continue;
+
+    const auto targets = transition.outputs;
+    if (std::any_of(targets.begin(), targets.end(), [&](std::size_t target) {
+          return target >= place_alive.size() || !place_alive[target] ||
+                 target == place ||
+                 contains(net.transitions[producer].outputs, target);
+        }))
+      continue;
+
+    std::set<std::size_t> producer_targets;
+    for (const auto target : net.transitions[producer].outputs)
+      producer_targets.insert(target);
+    std::set<std::size_t> silent_targets;
+    for (const auto target : targets) silent_targets.insert(target);
+    std::set<std::size_t> intersection;
+    std::set_intersection(producer_targets.begin(), producer_targets.end(),
+                          silent_targets.begin(), silent_targets.end(),
+                          std::inserter(intersection, intersection.begin()));
+    if (!intersection.empty()) continue;
+
+    const auto reset_on_place = extended_consumers(net, place, true);
+    const auto inhibitor_on_place = extended_consumers(net, place, false);
+    std::set<std::size_t> reset_on_targets;
+    std::set<std::size_t> inhibitor_on_targets;
+    for (const auto target : targets) {
+      const auto reset = extended_consumers(net, target, true);
+      reset_on_targets.insert(reset.begin(), reset.end());
+      const auto inhibitor = extended_consumers(net, target, false);
+      inhibitor_on_targets.insert(inhibitor.begin(), inhibitor.end());
+    }
+    if (reset_on_place != reset_on_targets ||
+        inhibitor_on_place != inhibitor_on_targets)
+      continue;
+
+    erase_place(net.transitions[producer].outputs, place);
+    net.transitions[producer].outputs.insert(
+        net.transitions[producer].outputs.end(), targets.begin(), targets.end());
+    net.transitions.erase(net.transitions.begin() +
+                          static_cast<std::ptrdiff_t>(silent));
+    place_alive[place] = false;
     return true;
   }
   return false;
@@ -342,6 +438,51 @@ bool remove_redundant_resets(WorkingNet& net) {
   return false;
 }
 
+// Elimination of Self-Loop Places (ELP): a positively marked place that is
+// preserved by every ordinary producer/consumer cycle can be removed because
+// it contributes no changing state.  Empty markings do not authorize this
+// rule; the supplied initial marking is the proof that the invariant token is
+// present.
+bool eliminate_self_loop_place(WorkingNet& net,
+                               std::vector<bool>& place_alive,
+                               const PetriNetReductionOptions& options) {
+  if (options.initial_marking.empty()) return false;
+  for (std::size_t place = 0; place < net.place_count; ++place) {
+    if (!place_alive[place] || place == net.source || place == net.sink ||
+        options.initial_marking[place] < 1)
+      continue;
+
+    const auto inhibitor = extended_consumers(net, place, false);
+    if (!inhibitor.empty()) continue;
+    const auto producers = ordinary_producers(net, place);
+    std::set<std::size_t> incoming(producers.begin(), producers.end());
+    std::set<std::size_t> outgoing;
+    for (const auto transition : ordinary_consumers(net, place))
+      outgoing.insert(transition);
+    const auto reset = extended_consumers(net, place, true);
+
+    std::set<std::size_t> outgoing_all = outgoing;
+    outgoing_all.insert(reset.begin(), reset.end());
+    if (!std::includes(incoming.begin(), incoming.end(), outgoing_all.begin(),
+                       outgoing_all.end()))
+      continue;
+
+    std::set<std::size_t> covered = outgoing;
+    covered.insert(reset.begin(), reset.end());
+    if (covered != incoming) continue;
+
+    for (auto& transition : net.transitions) {
+      erase_place(transition.inputs, place);
+      erase_place(transition.outputs, place);
+      erase_place(transition.reset_inputs, place);
+      erase_place(transition.inhibitor_inputs, place);
+    }
+    place_alive[place] = false;
+    return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 PetriNetReductionResult reduce_petri_net(
@@ -397,6 +538,10 @@ PetriNetReductionResult reduce_petri_net(
       changed = true;
       pass_changed = true;
     }
+    while (reduce_series_transition(working, place_alive, options)) {
+      changed = true;
+      pass_changed = true;
+    }
     while (reduce_single_entry(working, place_alive, options)) {
       changed = true;
       pass_changed = true;
@@ -414,6 +559,10 @@ PetriNetReductionResult reduce_petri_net(
       pass_changed = true;
     }
     while (eliminate_self_loop(working)) {
+      changed = true;
+      pass_changed = true;
+    }
+    while (eliminate_self_loop_place(working, place_alive, options)) {
       changed = true;
       pass_changed = true;
     }

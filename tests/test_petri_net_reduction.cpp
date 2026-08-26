@@ -336,6 +336,78 @@ int main() {
   }
 
   {
+    // A positively marked self-loop place is an invariant token and can be
+    // eliminated together with its ordinary input/output arcs.
+    PetriNet net;
+    net.set_activities({"a"});
+    const auto source = net.add_place();
+    const auto invariant = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source, invariant}, {invariant, sink});
+    PetriNetReductionOptions options;
+    options.initial_marking = {1, 1, 0};
+    options.final_marking = {0, 0, 1};
+    const auto result = reduce_petri_net(net, options);
+    assert(result.changed);
+    assert(result.net.place_count() == 2);
+    assert(result.net.transitions().size() == 1);
+    assert(result.net.transitions()[0].inputs ==
+           std::vector<std::size_t>{0});
+    assert(result.net.transitions()[0].outputs ==
+           std::vector<std::size_t>{1});
+    assert((result.old_to_new_place ==
+            std::vector<std::size_t>{0, kRemovedPlace, 1}));
+    assert(result.markings.initial == std::vector<std::int64_t>({1, 0}));
+    assert(result.markings.final == std::vector<std::int64_t>({0, 1}));
+  }
+
+  {
+    // The invariant-place rule requires a positive supplied marking and a
+    // closed producer/consumer set; an unmarked or externally consumed place
+    // must remain observable.
+    PetriNet net;
+    net.set_activities({"a", "b"});
+    const auto source = net.add_place();
+    const auto invariant = net.add_place();
+    const auto branch = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source, invariant}, {invariant, branch});
+    net.add_transition(1, {invariant}, {sink});
+    const auto unmarked = reduce_petri_net(net);
+    assert(!unmarked.changed);
+    PetriNetReductionOptions options;
+    options.initial_marking = {1, 1, 0, 0};
+    const auto open = reduce_petri_net(net, options);
+    assert(!open.changed);
+    assert(open.net.place_count() == net.place_count());
+    assert(open.net.transitions().size() == net.transitions().size());
+  }
+
+  {
+    // A shared producer output is not a legal series-transition splice: the
+    // silent bridge must not duplicate or reorder a token on that place.
+    PetriNet net;
+    net.set_activities({"a", "b"});
+    const auto source = net.add_place();
+    const auto private_place = net.add_place();
+    const auto shared = net.add_place();
+    const auto branch = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {private_place, shared});
+    net.add_transition(std::nullopt, {private_place}, {shared, branch});
+    net.add_transition(1, {shared}, {sink});
+    const auto result = reduce_petri_net(net);
+    assert(!result.changed);
+    assert(same_net(result.net, net));
+  }
+
+  {
     bool threw = false;
     try {
       PetriNetReductionOptions options;

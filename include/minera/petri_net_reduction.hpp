@@ -31,9 +31,10 @@ inline constexpr std::size_t kRemovedPlace =
     std::numeric_limits<std::size_t>::max();
 
 // Applies a fixed-point conservative reduction to a workflow net.  The
-// ordinary single-entry/single-exit rules remove private places around silent
-// transitions, while structural rules also fuse safe series places, discard
-// duplicate silent transitions, remove inert silent self-loops, and eliminate
+// ordinary single-entry/single-exit and series-transition rules remove private
+// places around silent transitions, while structural rules also fuse safe
+// series places, discard duplicate silent transitions, remove inert silent
+// self-loops, eliminate positively marked invariant places, and eliminate
 // reset arcs guarded by the same inhibitor.  Extended arcs on unrelated
 // places are retained and are never rewritten through a removed place; this
 // keeps mixed ordinary/extended nets reducible without changing their token
