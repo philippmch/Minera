@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDecisionTablesResult, isMineraExport } from "./types";
+import { isDecisionTablesResult, isMineraExport } from "../src/types";
 
 const valid = {
   family: "DECISION_TABLES",

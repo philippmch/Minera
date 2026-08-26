@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildEfgMatrix } from "./eventually-follows";
-import { type ActivityStat } from "./types";
+import { buildEfgMatrix } from "../src/eventually-follows";
+import { type ActivityStat } from "../src/types";
 
 const activity = (name: string, count: number): ActivityStat => ({
   name,

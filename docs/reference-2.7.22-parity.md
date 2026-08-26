@@ -77,7 +77,7 @@ are reconciled.
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
-| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis, OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
+| Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
@@ -304,7 +304,10 @@ event/trace columns, timestamp-aware stable ordering, forward-only filtering,
 first-occurrence reduction, deterministic transitive propagation, and a strict
 link bound. Its standalone JSON, `minera_export --link-analysis`, cached local
 `POST /api/link-analysis`, and frontend API/query guard all expose the same
-options and canonical event references.
+options and canonical event references. Each endpoint retains the stable
+`index` field for existing consumers and also materializes the configured
+`index_column` name as an alias; names that collide with the other endpoint
+fields are rejected.
 
 OCEL split evidence: `split_ocel` implements the connected-components and
 ancestors/descendants variants over the object-interaction graph. Projections
@@ -418,8 +421,11 @@ emit classic or standard XML or a SQLite file. The local server's multipart
 `POST /api/ocel/io` route also accepts classic/standard JSON and XML, validates
 the selected format, and returns bounded downloads or a canonical JSON import
 envelope. The same route accepts event CSV uploads with an optional object-table
-part and can download either deterministic event or object CSV; typed frontend
-exchange helpers cover every JSON/XML/CSV direction.
+part and can download either deterministic event or object CSV. CSV exchange
+now carries validated custom column names, object-type prefixes, one-character
+delimiters, trimming and timestamp-sort switches, import rejection policy, and
+explicit lossy-export opt-in through the CLI, local server, and typed frontend
+helpers; non-CSV formats reject those options instead of silently ignoring them.
 
 Embedding evidence: `to_embeddings` exposes both case-level and event-level
 variants through deterministic bounded encoder profiles. `hashing-v1` retains
@@ -521,7 +527,8 @@ supports configurable activity/timestamp attributes, and supports inclusive or s
 native interval-event, case-envelope, and concurrent-activity counters run
 after all ordinary, segment, path, and LTL filters; JSON embeds the three
 arrays under `overlap`. CLI flags and server/frontend form fields are covered
-by `tests/test_request_params.cpp` and the focused overlap/native JSON tests.
+by `src/backend/tests/test_request_params.cpp` and the focused overlap/native
+JSON tests.
 
 Passed-time evidence: `discover_passed_time` exposes `PRE`, `POST`, and
 `PREPOST` with deterministic neighbor rows, edge frequencies, weighted
@@ -1058,6 +1065,14 @@ still drives support filtering, while the optimization rows remain one per
 variant. This keeps final-row behavior independent across variants and lets a
 composite place remain valid when alpha filtering removes a rare suffix from
 its rows.
+
+Constraint construction now canonicalizes repeated encoding rows while leaving
+the objective contribution of every retained variant row intact. Thus repeated
+loops and competing continuations cannot accidentally increase feasibility
+constraints or change the objective merely because the same prefix was observed
+more than once. Support accumulation is saturating at the unsigned counter
+limit, and the inclusive alpha comparison is covered at and just below an
+exact support boundary.
 
 Each requested causal pair is seeded with a direct feasibility solve before
 bounded refinement is shared across the remaining pairs. If the safety bound
@@ -1876,7 +1891,8 @@ Silent (`tau`) model moves remain explicit routing moves in diagnostics and
 alignments, while weighted input/output arc multiplicity is preserved when
 testing enabledness and firing. A genuinely unreachable final marking is
 reported as unsound (`exhausted=false`), distinct from a bounded or timed-out
-search. Focused `tests/test_alignment_variants.cpp` regressions cover all six
+search. Focused `src/backend/tests/test_alignment_variants.cpp` regressions
+cover all six
 variants, reference/legacy cost profiles, custom costs and callbacks, full-product
 LP solving, less-memory dominance, discounted exponent and scheduling parity,
 generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
@@ -1936,10 +1952,10 @@ binary validation is deliberate and tested. The recursive variants also use
 deterministic duplicate-label event assignment and retain model moves so the
 rendered explanation sums to the reported cost.
 
-Focused validation is in `tests/test_process_tree_alignment.cpp`, with request
-mapping/rejection coverage in `tests/test_request_params.cpp`, JSON checks in
-`tests/test_core.cpp`, and frontend query/result checks in
-`src/frontend/src/app-logic.test.ts`. Tests cover all four variants, exact
+Focused validation is in `src/backend/tests/test_process_tree_alignment.cpp`,
+with request mapping/rejection coverage in `src/backend/tests/test_request_params.cpp`,
+JSON checks in `src/backend/tests/test_core.cpp`, and frontend query/result
+checks in `src/frontend/tests/app-logic.test.ts`. Tests cover all four variants, exact
 sequence/XOR/parallel/loop behavior, repeated traces and DP cache batches,
 approximation thresholds and loop fallback diagnostics, timeout/state
 completion flags, empty-denominator fitness, n-ary normalization, and MILP's

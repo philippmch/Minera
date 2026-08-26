@@ -3,8 +3,8 @@ import {
   deviatingActivities,
   flattenDecisionRules,
   splitCondition,
-} from "./conformance";
-import { type DecisionTreeNode } from "./types";
+} from "../src/conformance";
+import { type DecisionTreeNode } from "../src/types";
 
 describe("deviatingActivities", () => {
   it("keeps only rows with deviations, preserving the backend order", () => {

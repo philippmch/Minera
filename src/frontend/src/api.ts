@@ -4264,6 +4264,7 @@ export interface LinkAnalysisOptions {
   link_analysis_out_column?: string;
   link_analysis_in_column?: string;
   link_analysis_sorting_column?: string;
+  link_analysis_index_column?: string;
   link_analysis_look_forward?: boolean;
   link_analysis_keep_first_occurrence?: boolean;
   link_analysis_propagate?: boolean;
@@ -4278,6 +4279,7 @@ export function linkAnalysisQuery(options: LinkAnalysisOptions = {}): string {
   add("link_analysis_out_column", options.link_analysis_out_column);
   add("link_analysis_in_column", options.link_analysis_in_column);
   add("link_analysis_sorting_column", options.link_analysis_sorting_column);
+  add("link_analysis_index_column", options.link_analysis_index_column);
   add("link_analysis_look_forward", options.link_analysis_look_forward);
   add("link_analysis_keep_first_occurrence", options.link_analysis_keep_first_occurrence);
   add("link_analysis_propagate", options.link_analysis_propagate);
@@ -4471,11 +4473,70 @@ export async function requestOcelSqliteExport(
 export function ocelExchangeQuery(
   format: OcelExchangeFormat,
   mode: "import" | "export",
+  options: OcelCsvOptions = {},
 ): string {
   const query = new URLSearchParams();
   query.set("format", format);
   query.set("mode", mode);
+  if (format === "csv" || format === "csv_objects") {
+    appendOcelCsvOptions(query, options);
+  }
   return query.toString();
+}
+
+export interface OcelCsvOptions {
+  ocel_csv_event_id_column?: string;
+  ocel_csv_activity_column?: string;
+  ocel_csv_timestamp_column?: string;
+  ocel_csv_object_type_prefix?: string;
+  ocel_csv_object_id_column?: string;
+  ocel_csv_object_type_column?: string;
+  ocel_csv_delimiter?: string;
+  ocel_csv_trim_fields?: boolean;
+  ocel_csv_sort_events_by_timestamp?: boolean;
+  ocel_csv_reject_unsupported?: boolean;
+  ocel_csv_allow_lossy?: boolean;
+}
+
+function appendOcelCsvOptions(
+  query: URLSearchParams,
+  options: OcelCsvOptions,
+): void {
+  const strings: Array<[keyof OcelCsvOptions, string]> = [
+    ["ocel_csv_event_id_column", "ocel_csv_event_id_column"],
+    ["ocel_csv_activity_column", "ocel_csv_activity_column"],
+    ["ocel_csv_timestamp_column", "ocel_csv_timestamp_column"],
+    ["ocel_csv_object_type_prefix", "ocel_csv_object_type_prefix"],
+    ["ocel_csv_object_id_column", "ocel_csv_object_id_column"],
+    ["ocel_csv_object_type_column", "ocel_csv_object_type_column"],
+  ];
+  for (const [property, key] of strings) {
+    const value = options[property];
+    if (value === undefined) continue;
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error(`${key} must be a non-empty string`);
+    }
+    query.set(key, value);
+  }
+  if (options.ocel_csv_delimiter !== undefined) {
+    if (typeof options.ocel_csv_delimiter !== "string" ||
+        options.ocel_csv_delimiter.length !== 1) {
+      throw new Error("ocel_csv_delimiter must contain exactly one character");
+    }
+    query.set("ocel_csv_delimiter", options.ocel_csv_delimiter);
+  }
+  const booleans: Array<[keyof OcelCsvOptions, string]> = [
+    ["ocel_csv_trim_fields", "ocel_csv_trim_fields"],
+    ["ocel_csv_sort_events_by_timestamp", "ocel_csv_sort_events_by_timestamp"],
+    ["ocel_csv_reject_unsupported", "ocel_csv_reject_unsupported"],
+    ["ocel_csv_allow_lossy", "ocel_csv_allow_lossy"],
+  ];
+  for (const [property, key] of booleans) {
+    const value = options[property];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") throw new Error(`${key} must be boolean`);
+    query.set(key, value ? "true" : "false");
+  }
 }
 
 /** Imports classic or standard OCEL JSON/XML through the local backend. */
@@ -4483,6 +4544,7 @@ export async function requestOcelExchangeImport(
   log: Blob,
   format: OcelExchangeFormat = "json",
   objects?: Blob,
+  options: OcelCsvOptions = {},
 ): Promise<OcelExchangeResult> {
   const form = new FormData();
   if (format === "csv_objects")
@@ -4499,7 +4561,7 @@ export async function requestOcelExchangeImport(
       : "ocel_objects.csv";
     form.append("objects", objects, objectName);
   }
-  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "import")}`, {
+  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "import", options)}`, {
     method: "POST",
     body: form,
   });
@@ -4514,8 +4576,9 @@ export async function requestOcelExchangeImport(
 export async function requestOcelExchangeExport(
   log: Record<string, unknown>,
   format: OcelExchangeFormat = "json",
+  options: OcelCsvOptions = {},
 ): Promise<Blob> {
-  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "export")}`, {
+  const response = await fetch(`/api/ocel/io?${ocelExchangeQuery(format, "export", options)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(log),

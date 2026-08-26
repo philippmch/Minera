@@ -700,6 +700,61 @@ bool ocel_query_bool(const httplib::Request& request, std::string_view name,
   throw std::invalid_argument(key + ": expected true, false, 1, or 0");
 }
 
+struct ParsedOcelCsvOptions {
+  minera::OcelCsvImportOptions import_options;
+  minera::OcelCsvExportOptions export_options;
+};
+
+ParsedOcelCsvOptions parse_ocel_csv_options(const httplib::Request& request) {
+  ParsedOcelCsvOptions result;
+  const auto assign_string = [&](std::string_view name, std::string& import_value,
+                                 std::string& export_value) {
+    const auto key = std::string(name);
+    if (!request.has_param(key)) return;
+    const auto value = request.get_param_value(key);
+    if (value.empty())
+      throw std::invalid_argument(key + ": expected a non-empty value");
+    import_value = value;
+    export_value = value;
+  };
+  assign_string("ocel_csv_event_id_column",
+                result.import_options.event_id_column,
+                result.export_options.event_id_column);
+  assign_string("ocel_csv_activity_column", result.import_options.activity_column,
+                result.export_options.activity_column);
+  assign_string("ocel_csv_timestamp_column",
+                result.import_options.timestamp_column,
+                result.export_options.timestamp_column);
+  assign_string("ocel_csv_object_type_prefix",
+                result.import_options.object_type_prefix,
+                result.export_options.object_type_prefix);
+  assign_string("ocel_csv_object_id_column",
+                result.import_options.object_id_column,
+                result.export_options.object_id_column);
+  assign_string("ocel_csv_object_type_column",
+                result.import_options.object_type_column,
+                result.export_options.object_type_column);
+  if (request.has_param("ocel_csv_delimiter")) {
+    const auto value = request.get_param_value("ocel_csv_delimiter");
+    if (value.size() != 1)
+      throw std::invalid_argument(
+          "ocel_csv_delimiter: expected exactly one character");
+    result.import_options.delimiter = value.front();
+    result.export_options.delimiter = value.front();
+  }
+  result.import_options.trim_fields = ocel_query_bool(
+      request, "ocel_csv_trim_fields", result.import_options.trim_fields);
+  result.import_options.reject_unsupported = ocel_query_bool(
+      request, "ocel_csv_reject_unsupported",
+      result.import_options.reject_unsupported);
+  result.import_options.sort_events_by_timestamp = ocel_query_bool(
+      request, "ocel_csv_sort_events_by_timestamp",
+      result.import_options.sort_events_by_timestamp);
+  result.export_options.allow_lossy = ocel_query_bool(
+      request, "ocel_csv_allow_lossy", result.export_options.allow_lossy);
+  return result;
+}
+
 std::string ocel_request_body(const httplib::Request& request,
                               std::string_view field) {
   if (request.is_multipart_form_data()) {
@@ -1197,7 +1252,13 @@ void handle_ocel_exchange(const httplib::Request& request,
                           httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "mode", "format", "reject_unsupported", "include_declaration"};
+        "mode", "format", "reject_unsupported", "include_declaration",
+        "ocel_csv_event_id_column", "ocel_csv_activity_column",
+        "ocel_csv_timestamp_column", "ocel_csv_object_type_prefix",
+        "ocel_csv_object_id_column", "ocel_csv_object_type_column",
+        "ocel_csv_delimiter", "ocel_csv_trim_fields",
+        "ocel_csv_sort_events_by_timestamp", "ocel_csv_reject_unsupported",
+        "ocel_csv_allow_lossy"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1218,6 +1279,17 @@ void handle_ocel_exchange(const httplib::Request& request,
       throw std::invalid_argument(
           "OCEL exchange format expects json, json_standard, xml, xml_standard, csv, or csv_objects");
     }
+
+    const bool csv_format = format == "csv" || format == "csv_objects";
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!csv_format && key.rfind("ocel_csv_", 0) == 0)
+        throw std::invalid_argument(
+            "OCEL CSV options require csv or csv_objects format");
+    }
+    const auto csv_options = csv_format
+                                 ? parse_ocel_csv_options(request)
+                                 : ParsedOcelCsvOptions{};
 
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL exchange body");
@@ -1246,11 +1318,12 @@ void handle_ocel_exchange(const httplib::Request& request,
         content_type = "application/xml";
         filename = "ocel.xml";
       } else if (format == "csv") {
-        payload = minera::serialize_ocel_csv(log);
+        payload = minera::serialize_ocel_csv(log, csv_options.export_options);
         content_type = "text/csv";
         filename = "ocel.csv";
       } else {
-        payload = minera::serialize_ocel_objects_csv(log);
+        payload = minera::serialize_ocel_objects_csv(
+            log, csv_options.export_options);
         content_type = "text/csv";
         filename = "ocel_objects.csv";
       }
@@ -1278,8 +1351,9 @@ void handle_ocel_exchange(const httplib::Request& request,
                                    ? form_field(request, "objects")
                                    : std::string{};
       log = object_body.empty()
-                ? minera::parse_ocel_csv(body)
-                : minera::parse_ocel_csv(body, object_body);
+                ? minera::parse_ocel_csv(body, csv_options.import_options)
+                : minera::parse_ocel_csv(body, object_body,
+                                         csv_options.import_options);
     } else {
       throw std::invalid_argument(
           "csv_objects is an export-only format; upload csv event data");
@@ -2386,7 +2460,8 @@ void handle_link_analysis(const httplib::Request& request,
     }
     static const std::set<std::string> allowed = {
         "link_analysis_out_column", "link_analysis_in_column",
-        "link_analysis_sorting_column", "link_analysis_look_forward",
+        "link_analysis_sorting_column", "link_analysis_index_column",
+        "link_analysis_look_forward",
         "link_analysis_keep_first_occurrence", "link_analysis_propagate",
         "link_analysis_max_links"};
     for (const auto& [key, value] : request.params) {

@@ -357,6 +357,22 @@ int main() {
   assert(overlapping_replay.fitting_traces == overlapping_replay.trace_count);
   assert(!overlapping.diagnostics.exhausted);
 
+  // A continuation exactly on the alpha boundary is retained; moving below
+  // that boundary cuts its suffix deterministically.  This exercises the
+  // inclusive comparison used by the sequence-encoding support threshold.
+  ILPMinerOptions alpha_edge;
+  alpha_edge.alpha = 0.5;
+  alpha_edge.artificial_start_activity.clear();
+  alpha_edge.artificial_end_activity.clear();
+  alpha_edge.causal_relation = {{"a", "b"}};
+  const auto alpha_equal = mine_ilp(
+      log_of({{"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_edge);
+  alpha_edge.alpha = 0.499999;
+  const auto alpha_below = mine_ilp(
+      log_of({{"a", "b"}, {"a", "b"}, {"a", "c"}}), alpha_edge);
+  assert(alpha_equal.net.activities() == alpha_below.net.activities());
+  assert(alpha_equal.net.place_count() >= alpha_below.net.place_count());
+
   bool invalid_alpha = false;
   try {
     ILPMinerOptions invalid;

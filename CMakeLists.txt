@@ -177,109 +177,109 @@ else()
 endif()
 
 add_executable(minera_export
-  tools/minera_export.cpp
+  src/backend/tools/minera_export.cpp
 )
 target_link_libraries(minera_export PRIVATE minera::core)
 target_include_directories(minera_export PRIVATE third_party)
 target_compile_features(minera_export PRIVATE cxx_std_20)
 
 add_executable(minera_ocel
-  tools/minera_ocel.cpp
+  src/backend/tools/minera_ocel.cpp
 )
 target_link_libraries(minera_ocel PRIVATE minera::core)
 target_compile_features(minera_ocel PRIVATE cxx_std_20)
 
 add_executable(minera_process_cube
-  tools/minera_process_cube.cpp
+  src/backend/tools/minera_process_cube.cpp
 )
 target_link_libraries(minera_process_cube PRIVATE minera::core)
 target_compile_features(minera_process_cube PRIVATE cxx_std_20)
 
-add_executable(minera_log_util tools/minera_log_util.cpp)
+add_executable(minera_log_util src/backend/tools/minera_log_util.cpp)
 target_link_libraries(minera_log_util PRIVATE minera::core)
 target_compile_features(minera_log_util PRIVATE cxx_std_20)
 
 add_executable(minera_dfg
-  tools/minera_dfg.cpp
+  src/backend/tools/minera_dfg.cpp
 )
 target_link_libraries(minera_dfg PRIVATE minera::core)
 target_compile_features(minera_dfg PRIVATE cxx_std_20)
 
 add_executable(minera_dfg_precision
-  tools/minera_dfg_precision.cpp
+  src/backend/tools/minera_dfg_precision.cpp
 )
 target_link_libraries(minera_dfg_precision PRIVATE minera::core)
 target_compile_features(minera_dfg_precision PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_dfg
-  tools/minera_streaming_dfg.cpp
+  src/backend/tools/minera_streaming_dfg.cpp
 )
 target_link_libraries(minera_streaming_dfg PRIVATE minera::core)
 target_compile_features(minera_streaming_dfg PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_store
-  tools/minera_streaming_store.cpp
+  src/backend/tools/minera_streaming_store.cpp
 )
 target_link_libraries(minera_streaming_store PRIVATE minera::core)
 target_compile_features(minera_streaming_store PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_footprints
-  tools/minera_streaming_footprints.cpp
+  src/backend/tools/minera_streaming_footprints.cpp
 )
 target_link_libraries(minera_streaming_footprints PRIVATE minera::core)
 target_compile_features(minera_streaming_footprints PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_temporal
-  tools/minera_streaming_temporal.cpp
+  src/backend/tools/minera_streaming_temporal.cpp
 )
 target_link_libraries(minera_streaming_temporal PRIVATE minera::core)
 target_compile_features(minera_streaming_temporal PRIVATE cxx_std_20)
 
 add_executable(minera_streaming_tbr
-  tools/minera_streaming_tbr.cpp
+  src/backend/tools/minera_streaming_tbr.cpp
 )
 target_link_libraries(minera_streaming_tbr PRIVATE minera::core)
 target_compile_features(minera_streaming_tbr PRIVATE cxx_std_20)
 
 add_executable(minera_live_stream
-  tools/minera_live_stream.cpp
+  src/backend/tools/minera_live_stream.cpp
 )
 target_link_libraries(minera_live_stream PRIVATE minera::core)
 target_compile_features(minera_live_stream PRIVATE cxx_std_20)
 
 add_executable(minera_data_petri
-  tools/minera_data_petri.cpp
+  src/backend/tools/minera_data_petri.cpp
 )
 target_link_libraries(minera_data_petri PRIVATE minera::core)
 target_compile_features(minera_data_petri PRIVATE cxx_std_20)
 
 add_executable(minera_decision_table
-  tools/minera_decision_table.cpp
+  src/backend/tools/minera_decision_table.cpp
 )
 target_link_libraries(minera_decision_table PRIVATE minera::core)
 target_compile_features(minera_decision_table PRIVATE cxx_std_20)
 
 add_executable(minera_stream_import
-  tools/minera_stream_import.cpp
+  src/backend/tools/minera_stream_import.cpp
 )
 target_link_libraries(minera_stream_import PRIVATE minera::core)
 target_compile_features(minera_stream_import PRIVATE cxx_std_20)
 
 add_executable(minera_playout
-  tools/minera_playout.cpp
+  src/backend/tools/minera_playout.cpp
 )
 target_link_libraries(minera_playout PRIVATE minera::core)
 target_compile_features(minera_playout PRIVATE cxx_std_20)
 
 add_executable(minera_generate_sample
-  tools/minera_generate_sample.cpp
+  src/backend/tools/minera_generate_sample.cpp
 )
 target_compile_features(minera_generate_sample PRIVATE cxx_std_20)
 
 find_package(Threads REQUIRED)
 
 add_executable(minera_server
-  tools/minera_server.cpp
+  src/backend/tools/minera_server.cpp
 )
 target_link_libraries(minera_server PRIVATE minera::core Threads::Threads)
 target_include_directories(minera_server PRIVATE third_party)
@@ -295,7 +295,7 @@ if(MINERA_BUILD_TESTS)
                           $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>)
 
   add_executable(minera_core_tests
-    tests/test_core.cpp
+    src/backend/tests/test_core.cpp
   )
   target_link_libraries(minera_core_tests PRIVATE minera::core)
   target_compile_features(minera_core_tests PRIVATE cxx_std_20)
@@ -304,7 +304,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
 
   add_executable(minera_ocel_tests
-    tests/test_ocel.cpp
+    src/backend/tests/test_ocel.cpp
   )
   target_link_libraries(minera_ocel_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_tests PRIVATE cxx_std_20)
@@ -312,7 +312,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_tests COMMAND minera_ocel_tests)
 
   add_executable(minera_ocel_csv_tests
-    tests/test_ocel_csv.cpp
+    src/backend/tests/test_ocel_csv.cpp
   )
   target_link_libraries(minera_ocel_csv_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_csv_tests PRIVATE cxx_std_20)
@@ -320,7 +320,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_csv_tests COMMAND minera_ocel_csv_tests)
 
   add_executable(minera_ocel_sqlite_tests
-    tests/test_ocel_sqlite.cpp
+    src/backend/tests/test_ocel_sqlite.cpp
   )
   target_link_libraries(minera_ocel_sqlite_tests PRIVATE minera::core)
   if(WIN32)
@@ -333,7 +333,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_sqlite_tests COMMAND minera_ocel_sqlite_tests)
 
   add_executable(minera_ocel_xml_tests
-    tests/test_ocel_xml.cpp
+    src/backend/tests/test_ocel_xml.cpp
   )
   target_link_libraries(minera_ocel_xml_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_xml_tests PRIVATE cxx_std_20)
@@ -341,7 +341,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_xml_tests COMMAND minera_ocel_xml_tests)
 
   add_executable(minera_ocel_filter_tests
-    tests/test_ocel_filter.cpp
+    src/backend/tests/test_ocel_filter.cpp
   )
   target_link_libraries(minera_ocel_filter_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_filter_tests PRIVATE cxx_std_20)
@@ -349,7 +349,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_filter_tests COMMAND minera_ocel_filter_tests)
 
   add_executable(minera_ocel_query_tests
-    tests/test_ocel_query.cpp
+    src/backend/tests/test_ocel_query.cpp
   )
   target_link_libraries(minera_ocel_query_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_query_tests PRIVATE cxx_std_20)
@@ -357,7 +357,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_query_tests COMMAND minera_ocel_query_tests)
 
   add_executable(minera_ocel_statistics_tests
-    tests/test_ocel_statistics.cpp
+    src/backend/tests/test_ocel_statistics.cpp
   )
   target_link_libraries(minera_ocel_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_statistics_tests PRIVATE cxx_std_20)
@@ -365,7 +365,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_statistics_tests COMMAND minera_ocel_statistics_tests)
 
   add_executable(minera_dfg_filter_tests
-    tests/test_dfg_filter.cpp
+    src/backend/tests/test_dfg_filter.cpp
   )
   target_link_libraries(minera_dfg_filter_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_filter_tests PRIVATE cxx_std_20)
@@ -373,7 +373,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_dfg_filter_tests COMMAND minera_dfg_filter_tests)
 
   add_executable(minera_dfg_conversion_tests
-    tests/test_dfg_conversion.cpp
+    src/backend/tests/test_dfg_conversion.cpp
   )
   target_link_libraries(minera_dfg_conversion_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_conversion_tests PRIVATE cxx_std_20)
@@ -381,7 +381,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_dfg_conversion_tests COMMAND minera_dfg_conversion_tests)
 
   add_executable(minera_activity_split_tests
-    tests/test_activity_split.cpp
+    src/backend/tests/test_activity_split.cpp
   )
   target_link_libraries(minera_activity_split_tests PRIVATE minera::core)
   target_compile_features(minera_activity_split_tests PRIVATE cxx_std_20)
@@ -389,7 +389,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_activity_split_tests COMMAND minera_activity_split_tests)
 
   add_executable(minera_attribute_value_repetition_tests
-    tests/test_attribute_value_repetition.cpp
+    src/backend/tests/test_attribute_value_repetition.cpp
   )
   target_link_libraries(minera_attribute_value_repetition_tests PRIVATE minera::core)
   target_compile_features(minera_attribute_value_repetition_tests PRIVATE cxx_std_20)
@@ -397,7 +397,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_attribute_value_repetition_tests COMMAND minera_attribute_value_repetition_tests)
 
   add_executable(minera_case_grouping_tests
-    tests/test_case_grouping.cpp
+    src/backend/tests/test_case_grouping.cpp
   )
   target_link_libraries(minera_case_grouping_tests PRIVATE minera::core)
   target_compile_features(minera_case_grouping_tests PRIVATE cxx_std_20)
@@ -405,7 +405,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_case_grouping_tests COMMAND minera_case_grouping_tests)
 
   add_executable(minera_ltl_filter_tests
-    tests/test_ltl_filter.cpp
+    src/backend/tests/test_ltl_filter.cpp
   )
   target_link_libraries(minera_ltl_filter_tests PRIVATE minera::core)
   target_compile_features(minera_ltl_filter_tests PRIVATE cxx_std_20)
@@ -413,7 +413,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ltl_filter_tests COMMAND minera_ltl_filter_tests)
 
   add_executable(minera_path_filter_tests
-    tests/test_path_filter.cpp
+    src/backend/tests/test_path_filter.cpp
   )
   target_link_libraries(minera_path_filter_tests PRIVATE minera::core)
   target_compile_features(minera_path_filter_tests PRIVATE cxx_std_20)
@@ -421,7 +421,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_path_filter_tests COMMAND minera_path_filter_tests)
 
   add_executable(minera_segment_filter_tests
-    tests/test_segment_filter.cpp
+    src/backend/tests/test_segment_filter.cpp
   )
   target_link_libraries(minera_segment_filter_tests PRIVATE minera::core)
   target_compile_features(minera_segment_filter_tests PRIVATE cxx_std_20)
@@ -429,7 +429,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_segment_filter_tests COMMAND minera_segment_filter_tests)
 
   add_executable(minera_embeddings_tests
-    tests/test_embeddings.cpp
+    src/backend/tests/test_embeddings.cpp
   )
   target_link_libraries(minera_embeddings_tests PRIVATE minera::core)
   target_compile_features(minera_embeddings_tests PRIVATE cxx_std_20)
@@ -437,16 +437,16 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_embeddings_tests COMMAND minera_embeddings_tests)
 
   add_executable(minera_embedding_runtime_tests
-    tests/test_embedding_runtime.cpp
+    src/backend/tests/test_embedding_runtime.cpp
   )
   target_link_libraries(minera_embedding_runtime_tests PRIVATE minera::core)
-  target_include_directories(minera_embedding_runtime_tests PRIVATE third_party tools)
+  target_include_directories(minera_embedding_runtime_tests PRIVATE third_party src/backend/tools)
   target_compile_features(minera_embedding_runtime_tests PRIVATE cxx_std_20)
   target_compile_options(minera_embedding_runtime_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_embedding_runtime_tests COMMAND minera_embedding_runtime_tests)
 
   add_executable(minera_chaotic_activities_tests
-    tests/test_chaotic_activities.cpp
+    src/backend/tests/test_chaotic_activities.cpp
   )
   target_link_libraries(minera_chaotic_activities_tests PRIVATE minera::core)
   target_compile_features(minera_chaotic_activities_tests PRIVATE cxx_std_20)
@@ -454,7 +454,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_chaotic_activities_tests COMMAND minera_chaotic_activities_tests)
 
   add_executable(minera_passed_time_tests
-    tests/test_passed_time.cpp
+    src/backend/tests/test_passed_time.cpp
   )
   target_link_libraries(minera_passed_time_tests PRIVATE minera::core)
   target_compile_features(minera_passed_time_tests PRIVATE cxx_std_20)
@@ -462,7 +462,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_passed_time_tests COMMAND minera_passed_time_tests)
 
   add_executable(minera_service_time_tests
-    tests/test_service_time.cpp
+    src/backend/tests/test_service_time.cpp
   )
   target_link_libraries(minera_service_time_tests PRIVATE minera::core)
   target_compile_features(minera_service_time_tests PRIVATE cxx_std_20)
@@ -470,7 +470,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_service_time_tests COMMAND minera_service_time_tests)
 
   add_executable(minera_rework_tests
-    tests/test_rework.cpp
+    src/backend/tests/test_rework.cpp
   )
   target_link_libraries(minera_rework_tests PRIVATE minera::core)
   target_compile_features(minera_rework_tests PRIVATE cxx_std_20)
@@ -478,7 +478,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_rework_tests COMMAND minera_rework_tests)
 
   add_executable(minera_ilp_miner_tests
-    tests/test_ilp_miner.cpp
+    src/backend/tests/test_ilp_miner.cpp
   )
   target_link_libraries(minera_ilp_miner_tests PRIVATE minera::core)
   target_compile_features(minera_ilp_miner_tests PRIVATE cxx_std_20)
@@ -486,7 +486,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ilp_miner_tests COMMAND minera_ilp_miner_tests)
 
   add_executable(minera_trace_variant_query_tests
-    tests/test_trace_variant_query.cpp
+    src/backend/tests/test_trace_variant_query.cpp
   )
   target_link_libraries(minera_trace_variant_query_tests PRIVATE minera::core)
   target_compile_features(minera_trace_variant_query_tests PRIVATE cxx_std_20)
@@ -494,7 +494,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_trace_variant_query_tests COMMAND minera_trace_variant_query_tests)
 
   add_executable(minera_pripel_tests
-    tests/test_pripel.cpp
+    src/backend/tests/test_pripel.cpp
   )
   target_link_libraries(minera_pripel_tests PRIVATE minera::core)
   target_compile_features(minera_pripel_tests PRIVATE cxx_std_20)
@@ -502,7 +502,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pripel_tests COMMAND minera_pripel_tests)
 
   add_executable(minera_genetic_miner_tests
-    tests/test_genetic_miner.cpp
+    src/backend/tests/test_genetic_miner.cpp
   )
   target_link_libraries(minera_genetic_miner_tests PRIVATE minera::core)
   target_compile_features(minera_genetic_miner_tests PRIVATE cxx_std_20)
@@ -510,7 +510,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_genetic_miner_tests COMMAND minera_genetic_miner_tests)
 
   add_executable(minera_role_discovery_tests
-    tests/test_role_discovery.cpp
+    src/backend/tests/test_role_discovery.cpp
   )
   target_link_libraries(minera_role_discovery_tests PRIVATE minera::core)
   target_compile_features(minera_role_discovery_tests PRIVATE cxx_std_20)
@@ -518,14 +518,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_role_discovery_tests COMMAND minera_role_discovery_tests)
 
   add_executable(minera_organizational_mining_tests
-    tests/test_organizational_mining.cpp
+    src/backend/tests/test_organizational_mining.cpp
   )
   target_link_libraries(minera_organizational_mining_tests PRIVATE minera::core)
   target_compile_features(minera_organizational_mining_tests PRIVATE cxx_std_20)
   target_compile_options(minera_organizational_mining_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_organizational_mining_tests COMMAND minera_organizational_mining_tests)
   add_executable(minera_network_analysis_tests
-    tests/test_network_analysis.cpp
+    src/backend/tests/test_network_analysis.cpp
   )
   target_link_libraries(minera_network_analysis_tests PRIVATE minera::core)
   target_compile_features(minera_network_analysis_tests PRIVATE cxx_std_20)
@@ -533,7 +533,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_network_analysis_tests COMMAND minera_network_analysis_tests)
 
   add_executable(minera_resource_profiles_tests
-    tests/test_resource_profiles.cpp
+    src/backend/tests/test_resource_profiles.cpp
   )
   target_link_libraries(minera_resource_profiles_tests PRIVATE minera::core)
   target_compile_features(minera_resource_profiles_tests PRIVATE cxx_std_20)
@@ -541,129 +541,129 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_resource_profiles_tests COMMAND minera_resource_profiles_tests)
 
   add_executable(minera_local_diagnostics_tests
-    tests/test_local_diagnostics.cpp
+    src/backend/tests/test_local_diagnostics.cpp
   )
   target_link_libraries(minera_local_diagnostics_tests PRIVATE minera::core)
   target_compile_features(minera_local_diagnostics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_local_diagnostics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_local_diagnostics_tests COMMAND minera_local_diagnostics_tests)
 
-  add_executable(minera_clustering_tests tests/test_clustering.cpp)
+  add_executable(minera_clustering_tests src/backend/tests/test_clustering.cpp)
   target_link_libraries(minera_clustering_tests PRIVATE minera::core)
   target_compile_features(minera_clustering_tests PRIVATE cxx_std_20)
   target_compile_options(minera_clustering_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_clustering_tests COMMAND minera_clustering_tests)
 
-  add_executable(minera_process_cube_tests tests/test_process_cube.cpp)
+  add_executable(minera_process_cube_tests src/backend/tests/test_process_cube.cpp)
   target_link_libraries(minera_process_cube_tests PRIVATE minera::core)
   target_compile_features(minera_process_cube_tests PRIVATE cxx_std_20)
   target_compile_options(minera_process_cube_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_process_cube_tests COMMAND minera_process_cube_tests)
 
-  add_executable(minera_cycle_time_tests tests/test_cycle_time.cpp)
+  add_executable(minera_cycle_time_tests src/backend/tests/test_cycle_time.cpp)
   target_link_libraries(minera_cycle_time_tests PRIVATE minera::core)
   target_compile_features(minera_cycle_time_tests PRIVATE cxx_std_20)
   target_compile_options(minera_cycle_time_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_cycle_time_tests COMMAND minera_cycle_time_tests)
 
-  add_executable(minera_case_arrival_tests tests/test_case_arrival.cpp)
+  add_executable(minera_case_arrival_tests src/backend/tests/test_case_arrival.cpp)
   target_link_libraries(minera_case_arrival_tests PRIVATE minera::core)
   target_compile_features(minera_case_arrival_tests PRIVATE cxx_std_20)
   target_compile_options(minera_case_arrival_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_case_arrival_tests COMMAND minera_case_arrival_tests)
 
-  add_executable(minera_attribute_statistics_tests tests/test_attribute_statistics.cpp)
+  add_executable(minera_attribute_statistics_tests src/backend/tests/test_attribute_statistics.cpp)
   target_link_libraries(minera_attribute_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_attribute_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_attribute_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_attribute_statistics_tests COMMAND minera_attribute_statistics_tests)
 
-  add_executable(minera_attribute_distribution_tests tests/test_attribute_distribution.cpp)
+  add_executable(minera_attribute_distribution_tests src/backend/tests/test_attribute_distribution.cpp)
   target_link_libraries(minera_attribute_distribution_tests PRIVATE minera::core)
   target_compile_features(minera_attribute_distribution_tests PRIVATE cxx_std_20)
   target_compile_options(minera_attribute_distribution_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_attribute_distribution_tests COMMAND minera_attribute_distribution_tests)
 
-  add_executable(minera_attribute_kde_tests tests/test_attribute_kde.cpp)
+  add_executable(minera_attribute_kde_tests src/backend/tests/test_attribute_kde.cpp)
   target_link_libraries(minera_attribute_kde_tests PRIVATE minera::core)
   target_compile_features(minera_attribute_kde_tests PRIVATE cxx_std_20)
   target_compile_options(minera_attribute_kde_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_attribute_kde_tests COMMAND minera_attribute_kde_tests)
 
-  add_executable(minera_boundary_activities_tests tests/test_boundary_activities.cpp)
+  add_executable(minera_boundary_activities_tests src/backend/tests/test_boundary_activities.cpp)
   target_link_libraries(minera_boundary_activities_tests PRIVATE minera::core)
   target_compile_features(minera_boundary_activities_tests PRIVATE cxx_std_20)
   target_compile_options(minera_boundary_activities_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_boundary_activities_tests COMMAND minera_boundary_activities_tests)
 
-  add_executable(minera_variant_statistics_tests tests/test_variant_statistics.cpp)
+  add_executable(minera_variant_statistics_tests src/backend/tests/test_variant_statistics.cpp)
   target_link_libraries(minera_variant_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_variant_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_variant_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_variant_statistics_tests COMMAND minera_variant_statistics_tests)
 
-  add_executable(minera_case_statistics_tests tests/test_case_statistics.cpp)
+  add_executable(minera_case_statistics_tests src/backend/tests/test_case_statistics.cpp)
   target_link_libraries(minera_case_statistics_tests PRIVATE minera::core)
   target_compile_features(minera_case_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_case_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_case_statistics_tests COMMAND minera_case_statistics_tests)
 
-  add_executable(minera_streaming_dfg_tests tests/test_streaming_dfg.cpp)
+  add_executable(minera_streaming_dfg_tests src/backend/tests/test_streaming_dfg.cpp)
   target_link_libraries(minera_streaming_dfg_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_dfg_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_dfg_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_dfg_tests COMMAND minera_streaming_dfg_tests)
 
-  add_executable(minera_streaming_store_tests tests/test_streaming_store.cpp)
+  add_executable(minera_streaming_store_tests src/backend/tests/test_streaming_store.cpp)
   target_link_libraries(minera_streaming_store_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_store_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_store_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_store_tests COMMAND minera_streaming_store_tests)
 
-  add_executable(minera_streaming_footprints_tests tests/test_streaming_footprints.cpp)
+  add_executable(minera_streaming_footprints_tests src/backend/tests/test_streaming_footprints.cpp)
   target_link_libraries(minera_streaming_footprints_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_footprints_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_footprints_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_footprints_tests COMMAND minera_streaming_footprints_tests)
 
-  add_executable(minera_streaming_temporal_tests tests/test_streaming_temporal.cpp)
+  add_executable(minera_streaming_temporal_tests src/backend/tests/test_streaming_temporal.cpp)
   target_link_libraries(minera_streaming_temporal_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_temporal_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_temporal_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_temporal_tests COMMAND minera_streaming_temporal_tests)
 
-  add_executable(minera_streaming_tbr_tests tests/test_streaming_tbr.cpp)
+  add_executable(minera_streaming_tbr_tests src/backend/tests/test_streaming_tbr.cpp)
   target_link_libraries(minera_streaming_tbr_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_tbr_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_tbr_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_tbr_tests COMMAND minera_streaming_tbr_tests)
 
-  add_executable(minera_live_stream_tests tests/test_live_stream.cpp)
+  add_executable(minera_live_stream_tests src/backend/tests/test_live_stream.cpp)
   target_link_libraries(minera_live_stream_tests PRIVATE minera::core)
   target_compile_features(minera_live_stream_tests PRIVATE cxx_std_20)
   target_compile_options(minera_live_stream_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_live_stream_tests COMMAND minera_live_stream_tests)
 
-  add_executable(minera_streaming_import_tests tests/test_streaming_import.cpp)
+  add_executable(minera_streaming_import_tests src/backend/tests/test_streaming_import.cpp)
   target_link_libraries(minera_streaming_import_tests PRIVATE minera::core)
   target_compile_features(minera_streaming_import_tests PRIVATE cxx_std_20)
   target_compile_options(minera_streaming_import_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_streaming_import_tests COMMAND minera_streaming_import_tests)
 
-  add_executable(minera_data_petri_net_tests tests/test_data_petri_net.cpp)
+  add_executable(minera_data_petri_net_tests src/backend/tests/test_data_petri_net.cpp)
   target_link_libraries(minera_data_petri_net_tests PRIVATE minera::core)
   target_compile_features(minera_data_petri_net_tests PRIVATE cxx_std_20)
   target_compile_options(minera_data_petri_net_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_data_petri_net_tests COMMAND minera_data_petri_net_tests)
 
-  add_executable(minera_decision_table_tests tests/test_decision_table.cpp)
+  add_executable(minera_decision_table_tests src/backend/tests/test_decision_table.cpp)
   target_link_libraries(minera_decision_table_tests PRIVATE minera::core)
   target_compile_features(minera_decision_table_tests PRIVATE cxx_std_20)
   target_compile_options(minera_decision_table_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_decision_table_tests COMMAND minera_decision_table_tests)
 
   add_executable(minera_process_tree_playout_tests
-    tests/test_process_tree_playout.cpp
+    src/backend/tests/test_process_tree_playout.cpp
   )
   target_link_libraries(minera_process_tree_playout_tests PRIVATE minera::core)
   target_compile_features(minera_process_tree_playout_tests PRIVATE cxx_std_20)
@@ -671,7 +671,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_process_tree_playout_tests COMMAND minera_process_tree_playout_tests)
 
   add_executable(minera_playout_tests
-    tests/test_playout.cpp
+    src/backend/tests/test_playout.cpp
   )
   target_link_libraries(minera_playout_tests PRIVATE minera::core)
   target_compile_features(minera_playout_tests PRIVATE cxx_std_20)
@@ -679,7 +679,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_playout_tests COMMAND minera_playout_tests)
 
   add_executable(minera_stochastic_petri_tests
-    tests/test_stochastic_petri.cpp
+    src/backend/tests/test_stochastic_petri.cpp
   )
   target_link_libraries(minera_stochastic_petri_tests PRIVATE minera::core)
   target_compile_features(minera_stochastic_petri_tests PRIVATE cxx_std_20)
@@ -687,7 +687,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_stochastic_petri_tests COMMAND minera_stochastic_petri_tests)
 
   add_executable(minera_stochastic_map_tests
-    tests/test_stochastic_map.cpp
+    src/backend/tests/test_stochastic_map.cpp
   )
   target_link_libraries(minera_stochastic_map_tests PRIVATE minera::core)
   target_compile_features(minera_stochastic_map_tests PRIVATE cxx_std_20)
@@ -695,7 +695,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_stochastic_map_tests COMMAND minera_stochastic_map_tests)
 
   add_executable(minera_monte_carlo_tests
-    tests/test_monte_carlo.cpp
+    src/backend/tests/test_monte_carlo.cpp
   )
   target_link_libraries(minera_monte_carlo_tests PRIVATE minera::core)
   target_compile_features(minera_monte_carlo_tests PRIVATE cxx_std_20)
@@ -703,7 +703,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_monte_carlo_tests COMMAND minera_monte_carlo_tests)
 
   add_executable(minera_correlation_miner_tests
-    tests/test_correlation_miner.cpp
+    src/backend/tests/test_correlation_miner.cpp
   )
   target_link_libraries(minera_correlation_miner_tests PRIVATE minera::core)
   target_compile_features(minera_correlation_miner_tests PRIVATE cxx_std_20)
@@ -711,7 +711,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_correlation_miner_tests COMMAND minera_correlation_miner_tests)
 
   add_executable(minera_perspective_tests
-    tests/test_perspectives.cpp
+    src/backend/tests/test_perspectives.cpp
   )
   target_link_libraries(minera_perspective_tests PRIVATE minera::core)
   target_compile_features(minera_perspective_tests PRIVATE cxx_std_20)
@@ -720,7 +720,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_perspective_tests COMMAND minera_perspective_tests)
 
   add_executable(minera_request_params_tests
-    tests/test_request_params.cpp
+    src/backend/tests/test_request_params.cpp
   )
   target_link_libraries(minera_request_params_tests PRIVATE minera::core)
   target_compile_features(minera_request_params_tests PRIVATE cxx_std_20)
@@ -729,7 +729,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_request_params_tests COMMAND minera_request_params_tests)
 
   add_executable(minera_powl_tests
-    tests/test_powl.cpp
+    src/backend/tests/test_powl.cpp
   )
   target_link_libraries(minera_powl_tests PRIVATE minera::core)
   target_compile_features(minera_powl_tests PRIVATE cxx_std_20)
@@ -738,7 +738,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_powl_tests COMMAND minera_powl_tests)
 
   add_executable(minera_powl_discovery_tests
-    tests/test_powl_discovery.cpp
+    src/backend/tests/test_powl_discovery.cpp
   )
   target_link_libraries(minera_powl_discovery_tests PRIVATE minera::core)
   target_compile_features(minera_powl_discovery_tests PRIVATE cxx_std_20)
@@ -747,7 +747,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_powl_discovery_tests COMMAND minera_powl_discovery_tests)
 
   add_executable(minera_powl_conversion_tests
-    tests/test_powl_conversion.cpp
+    src/backend/tests/test_powl_conversion.cpp
   )
   target_link_libraries(minera_powl_conversion_tests PRIVATE minera::core)
   target_compile_features(minera_powl_conversion_tests PRIVATE cxx_std_20)
@@ -756,7 +756,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_powl_conversion_tests COMMAND minera_powl_conversion_tests)
 
   add_executable(minera_log_skeleton_tests
-    tests/test_log_skeleton.cpp
+    src/backend/tests/test_log_skeleton.cpp
   )
   target_link_libraries(minera_log_skeleton_tests PRIVATE minera::core)
   target_compile_features(minera_log_skeleton_tests PRIVATE cxx_std_20)
@@ -765,7 +765,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_log_skeleton_tests COMMAND minera_log_skeleton_tests)
 
   add_executable(minera_log_to_target_tests
-    tests/test_log_to_target.cpp
+    src/backend/tests/test_log_to_target.cpp
   )
   target_link_libraries(minera_log_to_target_tests PRIVATE minera::core)
   target_compile_features(minera_log_to_target_tests PRIVATE cxx_std_20)
@@ -773,21 +773,21 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_log_to_target_tests COMMAND minera_log_to_target_tests)
 
   add_executable(minera_log_to_features_tests
-    tests/test_log_to_features.cpp
+    src/backend/tests/test_log_to_features.cpp
   )
   target_link_libraries(minera_log_to_features_tests PRIVATE minera::core)
   target_compile_features(minera_log_to_features_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_to_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_to_features_tests COMMAND minera_log_to_features_tests)
 
-  add_executable(minera_log_util_tests tests/test_log_util.cpp)
+  add_executable(minera_log_util_tests src/backend/tests/test_log_util.cpp)
   target_link_libraries(minera_log_util_tests PRIVATE minera::core)
   target_compile_features(minera_log_util_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_util_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_util_tests COMMAND minera_log_util_tests)
 
   add_executable(minera_label_splitting_tests
-    tests/test_label_splitting.cpp
+    src/backend/tests/test_label_splitting.cpp
   )
   target_link_libraries(minera_label_splitting_tests PRIVATE minera::core)
   target_compile_features(minera_label_splitting_tests PRIVATE cxx_std_20)
@@ -795,7 +795,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_label_splitting_tests COMMAND minera_label_splitting_tests)
 
   add_executable(minera_footprints_tests
-    tests/test_footprints.cpp
+    src/backend/tests/test_footprints.cpp
   )
   target_link_libraries(minera_footprints_tests PRIVATE minera::core)
   target_compile_features(minera_footprints_tests PRIVATE cxx_std_20)
@@ -804,7 +804,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_footprints_tests COMMAND minera_footprints_tests)
 
   add_executable(minera_footprints_models_tests
-    tests/test_footprints_models.cpp
+    src/backend/tests/test_footprints_models.cpp
   )
   target_link_libraries(minera_footprints_models_tests PRIVATE minera::core)
   target_compile_features(minera_footprints_models_tests PRIVATE cxx_std_20)
@@ -813,7 +813,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_footprints_models_tests COMMAND minera_footprints_models_tests)
 
   add_executable(minera_declare_tests
-    tests/test_declare.cpp
+    src/backend/tests/test_declare.cpp
   )
   target_link_libraries(minera_declare_tests PRIVATE minera::core)
   target_compile_features(minera_declare_tests PRIVATE cxx_std_20)
@@ -822,7 +822,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_declare_tests COMMAND minera_declare_tests)
 
   add_executable(minera_declare_variants_tests
-    tests/test_declare_variants.cpp
+    src/backend/tests/test_declare_variants.cpp
   )
   target_link_libraries(minera_declare_variants_tests PRIVATE minera::core)
   target_compile_features(minera_declare_variants_tests PRIVATE cxx_std_20)
@@ -831,7 +831,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_declare_variants_tests COMMAND minera_declare_variants_tests)
 
   add_executable(minera_heuristic_variants_tests
-    tests/test_heuristic_variants.cpp
+    src/backend/tests/test_heuristic_variants.cpp
   )
   target_link_libraries(minera_heuristic_variants_tests PRIVATE minera::core)
   target_compile_features(minera_heuristic_variants_tests PRIVATE cxx_std_20)
@@ -840,7 +840,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_heuristic_variants_tests COMMAND minera_heuristic_variants_tests)
 
   add_executable(minera_dfg_variants_tests
-    tests/test_dfg_variants.cpp
+    src/backend/tests/test_dfg_variants.cpp
   )
   target_link_libraries(minera_dfg_variants_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_variants_tests PRIVATE cxx_std_20)
@@ -849,7 +849,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_dfg_variants_tests COMMAND minera_dfg_variants_tests)
 
   add_executable(minera_dfg_playout_tests
-    tests/test_dfg_playout.cpp
+    src/backend/tests/test_dfg_playout.cpp
   )
   target_link_libraries(minera_dfg_playout_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_playout_tests PRIVATE cxx_std_20)
@@ -857,21 +857,21 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_dfg_playout_tests COMMAND minera_dfg_playout_tests)
 
   add_executable(minera_dfg_io_tests
-    tests/test_dfg_io.cpp
+    src/backend/tests/test_dfg_io.cpp
   )
   target_link_libraries(minera_dfg_io_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_io_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_io_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_io_tests COMMAND minera_dfg_io_tests)
 
-  add_executable(minera_dfg_precision_tests tests/test_dfg_precision.cpp)
+  add_executable(minera_dfg_precision_tests src/backend/tests/test_dfg_precision.cpp)
   target_link_libraries(minera_dfg_precision_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_precision_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_precision_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_precision_tests COMMAND minera_dfg_precision_tests)
 
   add_executable(minera_temporal_behavioral_tests
-    tests/test_temporal_behavioral.cpp
+    src/backend/tests/test_temporal_behavioral.cpp
   )
   target_link_libraries(minera_temporal_behavioral_tests PRIVATE minera::core)
   target_compile_features(minera_temporal_behavioral_tests PRIVATE cxx_std_20)
@@ -879,7 +879,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_temporal_behavioral_tests COMMAND minera_temporal_behavioral_tests)
 
   add_executable(minera_concept_drift_tests
-    tests/test_concept_drift.cpp
+    src/backend/tests/test_concept_drift.cpp
   )
   target_link_libraries(minera_concept_drift_tests PRIVATE minera::core)
   target_compile_features(minera_concept_drift_tests PRIVATE cxx_std_20)
@@ -887,7 +887,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_concept_drift_tests COMMAND minera_concept_drift_tests)
 
   add_executable(minera_alignment_variants_tests
-    tests/test_alignment_variants.cpp
+    src/backend/tests/test_alignment_variants.cpp
   )
   target_link_libraries(minera_alignment_variants_tests PRIVATE minera::core)
   target_compile_features(minera_alignment_variants_tests PRIVATE cxx_std_20)
@@ -895,7 +895,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_alignment_variants_tests COMMAND minera_alignment_variants_tests)
 
   add_executable(minera_process_tree_alignment_tests
-    tests/test_process_tree_alignment.cpp
+    src/backend/tests/test_process_tree_alignment.cpp
   )
   target_link_libraries(minera_process_tree_alignment_tests PRIVATE minera::core)
   target_compile_features(minera_process_tree_alignment_tests PRIVATE cxx_std_20)
@@ -903,7 +903,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_process_tree_alignment_tests COMMAND minera_process_tree_alignment_tests)
 
   add_executable(minera_process_tree_reduction_tests
-    tests/test_process_tree_reduction.cpp
+    src/backend/tests/test_process_tree_reduction.cpp
   )
   target_link_libraries(minera_process_tree_reduction_tests PRIVATE minera::core)
   target_compile_features(minera_process_tree_reduction_tests PRIVATE cxx_std_20)
@@ -911,7 +911,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_process_tree_reduction_tests COMMAND minera_process_tree_reduction_tests)
 
   add_executable(minera_petri_net_reduction_tests
-    tests/test_petri_net_reduction.cpp
+    src/backend/tests/test_petri_net_reduction.cpp
   )
   target_link_libraries(minera_petri_net_reduction_tests PRIVATE minera::core)
   target_compile_features(minera_petri_net_reduction_tests PRIVATE cxx_std_20)
@@ -919,7 +919,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_petri_net_reduction_tests COMMAND minera_petri_net_reduction_tests)
 
   add_executable(minera_dfg_alignment_tests
-    tests/test_dfg_alignment.cpp
+    src/backend/tests/test_dfg_alignment.cpp
   )
   target_link_libraries(minera_dfg_alignment_tests PRIVATE minera::core)
   target_compile_features(minera_dfg_alignment_tests PRIVATE cxx_std_20)
@@ -927,7 +927,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_dfg_alignment_tests COMMAND minera_dfg_alignment_tests)
 
   add_executable(minera_edit_distance_alignment_tests
-    tests/test_edit_distance_alignment.cpp
+    src/backend/tests/test_edit_distance_alignment.cpp
   )
   target_link_libraries(minera_edit_distance_alignment_tests PRIVATE minera::core)
   target_compile_features(minera_edit_distance_alignment_tests PRIVATE cxx_std_20)
@@ -935,7 +935,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_edit_distance_alignment_tests COMMAND minera_edit_distance_alignment_tests)
 
   add_executable(minera_decomposed_alignment_tests
-    tests/test_decomposed_alignment.cpp
+    src/backend/tests/test_decomposed_alignment.cpp
   )
   target_link_libraries(minera_decomposed_alignment_tests PRIVATE minera::core)
   target_compile_features(minera_decomposed_alignment_tests PRIVATE cxx_std_20)
@@ -943,7 +943,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_decomposed_alignment_tests COMMAND minera_decomposed_alignment_tests)
 
   add_executable(minera_petri_anti_multi_alignment_tests
-    tests/test_petri_anti_multi_alignment.cpp
+    src/backend/tests/test_petri_anti_multi_alignment.cpp
   )
   target_link_libraries(minera_petri_anti_multi_alignment_tests PRIVATE minera::core)
   target_compile_features(minera_petri_anti_multi_alignment_tests PRIVATE cxx_std_20)
@@ -951,7 +951,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_petri_anti_multi_alignment_tests COMMAND minera_petri_anti_multi_alignment_tests)
 
   add_executable(minera_evaluation_tests
-    tests/test_evaluation.cpp
+    src/backend/tests/test_evaluation.cpp
   )
   target_link_libraries(minera_evaluation_tests PRIVATE minera::core)
   target_compile_features(minera_evaluation_tests PRIVATE cxx_std_20)
@@ -959,7 +959,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_evaluation_tests COMMAND minera_evaluation_tests)
 
   add_executable(minera_petri_analysis_tests
-    tests/test_petri_analysis.cpp
+    src/backend/tests/test_petri_analysis.cpp
   )
   target_link_libraries(minera_petri_analysis_tests PRIVATE minera::core)
   target_compile_features(minera_petri_analysis_tests PRIVATE cxx_std_20)
@@ -967,7 +967,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_petri_analysis_tests COMMAND minera_petri_analysis_tests)
 
   add_executable(minera_petri_extended_arcs_tests
-    tests/test_petri_extended_arcs.cpp
+    src/backend/tests/test_petri_extended_arcs.cpp
   )
   target_link_libraries(minera_petri_extended_arcs_tests PRIVATE minera::core)
   target_compile_features(minera_petri_extended_arcs_tests PRIVATE cxx_std_20)
@@ -975,7 +975,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_petri_extended_arcs_tests COMMAND minera_petri_extended_arcs_tests)
 
   add_executable(minera_petri_usage_comparison_tests
-    tests/test_petri_usage_comparison.cpp
+    src/backend/tests/test_petri_usage_comparison.cpp
   )
   target_link_libraries(minera_petri_usage_comparison_tests PRIVATE minera::core)
   target_compile_features(minera_petri_usage_comparison_tests PRIVATE cxx_std_20)
@@ -983,7 +983,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_petri_usage_comparison_tests COMMAND minera_petri_usage_comparison_tests)
 
   add_executable(minera_trie_tests
-    tests/test_trie.cpp
+    src/backend/tests/test_trie.cpp
   )
   target_link_libraries(minera_trie_tests PRIVATE minera::core)
   target_compile_features(minera_trie_tests PRIVATE cxx_std_20)
@@ -991,7 +991,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_trie_tests COMMAND minera_trie_tests)
 
   add_executable(minera_trie_conversion_tests
-    tests/test_trie_conversion.cpp
+    src/backend/tests/test_trie_conversion.cpp
   )
   target_link_libraries(minera_trie_conversion_tests PRIVATE minera::core)
   target_compile_features(minera_trie_conversion_tests PRIVATE cxx_std_20)
@@ -999,7 +999,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_trie_conversion_tests COMMAND minera_trie_conversion_tests)
 
   add_executable(minera_interval_tree_tests
-    tests/test_interval_tree.cpp
+    src/backend/tests/test_interval_tree.cpp
   )
   target_link_libraries(minera_interval_tree_tests PRIVATE minera::core)
   target_compile_features(minera_interval_tree_tests PRIVATE cxx_std_20)
@@ -1007,7 +1007,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_interval_tree_tests COMMAND minera_interval_tree_tests)
 
   add_executable(minera_case_relations_tests
-    tests/test_case_relations.cpp
+    src/backend/tests/test_case_relations.cpp
   )
   target_link_libraries(minera_case_relations_tests PRIVATE minera::core)
   target_compile_features(minera_case_relations_tests PRIVATE cxx_std_20)
@@ -1015,7 +1015,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_case_relations_tests COMMAND minera_case_relations_tests)
 
   add_executable(minera_random_tree_tests
-    tests/test_random_tree.cpp
+    src/backend/tests/test_random_tree.cpp
   )
   target_link_libraries(minera_random_tree_tests PRIVATE minera::core)
   target_compile_features(minera_random_tree_tests PRIVATE cxx_std_20)
@@ -1023,7 +1023,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_random_tree_tests COMMAND minera_random_tree_tests)
 
   add_executable(minera_saw_nets_tests
-    tests/test_saw_nets.cpp
+    src/backend/tests/test_saw_nets.cpp
   )
   target_link_libraries(minera_saw_nets_tests PRIVATE minera::core)
   target_compile_features(minera_saw_nets_tests PRIVATE cxx_std_20)
@@ -1031,7 +1031,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_saw_nets_tests COMMAND minera_saw_nets_tests)
 
   add_executable(minera_ocel_transform_tests
-    tests/test_ocel_transform.cpp
+    src/backend/tests/test_ocel_transform.cpp
   )
   target_link_libraries(minera_ocel_transform_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_transform_tests PRIVATE cxx_std_20)
@@ -1039,7 +1039,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_transform_tests COMMAND minera_ocel_transform_tests)
 
   add_executable(minera_ocel_playout_tests
-    tests/test_ocel_playout.cpp
+    src/backend/tests/test_ocel_playout.cpp
   )
   target_link_libraries(minera_ocel_playout_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_playout_tests PRIVATE cxx_std_20)
@@ -1047,7 +1047,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_playout_tests COMMAND minera_ocel_playout_tests)
 
   add_executable(minera_ocel_features_tests
-    tests/test_ocel_features.cpp
+    src/backend/tests/test_ocel_features.cpp
   )
   target_link_libraries(minera_ocel_features_tests PRIVATE minera::core)
   target_compile_features(minera_ocel_features_tests PRIVATE cxx_std_20)
@@ -1055,7 +1055,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_ocel_features_tests COMMAND minera_ocel_features_tests)
 
   add_executable(minera_oc_causal_net_tests
-    tests/test_oc_causal_net.cpp
+    src/backend/tests/test_oc_causal_net.cpp
   )
   target_link_libraries(minera_oc_causal_net_tests PRIVATE minera::core)
   target_compile_features(minera_oc_causal_net_tests PRIVATE cxx_std_20)
@@ -1063,7 +1063,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_oc_causal_net_tests COMMAND minera_oc_causal_net_tests)
 
   add_executable(minera_link_analysis_tests
-    tests/test_link_analysis.cpp
+    src/backend/tests/test_link_analysis.cpp
   )
   target_link_libraries(minera_link_analysis_tests PRIVATE minera::core)
   target_compile_features(minera_link_analysis_tests PRIVATE cxx_std_20)
@@ -1071,7 +1071,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_link_analysis_tests COMMAND minera_link_analysis_tests)
 
   add_executable(minera_timestamp_interleavings_tests
-    tests/test_timestamp_interleavings.cpp
+    src/backend/tests/test_timestamp_interleavings.cpp
   )
   target_link_libraries(minera_timestamp_interleavings_tests PRIVATE minera::core)
   target_compile_features(minera_timestamp_interleavings_tests PRIVATE cxx_std_20)
@@ -1079,7 +1079,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_timestamp_interleavings_tests COMMAND minera_timestamp_interleavings_tests)
 
   add_executable(minera_overlap_tests
-    tests/test_overlap.cpp
+    src/backend/tests/test_overlap.cpp
   )
   target_link_libraries(minera_overlap_tests PRIVATE minera::core)
   target_compile_features(minera_overlap_tests PRIVATE cxx_std_20)
@@ -1087,7 +1087,7 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_overlap_tests COMMAND minera_overlap_tests)
 
   add_executable(minera_overlap_json_tests
-    tests/test_overlap_json.cpp
+    src/backend/tests/test_overlap_json.cpp
   )
   target_link_libraries(minera_overlap_json_tests PRIVATE minera::core)
   target_compile_features(minera_overlap_json_tests PRIVATE cxx_std_20)

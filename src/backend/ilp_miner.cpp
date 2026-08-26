@@ -11,6 +11,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -95,6 +96,9 @@ struct RegionProblem {
   std::vector<std::int64_t> objective_output;
   bool have_observed_prefix = false;
 };
+
+using RegionRowKey =
+    std::tuple<bool, std::vector<std::int64_t>, std::vector<std::int64_t>>;
 
 std::int64_t saturating_add(std::int64_t left, std::int64_t right) {
   if (right > 0 && left > std::numeric_limits<std::int64_t>::max() - right)
@@ -228,7 +232,12 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
       }
       ++cumulative[trace.sequence[i]];
       SequenceVector current = cumulative;
-      support[previous][current] += static_cast<std::uint64_t>(trace.frequency);
+      auto& support_count = support[previous][current];
+      const auto frequency = static_cast<std::uint64_t>(trace.frequency);
+      if (std::numeric_limits<std::uint64_t>::max() - support_count < frequency)
+        support_count = std::numeric_limits<std::uint64_t>::max();
+      else
+        support_count += frequency;
       steps.push_back({std::move(previous), std::move(current)});
     }
     encoding_steps.push_back(std::move(steps));
@@ -290,6 +299,11 @@ RegionProblem build_region_problem(
   problem.activity_count = activity_count;
   problem.objective_input.assign(activity_count, 0);
   problem.objective_output.assign(activity_count, 0);
+  // The linear formulation has one constraint per distinct encoding row.
+  // Keep objective accumulation below outside this set: the reference
+  // objective is still summed once per retained variant row, while repeated
+  // rows need not be solved repeatedly as identical feasibility constraints.
+  std::set<RegionRowKey> constraint_rows;
   for (const auto& trace_entry : traces) {
     const auto& trace = trace_entry.sequence;
     const auto retained_prefix =
@@ -307,7 +321,10 @@ RegionProblem build_region_problem(
       row.input = cumulative;
       row.output = std::move(previous);
       row.equality = retained_prefix == trace.size() && i + 1 == retained_prefix;
-      problem.rows.push_back(row);
+      if (constraint_rows
+              .insert({row.equality, row.output, row.input})
+              .second)
+        problem.rows.push_back(row);
       problem.have_observed_prefix = true;
       for (std::size_t activity = 0; activity < activity_count; ++activity) {
         problem.objective_output[activity] = saturating_add(

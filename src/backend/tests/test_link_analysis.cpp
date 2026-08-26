@@ -42,6 +42,9 @@ void classic_forward_and_sorting() {
   assert(result.links[0].target.activity == "B" ||
          result.links[0].target.activity == "E");
   assert(result.links[0].source.index < result.links[0].target.index);
+  assert(result.options.index_column == "@@index");
+  assert(minera::link_analysis_json(result).find("\"index_column\":\"@@index\"") !=
+         std::string::npos);
 }
 
 void first_and_propagated_links() {
@@ -66,11 +69,16 @@ void look_backward_and_custom_trace_attribute() {
   minera::LinkAnalysisOptions options;
   options.out_column = "batch";
   options.in_column = "batch";
+  options.index_column = "row_id";
   options.look_forward = false;
   options.keep_first_occurrence = true;
   const auto result = minera::discover_link_analysis(log, options);
   assert(result.links.size() == result.event_count);
   assert(result.links.front().source.index == result.links.front().target.index);
+  assert(result.options.index_column == "row_id");
+  const auto json = minera::link_analysis_json(result);
+  assert(json.find(",\"row_id\":") != std::string::npos);
+  assert(json.find("\"index\":") != std::string::npos);
 }
 
 void event_index_is_trace_local_not_input_order() {
@@ -94,6 +102,18 @@ void invalid_columns_and_bound() {
   minera::LinkAnalysisOptions options;
   options.out_column = "missing";
   bool threw = false;
+  try { (void)minera::discover_link_analysis(log, options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  options = {};
+  options.index_column.clear();
+  threw = false;
+  try { (void)minera::discover_link_analysis(log, options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  options = {};
+  options.index_column = "trace_index";
+  threw = false;
   try { (void)minera::discover_link_analysis(log, options); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);

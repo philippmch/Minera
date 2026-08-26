@@ -319,9 +319,19 @@ ctest --test-dir build --output-on-failure
 ```
 
 Implementation sources live under `src/backend/`, while the React/Vite
-application is under `src/frontend/`. Public C++ headers stay in
-`include/minera/`; tests and command-line entry points remain in `tests/` and
-`tools/`.
+application is under `src/frontend/`. Native tools and tests follow their
+owners in `src/backend/tools/` and `src/backend/tests/`; frontend tests live
+in `src/frontend/tests/`.
+
+The other top-level directories are intentional repository boundaries:
+
+| Directory | Responsibility |
+| --- | --- |
+| `include/` | Installed/public C++ headers (`include/minera/`). |
+| `third_party/` | Vendored build dependencies kept separate from project code. |
+| `scripts/` | Repository automation and local development helpers. |
+| `docs/` | Design notes, contracts, and audit documentation. |
+| `data/` | Small sample inputs used by examples and smoke checks. |
 
 ## Minimal Example
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { VariantStat } from "./types";
-import { cumulativeCoverage } from "./variant-insights";
+import type { VariantStat } from "../src/types";
+import { cumulativeCoverage } from "../src/variant-insights";
 
 const variant = (count: number): VariantStat => ({ activities: [], count });
 

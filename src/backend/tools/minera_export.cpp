@@ -2157,7 +2157,8 @@ int main(int argc, char** argv) {
       std::replace(key.begin(), key.end(), '-', '_');
       static const std::set<std::string> names = {
           "link_analysis_out_column", "link_analysis_in_column",
-          "link_analysis_sorting_column", "link_analysis_look_forward",
+          "link_analysis_sorting_column", "link_analysis_index_column",
+          "link_analysis_look_forward",
           "link_analysis_keep_first_occurrence", "link_analysis_propagate",
           "link_analysis_max_links"};
       if (!names.contains(key)) return usage(argv[0]);

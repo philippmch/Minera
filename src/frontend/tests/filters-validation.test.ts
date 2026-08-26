@@ -3,7 +3,7 @@ import {
   caseDurationValidationMessage,
   caseSelectionValidationMessage,
   numericAttributeValidationMessage,
-} from "./components/Filters";
+} from "../src/components/Filters";
 
 describe("case duration filter validation", () => {
   it("accepts inclusive one-sided and ordered bounds", () => {

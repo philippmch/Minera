@@ -76,6 +76,12 @@ void validate_column(const EventLog& log, std::string_view column,
                               " does not exist in the event log");
 }
 
+bool is_reserved_index_field(std::string_view column) {
+  return column == "trace_index" || column == "event_index" ||
+         column == "case_id" || column == "activity" ||
+         column == "timestamp" || column == "value";
+}
+
 LinkAnalysisEvent event_ref(const Row& row, std::string value) {
   return {row.index, row.trace_index, row.event_index, row.trace->case_id,
           row.event->activity, row.event->timestamp, std::move(value)};
@@ -105,8 +111,15 @@ void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
 }
 
-void write_event(std::ostream& out, const LinkAnalysisEvent& event) {
-  out << "{\"index\":" << event.index << ",\"trace_index\":"
+void write_event(std::ostream& out, const LinkAnalysisEvent& event,
+                 std::string_view index_column) {
+  out << "{\"index\":" << event.index;
+  if (index_column != "index") {
+    out << ',';
+    write_json_string(out, index_column);
+    out << ':' << event.index;
+  }
+  out << ",\"trace_index\":"
       << event.trace_index << ",\"event_index\":" << event.event_index
       << ",\"case_id\":";
   write_json_string(out, event.case_id);
@@ -127,6 +140,11 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
   validate_column(log, options.in_column, "link_analysis_in_column");
   validate_column(log, options.sorting_column,
                   "link_analysis_sorting_column");
+  if (options.index_column.empty())
+    throw std::invalid_argument("link_analysis_index_column must not be empty");
+  if (is_reserved_index_field(options.index_column))
+    throw std::invalid_argument(
+        "link_analysis_index_column collides with a link endpoint field");
   if (options.max_links == 0)
     throw std::invalid_argument("link_analysis_max_links must be positive");
 
@@ -240,6 +258,8 @@ std::string link_analysis_json(const LinkAnalysisResult& result) {
   write_json_string(out, result.options.in_column);
   out << ",\"sorting_column\":";
   write_json_string(out, result.options.sorting_column);
+  out << ",\"index_column\":";
+  write_json_string(out, result.options.index_column);
   out << ",\"look_forward\":"
       << (result.options.look_forward ? "true" : "false")
       << ",\"keep_first_occurrence\":"
@@ -249,9 +269,9 @@ std::string link_analysis_json(const LinkAnalysisResult& result) {
   for (std::size_t i = 0; i < result.links.size(); ++i) {
     if (i != 0) out << ',';
     out << "{\"source\":";
-    write_event(out, result.links[i].source);
+    write_event(out, result.links[i].source, result.options.index_column);
     out << ",\"target\":";
-    write_event(out, result.links[i].target);
+    write_event(out, result.links[i].target, result.options.index_column);
     out << '}';
   }
   out << "]}";

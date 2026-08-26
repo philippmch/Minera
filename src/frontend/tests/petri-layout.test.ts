@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computePetriLayout } from "./petri-layout";
-import { type ActivityStat, type MineraExport, type PetriNetModel } from "./types";
+import { computePetriLayout } from "../src/petri-layout";
+import { type ActivityStat, type MineraExport, type PetriNetModel } from "../src/types";
 
 const act = (name: string): ActivityStat => ({
   name,

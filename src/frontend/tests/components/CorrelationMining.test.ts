@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import type {
   CorrelationMinerAnalysis,
   MineraExport,
-} from "../types";
-import { CorrelationMining } from "./CorrelationMining";
+} from "../../src/types";
+import { CorrelationMining } from "../../src/components/CorrelationMining";
 
 const baseData = (): MineraExport => ({
   dataset: "fixture",

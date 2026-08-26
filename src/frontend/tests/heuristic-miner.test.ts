@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { discoverHeuristicsNet } from "./heuristic-miner";
-import { type MineraExport } from "./types";
+import { discoverHeuristicsNet } from "../src/heuristic-miner";
+import { type MineraExport } from "../src/types";
 
 // Minimal export with activities and directly-follows edge counts.
 function makeExport(

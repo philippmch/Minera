@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { MineraExport } from "../types";
-import { Batches } from "./Batches";
+import type { MineraExport } from "../../src/types";
+import { Batches } from "../../src/components/Batches";
 
 const baseData = (): MineraExport => ({
   dataset: "fixture", trace_count: 1, event_count: 5,
