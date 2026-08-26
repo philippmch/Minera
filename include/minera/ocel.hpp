@@ -165,8 +165,18 @@ struct OcdfgGraph {
   bool performance_computed = true;
 };
 
+struct OcdfgDiscoveryOptions {
+  bool compute_edges_performance = true;
+  // Optional selectors for the labels used by the discovery projection.
+  // Empty selectors use the canonical activity and object type fields.
+  std::string activity_attribute;
+  std::string object_type_attribute;
+};
+
 OcdfgGraph discover_ocdfg_classic(const Ocel& log,
                                   bool compute_edges_performance = true);
+OcdfgGraph discover_ocdfg_classic_with_options(
+    const Ocel& log, const OcdfgDiscoveryOptions& options);
 std::string serialize_ocdfg_json(const OcdfgGraph& graph);
 [[nodiscard]] OcdfgGraph parse_ocdfg_json(
     std::string_view json, const OcelJsonLimits& limits = {});

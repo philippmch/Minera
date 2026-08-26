@@ -4399,6 +4399,10 @@ export async function requestRandomTree(options: RandomTreeOptions = {}): Promis
 export interface OcelDiscoveryOptions {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
+  ocdfg_activity_attribute?: string;
+  ocdfg_object_type_attribute?: string;
+  saw_activity_attribute?: string;
+  saw_object_type_attribute?: string;
   ocpn_annotation?: "annotated" | "none";
   ocpn_activity_attribute?: string;
   ocpn_object_type_attribute?: string;
@@ -4420,6 +4424,10 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   };
   addSelector("ocpn_activity_attribute", options.ocpn_activity_attribute);
   addSelector("ocpn_object_type_attribute", options.ocpn_object_type_attribute);
+  addSelector("ocdfg_activity_attribute", options.ocdfg_activity_attribute);
+  addSelector("ocdfg_object_type_attribute", options.ocdfg_object_type_attribute);
+  addSelector("saw_activity_attribute", options.saw_activity_attribute);
+  addSelector("saw_object_type_attribute", options.saw_object_type_attribute);
   if (options.diagnostics_with_token_based_replay !== undefined) {
     if (options.diagnostics_with_token_based_replay !== true &&
         options.diagnostics_with_token_based_replay !== false) {

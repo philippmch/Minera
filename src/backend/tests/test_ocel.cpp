@@ -7,6 +7,7 @@
 
 #include "minera/conformance.hpp"
 #include "minera/oc_causal_net.hpp"
+#include "minera/saw_nets.hpp"
 
 int main() {
   const std::string input =
@@ -170,6 +171,8 @@ int main() {
   const auto ocdfg = minera::discover_ocdfg_classic(log, true);
   assert(ocdfg.activities.size() == 2 && ocdfg.object_types.size() == 2);
   assert(ocdfg.activities_indep.at("Create").events.size() == 1);
+  const auto legacy_braced_ocdfg = minera::discover_ocdfg_classic(log, {});
+  assert(legacy_braced_ocdfg.activities == ocdfg.activities);
   assert(ocdfg.activities_ot.at("order").at("Ship").unique_objects.size() == 1);
   assert(ocdfg.start_activities.at("order").at("Create").events.size() == 1);
   assert(ocdfg.end_activities.at("order").at("Ship").events.size() == 1);
@@ -474,6 +477,62 @@ int main() {
     missing_selector_rejected = true;
   }
   assert(missing_selector_rejected);
+
+  minera::OcdfgDiscoveryOptions ocdfg_selected_options;
+  ocdfg_selected_options.activity_attribute = "selected_activity";
+  ocdfg_selected_options.object_type_attribute = "selected_type";
+  const auto selected_ocdfg =
+      minera::discover_ocdfg_classic_with_options(selected_log,
+                                                  ocdfg_selected_options);
+  assert(selected_ocdfg.activities ==
+         std::vector<std::string>({"Assemble", "Deliver"}));
+  assert(selected_ocdfg.object_types ==
+         std::vector<std::string>({"item-main", "order-main"}));
+  assert(selected_ocdfg.edges.at("order-main").at({"Assemble", "Deliver"})
+             .performance_event_couples.size() == 1);
+  ocdfg_selected_options.compute_edges_performance = false;
+  const auto selected_ocdfg_plain =
+      minera::discover_ocdfg_classic_with_options(selected_log,
+                                                  ocdfg_selected_options);
+  assert(!selected_ocdfg_plain.performance_computed);
+  assert(selected_ocdfg_plain.activities == selected_ocdfg.activities);
+  assert(selected_ocdfg_plain.edges.at("order-main")
+             .at({"Assemble", "Deliver"})
+             .performance_event_couples.empty());
+  bool ocdfg_missing_selector_rejected = false;
+  try {
+    auto invalid = ocdfg_selected_options;
+    invalid.object_type_attribute = "missing_type";
+    (void)minera::discover_ocdfg_classic_with_options(selected_log, invalid);
+  } catch (const std::invalid_argument&) {
+    ocdfg_missing_selector_rejected = true;
+  }
+  assert(ocdfg_missing_selector_rejected);
+
+  minera::SawNetDiscoveryOptions saw_selected_options;
+  saw_selected_options.activity_attribute = "selected_activity";
+  saw_selected_options.object_type_attribute = "selected_type";
+  const auto selected_saw =
+      minera::discover_saw_nets(selected_log, saw_selected_options);
+  assert(selected_saw.ot_saw_nets.contains("order-main") &&
+         selected_saw.ot_saw_nets.contains("item-main"));
+  assert(selected_saw.ot_saw_nets.at("order-main").net.activities() ==
+         std::vector<std::string>({"Assemble", "Deliver"}));
+  assert(selected_saw.multi_place_object_types.size() > 0);
+  for (const auto& [place, type] : selected_saw.multi_place_object_types) {
+    (void)place;
+    assert(type == "order-main" || type == "item-main");
+  }
+  assert(!selected_saw.ot_saw_nets.at("order-main").transition_weights.empty());
+  bool saw_missing_selector_rejected = false;
+  try {
+    auto invalid = saw_selected_options;
+    invalid.activity_attribute = "missing_activity";
+    (void)minera::discover_saw_nets(selected_log, invalid);
+  } catch (const std::invalid_argument&) {
+    saw_missing_selector_rejected = true;
+  }
+  assert(saw_missing_selector_rejected);
 
   minera::PetriNet replay_net;
   const auto replay_source = replay_net.add_place();

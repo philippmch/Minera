@@ -12,6 +12,7 @@
 #include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
+#include "ocpn_projection.hpp"
 
 namespace minera {
 namespace {
@@ -283,13 +284,20 @@ void write_net(std::ostringstream& out, const SawNet& saw) {
 }  // namespace
 
 SawNetDiscoveryResult discover_saw_nets(const Ocel& log) {
-  const auto ocpn = discover_ocpn(log);
+  return discover_saw_nets(log, {});
+}
+
+SawNetDiscoveryResult discover_saw_nets(
+    const Ocel& log, const SawNetDiscoveryOptions& options) {
+  const Ocel projected = project_ocel_labels(
+      log, options.activity_attribute, options.object_type_attribute, "SAW");
+  const auto ocpn = discover_ocpn(projected);
   SawNetDiscoveryResult result;
   for (const auto& type : ocpn.object_types) {
     const auto net_it = ocpn.petri_nets.find(type);
     if (net_it == ocpn.petri_nets.end()) continue;
     result.ot_saw_nets.emplace(
-        type, make_saw_net(type, net_it->second, flatten_type(log, type)));
+        type, make_saw_net(type, net_it->second, flatten_type(projected, type)));
   }
   result.multi_saw_net = merge_saw_nets(
       result.ot_saw_nets, result.multi_place_object_types,
