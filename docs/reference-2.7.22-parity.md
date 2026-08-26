@@ -82,7 +82,7 @@ are reconciled.
 | Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
 | Merging | case relations | **Complete (core)** — the single case-relations variation merges related incoming cases with deterministic timestamp ordering, strict relation validation, and native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Partial** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) now have native/JSON/CLI/server/frontend adapters; SNA and role discovery accept standard or custom activity/resource selectors; broader differential review remains |
-| Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Partial** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, JSON/CLI/server/frontend adapters, and deterministic ordinary-arc single-entry/single-exit reduction for generated process-tree, heuristic, POWL, and BPMN nets are available; extended-arc and structural reduction families remain |
+| Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Partial** — `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, custom activity keys, JSON/CLI/server/frontend adapters, and deterministic single-entry/single-exit reduction for generated process-tree, heuristic, POWL, BPMN, and mixed reset/inhibitor nets are available; conservative series-place fusion, duplicate silent-transition fusion, inert self-loop elimination, extended-arc preservation, and redundant reset cleanup are also covered, while broader structural families remain |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial** — Petri basic/stochastic/extensive, Declare classic, DFG classic/performance, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, independent activity/binding/transition branching caps, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; event rows infer typed attributes with bounded categorical cardinality, use canonical `event:key@value` names, and are rectangular across traces; trace extraction now defaults to trace-based rows and exposes selectable activity/succession representations, categorical cardinality bounds, case identifiers, duration/timing/path/workload/concurrency extras, and epsilon controls through native, JSON, CLI, server, and typed frontend adapters; temporal rows now provide arrival/finish-rate, service/waiting/sojourn, rework, case/resource, and legacy compact projections with explicit feature schemas; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables with shared activity, timestamp, relation, endpoint, independently selectable lifecycle metrics and relation-stream lifecycle paths, deterministic object-specific relation-prefix length/timediff/one-hot activity columns, interaction, and custom attribute option groups, object-type filtering, optional per-object-type interaction counts, and opt-in interaction/descendants/inheritance/cobirth/codeath graph scalar columns for OBJECTS, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; numeric transformer model runtimes and broader OCEL feature parameters remain |
 
@@ -985,15 +985,19 @@ workflow net when the strict conversion succeeds.
 
 Ordinary Petri-net reduction now applies a deterministic fixed point of the
 single-entry and single-exit silent-transition rules to generated process-tree,
-heuristic, POWL, and BPMN nets. A splice is accepted only when the removed
-place has one private producer/consumer boundary; source and sink places and
+heuristic, POWL, BPMN, and mixed reset/inhibitor nets. Conservative series-place
+fusion handles private inputs with multiple producers, while duplicate silent
+transitions, inert silent self-loops, and reset arcs guarded by the same
+inhibitor are simplified when their token effects are provably unchanged.
+Extended arcs that mention a candidate removed place block that local rewrite;
+unrelated extended guards are retained and remapped. Source and sink places and
 places carrying supplied initial/final tokens are retained. Place mappings and
 markings are returned for callers that need to preserve workflow metadata,
 duplicate ordinary-arc multiplicity is retained, malformed nets are left
-unchanged, and nets with reset or inhibitor arcs deliberately await their
-dedicated reduction rules. Focused regressions cover chains, fan-out/fan-in,
-shared-place guards, markings, extended arcs, invalid inputs, and deterministic
-output.
+unchanged, and broader structural rules remain outside this conservative core.
+Focused regressions cover chains, fan-out/fan-in, shared-place guards,
+markings, mixed extended arcs, series fusion, parallel silent transitions,
+self-loops, invalid inputs, and deterministic output.
 
 ## ILP discovery parity evidence
 

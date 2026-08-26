@@ -30,13 +30,15 @@ struct PetriNetReductionResult {
 inline constexpr std::size_t kRemovedPlace =
     std::numeric_limits<std::size_t>::max();
 
-// Applies fixed-point single-entry/single-exit elimination to silent
-// transitions connected only by ordinary arcs.  A single-entry transition is
-// removed when its input place has one producer and no other consumer; its
-// producer is rewired to the former outputs.  The dual single-exit rule
-// rewires the former inputs to the unique consumer of the output place.
-// Source/sink places and places carrying a nonzero supplied marking are
-// protected.  Nets containing reset or inhibitor arcs are returned unchanged.
+// Applies a fixed-point conservative reduction to a workflow net.  The
+// ordinary single-entry/single-exit rules remove private places around silent
+// transitions, while structural rules also fuse safe series places, discard
+// duplicate silent transitions, remove inert silent self-loops, and eliminate
+// reset arcs guarded by the same inhibitor.  Extended arcs on unrelated
+// places are retained and are never rewritten through a removed place; this
+// keeps mixed ordinary/extended nets reducible without changing their token
+// semantics.  Source/sink places and places carrying a nonzero supplied
+// marking are protected.
 [[nodiscard]] PetriNetReductionResult reduce_petri_net(
     const PetriNet& net, const PetriNetReductionOptions& options = {});
 
