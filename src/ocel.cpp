@@ -1014,11 +1014,16 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
 
   struct Rel { std::string event; std::string object; std::size_t order; };
   std::vector<Rel> rels;
+  std::set<std::pair<std::string, std::string>> seen_event_objects;
   for (std::size_t i = 0; i < log.relations.size(); ++i) {
     const auto& relation = log.relations[i];
     const auto event_it = event_order.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_order.end() || type_it == object_type.end()) continue;
+    // Qualifiers do not change the association metrics.  Collapse repeated
+    // rows for one event/object pair before deriving starts, ends, and flows.
+    if (!seen_event_objects.emplace(relation.event_id, relation.object_id).second)
+      continue;
     rels.push_back({relation.event_id, relation.object_id, event_it->second * (log.relations.size() + 1) + i});
   }
   auto add_association = [&](std::map<std::string, OcdfgActivityMetric>& target,
@@ -1028,6 +1033,7 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
     metric.events.push_back(event);
     metric.unique_objects.push_back(object);
     metric.event_objects.emplace_back(event, object);
+    metric.total_objects.emplace_back(event, object);
   };
   for (const auto& relation : rels) {
     const auto act = activity[relation.event];
@@ -1042,6 +1048,8 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
     metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()), metric.unique_objects.end());
     std::sort(metric.event_objects.begin(), metric.event_objects.end());
     metric.event_objects.erase(std::unique(metric.event_objects.begin(), metric.event_objects.end()), metric.event_objects.end());
+    std::sort(metric.total_objects.begin(), metric.total_objects.end());
+    metric.total_objects.erase(std::unique(metric.total_objects.begin(), metric.total_objects.end()), metric.total_objects.end());
   };
   for (auto& [act, metric] : result.activities_indep) normalize_activity(metric);
   for (auto& [type, metrics] : result.activities_ot) for (auto& [act, metric] : metrics) normalize_activity(metric);
@@ -1061,11 +1069,8 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
       edge.event_couples.emplace_back(sequence[i - 1].event, sequence[i].event);
       edge.unique_objects.push_back(object);
       edge.event_objects.emplace_back(sequence[i - 1].event, sequence[i].event, object);
-      if (compute_edges_performance) {
-        const auto from = parse_timestamp(timestamp[sequence[i - 1].event]);
-        const auto to = parse_timestamp(timestamp[sequence[i].event]);
-        if (from && to) edge.performance.push_back(*to - *from);
-      }
+      edge.total_objects.emplace_back(sequence[i - 1].event, sequence[i].event,
+                                      object);
     }
   }
   for (auto& [type, metrics] : result.start_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
@@ -1074,6 +1079,28 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
     std::sort(edge.event_couples.begin(), edge.event_couples.end()); edge.event_couples.erase(std::unique(edge.event_couples.begin(), edge.event_couples.end()), edge.event_couples.end());
     std::sort(edge.unique_objects.begin(), edge.unique_objects.end()); edge.unique_objects.erase(std::unique(edge.unique_objects.begin(), edge.unique_objects.end()), edge.unique_objects.end());
     std::sort(edge.event_objects.begin(), edge.event_objects.end()); edge.event_objects.erase(std::unique(edge.event_objects.begin(), edge.event_objects.end()), edge.event_objects.end());
+    std::sort(edge.total_objects.begin(), edge.total_objects.end()); edge.total_objects.erase(std::unique(edge.total_objects.begin(), edge.total_objects.end()), edge.total_objects.end());
+    edge.performance.clear();
+    edge.performance_event_couples.clear();
+    edge.performance_total_objects.clear();
+    if (compute_edges_performance) {
+      for (const auto& couple : edge.event_couples) {
+        const auto from = parse_timestamp(timestamp[couple.first]);
+        const auto to = parse_timestamp(timestamp[couple.second]);
+        if (from && to) edge.performance_event_couples.push_back(*to - *from);
+      }
+      for (const auto& triple : edge.total_objects) {
+        const auto from = parse_timestamp(timestamp[std::get<0>(triple)]);
+        const auto to = parse_timestamp(timestamp[std::get<1>(triple)]);
+        if (from && to) edge.performance_total_objects.push_back(*to - *from);
+      }
+      // Keep the historic field as the total-object projection.
+      edge.performance = edge.performance_total_objects;
+    }
+    std::sort(edge.performance_event_couples.begin(),
+              edge.performance_event_couples.end());
+    std::sort(edge.performance_total_objects.begin(),
+              edge.performance_total_objects.end());
     std::sort(edge.performance.begin(), edge.performance.end());
   }
   return result;
@@ -1101,6 +1128,18 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
       write_string(out, metric.event_objects[i].first);
       out << ',';
       write_string(out, metric.event_objects[i].second);
+      out << ']';
+    }
+    out << "],\"total_objects\":[";
+    const auto& total_objects = metric.total_objects.empty()
+                                    ? metric.event_objects
+                                    : metric.total_objects;
+    for (std::size_t i = 0; i < total_objects.size(); ++i) {
+      if (i != 0) out << ',';
+      out << '[';
+      write_string(out, total_objects[i].first);
+      out << ',';
+      write_string(out, total_objects[i].second);
       out << ']';
     }
     out << "]}";
@@ -1180,11 +1219,37 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
         write_string(out, std::get<2>(edge.event_objects[i]));
         out << ']';
       }
+      out << "],\"total_objects\":[";
+      const auto& total_objects = edge.total_objects.empty()
+                                      ? edge.event_objects
+                                      : edge.total_objects;
+      for (std::size_t i = 0; i < total_objects.size(); ++i) {
+        if (i != 0) out << ',';
+        out << '[';
+        write_string(out, std::get<0>(total_objects[i]));
+        out << ',';
+        write_string(out, std::get<1>(total_objects[i]));
+        out << ',';
+        write_string(out, std::get<2>(total_objects[i]));
+        out << ']';
+      }
       out << "],\"performance\":[";
       for (std::size_t i = 0; i < edge.performance.size(); ++i) {
         if (i != 0) out << ',';
         out.precision(17);
         out << edge.performance[i];
+      }
+      out << "],\"performance_event_couples\":[";
+      for (std::size_t i = 0; i < edge.performance_event_couples.size(); ++i) {
+        if (i != 0) out << ',';
+        out.precision(17);
+        out << edge.performance_event_couples[i];
+      }
+      out << "],\"performance_total_objects\":[";
+      for (std::size_t i = 0; i < edge.performance_total_objects.size(); ++i) {
+        if (i != 0) out << ',';
+        out.precision(17);
+        out << edge.performance_total_objects[i];
       }
       out << "]}";
     }
@@ -1385,12 +1450,15 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
       out << ']';
     }
     out << "],\"total_objects\":[";
-    for (std::size_t i = 0; i < metric.event_objects.size(); ++i) {
+    const auto& total_objects = metric.total_objects.empty()
+                                    ? metric.event_objects
+                                    : metric.total_objects;
+    for (std::size_t i = 0; i < total_objects.size(); ++i) {
       if (i != 0) out << ',';
       out << '[';
-      write_string(out, metric.event_objects[i].first);
+      write_string(out, total_objects[i].first);
       out << ',';
-      write_string(out, metric.event_objects[i].second);
+      write_string(out, total_objects[i].second);
       out << ']';
     }
     out << "]}";
@@ -1476,14 +1544,17 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
         out << ']';
       }
       out << "],\"total_objects\":[";
-      for (std::size_t i = 0; i < edge.event_objects.size(); ++i) {
+      const auto& total_objects = edge.total_objects.empty()
+                                      ? edge.event_objects
+                                      : edge.total_objects;
+      for (std::size_t i = 0; i < total_objects.size(); ++i) {
         if (i != 0) out << ',';
         out << '[';
-        write_string(out, std::get<0>(edge.event_objects[i]));
+        write_string(out, std::get<0>(total_objects[i]));
         out << ',';
-        write_string(out, std::get<1>(edge.event_objects[i]));
+        write_string(out, std::get<1>(total_objects[i]));
         out << ',';
-        write_string(out, std::get<2>(edge.event_objects[i]));
+        write_string(out, std::get<2>(total_objects[i]));
         out << ']';
       }
       out << ']';
@@ -1492,6 +1563,18 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
         if (i != 0) out << ',';
         out.precision(17);
         out << edge.performance[i];
+      }
+      out << "],\"performance_event_couples\":[";
+      for (std::size_t i = 0; i < edge.performance_event_couples.size(); ++i) {
+        if (i != 0) out << ',';
+        out.precision(17);
+        out << edge.performance_event_couples[i];
+      }
+      out << "],\"performance_total_objects\":[";
+      for (std::size_t i = 0; i < edge.performance_total_objects.size(); ++i) {
+        if (i != 0) out << ',';
+        out.precision(17);
+        out << edge.performance_total_objects[i];
       }
       out << "]}";
     }

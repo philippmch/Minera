@@ -175,8 +175,55 @@ int main() {
   assert(ocdfg_json.find("start_activities") != std::string::npos);
   assert(ocdfg_json.find("end_activities") != std::string::npos);
   assert(ocdfg_json.find("event_objects") != std::string::npos);
+  assert(ocdfg_json.find("total_objects") != std::string::npos);
+  assert(ocdfg_json.find("performance_event_couples") != std::string::npos);
+  assert(ocdfg_json.find("performance_total_objects") != std::string::npos);
   assert(ocdfg_json.find("performance_computed") != std::string::npos);
   assert(!minera::discover_ocdfg_classic(log, false).performance_computed);
+
+  // Associations are keyed by event/object identity, not relation qualifier.
+  // The event-couple performance projection is unique per pair, while the
+  // total-object projection retains one sample for each participating object.
+  minera::Ocel metric_log;
+  metric_log.events = {
+      {"e1", "A", "2024-01-01T00:00:00Z", {}},
+      {"e2", "B", "2024-01-01T01:00:00Z", {}},
+      {"e3", "C", "2024-01-01T03:00:00Z", {}},
+  };
+  metric_log.objects = {
+      {"o1", "item", {}}, {"o2", "item", {}}, {"o3", "other", {}},
+  };
+  metric_log.relations = {
+      {"e1", "o1", "source"}, {"e1", "o2", "source"},
+      {"e1", "o2", "duplicate-qualifier"}, {"e2", "o1", "target"},
+      {"e2", "o2", "target"}, {"e3", "o2", "target"},
+  };
+  const auto metric_graph = minera::discover_ocdfg_classic(metric_log, true);
+  const auto& activity_metric = metric_graph.activities_indep.at("A");
+  assert(activity_metric.events == std::vector<std::string>({"e1"}));
+  assert(activity_metric.unique_objects ==
+         std::vector<std::string>({"o1", "o2"}));
+  assert(activity_metric.event_objects == activity_metric.total_objects);
+  const auto& metric_edge = metric_graph.edges.at("item").at({"A", "B"});
+  const std::vector<std::pair<std::string, std::string>> expected_metric_couples{
+      {"e1", "e2"}};
+  assert(metric_edge.event_couples == expected_metric_couples);
+  assert(metric_edge.event_objects == metric_edge.total_objects);
+  assert(metric_edge.total_objects.size() == 2);
+  assert(metric_edge.performance_event_couples.size() == 1);
+  assert(metric_edge.performance_total_objects.size() == 2);
+  assert(metric_edge.performance == metric_edge.performance_total_objects);
+  assert(metric_edge.performance_event_couples.front() == 3600.0);
+  const auto metric_without_performance =
+      minera::discover_ocdfg_classic(metric_log, false);
+  const auto& no_perf_edge =
+      metric_without_performance.edges.at("item").at({"A", "B"});
+  assert(no_perf_edge.performance.empty() &&
+         no_perf_edge.performance_event_couples.empty() &&
+         no_perf_edge.performance_total_objects.empty());
+  assert(minera::serialize_ocdfg_json(metric_graph).find(
+             "\"total_objects\":[[\"e1\",\"o1\"]") !=
+         std::string::npos);
 
   const minera::EtotGraph etot_norm{
       {"Create", "Ship"}, {"order"}, {{"Create", "order", 10}, {"Ship", "order", 5}}};

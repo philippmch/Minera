@@ -353,10 +353,30 @@ std::string serialize_edges(const OcelEdgeAssociations& associations) {
         json_string(out, std::get<1>(metric.event_objects[i])); out << ',';
         json_string(out, std::get<2>(metric.event_objects[i])); out << ']';
       }
+      out << "],\"total_objects\":[";
+      const auto& total_objects = metric.total_objects.empty()
+                                      ? metric.event_objects
+                                      : metric.total_objects;
+      for (std::size_t i = 0; i < total_objects.size(); ++i) {
+        if (i) out << ',';
+        out << '['; json_string(out, std::get<0>(total_objects[i])); out << ',';
+        json_string(out, std::get<1>(total_objects[i])); out << ',';
+        json_string(out, std::get<2>(total_objects[i])); out << ']';
+      }
       out << "],\"performance\":[";
       for (std::size_t i = 0; i < metric.performance.size(); ++i) {
         if (i) out << ',';
         out << metric.performance[i];
+      }
+      out << "],\"performance_event_couples\":[";
+      for (std::size_t i = 0; i < metric.performance_event_couples.size(); ++i) {
+        if (i) out << ',';
+        out << metric.performance_event_couples[i];
+      }
+      out << "],\"performance_total_objects\":[";
+      for (std::size_t i = 0; i < metric.performance_total_objects.size(); ++i) {
+        if (i) out << ',';
+        out << metric.performance_total_objects[i];
       }
       out << "]}";
     }
@@ -455,6 +475,9 @@ OcelEdgeAssociations edge_associations(
   std::map<std::string, std::set<std::string>> object_events;
   for (const auto& relation : log.relations)
     object_events[relation.object_id].insert(relation.event_id);
+  std::unordered_map<std::string, const OcelEvent*> event_by_id;
+  event_by_id.reserve(log.events.size());
+  for (const auto& event : log.events) event_by_id.emplace(event.id, &event);
 
   OcelEdgeAssociations result;
   // Event table order is the canonical source order.  A set above removes
@@ -474,18 +497,7 @@ OcelEdgeAssociations edge_associations(
       metric.event_couples.emplace_back(source.id, target.id);
       metric.unique_objects.push_back(object_id);
       metric.event_objects.emplace_back(source.id, target.id, object_id);
-      const auto from = options.use_business_hours
-                            ? local_wall_instant(source.timestamp)
-                            : parse_timestamp(source.timestamp);
-      const auto to = options.use_business_hours
-                          ? local_wall_instant(target.timestamp)
-                          : parse_timestamp(target.timestamp);
-      if (from && to) {
-        metric.performance.push_back(
-            options.use_business_hours
-                ? business_elapsed(*from, *to, business_slots)
-                : *to - *from);
-      }
+      metric.total_objects.emplace_back(source.id, target.id, object_id);
     }
   }
   for (auto& [type, metrics] : result) {
@@ -504,6 +516,46 @@ OcelEdgeAssociations edge_associations(
       metric.event_objects.erase(
           std::unique(metric.event_objects.begin(), metric.event_objects.end()),
           metric.event_objects.end());
+      std::sort(metric.total_objects.begin(), metric.total_objects.end());
+      metric.total_objects.erase(
+          std::unique(metric.total_objects.begin(), metric.total_objects.end()),
+          metric.total_objects.end());
+      metric.performance.clear();
+      metric.performance_event_couples.clear();
+      metric.performance_total_objects.clear();
+      const auto duration = [&](const std::string& source_id,
+                                const std::string& target_id)
+          -> std::optional<double> {
+        const auto source_it = event_by_id.find(source_id);
+        const auto target_it = event_by_id.find(target_id);
+        if (source_it == event_by_id.end() || target_it == event_by_id.end())
+          return std::nullopt;
+        const auto from = options.use_business_hours
+                              ? local_wall_instant(source_it->second->timestamp)
+                              : parse_timestamp(source_it->second->timestamp);
+        const auto to = options.use_business_hours
+                            ? local_wall_instant(target_it->second->timestamp)
+                            : parse_timestamp(target_it->second->timestamp);
+        if (!from || !to) return std::nullopt;
+        return options.use_business_hours
+                   ? business_elapsed(*from, *to, business_slots)
+                   : *to - *from;
+      };
+      for (const auto& couple : metric.event_couples) {
+        if (const auto value = duration(couple.first, couple.second))
+          metric.performance_event_couples.push_back(*value);
+      }
+      for (const auto& triple : metric.total_objects) {
+        if (const auto value = duration(std::get<0>(triple),
+                                        std::get<1>(triple)))
+          metric.performance_total_objects.push_back(*value);
+      }
+      // Keep the historic field as the total-object projection.
+      metric.performance = metric.performance_total_objects;
+      std::sort(metric.performance_event_couples.begin(),
+                metric.performance_event_couples.end());
+      std::sort(metric.performance_total_objects.begin(),
+                metric.performance_total_objects.end());
       std::sort(metric.performance.begin(), metric.performance.end());
     }
   }

@@ -127,14 +127,27 @@ OtgGraph discover_otg_classic(const Ocel& log);
 struct OcdfgActivityMetric {
   std::vector<std::string> events;
   std::vector<std::string> unique_objects;
+  // Legacy association spelling retained for existing consumers.
   std::vector<std::pair<std::string, std::string>> event_objects;
+  // Explicit association pairs used by the object-centric metric contract.
+  std::vector<std::pair<std::string, std::string>> total_objects;
 };
 
 struct OcdfgEdgeMetric {
   std::vector<std::pair<std::string, std::string>> event_couples;
   std::vector<std::string> unique_objects;
+  // Legacy association spelling retained for existing consumers.
   std::vector<std::tuple<std::string, std::string, std::string>> event_objects;
+  // Explicit event-couple/object triples used by the object-centric metric
+  // contract.
+  std::vector<std::tuple<std::string, std::string, std::string>> total_objects;
+  // Legacy aggregate performance samples retained for compatibility.
   std::vector<double> performance;
+  // Performance is exposed separately for event couples and total-object
+  // triples.  The classic implementation currently yields the same samples
+  // for both projections, but keeping them distinct preserves the API shape.
+  std::vector<double> performance_event_couples;
+  std::vector<double> performance_total_objects;
 };
 
 struct OcdfgGraph {

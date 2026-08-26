@@ -555,9 +555,9 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
   boundary.insert(ends.begin(), ends.end());
 
   // The do group starts with all boundary activities. Remove those nodes and
-  // their incident edges before finding the weak components that can become
-  // redo groups.
-  std::vector<std::set<std::string>> groups{boundary};
+  // their incident edges before finding weakly connected redo components.
+  std::vector<std::set<std::string>> groups;
+  groups.push_back(boundary);
   std::set<std::string> remaining;
   for (const auto& activity : relations.acts)
     if (boundary.count(activity) == 0) remaining.insert(activity);
@@ -588,8 +588,8 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
       if (groups[index].count(activity) != 0) return index;
     return groups.size();
   };
-  const auto merge_edge_groups_into_do = [&](const std::string& left,
-                                             const std::string& right) {
+  const auto merge_groups_into_do = [&](const std::string& left,
+                                        const std::string& right) {
     const auto left_index = group_index(left);
     const auto right_index = group_index(right);
     if (left_index == groups.size() || right_index == groups.size() ||
@@ -604,14 +604,14 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     groups.insert(groups.begin(), std::move(merged));
   };
 
-  // A start that is not also an end, and an end that is not also a start,
-  // expose adjacent nodes that must be absorbed into the do group.
+  // A non-terminal start and a non-initial end expose adjacent components that
+  // must be absorbed into the do group before completeness is checked.
   for (const auto& start : starts) {
     if (ends.count(start) != 0) continue;
     for (const auto& [edge, count] : relations.dfg) {
       (void)count;
       if (edge.first == start)
-        merge_edge_groups_into_do(edge.first, edge.second);
+        merge_groups_into_do(edge.first, edge.second);
     }
   }
   for (const auto& end : ends) {
@@ -619,12 +619,12 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     for (const auto& [edge, count] : relations.dfg) {
       (void)count;
       if (edge.second == end)
-        merge_edge_groups_into_do(edge.first, edge.second);
+        merge_groups_into_do(edge.first, edge.second);
     }
   }
 
-  // A component with a return edge to one possible start must return to every
-  // possible start. Otherwise it is merged into do.
+  // A redo component with a return edge to one possible start must return to
+  // every possible start. Otherwise it is merged into do.
   for (std::size_t index = 1; index < groups.size();) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
@@ -653,7 +653,8 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
   }
 
-  // Apply the dual completeness rule at the end boundary.
+  // Apply the dual completeness rule at the end boundary: a component reached
+  // from one possible end must be reached from every possible end.
   for (std::size_t index = 1; index < groups.size();) {
     bool merge = false;
     for (const auto& activity : groups[index]) {
@@ -689,15 +690,15 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
   groups = std::move(nonempty_groups);
   if (groups.size() <= 1) return std::nullopt;
 
-  std::set<std::string> redo;
-  for (std::size_t index = 1; index < groups.size(); ++index)
-    redo.insert(groups[index].begin(), groups[index].end());
-  if (redo.empty()) return std::nullopt;
+  // The loop cut has exactly one do group and one merged redo group. Project
+  // by alternating maximal slices, retaining empty trailing do slices.
   const std::set<std::string> do_activities = groups.front();
+  std::set<std::string> redo_activities;
+  for (std::size_t index = 1; index < groups.size(); ++index) {
+    redo_activities.insert(groups[index].begin(), groups[index].end());
+  }
+  if (redo_activities.empty()) return std::nullopt;
 
-  // Project by alternating maximal do/redo slices. Whole-trace projection
-  // loses repeated do executions and can turn ordered redo behavior into a
-  // flat activity choice.
   UVCL do_log;
   UVCL redo_log;
   for (const auto& [sequence, count] : log) {
@@ -717,7 +718,7 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
       if (do_activities.count(activity) != 0) {
         flush_redo();
         do_slice.push_back(activity);
-      } else if (redo.count(activity) != 0) {
+      } else if (redo_activities.count(activity) != 0) {
         flush_do();
         redo_slice.push_back(activity);
       } else {
