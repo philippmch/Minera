@@ -844,14 +844,17 @@ const OcelValue* find_attribute(const std::vector<OcelAttribute>& attributes,
 
 std::string selector_value(const OcelValue& value, std::string_view selector,
                            std::string_view record_kind,
-                           std::string_view record_id) {
+                           std::string_view record_id,
+                           std::string_view family) {
   if (std::holds_alternative<std::nullptr_t>(value))
-    throw std::invalid_argument("OCPN " + std::string(record_kind) +
+    throw std::invalid_argument(std::string(family) + " " +
+                                std::string(record_kind) +
                                 " selector '" + std::string(selector) +
                                 "' is null for " + std::string(record_id));
   if (const auto* text = std::get_if<std::string>(&value)) {
     if (text->empty())
-      throw std::invalid_argument("OCPN " + std::string(record_kind) +
+      throw std::invalid_argument(std::string(family) + " " +
+                                  std::string(record_kind) +
                                   " selector '" + std::string(selector) +
                                   "' is empty for " + std::string(record_id));
     return *text;
@@ -862,7 +865,8 @@ std::string selector_value(const OcelValue& value, std::string_view selector,
     return std::to_string(*integer);
   const auto number = std::get<double>(value);
   if (!std::isfinite(number))
-    throw std::invalid_argument("OCPN " + std::string(record_kind) +
+    throw std::invalid_argument(std::string(family) + " " +
+                                std::string(record_kind) +
                                 " selector '" + std::string(selector) +
                                 "' is non-finite for " +
                                 std::string(record_id));
@@ -873,42 +877,47 @@ std::string selector_value(const OcelValue& value, std::string_view selector,
 }
 
 std::string selected_event_activity(const OcelEvent& event,
-                                    std::string_view selector) {
+                                    std::string_view selector,
+                                    std::string_view family) {
   if (selector.empty() || selector == "activity" ||
       selector == "concept:name" || selector == "ocel:activity")
     return event.activity;
   const auto* value = find_attribute(event.attributes, selector);
   if (value == nullptr)
-    throw std::invalid_argument("OCPN event activity attribute '" +
+    throw std::invalid_argument(std::string(family) +
+                                " event activity attribute '" +
                                 std::string(selector) + "' is missing for " +
                                 event.id);
-  return selector_value(*value, selector, "event activity", event.id);
+  return selector_value(*value, selector, "event activity", event.id, family);
 }
 
 std::string selected_object_type(const OcelObject& object,
-                                 std::string_view selector) {
+                                 std::string_view selector,
+                                 std::string_view family) {
   if (selector.empty() || selector == "type" || selector == "object_type" ||
       selector == "ocel:type")
     return object.type;
   const auto* value = find_attribute(object.attributes, selector);
   if (value == nullptr)
-    throw std::invalid_argument("OCPN object type attribute '" +
+    throw std::invalid_argument(std::string(family) +
+                                " object type attribute '" +
                                 std::string(selector) + "' is missing for " +
                                 object.id);
-  return selector_value(*value, selector, "object type", object.id);
+  return selector_value(*value, selector, "object type", object.id, family);
 }
 
 }  // namespace
 
-Ocel project_ocpn_labels(const Ocel& log,
-                         const OcpnDiscoveryOptions& options) {
+Ocel project_ocel_labels(const Ocel& log, std::string_view activity_attribute,
+                         std::string_view object_type_attribute,
+                         std::string_view family) {
   Ocel projected = log;
   for (auto& event : projected.events)
-    event.activity = selected_event_activity(event, options.activity_attribute);
+    event.activity = selected_event_activity(event, activity_attribute, family);
 
   std::map<std::string, std::string> object_types;
   for (auto& object : projected.objects) {
-    object.type = selected_object_type(object, options.object_type_attribute);
+    object.type = selected_object_type(object, object_type_attribute, family);
     object_types[object.id] = object.type;
   }
   for (auto& change : projected.object_changes) {
@@ -916,6 +925,12 @@ Ocel project_ocpn_labels(const Ocel& log,
     if (it != object_types.end()) change.object_type = it->second;
   }
   return projected;
+}
+
+Ocel project_ocpn_labels(const Ocel& log,
+                         const OcpnDiscoveryOptions& options) {
+  return project_ocel_labels(log, options.activity_attribute,
+                             options.object_type_attribute, "OCPN");
 }
 
 Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
@@ -1292,30 +1307,39 @@ OtgGraph parse_otg_json(std::string_view json, const OcelJsonLimits& limits) {
 }
 
 OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performance) {
+  OcdfgDiscoveryOptions options;
+  options.compute_edges_performance = compute_edges_performance;
+  return discover_ocdfg_classic_with_options(log, options);
+}
+
+OcdfgGraph discover_ocdfg_classic_with_options(
+    const Ocel& log, const OcdfgDiscoveryOptions& options) {
+  const Ocel projected = project_ocel_labels(
+      log, options.activity_attribute, options.object_type_attribute, "OCDFG");
   OcdfgGraph result;
-  result.performance_computed = compute_edges_performance;
+  result.performance_computed = options.compute_edges_performance;
   std::map<std::string, std::string> activity;
   std::map<std::string, std::string> timestamp;
   std::map<std::string, std::size_t> event_order;
-  for (std::size_t i = 0; i < log.events.size(); ++i) {
-    activity[log.events[i].id] = log.events[i].activity;
-    timestamp[log.events[i].id] = log.events[i].timestamp;
-    event_order[log.events[i].id] = i;
-    result.activities.push_back(log.events[i].activity);
+  for (std::size_t i = 0; i < projected.events.size(); ++i) {
+    activity[projected.events[i].id] = projected.events[i].activity;
+    timestamp[projected.events[i].id] = projected.events[i].timestamp;
+    event_order[projected.events[i].id] = i;
+    result.activities.push_back(projected.events[i].activity);
   }
   std::sort(result.activities.begin(), result.activities.end());
   result.activities.erase(std::unique(result.activities.begin(), result.activities.end()), result.activities.end());
   std::map<std::string, std::string> object_type;
-  for (const auto& object : log.objects) object_type[object.id] = object.type;
-  for (const auto& object : log.objects) result.object_types.push_back(object.type);
+  for (const auto& object : projected.objects) object_type[object.id] = object.type;
+  for (const auto& object : projected.objects) result.object_types.push_back(object.type);
   std::sort(result.object_types.begin(), result.object_types.end());
   result.object_types.erase(std::unique(result.object_types.begin(), result.object_types.end()), result.object_types.end());
 
   struct Rel { std::string event; std::string object; std::size_t order; };
   std::vector<Rel> rels;
   std::set<std::pair<std::string, std::string>> seen_event_objects;
-  for (std::size_t i = 0; i < log.relations.size(); ++i) {
-    const auto& relation = log.relations[i];
+  for (std::size_t i = 0; i < projected.relations.size(); ++i) {
+    const auto& relation = projected.relations[i];
     const auto event_it = event_order.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_order.end() || type_it == object_type.end()) continue;
@@ -1323,7 +1347,7 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
     // rows for one event/object pair before deriving starts, ends, and flows.
     if (!seen_event_objects.emplace(relation.event_id, relation.object_id).second)
       continue;
-    rels.push_back({relation.event_id, relation.object_id, event_it->second * (log.relations.size() + 1) + i});
+    rels.push_back({relation.event_id, relation.object_id, event_it->second * (projected.relations.size() + 1) + i});
   }
   auto add_association = [&](std::map<std::string, OcdfgActivityMetric>& target,
                              const std::string& act, const std::string& event,
@@ -1382,7 +1406,7 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
     edge.performance.clear();
     edge.performance_event_couples.clear();
     edge.performance_total_objects.clear();
-    if (compute_edges_performance) {
+    if (options.compute_edges_performance) {
       for (const auto& couple : edge.event_couples) {
         const auto from = parse_timestamp(timestamp[couple.first]);
         const auto to = parse_timestamp(timestamp[couple.second]);

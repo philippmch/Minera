@@ -1335,7 +1335,15 @@ describe("OCEL API", () => {
       variant: "ocpn", ocpn_activity_attribute: "  event_kind ",
       ocpn_object_type_attribute: "object_class",
     })).toBe("variant=ocpn&ocpn_activity_attribute=event_kind&ocpn_object_type_attribute=object_class");
+    expect(ocelDiscoveryQuery({
+      variant: "ocdfg", compute_edges_performance: false,
+      ocdfg_activity_attribute: " event_kind ",
+      ocdfg_object_type_attribute: " object_class ",
+      saw_activity_attribute: "saw_kind", saw_object_type_attribute: "saw_class",
+    })).toBe("variant=ocdfg&compute_edges_performance=false&ocdfg_activity_attribute=event_kind&ocdfg_object_type_attribute=object_class&saw_activity_attribute=saw_kind&saw_object_type_attribute=saw_class");
     expect(() => ocelDiscoveryQuery({ ocpn_activity_attribute: "  " }))
+      .toThrow(/must not be empty/);
+    expect(() => ocelDiscoveryQuery({ ocdfg_object_type_attribute: "  " }))
       .toThrow(/must not be empty/);
     expect(ocelDiscoveryQuery({ variant: "saw" }))
       .toBe("variant=saw");

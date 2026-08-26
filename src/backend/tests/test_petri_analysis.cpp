@@ -324,6 +324,8 @@ void weighted_invariant_contract() {
   assert(woflan_result.s_components.has_value() &&
          woflan_result.s_components->empty());
   assert(!woflan_result.left.has_value() || !*woflan_result.left);
+  assert(!woflan_result.coverability_markings.empty());
+  assert(!woflan_result.short_circuit_reachability_markings.empty());
 
   // Structural S-component failure is an early Woflan witness.  The
   // return-asap form must not spend the remaining budget on behavioral
@@ -334,6 +336,8 @@ void weighted_invariant_contract() {
   assert(early.status == SoundnessStatus::UNSOUND && early.computed &&
          early.returned_asap);
   assert(!early.left.has_value());
+  assert(early.structural_node_labels.empty());
+  assert(!early.handled_pairs.has_value());
   assert(early.reachability_markings.empty());
   assert(early.coverability_markings.empty());
   assert(early.restricted_coverability_markings.empty());
@@ -342,6 +346,39 @@ void weighted_invariant_contract() {
                        return message.find("S-component coverage") !=
                               std::string::npos;
                      }));
+
+  // A multi-step counterbalanced net makes the distinction observable: its
+  // behavioral projections contain a complete path, but the structural
+  // uniform-invariant test still has no certificate.  The early option must
+  // stop at that structural witness without constructing later artifacts.
+  PetriNet scaled_chain;
+  scaled_chain.set_activities({"A", "B"});
+  const auto scaled_source = scaled_chain.add_place();
+  const auto scaled_middle = scaled_chain.add_place();
+  const auto scaled_sink = scaled_chain.add_place();
+  scaled_chain.set_source(scaled_source);
+  scaled_chain.set_sink(scaled_sink);
+  scaled_chain.add_transition(0, {scaled_source},
+                              {scaled_middle, scaled_middle});
+  scaled_chain.add_transition(1, {scaled_middle, scaled_middle},
+                              {scaled_sink});
+  SoundnessOptions default_woflan = woflan;
+  default_woflan.return_asap_when_unsound = false;
+  const auto scaled_default = analyze_soundness(scaled_chain, default_woflan);
+  assert(!scaled_default.returned_asap);
+  assert(!scaled_default.reachability_markings.empty());
+  assert(!scaled_default.coverability_markings.empty());
+  const auto scaled_early = analyze_soundness(scaled_chain, woflan);
+  assert(scaled_early.status == SoundnessStatus::UNSOUND &&
+         scaled_early.returned_asap && scaled_early.computed);
+  assert(scaled_early.s_components.has_value() &&
+         scaled_early.s_components->empty());
+  assert(!scaled_early.uncovered_places_s_component.empty());
+  assert(scaled_early.structural_node_labels.empty());
+  assert(!scaled_early.handled_pairs.has_value());
+  assert(scaled_early.reachability_markings.empty());
+  assert(scaled_early.coverability_markings.empty());
+  assert(scaled_early.restricted_coverability_markings.empty());
 }
 
 void uniform_invariant_combination() {

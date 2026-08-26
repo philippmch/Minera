@@ -1694,6 +1694,31 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     return result;
   }
   if (!validation_error.empty()) throw std::invalid_argument(validation_error);
+
+  // The structural Woflan pipeline stops at the first conclusive S-component
+  // failure when the caller requests an early result.  Keep this decision
+  // ahead of the remaining structural projections as well as the behavioral
+  // searches; those projections belong to later Woflan stages.
+  if (options.variant == SoundnessVariant::kWoflan &&
+      result.s_components.has_value() &&
+      !result.uniform_invariant_search_exhausted &&
+      !result.uncovered_places_s_component.empty() &&
+      options.return_asap_when_unsound) {
+    result.status = SoundnessStatus::UNSOUND;
+    result.computed = true;
+    result.returned_asap = true;
+    result.error = "S-component coverage is missing for one or more places";
+    if (options.diagnostics) {
+      result.diagnostic_messages.push_back(result.error);
+      if (!result.uncovered_places.empty())
+        result.diagnostic_messages.push_back(
+            "positive place-invariant coverage is missing for one or more places");
+      if (!result.uncovered_places_uniform.empty())
+        result.diagnostic_messages.push_back(
+            "uniform invariant coverage is missing for one or more places");
+    }
+    return result;
+  }
   result.structural_node_labels = structural_node_labels(*structural_net);
   result.handled_pairs = structural_pair_diagnostics(*structural_net);
   if (options.variant == SoundnessVariant::kWoflan &&
@@ -1704,24 +1729,6 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       // with behavioral diagnostics.
     } else if (result.uncovered_places_s_component.empty()) {
       result.left = true;
-    } else if (options.return_asap_when_unsound) {
-      // Missing S-component coverage is a structural unsoundness witness.
-      // The early-return contract stops before constructing behavioral graph
-      // projections, while retaining the structural evidence above.
-      result.status = SoundnessStatus::UNSOUND;
-      result.computed = true;
-      result.returned_asap = true;
-      result.error = "S-component coverage is missing for one or more places";
-      if (options.diagnostics) {
-        result.diagnostic_messages.push_back(result.error);
-        if (!result.uncovered_places.empty())
-          result.diagnostic_messages.push_back(
-              "positive place-invariant coverage is missing for one or more places");
-        if (!result.uncovered_places_uniform.empty())
-          result.diagnostic_messages.push_back(
-              "uniform invariant coverage is missing for one or more places");
-      }
-      return result;
     } else if (!options.return_asap_when_unsound) {
       // The structural pair stage is the next Woflan decision point when
       // invariant coverage is incomplete.  A non-empty diagnostic set keeps

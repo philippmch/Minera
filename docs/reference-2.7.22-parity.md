@@ -302,7 +302,11 @@ attribute selectors. Scalar string, boolean, integer, and finite floating-point
 values are rendered deterministically, missing or null selectors are rejected,
 and the projected labels flow through annotated and unannotated OCPN models,
 causal-net discovery, diagnostics, CLI, local-server, and frontend playout
-requests without changing event/object identifiers or relations.
+requests without changing event/object identifiers or relations. OCDFG and SAW
+discovery expose the same selector contract: OCDFG applies projected labels to
+activity, start/end, flow, and performance metrics, while SAW applies them to
+per-type nets, merged-net decorations, and transition-weight projections.
+Their existing performance toggle and no-selector overloads remain compatible.
 
 Link-analysis evidence: the classic relation join is available as
 `discover_link_analysis` over event logs and supports first-class or generic

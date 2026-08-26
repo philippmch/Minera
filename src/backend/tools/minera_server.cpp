@@ -1380,7 +1380,9 @@ void handle_ocel_discovery(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "variant", "compute_edges_performance", "ocpn_annotation",
         "diagnostics_with_token_based_replay", "ocpn_activity_attribute",
-        "ocpn_object_type_attribute"};
+        "ocpn_object_type_attribute", "ocdfg_activity_attribute",
+        "ocdfg_object_type_attribute", "saw_activity_attribute",
+        "saw_object_type_attribute"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1435,12 +1437,43 @@ void handle_ocel_discovery(const httplib::Request& request,
       payload = minera::serialize_ocpn_json(
           minera::discover_ocpn(log, discovery));
     } else if (variant == "saw") {
-      payload = minera::saw_nets_json(minera::discover_saw_nets(log));
+      minera::SawNetDiscoveryOptions options;
+      if (request.has_param("saw_activity_attribute")) {
+        options.activity_attribute =
+            request.get_param_value("saw_activity_attribute");
+        if (options.activity_attribute.empty())
+          throw std::invalid_argument(
+              "saw_activity_attribute expects a non-empty value");
+      }
+      if (request.has_param("saw_object_type_attribute")) {
+        options.object_type_attribute =
+            request.get_param_value("saw_object_type_attribute");
+        if (options.object_type_attribute.empty())
+          throw std::invalid_argument(
+              "saw_object_type_attribute expects a non-empty value");
+      }
+      payload = minera::saw_nets_json(
+          minera::discover_saw_nets(log, options));
     } else {
-      const bool performance =
+      minera::OcdfgDiscoveryOptions options;
+      options.compute_edges_performance =
           ocel_query_bool(request, "compute_edges_performance", true);
+      if (request.has_param("ocdfg_activity_attribute")) {
+        options.activity_attribute =
+            request.get_param_value("ocdfg_activity_attribute");
+        if (options.activity_attribute.empty())
+          throw std::invalid_argument(
+              "ocdfg_activity_attribute expects a non-empty value");
+      }
+      if (request.has_param("ocdfg_object_type_attribute")) {
+        options.object_type_attribute =
+            request.get_param_value("ocdfg_object_type_attribute");
+        if (options.object_type_attribute.empty())
+          throw std::invalid_argument(
+              "ocdfg_object_type_attribute expects a non-empty value");
+      }
       payload = minera::serialize_ocdfg_json(
-          minera::discover_ocdfg_classic(log, performance));
+          minera::discover_ocdfg_classic_with_options(log, options));
     }
     response.set_content(ocel_discovery_response(variant, std::move(payload)),
                          "application/json");

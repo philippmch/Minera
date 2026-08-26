@@ -38,11 +38,20 @@ struct SawNetDiscoveryResult {
   std::map<std::string, std::string> multi_arc_object_types;
 };
 
+struct SawNetDiscoveryOptions {
+  // Optional selectors for the activity and object-type labels used by the
+  // flattened discovery projection. Empty selectors use canonical fields.
+  std::string activity_attribute;
+  std::string object_type_attribute;
+};
+
 // Discovers a classic stochastic-arc-weight net for every object type and a
 // merged net in which visible transitions with the same activity are shared.
 // Each per-type model is induced from that type's flattened object cases and
 // weighted by clean token-replay firing multiplicities.
 [[nodiscard]] SawNetDiscoveryResult discover_saw_nets(const Ocel& log);
+[[nodiscard]] SawNetDiscoveryResult discover_saw_nets(
+    const Ocel& log, const SawNetDiscoveryOptions& options);
 
 [[nodiscard]] std::string saw_nets_json(const SawNetDiscoveryResult& result);
 
