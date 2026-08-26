@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "ocpn_projection.hpp"
 
 namespace minera {
 namespace {
@@ -811,24 +812,25 @@ OcCausalNet discover_marker_model(const Ocel& log,
                                   const OcpnDiscoveryOptions& options) {
   OcCausalNet result;
   result.workflow_projection = discover_ocpn(log, options);
+  const Ocel projected = project_ocpn_labels(log, options);
   result.object_types = result.workflow_projection.object_types;
   std::map<std::string, std::vector<std::pair<std::string, std::string>>> by_object;
   std::map<std::string, std::string> object_types;
-  for (const auto& object : log.objects) {
+  for (const auto& object : projected.objects) {
     object_types[object.id] = object.type;
     by_object[object.id] = {};
   }
   std::map<std::string, const OcelEvent*> event_by_id;
-  for (const auto& event : log.events) event_by_id[event.id] = &event;
+  for (const auto& event : projected.events) event_by_id[event.id] = &event;
   std::map<std::string, std::vector<std::string>> event_objects;
-  for (const auto& relation : log.relations)
+  for (const auto& relation : projected.relations)
     if (event_by_id.contains(relation.event_id) && object_types.contains(relation.object_id))
       event_objects[relation.event_id].push_back(relation.object_id);
   for (auto& [event_id, objects] : event_objects) {
     std::sort(objects.begin(), objects.end());
     objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
   }
-  for (const auto& event : log.events) {
+  for (const auto& event : projected.events) {
     for (const auto& object_id : event_objects[event.id])
       by_object[object_id].push_back({event.id, event.activity});
   }

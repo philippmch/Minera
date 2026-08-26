@@ -6,6 +6,7 @@
 #include <string>
 
 #include "minera/conformance.hpp"
+#include "minera/oc_causal_net.hpp"
 
 int main() {
   const std::string input =
@@ -405,6 +406,74 @@ int main() {
          ocpn_plain.tbr_results.at("item").enabled);
   assert(minera::serialize_ocpn_json(ocpn_plain).find("\"annotations\":null") !=
          std::string::npos);
+
+  // OCPN discovery can project labels from typed event/object attributes while
+  // retaining the canonical IDs and relation graph. The source fields are
+  // deliberately different so the selector, rather than fallback behavior,
+  // determines every model family label.
+  auto selected_log = log;
+  selected_log.events[0].activity = "legacy-create";
+  selected_log.events[0].attributes.push_back(
+      {"selected_activity", std::string("Assemble")});
+  selected_log.events[1].activity = "legacy-ship";
+  selected_log.events[1].attributes.push_back(
+      {"selected_activity", std::string("Deliver")});
+  selected_log.objects[0].type = "legacy-order";
+  selected_log.objects[0].attributes.push_back(
+      {"selected_type", std::string("order-main")});
+  selected_log.objects[1].type = "legacy-item";
+  selected_log.objects[1].attributes.push_back(
+      {"selected_type", std::string("item-main")});
+  minera::OcpnDiscoveryOptions selected_options;
+  selected_options.activity_attribute = "selected_activity";
+  selected_options.object_type_attribute = "selected_type";
+  const auto selected_ocpn =
+      minera::discover_ocpn(selected_log, selected_options);
+  assert(selected_ocpn.activities ==
+         std::vector<std::string>({"Assemble", "Deliver"}));
+  assert(selected_ocpn.object_types ==
+         std::vector<std::string>({"item-main", "order-main"}));
+  assert(selected_ocpn.petri_nets.contains("order-main") &&
+         selected_ocpn.petri_nets.contains("item-main"));
+  assert(selected_ocpn.annotations.activities_indep.at("Assemble").events ==
+         std::vector<std::string>({"e1"}));
+  const auto selected_causal =
+      minera::discover_oc_causal_net(selected_log, selected_options);
+  assert(selected_causal.workflow_projection.activities ==
+         selected_ocpn.activities);
+  assert(std::any_of(
+      selected_causal.activities.begin(), selected_causal.activities.end(),
+      [](const auto& activity) { return activity.activity == "Assemble"; }));
+
+  // Scalar numeric selectors are rendered with a stable textual spelling.
+  auto numeric_log = selected_log;
+  numeric_log.events[0].attributes.push_back(
+      {"numeric_activity", std::int64_t{7}});
+  numeric_log.events[1].attributes.push_back(
+      {"numeric_activity", std::int64_t{8}});
+  numeric_log.objects[0].attributes.push_back(
+      {"numeric_type", std::int64_t{3}});
+  numeric_log.objects[1].attributes.push_back(
+      {"numeric_type", std::int64_t{4}});
+  minera::OcpnDiscoveryOptions numeric_options;
+  numeric_options.activity_attribute = "numeric_activity";
+  numeric_options.object_type_attribute = "numeric_type";
+  const auto numeric_ocpn =
+      minera::discover_ocpn(numeric_log, numeric_options);
+  assert(numeric_ocpn.activities ==
+         std::vector<std::string>({"7", "8"}));
+  assert(numeric_ocpn.object_types ==
+         std::vector<std::string>({"3", "4"}));
+
+  bool missing_selector_rejected = false;
+  try {
+    auto invalid_options = selected_options;
+    invalid_options.activity_attribute = "not_present";
+    (void)minera::discover_ocpn(selected_log, invalid_options);
+  } catch (const std::invalid_argument&) {
+    missing_selector_rejected = true;
+  }
+  assert(missing_selector_rejected);
 
   minera::PetriNet replay_net;
   const auto replay_source = replay_net.add_place();

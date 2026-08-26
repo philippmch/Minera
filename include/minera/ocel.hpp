@@ -273,6 +273,12 @@ struct OcpnDiscoveryOptions {
   // diagnostic payload.
   bool annotated = true;
   bool diagnostics_with_token_based_replay = false;
+  // Optional selectors for the activity and object-type labels used by the
+  // discovery projection. Empty selectors use OcelEvent::activity and
+  // OcelObject::type. Non-empty selectors resolve scalar attributes on the
+  // corresponding records and stringify them deterministically.
+  std::string activity_attribute;
+  std::string object_type_attribute;
 };
 
 struct OcpnTokenReplayPlaceDiagnostics {

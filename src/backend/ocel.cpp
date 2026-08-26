@@ -2,6 +2,7 @@
 #include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
+#include "ocpn_projection.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -831,6 +832,92 @@ void write_object_changes(std::ostringstream& out, const Ocel& log) {
 
 }  // namespace
 
+namespace {
+
+const OcelValue* find_attribute(const std::vector<OcelAttribute>& attributes,
+                                std::string_view key) {
+  for (const auto& attribute : attributes) {
+    if (attribute.key == key) return &attribute.value;
+  }
+  return nullptr;
+}
+
+std::string selector_value(const OcelValue& value, std::string_view selector,
+                           std::string_view record_kind,
+                           std::string_view record_id) {
+  if (std::holds_alternative<std::nullptr_t>(value))
+    throw std::invalid_argument("OCPN " + std::string(record_kind) +
+                                " selector '" + std::string(selector) +
+                                "' is null for " + std::string(record_id));
+  if (const auto* text = std::get_if<std::string>(&value)) {
+    if (text->empty())
+      throw std::invalid_argument("OCPN " + std::string(record_kind) +
+                                  " selector '" + std::string(selector) +
+                                  "' is empty for " + std::string(record_id));
+    return *text;
+  }
+  if (const auto* boolean = std::get_if<bool>(&value))
+    return *boolean ? "true" : "false";
+  if (const auto* integer = std::get_if<std::int64_t>(&value))
+    return std::to_string(*integer);
+  const auto number = std::get<double>(value);
+  if (!std::isfinite(number))
+    throw std::invalid_argument("OCPN " + std::string(record_kind) +
+                                " selector '" + std::string(selector) +
+                                "' is non-finite for " +
+                                std::string(record_id));
+  std::ostringstream rendered;
+  rendered << std::setprecision(std::numeric_limits<double>::max_digits10)
+           << number;
+  return rendered.str();
+}
+
+std::string selected_event_activity(const OcelEvent& event,
+                                    std::string_view selector) {
+  if (selector.empty() || selector == "activity" ||
+      selector == "concept:name" || selector == "ocel:activity")
+    return event.activity;
+  const auto* value = find_attribute(event.attributes, selector);
+  if (value == nullptr)
+    throw std::invalid_argument("OCPN event activity attribute '" +
+                                std::string(selector) + "' is missing for " +
+                                event.id);
+  return selector_value(*value, selector, "event activity", event.id);
+}
+
+std::string selected_object_type(const OcelObject& object,
+                                 std::string_view selector) {
+  if (selector.empty() || selector == "type" || selector == "object_type" ||
+      selector == "ocel:type")
+    return object.type;
+  const auto* value = find_attribute(object.attributes, selector);
+  if (value == nullptr)
+    throw std::invalid_argument("OCPN object type attribute '" +
+                                std::string(selector) + "' is missing for " +
+                                object.id);
+  return selector_value(*value, selector, "object type", object.id);
+}
+
+}  // namespace
+
+Ocel project_ocpn_labels(const Ocel& log,
+                         const OcpnDiscoveryOptions& options) {
+  Ocel projected = log;
+  for (auto& event : projected.events)
+    event.activity = selected_event_activity(event, options.activity_attribute);
+
+  std::map<std::string, std::string> object_types;
+  for (auto& object : projected.objects) {
+    object.type = selected_object_type(object, options.object_type_attribute);
+    object_types[object.id] = object.type;
+  }
+  for (auto& change : projected.object_changes) {
+    const auto it = object_types.find(change.object_id);
+    if (it != object_types.end()) change.object_type = it->second;
+  }
+  return projected;
+}
+
 Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
   const Json root = Parser(json, limits).parse();
   if (!root.is_object()) throw std::invalid_argument("OCEL root must be object");
@@ -1604,21 +1691,22 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       options.noise_threshold > 1.0)
     throw std::invalid_argument("OCPN noise_threshold must be in [0,1]");
 
+  const Ocel projected = project_ocpn_labels(log, options);
   OcpnGraph result;
   result.annotated = options.annotated;
   std::map<std::string, const OcelEvent*> event_by_id;
   std::map<std::string, std::size_t> event_order;
-  for (std::size_t index = 0; index < log.events.size(); ++index) {
-    event_by_id[log.events[index].id] = &log.events[index];
-    event_order[log.events[index].id] = index;
-    result.activities.push_back(log.events[index].activity);
+  for (std::size_t index = 0; index < projected.events.size(); ++index) {
+    event_by_id[projected.events[index].id] = &projected.events[index];
+    event_order[projected.events[index].id] = index;
+    result.activities.push_back(projected.events[index].activity);
   }
   std::sort(result.activities.begin(), result.activities.end());
   result.activities.erase(
       std::unique(result.activities.begin(), result.activities.end()),
       result.activities.end());
   std::map<std::string, std::string> object_type;
-  for (const auto& object : log.objects) {
+  for (const auto& object : projected.objects) {
     object_type[object.id] = object.type;
     result.object_types.push_back(object.type);
   }
@@ -1635,7 +1723,7 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       relation_counts;
   std::map<std::string, std::map<std::string, std::set<std::string>>>
       object_ids_by_activity_event;
-  for (const auto& relation : log.relations) {
+  for (const auto& relation : projected.relations) {
     const auto event_it = event_by_id.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_by_id.end() || type_it == object_type.end()) continue;
@@ -1658,7 +1746,7 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
   }
 
   if (options.annotated) {
-    result.annotations = discover_ocdfg_classic(log, false);
+    result.annotations = discover_ocdfg_classic(projected, false);
   }
   for (const auto& type : result.object_types) {
     OcpnTokenReplayDiagnostics* token_replay_diagnostics = nullptr;
@@ -1671,7 +1759,7 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     EventLog replay_flattened;
     std::map<std::string, std::set<std::string>> object_event_ids;
     std::map<std::string, std::vector<std::string>> replay_event_ids;
-    for (const auto& relation : log.relations) {
+    for (const auto& relation : projected.relations) {
       const auto type_it = object_type.find(relation.object_id);
       if (type_it == object_type.end() || type_it->second != type) continue;
       if (event_by_id.count(relation.event_id)) {
