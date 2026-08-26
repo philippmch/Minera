@@ -39,6 +39,12 @@ struct InductiveMinerOptions {
   // flower model. Applies to both variants.
   double noise_threshold = 0.0;
   InductiveMinerVariant variant = InductiveMinerVariant::kLog;
+  // When enabled, use the normal sequence cut instead of the stricter cut
+  // that merges groups made optional by observed skips.
+  bool disable_strict_sequence_cut = false;
+  // Suppress specialized fall-throughs. The empty-trace and flower cases
+  // remain available so the miner still returns a process tree.
+  bool disable_fallthroughs = false;
 };
 
 // Discovers a block-structured process tree from an event log using the

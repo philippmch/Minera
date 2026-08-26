@@ -307,6 +307,10 @@ discovery expose the same selector contract: OCDFG applies projected labels to
 activity, start/end, flow, and performance metrics, while SAW applies them to
 per-type nets, merged-net decorations, and transition-weight projections.
 Their existing performance toggle and no-selector overloads remain compatible.
+SAW discovery applies a fixed no-specialized-fall-through and normal-sequence
+policy to each flattened object-type projection before replaying transition
+multiplicities; the policy and sparse projected-activity regression are covered
+by the native SAW test suite.
 
 Link-analysis evidence: the classic relation join is available as
 `discover_link_analysis` over event logs and supports first-class or generic
