@@ -4400,6 +4400,8 @@ export interface OcelDiscoveryOptions {
   variant?: OcelDiscoveryVariant;
   compute_edges_performance?: boolean;
   ocpn_annotation?: "annotated" | "none";
+  ocpn_activity_attribute?: string;
+  ocpn_object_type_attribute?: string;
   diagnostics_with_token_based_replay?: boolean;
 }
 
@@ -4410,6 +4412,14 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
     query.set("compute_edges_performance", options.compute_edges_performance ? "true" : "false");
   }
   if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
+  const addSelector = (key: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const selector = value.trim();
+    if (!selector) throw new Error(`${key} must not be empty`);
+    query.set(key, selector);
+  };
+  addSelector("ocpn_activity_attribute", options.ocpn_activity_attribute);
+  addSelector("ocpn_object_type_attribute", options.ocpn_object_type_attribute);
   if (options.diagnostics_with_token_based_replay !== undefined) {
     if (options.diagnostics_with_token_based_replay !== true &&
         options.diagnostics_with_token_based_replay !== false) {
@@ -4846,6 +4856,8 @@ export interface OcelPlayoutOptions {
   event_interval?: number;
   ocpn_variant?: "log" | "dfg";
   ocpn_annotation?: "annotated" | "none";
+  ocpn_activity_attribute?: string;
+  ocpn_object_type_attribute?: string;
   double_arc_threshold?: number;
   noise_threshold?: number;
 }
@@ -4932,6 +4944,14 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
   addNumber("event_interval", options.event_interval);
   if (options.ocpn_variant !== undefined) query.set("ocpn_variant", options.ocpn_variant);
   if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
+  const addSelector = (key: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const selector = value.trim();
+    if (!selector) throw new Error(`${key} must not be empty`);
+    query.set(key, selector);
+  };
+  addSelector("ocpn_activity_attribute", options.ocpn_activity_attribute);
+  addSelector("ocpn_object_type_attribute", options.ocpn_object_type_attribute);
   addNumber("double_arc_threshold", options.double_arc_threshold);
   addNumber("noise_threshold", options.noise_threshold);
   return query.toString();

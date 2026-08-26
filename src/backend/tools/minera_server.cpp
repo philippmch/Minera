@@ -1379,7 +1379,8 @@ void handle_ocel_discovery(const httplib::Request& request,
   try {
     static const std::set<std::string> allowed = {
         "variant", "compute_edges_performance", "ocpn_annotation",
-        "diagnostics_with_token_based_replay"};
+        "diagnostics_with_token_based_replay", "ocpn_activity_attribute",
+        "ocpn_object_type_attribute"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1417,6 +1418,20 @@ void handle_ocel_discovery(const httplib::Request& request,
       }
       discovery.diagnostics_with_token_based_replay = ocel_query_bool(
           request, "diagnostics_with_token_based_replay", false);
+      if (request.has_param("ocpn_activity_attribute")) {
+        discovery.activity_attribute =
+            request.get_param_value("ocpn_activity_attribute");
+        if (discovery.activity_attribute.empty())
+          throw std::invalid_argument(
+              "ocpn_activity_attribute expects a non-empty value");
+      }
+      if (request.has_param("ocpn_object_type_attribute")) {
+        discovery.object_type_attribute =
+            request.get_param_value("ocpn_object_type_attribute");
+        if (discovery.object_type_attribute.empty())
+          throw std::invalid_argument(
+              "ocpn_object_type_attribute expects a non-empty value");
+      }
       payload = minera::serialize_ocpn_json(
           minera::discover_ocpn(log, discovery));
     } else if (variant == "saw") {
@@ -1588,7 +1603,8 @@ void handle_ocel_playout(const httplib::Request& request,
         "objects_unique_per_trace", "event_binding", "exists_trace", "return_sequences",
         "return_traces",
         "seed", "start", "case_interval", "event_interval", "ocpn_variant",
-        "double_arc_threshold", "noise_threshold", "ocpn_annotation"};
+        "double_arc_threshold", "noise_threshold", "ocpn_annotation",
+        "ocpn_activity_attribute", "ocpn_object_type_attribute"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -1703,8 +1719,22 @@ void handle_ocel_playout(const httplib::Request& request,
         discovery.annotated = false;
       } else {
         throw std::invalid_argument(
-            "ocpn_annotation expects annotated or none");
+          "ocpn_annotation expects annotated or none");
       }
+    }
+    if (request.has_param("ocpn_activity_attribute")) {
+      discovery.activity_attribute =
+          request.get_param_value("ocpn_activity_attribute");
+      if (discovery.activity_attribute.empty())
+        throw std::invalid_argument(
+            "ocpn_activity_attribute expects a non-empty value");
+    }
+    if (request.has_param("ocpn_object_type_attribute")) {
+      discovery.object_type_attribute =
+          request.get_param_value("ocpn_object_type_attribute");
+      if (discovery.object_type_attribute.empty())
+        throw std::invalid_argument(
+            "ocpn_object_type_attribute expects a non-empty value");
     }
     discovery.double_arc_threshold = ocel_query_number(
         request, "double_arc_threshold", discovery.double_arc_threshold);

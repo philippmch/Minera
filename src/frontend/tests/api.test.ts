@@ -1331,6 +1331,12 @@ describe("OCEL API", () => {
       .toBe("variant=ocdfg&compute_edges_performance=false");
     expect(ocelDiscoveryQuery({ variant: "ocpn", ocpn_annotation: "none", diagnostics_with_token_based_replay: true }))
       .toBe("variant=ocpn&ocpn_annotation=none&diagnostics_with_token_based_replay=true");
+    expect(ocelDiscoveryQuery({
+      variant: "ocpn", ocpn_activity_attribute: "  event_kind ",
+      ocpn_object_type_attribute: "object_class",
+    })).toBe("variant=ocpn&ocpn_activity_attribute=event_kind&ocpn_object_type_attribute=object_class");
+    expect(() => ocelDiscoveryQuery({ ocpn_activity_attribute: "  " }))
+      .toThrow(/must not be empty/);
     expect(ocelDiscoveryQuery({ variant: "saw" }))
       .toBe("variant=saw");
     expect(() => ocelDiscoveryQuery({
@@ -1347,6 +1353,12 @@ describe("OCEL API", () => {
       max_states: 40, objects: { item: ["i,1"], order: ["o1", "o2"] },
       objects_unique_per_trace: true, ocpn_variant: "dfg", ocpn_annotation: "none", event_interval: 1.5,
     })).toBe("model=causal_net&variant=extensive&max_bindings_per_activity=2&max_traces=3&max_states=40&objects=item%3Ai%5C%2C1%3Border%3Ao1%2Co2&objects_unique_per_trace=true&event_interval=1.5&ocpn_variant=dfg&ocpn_annotation=none");
+    expect(ocelPlayoutQuery({
+      model: "ocpn", ocpn_activity_attribute: "event_kind",
+      ocpn_object_type_attribute: "object_class",
+    })).toBe("model=ocpn&ocpn_activity_attribute=event_kind&ocpn_object_type_attribute=object_class");
+    expect(() => ocelPlayoutQuery({ ocpn_object_type_attribute: "" }))
+      .toThrow(/must not be empty/);
     expect(ocelFeaturesQuery({
       variant: "objects", max_features: 12,
       include_lifecycle_features: false,
