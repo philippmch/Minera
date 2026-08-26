@@ -149,6 +149,9 @@ struct EmdOptions {
   DistanceFunction distance;
   // Appended to preserve positional initialization of the legacy options.
   EmdVariant variant = EmdVariant::EXACT;
+  // Selects the accelerated implementation when one is available. Native
+  // builds retain the same deterministic transportation fallback either way.
+  bool use_fast_emd = true;
 };
 struct EmdResult {
   double distance = std::numeric_limits<double>::quiet_NaN();
@@ -157,6 +160,7 @@ struct EmdResult {
   std::string error;
   // Appended to preserve positional initialization of the legacy result.
   EmdVariant variant = EmdVariant::EXACT;
+  bool use_fast_emd = true;
 };
 
 // A request-scoped container for the selected model-quality evaluation.  Only

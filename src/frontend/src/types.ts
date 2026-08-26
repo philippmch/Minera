@@ -2544,7 +2544,9 @@ export type EmdVariant = "exact" | "pyemd";
 export function isEmdResult(value: unknown): value is EmdResult {
   return isRecord(value) && (value.variant === undefined || value.variant === "exact" || value.variant === "pyemd") &&
     metric(value.distance) && typeof value.computed === "boolean" &&
-    typeof value.normalized === "boolean" && nullableString(value.error);
+    typeof value.normalized === "boolean" &&
+    (value.use_fast_emd === undefined || typeof value.use_fast_emd === "boolean") &&
+    nullableString(value.error);
 }
 
 export function isProcessTreeAlignmentResult(value: unknown): value is ProcessTreeAlignmentResult {
@@ -3562,12 +3564,14 @@ export interface EmdOptions {
   emd_variant?: EmdVariant;
   normalize_masses?: boolean;
   strict_equal_mass?: boolean;
+  use_fast_emd?: boolean;
 }
 export interface EmdResult {
   variant?: EmdVariant;
   distance: EvaluationMetric;
   computed: boolean;
   normalized: boolean;
+  use_fast_emd?: boolean;
   error: string | null;
 }
 

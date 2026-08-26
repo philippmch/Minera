@@ -801,6 +801,7 @@ int usage(const char* program) {
                "  --emd-variant <id>       exact (default) or pyemd\n"
                "  --emd-normalize-masses <bool> Normalize unequal language masses\n"
                "  --emd-strict-equal-mass <bool> Reject unequal language masses\n"
+               "  --emd-use-fast-emd <bool> Select accelerated EMD when available\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
                "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
                "  --compare-petri-initial-marking <n,...> Initial place marking\n"
@@ -2607,15 +2608,18 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--emd-normalize-masses" ||
-        arg == "--emd-strict-equal-mass") {
+        arg == "--emd-strict-equal-mass" ||
+        arg == "--emd-use-fast-emd") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
         const bool parsed = parse_boolean(value, arg);
         if (arg == "--emd-normalize-masses") {
           emd_options.normalize_masses = parsed;
-        } else {
+        } else if (arg == "--emd-strict-equal-mass") {
           emd_options.strict_equal_mass = parsed;
+        } else {
+          emd_options.use_fast_emd = parsed;
         }
         emd_option_used = true;
       } catch (const std::invalid_argument& error) {

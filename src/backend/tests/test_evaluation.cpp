@@ -241,8 +241,18 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
   const auto first = evaluate_emd(left, right, pyemd);
   const auto second = evaluate_emd(left, right, pyemd);
   assert(first.computed && first.variant == EmdVariant::PYEMD);
+  assert(first.use_fast_emd);
   assert(std::abs(first.distance - 0.5) < 1e-12);
   assert(first.distance == second.distance);
+
+  // Both backend selections remain deterministic when the optional fast
+  // runtime is unavailable, and selecting the fallback does not alter the
+  // distance.
+  EmdOptions fallback = pyemd;
+  fallback.use_fast_emd = false;
+  const auto fallback_result = evaluate_emd(left, right, fallback);
+  assert(fallback_result.computed && !fallback_result.use_fast_emd);
+  assert(fallback_result.distance == first.distance);
 
   const auto empty = evaluate_emd({}, {}, pyemd);
   assert(empty.computed && empty.variant == EmdVariant::PYEMD &&
@@ -277,6 +287,9 @@ void emd_pyemd_variant_is_deterministic_and_strict() {
 
   const auto json = emd_json(first);
   assert(json.find("\"variant\": \"pyemd\"") != std::string::npos);
+  assert(json.find("\"use_fast_emd\": true") != std::string::npos);
+  const auto fallback_json = emd_json(fallback_result);
+  assert(fallback_json.find("\"use_fast_emd\": false") != std::string::npos);
 }
 
 int main() {
