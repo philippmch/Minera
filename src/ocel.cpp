@@ -163,6 +163,86 @@ void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view fiel
 }
 const Json::Object& obj(const Json& j, std::string_view field) { if (!j.is_object()) throw std::invalid_argument("OCEL field must be object: " + std::string(field)); return j.object(); }
 
+std::size_t size_value(const Json& value, std::string_view field) {
+  if (!value.is_int() || std::get<std::int64_t>(value.value) < 0 ||
+      static_cast<std::uint64_t>(std::get<std::int64_t>(value.value)) >
+          static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+    throw std::invalid_argument("graph JSON field must be a non-negative integer: " +
+                                std::string(field));
+  return static_cast<std::size_t>(std::get<std::int64_t>(value.value));
+}
+
+double number_value(const Json& value, std::string_view field) {
+  if (value.is_int()) return static_cast<double>(std::get<std::int64_t>(value.value));
+  if (std::holds_alternative<double>(value.value)) {
+    const auto result = std::get<double>(value.value);
+    if (std::isfinite(result)) return result;
+  }
+  throw std::invalid_argument("graph JSON field must be a finite number: " +
+                              std::string(field));
+}
+
+std::vector<std::string> string_array(const Json* raw,
+                                      std::string_view field) {
+  if (raw == nullptr) return {};
+  if (!raw->is_array())
+    throw std::invalid_argument("graph JSON field must be an array: " +
+                                std::string(field));
+  std::vector<std::string> result;
+  result.reserve(raw->array().size());
+  for (const auto& value : raw->array())
+    result.push_back(str(value, field));
+  return result;
+}
+
+std::vector<std::pair<std::string, std::string>> pair_array(
+    const Json* raw, std::string_view field) {
+  if (raw == nullptr) return {};
+  if (!raw->is_array())
+    throw std::invalid_argument("graph JSON field must be an array: " +
+                                std::string(field));
+  std::vector<std::pair<std::string, std::string>> result;
+  result.reserve(raw->array().size());
+  for (const auto& value : raw->array()) {
+    if (!value.is_array() || value.array().size() != 2)
+      throw std::invalid_argument("graph JSON pair must contain two strings: " +
+                                  std::string(field));
+    result.emplace_back(str(value.array()[0], field),
+                        str(value.array()[1], field));
+  }
+  return result;
+}
+
+std::vector<std::tuple<std::string, std::string, std::string>> triple_array(
+    const Json* raw, std::string_view field) {
+  if (raw == nullptr) return {};
+  if (!raw->is_array())
+    throw std::invalid_argument("graph JSON field must be an array: " +
+                                std::string(field));
+  std::vector<std::tuple<std::string, std::string, std::string>> result;
+  result.reserve(raw->array().size());
+  for (const auto& value : raw->array()) {
+    if (!value.is_array() || value.array().size() != 3)
+      throw std::invalid_argument("graph JSON triple must contain three strings: " +
+                                  std::string(field));
+    result.emplace_back(str(value.array()[0], field),
+                        str(value.array()[1], field),
+                        str(value.array()[2], field));
+  }
+  return result;
+}
+
+std::vector<double> number_array(const Json* raw, std::string_view field) {
+  if (raw == nullptr) return {};
+  if (!raw->is_array())
+    throw std::invalid_argument("graph JSON field must be an array: " +
+                                std::string(field));
+  std::vector<double> result;
+  result.reserve(raw->array().size());
+  for (const auto& value : raw->array()) result.push_back(number_value(value, field));
+  return result;
+}
+
 using StandardAttributeTypes =
     std::map<std::string, std::map<std::string, std::string>>;
 
@@ -992,6 +1072,49 @@ std::string otg_json(const OtgGraph& graph) {
   return out.str();
 }
 
+EtotGraph parse_etot_json(std::string_view json, const OcelJsonLimits& limits) {
+  const auto parsed = Parser(json, limits).parse();
+  const auto& root = obj(parsed, "ETOT graph");
+  EtotGraph result;
+  result.activities = string_array(&required(root, "activities"),
+                                   "activities");
+  result.object_types = string_array(&required(root, "object_types"),
+                                     "object_types");
+  const auto& raw_edges = required(root, "edges");
+  if (!raw_edges.is_array())
+    throw std::invalid_argument("ETOT edges must be an array");
+  result.edges.reserve(raw_edges.array().size());
+  for (const auto& raw : raw_edges.array()) {
+    const auto& edge = obj(raw, "ETOT edge");
+    result.edges.push_back(
+        {str(required(edge, "activity"), "activity"),
+         str(required(edge, "object_type"), "object_type"),
+         size_value(required(edge, "frequency"), "frequency")});
+  }
+  return result;
+}
+
+OtgGraph parse_otg_json(std::string_view json, const OcelJsonLimits& limits) {
+  const auto parsed = Parser(json, limits).parse();
+  const auto& root = obj(parsed, "OTG graph");
+  OtgGraph result;
+  result.object_types = string_array(&required(root, "object_types"),
+                                     "object_types");
+  const auto& raw_edges = required(root, "edges");
+  if (!raw_edges.is_array())
+    throw std::invalid_argument("OTG edges must be an array");
+  result.edges.reserve(raw_edges.array().size());
+  for (const auto& raw : raw_edges.array()) {
+    const auto& edge = obj(raw, "OTG edge");
+    result.edges.push_back(
+        {str(required(edge, "source_type"), "source_type"),
+         str(required(edge, "relation"), "relation"),
+         str(required(edge, "target_type"), "target_type"),
+         size_value(required(edge, "frequency"), "frequency")});
+  }
+  return result;
+}
+
 OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performance) {
   OcdfgGraph result;
   result.performance_computed = compute_edges_performance;
@@ -1258,6 +1381,130 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
   out << "},\"performance_computed\":"
       << (graph.performance_computed ? "true" : "false") << '}';
   return out.str();
+}
+
+OcdfgGraph parse_ocdfg_json(std::string_view json,
+                            const OcelJsonLimits& limits) {
+  const auto parsed = Parser(json, limits).parse();
+  const auto& root = obj(parsed, "OCDFG graph");
+  OcdfgGraph result;
+  result.activities =
+      string_array(&required(root, "activities"), "activities");
+  result.object_types =
+      string_array(&required(root, "object_types"), "object_types");
+
+  const auto parse_activity_metric = [&](const Json& raw,
+                                          std::string_view context) {
+    const auto& fields = obj(raw, context);
+    OcdfgActivityMetric metric;
+    metric.events = string_array(optional(fields, "events"), "events");
+    metric.unique_objects =
+        string_array(optional(fields, "unique_objects"), "unique_objects");
+    metric.event_objects =
+        pair_array(optional(fields, "event_objects"), "event_objects");
+    metric.total_objects =
+        pair_array(optional(fields, "total_objects"), "total_objects");
+    return metric;
+  };
+
+  const auto parse_activity_map = [&](const Json* raw,
+                                      std::string_view context,
+                                      std::map<std::string, OcdfgActivityMetric>&
+                                          target) {
+    if (raw == nullptr) return;
+    const auto& values = obj(*raw, context);
+    for (const auto& [name, metric] : values) {
+      target.emplace(name, parse_activity_metric(
+                              metric, std::string(context) + ":" + name));
+    }
+  };
+  const auto parse_nested_activity_map =
+      [&](const Json* raw, std::string_view context,
+          std::map<std::string,
+                   std::map<std::string, OcdfgActivityMetric>>& target) {
+        if (raw == nullptr) return;
+        const auto& values = obj(*raw, context);
+        for (const auto& [type, activities] : values) {
+          const auto& activity_values = obj(
+              activities, std::string(context) + ":" + type);
+          auto& destination = target[type];
+          for (const auto& [name, metric] : activity_values) {
+            destination.emplace(
+                name, parse_activity_metric(
+                          metric, std::string(context) + ":" + type + ":" +
+                                      name));
+          }
+        }
+      };
+
+  parse_activity_map(optional(root, "activities_indep"), "activities_indep",
+                     result.activities_indep);
+  parse_nested_activity_map(optional(root, "activities_ot"), "activities_ot",
+                            result.activities_ot);
+  parse_nested_activity_map(optional(root, "start_activities"),
+                            "start_activities", result.start_activities);
+  parse_nested_activity_map(optional(root, "end_activities"), "end_activities",
+                            result.end_activities);
+
+  const auto parse_edge_metric = [&](const Json& raw,
+                                     std::string_view context) {
+    const auto& fields = obj(raw, context);
+    OcdfgEdgeMetric metric;
+    metric.event_couples =
+        pair_array(optional(fields, "event_couples"), "event_couples");
+    metric.unique_objects =
+        string_array(optional(fields, "unique_objects"), "unique_objects");
+    metric.event_objects =
+        triple_array(optional(fields, "event_objects"), "event_objects");
+    metric.total_objects =
+        triple_array(optional(fields, "total_objects"), "total_objects");
+    metric.performance =
+        number_array(optional(fields, "performance"), "performance");
+    metric.performance_event_couples = number_array(
+        optional(fields, "performance_event_couples"),
+        "performance_event_couples");
+    metric.performance_total_objects = number_array(
+        optional(fields, "performance_total_objects"),
+        "performance_total_objects");
+    return metric;
+  };
+
+  const auto& edge_types = obj(required(root, "edges"), "edges");
+  for (const auto& [type, raw_for_type] : edge_types) {
+    const auto& raw_map = obj(raw_for_type, "edges type " + type);
+    auto& destination = result.edges[type];
+    for (const auto& [key, raw_metric] : raw_map) {
+      const auto& fields = obj(raw_metric, "OCDFG edge " + key);
+      std::string source;
+      std::string target;
+      if (const auto* value = optional(fields, "source_activity"))
+        source = str(*value, "source_activity");
+      if (const auto* value = optional(fields, "target_activity"))
+        target = str(*value, "target_activity");
+      if (source.empty() || target.empty()) {
+        const auto separator = key.find("->");
+        if (separator == std::string::npos || separator == 0 ||
+            separator + 2 >= key.size())
+          throw std::invalid_argument(
+              "OCDFG edge requires source_activity and target_activity");
+        source = key.substr(0, separator);
+        target = key.substr(separator + 2);
+      }
+      auto metric = parse_edge_metric(
+          raw_metric, "OCDFG edge " + type + ":" + key);
+      if (!destination.emplace(std::make_pair(source, target),
+                               std::move(metric))
+               .second)
+        throw std::invalid_argument("duplicate OCDFG edge");
+    }
+  }
+  if (const auto* performance = optional(root, "performance_computed")) {
+    if (!performance->is_bool())
+      throw std::invalid_argument(
+          "OCDFG performance_computed must be boolean");
+    result.performance_computed = std::get<bool>(performance->value);
+  }
+  return result;
 }
 
 OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
@@ -2065,6 +2312,12 @@ EtotConformanceResult compare_etot(const EtotGraph& real,
   return result;
 }
 
+EtotConformanceResult compare_etot(const Ocel& real,
+                                   const EtotGraph& normative,
+                                   const EtotConformanceOptions& options) {
+  return compare_etot(discover_etot_classic(real), normative, options);
+}
+
 OtgConformanceResult compare_otg(const OtgGraph& real,
                                   const OtgGraph& normative,
                                   const OtgConformanceOptions& options) {
@@ -2132,6 +2385,12 @@ OtgConformanceResult compare_otg(const OtgGraph& real,
     result.fitness = 1.0 - numerator / normalizer;
   }
   return result;
+}
+
+OtgConformanceResult compare_otg(const Ocel& real,
+                                  const OtgGraph& normative,
+                                  const OtgConformanceOptions& options) {
+  return compare_otg(discover_otg_classic(real), normative, options);
 }
 
 OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
@@ -2203,6 +2462,13 @@ OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
     result.fitness = std::clamp(1.0 - numerator / normalizer, 0.0, 1.0);
   }
   return result;
+}
+
+OcdfgConformanceResult compare_ocdfg(
+    const Ocel& real, const OcdfgGraph& normative,
+    const OcdfgConformanceOptions& options) {
+  return compare_ocdfg(discover_ocdfg_classic(real, false), normative,
+                       options);
 }
 
 std::string etot_conformance_json(const EtotConformanceResult& result) {

@@ -123,6 +123,10 @@ OtgGraph discover_otg_classic(const Ocel& log);
 
 [[nodiscard]] std::string etot_json(const EtotGraph& graph);
 [[nodiscard]] std::string otg_json(const OtgGraph& graph);
+[[nodiscard]] EtotGraph parse_etot_json(
+    std::string_view json, const OcelJsonLimits& limits = {});
+[[nodiscard]] OtgGraph parse_otg_json(
+    std::string_view json, const OcelJsonLimits& limits = {});
 
 struct OcdfgActivityMetric {
   std::vector<std::string> events;
@@ -164,6 +168,8 @@ struct OcdfgGraph {
 OcdfgGraph discover_ocdfg_classic(const Ocel& log,
                                   bool compute_edges_performance = true);
 std::string serialize_ocdfg_json(const OcdfgGraph& graph);
+[[nodiscard]] OcdfgGraph parse_ocdfg_json(
+    std::string_view json, const OcelJsonLimits& limits = {});
 
 struct EtotConformanceOptions {
   double alpha = 1.0;
@@ -184,6 +190,12 @@ struct EtotConformanceResult {
 };
 
 EtotConformanceResult compare_etot(const EtotGraph& real,
+                                   const EtotGraph& normative,
+                                   const EtotConformanceOptions& options = {});
+// The reference contract also accepts an OCEL as the real side and performs
+// classic ETOT discovery internally.  Keep the graph overload above for
+// callers that already materialized a projection.
+EtotConformanceResult compare_etot(const Ocel& real,
                                    const EtotGraph& normative,
                                    const EtotConformanceOptions& options = {});
 std::string etot_conformance_json(const EtotConformanceResult& result);
@@ -207,6 +219,11 @@ struct OtgConformanceResult {
 };
 
 OtgConformanceResult compare_otg(const OtgGraph& real,
+                                  const OtgGraph& normative,
+                                  const OtgConformanceOptions& options = {});
+// Direct OCEL input follows the same deterministic classic OTG projection as
+// the explicit graph path.
+OtgConformanceResult compare_otg(const Ocel& real,
                                   const OtgGraph& normative,
                                   const OtgConformanceOptions& options = {});
 std::string otg_conformance_json(const OtgConformanceResult& result);
@@ -237,6 +254,12 @@ struct OcdfgConformanceResult {
 OcdfgConformanceResult compare_ocdfg(const OcdfgGraph& real,
                                      const OcdfgGraph& normative,
                                      const OcdfgConformanceOptions& options = {});
+// Direct OCEL input uses the classic OCDFG projection.  Performance samples
+// are not needed by the conformance metrics, so the adapter avoids computing
+// them while preserving activity and event-couple measures.
+OcdfgConformanceResult compare_ocdfg(
+    const Ocel& real, const OcdfgGraph& normative,
+    const OcdfgConformanceOptions& options = {});
 std::string ocdfg_conformance_json(const OcdfgConformanceResult& result);
 
 enum class OcpnInductiveVariant { kLog, kDfg };

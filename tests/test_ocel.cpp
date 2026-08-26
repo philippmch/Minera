@@ -160,8 +160,12 @@ int main() {
   assert(bad_e2e);
   assert(minera::etot_json(etot).find("\"frequency\":1") !=
          std::string::npos);
+  const auto etot_round = minera::parse_etot_json(minera::etot_json(etot));
+  assert(minera::etot_json(etot_round) == minera::etot_json(etot));
   assert(minera::otg_json(otg).find("\"object_interaction\"") !=
          std::string::npos);
+  const auto otg_round = minera::parse_otg_json(minera::otg_json(otg));
+  assert(minera::otg_json(otg_round) == minera::otg_json(otg));
   const auto ocdfg = minera::discover_ocdfg_classic(log, true);
   assert(ocdfg.activities.size() == 2 && ocdfg.object_types.size() == 2);
   assert(ocdfg.activities_indep.at("Create").events.size() == 1);
@@ -180,6 +184,31 @@ int main() {
   assert(ocdfg_json.find("performance_total_objects") != std::string::npos);
   assert(ocdfg_json.find("performance_computed") != std::string::npos);
   assert(!minera::discover_ocdfg_classic(log, false).performance_computed);
+  const auto ocdfg_round = minera::parse_ocdfg_json(ocdfg_json);
+  assert(minera::serialize_ocdfg_json(ocdfg_round) == ocdfg_json);
+  bool bad_graph = false;
+  try {
+    (void)minera::parse_etot_json(
+        R"({"activities":[],"object_types":[],"edges":[{"activity":"A","object_type":"T","frequency":-1}]})");
+  } catch (...) {
+    bad_graph = true;
+  }
+  assert(bad_graph);
+  bad_graph = false;
+  try {
+    (void)minera::parse_ocdfg_json(R"({"activities":[],"object_types":[]})");
+  } catch (...) {
+    bad_graph = true;
+  }
+  assert(bad_graph);
+  bad_graph = false;
+  try {
+    (void)minera::parse_ocdfg_json(
+        R"({"activities":[],"object_types":[],"edges":{"T":{"A->B":{"source_activity":"A","target_activity":"B","event_couples":[["e"]]}}}})");
+  } catch (...) {
+    bad_graph = true;
+  }
+  assert(bad_graph);
 
   // Associations are keyed by event/object identity, not relation qualifier.
   // The event-couple performance projection is unique per pair, while the
@@ -244,6 +273,10 @@ int main() {
          etot_bad.missing_edges.size() == 1 && etot_bad.fitness < 1.0);
   assert(minera::etot_conformance_json(etot_bad).find("relative_frequency_delta") !=
          std::string::npos);
+  const auto etot_direct = minera::compare_etot(log, minera::discover_etot_classic(log));
+  assert(etot_direct.fitness == 1.0);
+  assert(etot_direct.missing_edges.empty() &&
+         etot_direct.additional_edges.empty());
 
   const minera::OtgGraph otg_norm{
       {"order", "item"},
@@ -267,6 +300,9 @@ int main() {
              .non_conforming_edges.empty());
   assert(minera::otg_conformance_json(otg_bad).find("non_conforming_edges") !=
          std::string::npos);
+  const auto otg_direct = minera::compare_otg(log, minera::discover_otg_classic(log));
+  assert(otg_direct.fitness == 1.0);
+  assert(otg_direct.missing_edges.empty() && otg_direct.additional_edges.empty());
 
   minera::OcdfgGraph ocdfg_norm;
   ocdfg_norm.activities = {"Create", "Ship"};
@@ -295,6 +331,11 @@ int main() {
   assert(ocdfg_at_threshold.non_conforming_flows_in_measure.empty());
   assert(minera::ocdfg_conformance_json(ocdfg_bad).find("activity_measure_differences") !=
          std::string::npos);
+  const auto ocdfg_direct =
+      minera::compare_ocdfg(log, minera::discover_ocdfg_classic(log, false));
+  assert(ocdfg_direct.fitness == 1.0);
+  assert(ocdfg_direct.missing_activities.empty() &&
+         ocdfg_direct.missing_flows.empty());
 
   minera::OcpnDiscoveryOptions ocpn_options;
   ocpn_options.double_arc_threshold = 0.8;

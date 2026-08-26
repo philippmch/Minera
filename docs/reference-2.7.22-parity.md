@@ -67,7 +67,7 @@ are reconciled.
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
-| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, native APIs, headless OCEL CLI output, and multipart local-server/frontend API adapters; broader OCEL schema coverage remains |
+| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, headless OCEL CLI output, and multipart local-server/frontend API adapters; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Complete** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, graph-recursive `dfg`, and direct-DFG IMd entry points share deterministic native semantics; request/CLI/frontend selectors cover event-log paths |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
@@ -271,6 +271,14 @@ route, and typed frontend query expose strict non-negative relation overrides
 for interaction, descendants, inheritance, cobirth, and codeath. Identical
 relative-frequency deltas can therefore be accepted for one relation and
 reported for another without changing the native `compare_otg` contract.
+
+Object-centric graph interchange evidence: ETOT and OTG serializers now have
+strict bounded JSON readers, and OCDFG serialized metrics (including event
+couples, total-object tuples, performance projections, and the computed flag)
+round-trip through a deterministic parser. The readers reject malformed pair or
+triple shapes, negative frequencies, non-finite performance values, and invalid
+graph envelopes. Direct-OCEL conformance adapters and explicit graph inputs
+therefore share one validated native surface.
 
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics
