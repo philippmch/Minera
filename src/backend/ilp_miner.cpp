@@ -128,8 +128,9 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
       if (!options.activity_key.empty() && options.activity_key != "activity" &&
           options.activity_key != "concept:name") {
         if (options.activity_key == "resource" || options.activity_key == "org:resource") {
-          label = event.resource;
-        } else if (const auto* value = event.attribute(options.activity_key)) {
+          if (!event.resource.empty()) label = event.resource;
+        } else if (const auto* value = event.attribute(options.activity_key);
+                   value != nullptr && !value->empty()) {
           label = *value;
         }
       }

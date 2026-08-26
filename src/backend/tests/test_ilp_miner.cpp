@@ -56,6 +56,23 @@ std::size_t visible_transition_count(const PetriNet& net) {
       net.transitions().begin(), net.transitions().end(),
       [](const PetriTransition& transition) { return transition.activity.has_value(); }));
 }
+
+bool same_net(const PetriNet& left, const PetriNet& right) {
+  if (left.activities() != right.activities() ||
+      left.place_count() != right.place_count() ||
+      left.source() != right.source() || left.sink() != right.sink() ||
+      left.transitions().size() != right.transitions().size())
+    return false;
+  for (std::size_t i = 0; i < left.transitions().size(); ++i) {
+    const auto& a = left.transitions()[i];
+    const auto& b = right.transitions()[i];
+    if (a.activity != b.activity || a.inputs != b.inputs ||
+        a.outputs != b.outputs || a.reset_inputs != b.reset_inputs ||
+        a.inhibitor_inputs != b.inhibitor_inputs)
+      return false;
+  }
+  return true;
+}
 }  // namespace
 
 int main() {
@@ -94,8 +111,7 @@ int main() {
 
   // Candidate ordering and diagnostics are stable across runs.
   const auto repeat_again = mine_ilp(repeated_log);
-  assert(repeated.net.activities() == repeat_again.net.activities());
-  assert(repeated.net.place_count() == repeat_again.net.place_count());
+  assert(same_net(repeated.net, repeat_again.net));
   assert(repeated.diagnostics.visited_nodes == repeat_again.diagnostics.visited_nodes);
 
   ILPMinerOptions bounded;
@@ -249,6 +265,37 @@ int main() {
   assert(one_each.net.transitions().size() == one_duplicated.net.transitions().size());
   assert(one_each.diagnostics.visited_nodes == one_duplicated.diagnostics.visited_nodes);
 
+  // An empty resource is a missing activity-key value, so selection falls
+  // back to the event activity instead of silently dropping the event.
+  EventLog missing_resource;
+  Trace missing_resource_trace;
+  missing_resource_trace.case_id = "resource-fallback";
+  missing_resource_trace.events.push_back(
+      Event{"resource-fallback", "a", {}, {}, 0, {}, {}});
+  missing_resource.traces.push_back(std::move(missing_resource_trace));
+  ILPMinerOptions resource_key;
+  resource_key.activity_key = "org:resource";
+  resource_key.artificial_start_activity.clear();
+  resource_key.artificial_end_activity.clear();
+  const auto resource_fallback = mine_ilp(missing_resource, resource_key);
+  assert(resource_fallback.net.activities() == std::vector<std::string>{"a"});
+  assert(check_workflow_net(resource_fallback.net).valid);
+
+  EventLog empty_attribute;
+  Trace empty_attribute_trace;
+  empty_attribute_trace.case_id = "empty-attribute";
+  Event empty_value{"empty-attribute", "b", {}, {}, 0, {}, {}};
+  empty_value.attributes.push_back({"phase", "", AttributeKind::kString});
+  empty_attribute_trace.events.push_back(std::move(empty_value));
+  empty_attribute.traces.push_back(std::move(empty_attribute_trace));
+  ILPMinerOptions custom_key;
+  custom_key.activity_key = "phase";
+  custom_key.artificial_start_activity.clear();
+  custom_key.artificial_end_activity.clear();
+  const auto empty_fallback = mine_ilp(empty_attribute, custom_key);
+  assert(empty_fallback.net.activities() == std::vector<std::string>{"b"});
+  assert(check_workflow_net(empty_fallback.net).valid);
+
   // Cumulative occurrence vectors compare continuations after the complete
   // multiset prefix: the rare d continuation shares the {a,b} prefix with a
   // frequent c continuation even though those events reached it in another
@@ -317,8 +364,7 @@ int main() {
   assert(sparse_replay.fitting_traces == sparse_replay.trace_count);
   const auto sparse_repeat = mine_ilp(
       log_of({{"a", "b"}, {"a", "c"}}), sparse_causal);
-  assert(sparse.net.place_count() == sparse_repeat.net.place_count());
-  assert(sparse.net.transitions().size() == sparse_repeat.net.transitions().size());
+  assert(same_net(sparse.net, sparse_repeat.net));
   assert(sparse.diagnostics.visited_nodes == sparse_repeat.diagnostics.visited_nodes);
   sparse_causal.max_nodes = 1;
   const auto sparse_limited = mine_ilp(
