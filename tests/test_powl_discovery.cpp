@@ -205,11 +205,11 @@ int main() {
   const auto once =
       discover_powl(log({{"A", "B", "C"}, {"B", "C", "A"}}), tree);
   assert(once.kind() == PowlNodeKind::kStrictPartialOrder);
-  assert(once.order().empty() && once.children().size() == 2);
+  assert(once.order().size() == 1 && once.children().size() == 3);
   assert(once.children()[0].label() == "A");
-  assert(once.children()[1].kind() ==
-         PowlNodeKind::kStrictPartialOrder);
-  assert(once.children()[1].has_edge(0, 1));
+  assert(once.children()[1].label() == "B");
+  assert(once.children()[2].label() == "C");
+  assert(once.has_edge(1, 2));
 
   // ActivityConcurrent follows ActivityOnce: A repeats in every trace, and
   // removing it exposes the XOR(B,C) cut.
@@ -339,6 +339,68 @@ int main() {
       log({{"A", "X", "A"}, {"A", "X", "B"}, {"A", "Y", "B"}}),
       tree);
   assert(incomplete_boundary_loop.kind() != PowlNodeKind::kLoop);
+
+  PowlDiscoveryOptions nontransitive = tree;
+  nontransitive.variant = PowlDiscoveryVariant::kBruteForce;
+  const auto nontransitive_result = discover_powl(
+      log({{"A", "B", "C"}, {"C", "A"}}), nontransitive);
+  // The A->B->C evidence is not closed by A->C, while C and A are
+  // bidirectional.  A merely acyclic partition would accept that order;
+  // strict-partial-order validation rejects it and the fall-through retains
+  // B's optional projected behavior.
+  assert(nontransitive_result.kind() == PowlNodeKind::kStrictPartialOrder);
+  assert(nontransitive_result.children().size() == 3);
+  assert(nontransitive_result.children()[0].label() == "A");
+  assert(nontransitive_result.children()[1].kind() == PowlNodeKind::kXor);
+  assert(nontransitive_result.children()[2].label() == "C");
+  assert(nontransitive_result.order().size() == 1 &&
+         nontransitive_result.has_edge(1, 2));
+
+  // A repeated singleton is the canonical flower/loop boundary case: the
+  // executable do side comes first and the silent redo side comes second.
+  const auto repeated_singleton = discover_powl(log({{"A", "A"}}), tree);
+  assert(repeated_singleton.kind() == PowlNodeKind::kLoop);
+  assert(repeated_singleton.children()[0].label() == "A");
+  assert(repeated_singleton.children()[1].kind() == PowlNodeKind::kSilent);
+
+  const auto flower_result = discover_powl(
+      log({{"A", "D", "C", "B", "A"},
+           {"D", "C", "B", "A", "D"},
+           {"C", "B", "A", "D", "C"},
+           {"B", "A", "D", "C", "B"},
+           {"A", "D", "C", "B", "A"}}),
+      tree);
+  assert(flower_result.kind() == PowlNodeKind::kLoop);
+  assert(flower_result.children()[0].kind() == PowlNodeKind::kXor);
+  assert(flower_result.children()[0].children().size() == 4);
+  assert(flower_result.children()[1].kind() == PowlNodeKind::kSilent);
+
+  // Activity-concurrent also probes ordinary cuts for dynamic variants.  The
+  // remainder exposes the same XOR split as the tree variant.
+  for (const auto variant : {PowlDiscoveryVariant::kDynamicClustering,
+                             PowlDiscoveryVariant::kDynamicClusteringPlain}) {
+    auto dynamic = tree;
+    dynamic.variant = variant;
+    const auto concurrent = discover_powl(
+        log({{"B", "A", "A"}, {"A", "A", "B"}, {"A", "A", "C"}}),
+        dynamic);
+    assert(concurrent.kind() == PowlNodeKind::kStrictPartialOrder);
+    assert(concurrent.order().empty() && concurrent.children().size() == 2);
+    assert(concurrent.children()[0].kind() == PowlNodeKind::kLoop);
+    assert(concurrent.children()[0].children()[0].label() == "A");
+    assert(concurrent.children()[0].children()[1].kind() ==
+           PowlNodeKind::kSilent);
+    assert(concurrent.children()[1].kind() == PowlNodeKind::kXor);
+    assert(concurrent.children()[1].children().size() == 2);
+  }
+
+  // Final normalization folds an optional loop into its canonical loop form
+  // and flattens a disconnected nested order into its parent.
+  const auto simplified_optional =
+      discover_powl(log({{}, {"A", "A"}}), tree);
+  assert(simplified_optional.kind() == PowlNodeKind::kLoop);
+  assert(simplified_optional.children()[0].kind() == PowlNodeKind::kSilent);
+  assert(simplified_optional.children()[1].label() == "A");
 
   std::cout << "POWL discovery tests passed\n";
 }
