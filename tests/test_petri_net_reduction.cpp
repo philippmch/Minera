@@ -408,6 +408,91 @@ int main() {
   }
 
   {
+    // Parallel-place fusion is opt-in and preserves ordinary arc weights by
+    // redirecting both equivalent place occurrences to one representative.
+    PetriNet net;
+    net.set_activities({"a"});
+    const auto source = net.add_place();
+    const auto left = net.add_place();
+    const auto right = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(std::nullopt, {source}, {left, right});
+    net.add_transition(0, {left, right}, {left, right});
+    net.add_transition(std::nullopt, {left, right}, {sink});
+
+    const auto conservative = reduce_petri_net(net);
+    assert(!conservative.changed);
+    PetriNetReductionOptions options;
+    options.enable_parallel_place_fusion = true;
+    const auto result = reduce_petri_net(net, options);
+    assert(result.changed);
+    assert(result.net.place_count() == 3);
+    assert(result.net.transitions().size() == 3);
+    assert((result.old_to_new_place ==
+            std::vector<std::size_t>{0, 1, 1, 2}));
+    assert(result.net.transitions()[0].outputs ==
+           std::vector<std::size_t>({1, 1}));
+    assert(result.net.transitions()[1].inputs ==
+           std::vector<std::size_t>({1, 1}));
+    assert(result.net.transitions()[1].outputs ==
+           std::vector<std::size_t>({1, 1}));
+    assert(result.net.transitions()[2].inputs ==
+           std::vector<std::size_t>({1, 1}));
+
+    options.initial_marking = {1, 1, 0, 0};
+    const auto mismatched = reduce_petri_net(net, options);
+    assert(!mismatched.changed);
+    assert(same_net(mismatched.net, net));
+
+    options.initial_marking = {1, 2, 2, 0};
+    const auto equal_marking = reduce_petri_net(net, options);
+    assert(equal_marking.changed);
+    assert(equal_marking.markings.initial ==
+           std::vector<std::int64_t>({1, 4, 0}));
+  }
+
+  {
+    // Abstraction removes a silent fan-out bridge with multiple producers and
+    // reconnects every producer to each target in deterministic order.
+    PetriNet net;
+    net.set_activities({"a", "b", "c", "d"});
+    const auto source = net.add_place();
+    const auto private_place = net.add_place();
+    const auto left = net.add_place();
+    const auto right = net.add_place();
+    const auto sink = net.add_place();
+    net.set_source(source);
+    net.set_sink(sink);
+    net.add_transition(0, {source}, {private_place});
+    net.add_transition(1, {source}, {private_place});
+    net.add_transition(std::nullopt, {private_place}, {left, right});
+    net.add_transition(2, {left}, {sink});
+    net.add_transition(3, {right}, {sink});
+
+    const auto conservative = reduce_petri_net(net);
+    assert(!conservative.changed);
+    PetriNetReductionOptions options;
+    options.enable_abstraction = true;
+    const auto result = reduce_petri_net(net, options);
+    assert(result.changed);
+    assert(result.net.place_count() == 4);
+    assert(result.net.transitions().size() == 4);
+    assert((result.old_to_new_place ==
+            std::vector<std::size_t>{0, kRemovedPlace, 1, 2, 3}));
+    assert(result.net.transitions()[0].outputs ==
+           std::vector<std::size_t>({1, 2}));
+    assert(result.net.transitions()[1].outputs ==
+           std::vector<std::size_t>({1, 2}));
+
+    options.initial_marking = {1, 1, 0, 0, 0};
+    const auto marked = reduce_petri_net(net, options);
+    assert(!marked.changed);
+    assert(same_net(marked.net, net));
+  }
+
+  {
     bool threw = false;
     try {
       PetriNetReductionOptions options;
