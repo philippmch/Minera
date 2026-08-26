@@ -1823,6 +1823,9 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
 
     InductiveMinerOptions miner_options;
     miner_options.noise_threshold = options.noise_threshold;
+    miner_options.disable_fallthroughs = options.disable_fallthroughs;
+    miner_options.disable_strict_sequence_cut =
+        options.disable_strict_sequence_cut;
     miner_options.variant = options.variant == OcpnInductiveVariant::kDfg
                                 ? InductiveMinerVariant::kDfg
                                 : InductiveMinerVariant::kLog;

@@ -1,7 +1,10 @@
 #include "minera/saw_nets.hpp"
+#include "minera/inductive_miner.hpp"
 
 #include <cassert>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -36,9 +39,105 @@ minera::Ocel shared_event_sample() {
   return log;
 }
 
+minera::Ocel policy_from_traces(
+    const std::vector<std::vector<std::string>>& traces) {
+  minera::Ocel log;
+  for (std::size_t object = 0; object < traces.size(); ++object) {
+    const auto object_id = "o" + std::to_string(object);
+    log.objects.push_back({object_id, "order", {}});
+    for (std::size_t index = 0; index < traces[object].size(); ++index) {
+      const auto event_id = object_id + "e" + std::to_string(index);
+      log.events.push_back({event_id, traces[object][index],
+                            "2026-01-01T00:00:00Z", {}});
+      log.relations.push_back({event_id, object_id, ""});
+    }
+  }
+  return log;
+}
+
+minera::Ocel policy_sample() {
+  return policy_from_traces({{"A", "B", "D"}, {"A", "C", "D"}});
+}
+
+std::string net_signature(const minera::PetriNet& net) {
+  std::ostringstream out;
+  out << net.place_count() << ':' << net.source() << ':' << net.sink() << ':';
+  for (const auto& activity : net.activities()) out << activity << ',';
+  out << '|';
+  for (const auto& transition : net.transitions()) {
+    if (transition.activity) {
+      out << 'a' << *transition.activity;
+    } else {
+      out << 't';
+    }
+    out << '[';
+    for (const auto place : transition.inputs) out << place << ',';
+    out << "]->[";
+    for (const auto place : transition.outputs) out << place << ',';
+    out << "]|";
+  }
+  return out.str();
+}
+
+minera::EventLog event_log_from_traces(
+    const std::vector<std::vector<std::string>>& traces) {
+  minera::EventLog log;
+  for (std::size_t case_index = 0; case_index < traces.size(); ++case_index) {
+    minera::Trace trace;
+    trace.case_id = "c" + std::to_string(case_index);
+    for (std::size_t index = 0; index < traces[case_index].size(); ++index) {
+      trace.events.push_back({trace.case_id, traces[case_index][index],
+                              "2026-01-01T00:00:00Z", {}, index, {}, {}});
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+std::string miner_signature(
+    const std::vector<std::vector<std::string>>& traces, bool strict,
+    minera::InductiveMinerVariant variant = minera::InductiveMinerVariant::kLog) {
+  minera::InductiveMinerOptions options;
+  options.disable_strict_sequence_cut = !strict;
+  options.variant = variant;
+  const auto tree = minera::discover_process_tree(event_log_from_traces(traces),
+                                                  options);
+  return net_signature(minera::to_petri_net(tree));
+}
+
 }  // namespace
 
 int main() {
+  const std::vector<std::vector<std::string>> policy_sensitive = {
+      {"A", "D", "B"}, {"C", "A", "C"}, {"C", "D", "D", "B"}};
+  const auto strict_policy = miner_signature(
+      policy_sensitive, true, minera::InductiveMinerVariant::kDfg);
+  const auto normal_policy = miner_signature(
+      policy_sensitive, false, minera::InductiveMinerVariant::kDfg);
+  assert(strict_policy != normal_policy);
+
+  // The second sequence group contains globally non-contiguous activities
+  // (B and C are interned around D).  Recursing into that projected group must
+  // still use compact local ids.
+  const auto sparse_projection =
+      miner_signature({{"A", "B", "D"}, {"A", "C", "D"}}, true);
+  assert(!sparse_projection.empty());
+  const auto sparse_projection_dfg = miner_signature(
+      {{"A", "B", "D"}, {"A", "C", "D"}}, true,
+      minera::InductiveMinerVariant::kDfg);
+  assert(!sparse_projection_dfg.empty());
+
+  const auto policy = policy_sample();
+  const auto saw_policy = minera::discover_saw_nets(policy);
+  minera::OcpnDiscoveryOptions saw_options;
+  saw_options.disable_fallthroughs = true;
+  saw_options.disable_strict_sequence_cut = true;
+  const auto expected = minera::discover_ocpn(policy, saw_options);
+  const auto& expected_net = expected.petri_nets.at("order");
+  const auto& saw_net = saw_policy.ot_saw_nets.at("order").net;
+  // The SAW projection must use the same fixed miner policy as an explicitly
+  // configured object-centric discovery, including transition topology.
+  assert(net_signature(saw_net) == net_signature(expected_net));
   const auto result = minera::discover_saw_nets(sample());
   assert(result.ot_saw_nets.size() == 2);
   assert(result.ot_saw_nets.at("order").net.activities().size() == 2);

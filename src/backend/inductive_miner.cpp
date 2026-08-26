@@ -295,8 +295,9 @@ std::optional<std::vector<std::vector<ActId>>> sequence_cut(
     }
   }
 
-  // Reachability lifted to groups, then a strict order by out-degree: the
-  // earliest group reaches all others, the next all but one, and so on.
+  // Reachability lifted to groups. The ordering key is computed from the
+  // representative activity's transitive predecessor/successor counts, as in
+  // the sequence-cut contract; the local-id tie break keeps equal keys stable.
   std::vector<std::vector<char>> greach(g, std::vector<char>(g, 0));
   for (std::size_t a = 0; a < n; ++a) {
     for (std::size_t b = 0; b < n; ++b) {
@@ -308,14 +309,20 @@ std::optional<std::vector<std::vector<ActId>>> sequence_cut(
 
   std::vector<std::size_t> order(g);
   std::iota(order.begin(), order.end(), std::size_t{0});
-  std::vector<std::size_t> out_degree(g, 0);
+  std::vector<std::size_t> order_key(g, 0);
   for (std::size_t k = 0; k < g; ++k) {
-    for (std::size_t l = 0; l < g; ++l) {
-      out_degree[k] += static_cast<std::size_t>(greach[k][l] != 0);
+    const auto representative = local_groups[k].front();
+    std::size_t predecessors = 0;
+    std::size_t successors = 0;
+    for (std::size_t activity = 0; activity < n; ++activity) {
+      predecessors += static_cast<std::size_t>(reachable[activity][representative]);
+      successors += static_cast<std::size_t>(reachable[representative][activity]);
     }
+    order_key[k] = predecessors + (n - successors);
   }
   std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-    return out_degree[a] > out_degree[b];
+    if (order_key[a] != order_key[b]) return order_key[a] < order_key[b];
+    return a < b;
   });
 
   // Reject anything that is not a genuine sequence: no later group may reach an
@@ -334,6 +341,116 @@ std::optional<std::vector<std::vector<ActId>>> sequence_cut(
     ordered.push_back(std::move(local_groups[k]));
   }
   return to_global(dfg, ordered);
+}
+
+// Strict sequence cuts merge groups that can be skipped as a unit. This keeps
+// optional middle sections together instead of exposing each skipped group as
+// an independent sequence child.
+std::optional<std::vector<std::vector<ActId>>> strict_sequence_cut(
+    const LocalDfg& dfg) {
+  auto global_groups = sequence_cut(dfg);
+  if (!global_groups || global_groups->size() < 2) return std::nullopt;
+
+  // Cut detectors expose global activity ids to the recursion.  The
+  // reachability and boundary arrays of a projected graph, however, are
+  // indexed by its compact local ids, so normalize the groups before doing
+  // any graph arithmetic.
+  std::vector<std::vector<std::size_t>> groups;
+  groups.reserve(global_groups->size());
+  for (const auto& global_group : *global_groups) {
+    auto& local_group = groups.emplace_back();
+    local_group.reserve(global_group.size());
+    for (const ActId activity : global_group) {
+      local_group.push_back(dfg.to_local.at(activity));
+    }
+  }
+
+  const std::size_t group_count = groups.size();
+  std::vector<std::size_t> group_of(dfg.size());
+  for (std::size_t group = 0; group < group_count; ++group) {
+    for (const std::size_t activity : groups[group]) {
+      group_of[activity] = group;
+    }
+  }
+
+  constexpr std::int64_t kNegInf = -1;
+  const auto kPosInf = static_cast<std::int64_t>(group_count);
+  std::vector<std::int64_t> min_from(group_count, kPosInf);
+  std::vector<std::int64_t> max_to(group_count, kNegInf);
+  std::vector<char> has_start(group_count, 0);
+  std::vector<char> has_end(group_count, 0);
+  for (std::size_t group = 0; group < group_count; ++group) {
+    for (const std::size_t activity : groups[group]) {
+      if (dfg.is_start[activity]) {
+        min_from[group] = kNegInf;
+        has_start[group] = 1;
+      }
+      if (dfg.is_end[activity]) {
+        max_to[group] = kPosInf;
+        has_end[group] = 1;
+      }
+    }
+  }
+  for (std::size_t source = 0; source < dfg.size(); ++source) {
+    for (const std::size_t target : dfg.succ[source]) {
+      const auto source_group = group_of[source];
+      const auto target_group = group_of[target];
+      if (source_group == target_group) continue;
+      min_from[target_group] =
+          std::min(min_from[target_group], static_cast<std::int64_t>(source_group));
+      max_to[source_group] =
+          std::max(max_to[source_group], static_cast<std::int64_t>(target_group));
+    }
+  }
+
+  for (std::size_t pivot = 0; pivot < group_count; ++pivot) {
+    bool skippable = false;
+    for (std::size_t before = 0; before < pivot && !skippable; ++before) {
+      for (std::size_t after = pivot + 1; after < group_count; ++after) {
+        if (max_to[before] >= static_cast<std::int64_t>(after)) {
+          skippable = true;
+          break;
+        }
+      }
+    }
+    for (std::size_t after = pivot + 1; after < group_count && !skippable;
+         ++after) {
+      if (has_start[after]) skippable = true;
+    }
+    for (std::size_t before = 0; before < pivot && !skippable; ++before) {
+      if (has_end[before]) skippable = true;
+    }
+    if (!skippable) continue;
+
+    for (std::size_t group = pivot; group > 0;) {
+      const auto previous = group - 1;
+      if (max_to[previous] > static_cast<std::int64_t>(pivot)) break;
+      groups[pivot].insert(groups[pivot].end(), groups[previous].begin(),
+                           groups[previous].end());
+      groups[previous].clear();
+      group = previous;
+    }
+    for (std::size_t group = pivot + 1; group < group_count;) {
+      if (min_from[group] < static_cast<std::int64_t>(pivot)) break;
+      groups[pivot].insert(groups[pivot].end(), groups[group].begin(),
+                           groups[group].end());
+      groups[group].clear();
+      ++group;
+    }
+  }
+
+  std::vector<std::vector<ActId>> result;
+  for (const auto& local_group : groups) {
+    if (local_group.empty()) continue;
+    auto& global_group = result.emplace_back();
+    global_group.reserve(local_group.size());
+    for (const std::size_t activity : local_group) {
+      global_group.push_back(dfg.to_global[activity]);
+    }
+  }
+  return result.size() > 1
+             ? std::optional<std::vector<std::vector<ActId>>>(std::move(result))
+             : std::nullopt;
 }
 
 // Parallel: activities that are not concurrent (not connected in both
@@ -667,12 +784,14 @@ ProcessTreeNode make_node(ProcessTreeOperator op,
   return node;
 }
 
-ProcessTreeNode mine(const Sublog& log, double f);
+ProcessTreeNode mine(const Sublog& log, double f,
+                     const InductiveMinerOptions& options);
 
 ProcessTreeNode build_from_cut(ProcessTreeOperator op,
                                const std::vector<std::vector<ActId>>& groups,
                                const Sublog& log,
-                               double f) {
+                               double f,
+                               const InductiveMinerOptions& options) {
   const GroupOf group_of = index_groups(groups);
   std::vector<Sublog> sublogs;
   switch (op) {
@@ -693,7 +812,7 @@ ProcessTreeNode build_from_cut(ProcessTreeOperator op,
   std::vector<ProcessTreeNode> children;
   children.reserve(sublogs.size());
   for (const auto& sublog : sublogs) {
-    children.push_back(mine(sublog, f));
+    children.push_back(mine(sublog, f, options));
   }
   return make_node(op, std::move(children));
 }
@@ -719,7 +838,8 @@ ProcessTreeNode flower(const std::vector<ActId>& activities) {
 // cut that fits the non-empty behaviour and are only modelled explicitly when
 // no cut applies -- this matches the canonical algorithm rather than skipping
 // the empty trace eagerly.
-ProcessTreeNode mine(const Sublog& log, double f) {
+ProcessTreeNode mine(const Sublog& log, double f,
+                     const InductiveMinerOptions& options) {
   std::uint64_t empty_weight = 0;
   std::uint64_t nonempty_weight = 0;
   for (const auto& wt : log) {
@@ -758,16 +878,22 @@ ProcessTreeNode mine(const Sublog& log, double f) {
 
   const auto try_cuts = [&](const LocalDfg& d) -> std::optional<ProcessTreeNode> {
     if (auto cut = exclusive_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f);
+      return build_from_cut(ProcessTreeOperator::kExclusive, *cut, log, f,
+                            options);
     }
-    if (auto cut = sequence_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kSequence, *cut, log, f);
+    const auto sequence = options.disable_strict_sequence_cut
+                              ? sequence_cut(d)
+                              : strict_sequence_cut(d);
+    if (sequence) {
+      return build_from_cut(ProcessTreeOperator::kSequence, *sequence, log, f,
+                            options);
     }
     if (auto cut = parallel_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f);
+      return build_from_cut(ProcessTreeOperator::kParallel, *cut, log, f,
+                            options);
     }
     if (auto cut = loop_cut(d)) {
-      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f);
+      return build_from_cut(ProcessTreeOperator::kLoop, *cut, log, f, options);
     }
     return std::nullopt;
   };
@@ -802,12 +928,14 @@ ProcessTreeNode mine(const Sublog& log, double f) {
     if (static_cast<double>(empty_weight) >
         f * static_cast<double>(nonempty_weight)) {
       return make_node(ProcessTreeOperator::kExclusive,
-                       {ProcessTreeNode::tau(), mine(nonempty, f)});
+                       {ProcessTreeNode::tau(), mine(nonempty, f, options)});
     }
-    return mine(nonempty, f);
+    return mine(nonempty, f, options);
   }
 
-  // Fall-through: unstructured behaviour becomes a flower model.
+  // The native fall-through set already consists of the empty-trace handling
+  // above and this flower fallback, both of which remain valid when callers
+  // request the reduced fall-through policy.
   return flower(dfg.to_global);
 }
 
@@ -870,7 +998,8 @@ LocalDfg project_dfg(const LocalDfg& parent,
   return sub;
 }
 
-ProcessTreeNode mine_dfg(LocalDfg dfg, double f) {
+ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
+                         const InductiveMinerOptions& options) {
   if (dfg.size() == 0) {
     return ProcessTreeNode::tau();
   }
@@ -931,7 +1060,8 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f) {
     std::vector<ProcessTreeNode> children;
     children.reserve(groups.size());
     for (std::size_t i = 0; i < groups.size(); ++i) {
-      auto child = mine_dfg(project_dfg(dfg, groups[i], crossing_edges), f);
+      auto child = mine_dfg(project_dfg(dfg, groups[i], crossing_edges), f,
+                            options);
       if (skippable[i]) {
         child = make_node(ProcessTreeOperator::kExclusive,
                           {ProcessTreeNode::tau(), std::move(child)});
@@ -945,8 +1075,11 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f) {
     if (auto cut = exclusive_cut(d)) {
       return build(ProcessTreeOperator::kExclusive, *cut);
     }
-    if (auto cut = sequence_cut(d)) {
-      return build(ProcessTreeOperator::kSequence, *cut);
+    const auto sequence = options.disable_strict_sequence_cut
+                              ? sequence_cut(d)
+                              : strict_sequence_cut(d);
+    if (sequence) {
+      return build(ProcessTreeOperator::kSequence, *sequence);
     }
     if (auto cut = parallel_cut(d)) {
       return build(ProcessTreeOperator::kParallel, *cut);
@@ -978,7 +1111,8 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f) {
 // a directly-follows graph, so the option to skip everything is decided here at
 // the root — the one place the log itself is still in hand — mirroring the
 // empty-trace fall-through of the log recursion.
-ProcessTreeNode mine_dfg_root(const Sublog& log, double f) {
+ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
+                              const InductiveMinerOptions& options) {
   std::uint64_t empty_weight = 0;
   std::uint64_t nonempty_weight = 0;
   for (const auto& wt : log) {
@@ -988,7 +1122,7 @@ ProcessTreeNode mine_dfg_root(const Sublog& log, double f) {
     return ProcessTreeNode::tau();
   }
 
-  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f);
+  ProcessTreeNode root = mine_dfg(build_local_dfg(log), f, options);
   if (static_cast<double>(empty_weight) >
       f * static_cast<double>(nonempty_weight)) {
     return make_node(ProcessTreeOperator::kExclusive,
@@ -1030,8 +1164,8 @@ ProcessTree discover_process_tree(const EventLog& event_log,
 
   const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
   ProcessTreeNode root = options.variant == InductiveMinerVariant::kDfg
-                             ? mine_dfg_root(sublog, f)
-                             : mine(sublog, f);
+                             ? mine_dfg_root(sublog, f, options)
+                             : mine(sublog, f, options);
   return ProcessTree(std::move(names), std::move(root));
 }
 
@@ -1042,7 +1176,7 @@ ProcessTree discover_process_tree(const DirectlyFollowsGraph& graph,
   // The noise threshold still applies to raw edge and endpoint counts during
   // graph fall-throughs.
   const double f = std::clamp(options.noise_threshold, 0.0, 1.0);
-  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f);
+  ProcessTreeNode root = mine_dfg(build_local_dfg(graph), f, options);
   return ProcessTree(graph.activities(), std::move(root));
 }
 

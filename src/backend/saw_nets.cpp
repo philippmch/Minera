@@ -291,7 +291,10 @@ SawNetDiscoveryResult discover_saw_nets(
     const Ocel& log, const SawNetDiscoveryOptions& options) {
   const Ocel projected = project_ocel_labels(
       log, options.activity_attribute, options.object_type_attribute, "SAW");
-  const auto ocpn = discover_ocpn(projected);
+  OcpnDiscoveryOptions discovery_options;
+  discovery_options.disable_fallthroughs = true;
+  discovery_options.disable_strict_sequence_cut = true;
+  const auto ocpn = discover_ocpn(projected, discovery_options);
   SawNetDiscoveryResult result;
   for (const auto& type : ocpn.object_types) {
     const auto net_it = ocpn.petri_nets.find(type);

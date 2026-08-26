@@ -289,6 +289,9 @@ struct OcpnDiscoveryOptions {
   // corresponding records and stringify them deterministically.
   std::string activity_attribute;
   std::string object_type_attribute;
+  // Inductive-miner policy forwarded to each object-type projection.
+  bool disable_strict_sequence_cut = false;
+  bool disable_fallthroughs = false;
 };
 
 struct OcpnTokenReplayPlaceDiagnostics {
