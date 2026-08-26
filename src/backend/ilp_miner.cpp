@@ -5,9 +5,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -17,6 +17,9 @@
 
 namespace minera {
 namespace {
+
+constexpr double kRegionEps = 1e-8;
+constexpr std::size_t kRegionSolverNodeLimit = 200000;
 
 struct NormalizedLog {
   std::vector<std::string> names;
@@ -64,11 +67,6 @@ bool any_bit(const BitMask& mask) {
 bool masks_equal(const BitMask& left, const BitMask& right) {
   return left == right;
 }
-
-struct Candidate {
-  BitMask input;
-  BitMask output;
-};
 
 struct Region {
   // One bit per activity.  A place may both consume and produce an activity
@@ -370,6 +368,266 @@ bool solve_region(const BitMask& input, const BitMask& output,
   return true;
 }
 
+bool region_less(const Region& a, const Region& b);
+
+struct BinaryRegionSearchResult {
+  bool feasible = false;
+  bool exhausted = false;
+  std::size_t nodes_explored = 0;
+  Region region;
+};
+
+// Two-phase dense simplex for max c*x subject to A*x<=b, x>=0.  Keeping the
+// relaxation local to the miner lets the integer region search remain
+// dependency-free while still solving large sparse alphabets efficiently.
+class RegionSimplex {
+ public:
+  RegionSimplex(const std::vector<std::vector<double>>& a,
+                const std::vector<double>& b, const std::vector<double>& c)
+      : m_(b.size()), n_(c.size()), basis_(m_), nonbasis_(n_ + 1),
+        tableau_(m_ + 2, std::vector<double>(n_ + 2)) {
+    for (std::size_t i = 0; i < m_; ++i)
+      for (std::size_t j = 0; j < n_; ++j) tableau_[i][j] = a[i][j];
+    for (std::size_t i = 0; i < m_; ++i) {
+      basis_[i] = static_cast<int>(n_ + i);
+      tableau_[i][n_] = -1.0;
+      tableau_[i][n_ + 1] = b[i];
+    }
+    for (std::size_t j = 0; j < n_; ++j) {
+      nonbasis_[j] = static_cast<int>(j);
+      tableau_[m_][j] = -c[j];
+    }
+    nonbasis_[n_] = -1;
+    tableau_[m_ + 1][n_] = 1.0;
+  }
+
+  enum class Status { kOptimal, kInfeasible, kUnbounded };
+
+  Status solve(std::vector<double>& solution, double& value) {
+    std::size_t row = 0;
+    for (std::size_t i = 1; i < m_; ++i)
+      if (tableau_[i][n_ + 1] < tableau_[row][n_ + 1]) row = i;
+    if (m_ && tableau_[row][n_ + 1] < -kRegionEps) {
+      pivot(row, n_);
+      if (!run(1) || tableau_[m_ + 1][n_ + 1] < -kRegionEps)
+        return Status::kInfeasible;
+      if (std::abs(tableau_[m_ + 1][n_ + 1]) > kRegionEps)
+        return Status::kInfeasible;
+      for (std::size_t i = 0; i < m_; ++i) {
+        if (basis_[i] != -1) continue;
+        std::size_t column = 0;
+        for (std::size_t j = 1; j <= n_; ++j)
+          if (tableau_[i][j] < tableau_[i][column] - kRegionEps ||
+              (std::abs(tableau_[i][j] - tableau_[i][column]) <= kRegionEps &&
+               nonbasis_[j] < nonbasis_[column]))
+            column = j;
+        pivot(i, column);
+      }
+    }
+    if (!run(0)) return Status::kUnbounded;
+    solution.assign(n_, 0.0);
+    for (std::size_t i = 0; i < m_; ++i)
+      if (basis_[i] >= 0 && static_cast<std::size_t>(basis_[i]) < n_)
+        solution[static_cast<std::size_t>(basis_[i])] = tableau_[i][n_ + 1];
+    value = tableau_[m_][n_ + 1];
+    return Status::kOptimal;
+  }
+
+ private:
+  void pivot(std::size_t row, std::size_t column) {
+    const double inverse = 1.0 / tableau_[row][column];
+    for (std::size_t i = 0; i < m_ + 2; ++i) {
+      if (i == row) continue;
+      for (std::size_t j = 0; j < n_ + 2; ++j) {
+        if (j == column) continue;
+        tableau_[i][j] -= tableau_[row][j] * tableau_[i][column] * inverse;
+      }
+    }
+    for (std::size_t j = 0; j < n_ + 2; ++j)
+      if (j != column) tableau_[row][j] *= inverse;
+    for (std::size_t i = 0; i < m_ + 2; ++i)
+      if (i != row) tableau_[i][column] *= -inverse;
+    tableau_[row][column] = inverse;
+    std::swap(basis_[row], nonbasis_[column]);
+  }
+
+  bool run(int phase) {
+    const std::size_t objective = m_ + static_cast<std::size_t>(phase);
+    while (true) {
+      std::size_t column = 0;
+      for (std::size_t j = 1; j <= n_; ++j) {
+        if (phase == 0 && nonbasis_[j] == -1) continue;
+        if (tableau_[objective][j] < tableau_[objective][column] - kRegionEps ||
+            (std::abs(tableau_[objective][j] - tableau_[objective][column]) <=
+                 kRegionEps &&
+             nonbasis_[j] < nonbasis_[column]))
+          column = j;
+      }
+      if (tableau_[objective][column] >= -kRegionEps) return true;
+      std::optional<std::size_t> row;
+      for (std::size_t i = 0; i < m_; ++i) {
+        if (tableau_[i][column] <= kRegionEps) continue;
+        if (!row ||
+            tableau_[i][n_ + 1] / tableau_[i][column] <
+                tableau_[*row][n_ + 1] / tableau_[*row][column] - kRegionEps ||
+            (std::abs(tableau_[i][n_ + 1] / tableau_[i][column] -
+                      tableau_[*row][n_ + 1] / tableau_[*row][column]) <=
+                 kRegionEps &&
+             basis_[i] < basis_[*row]))
+          row = i;
+      }
+      if (!row) return false;
+      pivot(*row, column);
+    }
+  }
+
+  std::size_t m_, n_;
+  std::vector<int> basis_, nonbasis_;
+  std::vector<std::vector<double>> tableau_;
+};
+
+BinaryRegionSearchResult solve_binary_region(
+    const RegionProblem& problem, std::size_t required_output,
+    std::size_t required_input, std::size_t node_limit) {
+  BinaryRegionSearchResult result;
+  const std::size_t n = problem.activity_count;
+  if (required_output >= n || required_input >= n || !problem.have_observed_prefix)
+    return result;
+  const std::size_t variable_count = 2 * n;
+  std::vector<std::vector<double>> constraints;
+  std::vector<double> bounds;
+  const auto add_inequality = [&](std::vector<double> row, double bound) {
+    constraints.push_back(std::move(row));
+    bounds.push_back(bound);
+  };
+  const auto add_equality = [&](std::vector<double> row) {
+    add_inequality(row, 0.0);
+    for (auto& value : row) value = -value;
+    add_inequality(std::move(row), 0.0);
+  };
+  for (const auto& row : problem.rows) {
+    std::vector<double> coefficients(variable_count, 0.0);
+    for (std::size_t activity = 0; activity < n; ++activity) {
+      coefficients[activity] = static_cast<double>(row.output[activity]);
+      coefficients[n + activity] = static_cast<double>(row.input[activity]);
+    }
+    if (row.equality)
+      add_equality(std::move(coefficients));
+    else
+      add_inequality(std::move(coefficients), 0.0);
+  }
+  std::vector<double> non_empty(variable_count, -1.0);
+  add_inequality(std::move(non_empty), -1.0);
+  for (std::size_t variable = 0; variable < variable_count; ++variable) {
+    std::vector<double> upper(variable_count, 0.0);
+    upper[variable] = 1.0;
+    add_inequality(std::move(upper), 1.0);
+  }
+  auto fix = [&](std::size_t variable) {
+    std::vector<double> row(variable_count, 0.0);
+    row[variable] = 1.0;
+    add_inequality(row, 1.0);
+    row[variable] = -1.0;
+    add_inequality(std::move(row), -1.0);
+  };
+  fix(required_output);
+  fix(n + required_input);
+
+  std::vector<double> costs(variable_count, 0.0);
+  const double tie_scale = static_cast<double>(variable_count + 1);
+  for (std::size_t activity = 0; activity < n; ++activity) {
+    costs[activity] =
+        static_cast<double>(problem.objective_output[activity]) * tie_scale + 1.0;
+    costs[n + activity] =
+        static_cast<double>(problem.objective_input[activity]) * tie_scale + 1.0;
+  }
+
+  struct Bound {
+    std::size_t variable;
+    bool upper;
+    double value;
+  };
+  struct Node {
+    std::vector<Bound> bounds;
+  };
+  std::vector<Node> stack(1);
+  bool found = false;
+  double incumbent = std::numeric_limits<double>::infinity();
+  Region best_region;
+  while (!stack.empty()) {
+    if (result.nodes_explored >= node_limit) {
+      result.exhausted = true;
+      break;
+    }
+    ++result.nodes_explored;
+    auto node = std::move(stack.back());
+    stack.pop_back();
+    auto node_constraints = constraints;
+    auto node_bounds = bounds;
+    for (const auto& bound : node.bounds) {
+      std::vector<double> row(variable_count, 0.0);
+      row[bound.variable] = bound.upper ? 1.0 : -1.0;
+      node_constraints.push_back(std::move(row));
+      node_bounds.push_back(bound.upper ? bound.value : -bound.value);
+    }
+    std::vector<double> maximize(costs.size(), 0.0);
+    for (std::size_t variable = 0; variable < costs.size(); ++variable)
+      maximize[variable] = -costs[variable];
+    RegionSimplex simplex(node_constraints, node_bounds, maximize);
+    std::vector<double> solution;
+    double maximum = 0.0;
+    if (simplex.solve(solution, maximum) != RegionSimplex::Status::kOptimal)
+      continue;
+    const double lower = -maximum;
+    if (found && lower >= incumbent - kRegionEps) continue;
+    std::optional<std::size_t> fractional;
+    for (std::size_t variable = 0; variable < solution.size(); ++variable) {
+      if (std::abs(solution[variable] - std::round(solution[variable])) > 1e-7) {
+        fractional = variable;
+        break;
+      }
+    }
+    if (!fractional) {
+      BitMask input = empty_mask(n);
+      BitMask output = empty_mask(n);
+      for (std::size_t activity = 0; activity < n; ++activity) {
+        if (solution[activity] > 0.5) set_bit(output, activity);
+        if (solution[n + activity] > 0.5) set_bit(input, activity);
+      }
+      Region candidate;
+      if (!solve_region(input, output, problem, candidate)) continue;
+      const double candidate_cost =
+          static_cast<double>(candidate.objective) * tie_scale +
+          static_cast<double>(bit_count(candidate.input) +
+                              bit_count(candidate.output));
+      if (!found || candidate_cost < incumbent - kRegionEps ||
+          (std::abs(candidate_cost - incumbent) <= kRegionEps &&
+           region_less(candidate, best_region))) {
+        found = true;
+        incumbent = candidate_cost;
+        best_region = std::move(candidate);
+      }
+      continue;
+    }
+    const auto variable = *fractional;
+    const double floor_value = std::floor(solution[variable]);
+    const double ceil_value = std::ceil(solution[variable]);
+    Node lower_branch = node;
+    lower_branch.bounds.push_back({variable, false, ceil_value});
+    node.bounds.push_back({variable, true, floor_value});
+    // Push the lower branch first so the LIFO stack explores the upper branch
+    // first, matching the deterministic tie order used by the other integer
+    // analyses.
+    stack.push_back(std::move(lower_branch));
+    stack.push_back(std::move(node));
+  }
+  if (found) {
+    result.feasible = true;
+    result.region = std::move(best_region);
+  }
+  return result;
+}
+
 bool region_less(const Region& a, const Region& b) {
   if (a.objective != b.objective) return a.objective < b.objective;
   const auto arcs = [](const Region& r) {
@@ -390,166 +648,31 @@ std::vector<Region> discover_regions(
     std::size_t max_nodes) {
   (void)sequence_edges;
   (void)causal_relation_supplied;
-  // A region is a pair of arbitrary-width input/output bit vectors. Candidate
-  // generation is lazy: the safety bound applies before solving, so a large
-  // alphabet never requires a 4^n allocation.
-  const auto empty = [&] { return empty_mask(n); };
+  // The classic region problem has one binary variable for every transition
+  // output arc (x) and input arc (y).  The cumulative sequence rows are shared
+  // across causal pairs; only the two pair-fixing equalities vary per solve.
   const auto problem = build_region_problem(traces, n);
-  std::vector<bool> final_activity(n, false);
-  for (const auto& trace_entry : traces) {
-    const auto retained_prefix =
-        std::min(trace_entry.retained_prefix, trace_entry.sequence.size());
-    if (retained_prefix == trace_entry.sequence.size() && retained_prefix != 0)
-      final_activity[trace_entry.sequence.back()] = true;
-  }
   std::vector<Region> regions;
-  std::set<std::pair<BitMask, BitMask>> seen;
-  std::size_t active_pair_start = 0;
-  std::size_t active_pair_limit = max_nodes;
-  bool active_pair_bounded = false;
-  struct VisitResult {
-    bool stop = false;
-    bool feasible = false;
-    Region region;
-  };
-  struct PairState {
-    std::size_t from = 0;
-    std::size_t to = 0;
-    bool found = false;
-    Region best;
-  };
-  const auto visit_candidate = [&](const Candidate& candidate) {
-    VisitResult result;
-    if (!any_bit(candidate.input) && !any_bit(candidate.output)) return result;
-    if (!seen.insert({candidate.input, candidate.output}).second)
-      return result;
-    if (diagnostics.visited_nodes >= max_nodes) {
-      diagnostics.exhausted = true;
-      result.stop = true;
-      return result;
-    }
-    if (active_pair_bounded &&
-        diagnostics.visited_nodes - active_pair_start >= active_pair_limit) {
-      result.stop = true;
-      return result;
-    }
-    ++diagnostics.visited_nodes;
-    ++diagnostics.lp_solved;
-    ++diagnostics.branch_and_bound_nodes;
-    result.feasible = solve_region(candidate.input, candidate.output, problem,
-                                   result.region);
-    return result;
-  };
-  const auto make_pair_candidate = [&](std::size_t from, std::size_t to) {
-    Candidate candidate{empty(), empty()};
-    set_bit(candidate.output, from);
-    set_bit(candidate.input, to);
-    return candidate;
-  };
-  const auto enumerate = [&](std::size_t required_from, std::size_t required_to,
-                             const PairState& pair_state,
-                             const std::function<void(const Region&)>& on_feasible) {
-    (void)pair_state;
-    Candidate candidate{empty(), empty()};
-    std::vector<std::size_t> order;
-    order.reserve(n);
-    if (required_from < n) order.push_back(required_from);
-    if (required_to < n && required_to != required_from)
-      order.push_back(required_to);
-    for (std::size_t activity = 0; activity < n; ++activity) {
-      if (final_activity[activity] && activity != required_from &&
-          activity != required_to)
-        order.push_back(activity);
-    }
-    for (std::size_t activity = 0; activity < n; ++activity) {
-      if (activity != required_from && activity != required_to &&
-          !final_activity[activity])
-        order.push_back(activity);
-    }
-    std::function<bool(std::size_t)> visit = [&](std::size_t depth) {
-      if (depth == order.size()) {
-        if (!any_bit(candidate.input) && !any_bit(candidate.output))
-          return false;
-        const auto outcome = visit_candidate(candidate);
-        if (outcome.feasible) on_feasible(outcome.region);
-        return outcome.stop;
-      }
-      const auto activity = order[depth];
-      const bool must_output =
-          required_from < n && activity == required_from;
-      const bool must_input = required_to < n && activity == required_to;
-      for (int state = 0; state < 4; ++state) {
-        const bool output = state == 2 || state == 3;
-        const bool input = state == 1 || state == 3;
-        if ((must_output && !output) || (must_input && !input)) continue;
-        if (output) set_bit(candidate.output, activity);
-        if (input) set_bit(candidate.input, activity);
-        if (visit(depth + 1)) return true;
-        if (output)
-          candidate.output[activity / 64] &=
-              ~(std::uint64_t{1} << (activity % 64));
-        if (input)
-          candidate.input[activity / 64] &=
-              ~(std::uint64_t{1} << (activity % 64));
-      }
-      return false;
-    };
-    return visit(0);
-  };
-  const auto collect = [&](const Candidate& candidate,
-                           const std::function<void(const Region&)>& on_feasible) {
-    const auto outcome = visit_candidate(candidate);
-    if (outcome.feasible) on_feasible(outcome.region);
-    return outcome.stop;
-  };
-  std::vector<PairState> pair_states;
   std::set<std::pair<std::size_t, std::size_t>> solved_pairs;
   for (const auto [from, to] : causal_relation) {
     if (!solved_pairs.insert({from, to}).second) continue;
-    PairState state{from, to};
-    seen.clear();
-    const auto keep_best = [&](const Region& candidate) {
-      if (!state.found || region_less(candidate, state.best)) {
-        state.best = candidate;
-        state.found = true;
-      }
-    };
-    // Reserve one direct feasibility solve for every causal pair before the
-    // optional exhaustive refinement.  A large alphabet must not prevent
-    // later pairs from receiving their required place when the global bound
-    // is reached while optimizing an earlier pair.
-    const auto first = collect(make_pair_candidate(from, to), keep_best);
-    pair_states.push_back(std::move(state));
-    if (first) break;
-  }
+    if (diagnostics.visited_nodes >= max_nodes) {
+      diagnostics.exhausted = true;
+      break;
+    }
+    ++diagnostics.visited_nodes;
+    ++diagnostics.lp_solved;
 
-  // Refine each already-seeded pair while budget remains.  Pair states found
-  // before exhaustion are retained even when a later refinement is partial.
-  for (std::size_t pair_index = 0; pair_index < pair_states.size();
-       ++pair_index) {
-    auto& state = pair_states[pair_index];
-    if (diagnostics.exhausted) break;
-    seen.clear();
-    const auto direct = make_pair_candidate(state.from, state.to);
-    seen.insert({direct.input, direct.output});
-    const auto keep_best = [&](const Region& candidate) {
-      if (!state.found || region_less(candidate, state.best)) {
-        state.best = candidate;
-        state.found = true;
-      }
-    };
-    const auto remaining_pairs = pair_states.size() - pair_index;
-    active_pair_start = diagnostics.visited_nodes;
-    active_pair_limit = std::max<std::size_t>(
-        1, (max_nodes - diagnostics.visited_nodes + remaining_pairs - 1) /
-               remaining_pairs);
-    active_pair_bounded = true;
-    enumerate(state.from, state.to, state, keep_best);
-    active_pair_bounded = false;
+    if (from >= n || to >= n) continue;
+    const auto solved =
+        solve_binary_region(problem, from, to, kRegionSolverNodeLimit);
+    diagnostics.branch_and_bound_nodes += solved.nodes_explored;
+    if (solved.exhausted) {
+      diagnostics.exhausted = true;
+    }
+    if (solved.feasible) regions.push_back(solved.region);
   }
-  for (const auto& state : pair_states) {
-    if (state.found) regions.push_back(state.best);
-  }
+  if (diagnostics.visited_nodes >= max_nodes) diagnostics.exhausted = true;
   std::sort(regions.begin(), regions.end(), region_less);
   regions.erase(std::unique(regions.begin(), regions.end(), [](const Region& a,
                                                                const Region& b) {

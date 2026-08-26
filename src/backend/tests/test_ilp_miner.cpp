@@ -131,9 +131,9 @@ int main() {
   }
   assert(rejected);
 
-  // Larger alphabets use lazy bounded region generation instead of an
-  // arbitrary fixed-width rejection.  The no-boundary form keeps the
-  // candidate count focused on the nine visible activities.
+  // Larger alphabets use arbitrary-width binary region variables instead of
+  // an arbitrary fixed-width rejection.  The no-boundary form keeps the
+  // pair-solve count focused on the nine visible activities.
   std::vector<std::vector<std::string>> many(1);
   for (int i = 0; i < 9; ++i) many[0].push_back("activity_" + std::to_string(i));
   ILPMinerOptions high_cardinality;
@@ -156,8 +156,8 @@ int main() {
   assert(twelve_result.diagnostics.visited_nodes <= bounded_high.max_nodes);
   assert(twelve_result.net.activities().size() == 12);
 
-  // Pair seeding preserves late causal relations even when refinement of a
-  // larger alphabet reaches the shared candidate budget.
+  // A bounded binary solve is performed once per causal pair; a generous
+  // pair budget preserves every late relation in a larger alphabet.
   ILPMinerOptions late_pairs = high_cardinality;
   late_pairs.max_nodes = 64;
   const auto late_result = mine_ilp(log_of(twelve), late_pairs);
@@ -171,7 +171,7 @@ int main() {
     assert(has_arc(late_result.net, late_id("activity_" + std::to_string(i)),
                    late_id("activity_" + std::to_string(i + 1))));
   }
-  assert(late_result.diagnostics.exhausted);
+  assert(!late_result.diagnostics.exhausted);
 
   // The dynamic signature crosses a machine-word boundary without changing
   // activity identity or the requested causal arc.

@@ -1042,18 +1042,18 @@ When no causal relation is supplied, the one-way portion of the normalized
 directly-follows graph is derived automatically; callers may override it with
 deterministic `A=>B` comma-separated entries. Frequency-based noise filtering
 can remove low-support variants and their activities before region search. The
-dependency-free integer-region search reports visited candidates, LP-feasibility
-attempts, branch counts, and exhaustion instead of claiming an unbounded
+dependency-free binary region solver uses the same cumulative constraints and
+objective as the classic formulation. It reports causal-pair solves,
+branch-and-bound nodes, and exhaustion instead of claiming an unbounded
 optimum. Supplied causal pairs are required producer/consumer constraints, not
-an exhaustive arc list: the bounded search may add compatible producer or
+an exhaustive arc list: the integer solve may add compatible producer or
 consumer arcs when a composite region is needed to satisfy all retained trace
 markings. Each supplied pair is optimized independently, with exact duplicate
 regions removed after selection; explicit pair places use zero initial/final
-markings so they survive workflow-net assembly. Region signatures use
-arbitrary-width bit vectors and are generated lazily in deterministic depth-
-first order, so nine-or-more activity alphabets no longer fail solely because
-a fixed-width signature table would be too large; `max_nodes` bounds candidate
-work and diagnostics before a large candidate table is allocated.
+markings so they survive workflow-net assembly. Arbitrary-width bit vectors
+keep large activity alphabets usable, while `max_nodes` bounds the number of
+causal-pair solves and the internal branch search has a separate deterministic
+budget.
 
 Region feasibility now follows the cumulative sequence-row formulation: the
 producer mask is applied to the negative prefix before an event, the consumer
@@ -1075,10 +1075,10 @@ more than once. Support accumulation is saturating at the unsigned counter
 limit, and the inclusive alpha comparison is covered at and just below an
 exact support boundary.
 
-Each requested causal pair is seeded with a direct feasibility solve before
-bounded refinement is shared across the remaining pairs. If the safety bound
-is reached while refining one pair, already-seeded later pairs are retained;
-the diagnostics explicitly report the resulting partial optimization.
+Each requested causal pair receives one deterministic binary integer solve. The
+objective is optimized before sparse arc-count tie breaking; if a solve or the
+pair-count bound is exhausted, any incumbent region is retained and the
+diagnostics explicitly report the resulting partial optimization.
 
 Strict request parsing, standalone CLI flags, the cached-session local-server
 endpoint, and typed frontend query serialization cover activity/boundary keys,
