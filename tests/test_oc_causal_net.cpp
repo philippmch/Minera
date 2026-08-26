@@ -73,6 +73,25 @@ void test_chain_and_serialization() {
   assert(result.log.relations.size() == 2);
   assert(result.log.events.front().timestamp.find('T') != std::string::npos);
 
+  auto traced_options = one_order_options();
+  traced_options.return_sequences = false;
+  traced_options.return_traces = true;
+  const auto traced = minera::oc_causal_net_extensive_playout_result(
+      model, traced_options);
+  assert(traced.return_traces_requested);
+  assert(traced.traces.size() == 1);
+  assert(traced.traces.front().size() == 2);
+  assert(traced.traces.front()[0].activity == "Create");
+  assert(traced.traces.front()[0].objects.size() == 1);
+  assert(traced.traces.front()[0].transitions.size() == 1);
+  assert(traced.traces.front()[0].transitions[0].object_id == "o1");
+  assert(traced.traces.front()[0].transitions[0].transition_index == 0);
+  assert(traced.traces.front()[1].transitions[0].transition_index == 1);
+  const auto traced_json = minera::serialize_oc_causal_net_playout_json(
+      traced, minera::OcpnEventBinding::kIndependent);
+  assert(traced_json.find("\"traces\"") != std::string::npos);
+  assert(traced_json.find("\"transition_index\":1") != std::string::npos);
+
   auto projected = one_order_options();
   projected.event_binding = minera::OcpnEventBinding::kSharedActivity;
   projected.objects_unique_per_trace = true;
@@ -206,6 +225,30 @@ void test_and_and_alternative_groups() {
       alternative, and_options);
   assert(alternative_result.trace_exists);
   assert(alternative_result.sequences.size() == 2);
+
+  auto branch_trace_options = and_options;
+  branch_trace_options.event_binding = minera::OcpnEventBinding::kIndependent;
+  branch_trace_options.return_sequences = false;
+  branch_trace_options.return_traces = true;
+  branch_trace_options.max_traces = 2;
+  const auto branch_traces = minera::oc_causal_net_extensive_playout_result(
+      alternative, branch_trace_options);
+  assert(branch_traces.trace_exists);
+  assert(branch_traces.traces.size() == 2);
+  assert(branch_traces.traces[0].size() == 2);
+  assert(branch_traces.traces[1].size() == 2);
+  assert(branch_traces.traces[0][0].activity == "Choose");
+  assert(branch_traces.traces[1][0].activity == "Choose");
+  assert(branch_traces.traces[0][0].transitions.size() == 1);
+  assert(branch_traces.traces[1][0].transitions.size() == 1);
+  assert(branch_traces.traces[0][0].transitions[0].transition_index == 0);
+  assert(branch_traces.traces[1][0].transitions[0].transition_index == 0);
+  assert(branch_traces.traces[0][1].transitions.size() == 1);
+  assert(branch_traces.traces[1][1].transitions.size() == 1);
+  assert(branch_traces.traces[0][1].transitions[0].transition_index == 0);
+  assert(branch_traces.traces[1][1].transitions[0].transition_index == 0);
+  assert(branch_traces.traces[0][0].objects !=
+         branch_traces.traces[1][0].objects);
 }
 
 void test_cardinality_and_key_constraints() {
