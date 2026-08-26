@@ -53,6 +53,11 @@ struct CausalAction {
   std::vector<CausalObject> consumed_start;
   std::vector<std::pair<std::string, Obligation>> produced;
   std::vector<CausalObject> objects;
+  // Marker-group actions have no Petri transition object of their own.  The
+  // stable activity index is therefore used as the transition identity in
+  // the optional trace projection.  Keeping one identity per bound object
+  // preserves batching and shared-event semantics without losing firings.
+  std::vector<OcpnFiredTransition> transitions;
 };
 
 struct MarkerSelection {
@@ -498,6 +503,10 @@ std::vector<CausalAction> enabled_actions(
         }
         action.objects = input.objects;
         for (const auto& object : output.objects) add_unique_object(action.objects, object);
+        action.transitions.reserve(action.objects.size());
+        for (const auto& object : action.objects)
+          action.transitions.push_back(
+              {object.type, object.id, activity_index});
         activity_actions.push_back(std::move(action));
       }
     }
@@ -568,7 +577,9 @@ void append_emitted_trace(Ocel& log, const std::vector<OcpnBinding>& sequence,
                           const std::vector<CausalObject>& objects,
                           const OcpnPlayoutOptions& options,
                           std::size_t trace_index,
-                          std::vector<OcpnBinding>* returned_sequence) {
+                          std::vector<OcpnBinding>* returned_sequence,
+                          const std::vector<OcpnTraceEvent>* source_trace,
+                          std::vector<OcpnTraceEvent>* returned_trace) {
   const auto suffix = options.objects_unique_per_trace
                           ? "_" + std::to_string(trace_index + 1)
                           : std::string();
@@ -581,34 +592,73 @@ void append_emitted_trace(Ocel& log, const std::vector<OcpnBinding>& sequence,
       log.objects.push_back({emitted, object.type, {}});
   }
 
-  std::vector<OcpnBinding> events;
-  for (const auto& binding : sequence) {
+  struct EmittedEvent {
+    OcpnBinding binding;
+    OcpnTraceEvent trace;
+  };
+  std::vector<EmittedEvent> events;
+  for (std::size_t source_index = 0; source_index < sequence.size();
+       ++source_index) {
+    const auto& binding = sequence[source_index];
     if (starts_with(binding.activity, "START_") ||
         starts_with(binding.activity, "END_"))
       continue;
+
+    OcpnTraceEvent source_event;
+    source_event.activity = binding.activity;
+    source_event.objects = binding.objects;
+    if (source_trace != nullptr && source_index < source_trace->size())
+      source_event = (*source_trace)[source_index];
+
     if (options.event_binding == OcpnEventBinding::kIndependent &&
         binding.objects.size() > 1) {
       for (const auto& object : binding.objects)
-        events.push_back({binding.activity, {object}});
+        {
+          EmittedEvent emitted;
+          emitted.binding = {binding.activity, {object}};
+          emitted.trace.activity = binding.activity;
+          emitted.trace.objects = {object};
+          for (const auto& transition : source_event.transitions)
+            if (transition.object_type == object.first &&
+                transition.object_id == object.second)
+              emitted.trace.transitions.push_back(transition);
+          events.push_back(std::move(emitted));
+        }
     } else if (options.event_binding == OcpnEventBinding::kSharedActivity &&
-        !events.empty() && events.back().activity == binding.activity) {
+               !events.empty() &&
+               events.back().binding.activity == binding.activity) {
       for (const auto& object : binding.objects)
-        if (std::find(events.back().objects.begin(), events.back().objects.end(), object) ==
-            events.back().objects.end())
-          events.back().objects.push_back(object);
+        if (std::find(events.back().binding.objects.begin(),
+                      events.back().binding.objects.end(), object) ==
+            events.back().binding.objects.end()) {
+          events.back().binding.objects.push_back(object);
+          events.back().trace.objects.push_back(object);
+        }
+      events.back().trace.transitions.insert(
+          events.back().trace.transitions.end(), source_event.transitions.begin(),
+          source_event.transitions.end());
     } else {
-      events.push_back(binding);
+      events.push_back({binding, std::move(source_event)});
     }
   }
-  if (returned_sequence) *returned_sequence = events;
+  if (returned_sequence) {
+    returned_sequence->clear();
+    returned_sequence->reserve(events.size());
+    for (const auto& event : events) returned_sequence->push_back(event.binding);
+  }
+  if (returned_trace) {
+    returned_trace->clear();
+    returned_trace->reserve(events.size());
+    for (const auto& event : events) returned_trace->push_back(event.trace);
+  }
   const auto event_offset = log.events.size();
   for (std::size_t index = 0; index < events.size(); ++index) {
     const auto event_id = "event_" + std::to_string(event_offset + index + 1);
     const auto timestamp = format_timestamp(
         options.start + static_cast<double>(trace_index) * options.case_interval +
         static_cast<double>(index) * options.event_interval);
-    log.events.push_back({event_id, events[index].activity, timestamp, {}});
-    for (const auto& [type, object_id] : events[index].objects) {
+    log.events.push_back({event_id, events[index].binding.activity, timestamp, {}});
+    for (const auto& [type, object_id] : events[index].binding.objects) {
       const auto found = emitted_ids.find({type, object_id});
       if (found != emitted_ids.end()) log.relations.push_back({event_id, found->second, ""});
     }
@@ -674,14 +724,18 @@ OcpnPlayoutResult causal_playout(
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+  result.return_traces_requested = options.return_traces;
   if (!options.exists_trace && options.max_traces == 0) return result;
 
   std::vector<std::vector<OcpnBinding>> traces;
+  std::vector<std::vector<OcpnTraceEvent>> transition_traces;
   std::set<std::string> visited;
   std::mt19937_64 rng(options.seed);
   std::size_t states = 0;
-  std::function<void(const CausalState&, std::vector<OcpnBinding>&)> visit =
-      [&](const CausalState& state, std::vector<OcpnBinding>& sequence) {
+  std::function<void(const CausalState&, std::vector<OcpnBinding>&,
+                     std::vector<OcpnTraceEvent>&)>
+      visit = [&](const CausalState& state, std::vector<OcpnBinding>& sequence,
+                  std::vector<OcpnTraceEvent>& transition_trace) {
         if (states++ >= options.max_states) return;
         if (state_is_terminal(state) &&
             !has_enabled_explicit_start(net, state,
@@ -689,6 +743,9 @@ OcpnPlayoutResult causal_playout(
           result.trace_exists = true;
           if (options.max_traces != 0 && traces.size() < options.max_traces)
             traces.push_back(sequence);
+          if (options.max_traces != 0 &&
+              transition_traces.size() < options.max_traces)
+            transition_traces.push_back(transition_trace);
           return;
         }
         if (options.exists_trace &&
@@ -702,7 +759,15 @@ OcpnPlayoutResult causal_playout(
           sequence.push_back({action.activity, {}});
           for (const auto& object : action.objects)
             sequence.back().objects.emplace_back(object.type, object.id);
-          visit(next, sequence);
+          if (options.return_traces) {
+            OcpnTraceEvent trace_event;
+            trace_event.activity = action.activity;
+            trace_event.objects = sequence.back().objects;
+            trace_event.transitions = action.transitions;
+            transition_trace.push_back(std::move(trace_event));
+          }
+          visit(next, sequence, transition_trace);
+          if (options.return_traces) transition_trace.pop_back();
           sequence.pop_back();
           if ((options.exists_trace && result.trace_exists) ||
               (options.max_traces != 0 && traces.size() >= options.max_traces))
@@ -710,14 +775,20 @@ OcpnPlayoutResult causal_playout(
         }
       };
   std::vector<OcpnBinding> sequence;
-  visit(initial, sequence);
+  std::vector<OcpnTraceEvent> transition_trace;
+  visit(initial, sequence, transition_trace);
 
   if (options.exists_trace || !result.trace_exists) return result;
   for (std::size_t index = 0; index < traces.size(); ++index) {
     std::vector<OcpnBinding> returned;
+    std::vector<OcpnTraceEvent> returned_trace;
     append_emitted_trace(result.log, traces[index], objects, options, index,
-                         options.return_sequences ? &returned : nullptr);
+                         options.return_sequences ? &returned : nullptr,
+                         options.return_traces ? &transition_traces[index]
+                                                : nullptr,
+                         options.return_traces ? &returned_trace : nullptr);
     if (options.return_sequences) result.sequences.push_back(std::move(returned));
+    if (options.return_traces) result.traces.push_back(std::move(returned_trace));
   }
   return result;
 }
