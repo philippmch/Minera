@@ -671,8 +671,8 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
 
   result.markings.initial.assign(result.net.place_count(), 0);
   result.markings.final.assign(result.net.place_count(), 0);
-  result.markings.initial[source] = 1;
-  result.markings.final[sink] = 1;
+  result.markings.initial[result.net.source()] = 1;
+  result.markings.final[result.net.sink()] = 1;
   result.diagnostics.computed = true;
   result.diagnostics.message = result.diagnostics.exhausted
                                   ? "node bound reached; partial region search returned"

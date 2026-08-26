@@ -1,4 +1,5 @@
 #include "minera/bpmn.hpp"
+#include "minera/petri_net_reduction.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -429,7 +430,7 @@ class BpmnNetBuilder {
     net_.set_sink(sink);
     convert(scopes_[root_scope], source, sink);
     net_.set_activities(std::move(activities_));
-    return std::move(net_);
+    return reduce_petri_net(net_).net;
   }
 
  private:

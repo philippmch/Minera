@@ -1,6 +1,7 @@
 #include "minera/powl_conversion.hpp"
 
 #include "minera/conformance.hpp"
+#include "minera/petri_net_reduction.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -410,7 +411,7 @@ class PowlBuilder {
     net_.set_source(source);
     net_.set_sink(sink);
     build(root_, source, sink);
-    return std::move(net_);
+    return reduce_petri_net(net_).net;
   }
 
  private:
@@ -465,12 +466,17 @@ class PowlBuilder {
         for (const auto& child : node.children()) build(child, in, out);
         return;
       case PowlNodeKind::kLoop: {
+        // Keep a private loop-entry place separate from the workflow source.
+        // The return edge must remain an explicit silent transition so reverse
+        // conversion can distinguish a loop from a sink escape.
+        const std::size_t loop_entry = net_.add_place();
+        net_.add_transition(std::nullopt, {in}, {loop_entry});
         const std::size_t control = net_.add_place();
-        build(node.children().at(0), in, control);
+        build(node.children().at(0), loop_entry, control);
         net_.add_transition(std::nullopt, {control}, {out});
         const std::size_t redo_out = net_.add_place();
         build(node.children().at(1), control, redo_out);
-        net_.add_transition(std::nullopt, {redo_out}, {in});
+        net_.add_transition(std::nullopt, {redo_out}, {loop_entry});
         return;
       }
       case PowlNodeKind::kStrictPartialOrder:

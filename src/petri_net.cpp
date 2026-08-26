@@ -1,4 +1,5 @@
 #include "minera/petri_net.hpp"
+#include "minera/petri_net_reduction.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -120,9 +121,13 @@ void build(const ProcessTreeNode& node,
         net.add_transition(std::nullopt, {in}, {out});
         return;
       }
-      build(node.children[0], in, out, net);
+      // Keep a private loop-entry place so the silent redo edge remains
+      // distinguishable from a sink escape after ordinary reduction.
+      const std::size_t loop_entry = net.add_place();
+      net.add_transition(std::nullopt, {in}, {loop_entry});
+      build(node.children[0], loop_entry, out, net);
       for (std::size_t i = 1; i < node.children.size(); ++i) {
-        build(node.children[i], out, in, net);
+        build(node.children[i], out, loop_entry, net);
       }
       return;
     }
@@ -139,7 +144,7 @@ PetriNet to_petri_net(const ProcessTree& tree) {
   net.set_source(source);
   net.set_sink(sink);
   build(tree.root(), source, sink, net);
-  return net;
+  return reduce_petri_net(net).net;
 }
 
 PetriNet to_petri_net(const HeuristicsNet& heuristics) {
@@ -235,7 +240,7 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     net.add_transition(a, merge(std::move(in_alts), true),
                        merge(std::move(out_alts), false));
   }
-  return net;
+  return reduce_petri_net(net).net;
 }
 
 }  // namespace minera
