@@ -34,6 +34,7 @@
 #include "minera/process_tree_playout.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
+#include "minera/ocel_playout.hpp"
 #include "minera/stochastic_petri.hpp"
 #include "minera/stochastic_map.hpp"
 #include "minera/monte_carlo.hpp"
@@ -208,6 +209,7 @@ using ProcessTreePlayoutParams = ProcessTreePlayoutOptions;
 using ExtensivePlayoutParams = ExtensivePlayoutOptions;
 using DfgPlayoutParams = DfgPlayoutOptions;
 using StochasticPlayoutParams = StochasticPlayoutOptions;
+using OcpnPlayoutParams = OcpnPlayoutOptions;
 using StochasticPetriParams = StochasticPetriOptions;
 using MonteCarloParams = MonteCarloOptions;
 
@@ -433,6 +435,14 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ExtensivePlayoutParams parse_extensive_playout_params(
     const FieldLookup& field);
 [[nodiscard]] ExtensivePlayoutParams parse_extensive_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Parses the optional OCPN playout trace-detail switch. The preferred wire
+// field is `ocpn_return_traces`; `return_traces` is accepted for the HTTP
+// endpoint's unprefixed query contract.
+[[nodiscard]] OcpnPlayoutParams parse_ocpn_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] OcpnPlayoutParams parse_ocpn_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parses DFG playout settings. Wire fields use the `dfg_playout_` prefix;

@@ -2522,6 +2522,26 @@ void parse_extensive_playout_params_maps_controls_and_rejects_zero() {
   assert(rejected);
 }
 
+void parse_ocpn_playout_params_maps_return_traces() {
+  const auto parsed = minera::parse_ocpn_playout_params(fields({
+      {"ocpn_return_traces", "true"}}));
+  assert(parsed.return_traces);
+  const auto http_alias = minera::parse_ocpn_playout_params(fields({
+      {"return_traces", "true"}}));
+  assert(http_alias.return_traces);
+  const auto disabled = minera::parse_ocpn_playout_params(fields({
+      {"return_traces", "false"}}));
+  assert(!disabled.return_traces);
+  bool rejected = false;
+  try {
+    (void)minera::parse_ocpn_playout_params(
+        fields({{"return_traces", "maybe"}}));
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void parse_stochastic_petri_params_maps_and_rejects_bad_values() {
   const auto parsed = minera::parse_stochastic_petri_params(fields({
       {"stochastic_petri_rates", "2, 3.5"},
@@ -3204,6 +3224,7 @@ int main() {
   parse_process_tree_playout_params_maps_variants_and_limits();
   parse_process_tree_playout_params_rejects_bad_values();
   parse_extensive_playout_params_maps_controls_and_rejects_zero();
+  parse_ocpn_playout_params_maps_return_traces();
   parse_stochastic_petri_params_maps_and_rejects_bad_values();
   parse_stochastic_map_params_maps_and_rejects_bad_values();
   parse_dfg_playout_params_maps_controls_and_aliases();

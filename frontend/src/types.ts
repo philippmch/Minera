@@ -1093,12 +1093,23 @@ export interface OcelPlayoutBinding {
   activity: string;
   objects: Array<{ type: string; id: string }>;
 }
+export interface OcelPlayoutFiredTransition {
+  object_type: string;
+  object_id: string;
+  transition_index: number;
+}
+export interface OcelPlayoutTraceEvent {
+  activity: string;
+  objects: Array<{ type: string; id: string }>;
+  transitions: OcelPlayoutFiredTransition[];
+}
 export interface OcelPetriPlayoutResult {
   family: "OCEL_PLAYOUT";
   variant: OcelPlayoutVariant;
   event_binding?: "independent" | "shared_activity" | "synchronized";
   exists_trace?: boolean;
   sequences?: OcelPlayoutBinding[][];
+  traces?: OcelPlayoutTraceEvent[][];
   log: Record<string, unknown>;
 }
 export interface OcelCausalNetPlayoutResult {
@@ -1107,6 +1118,7 @@ export interface OcelCausalNetPlayoutResult {
   event_binding?: "independent" | "shared_activity" | "synchronized";
   exists_trace?: boolean;
   sequences?: OcelPlayoutBinding[][];
+  traces?: OcelPlayoutTraceEvent[][];
   log: Record<string, unknown>;
 }
 export type OcelPlayoutResult = OcelPetriPlayoutResult | OcelCausalNetPlayoutResult;
@@ -1229,7 +1241,27 @@ export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult 
         isOcelRecord(binding) && typeof binding.activity === "string" &&
         Array.isArray(binding.objects) && binding.objects.every((object) =>
           isOcelRecord(object) && typeof object.type === "string" &&
-          typeof object.id === "string")))) return false;
+        typeof object.id === "string")))) return false;
+  }
+  if (value.traces !== undefined) {
+    if (!Array.isArray(value.traces)) return false;
+    for (const trace of value.traces) {
+      if (!Array.isArray(trace)) return false;
+      for (const event of trace) {
+        if (!isOcelRecord(event) || typeof event.activity !== "string" ||
+            !Array.isArray(event.objects) || !Array.isArray(event.transitions))
+          return false;
+        if (!event.objects.every((object) =>
+              isOcelRecord(object) && typeof object.type === "string" &&
+              typeof object.id === "string")) return false;
+        if (!event.transitions.every((transition) =>
+              isOcelRecord(transition) &&
+              typeof transition.object_type === "string" &&
+              typeof transition.object_id === "string" &&
+              isNonNegativeSafeInteger(transition.transition_index)))
+          return false;
+      }
+    }
   }
   return isOcelRecord(value.log);
 }

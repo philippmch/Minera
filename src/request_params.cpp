@@ -2461,6 +2461,30 @@ ExtensivePlayoutParams parse_extensive_playout_params(
   return params;
 }
 
+OcpnPlayoutParams parse_ocpn_playout_params(const FieldLookup& field) {
+  return parse_ocpn_playout_params(field, {});
+}
+
+OcpnPlayoutParams parse_ocpn_playout_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  OcpnPlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  const auto name = supplied("ocpn_return_traces")
+                        ? std::string_view("ocpn_return_traces")
+                        : std::string_view("return_traces");
+  if (supplied(name))
+    params.return_traces = parse_boolean(require(name), name);
+  return params;
+}
+
 DfgPlayoutParams parse_dfg_playout_params(const FieldLookup& field) {
   return parse_dfg_playout_params(field, {});
 }

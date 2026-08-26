@@ -26,6 +26,11 @@ struct ObjectChoice {
   std::string type;
   std::string object_id;
   std::vector<Trace> traces;
+  struct TransitionStep {
+    std::string activity;
+    std::size_t transition_index = 0;
+  };
+  std::vector<std::vector<TransitionStep>> transition_traces;
 };
 
 struct PendingEvent {
@@ -34,6 +39,7 @@ struct PendingEvent {
   std::string object_id;
   std::size_t local_index = 0;
   std::size_t choice_index = 0;
+  std::size_t transition_index = 0;
 };
 
 struct SynchronizedObject {
@@ -48,6 +54,7 @@ struct SynchronizedState {
   std::vector<std::vector<std::uint32_t>> markings;
   std::vector<std::size_t> activity_counts;
   std::vector<OcpnBinding> sequence;
+  std::vector<OcpnTraceEvent> traces;
 };
 
 struct SynchronizedAction {
@@ -56,6 +63,7 @@ struct SynchronizedAction {
   std::size_t transition_index = 0;
   OcpnBinding binding;
   std::vector<std::pair<std::size_t, std::size_t>> firings;
+  OcpnTraceEvent trace;
 };
 
 void validate_net(const PetriNet& net, const std::string& type) {
@@ -156,6 +164,87 @@ void sample_branch(std::vector<Value>& values, double cap,
   values.resize(limit);
 }
 
+struct TransitionTraceState {
+  std::vector<std::uint32_t> marking;
+  std::vector<std::size_t> visible_transitions;
+};
+
+std::string transition_trace_state_key(const TransitionTraceState& state) {
+  std::string key;
+  for (const auto token : state.marking) {
+    key += std::to_string(token);
+    key += ',';
+  }
+  key += '|';
+  for (const auto transition : state.visible_transitions) {
+    key += std::to_string(transition);
+    key += ',';
+  }
+  return key;
+}
+
+std::vector<std::vector<ObjectChoice::TransitionStep>>
+enumerate_transition_traces(
+    const PetriNet& net, const std::vector<std::uint32_t>& initial_marking,
+    const std::vector<std::uint32_t>& final_marking, std::size_t max_length,
+    std::size_t max_traces, std::size_t max_states,
+    double branching_factor_transitions, std::uint64_t seed) {
+  std::vector<std::vector<ObjectChoice::TransitionStep>> result;
+  if (max_traces == 0 || max_states == 0) return result;
+
+  std::mt19937_64 rng(seed);
+  std::deque<TransitionTraceState> queue;
+  std::unordered_set<std::string> visited;
+  TransitionTraceState initial{initial_marking, {}};
+  visited.insert(transition_trace_state_key(initial));
+  queue.push_back(initial);
+
+  const auto emit = [&](const TransitionTraceState& state) {
+    std::vector<ObjectChoice::TransitionStep> trace;
+    trace.reserve(state.visible_transitions.size());
+    for (const auto transition_index : state.visible_transitions) {
+      const auto& transition = net.transitions().at(transition_index);
+      trace.push_back({net.activities().at(*transition.activity),
+                       transition_index});
+    }
+    result.push_back(std::move(trace));
+  };
+
+  if (initial.marking == final_marking) emit(initial);
+  while (!queue.empty() && result.size() < max_traces &&
+         visited.size() < max_states) {
+    const auto state = std::move(queue.front());
+    queue.pop_front();
+    std::vector<std::size_t> enabled;
+    enabled.reserve(net.transitions().size());
+    for (std::size_t index = 0; index < net.transitions().size(); ++index) {
+      const auto& transition = net.transitions()[index];
+      if (transition.inputs.empty() && !transition.has_extended_arcs())
+        continue;
+      if (!transition.silent() && state.visible_transitions.size() >= max_length)
+        continue;
+      if (petri_transition_enabled(transition, state.marking))
+        enabled.push_back(index);
+    }
+    sample_branch(enabled, branching_factor_transitions, rng);
+    for (const auto transition_index : enabled) {
+      const auto& transition = net.transitions()[transition_index];
+      TransitionTraceState next = state;
+      fire_petri_transition(transition, next.marking);
+      if (!transition.silent())
+        next.visible_transitions.push_back(transition_index);
+      if (!visited.insert(transition_trace_state_key(next)).second) continue;
+      if (next.marking == final_marking) {
+        emit(next);
+        if (result.size() >= max_traces) break;
+      }
+      queue.push_back(std::move(next));
+      if (visited.size() >= max_states) break;
+    }
+  }
+  return result;
+}
+
 std::uint64_t derived_seed(std::uint64_t seed, const std::string& type,
                            const std::string& object_id,
                            const std::string& purpose) {
@@ -189,7 +278,8 @@ void append_key_part(std::string& key, const std::string& value) {
   key += ';';
 }
 
-std::string synchronized_state_key(const SynchronizedState& state) {
+std::string synchronized_state_key(const SynchronizedState& state,
+                                   bool include_transition_identity) {
   std::string key;
   for (const auto& marking : state.markings) {
     key += 'm';
@@ -212,6 +302,19 @@ std::string synchronized_state_key(const SynchronizedState& state) {
       append_key_part(key, object_id);
     }
     key += '|';
+  }
+  if (include_transition_identity) {
+    key += 't';
+    for (const auto& event : state.traces) {
+      append_key_part(key, event.activity);
+      for (const auto& transition : event.transitions) {
+        append_key_part(key, transition.object_type);
+        append_key_part(key, transition.object_id);
+        key += std::to_string(transition.transition_index);
+        key += ',';
+      }
+      key += '|';
+    }
   }
   return key;
 }
@@ -424,6 +527,15 @@ std::vector<SynchronizedAction> synchronized_actions(
     enumerate_binding_slots(slots.fixed, 0, activity, objects, state, used,
                             firings, bound_objects, bindings,
                             0, slots.variable);
+    for (auto& action : bindings) {
+      action.trace.activity = action.binding.activity;
+      action.trace.objects = action.binding.objects;
+      for (const auto [object_index, transition_index] : action.firings) {
+        action.trace.transitions.push_back(
+            {objects[object_index].type, objects[object_index].id,
+             transition_index});
+      }
+    }
     sample_branch(bindings, options.branching_factor_bindings, rng);
     actions.insert(actions.end(), std::make_move_iterator(bindings.begin()),
                    std::make_move_iterator(bindings.end()));
@@ -437,6 +549,7 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+  result.return_traces_requested = options.return_traces;
   if (!std::isfinite(options.branching_factor_transitions) ||
       options.branching_factor_transitions < 0.0 ||
       !std::isfinite(options.branching_factor_bindings) ||
@@ -500,7 +613,7 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
   std::deque<SynchronizedState> queue;
   std::unordered_set<std::string> visited;
   std::mt19937_64 rng(options.seed);
-  visited.insert(synchronized_state_key(initial));
+  visited.insert(synchronized_state_key(initial, options.return_traces));
   queue.push_back(std::move(initial));
   const auto trace_limit = options.exists_trace ? std::size_t{1} : options.max_traces;
   if (!options.exists_trace && options.max_traces == 0) return result;
@@ -544,6 +657,7 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
       }
     }
     if (options.return_sequences) result.sequences.push_back(state.sequence);
+    if (options.return_traces) result.traces.push_back(state.traces);
   };
 
   while (!queue.empty() && (trace_limit == 0 || generated_traces < trace_limit)) {
@@ -573,8 +687,9 @@ OcpnPlayoutResult synchronized_playout(const OcpnGraph& graph,
           fire_petri_transition(objects[object_index].net->transitions()[transition_index],
                                 next.markings[object_index]);
         next.sequence.push_back(action.binding);
+        next.traces.push_back(action.trace);
       }
-      if (visited.insert(synchronized_state_key(next)).second) {
+      if (visited.insert(synchronized_state_key(next, options.return_traces)).second) {
         queue.push_back(std::move(next));
         if (visited.size() >= options.max_states) break;
       }
@@ -598,6 +713,7 @@ const char* ocpn_event_binding_name(OcpnEventBinding binding) {
 Ocel legacy_ocpn_extensive_playout(
     const OcpnGraph& graph, const OcpnPlayoutOptions& options,
     std::vector<std::vector<OcpnBinding>>* sequences,
+    std::vector<std::vector<OcpnTraceEvent>>* traces,
     bool* trace_exists) {
   if (options.max_bindings_per_activity == 0)
     throw std::invalid_argument(
@@ -642,6 +758,23 @@ Ocel legacy_ocpn_extensive_playout(
         throw std::invalid_argument(
             "OCPN playout object ids must be unique across object types");
       supplied_object_types[object_id] = type;
+      if (traces != nullptr) {
+        const auto transition_traces = enumerate_transition_traces(
+            net, marker_for(net, options.initial_markings, type, net.source()),
+            marker_for(net, options.final_markings, type, net.sink()),
+            visible_bound(net, options.max_bindings_per_activity),
+            options.max_traces, options.max_states,
+            options.branching_factor_transitions,
+            derived_seed(options.seed, type, object_id, "trace-expansion"));
+        if (transition_traces.empty()) return {};
+        auto binding_rng = std::mt19937_64(
+            derived_seed(options.seed, type, object_id, "binding-selection"));
+        auto selected_traces = transition_traces;
+        sample_branch(selected_traces, options.branching_factor_bindings,
+                      binding_rng);
+        choices.push_back({type, object_id, {}, std::move(selected_traces)});
+        continue;
+      }
       ExtensivePlayoutOptions trace_options;
       trace_options.max_length = visible_bound(
           net, options.max_bindings_per_activity);
@@ -679,11 +812,22 @@ Ocel legacy_ocpn_extensive_playout(
     if (trace_exists) *trace_exists = true;
     std::vector<PendingEvent> pending;
     for (std::size_t choice = 0; choice < choices.size(); ++choice) {
-      const auto& selected_trace = choices[choice].traces[selected[choice]];
-      for (std::size_t index = 0; index < selected_trace.events.size(); ++index) {
-        pending.push_back({selected_trace.events[index].activity,
-                           choices[choice].type, choices[choice].object_id,
-                           index, choice});
+      if (traces != nullptr) {
+        const auto& selected_trace =
+            choices[choice].transition_traces[selected[choice]];
+        for (std::size_t index = 0; index < selected_trace.size(); ++index) {
+          pending.push_back({selected_trace[index].activity,
+                             choices[choice].type, choices[choice].object_id,
+                             index, choice,
+                             selected_trace[index].transition_index});
+        }
+      } else {
+        const auto& selected_trace = choices[choice].traces[selected[choice]];
+        for (std::size_t index = 0; index < selected_trace.events.size(); ++index) {
+          pending.push_back({selected_trace.events[index].activity,
+                             choices[choice].type, choices[choice].object_id,
+                             index, choice, 0});
+        }
       }
     }
     const bool shared_activity =
@@ -718,6 +862,7 @@ Ocel legacy_ocpn_extensive_playout(
     }
     std::size_t emitted_index = 0;
     std::vector<OcpnBinding> sequence;
+    std::vector<OcpnTraceEvent> emitted_trace;
     for (std::size_t index = 0; index < pending.size();) {
       const auto& event = pending[index];
       std::size_t end = index + 1;
@@ -749,10 +894,24 @@ Ocel legacy_ocpn_extensive_playout(
         }
         sequence.push_back(std::move(binding));
       }
+      if (traces != nullptr) {
+        OcpnTraceEvent trace_event;
+        trace_event.activity = event.activity;
+        for (std::size_t relation = index; relation < end; ++relation) {
+          const auto& related = pending[relation];
+          trace_event.objects.emplace_back(related.type, related.object_id);
+          trace_event.transitions.push_back(
+              {related.type, related.object_id, related.transition_index});
+        }
+        // The trace output follows the emitted event order, matching the
+        // existing sequence projection while retaining transition identity.
+        emitted_trace.push_back(std::move(trace_event));
+      }
       ++emitted_index;
       index = end;
     }
     if (sequences) sequences->push_back(std::move(sequence));
+    if (traces != nullptr) traces->push_back(std::move(emitted_trace));
     ++sequence_index;
   };
 
@@ -762,7 +921,10 @@ Ocel legacy_ocpn_extensive_playout(
       emit();
       return;
     }
-    for (std::size_t trace = 0; trace < choices[index].traces.size(); ++trace) {
+    const auto trace_count =
+        traces != nullptr ? choices[index].transition_traces.size()
+                          : choices[index].traces.size();
+    for (std::size_t trace = 0; trace < trace_count; ++trace) {
       selected[index] = trace;
       enumerate(index + 1);
       if (sequence_index >= options.max_traces) return;
@@ -813,11 +975,13 @@ OcpnPlayoutResult ocpn_extensive_playout_result(
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;
+  result.return_traces_requested = options.return_traces;
   auto legacy_options = options;
   if (options.exists_trace) legacy_options.max_traces = 1;
   result.log = legacy_ocpn_extensive_playout(
       graph, legacy_options,
       options.return_sequences ? &result.sequences : nullptr,
+      options.return_traces ? &result.traces : nullptr,
       &result.trace_exists);
   if (options.exists_trace) result.log = {};
   return result;
@@ -864,6 +1028,44 @@ std::string serialize_ocpn_playout_json(const OcpnPlayoutResult& result,
           out << ",\"id\":";
           write_json_string(out, values[step].objects[object].second);
           out << '}';
+        }
+        out << "]}";
+      }
+      out << ']';
+    }
+    out << ']';
+  }
+  if (result.return_traces_requested) {
+    out << ",\"traces\":[";
+    for (std::size_t trace = 0; trace < result.traces.size(); ++trace) {
+      if (trace != 0) out << ',';
+      out << '[';
+      const auto& values = result.traces[trace];
+      for (std::size_t step = 0; step < values.size(); ++step) {
+        if (step != 0) out << ',';
+        out << "{\"activity\":";
+        write_json_string(out, values[step].activity);
+        out << ",\"objects\":[";
+        for (std::size_t object = 0; object < values[step].objects.size();
+             ++object) {
+          if (object != 0) out << ',';
+          out << "{\"type\":";
+          write_json_string(out, values[step].objects[object].first);
+          out << ",\"id\":";
+          write_json_string(out, values[step].objects[object].second);
+          out << '}';
+        }
+        out << "],\"transitions\":[";
+        for (std::size_t transition = 0;
+             transition < values[step].transitions.size(); ++transition) {
+          if (transition != 0) out << ',';
+          const auto& fired = values[step].transitions[transition];
+          out << "{\"object_type\":";
+          write_json_string(out, fired.object_type);
+          out << ",\"object_id\":";
+          write_json_string(out, fired.object_id);
+          out << ",\"transition_index\":" << fired.transition_index
+              << '}';
         }
         out << "]}";
       }

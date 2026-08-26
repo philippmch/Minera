@@ -4777,6 +4777,7 @@ export interface OcelPlayoutOptions {
   event_binding?: "independent" | "shared_activity" | "synchronized";
   exists_trace?: boolean;
   return_sequences?: boolean;
+  return_traces?: boolean;
   start?: number;
   case_interval?: number;
   event_interval?: number;
@@ -4858,6 +4859,8 @@ export function ocelPlayoutQuery(options: OcelPlayoutOptions = {}): string {
     query.set("exists_trace", options.exists_trace ? "true" : "false");
   if (options.return_sequences !== undefined)
     query.set("return_sequences", options.return_sequences ? "true" : "false");
+  if (options.return_traces !== undefined)
+    query.set("return_traces", options.return_traces ? "true" : "false");
   const addNumber = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isFinite(value)) query.set(name, String(value));
   };

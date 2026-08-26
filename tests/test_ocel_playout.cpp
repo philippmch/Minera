@@ -88,6 +88,23 @@ minera::OcpnGraph dead_branching_graph() {
   return result;
 }
 
+minera::OcpnGraph duplicate_label_graph() {
+  minera::OcpnGraph result;
+  result.object_types = {"order"};
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {middle});
+  net.add_transition(0, {source}, {middle});
+  net.add_transition(1, {middle}, {sink});
+  result.petri_nets.emplace("order", std::move(net));
+  return result;
+}
+
 std::string activity_signature(const minera::Ocel& log) {
   std::string result;
   for (const auto& event : log.events) result += event.activity + ",";
@@ -291,6 +308,56 @@ void explicit_type_markers_drive_both_bindings() {
   assert(rejected);
 }
 
+void return_traces_preserves_duplicate_transition_identity() {
+  minera::OcpnPlayoutOptions options;
+  options.max_bindings_per_activity = 1;
+  options.max_traces = 4;
+  options.max_states = 100;
+  options.objects["order"] = {"o1"};
+  options.return_traces = true;
+
+  auto duplicate_graph = duplicate_label_graph();
+  auto regular_options = options;
+  regular_options.return_traces = false;
+  const auto regular =
+      minera::ocpn_extensive_playout(duplicate_graph, regular_options);
+  assert(regular.events.size() == 2);
+  const auto result = minera::ocpn_extensive_playout_result(
+      duplicate_graph, options);
+  assert(result.trace_exists);
+  assert(result.sequences.empty());
+  assert(result.traces.size() == 2);
+  assert(result.traces[0].size() == 2);
+  assert(result.traces[1].size() == 2);
+  assert(result.traces[0][0].activity == "A");
+  assert(result.traces[0][0].transitions.size() == 1);
+  assert(result.traces[0][0].transitions[0].object_id == "o1");
+  assert(result.traces[0][0].transitions[0].transition_index == 0);
+  assert(result.traces[1][0].transitions[0].transition_index == 1);
+  assert(result.traces[0][1].transitions[0].transition_index == 2);
+  assert(result.traces[1][1].transitions[0].transition_index == 2);
+
+  const auto json = minera::serialize_ocpn_playout_json(
+      result, minera::OcpnEventBinding::kIndependent);
+  assert(json.find("\"traces\"") != std::string::npos);
+  assert(json.find("\"transition_index\":1") != std::string::npos);
+
+  options.max_traces = 1;
+  const auto bounded = minera::ocpn_extensive_playout_result(
+      duplicate_label_graph(), options);
+  assert(bounded.traces.size() == 1);
+
+  options.event_binding = minera::OcpnEventBinding::kSynchronized;
+  options.max_traces = 4;
+  const auto synchronized = minera::ocpn_extensive_playout_result(
+      duplicate_label_graph(), options);
+  assert(synchronized.traces.size() == 2);
+  assert(synchronized.traces[0][0].transitions.size() == 1);
+  assert(synchronized.traces[1][0].transitions.size() == 1);
+  assert(synchronized.traces[0][0].transitions[0].transition_index == 0);
+  assert(synchronized.traces[1][0].transitions[0].transition_index == 1);
+}
+
 void synchronized_branching_is_seeded_and_fractional() {
   minera::OcpnPlayoutOptions options;
   options.max_bindings_per_activity = 1;
@@ -447,6 +514,7 @@ int main() {
   synchronized_exists_trace_reports_reachability();
   synchronized_variable_slots_bind_multiple_objects();
   explicit_type_markers_drive_both_bindings();
+  return_traces_preserves_duplicate_transition_identity();
   synchronized_branching_is_seeded_and_fractional();
   legacy_branching_is_seeded_for_independent_and_shared_modes();
   legacy_transition_sampling_is_per_object();

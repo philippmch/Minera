@@ -1752,6 +1752,24 @@ describe("OCEL API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("serializes and validates OCPN trace details", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe("/api/ocel/playout?model=ocpn&return_traces=true");
+      return { ok: true, json: async () => ({
+        family: "OCEL_PLAYOUT", variant: "EXTENSIVE",
+        traces: [[{
+          activity: "Ship", objects: [{ type: "order", id: "o1" }],
+          transitions: [{ object_type: "order", object_id: "o1", transition_index: 2 }],
+        }]],
+        log: { "ocel:events": {}, "ocel:objects": {} },
+      }) };
+    }));
+    await expect(requestOcelPlayout(new File(["{}"], "log.json"), {
+      model: "ocpn", return_traces: true,
+    })).resolves.toMatchObject({ family: "OCEL_PLAYOUT", traces: expect.any(Array) });
+    vi.unstubAllGlobals();
+  });
+
   it("posts an OCEL feature request and validates the table", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
       expect(init.body).toBeInstanceOf(FormData);
