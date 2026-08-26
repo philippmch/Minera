@@ -111,9 +111,11 @@ PowlNode flower(const std::vector<std::string>& acts) {
   if (acts.empty()) return PowlNode::silent();
   std::vector<PowlNode> leaves;
   for (const auto& a : acts) leaves.push_back(PowlNode::transition(a));
-  PowlNode do_node = leaves.size() == 1 ? std::move(leaves.front())
-                                       : PowlNode::xor_node(std::move(leaves));
-  return PowlNode::loop(std::move(do_node), PowlNode::silent());
+  PowlNode redo_node = leaves.size() == 1 ? std::move(leaves.front())
+                                         : PowlNode::xor_node(std::move(leaves));
+  // The flower fallback has an empty do part and an unrestricted redo part:
+  // it can start with no activity and then repeat any activity indefinitely.
+  return PowlNode::loop(PowlNode::silent(), std::move(redo_node));
 }
 
 // Discovery may produce nested partial orders while projecting a cut.  The
@@ -257,8 +259,38 @@ std::optional<PowlNode> make_xor(const UVCL& log, State& s) {
     comps.push_back(std::move(comp));
   }
   if (comps.size() < 2) return std::nullopt;
+  // Exclusive-choice projection assigns each trace to the component with the
+  // largest activity overlap.  A trace belongs to one branch only; projecting
+  // it independently onto every component would manufacture optional silent
+  // branches and change the discovered language.
+  std::vector<UVCL> projected(comps.size());
+  for (const auto& [sequence, count] : log) {
+    std::size_t selected = 0;
+    std::size_t selected_count = 0;
+    for (std::size_t index = 0; index < comps.size(); ++index) {
+      std::size_t overlap = 0;
+      for (const auto& activity : sequence)
+        if (std::find(comps[index].begin(), comps[index].end(), activity) !=
+            comps[index].end())
+          ++overlap;
+      // The source implementation resolves equal overlaps in favor of the
+      // later component after sorting by (overlap, index) descending.
+      if (overlap >= selected_count) {
+        selected = index;
+        selected_count = overlap;
+      }
+    }
+    Sequence branch;
+    for (const auto& activity : sequence)
+      if (std::find(comps[selected].begin(), comps[selected].end(), activity) !=
+          comps[selected].end())
+        branch.push_back(activity);
+    add_checked(projected[selected][branch], count);
+  }
   std::vector<PowlNode> children;
-  for (const auto& c : comps) { std::set<std::string> keep(c.begin(), c.end()); children.push_back(recurse(without_empty(project(log, keep)), s)); }
+  children.reserve(projected.size());
+  for (auto& child_log : projected)
+    children.push_back(recurse(child_log, s));
   return PowlNode::xor_node(std::move(children));
 }
 
@@ -827,6 +859,216 @@ bool valid_partition(const Relations& r, const std::vector<std::vector<std::size
   return true;
 }
 
+struct DynamicOrderResult {
+  std::vector<std::vector<std::size_t>> groups;
+  std::vector<std::pair<std::size_t, std::size_t>> order;
+};
+
+bool activity_group_less(const std::vector<std::size_t>& left,
+                         const std::vector<std::size_t>& right) {
+  return std::lexicographical_compare(left.begin(), left.end(), right.begin(),
+                                      right.end());
+}
+
+std::optional<DynamicOrderResult> dynamic_cluster_order(
+    const UVCL& log, const Relations& relations, bool weighted,
+    double order_frequency_ratio) {
+  using Groups = std::vector<std::vector<std::size_t>>;
+
+  std::map<std::string, std::size_t> activity_index;
+  for (std::size_t i = 0; i < relations.acts.size(); ++i)
+    activity_index.emplace(relations.acts[i], i);
+
+  std::function<std::optional<DynamicOrderResult>(Groups)> generate =
+      [&](Groups groups) -> std::optional<DynamicOrderResult> {
+    std::sort(groups.begin(), groups.end(), activity_group_less);
+    if (groups.size() < 2) return std::nullopt;
+    const std::size_t n = groups.size();
+
+    // The two dynamic variants differ only in how directional support is
+    // measured: plain clustering uses presence, while frequency clustering
+    // counts each direction once per trace and then applies multiplicity.
+    std::vector<std::vector<bool>> any(
+        n, std::vector<bool>(n, false));
+    std::vector<std::vector<std::uint64_t>> frequencies(
+        n, std::vector<std::uint64_t>(n, 0));
+    std::vector<std::size_t> cluster_of(relations.acts.size(), n);
+    for (std::size_t cluster = 0; cluster < n; ++cluster)
+      for (const auto activity : groups[cluster]) cluster_of[activity] = cluster;
+
+    if (weighted) {
+      for (const auto& [sequence, count] : log) {
+        std::set<std::pair<std::size_t, std::size_t>> seen;
+        for (std::size_t i = 0; i < sequence.size(); ++i) {
+          const auto source = activity_index.at(sequence[i]);
+          const auto source_group = cluster_of[source];
+          for (std::size_t j = i + 1; j < sequence.size(); ++j) {
+            const auto target = activity_index.at(sequence[j]);
+            const auto target_group = cluster_of[target];
+            if (!seen.insert({source_group, target_group}).second) continue;
+            add_checked(frequencies[source_group][target_group], count);
+          }
+        }
+      }
+      for (std::size_t i = 0; i < n; ++i)
+        for (std::size_t j = 0; j < n; ++j)
+          any[i][j] = frequencies[i][j] != 0;
+    } else {
+      for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = i + 1; j < n; ++j) {
+          for (const auto left : groups[i]) {
+            for (const auto right : groups[j]) {
+              any[i][j] = any[i][j] ||
+                          has(relations.efg, relations.acts[left],
+                              relations.acts[right]);
+              any[j][i] = any[j][i] ||
+                          has(relations.efg, relations.acts[right],
+                              relations.acts[left]);
+            }
+          }
+        }
+      }
+    }
+
+    std::vector<std::vector<bool>> edges(
+        n, std::vector<bool>(n, false));
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        if (weighted) {
+          if (std::numeric_limits<std::uint64_t>::max() -
+                  frequencies[i][j] < frequencies[j][i])
+            throw std::overflow_error("POWL dynamic frequency overflow");
+          const auto total = frequencies[i][j] + frequencies[j][i];
+          if (total != 0) {
+            const auto forward = static_cast<double>(frequencies[i][j]) /
+                                 static_cast<double>(total);
+            const auto reverse = static_cast<double>(frequencies[j][i]) /
+                                 static_cast<double>(total);
+            edges[i][j] = forward >= order_frequency_ratio;
+            edges[j][i] = reverse >= order_frequency_ratio;
+          }
+        } else {
+          if (any[i][j] && !any[j][i]) edges[i][j] = true;
+          if (any[j][i] && !any[i][j]) edges[j][i] = true;
+        }
+      }
+    }
+
+    // Close the relation transitively.  If the missing edge is contradicted
+    // by reverse evidence, merge the two endpoint groups and rebuild from
+    // the new partition; this is the key dynamic-clustering repair.
+    for (;;) {
+      bool added = false;
+      for (std::size_t i = 0; i < n && !added; ++i) {
+        for (std::size_t j = 0; j < n && !added; ++j) {
+          if (i == j || !edges[i][j]) continue;
+          for (std::size_t k = 0; k < n; ++k) {
+            if (k == i || k == j || !edges[j][k] || edges[i][k]) continue;
+            const bool reverse_evidence = weighted
+                                              ? (frequencies[k][i] != 0 ||
+                                                 frequencies[i][k] != 0)
+                                              : any[k][i];
+            if (reverse_evidence) {
+              auto merged = groups;
+              merged[i].insert(merged[i].end(), groups[k].begin(),
+                               groups[k].end());
+              merged.erase(merged.begin() + static_cast<std::ptrdiff_t>(k));
+              return generate(std::move(merged));
+            }
+            edges[i][k] = true;
+            added = true;
+            break;
+          }
+        }
+      }
+      if (!added) break;
+    }
+
+    // A two-cycle is not a strict partial order.  Merge the first conflicting
+    // pair and regenerate the order on the coarser partition.
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        if (!edges[i][j] || !edges[j][i]) continue;
+        auto merged = groups;
+        merged[i].insert(merged[i].end(), groups[j].begin(), groups[j].end());
+        merged.erase(merged.begin() + static_cast<std::ptrdiff_t>(j));
+        return generate(std::move(merged));
+      }
+    }
+
+    // Activities with no eventual-follows evidence in either direction are a
+    // choice and are coarsened before the next order attempt.
+    const auto merge_by_activity = [](Groups& target, std::size_t left_activity,
+                                      std::size_t right_activity) {
+      std::size_t left = target.size();
+      std::size_t right = target.size();
+      for (std::size_t index = 0; index < target.size(); ++index) {
+        if (std::find(target[index].begin(), target[index].end(),
+                      left_activity) != target[index].end())
+          left = index;
+        if (std::find(target[index].begin(), target[index].end(),
+                      right_activity) != target[index].end())
+          right = index;
+      }
+      if (left == target.size() || right == target.size() || left == right)
+        return false;
+      if (left > right) std::swap(left, right);
+      target[left].insert(target[left].end(), target[right].begin(),
+                          target[right].end());
+      target.erase(target.begin() + static_cast<std::ptrdiff_t>(right));
+      return true;
+    };
+    bool choice_merge = false;
+    Groups choice_groups = groups;
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        if (edges[i][j] || edges[j][i] || any[i][j] || any[j][i]) continue;
+        choice_merge =
+            merge_by_activity(choice_groups, groups[i].front(),
+                              groups[j].front()) || choice_merge;
+      }
+    }
+    if (choice_merge) return generate(std::move(choice_groups));
+
+    // Finally coarsen equal predecessor/successor neighborhoods.  The
+    // two-node case intentionally keeps its observable unordered PO even
+    // though both singleton neighborhoods are equal.
+    std::vector<std::set<std::size_t>> predecessors(
+        n), successors(n);
+    for (std::size_t i = 0; i < n; ++i)
+      for (std::size_t j = 0; j < n; ++j) {
+        if (edges[j][i]) predecessors[i].insert(j);
+        if (edges[i][j]) successors[i].insert(j);
+    }
+    Groups equal_groups = groups;
+    bool equal_merge = false;
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        if (predecessors[i] != predecessors[j] ||
+            successors[i] != successors[j])
+          continue;
+        equal_merge =
+            merge_by_activity(equal_groups, groups[i].front(),
+                              groups[j].front()) || equal_merge;
+      }
+    }
+    if (equal_merge && equal_groups.size() > 1)
+      return generate(std::move(equal_groups));
+
+    DynamicOrderResult result;
+    result.groups = std::move(groups);
+    for (std::size_t i = 0; i < n; ++i)
+      for (std::size_t j = 0; j < n; ++j)
+        if (edges[i][j]) result.order.emplace_back(i, j);
+    return result;
+  };
+
+  Groups initial;
+  for (std::size_t i = 0; i < relations.acts.size(); ++i)
+    initial.push_back({i});
+  return generate(std::move(initial));
+}
+
 std::optional<PowlNode> make_po(const UVCL& log, State& s) {
   const auto r = compute_relations(log);
   const auto n = r.acts.size();
@@ -836,7 +1078,7 @@ std::optional<PowlNode> make_po(const UVCL& log, State& s) {
   std::vector<std::vector<std::size_t>> groups;
   std::vector<std::pair<std::size_t, std::size_t>> order;
   if (s.opts.variant == PowlDiscoveryVariant::kBruteForce) {
-    for (std::size_t k = n - 1; k >= 2 && groups.empty(); --k) {
+    for (std::size_t k = n; k >= 2 && groups.empty(); --k) {
       for (const auto& g : enumerate_partitions(n, k)) if (valid_partition(r, g)) { groups = g; break; }
       if (k == 2) break;
     }
@@ -855,142 +1097,13 @@ std::optional<PowlNode> make_po(const UVCL& log, State& s) {
     for (auto& [key, b] : m) { (void)key; groups.push_back(std::move(b)); }
     if (!valid_partition(r, groups)) groups.clear();
   } else {
-    struct Cluster { std::vector<std::size_t> members; };
-    std::vector<Cluster> cs;
-    for (std::size_t i = 0; i < n; ++i) cs.push_back({{i}});
     const bool weighted = s.opts.variant == PowlDiscoveryVariant::kDynamicClustering;
-    struct Rel {
-      bool f = false;
-      bool b = false;
-      bool raw_f = false;
-      bool raw_b = false;
-      std::uint64_t fs = 0;
-      std::uint64_t bs = 0;
-    };
-    auto relation = [&](const Cluster& x, const Cluster& y) {
-      Rel out;
-      if (weighted) {
-        // The frequency variant counts a cluster direction once per
-        // UVCL trace, then applies that trace's multiplicity.  Repeated
-        // activity pairs must not inflate support within one sequence.
-        for (const auto& [seq, count] : log) {
-          bool f = false, b = false;
-          for (std::size_t i = 0; i < seq.size(); ++i) for (std::size_t j = i + 1; j < seq.size(); ++j) {
-            const auto in_x_i = std::find_if(x.members.begin(), x.members.end(), [&](std::size_t a) { return r.acts[a] == seq[i]; }) != x.members.end();
-            const auto in_y_j = std::find_if(y.members.begin(), y.members.end(), [&](std::size_t a) { return r.acts[a] == seq[j]; }) != y.members.end();
-            const auto in_y_i = std::find_if(y.members.begin(), y.members.end(), [&](std::size_t a) { return r.acts[a] == seq[i]; }) != y.members.end();
-            const auto in_x_j = std::find_if(x.members.begin(), x.members.end(), [&](std::size_t a) { return r.acts[a] == seq[j]; }) != x.members.end();
-            f = f || (in_x_i && in_y_j); b = b || (in_y_i && in_x_j);
-          }
-          if (f) add_checked(out.fs, count);
-          if (b) add_checked(out.bs, count);
-        }
-      } else {
-        for (const auto a : x.members) for (const auto b : y.members) {
-          out.raw_f =
-              out.raw_f || has(r.efg, r.acts[a], r.acts[b]);
-          out.raw_b =
-              out.raw_b || has(r.efg, r.acts[b], r.acts[a]);
-        }
-        out.f = out.raw_f && !out.raw_b;
-        out.b = out.raw_b && !out.raw_f;
-      }
-      if (weighted) {
-        if (std::numeric_limits<std::uint64_t>::max() - out.fs < out.bs)
-          throw std::overflow_error("POWL dynamic frequency overflow");
-        const auto total = out.fs + out.bs;
-        out.raw_f = out.fs != 0;
-        out.raw_b = out.bs != 0;
-        out.f = total != 0 && static_cast<double>(out.fs) / static_cast<double>(total) >= s.opts.order_frequency_ratio;
-        out.b = total != 0 && static_cast<double>(out.bs) / static_cast<double>(total) >= s.opts.order_frequency_ratio;
-      }
-      return out;
-    };
-    auto merge = [&](std::size_t i, std::size_t j) {
-      cs[i].members.insert(cs[i].members.end(), cs[j].members.begin(), cs[j].members.end());
-      cs.erase(cs.begin() + static_cast<std::ptrdiff_t>(j));
-    };
-    std::map<std::pair<std::size_t, std::size_t>, bool> inferred;
-    const auto has_order_edge =
-        [&](std::size_t from, std::size_t to) {
-          if (from == to) return false;
-          if (inferred.count({from, to}) != 0) return true;
-          if (from < to) return relation(cs[from], cs[to]).f;
-          return relation(cs[to], cs[from]).b;
-        };
-    for (;;) {
-      bool changed = false;
-      // Collapse two-cycles first.  A high-confidence frequency edge never
-      // reaches this branch unless both ratios independently pass.
-      for (std::size_t i = 0; i < cs.size() && !changed; ++i) for (std::size_t j = i + 1; j < cs.size() && !changed; ++j) {
-        if (has_order_edge(i, j) && has_order_edge(j, i)) {
-          merge(i, j);
-          changed = true;
-        }
-      }
-      if (changed) { inferred.clear(); continue; }
-      // Add transitive edges, or merge endpoints when reverse EFG evidence
-      // makes the inference contradictory.  Restart after every merge.
-      bool restart = false;
-      for (std::size_t i = 0; i < cs.size() && !restart; ++i) for (std::size_t j = 0; j < cs.size() && !restart; ++j) if (i != j) {
-        if (!has_order_edge(i, j)) continue;
-        for (std::size_t k = 0; k < cs.size() && !restart; ++k) {
-          if (k == i || k == j || !has_order_edge(j, k) ||
-              has_order_edge(i, k)) {
-            continue;
-          }
-          const auto reverse_evidence = relation(cs[k], cs[i]);
-          const bool conflicts =
-              weighted ? (reverse_evidence.raw_f ||
-                          reverse_evidence.raw_b)
-                       : reverse_evidence.raw_f;
-          if (conflicts) {
-            merge(std::min(i, k), std::max(i, k));
-            restart = true;
-          } else {
-            inferred[{i, k}] = true;
-          }
-        }
-      }
-      if (restart) { inferred.clear(); continue; }
-      // Merge unresolved (choice/weak) pairs.  For a two-node PO with equal
-      // empty neighbourhoods the observable unordered PO is preserved.
-      for (std::size_t i = 0; i < cs.size() && !changed; ++i) for (std::size_t j = i + 1; j < cs.size() && !changed; ++j) {
-        const auto a = relation(cs[i], cs[j]);
-        const bool ef = inferred.count({i, j}) != 0, eb = inferred.count({j, i}) != 0;
-        if (a.raw_f || a.raw_b || ef || eb) continue;
-        if (cs.size() == 2) continue;
-        merge(i, j); changed = true;
-      }
-      if (changed) { inferred.clear(); continue; }
-      // Merge equal predecessor/successor neighbourhoods, except the
-      // preserved two-node case above.
-      for (std::size_t i = 0; i < cs.size() && !changed; ++i) for (std::size_t j = i + 1; j < cs.size() && !changed; ++j) {
-        std::set<std::size_t> ip, is, jp, js;
-        for (std::size_t k = 0; k < cs.size(); ++k) if (k != i) {
-          if (has_order_edge(k, i)) ip.insert(k);
-          if (has_order_edge(i, k)) is.insert(k);
-        }
-        for (std::size_t k = 0; k < cs.size(); ++k) if (k != j) {
-          if (has_order_edge(k, j)) jp.insert(k);
-          if (has_order_edge(j, k)) js.insert(k);
-        }
-        if (ip == jp && is == js && cs.size() > 2) { merge(i, j); changed = true; }
-      }
-      if (!changed) break;
-      inferred.clear();
+    const auto dynamic = dynamic_cluster_order(
+        log, r, weighted, s.opts.order_frequency_ratio);
+    if (dynamic) {
+      groups = dynamic->groups;
+      order = dynamic->order;
     }
-    for (auto& c : cs) groups.push_back(std::move(c.members));
-    if (groups.size() < 2) groups.clear();
-    // Materialize direct and inferred cluster edges for the final PO.
-    for (std::size_t i = 0; i < groups.size(); ++i) for (std::size_t j = i + 1; j < groups.size(); ++j) {
-      const auto rel = relation(Cluster{groups[i]}, Cluster{groups[j]});
-      if (rel.f) order.emplace_back(i, j);
-      if (rel.b) order.emplace_back(j, i);
-    }
-    for (const auto& [edge, enabled] : inferred)
-      if (enabled && edge.first < groups.size() && edge.second < groups.size())
-        order.emplace_back(edge.first, edge.second);
   }
   if (groups.size() < 2) return std::nullopt;
   if (s.opts.variant != PowlDiscoveryVariant::kDynamicClustering && s.opts.variant != PowlDiscoveryVariant::kDynamicClusteringPlain) {
