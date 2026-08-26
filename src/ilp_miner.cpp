@@ -76,7 +76,33 @@ struct Region {
   BitMask output;
   std::size_t initial = 0;
   std::size_t final = 0;
+  // Cumulative-row objective used to choose the best region for a pair.
+  std::int64_t objective = 0;
 };
+
+struct RegionRow {
+  // Coefficients for input (place -> transition) and output
+  // (transition -> place) arcs in one cumulative sequence row.
+  std::vector<std::int64_t> input;
+  std::vector<std::int64_t> output;
+  bool equality = false;
+};
+
+struct RegionProblem {
+  std::size_t activity_count = 0;
+  std::vector<RegionRow> rows;
+  std::vector<std::int64_t> objective_input;
+  std::vector<std::int64_t> objective_output;
+  bool have_observed_prefix = false;
+};
+
+std::int64_t saturating_add(std::int64_t left, std::int64_t right) {
+  if (right > 0 && left > std::numeric_limits<std::int64_t>::max() - right)
+    return std::numeric_limits<std::int64_t>::max();
+  if (right < 0 && left < std::numeric_limits<std::int64_t>::min() - right)
+    return std::numeric_limits<std::int64_t>::min();
+  return static_cast<std::int64_t>(left + right);
+}
 
 NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
   if (log.traces.empty() || log.event_count() == 0)
@@ -258,60 +284,76 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
   return out;
 }
 
-// Check one candidate signature and compute its least feasible initial token
-// count.  This is the integer-region LP: every trace prefix must be enabled
-// without borrowing tokens, and all complete traces must have one common final
-// marking.  The least initial marking gives a deterministic objective.
-bool solve_region(const BitMask& input, const BitMask& output,
-                  const std::vector<NormalizedLog::Trace>& traces,
-                  std::size_t max_tokens, Region& out) {
-  if (!any_bit(input) && !any_bit(output)) return false;
-  for (std::size_t initial = 0; initial <= max_tokens; ++initial) {
-    bool valid = true;
-    std::size_t common_final = 0;
-    bool have_complete_final = false;
-    bool have_observed_prefix = false;
-    for (const auto& trace_entry : traces) {
-      const auto& trace = trace_entry.sequence;
-      const auto retained_prefix =
-          std::min(trace_entry.retained_prefix, trace.size());
-      if (retained_prefix != 0) have_observed_prefix = true;
-      std::size_t marking = initial;
-      for (std::size_t i = 0; i < retained_prefix; ++i) {
-        const auto activity = trace[i];
-        const bool consumes = has_bit(input, activity);
-        const bool produces = has_bit(output, activity);
-        // Pre-fire non-negativity is essential for input/output self-loops.
-        if (consumes && marking == 0) {
-          valid = false;
-          break;
-        }
-        if (consumes) --marking;
-        if (produces) ++marking;
+RegionProblem build_region_problem(
+    const std::vector<NormalizedLog::Trace>& traces, std::size_t activity_count) {
+  RegionProblem problem;
+  problem.activity_count = activity_count;
+  problem.objective_input.assign(activity_count, 0);
+  problem.objective_output.assign(activity_count, 0);
+  for (const auto& trace_entry : traces) {
+    const auto& trace = trace_entry.sequence;
+    const auto retained_prefix =
+        std::min(trace_entry.retained_prefix, trace.size());
+    std::vector<std::int64_t> cumulative(activity_count, 0);
+    for (std::size_t i = 0; i < retained_prefix; ++i) {
+      std::vector<std::int64_t> previous = cumulative;
+      if (i != 0) {
+        for (auto& value : previous) value = -value;
       }
-      if (!valid) break;
-      // A fully retained variant contributes the final-marking equality.  If
-      // alpha cut its suffix, the reference LP has no later equality row for
-      // that variant, so its partial marking must not reject the region.
-      if (retained_prefix == trace.size()) {
-        if (!have_complete_final) {
-          common_final = marking;
-          have_complete_final = true;
-        } else if (common_final != marking) {
-          valid = false;
-          break;
-        }
+      if (cumulative[trace[i]] < std::numeric_limits<std::int64_t>::max())
+        ++cumulative[trace[i]];
+
+      RegionRow row;
+      row.input = cumulative;
+      row.output = std::move(previous);
+      row.equality = retained_prefix == trace.size() && i + 1 == retained_prefix;
+      problem.rows.push_back(row);
+      problem.have_observed_prefix = true;
+      for (std::size_t activity = 0; activity < activity_count; ++activity) {
+        problem.objective_output[activity] = saturating_add(
+            problem.objective_output[activity], cumulative[activity]);
+        problem.objective_input[activity] = saturating_add(
+            problem.objective_input[activity], -cumulative[activity]);
       }
-    }
-    if (valid && have_observed_prefix) {
-      out = Region{input, output, initial, common_final};
-      return true;
     }
   }
-  return false;
+  return problem;
+}
+
+// Check one candidate signature against the cumulative sequence rows.  The
+// binary variables describe transition-to-place (output) and
+// place-to-transition (input) arcs.  The deviation variable is fixed to zero,
+// so each retained row enforces pre-fire enablement and each complete trace's
+// last row is an equality.
+bool solve_region(const BitMask& input, const BitMask& output,
+                  const RegionProblem& problem, Region& out) {
+  if (!any_bit(input) && !any_bit(output)) return false;
+  std::int64_t objective = 0;
+  for (const auto& row : problem.rows) {
+    std::int64_t lhs = 0;
+    for (std::size_t activity = 0; activity < problem.activity_count;
+         ++activity) {
+      if (has_bit(output, activity))
+        lhs = saturating_add(lhs, row.output[activity]);
+      if (has_bit(input, activity))
+        lhs = saturating_add(lhs, row.input[activity]);
+    }
+    if (row.equality ? lhs != 0 : lhs > 0) return false;
+  }
+  if (!problem.have_observed_prefix) return false;
+  for (std::size_t activity = 0; activity < problem.activity_count;
+       ++activity) {
+    if (has_bit(output, activity))
+      objective = saturating_add(objective, problem.objective_output[activity]);
+    if (has_bit(input, activity))
+      objective = saturating_add(objective, problem.objective_input[activity]);
+  }
+  out = Region{input, output, 0, 0, objective};
+  return true;
 }
 
 bool region_less(const Region& a, const Region& b) {
+  if (a.objective != b.objective) return a.objective < b.objective;
   const auto arcs = [](const Region& r) {
     return bit_count(r.input) + bit_count(r.output);
   };
@@ -328,68 +370,56 @@ std::vector<Region> discover_regions(
     const std::set<std::pair<std::size_t, std::size_t>>& sequence_edges,
     bool causal_relation_supplied, ILPMinerDiagnostics& diagnostics,
     std::size_t max_nodes) {
-  const std::size_t max_tokens = [&] {
-    std::size_t longest = 0;
-    for (const auto& trace : traces)
-      longest = std::max(longest, trace.sequence.size());
-    return longest;
-  }();
+  (void)sequence_edges;
+  (void)causal_relation_supplied;
   // A region is a pair of arbitrary-width input/output bit vectors. Candidate
-  // generation below is lazy: the safety bound applies before solving, so a
-  // large alphabet never requires a 4^n allocation.
+  // generation is lazy: the safety bound applies before solving, so a large
+  // alphabet never requires a 4^n allocation.
   const auto empty = [&] { return empty_mask(n); };
+  const auto problem = build_region_problem(traces, n);
+  std::vector<bool> final_activity(n, false);
+  for (const auto& trace_entry : traces) {
+    const auto retained_prefix =
+        std::min(trace_entry.retained_prefix, trace_entry.sequence.size());
+    if (retained_prefix == trace_entry.sequence.size() && retained_prefix != 0)
+      final_activity[trace_entry.sequence.back()] = true;
+  }
   std::vector<Region> regions;
   std::set<std::pair<BitMask, BitMask>> seen;
-  const auto compatible = [&](const Candidate& candidate) {
-    // Automatically derived one-way relations constrain composite places to
-    // retained continuations. Explicit relations remain permissive so one
-    // composite place can satisfy multiple requested pairs.
-    if (!causal_relation.empty() &&
-        (!any_bit(candidate.input) || !any_bit(candidate.output)))
-      return false;
-    if (causal_relation_supplied || causal_relation.empty()) return true;
-    for (std::size_t from = 0; from < n; ++from) {
-      if (!has_bit(candidate.output, from)) continue;
-      for (std::size_t to = 0; to < n; ++to) {
-        if (has_bit(candidate.input, to) &&
-            !sequence_edges.count({from, to}))
-          return false;
-      }
-    }
-    return true;
-  };
+  std::size_t active_pair_start = 0;
+  std::size_t active_pair_limit = max_nodes;
+  bool active_pair_bounded = false;
   struct VisitResult {
     bool stop = false;
     bool feasible = false;
     Region region;
   };
+  struct PairState {
+    std::size_t from = 0;
+    std::size_t to = 0;
+    bool found = false;
+    Region best;
+  };
   const auto visit_candidate = [&](const Candidate& candidate) {
     VisitResult result;
     if (!any_bit(candidate.input) && !any_bit(candidate.output)) return result;
+    if (!seen.insert({candidate.input, candidate.output}).second)
+      return result;
     if (diagnostics.visited_nodes >= max_nodes) {
       diagnostics.exhausted = true;
       result.stop = true;
       return result;
     }
-    ++diagnostics.visited_nodes;
-    if (!compatible(candidate)) return result;
-    if (!seen.insert({candidate.input, candidate.output}).second)
+    if (active_pair_bounded &&
+        diagnostics.visited_nodes - active_pair_start >= active_pair_limit) {
+      result.stop = true;
       return result;
+    }
+    ++diagnostics.visited_nodes;
     ++diagnostics.lp_solved;
     ++diagnostics.branch_and_bound_nodes;
-    if (!causal_relation_supplied && bit_count(candidate.input) == 1 &&
-        bit_count(candidate.output) == 1) {
-      std::size_t from = n;
-      std::size_t to = n;
-      for (std::size_t activity = 0; activity < n; ++activity) {
-        if (has_bit(candidate.output, activity)) from = activity;
-        if (has_bit(candidate.input, activity)) to = activity;
-      }
-      if (from == n || to == n || !sequence_edges.count({from, to}))
-        return result;
-    }
-    result.feasible = solve_region(candidate.input, candidate.output, traces,
-                                   max_tokens, result.region);
+    result.feasible = solve_region(candidate.input, candidate.output, problem,
+                                   result.region);
     return result;
   };
   const auto make_pair_candidate = [&](std::size_t from, std::size_t to) {
@@ -398,32 +428,45 @@ std::vector<Region> discover_regions(
     set_bit(candidate.input, to);
     return candidate;
   };
-  const auto make_loop_candidate = [&](std::size_t activity) {
-    Candidate candidate{empty(), empty()};
-    set_bit(candidate.input, activity);
-    set_bit(candidate.output, activity);
-    return candidate;
-  };
   const auto enumerate = [&](std::size_t required_from, std::size_t required_to,
+                             const PairState& pair_state,
                              const std::function<void(const Region&)>& on_feasible) {
+    (void)pair_state;
     Candidate candidate{empty(), empty()};
-    std::function<bool(std::size_t)> visit = [&](std::size_t activity) {
-      if (activity == n) {
+    std::vector<std::size_t> order;
+    order.reserve(n);
+    if (required_from < n) order.push_back(required_from);
+    if (required_to < n && required_to != required_from)
+      order.push_back(required_to);
+    for (std::size_t activity = 0; activity < n; ++activity) {
+      if (final_activity[activity] && activity != required_from &&
+          activity != required_to)
+        order.push_back(activity);
+    }
+    for (std::size_t activity = 0; activity < n; ++activity) {
+      if (activity != required_from && activity != required_to &&
+          !final_activity[activity])
+        order.push_back(activity);
+    }
+    std::function<bool(std::size_t)> visit = [&](std::size_t depth) {
+      if (depth == order.size()) {
         if (!any_bit(candidate.input) && !any_bit(candidate.output))
           return false;
         const auto outcome = visit_candidate(candidate);
         if (outcome.feasible) on_feasible(outcome.region);
         return outcome.stop;
       }
-      const bool must_output = required_from != n && activity == required_from;
-      const bool must_input = required_to != n && activity == required_to;
+      const auto activity = order[depth];
+      const bool must_output =
+          required_from < n && activity == required_from;
+      const bool must_input = required_to < n && activity == required_to;
       for (int state = 0; state < 4; ++state) {
         const bool output = state == 2 || state == 3;
         const bool input = state == 1 || state == 3;
         if ((must_output && !output) || (must_input && !input)) continue;
         if (output) set_bit(candidate.output, activity);
         if (input) set_bit(candidate.input, activity);
-        if (visit(activity + 1)) return true;
+        if (visit(depth + 1)) return true;
         if (output)
           candidate.output[activity / 64] &=
               ~(std::uint64_t{1} << (activity % 64));
@@ -441,83 +484,53 @@ std::vector<Region> discover_regions(
     if (outcome.feasible) on_feasible(outcome.region);
     return outcome.stop;
   };
-  const auto enumerate_legacy =
-      [&](std::size_t required_from, std::size_t required_to,
-          const std::function<void(const Region&)>& on_feasible) {
-        const auto mask = (std::uint64_t{1} << n) - 1;
-        const auto combinations = std::uint64_t{1} << (2 * n);
-        for (std::uint64_t code = 1; code < combinations; ++code) {
-          Candidate candidate{empty(), empty()};
-          const auto input = code & mask;
-          const auto output = code >> n;
-          for (std::size_t activity = 0; activity < n; ++activity) {
-            if ((input & (std::uint64_t{1} << activity)) != 0)
-              set_bit(candidate.input, activity);
-            if ((output & (std::uint64_t{1} << activity)) != 0)
-              set_bit(candidate.output, activity);
-          }
-          if (!causal_relation.empty() &&
-              (!any_bit(candidate.input) || !any_bit(candidate.output)))
-            continue;
-          if (required_from != n &&
-              (!has_bit(candidate.output, required_from) ||
-               !has_bit(candidate.input, required_to)))
-            continue;
-          const auto outcome = visit_candidate(candidate);
-          if (outcome.feasible) on_feasible(outcome.region);
-          if (outcome.stop) return true;
-        }
-        return false;
-      };
-  const auto append_region = [&](const Region& region) { regions.push_back(region); };
+  std::vector<PairState> pair_states;
+  std::set<std::pair<std::size_t, std::size_t>> solved_pairs;
+  for (const auto [from, to] : causal_relation) {
+    if (!solved_pairs.insert({from, to}).second) continue;
+    PairState state{from, to};
+    seen.clear();
+    const auto keep_best = [&](const Region& candidate) {
+      if (!state.found || region_less(candidate, state.best)) {
+        state.best = candidate;
+        state.found = true;
+      }
+    };
+    // Reserve one direct feasibility solve for every causal pair before the
+    // optional exhaustive refinement.  A large alphabet must not prevent
+    // later pairs from receiving their required place when the global bound
+    // is reached while optimizing an earlier pair.
+    const auto first = collect(make_pair_candidate(from, to), keep_best);
+    pair_states.push_back(std::move(state));
+    if (first) break;
+  }
 
-  if (!causal_relation_supplied) {
-    for (const auto [from, to] : causal_relation) {
-      if (collect(make_pair_candidate(from, to), append_region)) break;
-    }
-    if (!diagnostics.exhausted) {
-      for (std::size_t activity = 0; activity < n; ++activity) {
-        if (collect(make_loop_candidate(activity), append_region)) break;
+  // Refine each already-seeded pair while budget remains.  Pair states found
+  // before exhaustion are retained even when a later refinement is partial.
+  for (std::size_t pair_index = 0; pair_index < pair_states.size();
+       ++pair_index) {
+    auto& state = pair_states[pair_index];
+    if (diagnostics.exhausted) break;
+    seen.clear();
+    const auto direct = make_pair_candidate(state.from, state.to);
+    seen.insert({direct.input, direct.output});
+    const auto keep_best = [&](const Region& candidate) {
+      if (!state.found || region_less(candidate, state.best)) {
+        state.best = candidate;
+        state.found = true;
       }
-    }
-    if (!diagnostics.exhausted) {
-      if (n <= 8)
-        enumerate_legacy(n, n, append_region);
-      else
-        enumerate(n, n, append_region);
-    }
-  } else {
-    // Solve each supplied pair independently. A composite region may satisfy
-    // several pairs, but each pair still receives its own best feasible
-    // region; exact duplicate regions are removed after selection.
-    std::set<std::pair<std::size_t, std::size_t>> solved_pairs;
-    for (const auto [from, to] : causal_relation) {
-      if (!solved_pairs.insert({from, to}).second) continue;
-      // The reference optimizes each requested pair independently; a
-      // composite candidate may therefore be evaluated again for a later
-      // pair even when it was already considered for an earlier one.
-      seen.clear();
-      bool found = false;
-      Region best;
-      const auto keep_internal = [&](const Region& candidate) {
-        if (candidate.initial != 0 || candidate.final != 0) return;
-        if (!found || region_less(candidate, best)) {
-          best = candidate;
-          found = true;
-        }
-      };
-      if (collect(make_pair_candidate(from, to), keep_internal) &&
-          diagnostics.exhausted)
-        break;
-      if (!diagnostics.exhausted) {
-        if (n <= 8)
-          enumerate_legacy(from, to, keep_internal);
-        else
-          enumerate(from, to, keep_internal);
-      }
-      if (found) regions.push_back(best);
-      if (diagnostics.exhausted) break;
-    }
+    };
+    const auto remaining_pairs = pair_states.size() - pair_index;
+    active_pair_start = diagnostics.visited_nodes;
+    active_pair_limit = std::max<std::size_t>(
+        1, (max_nodes - diagnostics.visited_nodes + remaining_pairs - 1) /
+               remaining_pairs);
+    active_pair_bounded = true;
+    enumerate(state.from, state.to, state, keep_best);
+    active_pair_bounded = false;
+  }
+  for (const auto& state : pair_states) {
+    if (state.found) regions.push_back(state.best);
   }
   std::sort(regions.begin(), regions.end(), region_less);
   regions.erase(std::unique(regions.begin(), regions.end(), [](const Region& a,
@@ -591,43 +604,9 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
   std::vector<std::size_t> initial_places;
   std::vector<std::size_t> final_places;
   for (const auto& region : regions) {
-    const bool self_loop_region = [&] {
-      for (std::size_t activity = 0; activity < n; ++activity)
-        if (has_bit(region.input, activity) && has_bit(region.output, activity))
-          return true;
-      return false;
-    }();
-    const auto overlap_count = [&] {
-      std::size_t count = 0;
-      for (std::size_t activity = 0; activity < n; ++activity)
-        if (has_bit(region.input, activity) && has_bit(region.output, activity))
-          ++count;
-      return count;
-    };
-    // A pure self-loop is only needed when that activity actually repeats;
-    // otherwise it contributes an unconstrained token and makes reachability
-    // needlessly branch.  Mixed regions (for example a-loop -> b) remain.
-    if (self_loop_region && masks_equal(region.input, region.output)) {
-      bool repeated = false;
-      for (const auto& trace_entry : log.traces) {
-        const auto& trace = trace_entry.sequence;
-        std::size_t count = 0;
-        for (const auto activity : trace)
-          if (has_bit(region.input, activity)) ++count;
-        if (count > 1) { repeated = true; break; }
-      }
-      if (!repeated) continue;
-    }
-    if (overlap_count() > 1) continue;
-    // Workflow markings have one source token and one sink token.  A silent
-    // edge cannot manufacture an initial multiplicity greater than one, and
-    // retaining every such region creates a combinatorial silent-routing
-    // search.  Repeated traces are represented by the canonical one-token
-    // self-loop region instead.
-    if (region.initial > 1 || region.final > 1 ||
-        (region.initial != 0 && !self_loop_region) ||
-        (region.final != 0 && !self_loop_region))
-      continue;
+    // Each selected integer region is a place in the discovered net.  The
+    // solver's zero-deviation constraints already enforce all required
+    // boundaries, so no post-hoc overlap or marking filters are applied here.
     const std::size_t place = result.net.add_place();
     for (std::size_t a = 0; a < n; ++a) {
       if (has_bit(region.input, a)) inputs[a].push_back(place);
@@ -672,6 +651,7 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
       }
     }
   }
+
   // A region marking is a vector, so initialize/finalize all persistent
   // regions in one source split and one sink join.  Separate silent edges
   // would compete for the single source token and make otherwise valid logs

@@ -1011,6 +1011,23 @@ first order, so nine-or-more activity alphabets no longer fail solely because
 a fixed-width signature table would be too large; `max_nodes` bounds candidate
 work and diagnostics before a large candidate table is allocated.
 
+Region feasibility now follows the cumulative sequence-row formulation: the
+producer mask is applied to the negative prefix before an event, the consumer
+mask to the prefix including that event, and non-final rows require a
+non-positive pre-fire slack while each fully retained final row is an equality.
+The selected region minimizes the cumulative objective (`producer - consumer`)
+over one row per retained variant and resolves equal scores by sparse
+deterministic ordering (objective, arc count, then masks). Variant multiplicity
+still drives support filtering, while the optimization rows remain one per
+variant. This keeps final-row behavior independent across variants and lets a
+composite place remain valid when alpha filtering removes a rare suffix from
+its rows.
+
+Each requested causal pair is seeded with a direct feasibility solve before
+bounded refinement is shared across the remaining pairs. If the safety bound
+is reached while refining one pair, already-seeded later pairs are retained;
+the diagnostics explicitly report the resulting partial optimization.
+
 Strict request parsing, standalone CLI flags, the cached-session local-server
 endpoint, and typed frontend query serialization cover activity/boundary keys,
 alpha, causal edges, noise threshold, and safety bounds. Focused tests cover
