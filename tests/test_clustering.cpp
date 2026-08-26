@@ -55,6 +55,96 @@ int main() {
   auto dmm_options=o; dmm_options.trace_attribute="segment"; dmm_options.variant=TraceAttributeClusteringVariant::kDmmLeven;
   const auto dmm_result=discover_trace_attribute_clustering(dmm_log,dmm_options);
   assert(dmm_result.tree.distance > 0.19 && dmm_result.tree.distance < 0.21);
+
+  // Vector DMM matches activity and succession components independently;
+  // matching their already-combined pair scores produces a different value.
+  EventLog component_log;
+  component_log.traces.push_back(Trace{
+      "component-a-1",
+      {Event{"component-a-1", "A", "", "", 0, {}, ""},
+       Event{"component-a-1", "A", "", "", 1, {}, ""}},
+      {{"segment", "component-a"}}});
+  component_log.traces.push_back(Trace{
+      "component-a-2",
+      {Event{"component-a-2", "A", "", "", 0, {}, ""},
+       Event{"component-a-2", "B", "", "", 1, {}, ""}},
+      {{"segment", "component-a"}}});
+  component_log.traces.push_back(Trace{
+      "component-b-1",
+      {Event{"component-b-1", "B", "", "", 0, {}, ""},
+       Event{"component-b-1", "A", "", "", 1, {}, ""}},
+      {{"segment", "component-b"}}});
+  component_log.traces.push_back(Trace{
+      "component-b-2",
+      {Event{"component-b-2", "A", "", "", 0, {}, ""},
+       Event{"component-b-2", "B", "", "", 1, {}, ""},
+       Event{"component-b-2", "C", "", "", 2, {}, ""},
+       Event{"component-b-2", "C", "", "", 3, {}, ""}},
+      {{"segment", "component-b"}}});
+  auto component_options = dmm_options;
+  component_options.variant = TraceAttributeClusteringVariant::kDmmVec;
+  component_options.alpha = 0.5;
+  const auto component_result =
+      discover_trace_attribute_clustering(component_log, component_options);
+  assert(std::abs(component_result.tree.distance - 0.4451053) < 1e-6);
+
+  // Empty succession vectors are maximally distant, including for two
+  // one-event variants.
+  EventLog singleton_log;
+  singleton_log.traces.push_back(Trace{
+      "singleton-a", {Event{"singleton-a", "A", "", "", 0, {}, ""}},
+      {{"segment", "singleton-a"}}});
+  singleton_log.traces.push_back(Trace{
+      "singleton-b", {Event{"singleton-b", "B", "", "", 0, {}, ""}},
+      {{"segment", "singleton-b"}}});
+  const auto singleton_result =
+      discover_trace_attribute_clustering(singleton_log, component_options);
+  assert(std::abs(singleton_result.tree.distance - 1.0) < 1e-12);
+
+  // Traces without the selected case attribute are not an artificial empty
+  // group.
+  EventLog missing_attribute_log;
+  missing_attribute_log.traces.push_back(Trace{
+      "present-x", {Event{"present-x", "A", "", "", 0, {}, ""}},
+      {{"segment", "x"}}});
+  missing_attribute_log.traces.push_back(Trace{
+      "present-y", {Event{"present-y", "B", "", "", 0, {}, ""}},
+      {{"segment", "y"}}});
+  missing_attribute_log.traces.push_back(Trace{
+      "missing", {Event{"missing", "C", "", "", 0, {}, ""}}, {}});
+  const auto missing_result = discover_trace_attribute_clustering(
+      missing_attribute_log, component_options);
+  assert(missing_result.diagnostics.group_count == 2);
+  assert((missing_result.leaf_names ==
+          std::vector<std::string>{"x", "y"}));
+
+  // Linkage child order follows the merge order, not lexical leaf names.
+  assert(insertion_result.tree.children.size() == 2);
+  assert(insertion_result.tree.children[0].name == "z");
+  assert(insertion_result.tree.children[1].name == "a");
+
+  EventLog nested_order;
+  nested_order.traces.push_back(Trace{
+      "nested-z", {Event{"nested-z", "A", "", "", 0, {}, ""}},
+      {{"segment", "z"}}});
+  nested_order.traces.push_back(Trace{
+      "nested-a", {Event{"nested-a", "A", "", "", 0, {}, ""}},
+      {{"segment", "a"}}});
+  nested_order.traces.push_back(Trace{
+      "nested-m", {Event{"nested-m", "B", "", "", 0, {}, ""}},
+      {{"segment", "m"}}});
+  auto nested_options = insertion_options;
+  nested_options.variant = TraceAttributeClusteringVariant::kDmmLeven;
+  const auto nested_result =
+      discover_trace_attribute_clustering(nested_order, nested_options);
+  assert(nested_result.tree.name == "root");
+  assert(nested_result.tree.children.size() == 2);
+  assert(nested_result.tree.children[0].name == "m");
+  assert(nested_result.tree.children[1].name == "a-z");
+  assert(nested_result.tree.children[1].children.size() == 2);
+  assert(nested_result.tree.children[1].children[0].name == "z");
+  assert(nested_result.tree.children[1].children[1].name == "a");
+
   ProfileClusteringOptions profile_options;
   profile_options.cluster_count = 2;
   profile_options.variant = ProfileClusteringVariant::SKLEARN_PROFILES;
