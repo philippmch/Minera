@@ -721,9 +721,10 @@ short circuit, reports its transition id and strong-connectivity result, and
 serializes a separate short-circuit reachability projection while retaining
 the original graph for completion witnesses. Woflan marking inputs follow its
 single-place boundary contract. The soundness family also exposes a strict
-`return_asap_when_unsound` control: a reachable non-final deadlock or improper
-completion marking returns immediately with the partial reachability graph and
-its shortest witness. Structural pair diagnostics use a deterministic
+`return_asap_when_unsound` control: a structural S-component coverage failure
+returns immediately with invariant evidence, while a reachable non-final
+deadlock or improper completion marking returns with the partial reachability
+graph and its shortest witness. Structural pair diagnostics use a deterministic
 node-split unit-capacity flow graph and report both directions whose maximum flow
 exceeds one, preserving the duplicated-node coordinates in the JSON contract.
 Bounded exploration also returns every shortest path to a marking that cannot
@@ -1185,10 +1186,11 @@ Trace-attribute clustering keeps the input order of attribute groups and of
 equal-frequency variants before applying the five named distance families.
 DMM vector matching computes activity and succession similarities separately
 before applying `alpha`; empty succession vectors have maximal distance, and
-traces without the selected grouping attribute are excluded. Linkage children
-retain merge order while labels remain deterministic. Focused Release coverage
-exercises these numerical and ordering rules plus repeated serialization;
-broader differential fixtures remain.
+traces without the selected grouping attribute are excluded. The DFG distance
+uses complete group sublogs, so its result is invariant to the shared
+`percent` control. Linkage children retain merge order while labels remain
+deterministic. Focused Release coverage exercises these numerical and ordering
+rules plus repeated serialization; broader differential fixtures remain.
 
 ## Evaluation parity evidence
 

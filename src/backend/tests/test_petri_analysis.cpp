@@ -324,6 +324,24 @@ void weighted_invariant_contract() {
   assert(woflan_result.s_components.has_value() &&
          woflan_result.s_components->empty());
   assert(!woflan_result.left.has_value() || !*woflan_result.left);
+
+  // Structural S-component failure is an early Woflan witness.  The
+  // return-asap form must not spend the remaining budget on behavioral
+  // projections after this decision is already conclusive.
+  woflan.diagnostics = true;
+  woflan.return_asap_when_unsound = true;
+  const auto early = analyze_soundness(net, woflan);
+  assert(early.status == SoundnessStatus::UNSOUND && early.computed &&
+         early.returned_asap);
+  assert(!early.left.has_value());
+  assert(early.reachability_markings.empty());
+  assert(early.coverability_markings.empty());
+  assert(early.restricted_coverability_markings.empty());
+  assert(std::any_of(early.diagnostic_messages.begin(),
+                     early.diagnostic_messages.end(), [](const auto& message) {
+                       return message.find("S-component coverage") !=
+                              std::string::npos;
+                     }));
 }
 
 void uniform_invariant_combination() {
@@ -584,12 +602,31 @@ void unsound_models() {
   const auto early_locking = analyze_soundness(locking, early);
   assert(early_locking.returned_asap && early_locking.computed &&
          early_locking.status == SoundnessStatus::UNSOUND);
-  assert(early_locking.deadlock_witnesses ==
-         std::vector<std::vector<std::size_t>>{{0}});
-  assert(early_locking.reachability_markings.size() == 2);
+  assert(early_locking.deadlock_witnesses.empty());
+  assert(early_locking.reachability_markings.empty());
+  assert(early_locking.coverability_markings.empty());
+  assert(early_locking.restricted_coverability_markings.empty());
   const auto early_json = petri_analysis_json(early_locking);
   assert(early_json.find("\"returned_asap\":true") !=
          std::string::npos);
+
+  // Once structural coverage is complete, return-asap still stops on the
+  // first reachable non-final deadlock and retains its short witness.
+  PetriNet covered_deadlock;
+  covered_deadlock.set_activities({"A"});
+  const auto covered_source = covered_deadlock.add_place();
+  const auto covered_sink = covered_deadlock.add_place();
+  covered_deadlock.set_source(covered_source);
+  covered_deadlock.set_sink(covered_sink);
+  covered_deadlock.add_transition(0, {covered_source, covered_source},
+                                  {covered_sink, covered_sink});
+  const auto covered_early = analyze_soundness(covered_deadlock, early);
+  assert(covered_early.returned_asap && covered_early.computed &&
+         covered_early.status == SoundnessStatus::UNSOUND);
+  assert(covered_early.left.has_value() && *covered_early.left);
+  assert(covered_early.deadlock_witnesses ==
+         std::vector<std::vector<std::size_t>>{{}});
+  assert(covered_early.reachability_markings.size() == 1);
   const auto early_sound = analyze_soundness(chain(), early);
   assert(!early_sound.returned_asap &&
          early_sound.status == SoundnessStatus::SOUND);

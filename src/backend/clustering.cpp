@@ -255,7 +255,14 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   std::vector<std::string> names; std::vector<Profile> profiles;
   for (const auto& group : groups) {
     names.push_back(group.name);
-    profiles.push_back(profile(group.traces, o.percent));
+    // The DFG distance is defined over each complete group sublog.  Its
+    // reference evaluator accepts the percentage setting for API symmetry,
+    // but does not use it to discard trace variants.  Keep the sampling
+    // control for the other distance families only.
+    profiles.push_back(profile(
+        group.traces, o.variant == TraceAttributeClusteringVariant::kDfg
+                          ? 1.0
+                          : o.percent));
     r.leaf_names.push_back(group.name);
   }
   if (groups.empty()) {
