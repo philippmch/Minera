@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -290,13 +291,24 @@ PreparedOptions prepare_options(const PetriNet& net,
   }
 }
 
-// Reserve output-place resources for one firing.  Every output arc reserves a
-// slot for the transition's service interval.  A transition requiring several
-// slots on one place waits for the corresponding number of earliest slots.
+void append_interval(std::vector<MonteCarloInterval>& intervals,
+                     double start, double end) {
+  if (!std::isfinite(start) || !std::isfinite(end) || end < start) {
+    throw std::runtime_error("Monte Carlo interval has invalid finite bounds");
+  }
+  if (end > start) intervals.push_back({start, end});
+}
+
+// Reserve output-place resources for one firing. A transition requiring
+// several slots on one place waits for the corresponding number of earliest
+// slots. Place occupancy is recorded when an input token is consumed below;
+// output reservation itself is not a place-occupancy interval.
 double reserve_output_resources(
+    std::size_t transition_index,
     const PetriTransition& transition,
     const std::vector<std::size_t>& capacities,
     std::vector<std::vector<double>>& available,
+    std::vector<MonteCarloTransitionIntervalTree>& transition_intervals,
     double ready_time,
     double duration) {
   std::map<std::size_t, std::size_t> output_counts;
@@ -320,6 +332,10 @@ double reserve_output_resources(
   if (!std::isfinite(finish) || finish < start) {
     throw std::runtime_error("Monte Carlo virtual time overflow");
   }
+  if (start > ready_time) {
+    append_interval(transition_intervals[transition_index].intervals,
+                    ready_time, start);
+  }
   for (const auto& [place, count] : output_counts) {
     auto order = std::vector<std::size_t>(available[place].size());
     std::iota(order.begin(), order.end(), 0);
@@ -333,6 +349,28 @@ double reserve_output_resources(
     }
   }
   return start;
+}
+
+void assign_place_timestamp(std::vector<std::deque<double>>& assignments,
+                            std::size_t place, double timestamp) {
+  if (!std::isfinite(timestamp)) {
+    throw std::runtime_error("Monte Carlo place assignment is not finite");
+  }
+  auto& queue = assignments[place];
+  const auto position = std::upper_bound(queue.begin(), queue.end(), timestamp);
+  queue.insert(position, timestamp);
+}
+
+void consume_place_assignment(
+    std::vector<std::deque<double>>& assignments, std::size_t place,
+    double completion_time, std::vector<MonteCarloInterval>& intervals) {
+  auto& queue = assignments[place];
+  if (queue.empty()) {
+    throw std::runtime_error("Monte Carlo place assignment queue underflow");
+  }
+  const double assigned_time = queue.front();
+  queue.pop_front();
+  append_interval(intervals, assigned_time, completion_time);
 }
 
 void fire_transition(const PetriTransition& transition,
@@ -402,7 +440,18 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   MonteCarloResult result;
   result.diagnostics.simulated_cases = options.simulations;
   result.diagnostics.case_arrival_seconds = options.case_arrival_seconds;
+  result.diagnostics.case_arrival_ratio = options.case_arrival_seconds;
   result.log.traces.reserve(options.simulations);
+  result.output_places_interval_trees.resize(net.place_count());
+  for (std::size_t place = 0; place < net.place_count(); ++place) {
+    result.output_places_interval_trees[place].place_index = place;
+  }
+  result.output_transitions_interval_trees.resize(net.transitions().size());
+  for (std::size_t transition = 0; transition < net.transitions().size();
+       ++transition) {
+    result.output_transitions_interval_trees[transition].transition_index =
+        transition;
+  }
   if (options.enable_diagnostics) {
     result.diagnostics.case_execution_seconds.assign(options.simulations, 0.0);
   }
@@ -432,6 +481,10 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   std::vector<std::vector<double>> resource_available(net.place_count());
   for (std::size_t place = 0; place < net.place_count(); ++place) {
     resource_available[place].assign(prepared.capacities[place], 0.0);
+  }
+  std::vector<std::deque<double>> place_assignments(net.place_count());
+  for (const auto& state : cases) {
+    assign_place_timestamp(place_assignments, net.source(), state.arrival);
   }
   std::mt19937_64 rng(options.seed);
 
@@ -472,8 +525,8 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       throw std::runtime_error("Monte Carlo sampled an invalid duration");
     }
     const double start = reserve_output_resources(
-        transition, prepared.capacities, resource_available, state.now,
-        duration);
+        transition_index, transition, prepared.capacities, resource_available,
+        result.output_transitions_interval_trees, state.now, duration);
     const double finish = start + duration;
     if (!std::isfinite(finish) || finish < start) {
       throw std::runtime_error("Monte Carlo virtual time overflow");
@@ -481,6 +534,17 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     fire_transition(transition, state.marking);
     state.now = finish;
     ++state.steps;
+
+    // A place interval spans the time from token assignment to the firing
+    // that consumes that token. Output tokens become available at completion.
+    for (const auto place : transition.inputs) {
+      consume_place_assignment(
+          place_assignments, place, finish,
+          result.output_places_interval_trees[place].intervals);
+    }
+    for (const auto place : transition.outputs) {
+      assign_place_timestamp(place_assignments, place, finish);
+    }
 
     if (!transition.silent()) {
       Event event;
@@ -509,6 +573,51 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   if (options.enable_diagnostics) {
     result.diagnostics.median_case_execution_seconds =
         median(result.diagnostics.case_execution_seconds);
+
+    // The contract's case execution time uses the first and last visible
+    // event timestamps. Keep the legacy scheduler elapsed time above because
+    // it also accounts for silent work and is part of the existing API.
+    result.diagnostics.cases_ex_time.reserve(result.log.traces.size());
+    double first_visible = std::numeric_limits<double>::infinity();
+    double last_visible = -std::numeric_limits<double>::infinity();
+    for (const auto& trace : result.log.traces) {
+      if (trace.events.empty()) {
+        result.diagnostics.cases_ex_time.push_back(0.0);
+        continue;
+      }
+      const auto first = parse_timestamp(trace.events.front().timestamp);
+      const auto last = parse_timestamp(trace.events.back().timestamp);
+      if (!first || !last || !std::isfinite(*first) ||
+          !std::isfinite(*last) || *last < *first) {
+        result.diagnostics.cases_ex_time.push_back(0.0);
+        continue;
+      }
+      result.diagnostics.cases_ex_time.push_back(*last - *first);
+      first_visible = std::min(first_visible, *first);
+      last_visible = std::max(last_visible, *last);
+    }
+    result.diagnostics.median_cases_ex_time =
+        median(result.diagnostics.cases_ex_time);
+    result.diagnostics.total_cases_time =
+        std::isfinite(first_visible) && std::isfinite(last_visible)
+            ? std::max(0.0, last_visible - first_visible)
+            : result.diagnostics.total_cases_seconds;
+  } else {
+    result.diagnostics.total_cases_time = result.diagnostics.total_cases_seconds;
+  }
+  for (auto& tree : result.output_places_interval_trees) {
+    std::sort(tree.intervals.begin(), tree.intervals.end(),
+              [](const MonteCarloInterval& lhs, const MonteCarloInterval& rhs) {
+                return std::tie(lhs.start, lhs.end) <
+                       std::tie(rhs.start, rhs.end);
+              });
+  }
+  for (auto& tree : result.output_transitions_interval_trees) {
+    std::sort(tree.intervals.begin(), tree.intervals.end(),
+              [](const MonteCarloInterval& lhs, const MonteCarloInterval& rhs) {
+                return std::tie(lhs.start, lhs.end) <
+                       std::tie(rhs.start, rhs.end);
+              });
   }
   return result;
 }

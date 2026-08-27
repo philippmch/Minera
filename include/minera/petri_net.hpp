@@ -73,6 +73,17 @@ class PetriNet {
     else target.inhibitor_inputs.push_back(place);
   }
 
+  // Adds the output side of an ordinary transition-place arc.  Repeated
+  // output places are retained as arc multiplicity, just like repeated input
+  // places passed to add_transition/add_arc.
+  void add_output_arc(std::size_t transition, std::size_t place) {
+    if (transition >= transitions_.size())
+      throw std::out_of_range("Petri transition index is invalid");
+    if (place >= place_count_)
+      throw std::out_of_range("Petri place index is invalid");
+    transitions_[transition].outputs.push_back(place);
+  }
+
   void add_reset_arc(std::size_t transition, std::size_t place) {
     add_arc(transition, place, PetriArcType::kReset);
   }
@@ -126,6 +137,21 @@ class PetriNet {
   std::vector<std::string> activities_;
 };
 
+// Process-tree Petri-net conversion variants.  The standard variant keeps
+// the historical place-bordered construction; the transition-bordered
+// variant keeps an explicit silent entry and exit transition for every
+// composite fragment.
+enum class ProcessTreePetriNetVariant {
+  kStandard,
+  kTransitionBordered,
+
+  STANDARD = kStandard,
+  TRANSITION_BORDERED = kTransitionBordered,
+};
+
+using ProcessTreePetriNetConversionVariant = ProcessTreePetriNetVariant;
+using ProcessTreeToPetriNetVariant = ProcessTreePetriNetVariant;
+
 // Shared marking semantics for search and simulation code. The template keeps
 // the helper usable with signed replay markings and unsigned simulation ones.
 template <typename Token>
@@ -163,6 +189,17 @@ void fire_petri_transition(const PetriTransition& transition,
 // transitions, and loop wires the redo children from the body's exit back to
 // its entry.
 [[nodiscard]] PetriNet to_petri_net(const ProcessTree& tree);
+
+// Converts a process tree with the requested construction.  The one-argument
+// overload above remains the standard conversion for source compatibility.
+[[nodiscard]] PetriNet to_petri_net(
+    const ProcessTree& tree, ProcessTreePetriNetVariant variant);
+
+// The transition-bordered construction is useful when each recursive
+// composite fragment must expose silent source and sink transitions.  Activity
+// and tau leaves remain the fragment's transition boundaries.
+[[nodiscard]] PetriNet to_petri_net_transition_bordered(
+    const ProcessTree& tree);
 
 // Translates a Heuristic Miner dependency graph into a workflow net so it can
 // be replayed and aligned like any other model, honouring the net's split and

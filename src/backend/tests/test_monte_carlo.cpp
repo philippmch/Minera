@@ -93,6 +93,12 @@ void deterministic_seed_and_diagnostics() {
   assert(first.diagnostics.deadlocked_cases == 0);
   assert(first.diagnostics.step_limited_cases == 0);
   assert(first.diagnostics.case_execution_seconds.size() == 3);
+  assert(first.diagnostics.cases_ex_time.size() == 3);
+  for (const double seconds : first.diagnostics.cases_ex_time)
+    assert(seconds == 0.0);
+  assert(first.diagnostics.case_arrival_ratio == 2.0);
+  assert(first.diagnostics.total_cases_time == 4.0);
+  assert(first.diagnostics.median_cases_ex_time == 0.0);
   assert(std::abs(first.diagnostics.median_case_execution_seconds - 5.0) <
          1e-9);
   assert(first.diagnostics.total_cases_seconds >= 9.0);
@@ -301,6 +307,28 @@ void resources_create_virtual_fifo_wait() {
   assert(result.diagnostics.case_execution_seconds.size() == 2);
   assert(result.diagnostics.case_execution_seconds[0] == 5.0);
   assert(result.diagnostics.case_execution_seconds[1] == 10.0);
+  assert(result.diagnostics.cases_ex_time.size() == 2);
+  assert(result.diagnostics.cases_ex_time[0] == 0.0);
+  assert(result.diagnostics.cases_ex_time[1] == 0.0);
+  assert(result.diagnostics.median_cases_ex_time == 0.0);
+  assert(result.diagnostics.total_cases_time == 5.0);
+
+  assert(result.output_places_interval_trees.size() == net.place_count());
+  const auto& source_intervals = result.output_places_interval_trees[0].intervals;
+  assert(source_intervals.size() == 2);
+  constexpr double start = 1767225600.0;
+  assert(source_intervals[0] ==
+         (minera::MonteCarloInterval{start, start + 5.0}));
+  assert(source_intervals[1] ==
+         (minera::MonteCarloInterval{start, start + 10.0}));
+  assert(result.output_places_interval_trees[1].intervals.empty());
+
+  assert(result.output_transitions_interval_trees.size() ==
+         net.transitions().size());
+  const auto& waiting = result.output_transitions_interval_trees[0].intervals;
+  assert(waiting.size() == 1);
+  assert(waiting.front() ==
+         (minera::MonteCarloInterval{start, start + 5.0}));
 }
 
 void deadlocks_and_step_limits_are_reported() {
@@ -437,6 +465,10 @@ void json_contract_is_stable() {
   assert(json.find("\"trace_count\":100") != std::string::npos);
   assert(json.find("\"simulated_cases\":100") != std::string::npos);
   assert(json.find("case_execution_seconds") != std::string::npos);
+  assert(json.find("output_places_interval_trees") != std::string::npos);
+  assert(json.find("output_transitions_interval_trees") != std::string::npos);
+  assert(json.find("case_arrival_ratio") != std::string::npos);
+  assert(json.find("cases_ex_time") != std::string::npos);
 }
 
 }  // namespace
