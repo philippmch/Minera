@@ -1578,13 +1578,96 @@ void parse_bpmn_reads_subprocesses() {
   assert(minera::check_alignment(log, net).fitness == 1.0);
 }
 
+void parse_bpmn_supports_inclusive_gateway_blocks() {
+  // A structured inclusive split/join admits every non-empty branch subset,
+  // including either serial interleaving when both branches are selected.
+  const auto net = minera::parse_bpmn(R"(<definitions><process id="p">
+    <startEvent id="s"/><inclusiveGateway id="split"/>
+    <task id="a" name="a"/><task id="b" name="b"/>
+    <inclusiveGateway id="join"/><endEvent id="e"/>
+    <sequenceFlow id="f1" sourceRef="s" targetRef="split"/>
+    <sequenceFlow id="f2" sourceRef="split" targetRef="a"/>
+    <sequenceFlow id="f3" sourceRef="split" targetRef="b"/>
+    <sequenceFlow id="f4" sourceRef="a" targetRef="join"/>
+    <sequenceFlow id="f5" sourceRef="b" targetRef="join"/>
+    <sequenceFlow id="f6" sourceRef="join" targetRef="e"/>
+  </process></definitions>)");
+  assert(minera::final_marking_reachable(net));
+  const auto fitting = log_from_variants(
+      {{"a"}, {"b"}, {"a", "b"}, {"b", "a"}});
+  assert(minera::check_conformance(fitting, net).fitness == 1.0);
+  assert(minera::check_alignment(fitting, net).fitness == 1.0);
+  assert(minera::check_conformance(log_from_variants({{}}), net).fitness <
+         1.0);
+  assert(minera::check_alignment(log_from_variants({{"a", "a"}}), net)
+             .fitness < 1.0);
+
+  // The exporter emits the same structured shape.  A silent branch is a
+  // direct split-to-join flow and still must not make the empty subset valid.
+  const minera::ProcessTree tree(
+      {"a", "b"},
+      {minera::ProcessTreeOperator::kInclusiveChoice, 0,
+       {minera::ProcessTreeNode::leaf(0),
+        minera::ProcessTreeNode::tau(),
+        minera::ProcessTreeNode::leaf(1)}});
+  const auto xml = minera::to_bpmn(tree);
+  const auto reread = minera::parse_bpmn(xml);
+  assert(minera::final_marking_reachable(reread));
+  const auto tree_fitting = log_from_variants(
+      {{"a"}, {"b"}, {"a", "b"}, {"b", "a"}});
+  assert(minera::check_conformance(tree_fitting, reread).fitness == 1.0);
+  // Selecting only the silent branch is a valid non-empty subset, so the
+  // visible empty trace remains in the language of this exported tree.
+  assert(minera::check_conformance(log_from_variants({{}}), reread).fitness ==
+         1.0);
+
+  // Nested inclusive blocks pair by reachability, not by gateway names.  The
+  // inner block may select either activity or both while the outer block also
+  // selects the sibling branch.
+  const minera::ProcessTree nested(
+      {"a", "b", "c"},
+      {minera::ProcessTreeOperator::kInclusiveChoice, 0,
+       {minera::ProcessTreeNode{
+            minera::ProcessTreeOperator::kInclusiveChoice, 0,
+            {minera::ProcessTreeNode::leaf(0),
+             minera::ProcessTreeNode::leaf(1)}},
+        minera::ProcessTreeNode::leaf(2)}});
+  const auto nested_reread = minera::parse_bpmn(minera::to_bpmn(nested));
+  const auto nested_fitting = log_from_variants(
+      {{"a"}, {"b"}, {"a", "b"}, {"c"}, {"a", "c"}, {"c", "a"},
+       {"a", "b", "c"}, {"c", "b", "a"}});
+  assert(minera::check_conformance(nested_fitting, nested_reread).fitness ==
+         1.0);
+  assert(minera::check_alignment(nested_fitting, nested_reread).fitness ==
+         1.0);
+  assert(minera::check_conformance(log_from_variants({{}}), nested_reread)
+             .fitness < 1.0);
+}
+
 void parse_bpmn_rejects_unsupported_models() {
-  // An inclusive gateway has no faithful workflow-net reading.
+  // Complex gateways remain outside the structured workflow-net contract.
   assert(throws([] {
     (void)minera::parse_bpmn(R"(<definitions><process id="p">
-      <startEvent id="s"/><inclusiveGateway id="g"/><endEvent id="e"/>
+      <startEvent id="s"/><complexGateway id="g"/><endEvent id="e"/>
       <sequenceFlow id="f1" sourceRef="s" targetRef="g"/>
       <sequenceFlow id="f2" sourceRef="g" targetRef="e"/>
+    </process></definitions>)");
+  }));
+  // A mixed-arity inclusive gateway cannot be paired without changing the
+  // standard's activation and synchronization semantics.
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><task id="p"/><task id="q"/>
+      <inclusiveGateway id="mixed"/><task id="a"/><task id="b"/>
+      <endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="p"/>
+      <sequenceFlow id="f2" sourceRef="s" targetRef="q"/>
+      <sequenceFlow id="f3" sourceRef="p" targetRef="mixed"/>
+      <sequenceFlow id="f4" sourceRef="q" targetRef="mixed"/>
+      <sequenceFlow id="f5" sourceRef="mixed" targetRef="a"/>
+      <sequenceFlow id="f6" sourceRef="mixed" targetRef="b"/>
+      <sequenceFlow id="f7" sourceRef="a" targetRef="e"/>
+      <sequenceFlow id="f8" sourceRef="b" targetRef="e"/>
     </process></definitions>)");
   }));
   // A sequence flow referencing a node that does not exist.
@@ -5642,6 +5725,7 @@ int main() {
   parse_bpmn_reads_a_foreign_model();
   parse_bpmn_keeps_disconnected_tasks();
   parse_bpmn_reads_subprocesses();
+  parse_bpmn_supports_inclusive_gateway_blocks();
   parse_bpmn_rejects_unsupported_models();
   decorate_model_counts_firings_and_waits();
   decorate_model_skips_deviating_and_untimed_traces();

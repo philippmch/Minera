@@ -257,9 +257,11 @@ and tracks every family as complete, partial, or missing.
   one token and a parallel gateway forks and joins them, and expanded
   subprocesses convert recursively between their own start and end events —
   so a process drawn or exported anywhere can be conformance-checked, played
-  out, or re-exported like a discovered model. Constructs with no faithful
-  workflow-net reading (inclusive and complex gateways, boundary events) are
-  rejected with a clear error rather than checked approximately.
+  out, or re-exported like a discovered model. Block-structured inclusive
+  split/join gateways are compiled with selector and completion control places,
+  admitting every non-empty branch subset (including exported silent branches).
+  Mixed or ambiguous inclusive graphs, complex gateways, and boundary events
+  remain explicit errors rather than being checked approximately.
 - **Model playout**: simulate any workflow net — a discovered model, or an
   imported PNML net, BPMN process, or PTML tree — into a synthetic,
   timestamped event log (seeded, so runs reproduce). On a sound model every
