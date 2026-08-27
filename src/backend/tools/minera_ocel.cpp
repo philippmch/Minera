@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
                    "--ocel-csv-delimiter CHAR --ocel-csv-trim-fields BOOL "
                    "--ocel-csv-sort-events-by-timestamp BOOL --ocel-csv-reject-unsupported BOOL "
                    "--ocel-csv-emit-objects BOOL --ocel-csv-allow-lossy BOOL\n";
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--flatten-object-type TYPE] [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--flatten-object-type TYPE] [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --real ocel|graph --real-graph-kind etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
       std::cerr << "flatten options: --flatten-object-type TYPE [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME]\n";
       return 2;
     }
@@ -46,7 +46,8 @@ int main(int argc, char** argv) {
                         split_object_type, flatten_object_type, flatten_event_activity,
                         flatten_event_timestamp, normative_path, csv_objects_path,
                         normative_csv_objects_path, csv_output_path,
-                        csv_objects_output_path;
+                        csv_objects_output_path, real_mode = "ocel",
+                        real_graph_kind;
     std::map<std::string, std::size_t> filter_object_counts;
     std::vector<std::string> filter_object_types, filter_object_ids;
     std::size_t filter_object_level = 1;
@@ -776,6 +777,12 @@ int main(int argc, char** argv) {
       } else if ((option == "--conformance" || option == "--normative") &&
                  i + 1 < argc) {
         (option == "--conformance" ? conformance : normative_path) = argv[++i];
+      } else if (option == "--real" && i + 1 < argc) {
+        real_mode = argv[++i];
+      } else if (option == "--real-graph") {
+        real_mode = "graph";
+      } else if (option == "--real-graph-kind" && i + 1 < argc) {
+        real_graph_kind = argv[++i];
       } else if (option == "--alpha" && i + 1 < argc) {
         alpha = number(argv[++i], "--alpha");
       } else if (option == "--beta" && i + 1 < argc) {
@@ -1078,6 +1085,26 @@ int main(int argc, char** argv) {
         conformance != "otg") {
       throw std::invalid_argument("conformance must be etot, ocdfg, or otg");
     }
+    if (real_mode != "ocel" && real_mode != "graph") {
+      throw std::invalid_argument("real must be ocel or graph");
+    }
+    if (!real_graph_kind.empty() && real_graph_kind != "etot" &&
+        real_graph_kind != "ocdfg" && real_graph_kind != "otg") {
+      throw std::invalid_argument(
+          "real-graph-kind must be etot, ocdfg, or otg");
+    }
+    if (real_mode == "graph" && conformance.empty()) {
+      throw std::invalid_argument("real graph mode requires --conformance");
+    }
+    if (real_mode == "ocel" && !real_graph_kind.empty()) {
+      throw std::invalid_argument(
+          "real-graph-kind requires --real graph");
+    }
+    if (real_mode == "graph" && !real_graph_kind.empty() &&
+        real_graph_kind != conformance) {
+      throw std::invalid_argument(
+          "real-graph-kind must match --conformance");
+    }
     if (!conformance.empty() &&
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
          !split.empty() || !features.empty() || !statistics.empty() ||
@@ -1128,6 +1155,17 @@ int main(int argc, char** argv) {
       throw std::invalid_argument("--normative is required with --conformance");
     if (conformance.empty() && !normative_path.empty())
       throw std::invalid_argument("--normative requires --conformance");
+    if (real_mode == "graph" &&
+        (!filter_object_counts.empty() || !filter_object_types.empty() ||
+         !filter_object_ids.empty() || filter_object_level_set ||
+         filter_object_negative || !filter_start_events_type.empty() ||
+         !filter_end_events_type.empty() ||
+         !filter_activities_object_type.empty() || !filter_cc_object.empty() ||
+         filter_cc_length.has_value() || !filter_cc_object_type.empty() ||
+         filter_cc_object_type_negative || !filter_cc_activity.empty())) {
+      throw std::invalid_argument(
+          "real graph mode cannot be combined with OCEL filters");
+    }
     const std::filesystem::path input_path(argv[1]);
     const auto lower_extension = [](const std::filesystem::path& path) {
       std::string extension = path.extension().string();
@@ -1146,6 +1184,10 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "CSV, XML, and SQLite input modes are mutually exclusive");
     }
+    if (real_mode == "graph" && (csv_input || xml_input || sqlite_input)) {
+      throw std::invalid_argument(
+          "real graph mode requires a JSON graph input");
+    }
     if (!csv_input && !csv_objects_path.empty()) {
       throw std::invalid_argument("--csv-objects requires a CSV input");
     }
@@ -1158,8 +1200,15 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "--normative-csv-objects requires a CSV normative log");
     }
+    std::string real_graph_json;
     {
-      if (csv_input) {
+      if (real_mode == "graph") {
+        std::ifstream input(input_path, std::ios::binary);
+        if (!input) throw std::runtime_error("cannot open real graph input");
+        std::ostringstream text;
+        text << input.rdbuf();
+        real_graph_json = text.str();
+      } else if (csv_input) {
         if (!csv_objects_path.empty()) {
           log = minera::import_ocel_csv(input_path,
                                         std::filesystem::path(csv_objects_path),
@@ -1403,6 +1452,9 @@ int main(int argc, char** argv) {
         options.beta = beta;
         options.gamma = gamma;
         options.theta_relative = etot_theta;
+        std::optional<minera::EtotGraph> real_graph;
+        if (real_mode == "graph")
+          real_graph = minera::parse_etot_json(real_graph_json);
         std::optional<minera::EtotGraph> graph;
         if (normative_is_json) {
           try {
@@ -1411,7 +1463,22 @@ int main(int argc, char** argv) {
             // The input may be a regular OCEL document; parse it below.
           }
         }
-        if (graph) {
+        if (real_graph) {
+          if (graph) {
+            std::cout << minera::etot_conformance_json(
+                             minera::compare_etot(*real_graph, *graph, options))
+                      << '\n';
+          } else {
+            if (normative_is_json)
+              normative = minera::parse_ocel_json(normative_json);
+            std::cout << minera::etot_conformance_json(
+                             minera::compare_etot(
+                                 *real_graph,
+                                 minera::discover_etot_classic(normative),
+                                 options))
+                      << '\n';
+          }
+        } else if (graph) {
           std::cout << minera::etot_conformance_json(
                            minera::compare_etot(log, *graph, options))
                     << '\n';
@@ -1431,6 +1498,9 @@ int main(int argc, char** argv) {
         options.gamma = gamma;
         options.theta = otg_theta;
         options.theta_by_relation = otg_theta_by_relation;
+        std::optional<minera::OtgGraph> real_graph;
+        if (real_mode == "graph")
+          real_graph = minera::parse_otg_json(real_graph_json);
         std::optional<minera::OtgGraph> graph;
         if (normative_is_json) {
           try {
@@ -1439,7 +1509,22 @@ int main(int argc, char** argv) {
             // The input may be a regular OCEL document; parse it below.
           }
         }
-        if (graph) {
+        if (real_graph) {
+          if (graph) {
+            std::cout << minera::otg_conformance_json(
+                             minera::compare_otg(*real_graph, *graph, options))
+                      << '\n';
+          } else {
+            if (normative_is_json)
+              normative = minera::parse_ocel_json(normative_json);
+            std::cout << minera::otg_conformance_json(
+                             minera::compare_otg(
+                                 *real_graph,
+                                 minera::discover_otg_classic(normative),
+                                 options))
+                      << '\n';
+          }
+        } else if (graph) {
           std::cout << minera::otg_conformance_json(
                            minera::compare_otg(log, *graph, options))
                     << '\n';
@@ -1460,6 +1545,9 @@ int main(int argc, char** argv) {
         options.delta = delta;
         options.theta_activity = ocdfg_theta_activity;
         options.theta_flow = ocdfg_theta_flow;
+        std::optional<minera::OcdfgGraph> real_graph;
+        if (real_mode == "graph")
+          real_graph = minera::parse_ocdfg_json(real_graph_json);
         std::optional<minera::OcdfgGraph> graph;
         if (normative_is_json) {
           try {
@@ -1468,7 +1556,22 @@ int main(int argc, char** argv) {
             // The input may be a regular OCEL document; parse it below.
           }
         }
-        if (graph) {
+        if (real_graph) {
+          if (graph) {
+            std::cout << minera::ocdfg_conformance_json(
+                             minera::compare_ocdfg(*real_graph, *graph, options))
+                      << '\n';
+          } else {
+            if (normative_is_json)
+              normative = minera::parse_ocel_json(normative_json);
+            std::cout << minera::ocdfg_conformance_json(
+                             minera::compare_ocdfg(
+                                 *real_graph,
+                                 minera::discover_ocdfg_classic(normative, false),
+                                 options))
+                      << '\n';
+          }
+        } else if (graph) {
           std::cout << minera::ocdfg_conformance_json(
                            minera::compare_ocdfg(log, *graph, options))
                     << '\n';

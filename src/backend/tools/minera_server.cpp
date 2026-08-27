@@ -2353,30 +2353,62 @@ void handle_ocel_conformance(const httplib::Request& request,
         "variant", "alpha", "beta", "gamma", "delta", "etot_theta",
         "otg_theta", "otg_theta_interaction", "otg_theta_descendants",
         "otg_theta_inheritance", "otg_theta_cobirth", "otg_theta_codeath",
-        "ocdfg_theta_activity", "ocdfg_theta_flow"};
+        "ocdfg_theta_activity", "ocdfg_theta_flow", "real",
+        "real_graph_kind"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
         throw std::invalid_argument(
             "unknown OCEL conformance parameter: " + key);
     }
+    const auto real_mode = request.has_param("real")
+                               ? lower_ascii(request.get_param_value("real"))
+                               : std::string("ocel");
+    if (real_mode != "ocel" && real_mode != "graph") {
+      throw std::invalid_argument("real expects ocel or graph");
+    }
+    const auto requested_graph_kind = request.has_param("real_graph_kind")
+                                          ? lower_ascii(request.get_param_value(
+                                                "real_graph_kind"))
+                                          : std::string{};
     const auto variant = request.has_param("variant")
                              ? request.get_param_value("variant")
-                             : std::string("ocdfg");
+                             : (real_mode == "graph" &&
+                                        !requested_graph_kind.empty()
+                                    ? requested_graph_kind
+                                    : std::string("ocdfg"));
     if (variant != "etot" && variant != "ocdfg" && variant != "otg") {
       throw std::invalid_argument("variant expects etot, ocdfg, or otg");
     }
+    const auto real_graph_kind = requested_graph_kind.empty()
+                                     ? variant
+                                     : requested_graph_kind;
+    if (real_graph_kind != "etot" && real_graph_kind != "ocdfg" &&
+        real_graph_kind != "otg") {
+      throw std::invalid_argument(
+          "real_graph_kind expects etot, ocdfg, or otg");
+    }
+    if (real_mode == "ocel" && request.has_param("real_graph_kind")) {
+      throw std::invalid_argument(
+          "real_graph_kind requires real=graph");
+    }
+    if (real_mode == "graph" && real_graph_kind != variant) {
+      throw std::invalid_argument(
+          "real_graph_kind must match the conformance variant");
+    }
     if (!request.is_multipart_form_data()) {
       throw std::invalid_argument(
-          "OCEL conformance requires multipart fields log and normative");
+          "OCEL conformance requires multipart fields log or real_graph and normative");
     }
-    const auto real_body = form_field(request, "log");
+    const auto real_body = form_field(
+        request, real_mode == "graph" ? "real_graph" : "log");
     const auto normative_body = form_field(request, "normative");
     if (real_body.empty() || normative_body.empty()) {
       throw std::invalid_argument(
-          "OCEL conformance requires multipart fields log and normative");
+          "OCEL conformance requires multipart fields log or real_graph and normative");
     }
-    const auto real = minera::parse_ocel_json(real_body);
+    std::optional<minera::Ocel> real_ocel;
+    if (real_mode == "ocel") real_ocel = minera::parse_ocel_json(real_body);
     std::optional<minera::Ocel> normative_ocel;
     const auto normative_log = [&]() -> const minera::Ocel& {
       if (!normative_ocel) normative_ocel = minera::parse_ocel_json(normative_body);
@@ -2393,18 +2425,30 @@ void handle_ocel_conformance(const httplib::Request& request,
       options.gamma = gamma;
       options.theta_relative =
           ocel_query_number(request, "etot_theta", options.theta_relative);
+      std::optional<minera::EtotGraph> real_graph;
+      if (real_mode == "graph")
+        real_graph = minera::parse_etot_json(real_body);
       std::optional<minera::EtotGraph> graph;
       try {
         graph = minera::parse_etot_json(normative_body);
       } catch (const std::exception&) {
         // Multipart normative inputs may also be regular OCEL documents.
       }
-      if (graph) {
+      if (real_graph) {
+        if (graph) {
+          payload = minera::etot_conformance_json(
+              minera::compare_etot(*real_graph, *graph, options));
+        } else {
+          payload = minera::etot_conformance_json(minera::compare_etot(
+              *real_graph, minera::discover_etot_classic(normative_log()),
+              options));
+        }
+      } else if (graph) {
         payload = minera::etot_conformance_json(
-            minera::compare_etot(real, *graph, options));
+            minera::compare_etot(*real_ocel, *graph, options));
       } else {
         payload = minera::etot_conformance_json(minera::compare_etot(
-            minera::discover_etot_classic(real),
+            minera::discover_etot_classic(*real_ocel),
             minera::discover_etot_classic(normative_log()), options));
       }
     } else if (variant == "otg") {
@@ -2428,18 +2472,30 @@ void handle_ocel_conformance(const httplib::Request& request,
               ocel_query_number(request, parameter, options.theta);
         }
       }
+      std::optional<minera::OtgGraph> real_graph;
+      if (real_mode == "graph")
+        real_graph = minera::parse_otg_json(real_body);
       std::optional<minera::OtgGraph> graph;
       try {
         graph = minera::parse_otg_json(normative_body);
       } catch (const std::exception&) {
         // Multipart normative inputs may also be regular OCEL documents.
       }
-      if (graph) {
+      if (real_graph) {
+        if (graph) {
+          payload = minera::otg_conformance_json(
+              minera::compare_otg(*real_graph, *graph, options));
+        } else {
+          payload = minera::otg_conformance_json(minera::compare_otg(
+              *real_graph, minera::discover_otg_classic(normative_log()),
+              options));
+        }
+      } else if (graph) {
         payload = minera::otg_conformance_json(
-            minera::compare_otg(real, *graph, options));
+            minera::compare_otg(*real_ocel, *graph, options));
       } else {
         payload = minera::otg_conformance_json(minera::compare_otg(
-            minera::discover_otg_classic(real),
+            minera::discover_otg_classic(*real_ocel),
             minera::discover_otg_classic(normative_log()), options));
       }
     } else {
@@ -2452,18 +2508,31 @@ void handle_ocel_conformance(const httplib::Request& request,
           request, "ocdfg_theta_activity", options.theta_activity);
       options.theta_flow =
           ocel_query_number(request, "ocdfg_theta_flow", options.theta_flow);
+      std::optional<minera::OcdfgGraph> real_graph;
+      if (real_mode == "graph")
+        real_graph = minera::parse_ocdfg_json(real_body);
       std::optional<minera::OcdfgGraph> graph;
       try {
         graph = minera::parse_ocdfg_json(normative_body);
       } catch (const std::exception&) {
         // Multipart normative inputs may also be regular OCEL documents.
       }
-      if (graph) {
+      if (real_graph) {
+        if (graph) {
+          payload = minera::ocdfg_conformance_json(
+              minera::compare_ocdfg(*real_graph, *graph, options));
+        } else {
+          payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
+              *real_graph,
+              minera::discover_ocdfg_classic(normative_log(), false),
+              options));
+        }
+      } else if (graph) {
         payload = minera::ocdfg_conformance_json(
-            minera::compare_ocdfg(real, *graph, options));
+            minera::compare_ocdfg(*real_ocel, *graph, options));
       } else {
         payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
-            minera::discover_ocdfg_classic(real, false),
+            minera::discover_ocdfg_classic(*real_ocel, false),
             minera::discover_ocdfg_classic(normative_log(), false), options));
       }
     }

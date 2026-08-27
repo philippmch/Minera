@@ -1568,6 +1568,18 @@ describe("OCEL API", () => {
     })).toBe("variant=otg&otg_theta=0.4&otg_theta_interaction=0.1&otg_theta_descendants=0.2&otg_theta_inheritance=0.3&otg_theta_cobirth=0.4&otg_theta_codeath=0.5");
     expect(() => ocelConformanceQuery({ otg_theta_interaction: -0.1 }))
       .toThrow(/finite non-negative/);
+    expect(ocelConformanceQuery({
+      variant: "etot", real: "graph", real_graph_kind: "etot",
+    })).toBe("variant=etot&real=graph&real_graph_kind=etot");
+    expect(ocelConformanceQuery({ real: "ocel" })).toBe("real=ocel");
+    expect(ocelConformanceQuery({ real: "graph" })).toBe("real=graph");
+    expect(() => ocelConformanceQuery({ real: "ocel", real_graph_kind: "otg" }))
+      .toThrow(/applies only/);
+    expect(() => ocelConformanceQuery({
+      variant: "otg", real: "graph", real_graph_kind: "etot",
+    })).toThrow(/must match/);
+    expect(() => ocelConformanceQuery({ real: "graph", real_graph_kind: "invalid" as never }))
+      .toThrow(/must be etot/);
     expect(ocelFilterQuery({
       variant: "object_count", minimum_counts: { item: 2, order: 1 }, positive: true,
       level: 2, object_type: "order", min_size: 1, max_size: 4,
@@ -1980,6 +1992,36 @@ describe("OCEL API", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "OCEL_CONFORMANCE", variant: "otg" }) })));
     await expect(requestOcelConformance(new File(["{}"], "log.json"), new File(["{}"], "normative.json")))
       .rejects.toThrow(/invalid OCEL conformance/);
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the default OCEL upload field and switches the real-side graph field explicitly", async () => {
+    const payload = { family: "OCEL_CONFORMANCE", variant: "etot", result: {} };
+    const calls: Array<{ path: string; form: FormData }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      calls.push({ path, form: init?.body as FormData });
+      return { ok: true, json: async () => payload };
+    }));
+
+    await expect(requestOcelConformance(
+      new File(["{}"], "real.json"), new File(["{}"], "normative.json"),
+    )).resolves.toMatchObject({ family: "OCEL_CONFORMANCE" });
+    await expect(requestOcelConformance(
+      new File(["{}"], "real.etot.json"), new File(["{}"], "normative.json"),
+      { variant: "etot", real: "graph", real_graph_kind: "etot" },
+    )).resolves.toMatchObject({ family: "OCEL_CONFORMANCE" });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].path).toBe("/api/ocel/conformance");
+    expect(calls[0].form.get("log")).toBeInstanceOf(File);
+    expect((calls[0].form.get("log") as File).name).toBe("real.json");
+    expect(calls[0].form.get("real_graph")).toBeNull();
+    expect(calls[0].form.get("normative")).toBeInstanceOf(File);
+    expect(calls[1].path).toBe("/api/ocel/conformance?variant=etot&real=graph&real_graph_kind=etot");
+    expect(calls[1].form.get("log")).toBeNull();
+    expect(calls[1].form.get("real_graph")).toBeInstanceOf(File);
+    expect((calls[1].form.get("real_graph") as File).name).toBe("real.etot.json");
+    expect(calls[1].form.get("normative")).toBeInstanceOf(File);
     vi.unstubAllGlobals();
   });
 });

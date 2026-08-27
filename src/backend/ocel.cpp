@@ -1266,6 +1266,13 @@ std::string otg_json(const OtgGraph& graph) {
 EtotGraph parse_etot_json(std::string_view json, const OcelJsonLimits& limits) {
   const auto parsed = Parser(json, limits).parse();
   const auto& root = obj(parsed, "ETOT graph");
+  if (root.find("activities_indep") != root.end() ||
+      root.find("activities_ot") != root.end() ||
+      root.find("start_activities") != root.end() ||
+      root.find("end_activities") != root.end() ||
+      root.find("performance_computed") != root.end()) {
+    throw std::invalid_argument("ETOT graph envelope does not match the selected kind");
+  }
   EtotGraph result;
   result.activities = string_array(&required(root, "activities"),
                                    "activities");
@@ -1288,6 +1295,14 @@ EtotGraph parse_etot_json(std::string_view json, const OcelJsonLimits& limits) {
 OtgGraph parse_otg_json(std::string_view json, const OcelJsonLimits& limits) {
   const auto parsed = Parser(json, limits).parse();
   const auto& root = obj(parsed, "OTG graph");
+  if (root.find("activities") != root.end() ||
+      root.find("activities_indep") != root.end() ||
+      root.find("activities_ot") != root.end() ||
+      root.find("start_activities") != root.end() ||
+      root.find("end_activities") != root.end() ||
+      root.find("performance_computed") != root.end()) {
+    throw std::invalid_argument("OTG graph envelope does not match the selected kind");
+  }
   OtgGraph result;
   result.object_types = string_array(&required(root, "object_types"),
                                      "object_types");
