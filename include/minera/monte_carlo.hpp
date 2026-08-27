@@ -102,11 +102,45 @@ struct MonteCarloDiagnostics {
   double total_cases_seconds = 0.0;
   double median_case_execution_seconds = 0.0;
   std::vector<double> case_execution_seconds;
+
+  // Names used by the simulation-result contract. The *_seconds fields above
+  // remain the compatibility spelling used by existing callers.
+  double case_arrival_ratio = 0.0;
+  double total_cases_time = 0.0;
+  double median_cases_ex_time = 0.0;
+  std::vector<double> cases_ex_time;
+};
+
+struct MonteCarloInterval {
+  double start = 0.0;
+  double end = 0.0;
+  friend bool operator==(const MonteCarloInterval&, const MonteCarloInterval&) =
+      default;
+};
+
+struct MonteCarloPlaceIntervalTree {
+  std::size_t place_index = 0;
+  std::vector<MonteCarloInterval> intervals;
+  friend bool operator==(const MonteCarloPlaceIntervalTree&,
+                         const MonteCarloPlaceIntervalTree&) = default;
+};
+
+struct MonteCarloTransitionIntervalTree {
+  std::size_t transition_index = 0;
+  std::vector<MonteCarloInterval> intervals;
+  friend bool operator==(const MonteCarloTransitionIntervalTree&,
+                         const MonteCarloTransitionIntervalTree&) = default;
 };
 
 struct MonteCarloResult {
   EventLog log;
   MonteCarloDiagnostics diagnostics;
+  // One deterministic interval tree is returned for every net place and
+  // transition, including trees with no intervals. Records are ordered by
+  // place/transition index and then by interval start/end.
+  std::vector<MonteCarloPlaceIntervalTree> output_places_interval_trees;
+  std::vector<MonteCarloTransitionIntervalTree>
+      output_transitions_interval_trees;
 };
 
 // Fits optional transition weights and service durations from a source log.

@@ -910,6 +910,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_process_tree_reduction_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_process_tree_reduction_tests COMMAND minera_process_tree_reduction_tests)
 
+  add_executable(minera_petri_net_conversion_tests
+    src/backend/tests/test_petri_net_conversion.cpp
+  )
+  target_link_libraries(minera_petri_net_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_petri_net_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_petri_net_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_petri_net_conversion_tests COMMAND minera_petri_net_conversion_tests)
+
   add_executable(minera_petri_net_reduction_tests
     src/backend/tests/test_petri_net_reduction.cpp
   )

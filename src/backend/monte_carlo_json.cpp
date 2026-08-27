@@ -1,9 +1,60 @@
 #include "minera/monte_carlo.hpp"
 
+#include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 namespace minera {
+
+namespace {
+
+void write_intervals(std::ostream& out,
+                     const std::vector<MonteCarloInterval>& intervals) {
+  out << '[';
+  for (std::size_t index = 0; index < intervals.size(); ++index) {
+    if (index) out << ',';
+    const auto& interval = intervals[index];
+    if (!std::isfinite(interval.start) || !std::isfinite(interval.end) ||
+        interval.end < interval.start) {
+      throw std::invalid_argument(
+          "Monte Carlo interval has invalid finite bounds");
+    }
+    out << "{\"start\":" << interval.start << ",\"end\":"
+        << interval.end << '}';
+  }
+  out << ']';
+}
+
+void write_place_trees(std::ostream& out,
+                       const std::vector<MonteCarloPlaceIntervalTree>& trees) {
+  out << '[';
+  for (std::size_t index = 0; index < trees.size(); ++index) {
+    if (index) out << ',';
+    const auto& tree = trees[index];
+    out << "{\"place_index\":" << tree.place_index << ",\"intervals\":";
+    write_intervals(out, tree.intervals);
+    out << '}';
+  }
+  out << ']';
+}
+
+void write_transition_trees(
+    std::ostream& out,
+    const std::vector<MonteCarloTransitionIntervalTree>& trees) {
+  out << '[';
+  for (std::size_t index = 0; index < trees.size(); ++index) {
+    if (index) out << ',';
+    const auto& tree = trees[index];
+    out << "{\"transition_index\":" << tree.transition_index
+        << ",\"intervals\":";
+    write_intervals(out, tree.intervals);
+    out << '}';
+  }
+  out << ']';
+}
+
+}  // namespace
 
 std::string monte_carlo_json(const MonteCarloResult& result) {
   const auto& diagnostics = result.diagnostics;
@@ -26,7 +77,21 @@ std::string monte_carlo_json(const MonteCarloResult& result) {
     if (i) out << ',';
     out << diagnostics.case_execution_seconds[i];
   }
-  out << "]}}";
+  out << ']';
+  out << ",\"case_arrival_ratio\":" << diagnostics.case_arrival_ratio;
+  out << ",\"total_cases_time\":" << diagnostics.total_cases_time;
+  out << ",\"median_cases_ex_time\":" << diagnostics.median_cases_ex_time;
+  out << ",\"cases_ex_time\":[";
+  for (std::size_t i = 0; i < diagnostics.cases_ex_time.size(); ++i) {
+    if (i) out << ',';
+    out << diagnostics.cases_ex_time[i];
+  }
+  out << "]}";
+  out << ",\"output_places_interval_trees\":";
+  write_place_trees(out, result.output_places_interval_trees);
+  out << ",\"output_transitions_interval_trees\":";
+  write_transition_trees(out, result.output_transitions_interval_trees);
+  out << '}';
   return out.str();
 }
 

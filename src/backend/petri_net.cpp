@@ -12,12 +12,21 @@
 namespace minera {
 namespace {
 
+struct BorderedFragment {
+  std::size_t source_transition = 0;
+  std::size_t sink_transition = 0;
+};
+
 // Wires the fragment for `node` between the given entry and exit places,
 // appending the transitions (and any intermediate places) to `net`.
 void build(const ProcessTreeNode& node,
            std::size_t in,
            std::size_t out,
            PetriNet& net);
+
+BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
+                                           const ProcessTree& tree,
+                                           PetriNet& net);
 
 void build_inclusive_or(const ProcessTreeNode& node,
                         std::size_t in,
@@ -134,6 +143,120 @@ void build(const ProcessTreeNode& node,
   }
 }
 
+BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
+                                           const ProcessTree& tree,
+                                           PetriNet& net) {
+  switch (node.op) {
+    case ProcessTreeOperator::kActivity:
+      if (node.activity >= tree.activities().size()) {
+        throw std::out_of_range(
+            "process-tree activity index is outside the activity table");
+      }
+      {
+        const auto transition =
+            net.add_transition(node.activity, {}, {});
+        return {transition, transition};
+      }
+    case ProcessTreeOperator::kTau: {
+      const auto transition = net.add_transition(std::nullopt, {}, {});
+      return {transition, transition};
+    }
+    case ProcessTreeOperator::kSequence: {
+      if (node.children.empty()) {
+        throw std::invalid_argument(
+            "process-tree sequence requires at least one child");
+      }
+      std::vector<BorderedFragment> children;
+      children.reserve(node.children.size());
+      for (const auto& child : node.children) {
+        children.push_back(build_transition_bordered(child, tree, net));
+      }
+      std::vector<std::size_t> places;
+      places.reserve(children.size() + 1);
+      for (std::size_t i = 0; i <= children.size(); ++i) {
+        places.push_back(net.add_place());
+      }
+      for (std::size_t i = 0; i < children.size(); ++i) {
+        net.add_arc(children[i].source_transition, places[i]);
+        net.add_output_arc(children[i].sink_transition, places[i + 1]);
+      }
+      const auto source = net.add_transition(std::nullopt, {}, {places.front()});
+      const auto sink =
+          net.add_transition(std::nullopt, {places.back()}, {});
+      return {source, sink};
+    }
+    case ProcessTreeOperator::kExclusive: {
+      if (node.children.empty()) {
+        throw std::invalid_argument(
+            "process-tree exclusive choice requires at least one child");
+      }
+      std::vector<BorderedFragment> children;
+      children.reserve(node.children.size());
+      for (const auto& child : node.children) {
+        children.push_back(build_transition_bordered(child, tree, net));
+      }
+      const auto input = net.add_place();
+      const auto output = net.add_place();
+      for (const auto fragment : children) {
+        net.add_arc(fragment.source_transition, input);
+        net.add_output_arc(fragment.sink_transition, output);
+      }
+      const auto source = net.add_transition(std::nullopt, {}, {input});
+      const auto sink = net.add_transition(std::nullopt, {output}, {});
+      return {source, sink};
+    }
+    case ProcessTreeOperator::kInclusiveChoice:
+      throw std::invalid_argument(
+          "transition-bordered process-tree conversion does not support inclusive choice");
+    case ProcessTreeOperator::kParallel: {
+      if (node.children.empty()) {
+        throw std::invalid_argument(
+            "process-tree parallel operator requires at least one child");
+      }
+      std::vector<std::size_t> inputs;
+      std::vector<std::size_t> outputs;
+      std::vector<BorderedFragment> children;
+      children.reserve(node.children.size());
+      inputs.reserve(node.children.size());
+      outputs.reserve(node.children.size());
+      for (const auto& child : node.children) {
+        children.push_back(build_transition_bordered(child, tree, net));
+      }
+      for (const auto fragment : children) {
+        const auto input = net.add_place();
+        const auto output = net.add_place();
+        net.add_arc(fragment.source_transition, input);
+        net.add_output_arc(fragment.sink_transition, output);
+        inputs.push_back(input);
+        outputs.push_back(output);
+      }
+      const auto source = net.add_transition(std::nullopt, {}, inputs);
+      const auto sink = net.add_transition(std::nullopt, outputs, {});
+      return {source, sink};
+    }
+    case ProcessTreeOperator::kLoop: {
+      if (node.children.size() != 2) {
+        throw std::invalid_argument(
+            "transition-bordered process-tree conversion requires binary loops");
+      }
+      const auto body =
+          build_transition_bordered(node.children[0], tree, net);
+      const auto redo =
+          build_transition_bordered(node.children[1], tree, net);
+      const auto input = net.add_place();
+      const auto output = net.add_place();
+      net.add_arc(body.source_transition, input);
+      net.add_output_arc(body.sink_transition, output);
+      net.add_arc(redo.source_transition, output);
+      net.add_output_arc(redo.sink_transition, input);
+      const auto source = net.add_transition(std::nullopt, {}, {input});
+      const auto sink = net.add_transition(std::nullopt, {output}, {});
+      return {source, sink};
+    }
+  }
+  throw std::invalid_argument("unknown process-tree operator");
+}
+
 }  // namespace
 
 PetriNet to_petri_net(const ProcessTree& tree) {
@@ -241,6 +364,33 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
                        merge(std::move(out_alts), false));
   }
   return reduce_petri_net(net).net;
+}
+
+PetriNet to_petri_net_transition_bordered(const ProcessTree& tree) {
+  PetriNet net;
+  net.set_activities(tree.activities());
+  // Keep the workflow boundary place ids stable with the ordinary
+  // conversion: callers can use source() and sink() without remapping.
+  const std::size_t source = net.add_place();
+  const std::size_t sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+
+  const auto fragment = build_transition_bordered(tree.root(), tree, net);
+  net.add_arc(fragment.source_transition, source);
+  net.add_output_arc(fragment.sink_transition, sink);
+  return net;
+}
+
+PetriNet to_petri_net(const ProcessTree& tree,
+                     ProcessTreePetriNetVariant variant) {
+  switch (variant) {
+    case ProcessTreePetriNetVariant::kStandard:
+      return to_petri_net(tree);
+    case ProcessTreePetriNetVariant::kTransitionBordered:
+      return to_petri_net_transition_bordered(tree);
+  }
+  throw std::invalid_argument("unknown process-tree Petri-net variant");
 }
 
 }  // namespace minera
