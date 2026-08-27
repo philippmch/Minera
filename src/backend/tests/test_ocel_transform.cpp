@@ -170,6 +170,83 @@ void object_graph_contract() {
   assert(threw);
 }
 
+void heterogeneous_graph_contract() {
+  auto log = sample();
+  log.events.front().attributes.push_back({"priority", std::int64_t{3}});
+  log.objects.front().attributes.push_back({"active", true});
+  const auto graph = minera::discover_ocel_heterogeneous_graph(log);
+  assert(graph.include_df && graph.include_object_changes);
+  assert(graph.nodes.size() == log.events.size() + log.objects.size() +
+         log.object_changes.size());
+  assert(graph.nodes[0].id == "e1" && graph.nodes[0].type == "EVENT");
+  assert(graph.nodes[0].activity == "Create");
+  assert(graph.nodes[4].id == "o1" && graph.nodes[4].type == "OBJECT");
+  assert(graph.nodes[4].object_type == "order");
+  assert(graph.nodes.back().id == "@@change##0" &&
+         graph.nodes.back().type == "CHANGE");
+  assert(graph.nodes.back().value.has_value());
+
+  assert(graph.edges.size() == log.relations.size() + log.o2o.size() + 2 +
+         log.object_changes.size());
+  for (std::size_t index = 0; index < log.relations.size(); ++index) {
+    assert(graph.edges[index].type == "E2O");
+    assert(graph.edges[index].source == log.relations[index].event_id);
+    assert(graph.edges[index].target == log.relations[index].object_id);
+  }
+  assert(graph.edges[8].type == "O2O");
+  assert(graph.edges[9].type == "DF" && graph.edges[9].source == "e1" &&
+         graph.edges[9].target == "e2" && graph.edges[9].object == "i1");
+  assert(graph.edges[10].type == "DF" && graph.edges[10].source == "e2" &&
+         graph.edges[10].target == "e3" && graph.edges[10].object == "o2");
+  assert(graph.edges[11].type == "CHANGE" &&
+         graph.edges[11].source == "@@change##0" &&
+         graph.edges[11].target == "o1");
+
+  const auto json = minera::serialize_ocel_heterogeneous_graph_json(graph);
+  assert(json.find("\"family\":\"OCEL_GRAPH\"") != std::string::npos);
+  assert(json.find("\"variant\":\"HETEROGENEOUS\"") !=
+         std::string::npos);
+  assert(json.find("\"type\":\"DF\"") != std::string::npos);
+  assert(json.find("\"priority\":3") != std::string::npos);
+  assert(json.find("\"value\":\"done\"") != std::string::npos);
+  assert(json == minera::serialize_ocel_heterogeneous_graph_json(graph));
+
+  minera::OcelHeterogeneousGraphOptions limited;
+  limited.include_df = false;
+  limited.include_object_changes = false;
+  const auto without_optional =
+      minera::discover_ocel_heterogeneous_graph(log, limited);
+  assert(!without_optional.include_df &&
+         !without_optional.include_object_changes);
+  assert(without_optional.nodes.size() ==
+         log.events.size() + log.objects.size());
+  assert(without_optional.edges.size() == log.relations.size() + log.o2o.size());
+  for (const auto& edge : without_optional.edges) {
+    assert(edge.type == "E2O" || edge.type == "O2O");
+  }
+
+  // Event/object namespaces share the graph key space, and synthetic change
+  // identifiers use that same key space. Later records update the keyed node.
+  auto colliding = log;
+  colliding.events.push_back(
+      {"o1", "Shadow", "2026-01-05T00:00:00Z", {}});
+  colliding.events.push_back(
+      {"@@change##0", "ShadowChange", "2026-01-06T00:00:00Z", {}});
+  const auto keyed = minera::discover_ocel_heterogeneous_graph(colliding);
+  assert(keyed.nodes.size() == colliding.events.size() + colliding.objects.size() +
+         colliding.object_changes.size() - 2);
+  const auto find_node = [&](const std::string& id) -> const minera::OcelGraphNode* {
+    for (const auto& node : keyed.nodes) {
+      if (node.id == id) return &node;
+    }
+    return nullptr;
+  };
+  const auto* o1 = find_node("o1");
+  assert(o1 && o1->type == "OBJECT" && o1->object_type == "order");
+  const auto* change = find_node("@@change##0");
+  assert(change && change->type == "CHANGE" && change->object_id == "o1");
+}
+
 }  // namespace
 
 int main() {
@@ -178,4 +255,5 @@ int main() {
   validation_contract();
   enrichment_contract();
   object_graph_contract();
+  heterogeneous_graph_contract();
 }

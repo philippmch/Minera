@@ -65,6 +65,47 @@ struct OcelObjectGraph {
 [[nodiscard]] std::string serialize_ocel_object_graph_json(
     const OcelObjectGraph& graph);
 
+// A heterogeneous graph keeps event, object, and optional object-change
+// records as typed nodes, with relation edges retained in input order.
+struct OcelGraphNode {
+  std::string id;
+  std::string type;
+  std::string activity;
+  std::string timestamp;
+  std::string object_type;
+  std::string object_id;
+  std::string field;
+  std::vector<OcelAttribute> attributes;
+  std::optional<OcelValue> value;
+};
+
+struct OcelGraphEdge {
+  std::string source;
+  std::string target;
+  std::string type;
+  std::string qualifier;
+  std::string object;
+};
+
+struct OcelHeterogeneousGraphOptions {
+  bool include_df = true;
+  bool include_object_changes = true;
+};
+
+struct OcelHeterogeneousGraph {
+  bool include_df = true;
+  bool include_object_changes = true;
+  std::vector<OcelGraphNode> nodes;
+  std::vector<OcelGraphEdge> edges;
+};
+
+[[nodiscard]] OcelHeterogeneousGraph discover_ocel_heterogeneous_graph(
+    const Ocel& log,
+    const OcelHeterogeneousGraphOptions& options = {});
+
+[[nodiscard]] std::string serialize_ocel_heterogeneous_graph_json(
+    const OcelHeterogeneousGraph& graph);
+
 struct OcelSplitOptions {
   OcelSplitVariant variant = OcelSplitVariant::kConnectedComponents;
   // Required for the ancestors/descendants variant. Objects of this type are

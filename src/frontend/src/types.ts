@@ -1090,6 +1090,34 @@ export interface OcelObjectGraphResult {
   object_ids: string[];
   edges: Array<[string, string]>;
 }
+export type OcelHeterogeneousGraphNodeType = "EVENT" | "OBJECT" | "CHANGE";
+export interface OcelHeterogeneousGraphNode {
+  id: string;
+  type: OcelHeterogeneousGraphNodeType;
+  activity?: string;
+  timestamp?: string;
+  object_type?: string;
+  object_id?: string;
+  field?: string;
+  value?: unknown;
+  attributes?: Record<string, unknown>;
+}
+export type OcelHeterogeneousGraphEdgeType = "E2O" | "O2O" | "DF" | "CHANGE";
+export interface OcelHeterogeneousGraphEdge {
+  source: string;
+  target: string;
+  type: OcelHeterogeneousGraphEdgeType;
+  qualifier?: string;
+  object?: string;
+}
+export interface OcelHeterogeneousGraphResult {
+  family: "OCEL_GRAPH";
+  variant: "HETEROGENEOUS";
+  include_df: boolean;
+  include_object_changes: boolean;
+  nodes: OcelHeterogeneousGraphNode[];
+  edges: OcelHeterogeneousGraphEdge[];
+}
 export type OcelPlayoutVariant = "EXTENSIVE";
 export interface OcelPlayoutBinding {
   activity: string;
@@ -1227,6 +1255,44 @@ export function isOcelObjectGraphResult(value: unknown): value is OcelObjectGrap
       !Array.isArray(value.edges)) return false;
   return value.edges.every((edge) => Array.isArray(edge) && edge.length === 2 &&
     edge.every((id) => typeof id === "string"));
+}
+function isOcelHeterogeneousGraphNode(value: unknown): value is OcelHeterogeneousGraphNode {
+  if (!isOcelRecord(value) || typeof value.id !== "string" ||
+      !["EVENT", "OBJECT", "CHANGE"].includes(String(value.type))) return false;
+  const type = value.type;
+  if (type === "EVENT") {
+    return typeof value.activity === "string" &&
+      typeof value.timestamp === "string" && isOcelRecord(value.attributes);
+  }
+  if (type === "OBJECT") {
+    return typeof value.object_type === "string" &&
+      isOcelRecord(value.attributes);
+  }
+  return typeof value.object_id === "string" &&
+    typeof value.object_type === "string" &&
+    typeof value.timestamp === "string" &&
+    typeof value.field === "string" && "value" in value &&
+    (value.value === null || typeof value.value === "string" ||
+      typeof value.value === "number" || typeof value.value === "boolean");
+}
+function isOcelHeterogeneousGraphEdge(value: unknown): value is OcelHeterogeneousGraphEdge {
+  if (!isOcelRecord(value) || typeof value.source !== "string" ||
+      typeof value.target !== "string" ||
+      !["E2O", "O2O", "DF", "CHANGE"].includes(String(value.type))) return false;
+  if (value.type === "E2O" || value.type === "O2O")
+    return typeof value.qualifier === "string";
+  if (value.type === "DF") return typeof value.object === "string";
+  return true;
+}
+export function isOcelHeterogeneousGraphResult(
+  value: unknown,
+): value is OcelHeterogeneousGraphResult {
+  if (!isOcelRecord(value) || value.family !== "OCEL_GRAPH" ||
+      value.variant !== "HETEROGENEOUS" || typeof value.include_df !== "boolean" ||
+      typeof value.include_object_changes !== "boolean" || !Array.isArray(value.nodes) ||
+      !Array.isArray(value.edges)) return false;
+  return value.nodes.every(isOcelHeterogeneousGraphNode) &&
+    value.edges.every(isOcelHeterogeneousGraphEdge);
 }
 export function isOcelPlayoutResult(value: unknown): value is OcelPlayoutResult {
   if (!isOcelRecord(value) ||

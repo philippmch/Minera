@@ -49,6 +49,7 @@ import {
   type OcelEnrichmentGraph,
   type OcelEnrichmentResult,
   type OcelObjectGraphResult,
+  type OcelHeterogeneousGraphResult,
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelInteractionGraphSource,
@@ -93,6 +94,7 @@ import {
   isOcelSplitResult,
   isOcelEnrichmentResult,
   isOcelObjectGraphResult,
+  isOcelHeterogeneousGraphResult,
   isOcelPlayoutResult,
   isOcelFeatureResult,
   isOcelStatisticsResult,
@@ -4919,6 +4921,50 @@ export async function requestOcelObjectGraph(
     throw new Error("the Minera backend returned an invalid OCEL object graph");
   return payload;
 }
+
+export interface OcelHeterogeneousGraphOptions {
+  include_df?: boolean;
+  include_object_changes?: boolean;
+}
+export type OcelEventObjectGraphOptions = OcelHeterogeneousGraphOptions;
+
+export function ocelEventObjectGraphQuery(
+  options: OcelEventObjectGraphOptions = {},
+): string {
+  if (options.include_df !== undefined && typeof options.include_df !== "boolean")
+    throw new Error("OCEL event/object graph include_df must be boolean");
+  if (options.include_object_changes !== undefined &&
+      typeof options.include_object_changes !== "boolean")
+    throw new Error("OCEL event/object graph include_object_changes must be boolean");
+  const query = new URLSearchParams();
+  query.set("variant", "heterogeneous");
+  query.set("include_df", String(options.include_df ?? true));
+  query.set("include_object_changes", String(options.include_object_changes ?? true));
+  return query.toString();
+}
+
+export const ocelHeterogeneousGraphQuery = ocelEventObjectGraphQuery;
+
+export async function requestOcelEventObjectGraph(
+  log: Blob,
+  options: OcelEventObjectGraphOptions = {},
+): Promise<OcelHeterogeneousGraphResult> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const query = ocelEventObjectGraphQuery(options);
+  const response = await fetch(`/api/ocel/event-object-graph?${query}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isOcelHeterogeneousGraphResult(payload))
+    throw new Error("the Minera backend returned an invalid OCEL event/object graph");
+  return payload;
+}
+
+export const requestOcelHeterogeneousGraph = requestOcelEventObjectGraph;
 
 export interface OcelPlayoutOptions {
   model?: "ocpn" | "causal_net";
