@@ -241,6 +241,7 @@ int main() {
   lifecycle_options.include_endpoint_features = false;
   lifecycle_options.include_attribute_counts = false;
   lifecycle_options.include_interaction_features = false;
+  lifecycle_options.include_lifecycle_wip_features = true;
   const auto lifecycle_table = minera::extract_ocel_features(
       lifecycle_order, minera::OcelFeatureVariant::kObjects,
       lifecycle_options);
@@ -262,6 +263,58 @@ int main() {
          minera::parse_timestamp("2026-01-01T00:00:00Z").value());
   assert(lifecycle_table.values[0][path_ab] == 1.0 &&
          lifecycle_table.values[0][path_ba] == 1.0);
+
+  // Work-in-progress is a forward start-window, not a symmetric overlap
+  // count.  The object rows are deliberately not in lifecycle order: the
+  // result must be restored to the original object order after sorting.
+  minera::Ocel wip_log;
+  wip_log.events = {
+      {"w1", "OuterStart", "2026-01-01T00:00:00Z", {}},
+      {"w2", "InnerStart", "2026-01-01T01:00:00Z", {}},
+      {"w3", "InnerEnd", "2026-01-01T02:00:00Z", {}},
+      {"w4", "OuterEnd", "2026-01-01T03:00:00Z", {}},
+      {"w5", "DisjointStart", "2026-01-01T05:00:00Z", {}},
+      {"w6", "DisjointEnd", "2026-01-01T06:00:00Z", {}},
+      {"w7", "MissingTime", "not-a-timestamp", {}}};
+  wip_log.objects = {{"inner", "item", {}}, {"outer", "order", {}},
+                     {"disjoint", "case", {}}, {"missing", "case", {}}};
+  wip_log.relations = {{"w2", "inner", ""}, {"w3", "inner", ""},
+                       {"w1", "outer", ""}, {"w4", "outer", ""},
+                       {"w5", "disjoint", ""}, {"w6", "disjoint", ""},
+                       {"w7", "missing", ""}};
+  auto wip_options = lifecycle_options;
+  wip_options.include_lifecycle_length_features = false;
+  wip_options.include_lifecycle_unique_activity_features = false;
+  wip_options.include_lifecycle_duration_features = false;
+  wip_options.include_lifecycle_activity_features = false;
+  wip_options.include_lifecycle_path_features = false;
+  const auto wip_table = minera::extract_ocel_features(
+      wip_log, minera::OcelFeatureVariant::kObjects, wip_options);
+  assert(wip_table.feature_names.size() == 1 &&
+         wip_table.feature_names.front() == "@@object_wip");
+  // Original order: inner, outer, disjoint, missing.
+  assert(wip_table.values[0][0] == 1.0);
+  assert(wip_table.values[1][0] == 2.0);
+  assert(wip_table.values[2][0] == 1.0);
+  assert(wip_table.values[3][0] == 0.0);
+
+  auto default_lifecycle = minera::OcelFeatureOptions{};
+  default_lifecycle.include_activity_features = false;
+  default_lifecycle.include_timestamp_features = false;
+  default_lifecycle.include_relation_features = false;
+  default_lifecycle.include_endpoint_features = false;
+  default_lifecycle.include_attribute_counts = false;
+  default_lifecycle.include_interaction_features = false;
+  default_lifecycle.include_lifecycle_length_features = false;
+  default_lifecycle.include_lifecycle_unique_activity_features = false;
+  default_lifecycle.include_lifecycle_duration_features = false;
+  default_lifecycle.include_lifecycle_activity_features = false;
+  default_lifecycle.include_lifecycle_path_features = false;
+  const auto default_lifecycle_table = minera::extract_ocel_features(
+      wip_log, minera::OcelFeatureVariant::kObjects, default_lifecycle);
+  assert(std::find(default_lifecycle_table.feature_names.begin(),
+                   default_lifecycle_table.feature_names.end(),
+                   "@@object_wip") == default_lifecycle_table.feature_names.end());
 
   auto duration_only = lifecycle_options;
   duration_only.include_lifecycle_length_features = false;
