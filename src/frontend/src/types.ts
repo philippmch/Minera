@@ -1814,6 +1814,8 @@ export interface PetriUsageComparisonOptions {
   initial_marking?: number[];
   /** Optional target token counts by place; omitted entries use the workflow default. */
   final_marking?: number[];
+  /** Optional event attribute used as the replay activity label. */
+  activity_attribute?: string;
 }
 
 /** Recursive POWL model emitted by the POWL discovery miner. */

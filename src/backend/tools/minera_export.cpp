@@ -132,6 +132,13 @@ std::vector<std::string> split_csv(std::string_view value) {
   return parts;
 }
 
+std::string trim_text(std::string_view value) {
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string_view::npos) return {};
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return std::string(value.substr(first, last - first + 1));
+}
+
 const minera::PetriNet* select_decision_model(
     std::string_view miner, const minera::PetriNet& inductive,
     const minera::PetriNet& alpha, const minera::PetriNet& heuristic,
@@ -807,6 +814,8 @@ int usage(const char* program) {
                "  --emd-use-fast-emd <bool> Select accelerated EMD when available\n"
                "  --compare-petri-reference <file> Compare Petri element usage with CSV/XES log\n"
                "  --compare-petri-miner <id>      inductive (default), alpha, heuristic, or powl\n"
+               "  --compare-petri-activity-attribute <name>\n"
+               "                            Event attribute used as the activity label\n"
                "  --compare-petri-initial-marking <n,...> Initial place marking\n"
                "  --compare-petri-final-marking <n,...>   Final place marking\n"
                "  --align-process-tree     Embed process-tree alignments\n"
@@ -1192,6 +1201,7 @@ int main(int argc, char** argv) {
   std::filesystem::path emd_reference;
   std::filesystem::path compare_petri_reference;
   std::string compare_petri_miner = "inductive";
+  std::string compare_petri_activity_attribute;
   std::vector<std::uint32_t> compare_petri_initial_marking;
   std::vector<std::uint32_t> compare_petri_final_marking;
   bool compare_petri_initial_marking_used = false;
@@ -2589,6 +2599,19 @@ int main(int argc, char** argv) {
       if (compare_petri_miner != "inductive" && compare_petri_miner != "alpha" &&
           compare_petri_miner != "heuristic" && compare_petri_miner != "powl") {
         std::cerr << "error: --compare-petri-miner expects inductive, alpha, heuristic, or powl\n";
+        return 2;
+      }
+      continue;
+    }
+    if (arg == "--compare-petri-activity-attribute") {
+      const auto* value = next();
+      if (!value) {
+        std::cerr << "error: --compare-petri-activity-attribute expects a non-empty name\n";
+        return 2;
+      }
+      compare_petri_activity_attribute = trim_text(value);
+      if (compare_petri_activity_attribute.empty()) {
+        std::cerr << "error: --compare-petri-activity-attribute expects a non-empty name\n";
         return 2;
       }
       continue;
@@ -3991,6 +4014,7 @@ int main(int argc, char** argv) {
   }
   if (compare_petri_reference.empty() &&
       (compare_petri_miner != "inductive" ||
+       !compare_petri_activity_attribute.empty() ||
        compare_petri_initial_marking_used || compare_petri_final_marking_used)) {
     std::cerr << "error: --compare-petri options require --compare-petri-reference <file>\n";
     return 2;
@@ -5349,10 +5373,23 @@ int main(int argc, char** argv) {
                   << compare_petri_miner << "'\n";
         return 2;
       }
-      const auto reference = ends_with_ci(compare_petri_reference.string(), ".xes")
-          ? minera::import_xes_event_log(compare_petri_reference)
-          : minera::import_csv_event_log(compare_petri_reference, options);
+      const auto selector = compare_petri_activity_attribute;
+      const auto reference = [&]() {
+        if (ends_with_ci(compare_petri_reference.string(), ".xes")) {
+          minera::XesImportOptions reference_options;
+          if (!selector.empty() && selector != "concept:name")
+            reference_options.activity_attribute = selector;
+          return minera::import_xes_event_log(compare_petri_reference,
+                                              reference_options);
+        }
+        auto reference_options = options;
+        if (!selector.empty() && selector != "activity")
+          reference_options.activity_column = selector;
+        return minera::import_csv_event_log(compare_petri_reference,
+                                            reference_options);
+      }();
       minera::PetriUsageComparisonOptions comparison_options;
+      comparison_options.activity_attribute = compare_petri_activity_attribute;
       if (compare_petri_initial_marking_used)
         comparison_options.initial_marking = compare_petri_initial_marking;
       if (compare_petri_final_marking_used)

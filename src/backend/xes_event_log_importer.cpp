@@ -68,6 +68,15 @@ EventLog import_xes_event_log(
           "XES event is missing its activity attribute ('" +
           options.activity_attribute + "')");
     }
+    // Keep a selected non-default activity key available in the generic bag
+    // too, so replay can apply that selector consistently after import.
+    if (options.activity_attribute != "activity" &&
+        options.activity_attribute != "concept:name" &&
+        current_event.attribute(options.activity_attribute) == nullptr) {
+      current_event.attributes.push_back(EventAttribute{
+          options.activity_attribute, current_event.activity,
+          AttributeKind::kString});
+    }
     current_event.input_order = input_order++;
     current_trace.events.push_back(std::move(current_event));
     current_event = Event{};
