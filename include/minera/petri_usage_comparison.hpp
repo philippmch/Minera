@@ -50,7 +50,9 @@ struct PetriUsageComparisonOptions {
   // Optional event attribute used as the activity label during replay. The
   // canonical Event::activity field is used when this is empty, "activity",
   // or "concept:name". Events without the selected attribute are treated as
-  // unknown labels and do not activate a model transition.
+  // unknown labels and do not activate a model transition. Leading and
+  // trailing whitespace is ignored; a non-empty all-whitespace selector is
+  // rejected.
   std::string activity_attribute;
 };
 

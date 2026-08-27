@@ -28,18 +28,26 @@ const std::string* selected_activity_value(const Event& event,
     return &event.activity;
   }
   if (attribute == "resource" || attribute == "org:resource") {
-    if (const auto* generic = event.attribute(attribute)) return generic;
     return &event.resource;
   }
   if (attribute == "timestamp" || attribute == "time:timestamp") {
-    if (const auto* generic = event.attribute(attribute)) return generic;
     return &event.timestamp;
   }
   if (attribute == "lifecycle" || attribute == "lifecycle:transition") {
-    if (const auto* generic = event.attribute(attribute)) return generic;
     return &event.lifecycle;
   }
   return event.attribute(attribute);
+}
+
+std::string normalize_activity_attribute(std::string_view attribute) {
+  const auto first = attribute.find_first_not_of(" \t\r\n");
+  if (first == std::string_view::npos) {
+    if (attribute.empty()) return {};
+    throw std::invalid_argument(
+        "Petri usage activity attribute must not be blank");
+  }
+  const auto last = attribute.find_last_not_of(" \t\r\n");
+  return std::string(attribute.substr(first, last - first + 1));
 }
 
 struct MarkingHash {
@@ -339,6 +347,8 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
                                          const EventLog& log2,
                                          const PetriUsageComparisonOptions& options) {
   validate_net(net);
+  const auto activity_attribute =
+      normalize_activity_attribute(options.activity_attribute);
   const auto initial_marking = resolve_marking(
       options.initial_marking, net.place_count(), net.source(), "initial_marking");
   const auto final_marking = resolve_marking(
@@ -348,9 +358,9 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
     activities.emplace(net.activities()[i], i);
   }
   const auto usage1 = replay_log(log1, net, activities, initial_marking,
-                                 final_marking, options.activity_attribute);
+                                 final_marking, activity_attribute);
   const auto usage2 = replay_log(log2, net, activities, initial_marking,
-                                 final_marking, options.activity_attribute);
+                                 final_marking, activity_attribute);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {

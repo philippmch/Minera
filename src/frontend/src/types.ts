@@ -72,7 +72,9 @@ export function isConceptDriftResult(value: unknown): value is ConceptDriftResul
 }
 
 export interface ILPMinerTransition {
-  activity: string | null;
+  // Visible transitions use the numeric activity-table index emitted by the
+  // native Petri-net serializer; null denotes a silent transition.
+  activity: number | null;
   inputs: number[];
   outputs: number[];
   reset_inputs?: number[];
@@ -124,7 +126,11 @@ export function isILPMinerResult(value: unknown): value is ILPMinerResult {
   if (!Number.isInteger(placeCount) || (placeCount as number) <= 0 || !Number.isInteger(n.source) || !Number.isInteger(n.sink) || (n.source as number) < 0 || (n.sink as number) < 0 || (n.source as number) >= (placeCount as number) || (n.sink as number) >= (placeCount as number) || !Array.isArray(n.activities) || !n.activities.every((x) => typeof x === "string") || !Array.isArray(n.transitions)) return false;
   const activities = n.activities as string[];
   if (!n.transitions.every((t) => {
-    if (!t || typeof t !== "object" || !(t.activity === null || (typeof t.activity === "string" && activities.includes(t.activity))) || !isFiniteIntegerArray(t.inputs) || !isFiniteIntegerArray(t.outputs)) return false;
+    if (!t || typeof t !== "object" ||
+        !(t.activity === null || (Number.isInteger(t.activity) &&
+          (t.activity as number) >= 0 &&
+          (t.activity as number) < activities.length)) ||
+        !isFiniteIntegerArray(t.inputs) || !isFiniteIntegerArray(t.outputs)) return false;
     return t.inputs.every((place) => place < (placeCount as number)) && t.outputs.every((place) => place < (placeCount as number));
   })) return false;
   const m = c.markings as Partial<ILPMinerMarkings>;

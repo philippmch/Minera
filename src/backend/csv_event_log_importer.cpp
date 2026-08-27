@@ -74,14 +74,41 @@ std::size_t required_column(
   return it->second;
 }
 
-std::optional<std::size_t> optional_column(
+std::vector<std::string_view> selector_aliases(std::string_view name) {
+  if (name == "activity" || name == "concept:name")
+    return {"activity", "concept:name"};
+  if (name == "resource" || name == "org:resource")
+    return {"resource", "org:resource"};
+  if (name == "timestamp" || name == "time:timestamp")
+    return {"timestamp", "time:timestamp"};
+  if (name == "lifecycle" || name == "lifecycle:transition")
+    return {"lifecycle", "lifecycle:transition"};
+  return {};
+}
+
+std::size_t required_selector_column(
     const std::unordered_map<std::string, std::size_t>& columns,
     const std::string& name) {
-  const auto it = columns.find(name);
-  if (it == columns.end()) {
-    return std::nullopt;
+  if (name.find_first_not_of(" \t\r\n") == std::string::npos) {
+    throw std::invalid_argument("CSV activity column must not be blank");
   }
-  return it->second;
+  if (const auto it = columns.find(name); it != columns.end()) return it->second;
+  for (const auto alias : selector_aliases(name)) {
+    if (const auto it = columns.find(std::string(alias)); it != columns.end())
+      return it->second;
+  }
+  throw std::invalid_argument("CSV column not found: " + name);
+}
+
+std::optional<std::size_t> optional_selector_column(
+    const std::unordered_map<std::string, std::size_t>& columns,
+    const std::string& name) {
+  if (const auto it = columns.find(name); it != columns.end()) return it->second;
+  for (const auto alias : selector_aliases(name)) {
+    if (const auto it = columns.find(std::string(alias)); it != columns.end())
+      return it->second;
+  }
+  return std::nullopt;
 }
 
 std::string field_at(
@@ -124,14 +151,18 @@ EventLog import_csv_event_log(
       parse_csv_row(line, options.delimiter, options.trim_fields);
   auto columns = header_index(header);
   const auto case_index = required_column(columns, options.case_id_column);
-  const auto activity_index = required_column(columns, options.activity_column);
-  auto timestamp_index = optional_column(columns, options.timestamp_column);
+  const auto activity_index =
+      required_selector_column(columns, options.activity_column);
+  auto timestamp_index =
+      optional_selector_column(columns, options.timestamp_column);
   if (!timestamp_index && options.require_timestamp_column) {
     throw std::invalid_argument(
         "CSV column not found: " + options.timestamp_column);
   }
-  auto resource_index = optional_column(columns, options.resource_column);
-  auto lifecycle_index = optional_column(columns, options.lifecycle_column);
+  auto resource_index =
+      optional_selector_column(columns, options.resource_column);
+  auto lifecycle_index =
+      optional_selector_column(columns, options.lifecycle_column);
 
   // Every remaining named column becomes a generic event attribute, keyed by
   // its header, so domain data (channel, amount, region, …) survives import —

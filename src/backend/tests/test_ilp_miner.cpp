@@ -224,6 +224,36 @@ int main() {
                      [](const PetriTransition& transition) { return transition.silent(); }));
   assert(check_workflow_net(boundary_result.net).valid);
 
+  // Empty traces are retained as boundary-only variants.  A log containing
+  // such a trace therefore yields a valid silent workflow, while a log with
+  // no traces at all remains invalid.
+  EventLog empty_variant_log;
+  Trace empty_variant;
+  empty_variant.case_id = "empty-variant";
+  empty_variant_log.traces.push_back(std::move(empty_variant));
+  const auto empty_variant_result = mine_ilp(empty_variant_log);
+  assert(empty_variant_result.diagnostics.computed);
+  assert(empty_variant_result.net.activities().empty());
+  assert(check_workflow_net(empty_variant_result.net).valid);
+  const auto empty_variant_replay =
+      check_conformance(empty_variant_log, empty_variant_result.net);
+  assert(empty_variant_replay.fitting_traces == empty_variant_replay.trace_count);
+
+  const auto mixed_empty_result = mine_ilp(log_of({{}, {"a"}}));
+  assert(mixed_empty_result.net.activities() == std::vector<std::string>{"a"});
+  assert(check_workflow_net(mixed_empty_result.net).valid);
+  const auto mixed_empty_replay =
+      check_conformance(log_of({{}, {"a"}}), mixed_empty_result.net);
+  assert(mixed_empty_replay.fitting_traces == mixed_empty_replay.trace_count);
+
+  bool no_trace_rejected = false;
+  try {
+    (void)mine_ilp(EventLog{});
+  } catch (const std::invalid_argument&) {
+    no_trace_rejected = true;
+  }
+  assert(no_trace_rejected);
+
   // Duplicate variants are collapsed for the bounded search, but their
   // frequencies still drive noise filtering: the singleton branch disappears
   // when it is below half of the dominant variant's support.

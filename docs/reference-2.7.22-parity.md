@@ -838,9 +838,11 @@ the same reference as multipart `reference_log` against its cached session;
 both adapters accept comma-separated initial and final place markings, while
 the frontend exposes those controls beside the reference upload. An optional
 trimmed activity selector applies to both replay logs; resource, timestamp,
-and lifecycle aliases resolve to their first-class event fields, while custom
-CSV/XES keys are retained through import. Replay uses normal, reset, and
-inhibitor arc semantics and preserves weighted arcs in the usage records.
+and lifecycle aliases resolve to their first-class event fields, while the
+CSV/XES import paths accept either short or qualified standard keys even when
+the default activity column/key is absent. Custom CSV/XES keys are retained
+through import. Replay uses normal, reset, and inhibitor arc semantics and
+preserves weighted arcs in the usage records.
 Native replay, importer coverage, standalone JSON, CLI, server, and frontend
 request/response guards are covered; richer differential semantics remain
 outside this adapter.
@@ -1128,6 +1130,11 @@ occurrence vectors, so continuations are compared after their complete prefix
 rather than only by the immediately preceding activity; rejected continuations
 cut the remaining suffix of that variant. The complete variants and activity
 alphabet remain intact while weak sequence-encoding candidates are excluded.
+Trace-bearing logs with no events retain their empty trace as a boundary-only
+variant; a log with zero traces is still rejected. The standalone JSON and
+frontend guard represent visible transition activities as indexes into the
+activity table and reject indexes outside that table, while `null` remains the
+silent-transition marker.
 When no causal relation is supplied, the one-way portion of the normalized
 directly-follows graph is derived automatically; callers may override it with
 deterministic `A=>B` comma-separated entries. Frequency-based noise filtering

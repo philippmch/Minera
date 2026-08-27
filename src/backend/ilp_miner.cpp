@@ -107,7 +107,10 @@ std::int64_t saturating_add(std::int64_t left, std::int64_t right) {
 }
 
 NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
-  if (log.traces.empty() || log.event_count() == 0)
+  // An event log with no traces is invalid, but an empty trace is still a
+  // meaningful variant.  Boundary insertion below turns it into a
+  // boundary-only sequence, matching the normal per-trace normalization.
+  if (log.traces.empty())
     throw std::invalid_argument("ILP miner requires a non-empty event log");
 
   if (!std::isfinite(options.alpha) || options.alpha < 0.0 || options.alpha > 1.0)
@@ -137,15 +140,13 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
         sequence.push_back(std::move(label));
       }
     }
-    if (!sequence.empty()) {
-      if (!options.artificial_start_activity.empty())
-        sequence.insert(sequence.begin(), options.artificial_start_activity);
-      if (!options.artificial_end_activity.empty())
-        sequence.push_back(options.artificial_end_activity);
-      raw.push_back(std::move(sequence));
-    }
+    if (!options.artificial_start_activity.empty())
+      sequence.insert(sequence.begin(), options.artificial_start_activity);
+    if (!options.artificial_end_activity.empty())
+      sequence.push_back(options.artificial_end_activity);
+    raw.push_back(std::move(sequence));
   }
-  if (raw.empty() || names.empty())
+  if (raw.empty())
     throw std::invalid_argument("ILP miner found no activities");
 
   if ((!options.artificial_start_activity.empty() &&
@@ -159,6 +160,8 @@ NormalizedLog normalize(const EventLog& log, const ILPMinerOptions& options) {
     names.insert(options.artificial_start_activity);
   if (!options.artificial_end_activity.empty())
     names.insert(options.artificial_end_activity);
+  if (names.empty())
+    throw std::invalid_argument("ILP miner found no activities");
 
   NormalizedLog out;
   // Keep one representative per variant in first-seen order while retaining

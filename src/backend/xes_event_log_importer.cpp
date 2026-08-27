@@ -29,6 +29,28 @@ std::optional<AttributeKind> attribute_kind_of(std::string_view element) {
   return std::nullopt;
 }
 
+int selector_match_rank(std::string_view key, std::string_view selector) {
+  // The configured spelling is authoritative; its short/qualified alternate
+  // is only a fallback when the authoritative key is absent.
+  if (key == selector) return 2;
+  if (selector == "activity" || selector == "concept:name")
+    return key == "activity" || key == "concept:name" ? 1 : 0;
+  if (selector == "resource" || selector == "org:resource")
+    return key == "resource" || key == "org:resource" ? 1 : 0;
+  if (selector == "timestamp" || selector == "time:timestamp")
+    return key == "timestamp" || key == "time:timestamp" ? 1 : 0;
+  if (selector == "lifecycle" || selector == "lifecycle:transition")
+    return key == "lifecycle" || key == "lifecycle:transition" ? 1 : 0;
+  return 0;
+}
+
+bool first_class_activity_selector(std::string_view selector) {
+  return selector == "activity" || selector == "concept:name" ||
+         selector == "resource" || selector == "org:resource" ||
+         selector == "timestamp" || selector == "time:timestamp" ||
+         selector == "lifecycle" || selector == "lifecycle:transition";
+}
+
 }  // namespace
 
 EventLog import_xes_event_log(
@@ -58,6 +80,10 @@ EventLog import_xes_event_log(
 
   Event current_event;
   bool in_event = false;
+  int activity_match_rank = 0;
+  int timestamp_match_rank = 0;
+  int resource_match_rank = 0;
+  int lifecycle_match_rank = 0;
 
   std::size_t input_order = 0;
   bool saw_timestamp = false;
@@ -70,8 +96,7 @@ EventLog import_xes_event_log(
     }
     // Keep a selected non-default activity key available in the generic bag
     // too, so replay can apply that selector consistently after import.
-    if (options.activity_attribute != "activity" &&
-        options.activity_attribute != "concept:name" &&
+    if (!first_class_activity_selector(options.activity_attribute) &&
         current_event.attribute(options.activity_attribute) == nullptr) {
       current_event.attributes.push_back(EventAttribute{
           options.activity_attribute, current_event.activity,
@@ -81,6 +106,10 @@ EventLog import_xes_event_log(
     current_trace.events.push_back(std::move(current_event));
     current_event = Event{};
     in_event = false;
+    activity_match_rank = 0;
+    timestamp_match_rank = 0;
+    resource_match_rank = 0;
+    lifecycle_match_rank = 0;
   };
 
   const auto finish_trace = [&]() {
@@ -118,20 +147,51 @@ EventLog import_xes_event_log(
       } else if (in_event && parent == "event") {
         if (const auto* key = detail::attribute(token.attributes, "key")) {
           if (const auto* value = detail::attribute(token.attributes, "value")) {
-            if (*key == options.activity_attribute) {
-              current_event.activity = *value;
-            } else if (*key == options.timestamp_attribute) {
-              current_event.timestamp = *value;
+            bool recognized = false;
+            const auto activity_rank =
+                selector_match_rank(*key, options.activity_attribute);
+            if (activity_rank != 0) {
+              if (activity_rank > activity_match_rank) {
+                current_event.activity = *value;
+                activity_match_rank = activity_rank;
+              }
+              recognized = true;
+            }
+            const auto timestamp_rank =
+                selector_match_rank(*key, options.timestamp_attribute);
+            if (timestamp_rank != 0) {
+              if (timestamp_rank > timestamp_match_rank) {
+                current_event.timestamp = *value;
+                timestamp_match_rank = timestamp_rank;
+              }
               saw_timestamp = true;
-            } else if (*key == options.resource_attribute) {
-              current_event.resource = *value;
-            } else if (*key == options.lifecycle_attribute) {
-              current_event.lifecycle = *value;
-            } else if (const auto kind = attribute_kind_of(token.name)) {
-              // Any other scalar attribute is kept generically, with its XES
-              // type so an export can round-trip it faithfully.
-              current_event.attributes.push_back(
-                  EventAttribute{*key, *value, *kind});
+              recognized = true;
+            }
+            const auto resource_rank =
+                selector_match_rank(*key, options.resource_attribute);
+            if (resource_rank != 0) {
+              if (resource_rank > resource_match_rank) {
+                current_event.resource = *value;
+                resource_match_rank = resource_rank;
+              }
+              recognized = true;
+            }
+            const auto lifecycle_rank =
+                selector_match_rank(*key, options.lifecycle_attribute);
+            if (lifecycle_rank != 0) {
+              if (lifecycle_rank > lifecycle_match_rank) {
+                current_event.lifecycle = *value;
+                lifecycle_match_rank = lifecycle_rank;
+              }
+              recognized = true;
+            }
+            if (!recognized) {
+              if (const auto kind = attribute_kind_of(token.name)) {
+                // Any other scalar attribute is kept generically, with its XES
+                // type so an export can round-trip it faithfully.
+                current_event.attributes.push_back(
+                    EventAttribute{*key, *value, *kind});
+              }
             }
           }
         }
