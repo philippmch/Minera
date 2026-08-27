@@ -4,9 +4,11 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "minera/event_log.hpp"
 #include "minera/ocel.hpp"
 
 namespace minera {
@@ -105,6 +107,30 @@ struct OcelHeterogeneousGraph {
 
 [[nodiscard]] std::string serialize_ocel_heterogeneous_graph_json(
     const OcelHeterogeneousGraph& graph);
+
+struct OcelFlattenOptions {
+  // Required object type.  An all-whitespace value is invalid; an unknown
+  // non-empty type produces an empty EventLog.
+  std::string object_type;
+  // Optional event attribute selectors.  Empty selectors use the canonical
+  // OcelEvent activity/timestamp fields; non-empty selectors name scalar
+  // event attributes (or their canonical aliases).
+  std::string event_activity_attribute;
+  std::string event_timestamp_attribute;
+};
+
+// Projects one OCEL object type into a conventional event log.  Referenced
+// objects of the selected type become traces, and each event-object relation
+// remains one event occurrence, including duplicates.  The source event
+// order is the primary output order, with object-table order and relation
+// order as stable tie-breakers.  Event and object scalar attributes are
+// retained with their native scalar kinds; selected object fields retain
+// their original keys in Trace attributes.
+[[nodiscard]] EventLog flatten_ocel_to_event_log(
+    const Ocel& log, const OcelFlattenOptions& options);
+
+[[nodiscard]] EventLog flatten_ocel_to_event_log(
+    const Ocel& log, std::string_view object_type);
 
 struct OcelSplitOptions {
   OcelSplitVariant variant = OcelSplitVariant::kConnectedComponents;

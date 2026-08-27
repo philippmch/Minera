@@ -1692,6 +1692,62 @@ void handle_ocel_event_object_graph(const httplib::Request& request,
   }
 }
 
+void handle_ocel_flatten(const httplib::Request& request,
+                         httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "object_type", "event_activity_attribute",
+        "event_timestamp_attribute"};
+    const auto all_whitespace = [](std::string_view value) {
+      return !value.empty() && std::all_of(
+          value.begin(), value.end(), [](unsigned char character) {
+            return std::isspace(character) != 0;
+          });
+    };
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown OCEL flatten parameter: " + key);
+    }
+    if (!request.has_param("object_type"))
+      throw std::invalid_argument(
+          "object_type is required for OCEL flattening");
+    const auto object_type = request.get_param_value("object_type");
+    if (object_type.empty() || all_whitespace(object_type))
+      throw std::invalid_argument(
+          "object_type must be a non-blank value");
+    minera::OcelFlattenOptions options;
+    options.object_type = object_type;
+    if (request.has_param("event_activity_attribute")) {
+      options.event_activity_attribute =
+          request.get_param_value("event_activity_attribute");
+      if (options.event_activity_attribute.empty() ||
+          all_whitespace(options.event_activity_attribute))
+        throw std::invalid_argument(
+            "event_activity_attribute must be a non-blank value");
+    }
+    if (request.has_param("event_timestamp_attribute")) {
+      options.event_timestamp_attribute =
+          request.get_param_value("event_timestamp_attribute");
+      if (options.event_timestamp_attribute.empty() ||
+          all_whitespace(options.event_timestamp_attribute))
+        throw std::invalid_argument(
+            "event_timestamp_attribute must be a non-blank value");
+    }
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    const auto log = minera::parse_ocel_json(body);
+    response.set_content(
+        minera::to_xes(minera::flatten_ocel_to_event_log(log, options),
+                       "ocel flatten"),
+        "application/xml");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -6092,6 +6148,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/enrich", preflight);
   server.Options("/api/ocel/graph", preflight);
   server.Options("/api/ocel/event-object-graph", preflight);
+  server.Options("/api/ocel/flatten", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
@@ -6178,6 +6235,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/enrich", handle_ocel_enrichment);
   server.Post("/api/ocel/graph", handle_ocel_graph);
   server.Post("/api/ocel/event-object-graph", handle_ocel_event_object_graph);
+  server.Post("/api/ocel/flatten", handle_ocel_flatten);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);

@@ -1,4 +1,5 @@
 #include <fstream>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -24,6 +25,7 @@
 #include "minera/ocel_playout.hpp"
 #include "minera/ocel_transform.hpp"
 #include "minera/saw_nets.hpp"
+#include "minera/xes_export.hpp"
 
 int main(int argc, char** argv) {
   try {
@@ -35,12 +37,14 @@ int main(int argc, char** argv) {
                    "--ocel-csv-delimiter CHAR --ocel-csv-trim-fields BOOL "
                    "--ocel-csv-sort-events-by-timestamp BOOL --ocel-csv-reject-unsupported BOOL "
                    "--ocel-csv-emit-objects BOOL --ocel-csv-allow-lossy BOOL\n";
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--flatten-object-type TYPE] [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "flatten options: --flatten-object-type TYPE [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME]\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, enrich, graph, split, conformance,
                         statistics, statistics_prefilter = "none",
-                        split_object_type, normative_path, csv_objects_path,
+                        split_object_type, flatten_object_type, flatten_event_activity,
+                        flatten_event_timestamp, normative_path, csv_objects_path,
                         normative_csv_objects_path, csv_output_path,
                         csv_objects_output_path;
     std::map<std::string, std::size_t> filter_object_counts;
@@ -53,6 +57,9 @@ int main(int argc, char** argv) {
     std::optional<std::pair<std::size_t, std::size_t>> filter_cc_length;
     bool filter_cc_object_type_negative = false;
     bool csv_input = false, xml_input = false, sqlite_input = false;
+    bool flatten_object_type_set = false;
+    bool flatten_event_activity_set = false;
+    bool flatten_event_timestamp_set = false;
     std::string sqlite_output_path;
     minera::OcelCsvImportOptions csv_import_options;
     minera::OcelCsvExportOptions csv_export_options;
@@ -111,6 +118,12 @@ int main(int argc, char** argv) {
       if (index + 1 >= argc || std::string(argv[index + 1]).empty())
         throw std::invalid_argument(std::string(option) + " expects a value");
       return std::string(argv[++index]);
+    };
+    const auto all_whitespace = [](const std::string& value) {
+      return !value.empty() && std::all_of(
+          value.begin(), value.end(), [](unsigned char character) {
+            return std::isspace(character) != 0;
+          });
     };
     const auto list = [](const std::string& value) {
       std::vector<std::string> result;
@@ -622,6 +635,39 @@ int main(int argc, char** argv) {
         enrich = argv[++i];
       } else if (option == "--enrich-no-lifecycle") {
         enrich_no_lifecycle = true;
+      } else if (option == "--flatten-object-type") {
+        if (flatten_object_type_set)
+          throw std::invalid_argument(
+              "--flatten-object-type may be specified once");
+        flatten_object_type = required_value(i, "--flatten-object-type");
+        if (all_whitespace(flatten_object_type))
+          throw std::invalid_argument(
+              "--flatten-object-type expects a non-blank value");
+        flatten_object_type_set = true;
+      } else if (option == "--flatten-event-activity-attribute" ||
+                 option == "--flatten-event-activity") {
+        if (flatten_event_activity_set)
+          throw std::invalid_argument(
+              "event activity selector may be specified once");
+        flatten_event_activity = required_value(
+            i, "--flatten-event-activity-attribute");
+        if (flatten_event_activity.empty() ||
+            all_whitespace(flatten_event_activity))
+          throw std::invalid_argument(
+              "--flatten-event-activity-attribute expects a non-blank value");
+        flatten_event_activity_set = true;
+      } else if (option == "--flatten-event-timestamp-attribute" ||
+                 option == "--flatten-event-timestamp") {
+        if (flatten_event_timestamp_set)
+          throw std::invalid_argument(
+              "event timestamp selector may be specified once");
+        flatten_event_timestamp = required_value(
+            i, "--flatten-event-timestamp-attribute");
+        if (flatten_event_timestamp.empty() ||
+            all_whitespace(flatten_event_timestamp))
+          throw std::invalid_argument(
+              "--flatten-event-timestamp-attribute expects a non-blank value");
+        flatten_event_timestamp_set = true;
       } else if (option == "--split-object-type" && i + 1 < argc) {
         split_object_type = argv[++i];
       } else if (option == "--split-max-objects" && i + 1 < argc) {
@@ -827,6 +873,13 @@ int main(int argc, char** argv) {
     if (format == "sqlite" && sqlite_output_path.empty())
       throw std::invalid_argument(
           "--format sqlite requires --sqlite-output OUTPUT.sqlite");
+    if (flatten_object_type_set && format != "classic")
+      throw std::invalid_argument(
+          "--flatten-object-type emits XES and requires the default format");
+    if ((flatten_event_activity_set || flatten_event_timestamp_set) &&
+        !flatten_object_type_set)
+      throw std::invalid_argument(
+          "flatten event attribute selectors require --flatten-object-type");
     if (!sqlite_output_path.empty() && format != "sqlite")
       throw std::invalid_argument(
           "--sqlite-output requires --format sqlite");
@@ -1028,19 +1081,23 @@ int main(int argc, char** argv) {
     if (!conformance.empty() &&
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
          !split.empty() || !features.empty() || !statistics.empty() ||
-         ocpn_playout || oc_causal_net_playout))
+         ocpn_playout || oc_causal_net_playout ||
+         flatten_object_type_set))
       throw std::invalid_argument(
           "--conformance cannot be combined with discovery, enrichment, graph, or split");
     if ((!discover.empty() && !split.empty()) ||
         (!discover.empty() && !enrich.empty()) ||
         (!split.empty() && !enrich.empty()) ||
         (!graph.empty() && (!discover.empty() || !enrich.empty() ||
-                            !split.empty())))
+                            !split.empty())) ||
+        (flatten_object_type_set &&
+         (!discover.empty() || !enrich.empty() || !graph.empty() ||
+          !split.empty())))
       throw std::invalid_argument(
           "--discover, --enrich, --graph, and --split are mutually exclusive");
     if ((ocpn_playout || oc_causal_net_playout) &&
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
-         !split.empty()))
+         !split.empty() || flatten_object_type_set))
       throw std::invalid_argument(
           "object-centric playout cannot be combined with discovery, enrichment, graph, or split");
     if (ocpn_event_binding_used && !ocpn_playout && !oc_causal_net_playout)
@@ -1056,14 +1113,15 @@ int main(int argc, char** argv) {
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
          !split.empty() || !features.empty() ||
          !statistics.empty() || !conformance.empty() ||
-         ocpn_playout || oc_causal_net_playout))
+         ocpn_playout || oc_causal_net_playout ||
+         flatten_object_type_set))
       throw std::invalid_argument(
           "--describe cannot be combined with discovery, enrichment, graph, split, or conformance");
     if (!statistics.empty() &&
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
          !split.empty() || !features.empty() ||
          !conformance.empty() || ocpn_playout || oc_causal_net_playout ||
-         !describe.empty()))
+         !describe.empty() || flatten_object_type_set))
       throw std::invalid_argument(
           "--statistics cannot be combined with other OCEL output modes");
     if (!conformance.empty() && normative_path.empty())
@@ -1175,9 +1233,13 @@ int main(int argc, char** argv) {
     if (!features.empty() &&
         (!discover.empty() || !enrich.empty() || !graph.empty() ||
          !split.empty() || !conformance.empty() ||
-         !statistics.empty() || ocpn_playout || oc_causal_net_playout))
+         !statistics.empty() || ocpn_playout || oc_causal_net_playout ||
+         flatten_object_type_set))
       throw std::invalid_argument(
           "--features cannot be combined with discovery, enrichment, graph, split, conformance, or playout");
+    if (flatten_object_type_set && !normative_path.empty())
+      throw std::invalid_argument(
+          "--flatten-object-type cannot be combined with --normative");
     if (!graph.empty()) {
       if (heterogeneous_graph(graph)) {
         std::cout << minera::serialize_ocel_heterogeneous_graph_json(
@@ -1190,6 +1252,18 @@ int main(int argc, char** argv) {
                              log, object_graph_variant(graph)))
                   << '\n';
       }
+      return 0;
+    }
+    if (flatten_object_type_set) {
+      minera::OcelFlattenOptions flatten_options;
+      flatten_options.object_type = flatten_object_type;
+      if (flatten_event_activity_set)
+        flatten_options.event_activity_attribute = flatten_event_activity;
+      if (flatten_event_timestamp_set)
+        flatten_options.event_timestamp_attribute = flatten_event_timestamp;
+      std::cout << minera::to_xes(
+          minera::flatten_ocel_to_event_log(log, flatten_options),
+          "ocel flatten");
       return 0;
     }
     if (!statistics.empty()) {

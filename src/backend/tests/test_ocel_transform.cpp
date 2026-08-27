@@ -1,7 +1,9 @@
 #include "minera/ocel_transform.hpp"
+#include "minera/xes_export.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -247,6 +249,175 @@ void heterogeneous_graph_contract() {
   assert(change && change->type == "CHANGE" && change->object_id == "o1");
 }
 
+void flatten_contract() {
+  minera::Ocel log;
+  log.objects = {
+      {"o1", "order",
+       {{"region", std::string("EU")},
+        {"amount", std::int64_t{7}},
+        {"active", true},
+        {"ratio", 1.25},
+        {"missing", std::nullptr_t{}}}},
+      {"o2", "order", {}},
+      {"i1", "item", {}}};
+  log.events = {
+      {"e1", "Create", "2026-01-01T00:00:00Z",
+       {{"priority", std::int64_t{3}}, {"flag", false},
+        {"note", std::string("first")},
+        {"missing", std::nullptr_t{}}}},
+      {"e2", "Pack", "2026-01-02T00:00:00Z", {}},
+      {"unused", "Ignore", "2026-01-03T00:00:00Z", {}}};
+  // Relation order is intentionally different from event order, and the
+  // repeated e1/o1 row must survive as a repeated event occurrence.
+  log.relations = {{"e2", "o1", "first"}, {"e1", "o1", "second"},
+                   {"e1", "o1", "duplicate"}, {"e2", "o2", ""},
+                   {"unused", "i1", ""}};
+
+  const auto flattened = minera::flatten_ocel_to_event_log(log, "order");
+  assert(flattened.traces.size() == 2);
+  assert(flattened.traces[0].case_id == "o1");
+  assert(flattened.traces[1].case_id == "o2");
+  assert(flattened.traces[0].events.size() == 3);
+  assert(flattened.traces[1].events.size() == 1);
+  // The source-event order drives the left join. Relation order remains the
+  // stable tie-breaker, so both e1/o1 duplicates precede e2/o1.
+  assert(flattened.traces[0].events[0].activity == "Create");
+  assert(flattened.traces[0].events[1].activity == "Create");
+  assert(flattened.traces[0].events[2].activity == "Pack");
+  assert(flattened.traces[1].events[0].activity == "Pack");
+  assert(flattened.traces[0].events[0].input_order == 0);
+  assert(flattened.traces[0].events[1].input_order == 1);
+  assert(flattened.traces[0].events[2].input_order == 2);
+  assert(flattened.traces[1].events[0].input_order == 3);
+  assert(flattened.traces[0].events[0].attributes.size() == 4);
+  assert(flattened.traces[0].events[0].attributes[0].key == "ocel:eid");
+  assert(flattened.traces[0].events[0].attributes[0].value == "e1");
+  assert(flattened.traces[0].events[0].attributes[1].key == "priority");
+  assert(flattened.traces[0].events[0].attributes[1].kind ==
+         minera::AttributeKind::kInt);
+  assert(flattened.traces[0].events[0].attributes[2].kind ==
+         minera::AttributeKind::kBoolean);
+  assert(flattened.traces[0].events[0].attributes[3].kind ==
+         minera::AttributeKind::kString);
+  assert(flattened.traces[0].events[2].attributes.size() == 1);
+  assert(flattened.traces[0].events[2].attributes[0].key == "ocel:eid");
+  assert(flattened.traces[0].events[2].attributes[0].value == "e2");
+  assert(flattened.traces[1].events[0].attributes[0].value == "e2");
+  assert(flattened.traces[0].attributes.size() == 5);
+  assert(flattened.traces[0].attributes[0].key == "ocel:type");
+  assert(flattened.traces[0].attributes[1].key == "region");
+  assert(flattened.traces[0].attributes[2].key == "amount");
+  assert(flattened.traces[0].attributes[3].key == "active");
+  assert(flattened.traces[0].attributes[4].key == "ratio");
+  assert(flattened.traces[0].attribute("missing") == nullptr);
+  assert(flattened.traces[0].attribute("ocel:type") != nullptr);
+  assert(flattened.event_count() == 4);
+  const auto xes = minera::to_xes(flattened, "ocel flatten");
+  assert(xes.find("value=\"o1\"") != std::string::npos);
+  assert(xes.find("key=\"ocel:type\" value=\"order\"") !=
+         std::string::npos);
+  assert(xes.find("key=\"amount\" value=\"7\"") !=
+         std::string::npos);
+  assert(xes.find("key=\"ocel:eid\" value=\"e1\"") !=
+         std::string::npos);
+  assert(xes.find("key=\"case:ocel:type\"") == std::string::npos);
+  assert(xes.find("key=\"case:amount\"") == std::string::npos);
+
+  bool threw = false;
+  try {
+    (void)minera::flatten_ocel_to_event_log(log, "");
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  const auto unknown = minera::flatten_ocel_to_event_log(log, "missing");
+  assert(unknown.traces.empty());
+  assert(unknown.event_count() == 0);
+  assert(minera::to_xes(unknown, "ocel flatten").find("<trace>") ==
+         std::string::npos);
+
+  threw = false;
+  try {
+    (void)minera::flatten_ocel_to_event_log(log, "   ");
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  auto spaced = log;
+  spaced.objects[2].type = " order ";
+  minera::OcelFlattenOptions spaced_options;
+  spaced_options.object_type = " order ";
+  const auto exact =
+      minera::flatten_ocel_to_event_log(spaced, spaced_options);
+  assert(exact.traces.size() == 1);
+  assert(exact.traces[0].case_id == "i1");
+  assert(exact.traces[0].attribute("ocel:type") != nullptr);
+  assert(*exact.traces[0].attribute("ocel:type") == " order ");
+
+  auto custom = log;
+  custom.events[0].attributes.push_back(
+      {"display_activity", std::string("Created")});
+  custom.events[0].attributes.push_back(
+      {"event_time", std::int64_t{42}});
+  custom.events[1].attributes.push_back(
+      {"display_activity", std::string("Packed")});
+  custom.events[1].attributes.push_back(
+      {"event_time", std::int64_t{43}});
+  minera::OcelFlattenOptions custom_options;
+  custom_options.object_type = "order";
+  custom_options.event_activity_attribute = "display_activity";
+  custom_options.event_timestamp_attribute = "event_time";
+  const auto custom_flattened =
+      minera::flatten_ocel_to_event_log(custom, custom_options);
+  assert(custom_flattened.traces[0].events[0].activity == "Created");
+  assert(custom_flattened.traces[0].events[0].timestamp == "42");
+  assert(custom_flattened.traces[0].events[0].attribute(
+             "display_activity") == nullptr);
+  assert(custom_flattened.traces[0].events[0].attribute("event_time") ==
+         nullptr);
+  assert(custom_flattened.traces[0].events[2].activity == "Packed");
+  assert(custom_flattened.traces[0].events[2].timestamp == "43");
+  assert(custom_flattened.traces[0].events[2].attribute(
+             "display_activity") == nullptr);
+  assert(custom_flattened.traces[0].events[2].attribute("event_time") ==
+         nullptr);
+
+  auto null_selector = custom;
+  null_selector.events[0].attributes.push_back(
+      {"null_time", std::nullptr_t{}});
+  custom_options.event_timestamp_attribute = "null_time";
+  threw = false;
+  try {
+    (void)minera::flatten_ocel_to_event_log(null_selector, custom_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  auto nonfinite_selector = custom;
+  nonfinite_selector.events[0].attributes.push_back(
+      {"nonfinite_time", std::numeric_limits<double>::infinity()});
+  custom_options.event_timestamp_attribute = "nonfinite_time";
+  threw = false;
+  try {
+    (void)minera::flatten_ocel_to_event_log(nonfinite_selector,
+                                            custom_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  custom_options.event_activity_attribute = " ";
+  threw = false;
+  try {
+    (void)minera::flatten_ocel_to_event_log(custom, custom_options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -256,4 +427,5 @@ int main() {
   enrichment_contract();
   object_graph_contract();
   heterogeneous_graph_contract();
+  flatten_contract();
 }

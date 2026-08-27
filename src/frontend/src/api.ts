@@ -4706,6 +4706,48 @@ export async function requestOcelExchangeExport(
   return payload;
 }
 
+export interface OcelFlattenOptions {
+  object_type: string;
+  event_activity_attribute?: string;
+  event_timestamp_attribute?: string;
+}
+
+/** Converts an OCEL upload into a classic event log for one object type. */
+export function ocelFlattenQuery(options?: OcelFlattenOptions): string {
+  const objectType = options?.object_type;
+  if (typeof objectType !== "string" || !objectType.trim()) {
+    throw new Error("OCEL flatten object_type must be a non-empty string");
+  }
+  const query = new URLSearchParams();
+  query.set("object_type", objectType);
+  const addSelector = (key: string, value: string | undefined) => {
+    if (value === undefined) return;
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`OCEL flatten ${key} must be a non-empty string`);
+    }
+    query.set(key, value);
+  };
+  addSelector("event_activity_attribute", options?.event_activity_attribute);
+  addSelector("event_timestamp_attribute", options?.event_timestamp_attribute);
+  return query.toString();
+}
+
+/** Converts an OCEL upload into XES for the selected object type. */
+export async function requestOcelFlatten(
+  log: Blob,
+  options: OcelFlattenOptions,
+): Promise<Blob> {
+  const form = new FormData();
+  const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
+  form.append("log", log, logName);
+  const response = await fetch(`/api/ocel/flatten?${ocelFlattenQuery(options)}`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  return response.blob();
+}
+
 export type OcelFilterSelector =
   | "event_attribute" | "object_attribute" | "object_types" | "objects"
   | "events" | "timestamp" | "activity_type_matching" | "object_count"
