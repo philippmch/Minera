@@ -1039,16 +1039,19 @@ envelope for clients that need the selected construction directly.
 
 The reverse workflow-net conversion is also available through the native
 `to_powl(const PetriNet&)` API. It validates designated source/sink reachability
-and final-marking reachability, keeps the silent return boundary used by loop
-fragments, strips only deterministic silent routing wrappers, and recursively
-recognizes exclusive branches, do/redo cycles, sequence cuts, and residual
-strict partial orders. Labels and child ordering are deterministic;
-extended-arc nets, sink escapes, malformed boundaries, unsound markings, and
-unresolved transition cycles are rejected instead of being silently
-over-approximated. Focused round-trip tests cover silent, visible, optional,
-unbounded, exclusive, loop, sequence, nested choice, nested loop, concurrent,
-and diamond partial-order models, plus invalid extended, non-workflow, unsound,
-and sink-escape nets.
+and final-marking reachability; when neither boundary is assigned, it infers a
+unique structural source and sink without mutating the caller's net. Equivalent
+local places are normalized before recursive analysis, silent return boundaries
+used by loop fragments are retained, deterministic silent routing wrappers are
+stripped, and exclusive branches, do/redo cycles, sequence cuts, and residual
+strict partial orders are recognized recursively. Labels and child ordering are
+deterministic; extended-arc nets, ambiguous or partial boundary metadata, sink
+escapes, malformed boundaries, unsound markings, and unresolved transition
+cycles are rejected instead of being silently over-approximated. Focused
+round-trip tests cover silent, visible, optional, unbounded, exclusive, loop,
+sequence, nested choice, nested loop, concurrent, and diamond partial-order
+models, plus inferred and duplicate-place workflow boundaries and invalid
+extended, non-workflow, unsound, and sink-escape nets.
 
 Workflow-net-to-process-tree conversion now uses a strict block reducer over
 the reverse workflow reconstruction. Exact sequence, XOR, parallel, loop,

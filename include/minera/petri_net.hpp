@@ -113,8 +113,14 @@ class PetriNet {
     target.outputs.insert(target.outputs.end(), outputs.begin(), outputs.end());
   }
 
-  void set_source(std::size_t place) noexcept { source_ = place; }
-  void set_sink(std::size_t place) noexcept { sink_ = place; }
+  void set_source(std::size_t place) noexcept {
+    source_ = place;
+    source_set_ = true;
+  }
+  void set_sink(std::size_t place) noexcept {
+    sink_ = place;
+    sink_set_ = true;
+  }
   void set_activities(std::vector<std::string> activities) {
     activities_ = std::move(activities);
   }
@@ -122,6 +128,8 @@ class PetriNet {
   [[nodiscard]] std::size_t place_count() const noexcept { return place_count_; }
   [[nodiscard]] std::size_t source() const noexcept { return source_; }
   [[nodiscard]] std::size_t sink() const noexcept { return sink_; }
+  [[nodiscard]] bool has_source() const noexcept { return source_set_; }
+  [[nodiscard]] bool has_sink() const noexcept { return sink_set_; }
 
   [[nodiscard]] const std::vector<PetriTransition>& transitions() const noexcept {
     return transitions_;
@@ -134,6 +142,8 @@ class PetriNet {
   std::size_t place_count_ = 0;
   std::size_t source_ = 0;
   std::size_t sink_ = 0;
+  bool source_set_ = false;
+  bool sink_set_ = false;
   std::vector<PetriTransition> transitions_;
   std::vector<std::string> activities_;
 };

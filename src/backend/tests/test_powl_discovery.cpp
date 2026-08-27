@@ -239,7 +239,14 @@ int main() {
          "order={A-->B,A-->C,B-->C})");
   const auto b_rev = discover_powl(log({{"A", "B", "C"}}), brute).serialize();
   assert(b.serialize() == b_rev);
-  throws([&] { brute.brute_force_activity_limit = 2; discover_powl(log({{"A", "B", "C"}}), brute); });
+  auto limited_brute = brute;
+  limited_brute.brute_force_activity_limit = 2;
+  throws([&] { discover_powl(log({{"A", "B", "C"}}), limited_brute); });
+  const auto brute_partition_order = discover_powl(
+      log({{"A", "B", "C"}, {"A", "C", "B"}, {"B", "C", "A"}}),
+      brute);
+  assert(brute_partition_order.serialize() ==
+         "PO=(nodes={T(\"A\"),T(\"B\"),T(\"C\")},order={})");
 
   // Maximal groups activities with identical one-way EFG neighborhoods.
   PowlDiscoveryOptions maximal; maximal.variant = PowlDiscoveryVariant::kMaximal;
@@ -248,6 +255,10 @@ int main() {
   assert(m.children().size() == 2 && m.has_edge(0, 1));
   const auto maximal_chain = discover_powl(log({{"A", "B", "C"}}), maximal);
   assert(maximal_chain.serialize() == "PO=(nodes={T(\"A\"),T(\"B\"),T(\"C\")},order={A-->B,A-->C,B-->C})");
+  const auto maximal_neighborhood_order =
+      discover_powl(log({{"A", "B", "C"}, {"C", "A", "B"}}), maximal);
+  assert(maximal_neighborhood_order.serialize() ==
+         "PO=(nodes={T(\"A\"),T(\"B\"),T(\"C\")},order={A-->B})");
 
   // Plain and frequency dynamic are distinct source variants; both terminate
   // on a three-activity non-transitive fixture.
