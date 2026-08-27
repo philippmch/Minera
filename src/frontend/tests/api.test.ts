@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchExtensivePlayoutVisited } from "../src/api";
+import { fetchExtensivePlayoutVisited, fetchProcessTreePetriNet, processTreePetriNetQuery, fetchPnml, fetchBpmn } from "../src/api";
 import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery, fetchStochasticMap, stochasticMapQuery } from "../src/api";
 import { isStochasticMapResult } from "../src/types";
 import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
@@ -74,6 +74,46 @@ describe("classic DFG export API", () => {
       json: async () => ({ error: "no mined log; mine a log first" }),
     })));
     await expect(fetchDfg()).rejects.toThrow(/no mined log/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("process-tree Petri conversion API", () => {
+  it("serializes strict conversion selectors and fetches the typed model", async () => {
+    expect(processTreePetriNetQuery()).toBe("");
+    expect(processTreePetriNetQuery({ variant: "transition_bordered" }))
+      .toBe("process_tree_variant=transition_bordered");
+    expect(() => processTreePetriNetQuery({ variant: "future" as never }))
+      .toThrow(/standard or transition_bordered/);
+    const payload = {
+      family: "PROCESS_TREE_PETRI_NET", variant: "transition_bordered",
+      place_count: 2, source: 0, sink: 1, activities: ["A"],
+      transitions: [{ activity: 0, inputs: [], outputs: [1] }],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe(
+        "/api/process-tree-petri?process_tree_variant=transition_bordered",
+      );
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(fetchProcessTreePetriNet({ variant: "transition_bordered" }))
+      .resolves.toEqual(payload);
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps export routes compatible while forwarding an explicit selector", async () => {
+    const paths: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      paths.push(path);
+      return { ok: true, text: async () => "<model/>" };
+    }));
+    await expect(fetchPnml("inductive")).resolves.toBe("<model/>");
+    await expect(fetchBpmn("inductive", { variant: "transition_bordered" }))
+      .resolves.toBe("<model/>");
+    expect(paths).toEqual([
+      "/api/pnml?miner=inductive",
+      "/api/bpmn?miner=inductive&process_tree_variant=transition_bordered",
+    ]);
     vi.unstubAllGlobals();
   });
 });

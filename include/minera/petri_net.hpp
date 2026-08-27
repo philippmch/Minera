@@ -5,6 +5,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -200,6 +201,18 @@ void fire_petri_transition(const PetriTransition& transition,
 // and tau leaves remain the fragment's transition boundaries.
 [[nodiscard]] PetriNet to_petri_net_transition_bordered(
     const ProcessTree& tree);
+
+// Stable wire names used by export adapters.  The parser intentionally
+// accepts only the two supported spellings and rejects unknown values.
+[[nodiscard]] const char* process_tree_petri_net_variant_name(
+    ProcessTreePetriNetVariant variant) noexcept;
+[[nodiscard]] ProcessTreePetriNetVariant parse_process_tree_petri_net_variant(
+    std::string_view value);
+
+// Serializes a converted process-tree net without changing the established
+// analysis envelope.  The variant is metadata for the selected construction.
+[[nodiscard]] std::string serialize_process_tree_petri_net_json(
+    const PetriNet& net, ProcessTreePetriNetVariant variant);
 
 // Translates a Heuristic Miner dependency graph into a workflow net so it can
 // be replayed and aligned like any other model, honouring the net's split and

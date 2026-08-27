@@ -155,6 +155,35 @@ struct MinedSession {
   std::string dataset;       // uploaded file name, echoed into XES exports
   minera::TokenReplayOptions token_replay;
 };
+
+// A selector is deliberately request-scoped: the cached inductive model and
+// its default conversion remain unchanged, while callers that need the
+// alternate construction receive a fresh value for the duration of a route.
+std::optional<minera::PetriNet> selected_process_tree_net(
+    const httplib::Request& request, const MinedSession& session,
+    std::string_view miner) {
+  if (!request.has_param("process_tree_variant")) return std::nullopt;
+  if (miner != "inductive") {
+    throw std::invalid_argument(
+        "process_tree_variant requires miner=inductive");
+  }
+  const auto variant =
+      minera::parse_process_tree_petri_net_variant(
+          request.get_param_value("process_tree_variant"));
+  return minera::to_petri_net(session.tree, variant);
+}
+
+const minera::PetriNet& select_cached_or_process_tree_net(
+    const httplib::Request& request, const MinedSession& session,
+    std::string_view miner, std::optional<minera::PetriNet>& converted) {
+  converted = selected_process_tree_net(request, session, miner);
+  if (converted.has_value()) return *converted;
+  const auto it = session.nets.find(std::string(miner));
+  if (it == session.nets.end())
+    throw std::invalid_argument("unknown miner: " + std::string(miner));
+  return it->second;
+}
+
 std::shared_ptr<const MinedSession> g_session;
 std::mutex g_session_mutex;
 bool g_embedding_runtime_enabled = false;
@@ -186,7 +215,8 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request) {
       "monte_carlo_transition_durations",
       "monte_carlo_resources_per_place",
       "monte_carlo_default_resources_per_place",
-      "monte_carlo_enable_diagnostics", "monte_carlo_stop_at_final"};
+      "monte_carlo_enable_diagnostics", "monte_carlo_stop_at_final",
+      "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key))
@@ -202,7 +232,7 @@ void reject_unknown_stochastic_params(const httplib::Request& request) {
       "stochastic_return_visited_elements",
       "stochastic_start", "stochastic_case_interval",
       "stochastic_event_interval", "stochastic_initial_marking",
-      "stochastic_final_marking"};
+      "stochastic_final_marking", "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key))
@@ -3314,15 +3344,10 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 
   const std::string miner = request.get_param_value("miner");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
-  }
-
   try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
     const auto lookup = [&](std::string_view name) {
       return request.has_param(std::string(name))
                  ? request.get_param_value(std::string(name))
@@ -3332,7 +3357,8 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
       return request.has_param(std::string(name));
     };
     const auto options = minera::parse_alignment_params(lookup, present);
-    const auto alignment = minera::check_alignment(session->log, it->second, options);
+    const auto alignment =
+        minera::check_alignment(session->log, selected, options);
     response.set_content(minera::alignment_json(alignment, session->graph),
                          "application/json");
   } catch (const std::exception& error) {
@@ -4094,15 +4120,10 @@ void handle_evaluate(const httplib::Request& request,
   }
 
   const std::string miner = request.get_param_value("miner");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
-  }
-
   try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
       return request.has_param(key) ? request.get_param_value(key)
@@ -4117,24 +4138,24 @@ void handle_evaluate(const httplib::Request& request,
     switch (params.family) {
       case minera::EvaluationFamily::kReplayFitness:
         result.replay_fitness = minera::evaluate_replay_fitness(
-            session->log, it->second, params.replay_fitness_variant);
+            session->log, selected, params.replay_fitness_variant);
         break;
       case minera::EvaluationFamily::kPrecision:
         result.precision = minera::evaluate_precision(
-            session->log, it->second, params.precision_variant,
+            session->log, selected, params.precision_variant,
             params.precision_options);
         break;
       case minera::EvaluationFamily::kGeneralization:
         result.generalization = minera::evaluate_generalization(
-            session->log, it->second, params.generalization_variant);
+            session->log, selected, params.generalization_variant);
         break;
       case minera::EvaluationFamily::kSimplicity:
         result.simplicity = minera::evaluate_simplicity(
-            it->second, params.simplicity_variant, params.simplicity_options);
+            selected, params.simplicity_variant, params.simplicity_options);
         break;
       case minera::EvaluationFamily::kComposite:
         result.composite = minera::evaluate_composite(
-            session->log, it->second, params.composite_options);
+            session->log, selected, params.composite_options);
         break;
     }
     response.set_content(
@@ -4169,11 +4190,9 @@ void handle_petri_analysis(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto params = minera::parse_petri_analysis_params(lookup, present);
-    const auto it = session->nets.find(params.miner);
-    if (it == session->nets.end())
-      throw std::invalid_argument("petri_analysis_miner: unknown model '" +
-                                  params.miner + "'");
-    const auto& net = it->second;
+    std::optional<minera::PetriNet> converted;
+    const auto& net = select_cached_or_process_tree_net(
+        request, *session, params.miner, converted);
     switch (params.family) {
       case minera::PetriAnalysisFamily::kMarkingEquation: {
         minera::MarkingEquationOptions options;
@@ -4410,7 +4429,8 @@ minera::DecisionMiningOptions decision_mining_options(
       "miner", "decision_max_depth", "decision_min_split",
       "decision_min_leaf", "decision_max_categories",
       "decision_max_thresholds", "decision_min_gain",
-      "decision_include_trace_attributes", "decision_attributes"};
+      "decision_include_trace_attributes", "decision_attributes",
+      "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
     if (!allowed.contains(key) &&
@@ -4466,17 +4486,12 @@ void handle_decide(const httplib::Request& request,
   }
 
   const std::string miner = request.get_param_value("miner");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
-  }
-
   try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
     const auto options = decision_mining_options(request);
-    auto decisions = minera::mine_decisions(session->log, it->second, options);
+    auto decisions = minera::mine_decisions(session->log, selected, options);
     decisions.miner = miner;
     response.set_content(minera::decisions_json(decisions),
                          "application/json");
@@ -4502,16 +4517,60 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
   }
 
   const std::string miner = request.get_param_value("miner");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
+  try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
+    response.set_content(minera::to_pnml(selected, miner + " net"),
+                         "application/xml");
+  } catch (const std::exception& error) {
     response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
+// Returns the selected process-tree conversion as structured JSON. Omitting
+// the selector preserves the standard construction.
+void handle_process_tree_petri(const httplib::Request& request,
+                               httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
                          "application/json");
     return;
   }
-
-  response.set_content(minera::to_pnml(it->second, miner + " net"),
-                       "application/xml");
+  try {
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (key != "variant" && key != "process_tree_variant")
+        throw std::invalid_argument(
+            "unknown process-tree conversion parameter: " + key);
+    }
+    if (request.has_param("variant") &&
+        request.has_param("process_tree_variant")) {
+      throw std::invalid_argument(
+          "variant and process_tree_variant cannot both be supplied");
+    }
+    const std::string value = request.has_param("process_tree_variant")
+                                  ? request.get_param_value("process_tree_variant")
+                                  : request.has_param("variant")
+                                        ? request.get_param_value("variant")
+                                        : std::string{};
+    const auto variant =
+        minera::parse_process_tree_petri_net_variant(value);
+    const auto net = minera::to_petri_net(session->tree, variant);
+    response.set_content(
+        minera::serialize_process_tree_petri_net_json(net, variant),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 // Exports one model from the most recent mine as BPMN 2.0. The `miner` query
@@ -4576,20 +4635,22 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
   const std::string miner = request.has_param("miner")
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
-  if (miner == "inductive") {
-    response.set_content(minera::to_bpmn(session->tree, "process"),
+  try {
+    if (miner == "inductive" &&
+        !request.has_param("process_tree_variant")) {
+      response.set_content(minera::to_bpmn(session->tree, "process"),
+                           "application/xml");
+      return;
+    }
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
+    response.set_content(minera::to_bpmn(selected, "process"),
                          "application/xml");
-    return;
-  }
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
+  } catch (const std::exception& error) {
     response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
+    response.set_content(error_json(error.what()), "application/json");
   }
-  response.set_content(minera::to_bpmn(it->second, "process"),
-                       "application/xml");
 }
 
 void handle_monte_carlo_json(const httplib::Request& request,
@@ -4610,13 +4671,7 @@ void handle_monte_carlo_json(const httplib::Request& request,
                                 : std::string("inductive");
   const std::string selected_miner =
       miner == "monte_carlo" ? "inductive" : miner;
-  const auto it = session->nets.find(selected_miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + selected_miner),
-                         "application/json");
-    return;
-  }
+  std::optional<minera::PetriNet> converted;
   const auto reject = [&](std::string message) {
     response.status = 400;
     response.set_content(error_json(message), "application/json");
@@ -4643,8 +4698,10 @@ void handle_monte_carlo_json(const httplib::Request& request,
       reject("Monte Carlo simulation budget exceeds the server safety limit");
       return;
     }
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, selected_miner, converted);
     const auto result =
-        minera::monte_carlo(session->log, it->second, options);
+        minera::monte_carlo(session->log, selected, options);
     response.set_content(minera::monte_carlo_json(result), "application/json");
   } catch (const std::exception& error) {
     reject(error.what());
@@ -4669,14 +4726,10 @@ void handle_decision_tables(const httplib::Request& request,
   const std::string miner = request.has_param("miner")
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
-  }
   try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
     const auto mining = decision_mining_options(request, true);
     minera::DecisionTableOptions options;
     options.mining = mining;
@@ -4684,7 +4737,7 @@ void handle_decision_tables(const httplib::Request& request,
     options.attributes = mining.attributes;
     options.lookback = decision_table_lookback(request);
     const auto result =
-        minera::mine_decision_tables(session->log, it->second, options);
+        minera::mine_decision_tables(session->log, selected, options);
     response.set_content(minera::serialize_decision_tables_json(result),
                          "application/json");
   } catch (const std::exception& error) {
@@ -4712,19 +4765,15 @@ void handle_data_petri_net(const httplib::Request& request,
   const std::string miner = request.has_param("miner")
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
-  const auto it = session->nets.find(miner);
-  if (it == session->nets.end()) {
-    response.status = 400;
-    response.set_content(error_json("unknown miner: " + miner),
-                         "application/json");
-    return;
-  }
   try {
+    std::optional<minera::PetriNet> converted;
+    const auto& selected = select_cached_or_process_tree_net(
+        request, *session, miner, converted);
     minera::DataPetriNetOptions options;
     options.decision_options = decision_mining_options(request, true);
     options.decision_table_lookback = decision_table_lookback(request);
     const auto result =
-        minera::mine_data_petri_net(session->log, it->second, options);
+        minera::mine_data_petri_net(session->log, selected, options);
     response.set_content(minera::serialize_data_petri_net_json(result, miner),
                          "application/json");
   } catch (const std::exception& error) {
@@ -4918,6 +4967,15 @@ void handle_playout(const httplib::Request& request,
   const std::string miner = request.has_param("miner")
                                 ? request.get_param_value("miner")
                                 : std::string("inductive");
+  if (request.has_param("process_tree_variant") &&
+      miner != "inductive" && miner != "stochastic" &&
+      miner != "monte_carlo") {
+    response.status = 400;
+    response.set_content(
+        error_json("process_tree_variant requires an inductive Petri miner"),
+        "application/json");
+    return;
+  }
   const bool is_declare = miner == "declare";
   const std::string mode = request.has_param("mode")
                                ? request.get_param_value("mode")
@@ -4953,13 +5011,7 @@ void handle_playout(const httplib::Request& request,
   if (is_monte_carlo) {
     const std::string selected_miner =
         miner == "monte_carlo" ? "inductive" : miner;
-    const auto it = session->nets.find(selected_miner);
-    if (it == session->nets.end()) {
-      response.status = 400;
-      response.set_content(error_json("unknown miner: " + selected_miner),
-                           "application/json");
-      return;
-    }
+    std::optional<minera::PetriNet> converted;
     const auto reject = [&](std::string message) {
       response.status = 400;
       response.set_content(error_json(message), "application/json");
@@ -4987,7 +5039,11 @@ void handle_playout(const httplib::Request& request,
         return;
       }
       const auto result =
-          minera::monte_carlo(session->log, it->second, options);
+          minera::monte_carlo(
+              session->log,
+              select_cached_or_process_tree_net(request, *session,
+                                                selected_miner, converted),
+              options);
       response.set_content(
           minera::to_xes(result.log, selected_miner + " Monte Carlo playout"),
           "application/xml");
@@ -4998,13 +5054,7 @@ void handle_playout(const httplib::Request& request,
   }
   if (is_stochastic) {
     const std::string selected_miner = miner == "stochastic" ? "inductive" : miner;
-    const auto it = session->nets.find(selected_miner);
-    if (it == session->nets.end()) {
-      response.status = 400;
-      response.set_content(error_json("unknown miner: " + selected_miner),
-                           "application/json");
-      return;
-    }
+    std::optional<minera::PetriNet> converted;
     const auto reject = [&](std::string message) {
       response.status = 400;
       response.set_content(error_json(message), "application/json");
@@ -5031,20 +5081,24 @@ void handle_playout(const httplib::Request& request,
         return;
       }
       if (options.return_visited_elements) {
+        const auto& selected = select_cached_or_process_tree_net(
+            request, *session, selected_miner, converted);
         const auto visited = options.fit_from_log
                                  ? minera::stochastic_playout_visited(
-                                       it->second, session->log, options)
+                                       selected, session->log, options)
                                  : minera::stochastic_playout_visited(
-                                       it->second, options);
+                                       selected, options);
         response.set_content(
-            minera::serialize_stochastic_playout_visited_json(it->second,
+            minera::serialize_stochastic_playout_visited_json(selected,
                                                                 visited),
             "application/json");
       } else {
+        const auto& selected = select_cached_or_process_tree_net(
+            request, *session, selected_miner, converted);
         const auto log = options.fit_from_log
-                             ? minera::stochastic_playout(it->second,
+                             ? minera::stochastic_playout(selected,
                                                          session->log, options)
-                             : minera::stochastic_playout(it->second, options);
+                             : minera::stochastic_playout(selected, options);
         response.set_content(
             minera::to_xes(log, selected_miner + " stochastic playout"),
             "application/xml");
@@ -5055,6 +5109,13 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   if (miner == "process_tree") {
+    if (request.has_param("process_tree_variant")) {
+      response.status = 400;
+      response.set_content(
+          error_json("process_tree_variant requires a Petri miner selection"),
+          "application/json");
+      return;
+    }
     const auto lookup = [&](std::string_view name) {
       const std::string key(name.substr(std::string_view("playout_").size()));
       return request.has_param(key) ? request.get_param_value(key) : std::string{};
@@ -5108,7 +5169,18 @@ void handle_playout(const httplib::Request& request,
     }
     return;
   }
-  const auto it = session->nets.find(miner);
+  std::optional<minera::PetriNet> converted;
+  const minera::PetriNet* selected = nullptr;
+  if (!is_declare && miner != "dfg") {
+    try {
+      selected = &select_cached_or_process_tree_net(
+          request, *session, miner, converted);
+    } catch (const std::exception& error) {
+      response.status = 400;
+      response.set_content(error_json(error.what()), "application/json");
+      return;
+    }
+  }
   if (miner == "dfg") {
     const auto reject = [&](std::string message) {
       response.status = 400;
@@ -5174,7 +5246,7 @@ void handle_playout(const httplib::Request& request,
     }
     return;
   }
-  if (!is_declare && it == session->nets.end()) {
+  if (!is_declare && miner != "dfg" && selected == nullptr) {
     response.status = 400;
     response.set_content(error_json("unknown miner: " + miner),
                          "application/json");
@@ -5334,7 +5406,7 @@ void handle_playout(const httplib::Request& request,
   if (options.return_visited_elements) {
     response.set_content(
         minera::serialize_playout_visited_json(
-            it->second, minera::playout_visited(it->second, options)),
+            *selected, minera::playout_visited(*selected, options)),
         "application/json");
     return;
   }
@@ -5350,18 +5422,18 @@ void handle_playout(const httplib::Request& request,
     if (extensive.return_elements) {
       response.set_content(
           minera::serialize_extensive_playout_visited_json(
-              it->second,
-              minera::extensive_playout_visited(it->second, extensive)),
+              *selected,
+              minera::extensive_playout_visited(*selected, extensive)),
           "application/json");
     } else {
-      const auto log = minera::extensive_playout(it->second, extensive);
+      const auto log = minera::extensive_playout(*selected, extensive);
       response.set_content(minera::to_xes(log, miner + " playout"),
                            "application/xml");
     }
     return;
   }
 
-  const auto log = minera::playout(it->second, options);
+  const auto log = minera::playout(*selected, options);
   response.set_content(minera::to_xes(log, miner + " playout"),
                        "application/xml");
 }
@@ -6052,6 +6124,7 @@ int main(int argc, char** argv) {
   server.Options("/api/decision-tables", preflight);
   server.Options("/api/data-petri-net", preflight);
   server.Options("/api/check-model", preflight);
+  server.Options("/api/process-tree-petri", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
   server.Options("/api/dfg-precision", preflight);
@@ -6137,6 +6210,7 @@ int main(int argc, char** argv) {
   server.Post("/api/data-petri-net", handle_data_petri_net);
   server.Post("/api/check-model", handle_check_model);
   server.Get("/api/pnml", handle_pnml);
+  server.Get("/api/process-tree-petri", handle_process_tree_petri);
   server.Get("/api/bpmn", handle_bpmn);
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);

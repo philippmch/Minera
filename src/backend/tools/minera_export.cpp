@@ -515,6 +515,9 @@ int usage(const char* program) {
                "  --pnml-miner <id>         Which model to export as PNML:\n"
                "                            inductive (default), alpha, heuristic,\n"
                "                            or powl\n"
+               "  --process-tree-variant <id>\n"
+               "                            Process-tree Petri conversion:\n"
+               "                            standard (default) or transition_bordered\n"
                "  --bpmn <path>             Also write a model as BPMN 2.0 to <path>\n"
                "  --check-bpmn <path>       Also check the log against the\n"
                "                            BPMN 2.0 model in this file\n"
@@ -1160,6 +1163,8 @@ int main(int argc, char** argv) {
   std::filesystem::path playout_output;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
+  minera::ProcessTreePetriNetVariant process_tree_variant =
+      minera::ProcessTreePetriNetVariant::kStandard;
   std::string playout_miner = "inductive";
   std::string decisions_miner;  // empty = no decision mining
   std::string decision_tables_miner;  // empty = no decision-table mining
@@ -2899,6 +2904,20 @@ int main(int argc, char** argv) {
       } catch (const std::exception& e) { std::cerr << "error: " << e.what() << '\n'; return 2; }
       continue;
     }
+    // Keep this option outside the legacy chain below; that chain is close to
+    // the compiler's block-nesting limit on Windows.
+    if (arg == "--process-tree-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        process_tree_variant =
+            minera::parse_process_tree_petri_net_variant(value);
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
 
     if (arg == "-o") {
       const auto* value = next();
@@ -4286,6 +4305,20 @@ int main(int argc, char** argv) {
   if (input.empty() && !random_tree_requested && reverse_tree_inputs == 0) {
     return usage(argv[0]);
   }
+  if (process_tree_variant !=
+          minera::ProcessTreePetriNetVariant::kStandard &&
+      !pnml_output.empty() && pnml_miner != "inductive") {
+    std::cerr << "error: --process-tree-variant requires "
+                 "--pnml-miner inductive\n";
+    return 2;
+  }
+  if (process_tree_variant !=
+          minera::ProcessTreePetriNetVariant::kStandard &&
+      !bpmn_output.empty() && bpmn_miner != "inductive") {
+    std::cerr << "error: --process-tree-variant requires "
+                 "--bpmn-miner inductive\n";
+    return 2;
+  }
   if (timestamp_interleavings_requested) {
     if (timestamp_interleavings_right_path.empty() ||
         merge_relations_path.empty()) {
@@ -5177,7 +5210,8 @@ int main(int argc, char** argv) {
     // unless --no-alignments opted out of this standard export section.
     // Evaluations are independent and may still select an alignment-based
     // metric explicitly.
-    const auto inductive_net = minera::to_petri_net(tree);
+    const auto inductive_net =
+        minera::to_petri_net(tree, process_tree_variant);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
     if (stochastic_map_requested) {
@@ -5631,8 +5665,16 @@ int main(int argc, char** argv) {
     // Optionally emit one discovered model as standard PNML.
     if (!pnml_output.empty()) {
       const minera::PetriNet* selected = nullptr;
+      std::optional<minera::PetriNet> converted_process_tree;
       if (pnml_miner == "inductive") {
-        selected = &inductive_net;
+        if (process_tree_variant ==
+            minera::ProcessTreePetriNetVariant::kStandard) {
+          selected = &inductive_net;
+        } else {
+          converted_process_tree =
+              minera::to_petri_net(tree, process_tree_variant);
+          selected = &*converted_process_tree;
+        }
       } else if (pnml_miner == "alpha") {
         selected = &net;
       } else if (pnml_miner == "heuristic") {
@@ -5650,7 +5692,12 @@ int main(int argc, char** argv) {
                   << '\n';
         return 1;
       }
-      minera::write_pnml(pnml_file, *selected, pnml_miner + " net");
+      const std::string pnml_name =
+          process_tree_variant ==
+                  minera::ProcessTreePetriNetVariant::kStandard
+              ? pnml_miner + " net"
+              : pnml_miner + " net (transition_bordered)";
+      minera::write_pnml(pnml_file, *selected, pnml_name);
     }
 
     // Optionally emit one discovered model as BPMN. The inductive tree maps
@@ -5664,7 +5711,14 @@ int main(int argc, char** argv) {
         return 1;
       }
       if (bpmn_miner == "inductive") {
-        minera::write_bpmn(bpmn_file, tree, dataset);
+        if (process_tree_variant ==
+            minera::ProcessTreePetriNetVariant::kStandard) {
+          minera::write_bpmn(bpmn_file, tree, dataset);
+        } else {
+          const auto converted =
+              minera::to_petri_net(tree, process_tree_variant);
+          minera::write_bpmn(bpmn_file, converted, dataset);
+        }
       } else if (bpmn_miner == "alpha") {
         minera::write_bpmn(bpmn_file, net, dataset);
       } else if (bpmn_miner == "heuristic") {
