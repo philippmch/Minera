@@ -2,7 +2,10 @@
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -760,6 +763,217 @@ std::string serialize_ocel_heterogeneous_graph_json(
   }
   out << "]}";
   return out.str();
+}
+
+EventLog flatten_ocel_to_event_log(const Ocel& log,
+                                   const OcelFlattenOptions& options) {
+  const auto all_whitespace = [](std::string_view value) {
+    return !value.empty() && std::all_of(
+        value.begin(), value.end(), [](unsigned char character) {
+          return std::isspace(character) != 0;
+        });
+  };
+  if (options.object_type.empty() || all_whitespace(options.object_type))
+    throw std::invalid_argument(
+        "OCEL flatten requires a non-empty object type");
+
+  const auto validate_selector = [&](std::string_view selector,
+                                     std::string_view name) {
+    if (all_whitespace(selector))
+      throw std::invalid_argument("OCEL flatten " + std::string(name) +
+                                  " selector must not be blank");
+  };
+  validate_selector(options.event_activity_attribute, "event activity");
+  validate_selector(options.event_timestamp_attribute, "event timestamp");
+
+  std::map<std::string, const OcelObject*> objects_by_id;
+  std::vector<const OcelObject*> selected_objects;
+  for (const auto& object : log.objects) {
+    if (object.id.empty())
+      throw std::invalid_argument(
+          "OCEL flatten objects require non-empty ids");
+    if (!objects_by_id.emplace(object.id, &object).second)
+      throw std::invalid_argument(
+          "OCEL flatten objects require unique ids");
+    if (object.type == options.object_type) selected_objects.push_back(&object);
+  }
+
+  std::map<std::string, const OcelEvent*> events_by_id;
+  for (const auto& event : log.events) {
+    if (event.id.empty())
+      throw std::invalid_argument(
+          "OCEL flatten events require non-empty ids");
+    if (!events_by_id.emplace(event.id, &event).second)
+      throw std::invalid_argument(
+          "OCEL flatten events require unique ids");
+  }
+
+  // Keep relation rows rather than collapsing them: duplicate associations
+  // are repeated event occurrences in the flattened log.
+  std::map<std::string, std::size_t> selected_object_rank;
+  for (std::size_t rank = 0; rank < selected_objects.size(); ++rank)
+    selected_object_rank.emplace(selected_objects[rank]->id, rank);
+  struct RelationOccurrence {
+    std::size_t object_rank;
+    std::size_t relation_index;
+  };
+  std::map<std::string, std::vector<RelationOccurrence>> relations_by_event;
+  for (std::size_t index = 0; index < log.relations.size(); ++index) {
+    const auto& relation = log.relations[index];
+    const auto object_it = selected_object_rank.find(relation.object_id);
+    if (object_it == selected_object_rank.end()) continue;
+    // The tabular left join simply drops relation rows whose event is not
+    // present in the event table. Parsed OCEL inputs reject such rows earlier;
+    // native callers get the same projection behavior when constructing logs
+    // directly.
+    if (!events_by_id.contains(relation.event_id)) continue;
+    relations_by_event[relation.event_id].push_back(
+        {object_it->second, index});
+  }
+  // The merge that defines the projection is left-driven by source events;
+  // matching object rows follow object-table order, with relation order kept
+  // for each object. A stable sort provides exactly those tie-breakers.
+  for (auto& [event_id, occurrences] : relations_by_event) {
+    (void)event_id;
+    std::stable_sort(
+        occurrences.begin(), occurrences.end(),
+        [](const RelationOccurrence& left, const RelationOccurrence& right) {
+          return left.object_rank < right.object_rank;
+        });
+  }
+
+  const auto convert_attribute = [](const OcelAttribute& source)
+      -> std::optional<EventAttribute> {
+    if (std::holds_alternative<std::nullptr_t>(source.value)) return std::nullopt;
+    if (const auto* value = std::get_if<bool>(&source.value))
+      return EventAttribute{source.key, *value ? "true" : "false",
+                            AttributeKind::kBoolean};
+    if (const auto* value = std::get_if<std::int64_t>(&source.value))
+      return EventAttribute{source.key, std::to_string(*value),
+                            AttributeKind::kInt};
+    if (const auto* value = std::get_if<double>(&source.value)) {
+      if (!std::isfinite(*value))
+        throw std::invalid_argument(
+            "OCEL flatten attributes require finite numbers");
+      std::ostringstream text;
+      text << std::setprecision(std::numeric_limits<double>::max_digits10)
+           << *value;
+      return EventAttribute{source.key, text.str(), AttributeKind::kFloat};
+    }
+    return EventAttribute{source.key, std::get<std::string>(source.value),
+                          AttributeKind::kString};
+  };
+
+  const auto selector_value = [&](const OcelValue& value,
+                                  std::string_view selector,
+                                  std::string_view field,
+                                  std::string_view event_id) {
+    if (std::holds_alternative<std::nullptr_t>(value))
+      throw std::invalid_argument("OCEL flatten " + std::string(field) +
+                                  " selector '" + std::string(selector) +
+                                  "' is null for " + std::string(event_id));
+    if (const auto* text = std::get_if<std::string>(&value)) {
+      if (text->empty())
+        throw std::invalid_argument(
+            "OCEL flatten " + std::string(field) + " selector '" +
+            std::string(selector) + "' is empty for " +
+            std::string(event_id));
+      return *text;
+    }
+    if (const auto* boolean = std::get_if<bool>(&value))
+      return *boolean ? std::string("true") : std::string("false");
+    if (const auto* integer = std::get_if<std::int64_t>(&value))
+      return std::to_string(*integer);
+    const auto number = std::get<double>(value);
+    if (!std::isfinite(number))
+      throw std::invalid_argument("OCEL flatten " + std::string(field) +
+                                  " selector '" + std::string(selector) +
+                                  "' is non-finite for " +
+                                  std::string(event_id));
+    std::ostringstream rendered;
+    rendered << std::setprecision(std::numeric_limits<double>::max_digits10)
+             << number;
+    return rendered.str();
+  };
+  const auto selected_field = [&](const OcelEvent& event,
+                                  std::string_view selector,
+                                  std::string_view field) {
+    const bool canonical =
+        selector.empty() ||
+        (field == "activity" &&
+         (selector == "activity" || selector == "concept:name" ||
+          selector == "ocel:activity")) ||
+        (field == "timestamp" &&
+         (selector == "timestamp" || selector == "time:timestamp" ||
+          selector == "ocel:timestamp"));
+    if (canonical)
+      return field == "activity" ? event.activity : event.timestamp;
+    for (const auto& attribute : event.attributes) {
+      if (attribute.key == selector)
+        return selector_value(attribute.value, selector, field, event.id);
+    }
+    throw std::invalid_argument("OCEL flatten event " + std::string(field) +
+                                " attribute '" + std::string(selector) +
+                                "' is missing for " + event.id);
+  };
+
+  const auto make_trace = [&](const OcelObject* object) {
+    Trace trace;
+    trace.case_id = object->id;
+    // Trace attributes use the source object keys. The case id itself is
+    // represented by Trace::case_id, so no object-id attribute is duplicated.
+    trace.attributes.push_back(
+        {"ocel:type", object->type, AttributeKind::kString});
+    for (const auto& attribute : object->attributes) {
+      const auto converted = convert_attribute(attribute);
+      if (converted) trace.attributes.push_back(*converted);
+    }
+    return trace;
+  };
+
+  EventLog result;
+  std::map<std::string, std::size_t> trace_indices;
+  std::size_t input_order = 0;
+  for (const auto& source : log.events) {
+    const auto grouped = relations_by_event.find(source.id);
+    if (grouped == relations_by_event.end()) continue;
+    for (const auto& occurrence : grouped->second) {
+      const auto* object = selected_objects[occurrence.object_rank];
+      const auto [trace_it, inserted] =
+          trace_indices.emplace(object->id, result.traces.size());
+      if (inserted) result.traces.push_back(make_trace(object));
+
+      Event event;
+      event.case_id = object->id;
+      event.activity =
+          selected_field(source, options.event_activity_attribute, "activity");
+      event.timestamp =
+          selected_field(source, options.event_timestamp_attribute, "timestamp");
+      event.input_order = input_order++;
+      // The source event id is not represented by an Event field, so retain
+      // it explicitly for round-tripping and downstream joins.
+      event.attributes.push_back(
+          {"ocel:eid", source.id, AttributeKind::kString});
+      for (const auto& attribute : source.attributes) {
+        if ((!options.event_activity_attribute.empty() &&
+             attribute.key == options.event_activity_attribute) ||
+            (!options.event_timestamp_attribute.empty() &&
+             attribute.key == options.event_timestamp_attribute))
+          continue;
+        const auto converted = convert_attribute(attribute);
+        if (converted) event.attributes.push_back(*converted);
+      }
+      result.traces[trace_it->second].events.push_back(std::move(event));
+    }
+  }
+  return result;
+}
+
+EventLog flatten_ocel_to_event_log(const Ocel& log,
+                                   std::string_view object_type) {
+  OcelFlattenOptions options;
+  options.object_type = std::string(object_type);
+  return flatten_ocel_to_event_log(log, options);
 }
 
 OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {

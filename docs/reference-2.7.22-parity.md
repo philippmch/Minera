@@ -274,6 +274,26 @@ both optional families enabled by default; disabling either family is available
 through the CLI and query parameters. The existing object-only graph route
 remains unchanged.
 
+OCEL flattening evidence: `flatten_ocel_to_event_log` projects one non-empty
+object type into a conventional `EventLog`. Each selected object becomes a
+trace case id; source events drive the left-join order, while matching
+event-object rows retain object-table and relation order, including duplicate
+rows. The source event id is retained as `ocel:eid`, canonical activity and
+timestamp fields can be replaced by scalar event selectors, and scalar event
+and object attributes retain their native kinds and original keys. The
+selected object type is emitted as `ocel:type`; no `case:` prefix is added to
+trace attributes by the XES exporter. Public adapters accept the independent
+`event_activity_attribute` and `event_timestamp_attribute` selectors (with
+`--flatten-event-activity-attribute` and `--flatten-event-timestamp-attribute`
+CLI flags). Unreferenced objects and events are
+omitted, while O2O, E2E, and object-change records are ignored. Null scalar
+attributes are omitted because the conventional event-log/XES model has no
+null attribute kind. Unknown non-empty object types produce an empty XES log;
+empty or all-whitespace selectors are rejected; object-type and selector values
+are otherwise matched as supplied. The standalone `minera_ocel --flatten-object-type` selector
+and multipart local `POST /api/ocel/flatten?object_type=...` route emit the
+resulting XES.
+
 OTG conformance threshold evidence: the scalar `otg_theta` remains the fallback
 for every relation, while the standalone OCEL CLI, multipart local conformance
 route, and typed frontend query expose strict non-negative relation overrides
@@ -532,7 +552,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object and event-to-event relations, o2o links, object changes, scalar globals, classic/standard JSON/XML, declared event/object type catalogs with empty-type schemas, and a typed OCEL 2 relational SQLite projection are present; remaining schema coverage remains |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; reusable stochastic maps now round-trip distribution/rate metadata and derive tangible CTMC options, while object-centric, trie, and broader stochastic model-family coverage remains |
-| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, trie-to-Petri conversion to workflow nets, tree to POWL, tree/net to BPMN, and typed heterogeneous OCEL event/object graphs with optional DF and object-change families; broader object-centric and adapter conversions remain |
+| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, trie-to-Petri conversion to workflow nets, tree to POWL, tree/net to BPMN, typed heterogeneous OCEL event/object graphs with optional DF and object-change families, and object-type OCEL flattening to typed XES traces through native, CLI, and local-server adapters; broader object-centric and adapter conversions remain |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, including empty types and declared attributes without observed values, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite persists the exact declared schemas alongside inferred type-table columns, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, exact admitted-variant selection (including empty variants and polarity) plus exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path filtering with custom activity/timestamp attribute selectors and inclusive performance bounds, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters through native, CLI, server, and frontend export surfaces, and complete native/CLI/server/frontend OCEL filters; OCEL adapter query values now preserve nested delimiters and typed scalar overflow is rejected under a bounded recursive level; broader filter families remain |

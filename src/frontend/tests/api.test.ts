@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fetchExtensivePlayoutVisited, fetchProcessTreePetriNet, processTreePetriNetQuery, fetchPnml, fetchBpmn } from "../src/api";
 import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetriQuery, fetchStochasticMap, stochasticMapQuery } from "../src/api";
 import { isStochasticMapResult } from "../src/types";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFlattenQuery, requestOcelFlatten, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
 
 describe("Petri usage comparison API", () => {
   it("serializes explicit replay markings in the multipart request", async () => {
@@ -1742,6 +1742,45 @@ describe("OCEL API", () => {
       blob: async () => new Blob(["not XML"]),
     })));
     await expect(requestOcelExchangeExport({}, "xml")).rejects.toThrow(/invalid OCEL XML/);
+    vi.unstubAllGlobals();
+  });
+
+  it("serializes the required object type and returns the flattening XES blob", async () => {
+    expect(ocelFlattenQuery({
+      object_type: "  order items  ",
+      event_activity_attribute: "  custom activity  ",
+      event_timestamp_attribute: "custom:timestamp",
+    })).toBe("object_type=++order+items++&event_activity_attribute=++custom+activity++&event_timestamp_attribute=custom%3Atimestamp");
+    expect(() => ocelFlattenQuery()).toThrow(/non-empty string/);
+    expect(() => ocelFlattenQuery({ object_type: "   " })).toThrow(/non-empty string/);
+    expect(() => ocelFlattenQuery({ object_type: 7 as never })).toThrow(/non-empty string/);
+    expect(() => ocelFlattenQuery({ object_type: "order", event_activity_attribute: "   " }))
+      .toThrow(/event_activity_attribute.*non-empty string/);
+    expect(() => ocelFlattenQuery({ object_type: "order", event_timestamp_attribute: "" }))
+      .toThrow(/event_timestamp_attribute.*non-empty string/);
+    expect(() => ocelFlattenQuery({ object_type: "order", event_activity_attribute: 4 as never }))
+      .toThrow(/event_activity_attribute.*non-empty string/);
+
+    const xes = new Blob(["<log></log>"], { type: "application/xml" });
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/ocel/flatten?object_type=++order+items++&event_activity_attribute=custom+activity&event_timestamp_attribute=custom%3Atimestamp");
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return { ok: true, blob: async () => xes };
+    }));
+    await expect(requestOcelFlatten(new File(["{}"], "log.json"), {
+      object_type: "  order items  ",
+      event_activity_attribute: "custom activity",
+      event_timestamp_attribute: "custom:timestamp",
+    })).resolves.toBe(xes);
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a failed flattening response", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 422 })));
+    await expect(requestOcelFlatten(new File(["{}"], "log.json"), {
+      object_type: "order",
+    })).rejects.toThrow(/status 422/);
     vi.unstubAllGlobals();
   });
 
