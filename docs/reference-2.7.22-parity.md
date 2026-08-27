@@ -1003,7 +1003,12 @@ start- and end-side boundary reachability, split return components, single
 closed variants, strict transitive sequence grouping with skip repair,
 least-cost sequence projection, strict filtering boundaries, and dynamic
 zero-threshold filtering, and concurrency grouping with skippable-branch
-repair. Recursive POWL JSON, request
+repair. The activity-concurrent fall-through performs a cut-only probe on its
+projected remainder: the probe runs the same cut validation and projection
+checks as discovery, then stops before recursively constructing child models.
+This preserves the boolean fall-through decision while avoiding duplicate
+recursive work; tree and dynamic variants exercise the path. Recursive POWL
+JSON, request
 validation, CLI flags, local-server mining, frontend controls/rendering,
 converted-net conformance and decoration, and the PNML/BPMN/decision/playout
 selectors are exercised by native tests, frontend tests/build, and headless

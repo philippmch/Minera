@@ -417,7 +417,9 @@ int main() {
   assert(flower_result.children()[1].kind() == PowlNodeKind::kSilent);
 
   // Activity-concurrent also probes ordinary cuts for dynamic variants.  The
-  // remainder exposes the same XOR split as the tree variant.
+  // remainder exposes the same XOR split as the tree variant.  The probe is
+  // intentionally boolean-only; its result must not depend on recursively
+  // materializing the projected child models.
   for (const auto variant : {PowlDiscoveryVariant::kDynamicClustering,
                              PowlDiscoveryVariant::kDynamicClusteringPlain}) {
     auto dynamic = tree;

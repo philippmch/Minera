@@ -235,7 +235,11 @@ PowlNode simplify_powl(PowlNode node) {
   return PowlNode::strict_partial_order(std::move(output_children), order);
 }
 
-struct State { PowlDiscoveryOptions opts; std::size_t depth = 0; };
+struct State {
+  PowlDiscoveryOptions opts;
+  std::size_t depth = 0;
+  bool probe_only = false;
+};
 PowlNode discover_rec(const UVCL&, State&);
 
 PowlNode recurse(const UVCL& log, State& s) {
@@ -289,6 +293,7 @@ std::optional<PowlNode> make_xor(const UVCL& log, State& s) {
     add_checked(projected[selected][branch], count);
   }
   std::vector<PowlNode> children;
+  if (s.probe_only) return PowlNode::silent();
   children.reserve(projected.size());
   for (auto& child_log : projected)
     children.push_back(recurse(child_log, s));
@@ -491,6 +496,7 @@ std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
     }
   }
   std::vector<PowlNode> children;
+  if (s.probe_only) return PowlNode::silent();
   children.reserve(projected_logs.size());
   for (auto& child_log : projected_logs)
     children.push_back(recurse(child_log, s));
@@ -564,6 +570,7 @@ std::optional<PowlNode> make_concurrency(const UVCL& log, State& s) {
   if (groups.size() < 2) return std::nullopt;
 
   std::vector<PowlNode> children;
+  if (s.probe_only) return PowlNode::silent();
   children.reserve(groups.size());
   for (const auto& group : groups) children.push_back(recurse(project(log, group), s));
   return PowlNode::concurrency(std::move(children));
@@ -763,6 +770,7 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     // The loop projection retains an empty trailing do slice.
     add_checked(do_log[do_slice], count);
   }
+  if (s.probe_only) return PowlNode::silent();
   return PowlNode::loop(recurse(do_log, s), recurse(redo_log, s));
 }
 
@@ -1199,6 +1207,7 @@ std::optional<PowlNode> activity_once_fall_through(const UVCL& log,
 bool remainder_has_normal_cut(const UVCL& log, const State& state) {
   if (activities(log).size() < 2) return false;
   State probe = state;
+  probe.probe_only = true;
   if (make_xor(log, probe)) return true;
   if (make_sequence(log, probe)) return true;
   if (make_concurrency(log, probe)) return true;
