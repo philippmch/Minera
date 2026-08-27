@@ -761,13 +761,14 @@ describe("isMonteCarloResult", () => {
 });
 
 describe("isILPMinerResult", () => {
-  const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: "A", inputs: [0], outputs: [1] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
-  it("accepts the standalone net contract", () => expect(isILPMinerResult(valid)).toBe(true));
+  const valid = { family: "ILP", net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: 0, inputs: [0], outputs: [1] }, { activity: null, inputs: [1], outputs: [0] }] }, markings: { initial: [1, 0], final: [0, 1] }, diagnostics: { computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1, branch_and_bound_nodes: 1, message: "done" } };
+  it("accepts backend activity indexes and silent transitions", () => expect(isILPMinerResult(valid)).toBe(true));
   it("rejects malformed markings and diagnostics", () => expect(isILPMinerResult({ ...valid, markings: { initial: [1], final: [0, 1] } })).toBe(false));
   it("rejects out-of-range net references", () => {
     expect(isILPMinerResult({ ...valid, net: { ...valid.net, source: 2 } })).toBe(false);
     expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: "A", inputs: [2], outputs: [1] }] } })).toBe(false);
-    expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: "missing", inputs: [0], outputs: [1] }] } })).toBe(false);
+    expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: 1, inputs: [0], outputs: [1] }] } })).toBe(false);
+    expect(isILPMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: "A", inputs: [0], outputs: [1] }] } })).toBe(false);
   });
 });
 

@@ -38,6 +38,22 @@ describe("Petri usage comparison API", () => {
       new File([""], "reference.csv"), "inductive", { activity_attribute: "   " },
     )).rejects.toThrow(/activity_attribute/);
   });
+
+  it("trims qualified first-class selectors before upload", async () => {
+    const payload = {
+      family: "PETRI_USAGE_COMPARISON", places: [], transitions: [], arcs: [],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (_path: string, init?: RequestInit) => {
+      const form = init?.body as FormData;
+      expect(form.get("activity_attribute")).toBe("org:resource");
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(comparePetriUsage(
+      new File(["case_id,resource\nc1,A\n"], "reference.csv"),
+      "inductive", { activity_attribute: "  org:resource  " },
+    )).resolves.toMatchObject({ family: "PETRI_USAGE_COMPARISON" });
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("classic DFG export API", () => {
@@ -1213,6 +1229,21 @@ describe("label-splitting API", () => {
 });
 
 describe("ILP miner API", () => {
+  const validBackendResult = {
+    family: "ILP",
+    net: {
+      place_count: 2, source: 0, sink: 1, activities: ["A"],
+      transitions: [
+        { activity: 0, inputs: [0], outputs: [1] },
+        { activity: null, inputs: [1], outputs: [0] },
+      ],
+    },
+    markings: { initial: [1, 0], final: [0, 1] },
+    diagnostics: {
+      computed: true, exhausted: false, visited_nodes: 1, lp_solved: 1,
+      branch_and_bound_nodes: 1, message: "done",
+    },
+  };
   it("encodes strict cached-session options", () => {
     expect(ilpMinerQuery({ activity_key: "concept:name", noise_threshold: 0.2, max_nodes: 42 }))
       .toBe("ilp_activity_key=concept%3Aname&ilp_noise_threshold=0.2&ilp_max_nodes=42");
@@ -1224,6 +1255,27 @@ describe("ILP miner API", () => {
     })).toBe("ilp_artificial_start_activity=%3Cbegin%3E&ilp_artificial_end_activity=%3Cfinish%3E&ilp_alpha=0.75&ilp_causal_relation=%3Cbegin%3E%3D%3EA%2CA%3D%3EB%2CB%3D%3E%3Cfinish%3E");
     expect(() => ilpMinerQuery({ alpha: 1.1 })).toThrow(/\[0,1\]/);
     expect(() => ilpMinerQuery({ artificial_start_activity: "" })).toThrow(/must not be empty/);
+  });
+  it("accepts backend numeric activity indexes in responses", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true, json: async () => validBackendResult,
+    })));
+    const result = await requestIlpMine();
+    expect(result.family).toBe("ILP");
+    expect(result.net.transitions[0].activity).toBe(0);
+    vi.unstubAllGlobals();
+  });
+  it("rejects visible activity indexes outside the activity table", async () => {
+    const invalid = {
+      ...validBackendResult,
+      net: {
+        ...validBackendResult.net,
+        transitions: [{ activity: 1, inputs: [0], outputs: [1] }],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => invalid })));
+    await expect(requestIlpMine()).rejects.toThrow(/invalid ILP miner/);
+    vi.unstubAllGlobals();
   });
   it("rejects malformed ILP responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ family: "ILP" }) })));

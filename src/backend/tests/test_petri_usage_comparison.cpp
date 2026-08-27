@@ -2,6 +2,7 @@
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
@@ -232,6 +233,35 @@ void custom_activity_attribute_controls_replay() {
   }
 }
 
+void aliases_prefer_first_class_fields_and_reject_blank_selectors() {
+  const auto net = simple_net();
+  minera::EventLog selected;
+  minera::Trace trace;
+  trace.case_id = "aliases";
+  minera::Event event;
+  event.case_id = trace.case_id;
+  event.activity = "ignored";
+  event.resource = "A";
+  event.attributes.push_back({"resource", "not-the-resource",
+                              minera::AttributeKind::kString});
+  trace.events.push_back(std::move(event));
+  selected.traces.push_back(std::move(trace));
+
+  minera::PetriUsageComparisonOptions options;
+  options.activity_attribute = "  org:resource  ";
+  const auto result = compare_petri_usage(net, selected, log_of({}), options);
+  assert(result.transitions[0].log1_occurrences == 1);
+
+  options.activity_attribute = " \t ";
+  bool rejected = false;
+  try {
+    (void)compare_petri_usage(net, selected, log_of({}), options);
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 void imported_custom_activity_attributes_are_replayable() {
   const auto net = simple_net();
 
@@ -261,6 +291,67 @@ void imported_custom_activity_attributes_are_replayable() {
          nullptr);
   const auto xes_result = compare_petri_usage(net, xes_log, log_of({}), options);
   assert(xes_result.transitions[0].log1_occurrences == 1);
+}
+
+void imported_first_class_aliases_work_without_default_activity_columns() {
+  const auto net = simple_net();
+  const std::vector<std::pair<const char*, const char*>> csv_aliases = {
+      {"org:resource", "resource"},
+      {"time:timestamp", "timestamp"},
+      {"lifecycle:transition", "lifecycle"},
+  };
+  for (const auto& [selector, column] : csv_aliases) {
+    minera::CsvImportOptions import_options;
+    import_options.activity_column = selector;
+    std::istringstream csv(std::string("case_id,") + column +
+                           "\ncase-1,A\n");
+    const auto log = minera::import_csv_event_log(csv, import_options);
+    assert(log.traces.size() == 1);
+    minera::PetriUsageComparisonOptions comparison_options;
+    comparison_options.activity_attribute = selector;
+    const auto result =
+        compare_petri_usage(net, log, log_of({}), comparison_options);
+    assert(result.transitions[0].log1_occurrences == 1);
+  }
+
+  const std::vector<std::pair<const char*, const char*>> xes_aliases = {
+      {"org:resource", "org:resource"},
+      {"time:timestamp", "time:timestamp"},
+      {"lifecycle:transition", "lifecycle:transition"},
+  };
+  for (const auto& [selector, key] : xes_aliases) {
+    minera::XesImportOptions import_options;
+    import_options.activity_attribute = selector;
+    std::istringstream xes(
+        std::string("<log><trace><string key=\"concept:name\" value=\"case-1\"/>"
+                    "<event><string key=\"") +
+        key + "\" value=\"A\"/></event></trace></log>");
+    const auto log = minera::import_xes_event_log(xes, import_options);
+    assert(log.traces.size() == 1);
+    minera::PetriUsageComparisonOptions comparison_options;
+    comparison_options.activity_attribute = selector;
+    const auto result =
+        compare_petri_usage(net, log, log_of({}), comparison_options);
+    assert(result.transitions[0].log1_occurrences == 1);
+  }
+}
+
+void xes_exact_selector_beats_alias_in_any_order() {
+  const auto net = simple_net();
+  const std::vector<std::string> event_attributes = {
+      "<string key=\"activity\" value=\"B\"/>"
+      "<string key=\"concept:name\" value=\"A\"/>",
+      "<string key=\"concept:name\" value=\"A\"/>"
+      "<string key=\"activity\" value=\"B\"/>"};
+  for (const auto& attributes : event_attributes) {
+    std::istringstream xes(
+        std::string("<log><trace><string key=\"concept:name\" value=\"case-1\"/>"
+                    "<event>") +
+        attributes + "</event></trace></log>");
+    const auto log = minera::import_xes_event_log(xes);
+    const auto result = compare_petri_usage(net, log, log_of({}));
+    assert(result.transitions[0].log1_occurrences == 1);
+  }
 }
 
 void invalid_net_indices_are_rejected() {
@@ -325,7 +416,10 @@ int main() {
   inhibitor_arcs_gate_silent_completion();
   marking_dimensions_are_checked();
   custom_activity_attribute_controls_replay();
+  aliases_prefer_first_class_fields_and_reject_blank_selectors();
   imported_custom_activity_attributes_are_replayable();
+  imported_first_class_aliases_work_without_default_activity_columns();
+  xes_exact_selector_beats_alias_in_any_order();
   invalid_net_indices_are_rejected();
   silent_search_budget_is_reported();
 }
