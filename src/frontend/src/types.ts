@@ -1683,6 +1683,48 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+export type ProcessTreePetriNetVariant = "standard" | "transition_bordered";
+
+export interface ProcessTreePetriNetConversionResult extends PetriNetModel {
+  family: "PROCESS_TREE_PETRI_NET";
+  variant: ProcessTreePetriNetVariant;
+  activities: string[];
+}
+
+export function isProcessTreePetriNetConversionResult(
+  value: unknown,
+): value is ProcessTreePetriNetConversionResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Partial<ProcessTreePetriNetConversionResult>;
+  if (result.family !== "PROCESS_TREE_PETRI_NET" ||
+      (result.variant !== "standard" && result.variant !== "transition_bordered")) {
+    return false;
+  }
+  if (typeof result.place_count !== "number" ||
+      !Number.isInteger(result.place_count) || result.place_count < 0 ||
+      typeof result.source !== "number" || !Number.isInteger(result.source) ||
+      result.source < 0 || typeof result.sink !== "number" ||
+      !Number.isInteger(result.sink) || result.sink < 0 ||
+      !Array.isArray(result.activities) ||
+      !result.activities.every((activity) => typeof activity === "string") ||
+      !Array.isArray(result.transitions)) return false;
+  const placeCount = result.place_count;
+  const source = result.source;
+  const sink = result.sink;
+  const activities = result.activities as string[];
+  const transitions = result.transitions as PetriTransition[];
+  if (source >= placeCount || sink >= placeCount) return false;
+  return transitions.every((transition) => {
+    if (typeof transition !== "object" || transition === null) return false;
+    const item = transition as Partial<PetriTransition>;
+    return (item.activity === null ||
+            (typeof item.activity === "number" && Number.isInteger(item.activity) &&
+             item.activity >= 0 && item.activity < activities.length)) &&
+      Array.isArray(item.inputs) && item.inputs.every((place) => Number.isInteger(place) && place >= 0 && place < placeCount) &&
+      Array.isArray(item.outputs) && item.outputs.every((place) => Number.isInteger(place) && place >= 0 && place < placeCount);
+  });
+}
+
 export interface PetriUsageRecord {
   id: number;
   log1_occurrences: number;
@@ -1993,6 +2035,8 @@ export type AlignmentCostProfile = "legacy" | "standard";
 
 /** Optional controls for one deferred alignment request. */
 export interface AlignmentOptions {
+  /** Selects the process-tree Petri construction for the inductive model. */
+  process_tree_variant?: ProcessTreePetriNetVariant;
   variant?: AlignmentVariant;
   max_states?: number;
   max_align_time?: number;
@@ -2833,6 +2877,8 @@ export type SimplicityVariant =
 
 /** Query options accepted by the model-quality endpoint. */
 export interface EvaluationOptions {
+  /** Selects the process-tree Petri construction for the inductive model. */
+  process_tree_variant?: ProcessTreePetriNetVariant;
   evaluation_family?: EvaluationFamily;
   fitness_variant?: ReplayFitnessVariant;
   precision_variant?: PrecisionVariant;
@@ -2858,6 +2904,8 @@ export type PetriAnalysisFamily =
   | "woflan";
 
 export interface PetriAnalysisOptions {
+  /** Selects the process-tree Petri construction for the inductive model. */
+  process_tree_variant?: ProcessTreePetriNetVariant;
   family?: PetriAnalysisFamily;
   miner?: string;
   trace_index?: number;
@@ -2927,6 +2975,7 @@ export function isProcessTreePlayoutSetResult(
 
 /** Controls uniform random execution of a Petri-net model. */
 export interface BasicPlayoutOptions {
+  process_tree_variant?: ProcessTreePetriNetVariant;
   mode?: "basic" | "extensive";
   traces?: number;
   max_steps?: number;
@@ -3031,6 +3080,7 @@ function isPlayoutVisitedResult(
 
 /** Controls weighted random execution of a Petri-net model. */
 export interface StochasticPlayoutOptions {
+  process_tree_variant?: ProcessTreePetriNetVariant;
   traces?: number;
   max_steps?: number;
   seed?: number;
@@ -3235,6 +3285,7 @@ export function isStochasticPetriDistributionResult(
 
 /** Controls bounded virtual-time Petri-net Monte Carlo simulation. */
 export interface MonteCarloOptions {
+  process_tree_variant?: ProcessTreePetriNetVariant;
   simulations?: number;
   case_arrival_seconds?: number;
   max_steps?: number;

@@ -213,6 +213,38 @@ void explicit_standard_variant_matches_default() {
   assert(default_net.transitions().size() == explicit_net.transitions().size());
 }
 
+void variant_names_and_json_are_stable() {
+  assert(std::string(minera::process_tree_petri_net_variant_name(
+             minera::ProcessTreePetriNetVariant::kStandard)) == "standard");
+  assert(std::string(minera::process_tree_petri_net_variant_name(
+             minera::ProcessTreePetriNetVariant::kTransitionBordered)) ==
+         "transition_bordered");
+  assert(minera::parse_process_tree_petri_net_variant("") ==
+         minera::ProcessTreePetriNetVariant::kStandard);
+  assert(minera::parse_process_tree_petri_net_variant("standard") ==
+         minera::ProcessTreePetriNetVariant::kStandard);
+  assert(minera::parse_process_tree_petri_net_variant("transition_bordered") ==
+         minera::ProcessTreePetriNetVariant::kTransitionBordered);
+  bool rejected = false;
+  try {
+    (void)minera::parse_process_tree_petri_net_variant("unsupported");
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+
+  const auto tree = minera::ProcessTree({"A\"\\B"},
+                                         minera::ProcessTreeNode::leaf(0));
+  const auto net = minera::to_petri_net_transition_bordered(tree);
+  const auto json = minera::serialize_process_tree_petri_net_json(
+      net, minera::ProcessTreePetriNetVariant::kTransitionBordered);
+  assert(json.find("\"family\":\"PROCESS_TREE_PETRI_NET\"") !=
+         std::string::npos);
+  assert(json.find("\"variant\":\"transition_bordered\"") !=
+         std::string::npos);
+  assert(json.find("A\\\"\\\\B") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -221,4 +253,5 @@ int main() {
   binary_loop_preserves_language();
   unsupported_and_malformed_trees_are_rejected();
   explicit_standard_variant_matches_default();
+  variant_names_and_json_are_stable();
 }

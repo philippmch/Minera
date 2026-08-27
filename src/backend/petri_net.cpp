@@ -5,7 +5,9 @@
 #include <cstddef>
 #include <map>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -391,6 +393,97 @@ PetriNet to_petri_net(const ProcessTree& tree,
       return to_petri_net_transition_bordered(tree);
   }
   throw std::invalid_argument("unknown process-tree Petri-net variant");
+}
+
+const char* process_tree_petri_net_variant_name(
+    ProcessTreePetriNetVariant variant) noexcept {
+  switch (variant) {
+    case ProcessTreePetriNetVariant::kStandard:
+      return "standard";
+    case ProcessTreePetriNetVariant::kTransitionBordered:
+      return "transition_bordered";
+  }
+  return "unknown";
+}
+
+ProcessTreePetriNetVariant parse_process_tree_petri_net_variant(
+    std::string_view value) {
+  if (value.empty() || value == "standard")
+    return ProcessTreePetriNetVariant::kStandard;
+  if (value == "transition_bordered")
+    return ProcessTreePetriNetVariant::kTransitionBordered;
+  throw std::invalid_argument(
+      "process_tree_variant: expected standard or transition_bordered");
+}
+
+namespace {
+
+void write_json_string(std::ostringstream& out, std::string_view value) {
+  out << '"';
+  for (const unsigned char c : value) {
+    switch (c) {
+      case '"': out << "\\\""; break;
+      case '\\': out << "\\\\"; break;
+      case '\b': out << "\\b"; break;
+      case '\f': out << "\\f"; break;
+      case '\n': out << "\\n"; break;
+      case '\r': out << "\\r"; break;
+      case '\t': out << "\\t"; break;
+      default:
+        if (c < 0x20) {
+          static constexpr char hex[] = "0123456789abcdef";
+          out << "\\u00" << hex[c >> 4] << hex[c & 0x0f];
+        } else {
+          out << static_cast<char>(c);
+        }
+    }
+  }
+  out << '"';
+}
+
+void write_places(std::ostringstream& out,
+                  const std::vector<std::size_t>& places) {
+  out << '[';
+  for (std::size_t i = 0; i < places.size(); ++i) {
+    if (i != 0) out << ',';
+    out << places[i];
+  }
+  out << ']';
+}
+
+}  // namespace
+
+std::string serialize_process_tree_petri_net_json(
+    const PetriNet& net, ProcessTreePetriNetVariant variant) {
+  if (variant != ProcessTreePetriNetVariant::kStandard &&
+      variant != ProcessTreePetriNetVariant::kTransitionBordered) {
+    throw std::invalid_argument("unknown process-tree Petri-net variant");
+  }
+  std::ostringstream out;
+  out << "{\"family\":\"PROCESS_TREE_PETRI_NET\",\"variant\":";
+  write_json_string(out, process_tree_petri_net_variant_name(variant));
+  out << ",\"place_count\":" << net.place_count()
+      << ",\"source\":" << net.source()
+      << ",\"sink\":" << net.sink() << ",\"activities\":[";
+  for (std::size_t i = 0; i < net.activities().size(); ++i) {
+    if (i != 0) out << ',';
+    write_json_string(out, net.activities()[i]);
+  }
+  out << "],\"transitions\":[";
+  for (std::size_t i = 0; i < net.transitions().size(); ++i) {
+    if (i != 0) out << ',';
+    const auto& transition = net.transitions()[i];
+    out << "{\"activity\":";
+    if (transition.activity.has_value()) out << *transition.activity;
+    else out << "null";
+    out << ",\"inputs\":";
+    write_places(out, transition.inputs);
+    out << ",\"outputs\":";
+    write_places(out, transition.outputs);
+    out << '}';
+  }
+  out << "]}";
+  return out.str();
 }
 
 }  // namespace minera

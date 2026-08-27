@@ -998,6 +998,16 @@ existing tree-to-POWL conversion; inclusive choices use a bounded XOR of
 non-empty concurrent subsets because the POWL object model has no primitive OR
 node.
 
+Process-tree Petri conversion also exposes both construction variants. The
+standard place-bordered form remains the default export path; the
+transition-bordered form adds explicit silent fragment boundaries while
+preserving the same workflow language for supported sequence, choice,
+parallel, loop, activity, and tau nodes. The selector is validated strictly
+and is available in the native API, standalone export CLI, `/api/pnml`,
+`/api/bpmn`, `/api/playout`, alignment/evaluation/decision routes, and the
+typed frontend API. `/api/process-tree-petri` provides a compact JSON net
+envelope for clients that need the selected construction directly.
+
 The reverse workflow-net conversion is also available through the native
 `to_powl(const PetriNet&)` API. It validates designated source/sink reachability
 and final-marking reachability, keeps the silent return boundary used by loop

@@ -61,6 +61,8 @@ import {
   type StreamingTemporalResult,
   type StreamingTbrResult,
   type TriePetriConversionResult,
+  type ProcessTreePetriNetVariant,
+  type ProcessTreePetriNetConversionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -104,6 +106,7 @@ import {
   isDecisionTablesResult,
   isProcessCubeTable,
   isTriePetriConversionResult,
+  isProcessTreePetriNetConversionResult,
   isDfgPrecisionResult,
   isILPMinerResult,
   isGeneticMinerResult,
@@ -1166,6 +1169,7 @@ export async function mineCsv(
 /** Stable query serialization used by the alignment cache and request API. */
 export function alignmentQuery(options: AlignmentOptions = {}): string {
   const query = new URLSearchParams();
+  setProcessTreePetriNetVariant(query, options.process_tree_variant);
   const add = (name: string, value: unknown) => {
     if (value !== undefined && value !== null && value !== "") query.set(name, String(value));
   };
@@ -1399,6 +1403,7 @@ export function evaluationQuery(options: EvaluationOptions = {}): string {
   }
 
   const query = new URLSearchParams();
+  setProcessTreePetriNetVariant(query, options.process_tree_variant);
   query.set("evaluation_family", family);
   const add = (name: string, value: unknown) => { if (value !== undefined) query.set(name, Array.isArray(value) ? value.join(",") : String(value)); };
   add("fitness_variant", options.fitness_variant);
@@ -1455,6 +1460,7 @@ export function petriAnalysisQuery(options: PetriAnalysisOptions = {}): string {
   if (options.diagnostics !== undefined && typeof options.diagnostics !== "boolean") throw new Error("diagnostics must be boolean");
   if (options.return_asap_when_unsound !== undefined && typeof options.return_asap_when_unsound !== "boolean") throw new Error("return_asap_when_unsound must be boolean");
   const query = new URLSearchParams();
+  setProcessTreePetriNetVariant(query, options.process_tree_variant);
   const add = (name: string, value: unknown) => { if (value !== undefined) query.set(`petri_analysis_${name}`, Array.isArray(value) ? value.join(",") : String(value)); };
   add("family", family);
   add("miner", options.miner);
@@ -2287,6 +2293,7 @@ export function reduceProcessTree(traceIndex: number, options: ProcessTreeReduct
 }
 
 export interface DecisionMiningOptions {
+  process_tree_variant?: ProcessTreePetriNetVariant;
   max_depth?: number;
   min_split?: number;
   min_leaf?: number;
@@ -2305,6 +2312,7 @@ export interface DecisionTablesRequestOptions extends DecisionMiningOptions {
 
 export function decisionMiningQuery(options: DecisionMiningOptions = {}): string {
   const query = new URLSearchParams();
+  setProcessTreePetriNetVariant(query, options.process_tree_variant);
   const integer = (name: string, value: number | undefined, minimum: number) => {
     if (value === undefined) return;
     if (!Number.isSafeInteger(value) || value < minimum)
@@ -2439,10 +2447,60 @@ export async function checkModel(file: File): Promise<ImportedModelCheck> {
  * The net is translated server-side (the single source of truth used for
  * conformance), so this only works for a log mined this session.
  */
-export async function fetchPnml(miner: string): Promise<string> {
+export interface ProcessTreePetriNetOptions {
+  variant?: ProcessTreePetriNetVariant;
+}
+
+export function processTreePetriNetQuery(
+  options: ProcessTreePetriNetOptions = {},
+): string {
+  if (options.variant !== undefined &&
+      options.variant !== "standard" &&
+      options.variant !== "transition_bordered") {
+    throw new Error("variant expects standard or transition_bordered");
+  }
+  const params = new URLSearchParams();
+  if (options.variant !== undefined) {
+    params.set("process_tree_variant", options.variant);
+  }
+  return params.toString();
+}
+
+export async function fetchProcessTreePetriNet(
+  options: ProcessTreePetriNetOptions = {},
+): Promise<ProcessTreePetriNetConversionResult> {
+  const query = processTreePetriNetQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/pnml?miner=${encodeURIComponent(miner)}`);
+    response = await fetch(`/api/process-tree-petri${query ? `?${query}` : ""}`);
+  } catch {
+    throw new Error(
+      "could not reach the Minera backend — is minera_server running?",
+    );
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
+      throw new Error(String((parsed as { error: unknown }).error));
+    }
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isProcessTreePetriNetConversionResult(parsed)) {
+    throw new Error("the Minera backend returned an invalid process-tree Petri net");
+  }
+  return parsed;
+}
+
+export async function fetchPnml(
+  miner: string,
+  options: ProcessTreePetriNetOptions = {},
+): Promise<string> {
+  const query = processTreePetriNetQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/pnml?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
+    );
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3128,6 +3186,17 @@ function serializeComparisonMarking(name: string, value: number[]): string {
   return value.join(",");
 }
 
+function setProcessTreePetriNetVariant(
+  params: URLSearchParams,
+  value: ProcessTreePetriNetVariant | undefined,
+): void {
+  if (value === undefined) return;
+  if (value !== "standard" && value !== "transition_bordered") {
+    throw new Error("process_tree_variant expects standard or transition_bordered");
+  }
+  params.set("process_tree_variant", value);
+}
+
 export async function comparePetriUsage(
   reference: File,
   miner = "inductive",
@@ -3161,6 +3230,7 @@ export async function comparePetriUsage(
 
 export function basicPlayoutQuery(options: BasicPlayoutOptions = {}): string {
   const params = new URLSearchParams();
+  setProcessTreePetriNetVariant(params, options.process_tree_variant);
   if (options.mode !== undefined) {
     if (options.mode !== "basic" && options.mode !== "extensive")
       throw new Error("mode must be basic or extensive");
@@ -3258,6 +3328,7 @@ export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {})
 
 export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): string {
   const params = new URLSearchParams();
+  setProcessTreePetriNetVariant(params, options.process_tree_variant);
   const integerFields: Array<[keyof StochasticPlayoutOptions, boolean]> = [
     ["traces", true], ["max_steps", false], ["seed", false],
   ];
@@ -3334,6 +3405,7 @@ export async function fetchStochasticPlayoutVisited(
 
 export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   const params = new URLSearchParams();
+  setProcessTreePetriNetVariant(params, options.process_tree_variant);
   const positiveIntegers: Array<keyof MonteCarloOptions> = ["simulations"];
   for (const name of positiveIntegers) {
     const value = options[name];
@@ -3858,10 +3930,16 @@ export async function fetchMonteCarloResult(
  * others convert from their workflow nets server-side. Like PNML this only
  * works for a log mined this session.
  */
-export async function fetchBpmn(miner: string): Promise<string> {
+export async function fetchBpmn(
+  miner: string,
+  options: ProcessTreePetriNetOptions = {},
+): Promise<string> {
+  const query = processTreePetriNetQuery(options);
   let response: Response;
   try {
-    response = await fetch(`/api/bpmn?miner=${encodeURIComponent(miner)}`);
+    response = await fetch(
+      `/api/bpmn?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
+    );
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",

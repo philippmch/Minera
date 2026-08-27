@@ -235,6 +235,9 @@ describe("evaluation adapters", () => {
     })).toBe("evaluation_family=simplicity&fitness_variant=alignment_based&precision_variant=automaton_after_align&precision_use_task_ids=true&precision_max_states=200&generalization_variant=generalization_token&simplicity_variant=extended_cyclomatic&simplicity_arc_degree_k=2.5&simplicity_max_states=300&simplicity_initial_marking=1%2C0&simplicity_final_marking=0%2C1");
     expect(evaluationQuery()).toBe("evaluation_family=replay_fitness");
     expect(new URLSearchParams(evaluationQuery({
+      process_tree_variant: "transition_bordered",
+    })).get("process_tree_variant")).toBe("transition_bordered");
+    expect(new URLSearchParams(evaluationQuery({
       evaluation_family: "composite", fitness_weight: 2, precision_weight: 1,
       simplicity_weight: 0, generalization_weight: 0,
     })).toString()).toBe("evaluation_family=composite&fitness_weight=2&precision_weight=1&simplicity_weight=0&generalization_weight=0");
@@ -255,6 +258,10 @@ describe("evaluation adapters", () => {
     expect(query.get("petri_analysis_full_bootstrap")).toBe("false");
     expect(new URLSearchParams(petriAnalysisQuery({ family: "woflan" }))
       .get("petri_analysis_family")).toBe("woflan");
+    expect(new URLSearchParams(petriAnalysisQuery({
+      process_tree_variant: "transition_bordered",
+      miner: "inductive",
+    })).get("process_tree_variant")).toBe("transition_bordered");
     expect(new URLSearchParams(petriAnalysisQuery({
       family: "woflan", return_asap_when_unsound: true,
     })).get("petri_analysis_return_asap_when_unsound")).toBe("true");
@@ -499,6 +506,7 @@ describe("alignmentQuery", () => {
       sync_cost: 0,
     });
     const params = new URLSearchParams(query);
+    expect(params.get("process_tree_variant")).toBeNull();
     expect(params.get("alignment_variant")).toBe("discounted_a_star");
     expect(params.get("variant")).toBeNull();
     expect(params.get("max_states")).toBe("42");
@@ -510,6 +518,9 @@ describe("alignmentQuery", () => {
 
   it("omits unset controls so the legacy request remains compatible", () => {
     expect(alignmentQuery({})).toBe("");
+    expect(new URLSearchParams(alignmentQuery({
+      process_tree_variant: "transition_bordered",
+    })).get("process_tree_variant")).toBe("transition_bordered");
   });
 
   it("drops controls that do not apply after switching variants", () => {
