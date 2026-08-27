@@ -77,7 +77,10 @@ struct OcelFeatureOptions {
   bool include_lifecycle_unique_activity_features = true;
   bool include_lifecycle_duration_features = true;
   bool include_lifecycle_activity_features = true;
-  bool include_lifecycle_wip_features = true;
+  // Work-in-progress uses a directional start-window over lifecycle
+  // intervals.  An unset value follows the compact default (disabled), while
+  // an explicit value lets object callers opt in or suppress the column.
+  std::optional<bool> include_lifecycle_wip_features;
   bool include_lifecycle_path_features = true;
   bool include_related_events_features = false;
   bool include_related_activities_features = false;

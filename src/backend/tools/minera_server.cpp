@@ -2084,9 +2084,9 @@ void handle_ocel_features(const httplib::Request& request,
     options.include_lifecycle_path_features = ocel_query_bool(
         request, "include_lifecycle_path_features",
         options.include_lifecycle_path_features);
-    options.include_lifecycle_wip_features = ocel_query_bool(
-        request, "include_lifecycle_wip_features",
-        options.include_lifecycle_wip_features);
+    if (request.has_param("include_lifecycle_wip_features"))
+      options.include_lifecycle_wip_features = ocel_query_bool(
+          request, "include_lifecycle_wip_features", false);
     options.include_related_events_features = ocel_query_bool(
         request, "include_related_events_features",
         options.include_related_events_features);

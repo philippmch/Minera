@@ -374,13 +374,15 @@ lifecycle starts and ends, attribute counts, custom numeric/string attributes,
 newly observed interactions, and opt-in min/max aggregation of the
 selected object feature vector over each event's related objects. Object features cover type
 indicators, lifecycle length/duration/endpoints, activity/path counts, custom
-attributes, work-in-progress, normalized interaction-graph degree, and optional
+attributes, opt-in work-in-progress, normalized interaction-graph degree, and optional
 per-object-type interaction counts. Degree centrality is independently
 selectable from the interaction feature group, so OBJECTS callers can request
 degree alone or interaction-by-type columns without degree. Lifecycle length,
 unique-activity, duration/endpoints,
 activity, path, and work-in-progress columns can be enabled independently
-while the legacy lifecycle switch remains a group-level override. Optional
+while the legacy lifecycle switch remains a group-level override. Work-in-progress
+uses a deterministic forward window over lifecycle start/end boundaries and
+restores the original object row order; it is disabled by default. Optional
 OBJECTS-only graph columns cover general
 interaction degree, descendants and inheritance incoming/outgoing counts, and
 cobirth/codeath degree. The OBJECTS table also supports opt-in related-event

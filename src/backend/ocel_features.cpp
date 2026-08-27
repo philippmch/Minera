@@ -484,15 +484,32 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
                     std::move(values));
       }
     }
-    if (options.include_lifecycle_wip_features) {
+    if (options.include_lifecycle_wip_features.value_or(false)) {
       std::vector<double> wip(log.objects.size(), 0.0);
-      for (std::size_t row = 0; row < log.objects.size(); ++row) {
-        if (!lifecycles[row].start || !lifecycles[row].end) continue;
-        for (std::size_t other = 0; other < log.objects.size(); ++other) {
-          if (!lifecycles[other].start || !lifecycles[other].end) continue;
-          if (*lifecycles[other].start <= *lifecycles[row].end &&
-              *lifecycles[other].end >= *lifecycles[row].start) wip[row] += 1.0;
-        }
+      // Sort valid lifecycles by their start/end boundary, then count the
+      // contiguous suffix whose start is within the current end boundary.
+      // The feature is intentionally directional: an earlier lifecycle can
+      // see later starts, while a later nested lifecycle does not look back.
+      // Restore the input object order after computing the window counts.
+      std::vector<std::size_t> ordered;
+      ordered.reserve(log.objects.size());
+      for (std::size_t row = 0; row < log.objects.size(); ++row)
+        if (lifecycles[row].start && lifecycles[row].end)
+          ordered.push_back(row);
+      std::stable_sort(ordered.begin(), ordered.end(), [&](std::size_t left,
+                                                            std::size_t right) {
+        if (*lifecycles[left].start != *lifecycles[right].start)
+          return *lifecycles[left].start < *lifecycles[right].start;
+        return *lifecycles[left].end < *lifecycles[right].end;
+      });
+      for (std::size_t position = 0; position < ordered.size(); ++position) {
+        const auto row = ordered[position];
+        const double end = *lifecycles[row].end;
+        std::size_t next = position + 1;
+        while (next < ordered.size() &&
+               *lifecycles[ordered[next]].start <= end)
+          ++next;
+        wip[row] = static_cast<double>(next - position);
       }
       builder.add("@@object_wip", std::move(wip));
     }
@@ -1051,7 +1068,7 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       !options.include_lifecycle_duration_features ||
       !options.include_lifecycle_activity_features ||
       !options.include_lifecycle_path_features ||
-      !options.include_lifecycle_wip_features;
+      options.include_lifecycle_wip_features.has_value();
   if (lifecycle_object_control_disabled &&
       variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
     throw std::invalid_argument(
