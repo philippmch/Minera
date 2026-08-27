@@ -5,7 +5,9 @@
 #include <cstddef>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -378,8 +380,11 @@ enum class BpmnNodeKind {
   end,
   exclusive,    // exclusive and event-based gateways: one in, one out
   parallel,     // parallel gateways: all in, all out
+  inclusive,    // block-structured inclusive split/join pair
   subprocess,   // an embedded scope with its own start and end events
 };
+
+constexpr std::size_t kNoIndex = std::numeric_limits<std::size_t>::max();
 
 struct BpmnNode {
   std::string id;
@@ -388,6 +393,11 @@ struct BpmnNode {
   std::size_t child_scope = 0;  // scope index, kind == subprocess only
   std::vector<std::size_t> in_flows;   // indices into the scope's flows
   std::vector<std::size_t> out_flows;
+  // Inclusive gateways are compiled as one block: the split owns the
+  // selector/control places and records which join input belongs to each
+  // branch.  A gateway with one input and one output is a plain pass-through.
+  std::size_t inclusive_pair = kNoIndex;
+  std::vector<std::size_t> inclusive_join_flows;
 };
 
 struct BpmnFlow {
@@ -417,6 +427,129 @@ bool is_task_element(std::string_view name) {
          name == "callActivity";
 }
 
+// Returns the nodes reachable by following sequence flows from `start`.
+// Flow-node reachability is enough to match a structured inclusive split with
+// its converging join; sequence-flow places are introduced only afterwards.
+std::vector<char> reachable_nodes(const BpmnScope& scope, std::size_t start) {
+  std::vector<char> reached(scope.nodes.size(), 0);
+  if (start >= scope.nodes.size()) return reached;
+  std::vector<std::size_t> pending{start};
+  reached[start] = 1;
+  while (!pending.empty()) {
+    const auto node = pending.back();
+    pending.pop_back();
+    for (const auto flow : scope.nodes[node].out_flows) {
+      const auto target = scope.node_index.find(scope.flows[flow].target);
+      if (target == scope.node_index.end()) continue;
+      if (reached[target->second]) continue;
+      reached[target->second] = 1;
+      pending.push_back(target->second);
+    }
+  }
+  return reached;
+}
+
+// Inclusive gateways have a faithful workflow-net representation when they
+// form a block with one diverging split and one converging join.  Pairing is
+// structural rather than id-based: every split branch must reach exactly one
+// distinct incoming flow of the same join, and all join inputs must be
+// accounted for.  This accepts arbitrary ids and nested blocks while keeping
+// ambiguous graphs explicit instead of silently changing their language.
+void prepare_inclusive_pairs(BpmnScope& scope) {
+  std::vector<std::size_t> splits;
+  std::vector<std::size_t> joins;
+  for (std::size_t index = 0; index < scope.nodes.size(); ++index) {
+    auto& node = scope.nodes[index];
+    if (node.kind != BpmnNodeKind::inclusive) continue;
+    if (node.in_flows.empty() || node.out_flows.empty()) {
+      throw std::runtime_error("BPMN inclusive gateway '" + node.id +
+                               "' must have incoming and outgoing flows");
+    }
+    if (node.in_flows.size() == 1 && node.out_flows.size() > 1) {
+      splits.push_back(index);
+    } else if (node.in_flows.size() > 1 && node.out_flows.size() == 1) {
+      joins.push_back(index);
+    } else if (node.in_flows.size() > 1 && node.out_flows.size() > 1) {
+      throw std::runtime_error(
+          "BPMN inclusive gateway '" + node.id +
+          "' mixes split and join semantics; only block-structured pairs are supported");
+    }
+  }
+
+  std::vector<char> matched_join(scope.nodes.size(), 0);
+  for (const auto split_index : splits) {
+    auto& split = scope.nodes[split_index];
+    std::vector<std::pair<std::size_t, std::vector<std::size_t>>> candidates;
+    for (const auto join_index : joins) {
+      const auto& join = scope.nodes[join_index];
+      std::vector<std::size_t> mapping;
+      std::set<std::size_t> used;
+      bool valid = true;
+      for (const auto out_flow : split.out_flows) {
+        const auto target_it = scope.node_index.find(scope.flows[out_flow].target);
+        if (target_it == scope.node_index.end()) {
+          valid = false;
+          break;
+        }
+        const auto reached = reachable_nodes(scope, target_it->second);
+        std::size_t selected = kNoIndex;
+        for (const auto join_flow : join.in_flows) {
+          if (used.count(join_flow) != 0) continue;
+          const auto& incoming = scope.flows[join_flow];
+          const auto source_it = scope.node_index.find(incoming.source);
+          if (source_it == scope.node_index.end()) continue;
+          // An empty branch is represented by a direct split -> join flow;
+          // its incoming source is the split itself and is therefore not in
+          // the branch's forward reachability set.
+          const bool direct_empty = join_flow == out_flow &&
+                                    incoming.source == split.id &&
+                                    incoming.target == join.id;
+          if (!direct_empty && !reached[source_it->second]) continue;
+          if (selected != kNoIndex) {
+            valid = false;
+            break;
+          }
+          selected = join_flow;
+        }
+        if (!valid || selected == kNoIndex) {
+          valid = false;
+          break;
+        }
+        used.insert(selected);
+        mapping.push_back(selected);
+      }
+      if (valid && used.size() == join.in_flows.size())
+        candidates.emplace_back(join_index, std::move(mapping));
+    }
+    if (candidates.empty()) {
+      throw std::runtime_error("BPMN inclusive gateway '" + split.id +
+                               "' has no unambiguous matching join");
+    }
+    if (candidates.size() != 1) {
+      throw std::runtime_error("BPMN inclusive gateway '" + split.id +
+                               "' has multiple possible matching joins");
+    }
+    const auto join_index = candidates.front().first;
+    if (matched_join[join_index]) {
+      throw std::runtime_error("BPMN inclusive join '" +
+                               scope.nodes[join_index].id +
+                               "' is shared by multiple splits");
+    }
+    matched_join[join_index] = 1;
+    split.inclusive_pair = join_index;
+    split.inclusive_join_flows = std::move(candidates.front().second);
+    scope.nodes[join_index].inclusive_pair = split_index;
+  }
+
+  for (const auto join_index : joins) {
+    if (!matched_join[join_index]) {
+      throw std::runtime_error("BPMN inclusive join '" +
+                               scope.nodes[join_index].id +
+                               "' has no matching split");
+    }
+  }
+}
+
 // Wires each scope's flows onto its nodes and assembles the workflow net,
 // recursing through subprocess scopes.
 class BpmnNetBuilder {
@@ -436,6 +569,7 @@ class BpmnNetBuilder {
  private:
   void convert(BpmnScope& scope, std::size_t entry, std::size_t exit) {
     resolve_flows(scope);
+    prepare_inclusive_pairs(scope);
 
     bool has_start = false;
     bool has_end = false;
@@ -505,6 +639,26 @@ class BpmnNetBuilder {
           inputs.reserve(node.in_flows.size());
           for (const auto flow : node.in_flows) inputs.push_back(place[flow]);
           silent(std::move(inputs), out_places(node, place));
+          break;
+        }
+        case BpmnNodeKind::inclusive: {
+          // A one-in/one-out inclusive gateway is just a routing point.  A
+          // diverging gateway owns the complete selector/control block; its
+          // paired converging gateway is handled there and skipped below.
+          if (node.inclusive_pair != kNoIndex &&
+              node.in_flows.size() == 1 && node.out_flows.size() > 1) {
+            add_inclusive_block(node, scope.nodes[node.inclusive_pair], place);
+          } else if (node.inclusive_pair != kNoIndex &&
+                     node.in_flows.size() > 1 && node.out_flows.size() == 1) {
+            // The split created the completion and join transitions already.
+            continue;
+          } else if (node.in_flows.size() == 1 && node.out_flows.size() == 1) {
+            silent({place[node.in_flows.front()]},
+                   {place[node.out_flows.front()]});
+          } else {
+            throw std::runtime_error("BPMN inclusive gateway '" + node.id +
+                                     "' has unsupported flow arity");
+          }
           break;
         }
         case BpmnNodeKind::subprocess: {
@@ -593,6 +747,57 @@ class BpmnNetBuilder {
     outs.reserve(node.out_flows.size());
     for (const auto flow : node.out_flows) outs.push_back(place[flow]);
     return outs;
+  }
+
+  // Compiles one block-structured inclusive split/join pair.  The split
+  // makes one selector token per branch and an initially unstarted control
+  // token.  Each selector may skip its branch or execute it; the first
+  // selected branch moves the control token to `started`, while later
+  // branches preserve it.  The join waits for every branch completion and
+  // the started token, so exactly the non-empty subsets of branches are
+  // represented without enumerating a power set.
+  void add_inclusive_block(
+      const BpmnNode& split, const BpmnNode& join,
+      const std::vector<std::size_t>& place) {
+    if (split.in_flows.size() != 1 || split.out_flows.size() < 2 ||
+        join.in_flows.size() != split.out_flows.size() ||
+        join.out_flows.size() != 1 ||
+        split.inclusive_join_flows.size() != split.out_flows.size()) {
+      throw std::runtime_error(
+          "BPMN inclusive split/join pair is not block structured");
+    }
+
+    const auto not_started = net_.add_place();
+    const auto started = net_.add_place();
+    std::vector<std::size_t> selectors;
+    std::vector<std::size_t> completions;
+    selectors.reserve(split.out_flows.size());
+    completions.reserve(split.out_flows.size());
+    for (std::size_t i = 0; i < split.out_flows.size(); ++i) {
+      selectors.push_back(net_.add_place());
+      completions.push_back(net_.add_place());
+    }
+
+    std::vector<std::size_t> split_outputs = selectors;
+    split_outputs.push_back(not_started);
+    silent({place[split.in_flows.front()]}, std::move(split_outputs));
+
+    for (std::size_t i = 0; i < split.out_flows.size(); ++i) {
+      // Skip this branch.
+      silent({selectors[i]}, {completions[i]});
+      // Select the first branch, or a later branch after another one started.
+      silent({selectors[i], not_started},
+             {place[split.out_flows[i]], started});
+      silent({selectors[i], started},
+             {place[split.out_flows[i]], started});
+    }
+
+    for (std::size_t i = 0; i < split.inclusive_join_flows.size(); ++i) {
+      silent({place[split.inclusive_join_flows[i]]}, {completions[i]});
+    }
+    std::vector<std::size_t> join_inputs = completions;
+    join_inputs.push_back(started);
+    silent(std::move(join_inputs), {place[join.out_flows.front()]});
   }
 
   void silent(std::vector<std::size_t> inputs, std::vector<std::size_t> outputs) {
@@ -707,6 +912,8 @@ PetriNet parse_bpmn(std::string_view xml) {
       add_node(scope, BpmnNodeKind::exclusive, token);
     } else if (name == "parallelGateway") {
       add_node(scope, BpmnNodeKind::parallel, token);
+    } else if (name == "inclusiveGateway") {
+      add_node(scope, BpmnNodeKind::inclusive, token);
     } else if (name == "subProcess" || name == "transaction") {
       const auto* triggered =
           detail::attribute(token.attributes, "triggeredByEvent");
@@ -721,10 +928,10 @@ PetriNet parse_bpmn(std::string_view xml) {
       add_node(scopes[scope_stack.back()], BpmnNodeKind::subprocess, token,
                child);
       if (!token.self_closing) scope_stack.push_back(child);
-    } else if (name == "inclusiveGateway" || name == "complexGateway") {
+    } else if (name == "complexGateway") {
       throw std::runtime_error(
-          "BPMN inclusive and complex gateways are not supported; their "
-          "token semantics do not fit a workflow net");
+          "BPMN complex gateways are not supported; their token semantics "
+          "do not fit a workflow net");
     } else if (name == "boundaryEvent") {
       throw std::runtime_error(
           "BPMN boundary events are not supported; interrupting semantics "

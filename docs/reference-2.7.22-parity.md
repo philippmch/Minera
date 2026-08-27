@@ -552,7 +552,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog with typed scalar attributes and restartable CSV/XES event/trace readers; columnar adapters remain |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object and event-to-event relations, o2o links, object changes, scalar globals, classic/standard JSON/XML, declared event/object type catalogs with empty-type schemas, and a typed OCEL 2 relational SQLite projection are present; remaining schema coverage remains |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; reusable stochastic maps now round-trip distribution/rate metadata and derive tangible CTMC options, while object-centric, trie, and broader stochastic model-family coverage remains |
-| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, trie-to-Petri conversion to workflow nets, tree to POWL, tree/net to BPMN, typed heterogeneous OCEL event/object graphs with optional DF and object-change families, and object-type OCEL flattening to typed XES traces through native, CLI, and local-server adapters; broader object-centric and adapter conversions remain |
+| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, trie-to-Petri conversion to workflow nets, tree to POWL, tree/net to BPMN, structured inclusive BPMN split/join import with every non-empty branch subset, typed heterogeneous OCEL event/object graphs with optional DF and object-change families, and object-type OCEL flattening to typed XES traces through native, CLI, and local-server adapters; broader object-centric and adapter conversions remain |
 | Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — XES, PNML, PTML, deterministic classic DFG text read/write, and DFG input/output through CLI/server/frontend adapters are present; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, including empty types and declared attributes without observed values, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite persists the exact declared schemas alongside inferred type-table columns, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, exact admitted-variant selection (including empty variants and polarity) plus exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path filtering with custom activity/timestamp attribute selectors and inclusive performance bounds, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters through native, CLI, server, and frontend export surfaces, and complete native/CLI/server/frontend OCEL filters; OCEL adapter query values now preserve nested delimiters and typed scalar overflow is rejected under a bounded recursive level; broader filter families remain |
@@ -980,6 +980,27 @@ server GET, and frontend response validation. The PT-and-log generator also
 preserves inclusive-choice nodes when the OR weight is selected; their
 non-empty subset language is available through playout, Petri conversion,
 POWL/alignment expansion, PTML, BPMN, JSON, and frontend rendering.
+
+## BPMN inclusive-gateway evidence
+
+The BPMN importer recognizes block-structured inclusive split/join pairs by
+graph structure rather than element identifiers. Each split branch must reach a
+distinct incoming flow of one converging join, and every join input must be
+accounted for; unmatched, shared, mixed-arity, and ambiguous gateways fail
+explicitly. One-in/one-out inclusive gateways remain silent pass-throughs.
+
+The workflow-net translation uses one selector and completion place per branch,
+plus a two-state control token. A branch may be skipped or selected, the first
+selected branch starts the control token, and the join waits for all branch
+completions and a started token. This admits every non-empty subset and all
+interleavings of selected branches without enumerating subsets. Direct
+split-to-join flows represent silent branches and still require at least one
+visible or silent branch selection.
+
+Focused native regressions cover hand-written inclusive models, both branch
+orders, subset rejection, silent branches emitted by tree export, nested
+structure, malformed mixed-arity gateways, final-marking reachability, and
+alignment fitness after a BPMN round trip.
 
 ## POWL parity evidence
 

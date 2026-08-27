@@ -48,7 +48,10 @@ void write_bpmn(std::ostream& out,
 // name, silent when unnamed — an exclusive or event-based gateway routes one
 // token from any incoming flow to one outgoing flow, and a parallel gateway
 // consumes a token from every incoming flow and produces one on every
-// outgoing flow. Per the standard's token rules, a non-gateway node with
+// outgoing flow. A block-structured inclusive split/join pair uses selector
+// and completion places to represent every non-empty subset of branches; a
+// one-in/one-out inclusive gateway is a silent pass-through. Per the
+// standard's token rules, a non-gateway node with
 // several outgoing flows starts all of them, and one with several incoming
 // flows fires on each token separately; intermediate events pass tokens
 // through silently. An expanded subprocess converts recursively between its
@@ -58,10 +61,10 @@ void write_bpmn(std::ostream& out,
 // replays. A task no sequence flow reaches — how an activity that is
 // disconnected in the source model comes out of a BPMN export — stays a
 // disconnected (dead) transition rather than an error, so conformance can
-// report it honestly. Inclusive, complex, and boundary constructs have no
-// faithful workflow-net reading and are rejected, as are malformed models
-// (dangling flow references, missing start or end events, gateways without
-// incoming or outgoing flows) — all via std::runtime_error.
+// report it honestly. Complex, mixed-arity inclusive, ambiguous inclusive,
+// and boundary constructs are rejected, as are malformed models (dangling
+// flow references, missing start or end events, gateways without incoming or
+// outgoing flows) — all via std::runtime_error.
 [[nodiscard]] PetriNet parse_bpmn(std::string_view xml);
 
 // Reads and parses a BPMN file.
