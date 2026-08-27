@@ -4049,7 +4049,9 @@ void handle_case_relations(const httplib::Request& request,
           "required multipart fields: base_log, incoming_log, case_relations");
     }
     static const std::set<std::string> allowed = {
-        "merge_variant", "merge_timestamp_key", "merge_left_column", "merge_right_column"};
+        "merge_variant", "merge_timestamp_key", "merge_case_id_key",
+        "merge_left_suffix", "merge_right_suffix", "merge_left_column",
+        "merge_right_column"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -4074,14 +4076,20 @@ void handle_case_relations(const httplib::Request& request,
                  ? request.get_param_value(std::string(key))
                  : std::move(fallback);
     };
-    const auto timestamp_key = value("merge_timestamp_key", "time:timestamp");
-    const auto left_column = value("merge_left_column", "case_id_LEFT");
-    const auto right_column = value("merge_right_column", "case_id_RIGHT");
-    minera::CaseRelationsOptions options;
-    const auto variant = value("merge_variant", "pandas");
-    if (variant != "pandas" && variant != "PANDAS")
-      throw std::invalid_argument("merge_variant: expected pandas");
-    options.timestamp_key = timestamp_key;
+    const auto lookup = [&](std::string_view key) {
+      return request.has_param(std::string(key))
+                 ? request.get_param_value(std::string(key))
+                 : std::string{};
+    };
+    const auto present = [&](std::string_view key) {
+      return request.has_param(std::string(key));
+    };
+    const auto options =
+        minera::parse_case_relations_params(lookup, present);
+    const auto left_column = value(
+        "merge_left_column", options.case_id_key + options.left_suffix);
+    const auto right_column = value(
+        "merge_right_column", options.case_id_key + options.right_suffix);
     const auto relations = minera::parse_case_relations_csv(
         relation_input, left_column, right_column);
     response.set_content(

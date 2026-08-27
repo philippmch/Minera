@@ -22,6 +22,13 @@ enum class CaseRelationsVariant {
 struct CaseRelationsOptions {
   CaseRelationsVariant variant = CaseRelationsVariant::kPandas;
   std::string timestamp_key = "time:timestamp";
+  // Name of the case identifier column represented by Trace::case_id.  A
+  // custom key may instead resolve to a trace-level attribute.
+  std::string case_id_key = "case_id";
+  // Relation-file columns default to case_id_key plus these suffixes.  The
+  // callers resolve those defaults before parsing the relation CSV.
+  std::string left_suffix = "_LEFT";
+  std::string right_suffix = "_RIGHT";
 };
 
 [[nodiscard]] std::vector<CaseRelation> parse_case_relations_csv(

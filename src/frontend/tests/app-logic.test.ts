@@ -7,6 +7,7 @@ import {
   hasActiveMinerOptions,
   initialTab,
   isJsonExport,
+  isOcelJsonDocument,
   logLifecycles,
   maxEdgeCount,
 } from "../src/app-logic";
@@ -137,6 +138,8 @@ describe("native alignment adapters", () => {
   });
   it("serializes case-relation merge controls and validates merged logs", async () => {
     expect(caseRelationsQuery({ merge_variant: "pandas", merge_timestamp_key: "completed", merge_left_column: "left", merge_right_column: "right" })).toBe("merge_variant=pandas&merge_timestamp_key=completed&merge_left_column=left&merge_right_column=right");
+    expect(caseRelationsQuery({ merge_case_id_key: "order_id", merge_left_suffix: "__left", merge_right_suffix: "__right" })).toBe("merge_case_id_key=order_id&merge_left_suffix=__left&merge_right_suffix=__right");
+    expect(() => caseRelationsQuery({ merge_left_suffix: "" })).toThrow(/non-empty string/);
     const valid = { family: "MERGE_CASE_RELATIONS", variant: "pandas", log: { traces: [{ case_id: "L1", events: [{ activity: "A", timestamp: "2024-01-01T00:00:00Z", resource: "", lifecycle: "", input_order: 0 }] }] } };
     expect(isCaseRelationsResult(valid)).toBe(true);
     expect(isCaseRelationsResult({ ...valid, log: { traces: [{ ...valid.log.traces[0], events: [{ ...valid.log.traces[0].events[0], input_order: 0.5 }] }] } })).toBe(false);
@@ -697,6 +700,14 @@ describe("file routing", () => {
     expect(delimiterForFile("LOG.TSV")).toBe("\t");
     expect(delimiterForFile("log.csv")).toBeUndefined();
     expect(delimiterForFile("log")).toBeUndefined();
+  });
+
+  it("recognizes classic and standard object-centric JSON envelopes", () => {
+    expect(isOcelJsonDocument({ "ocel:events": {}, "ocel:objects": {} })).toBe(true);
+    expect(isOcelJsonDocument({ events: [], objects: [] })).toBe(true);
+    expect(isOcelJsonDocument({ "ocel:events": {}, objects: [] })).toBe(false);
+    expect(isOcelJsonDocument({ events: null, objects: [] })).toBe(false);
+    expect(isOcelJsonDocument([])).toBe(false);
   });
 });
 

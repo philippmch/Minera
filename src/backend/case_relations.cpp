@@ -82,6 +82,20 @@ struct TaggedEvent {
   std::size_t sequence = 0;
 };
 
+const std::string* trace_case_value(const Trace& trace,
+                                    const std::string& key) {
+  if (key == "case_id" || key == "case:concept:name" ||
+      key == "concept:name") {
+    return &trace.case_id;
+  }
+  if (const auto* value = trace.attribute(key)) return value;
+  // CSV case columns are stored without their `case:` prefix, while XES
+  // trace attributes retain their original key.  Accept both spellings.
+  if (key.rfind("case:", 0) == 0)
+    return trace.attribute(std::string_view(key).substr(5));
+  return nullptr;
+}
+
 }  // namespace
 
 std::vector<CaseRelation> parse_case_relations_csv(std::istream& input,
@@ -134,6 +148,12 @@ EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
     throw std::invalid_argument("case relations variant must be pandas");
   if (options.timestamp_key.empty())
     throw std::invalid_argument("case relations: timestamp key must not be empty");
+  if (options.case_id_key.empty())
+    throw std::invalid_argument("case relations: case id key must not be empty");
+  if (options.left_suffix.empty() || options.right_suffix.empty() ||
+      options.left_suffix == options.right_suffix)
+    throw std::invalid_argument(
+        "case relations: relation suffixes must be non-empty and differ");
 
   std::unordered_map<std::string, std::vector<std::string>> targets;
   for (const auto& relation : relations) {
@@ -148,22 +168,30 @@ EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
   };
   std::map<std::string, OutputTrace> grouped;
   std::size_t sequence = 0;
+  const auto case_value = [&](const Trace& source) -> std::string {
+    const auto* value = trace_case_value(source, options.case_id_key);
+    if (!value || value->empty())
+      throw std::invalid_argument("case relations: trace is missing case id key " +
+                                  options.case_id_key);
+    return *value;
+  };
   const auto add_base = [&](const Trace& source) {
-    auto& out = grouped[source.case_id];
+    const auto selected_case_id = case_value(source);
+    auto& out = grouped[selected_case_id];
     if (out.trace.case_id.empty()) {
-      out.trace.case_id = source.case_id;
+      out.trace.case_id = selected_case_id;
       out.trace.attributes = source.attributes;
     }
     for (const auto& source_event : source.events) {
       Event event = source_event;
-      event.case_id = source.case_id;
+      event.case_id = selected_case_id;
       out.events.push_back({std::move(event), sequence++});
     }
   };
   for (const auto& trace : base.traces) add_base(trace);
 
   for (const auto& source : incoming.traces) {
-    const auto target_it = targets.find(source.case_id);
+    const auto target_it = targets.find(case_value(source));
     if (target_it == targets.end()) continue;
     for (const auto& left_case_id : target_it->second) {
       auto& out = grouped[left_case_id];

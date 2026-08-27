@@ -4315,6 +4315,9 @@ export async function requestIntervalTree(options: IntervalTreeOptions = {}): Pr
 export interface CaseRelationsOptions {
   merge_variant?: "pandas";
   merge_timestamp_key?: string;
+  merge_case_id_key?: string;
+  merge_left_suffix?: string;
+  merge_right_suffix?: string;
   merge_left_column?: string;
   merge_right_column?: string;
 }
@@ -4322,9 +4325,21 @@ export interface CaseRelationsOptions {
 export function caseRelationsQuery(options: CaseRelationsOptions = {}): string {
   const query = new URLSearchParams();
   if (options.merge_variant !== undefined) query.set("merge_variant", options.merge_variant);
-  if (options.merge_timestamp_key !== undefined) query.set("merge_timestamp_key", options.merge_timestamp_key);
-  if (options.merge_left_column !== undefined) query.set("merge_left_column", options.merge_left_column);
-  if (options.merge_right_column !== undefined) query.set("merge_right_column", options.merge_right_column);
+  const strings: Array<[keyof CaseRelationsOptions, string]> = [
+    ["merge_timestamp_key", "merge_timestamp_key"],
+    ["merge_case_id_key", "merge_case_id_key"],
+    ["merge_left_suffix", "merge_left_suffix"],
+    ["merge_right_suffix", "merge_right_suffix"],
+    ["merge_left_column", "merge_left_column"],
+    ["merge_right_column", "merge_right_column"],
+  ];
+  for (const [property, key] of strings) {
+    const value = options[property];
+    if (value === undefined) continue;
+    if (typeof value !== "string" || value.length === 0)
+      throw new Error(`${key} must be a non-empty string`);
+    query.set(key, value);
+  }
   return query.toString();
 }
 

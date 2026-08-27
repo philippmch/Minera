@@ -16,7 +16,7 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
         <h1 className="landing-title reveal">Minera</h1>
         <p className="landing-tagline reveal">process intelligence</p>
         <p className="landing-lede reveal">
-          Local process mining for CSV and XES event logs.
+          Local process mining for CSV/XES event logs and object-centric JSON.
         </p>
 
         <label className={mining ? "landing-drop mining" : "landing-drop"}>
@@ -67,7 +67,8 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
         </div>
 
         <p className="landing-note reveal">
-          JSON exports from the <code>minera_export</code> CLI open here too.
+          JSON exports from the <code>minera_export</code> CLI and standard OCEL
+          files open here too.
         </p>
       </div>
     </div>

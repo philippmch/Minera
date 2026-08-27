@@ -729,9 +729,15 @@ void interval_tree_params_contract() {
 
 void case_relations_params_contract() {
   const auto p = minera::parse_case_relations_params(
-      fields({{"merge_variant", "pandas"}, {"merge_timestamp_key", "completed_at"}}));
+      fields({{"merge_variant", "pandas"},
+              {"merge_timestamp_key", "completed_at"},
+              {"merge_case_id_key", "case:order_id"},
+              {"merge_left_suffix", "__left"},
+              {"merge_right_suffix", "__right"}}));
   assert(p.variant == minera::CaseRelationsVariant::kPandas);
   assert(p.timestamp_key == "completed_at");
+  assert(p.case_id_key == "case:order_id");
+  assert(p.left_suffix == "__left" && p.right_suffix == "__right");
   bool threw = false;
   try {
     (void)minera::parse_case_relations_params(

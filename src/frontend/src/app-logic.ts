@@ -215,6 +215,17 @@ export function isJsonExport(name: string): boolean {
   return /\.json$/i.test(name);
 }
 
+/** Whether a JSON document carries either supported object-centric envelope. */
+export function isOcelJsonDocument(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const hasPair = (events: string, objects: string) =>
+    record[events] !== null && typeof record[events] === "object" &&
+    record[objects] !== null && typeof record[objects] === "object";
+  return hasPair("ocel:events", "ocel:objects") ||
+    hasPair("events", "objects");
+}
+
 /**
  * Field delimiter implied by a file's name: a tab for ".tsv" uploads, otherwise
  * undefined so the backend applies its default (comma).
