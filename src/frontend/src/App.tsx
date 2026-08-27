@@ -20,6 +20,7 @@ import {
   type Decisions,
   type EventAttributeStat,
   type MineraExport,
+  type OcelDiscoveryResult,
   isMineraExport,
   numberFormat,
 } from "./types";
@@ -44,6 +45,7 @@ import { EventuallyFollows } from "./components/EventuallyFollows";
 import { DfgVariants } from "./components/DfgVariants";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
+import { OcdfgModel } from "./components/OcdfgModel";
 import {
   alignModel,
   alignDfg,
@@ -71,6 +73,7 @@ import {
   checkModel,
   decideModel,
   mineCsv,
+  requestOcelDiscovery,
   type FilterOptions,
   type MinerOptions,
 } from "./api";
@@ -80,6 +83,7 @@ import {
   hasActiveMinerOptions,
   initialTab,
   isJsonExport,
+  isOcelJsonDocument,
   logLifecycles,
   maxEdgeCount,
   type Tab,
@@ -87,6 +91,8 @@ import {
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
+  const [ocdfgResult, setOcdfgResult] = useState<OcelDiscoveryResult | null>(null);
+  const [ocelDataset, setOcelDataset] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fontsReady, setFontsReady] = useState(false);
   const [threshold, setThreshold] = useState(1);
@@ -272,6 +278,8 @@ export default function App() {
   const openData = (parsed: MineraExport) => {
     cacheGeneration.current += 1;
     setData(parsed);
+    setOcdfgResult(null);
+    setOcelDataset(null);
     alignCache.current = {};
     decideCache.current = {};
     dfgCache.current = {};
@@ -294,13 +302,26 @@ export default function App() {
   const loadFile = (file: File) => {
     setMining(true);
     (async () => {
-      // JSON files are pre-mined exports and open directly; anything else
-      // is a raw CSV event log, uploaded to the local backend for mining.
+      // Minera JSON exports open directly; object-centric JSON is discovered
+      // through the local backend, and other files are mined as event logs.
       if (isJsonExport(file.name)) {
         const parsed: unknown = JSON.parse(await file.text());
-        if (!isMineraExport(parsed)) throw new Error("not a Minera export");
-        setSource(null);
-        openData(parsed);
+        if (isMineraExport(parsed)) {
+          setSource(null);
+          openData(parsed);
+        } else {
+          if (!isOcelJsonDocument(parsed)) {
+            throw new Error("not a supported JSON export");
+          }
+          const result = await requestOcelDiscovery(file, { variant: "ocdfg" });
+          cacheGeneration.current += 1;
+          setData(null);
+          setOcdfgResult(result);
+          setOcelDataset(file.name);
+          setSource(null);
+          setFiltersActive(false);
+          setError(null);
+        }
       } else {
         const delimiter = delimiterForFile(file.name);
         const result = await mineCsv(file, { delimiter });
@@ -464,6 +485,36 @@ export default function App() {
     [data, selectedVariant],
   );
 
+  if (!data && ocdfgResult) {
+    return (
+      <>
+        <TopBar
+          dataset={ocelDataset ?? "object-centric log"}
+          datasetKind="object-centric"
+          onOpenFile={loadFile}
+          onHome={() => {
+            cacheGeneration.current += 1;
+            setData(null);
+            setOcdfgResult(null);
+            setOcelDataset(null);
+            setError(null);
+            setSource(null);
+          }}
+        />
+        {error && <div className="error-banner">{error}</div>}
+        <main className="layout-log">
+          <OcdfgModel result={ocdfgResult} />
+        </main>
+        <footer className="footer reveal">
+          <span>{ocelDataset ?? "object-centric log"} · object-centric graph</span>
+        </footer>
+        <div className={dragging ? "dropveil active" : "dropveil"}>
+          <div className="dropveil-card">Drop a Minera JSON export</div>
+        </div>
+      </>
+    );
+  }
+
   if (!data || !layout) {
     return (
       <>
@@ -491,6 +542,8 @@ export default function App() {
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);
+          setOcdfgResult(null);
+          setOcelDataset(null);
           setError(null);
           setSource(null);
           setFiltersActive(false);

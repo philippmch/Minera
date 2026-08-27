@@ -562,7 +562,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, including empty types and declared attributes without observed values, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite persists the exact declared schemas alongside inferred type-table columns, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, exact admitted-variant selection (including empty variants and polarity) plus exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path filtering with custom activity/timestamp attribute selectors and inclusive performance bounds, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters through native, CLI, server, and frontend export surfaces, and complete native/CLI/server/frontend OCEL filters; OCEL adapter query values now preserve nested delimiters and typed scalar overflow is rejected under a bounded recursive level; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, numeric/date KDE, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, numeric/date attribute KDE grids, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
-| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations; several model families and render backends remain |
+| Visualization | Petri/DFG/tree/BPMN/heuristics/footprints/SNA/transition system/POWL/declarative/OCEL, decorations and render backends | **Partial** — interactive native UI includes statistical/causal/correlation DFG results, performance spectra, batch diagnostics, recursive POWL, footprint variants/diagnostics, Declare, log-skeleton, converted workflow nets and decorations, plus a bounded deterministic SVG view for classic object-centric directly-follows graphs; several model families and render backends remain |
 | Streaming | CSV/XES event/trace streams, streaming DFG, online Declare/footprints/token/temporal conformance, classic/thread-safe/Redis stores | **Partial** — restartable CSV/XES event and trace readers, live bounded worker-pool streams, incremental DFG, a file-backed restartable streaming DFG store, deterministic classic and mutex-protected dictionaries, a bounded RESP remote dictionary, Declare, footprints, token, and temporal conformance are present; richer distributed lifecycle orchestration remains |
 | Decision mining | decision-tree extraction, encoded decision tables, data Petri nets | **Partial** — decision trees/rules with bounded depth/split/leaf/candidate/gain controls and selected context attributes, deterministic encoded numeric/one-hot tables with bounded pre-choice lookback, and guarded data-Petri-net JSON/CLI/server/frontend surfaces are present; clean variants use exact replay while deviating variants now use optimal-alignment model choices with replay/alignment/failure diagnostics; richer classifier backends and columnar training integrations remain |
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
@@ -967,16 +967,30 @@ and timestamp controls. Frontend upload/query helpers validate the textual
 and tuple shapes, including timestamp-disabled tuples and malformed duration
 fields.
 
+## Object-centric directly-follows visualization evidence
+
+Opening a standard object-centric JSON file now discovers its classic
+directly-follows projection through the local endpoint and presents a bounded,
+deterministic SVG view. The view aggregates activity and flow metrics across
+object types, supports event/object-count and performance projections,
+thresholds, rank direction, finite-sample aggregation, annotations, and
+cycle-safe return edges. Geometry is pure and capped at 80 activities and 240
+flows, so large or malformed metric payloads cannot start an unbounded layout
+or produce non-finite SVG coordinates.
+
 ## Case-relations merging evidence
 
 The case-relations variation preserves the base log, inserts only incoming
 events with a declared right-case relation, rewrites those events to the left
 case, preserves duplicate relation rows, supports new left cases, and sorts
 each resulting case deterministically by a configured timestamp attribute.
-Malformed relation headers/rows, empty identifiers, missing timestamps, and
-invalid timestamps are rejected. The result is exposed as recursive JSON,
-strict CLI flags, a multipart local-server endpoint, and a frontend upload
-adapter with runtime response validation.
+The case identifier can target the canonical trace id or a trace-level
+attribute, and relation-column defaults are derived from configurable left and
+right suffixes; explicit relation-column selectors still take precedence.
+Malformed relation headers/rows, empty identifiers/suffixes, missing selected
+case ids, missing timestamps, and invalid timestamps are rejected. The result
+is exposed as recursive JSON, strict CLI/server/frontend controls, and a
+multipart local-server endpoint with runtime response validation.
 
 ## Basic random-tree generation evidence
 

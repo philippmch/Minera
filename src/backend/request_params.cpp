@@ -3358,6 +3358,12 @@ CaseRelationsParams parse_case_relations_params(const FieldLookup& field,
   }
   if (supplied("merge_timestamp_key"))
     params.timestamp_key = require("merge_timestamp_key");
+  if (supplied("merge_case_id_key"))
+    params.case_id_key = require("merge_case_id_key");
+  if (supplied("merge_left_suffix"))
+    params.left_suffix = require("merge_left_suffix");
+  if (supplied("merge_right_suffix"))
+    params.right_suffix = require("merge_right_suffix");
   return params;
 }
 

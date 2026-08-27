@@ -658,6 +658,9 @@ int usage(const char* program) {
                "  --merge-case-relations <file> Merge incoming CSV/XES log\n"
                "  --case-relations <file>       Relation CSV for merge\n"
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
+               "  --merge-case-id-key <name>   Case id/trace attribute selector\n"
+               "  --merge-left-suffix <text>    Relation left-column suffix\n"
+               "  --merge-right-suffix <text>   Relation right-column suffix\n"
                "  --merge-variant <id>          pandas (default)\n"
                "  --merge-left-column <name>    Relation left-case column\n"
                "  --merge-right-column <name>   Relation right-case column\n"
@@ -2496,7 +2499,9 @@ int main(int argc, char** argv) {
       merge_requested = true;
       continue;
     }
-    if (arg == "--merge-variant" || arg == "--merge-timestamp-key" || arg == "--merge-left-column" ||
+    if (arg == "--merge-variant" || arg == "--merge-timestamp-key" ||
+        arg == "--merge-case-id-key" || arg == "--merge-left-suffix" ||
+        arg == "--merge-right-suffix" || arg == "--merge-left-column" ||
         arg == "--merge-right-column") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4477,10 +4482,10 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_case_relations_params(lookup, present);
       const auto left = merge_fields.contains("merge_left_column")
                             ? merge_fields.at("merge_left_column")
-                            : std::string("case_id_LEFT");
+                            : params.case_id_key + params.left_suffix;
       const auto right = merge_fields.contains("merge_right_column")
                              ? merge_fields.at("merge_right_column")
-                             : std::string("case_id_RIGHT");
+                             : params.case_id_key + params.right_suffix;
       const auto relations = minera::parse_case_relations_csv(
           relation_input, left, right);
       std::cout << minera::case_relations_json(

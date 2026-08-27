@@ -1,11 +1,12 @@
 interface TopBarProps {
   dataset: string;
   generator?: string;
+  datasetKind?: string;
   onOpenFile: (file: File) => void;
   onHome: () => void;
 }
 
-export function TopBar({ dataset, generator, onOpenFile, onHome }: TopBarProps) {
+export function TopBar({ dataset, generator, datasetKind = "event log", onOpenFile, onHome }: TopBarProps) {
   return (
     <header className="topbar reveal">
       <button className="brand" onClick={onHome} title="Back to start">
@@ -17,7 +18,7 @@ export function TopBar({ dataset, generator, onOpenFile, onHome }: TopBarProps) 
         <span className="brand-tagline">process intelligence</span>
       </button>
       <div className="dataset">
-        <span className="dataset-label">event log</span>
+        <span className="dataset-label">{datasetKind}</span>
         <span className="dataset-name">{dataset}</span>
         {generator && <span className="dataset-generator">· {generator}</span>}
       </div>

@@ -101,6 +101,49 @@ void rejects_invalid_timestamps() {
   assert(threw);
 }
 
+void supports_custom_case_key_and_suffixes() {
+  auto base = base_log();
+  base.traces[0].case_id = "base-raw";
+  base.traces[0].attributes.push_back(
+      {"order_id", "L1", AttributeKind::kString});
+  for (auto& source_event : base.traces[0].events)
+    source_event.case_id = base.traces[0].case_id;
+
+  auto incoming = incoming_log();
+  incoming.traces[0].case_id = "incoming-raw";
+  incoming.traces[0].attributes.push_back(
+      {"order_id", "R1", AttributeKind::kString});
+  for (auto& source_event : incoming.traces[0].events)
+    source_event.case_id = incoming.traces[0].case_id;
+
+  CaseRelationsOptions options;
+  options.case_id_key = "order_id";
+  options.left_suffix = "__left";
+  options.right_suffix = "__right";
+  const auto merged = merge_case_relations(
+      base, incoming, {{"L1", "R1"}}, options);
+  assert(merged.traces.size() == 1 && merged.traces[0].case_id == "L1");
+  assert(merged.traces[0].events.size() == 3);
+
+  auto missing = incoming;
+  missing.traces[0].attributes.clear();
+  bool threw = false;
+  try {
+    (void)merge_case_relations(base, missing, {{"L1", "R1"}}, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  options.right_suffix = options.left_suffix;
+  threw = false;
+  try {
+    (void)merge_case_relations(base, incoming, {{"L1", "R1"}}, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void json_shape_is_stable() {
   const auto merged = merge_case_relations(base_log(), incoming_log(),
                                            {{"L1", "R1"}});
@@ -117,5 +160,6 @@ int main() {
   merges_and_drops();
   parses_relations_and_custom_timestamps();
   rejects_invalid_timestamps();
+  supports_custom_case_key_and_suffixes();
   json_shape_is_stable();
 }
