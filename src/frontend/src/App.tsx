@@ -21,6 +21,7 @@ import {
   type EventAttributeStat,
   type MineraExport,
   type OcelDiscoveryResult,
+  type OcelDiscoveryVariant,
   isMineraExport,
   numberFormat,
 } from "./types";
@@ -45,7 +46,7 @@ import { EventuallyFollows } from "./components/EventuallyFollows";
 import { DfgVariants } from "./components/DfgVariants";
 import { CorrelationMining } from "./components/CorrelationMining";
 import { Filters } from "./components/Filters";
-import { OcdfgModel } from "./components/OcdfgModel";
+import { OcelExplorer } from "./components/OcelExplorer";
 import {
   alignModel,
   alignDfg,
@@ -91,7 +92,8 @@ import {
 
 export default function App() {
   const [data, setData] = useState<MineraExport | null>(null);
-  const [ocdfgResult, setOcdfgResult] = useState<OcelDiscoveryResult | null>(null);
+  const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
+  const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fontsReady, setFontsReady] = useState(false);
@@ -278,7 +280,8 @@ export default function App() {
   const openData = (parsed: MineraExport) => {
     cacheGeneration.current += 1;
     setData(parsed);
-    setOcdfgResult(null);
+    setOcelResult(null);
+    setOcelFile(null);
     setOcelDataset(null);
     alignCache.current = {};
     decideCache.current = {};
@@ -299,6 +302,21 @@ export default function App() {
     setTab(initialTab(parsed));
   };
 
+  // Object-centric uploads stay available so the graph projection can be
+  // switched without asking the user to upload the same file again.
+  const changeOcelVariant = useCallback((variant: OcelDiscoveryVariant) => {
+    if (!ocelFile) return;
+    setMining(true);
+    requestOcelDiscovery(ocelFile, { variant })
+      .then((result) => {
+        cacheGeneration.current += 1;
+        setOcelResult(result);
+        setError(null);
+      })
+      .catch((cause: Error) => setError(`Could not discover ${variant}: ${cause.message}`))
+      .finally(() => setMining(false));
+  }, [ocelFile]);
+
   const loadFile = (file: File) => {
     setMining(true);
     (async () => {
@@ -316,7 +334,8 @@ export default function App() {
           const result = await requestOcelDiscovery(file, { variant: "ocdfg" });
           cacheGeneration.current += 1;
           setData(null);
-          setOcdfgResult(result);
+          setOcelResult(result);
+          setOcelFile(file);
           setOcelDataset(file.name);
           setSource(null);
           setFiltersActive(false);
@@ -485,7 +504,7 @@ export default function App() {
     [data, selectedVariant],
   );
 
-  if (!data && ocdfgResult) {
+  if (!data && ocelResult) {
     return (
       <>
         <TopBar
@@ -495,7 +514,8 @@ export default function App() {
           onHome={() => {
             cacheGeneration.current += 1;
             setData(null);
-            setOcdfgResult(null);
+            setOcelResult(null);
+            setOcelFile(null);
             setOcelDataset(null);
             setError(null);
             setSource(null);
@@ -503,7 +523,11 @@ export default function App() {
         />
         {error && <div className="error-banner">{error}</div>}
         <main className="layout-log">
-          <OcdfgModel result={ocdfgResult} />
+          <OcelExplorer
+            result={ocelResult}
+            busy={mining}
+            onVariantChange={changeOcelVariant}
+          />
         </main>
         <footer className="footer reveal">
           <span>{ocelDataset ?? "object-centric log"} · object-centric graph</span>
@@ -542,7 +566,8 @@ export default function App() {
         onHome={() => {
           cacheGeneration.current += 1;
           setData(null);
-          setOcdfgResult(null);
+          setOcelResult(null);
+          setOcelFile(null);
           setOcelDataset(null);
           setError(null);
           setSource(null);

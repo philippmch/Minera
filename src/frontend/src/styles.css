@@ -502,6 +502,19 @@ body {
 
 .map-panel { padding-right: 24px; }
 
+.ocel-view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+.ocel-view-toolbar select {
+  max-width: min(100%, 280px);
+}
+
 .map-controls {
   margin-left: auto;
   display: flex;
