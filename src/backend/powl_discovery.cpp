@@ -6,6 +6,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -766,22 +767,48 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
 }
 
 std::vector<std::vector<std::vector<std::size_t>>> enumerate_partitions(std::size_t n, std::size_t k) {
-  std::vector<std::vector<std::vector<std::size_t>>> result;
-  std::vector<std::size_t> assignment(n, 0);
-  std::function<void(std::size_t, std::size_t)> rec = [&](std::size_t pos, std::size_t used) {
-    if (pos == n) {
-      if (used == k) {
-        std::vector<std::vector<std::size_t>> blocks(k);
-        for (std::size_t i = 0; i < n; ++i) blocks[assignment[i]].push_back(i);
-        result.push_back(std::move(blocks));
-      }
-      return;
-    }
-    const std::size_t limit = std::min(used + 1, k);
-    for (std::size_t g = 0; g < limit; ++g) { assignment[pos] = g; rec(pos + 1, std::max(used, g + 1)); }
-  };
-  if (n) rec(1, 1);
-  return result;
+  using Partition = std::vector<std::vector<std::size_t>>;
+  using Nodes = std::vector<std::size_t>;
+
+  // Generate set partitions in the stable first-element order used by the
+  // discovery cut. Each recursive step either keeps the first element as a
+  // singleton block or inserts it into each existing block from left to
+  // right. The block order is observable in serialized models.
+  std::function<std::vector<Partition>(const Nodes&, std::size_t)> generate =
+      [&](const Nodes& nodes, std::size_t groups) {
+        std::vector<Partition> result;
+        if (groups == 0 || nodes.empty() || groups > nodes.size()) return result;
+        if (groups == 1) {
+          result.push_back({nodes});
+          return result;
+        }
+        if (nodes.size() == groups) {
+          Partition singletons;
+          singletons.reserve(groups);
+          for (const auto node : nodes) singletons.push_back({node});
+          result.push_back(std::move(singletons));
+          return result;
+        }
+
+        const auto first = nodes.front();
+        Nodes remainder(nodes.begin() + 1, nodes.end());
+        for (auto partition : generate(remainder, groups - 1)) {
+          partition.insert(partition.begin(), {first});
+          result.push_back(std::move(partition));
+        }
+        for (auto partition : generate(remainder, groups)) {
+          for (std::size_t block = 0; block < partition.size(); ++block) {
+            auto with_first = partition;
+            with_first[block].insert(with_first[block].begin(), first);
+            result.push_back(std::move(with_first));
+          }
+        }
+        return result;
+      };
+
+  Nodes nodes(n);
+  std::iota(nodes.begin(), nodes.end(), 0);
+  return generate(nodes, k);
 }
 
 struct BlockRelation {
@@ -1085,16 +1112,32 @@ std::optional<PowlNode> make_po(const UVCL& log, State& s) {
   } else if (s.opts.variant == PowlDiscoveryVariant::kMaximal) {
     // Maximal groups are based only on the one-way relation, never on raw
     // bidirectional EFG neighbourhoods.
-    std::map<std::pair<std::set<std::string>, std::set<std::string>>, std::vector<std::size_t>> m;
+    struct Neighborhood {
+      std::set<std::string> predecessors;
+      std::set<std::string> successors;
+      std::vector<std::size_t> members;
+    };
+    std::vector<Neighborhood> neighborhoods;
     for (std::size_t i = 0; i < n; ++i) {
       std::set<std::string> pre, suc;
       for (const auto& a : r.acts) if (a != r.acts[i]) {
         if (has(r.efg, a, r.acts[i]) && !has(r.efg, r.acts[i], a)) pre.insert(a);
         if (has(r.efg, r.acts[i], a) && !has(r.efg, a, r.acts[i])) suc.insert(a);
       }
-      m[{pre, suc}].push_back(i);
+      const auto found = std::find_if(
+          neighborhoods.begin(), neighborhoods.end(),
+          [&](const auto& neighborhood) {
+            return neighborhood.predecessors == pre &&
+                   neighborhood.successors == suc;
+          });
+      if (found == neighborhoods.end()) {
+        neighborhoods.push_back({std::move(pre), std::move(suc), {i}});
+      } else {
+        found->members.push_back(i);
+      }
     }
-    for (auto& [key, b] : m) { (void)key; groups.push_back(std::move(b)); }
+    for (auto& neighborhood : neighborhoods)
+      groups.push_back(std::move(neighborhood.members));
     if (!valid_partition(r, groups)) groups.clear();
   } else {
     const bool weighted = s.opts.variant == PowlDiscoveryVariant::kDynamicClustering;

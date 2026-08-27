@@ -486,6 +486,117 @@ void petri_to_powl_round_trips_structured_nets() {
   assert(rejected_sink_escape);
 }
 
+void workflow_boundaries_are_inferred_and_normalized() {
+  // A net assembled by a caller that does not carry boundary metadata still
+  // has an unambiguous structural source and sink. The conversion must not
+  // write those inferred values back into the caller's object.
+  minera::PetriNet inferred;
+  const auto source = inferred.add_place();
+  const auto middle = inferred.add_place();
+  const auto sink = inferred.add_place();
+  inferred.set_activities({"A", "B"});
+  inferred.add_transition(0, {source}, {middle});
+  inferred.add_transition(1, {middle}, {sink});
+  const auto recovered = minera::to_powl(inferred);
+  assert(recovered.kind() == minera::PowlNodeKind::kStrictPartialOrder);
+  assert(recovered.children().size() == 2);
+  assert(recovered.has_edge(0, 1));
+  assert(inferred.source() == 0 && inferred.sink() == 0);
+
+  // Locally duplicate places are treated as one incidence boundary. This is
+  // common in imported nets where an equivalent place was retained by a
+  // serializer, and must not create a spurious partial-order branch.
+  minera::PetriNet duplicate_places;
+  const auto duplicate_source = duplicate_places.add_place();
+  const auto first = duplicate_places.add_place();
+  const auto second = duplicate_places.add_place();
+  const auto duplicate_sink = duplicate_places.add_place();
+  duplicate_places.set_activities({"A", "B"});
+  duplicate_places.add_transition(0, {duplicate_source}, {first, second});
+  duplicate_places.add_transition(1, {first, second}, {duplicate_sink});
+  const auto duplicate_model = minera::to_powl(duplicate_places);
+  assert(duplicate_model.kind() == minera::PowlNodeKind::kStrictPartialOrder);
+  assert(duplicate_model.children().size() == 2);
+  assert(duplicate_model.has_edge(0, 1));
+
+  // Silent entry/exit wrappers are routing details, not POWL activities.
+  minera::PetriNet wrapped;
+  const auto wrapped_source = wrapped.add_place();
+  const auto wrapped_entry = wrapped.add_place();
+  const auto wrapped_exit = wrapped.add_place();
+  const auto wrapped_sink = wrapped.add_place();
+  wrapped.set_activities({"A"});
+  wrapped.add_transition(std::nullopt, {wrapped_source}, {wrapped_entry});
+  wrapped.add_transition(0, {wrapped_entry}, {wrapped_exit});
+  wrapped.add_transition(std::nullopt, {wrapped_exit}, {wrapped_sink});
+  const auto wrapped_model = minera::to_powl(wrapped);
+  assert(wrapped_model == PowlNode::transition("A"));
+
+  bool rejected_multiple_sources = false;
+  try {
+    minera::PetriNet ambiguous;
+    const auto first_source = ambiguous.add_place();
+    const auto second_source = ambiguous.add_place();
+    const auto end = ambiguous.add_place();
+    ambiguous.set_activities({"A", "B"});
+    ambiguous.add_transition(0, {first_source}, {end});
+    ambiguous.add_transition(1, {second_source}, {end});
+    (void)minera::to_powl(ambiguous);
+  } catch (const std::invalid_argument&) {
+    rejected_multiple_sources = true;
+  }
+  assert(rejected_multiple_sources);
+
+  bool rejected_multiple_sinks = false;
+  try {
+    minera::PetriNet ambiguous;
+    const auto begin = ambiguous.add_place();
+    const auto first_sink = ambiguous.add_place();
+    const auto second_sink = ambiguous.add_place();
+    ambiguous.set_activities({"A", "B"});
+    ambiguous.add_transition(0, {begin}, {first_sink});
+    ambiguous.add_transition(1, {begin}, {second_sink});
+    (void)minera::to_powl(ambiguous);
+  } catch (const std::invalid_argument&) {
+    rejected_multiple_sinks = true;
+  }
+  assert(rejected_multiple_sinks);
+
+  // Explicitly malformed boundary metadata must not be mistaken for the
+  // unset default. Structural inference is reserved for nets that assign
+  // neither boundary.
+  bool rejected_equal_metadata = false;
+  try {
+    minera::PetriNet malformed;
+    const auto begin = malformed.add_place();
+    const auto middle = malformed.add_place();
+    const auto end = malformed.add_place();
+    malformed.set_activities({"A", "B"});
+    malformed.add_transition(0, {begin}, {middle});
+    malformed.add_transition(1, {middle}, {end});
+    malformed.set_source(middle);
+    malformed.set_sink(middle);
+    (void)minera::to_powl(malformed);
+  } catch (const std::invalid_argument&) {
+    rejected_equal_metadata = true;
+  }
+  assert(rejected_equal_metadata);
+
+  bool rejected_partial_metadata = false;
+  try {
+    minera::PetriNet malformed;
+    const auto begin = malformed.add_place();
+    const auto end = malformed.add_place();
+    malformed.set_activities({"A"});
+    malformed.add_transition(0, {begin}, {end});
+    malformed.set_source(begin);
+    (void)minera::to_powl(malformed);
+  } catch (const std::invalid_argument&) {
+    rejected_partial_metadata = true;
+  }
+  assert(rejected_partial_metadata);
+}
+
 }  // namespace
 
 int main() {
@@ -495,5 +606,6 @@ int main() {
   workflow_net_to_process_tree_is_strict();
   powl_ptml_uses_strict_workflow_semantics();
   petri_to_powl_round_trips_structured_nets();
+  workflow_boundaries_are_inferred_and_normalized();
   std::cout << "POWL conversion tests passed\n";
 }

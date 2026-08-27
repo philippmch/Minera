@@ -552,25 +552,15 @@ class PetriToPowlBuilder {
     IdSet transitions;
   };
 
- public:
-  explicit PetriToPowlBuilder(const PetriNet& net) : net_(net) {
-    place_out_.resize(net_.place_count());
-    for (std::size_t index = 0; index < net_.transitions().size(); ++index) {
-      const auto& transition = net_.transitions()[index];
-      transition_inputs_.push_back(to_set(transition.inputs));
-      transition_outputs_.push_back(to_set(transition.outputs));
-      for (const auto place : transition.inputs) {
-        if (place < place_out_.size()) place_out_[place].push_back(index);
-      }
-    }
-    for (auto& transitions : place_out_) {
-      std::sort(transitions.begin(), transitions.end());
-      transitions.erase(std::unique(transitions.begin(), transitions.end()),
-                        transitions.end());
-    }
-  }
+  struct Boundary {
+    std::size_t source = 0;
+    std::size_t sink = 0;
+  };
 
-  PowlNode run() const {
+ public:
+  explicit PetriToPowlBuilder(const PetriNet& net) : net_(net) {}
+
+  PowlNode run() {
     if (net_.has_extended_arcs()) {
       throw std::invalid_argument(
           "workflow-net to POWL conversion requires ordinary arcs");
@@ -587,12 +577,13 @@ class PetriToPowlBuilder {
     }
 
     const auto boundary = validate_boundaries();
+    initialize_topology(boundary);
 
     IdSet transitions;
     for (std::size_t index = 0; index < net_.transitions().size(); ++index)
       transitions.insert(index);
-    return convert(Fragment{{boundary.first},
-                            {boundary.second},
+    return convert(Fragment{{canonical_place(boundary.source)},
+                            {canonical_place(boundary.sink)},
                             std::move(transitions)});
   }
 
@@ -601,14 +592,11 @@ class PetriToPowlBuilder {
   std::vector<IdSet> transition_inputs_;
   std::vector<IdSet> transition_outputs_;
   std::vector<std::vector<std::size_t>> place_out_;
+  std::vector<std::size_t> place_alias_;
 
-  static IdSet to_set(const std::vector<std::size_t>& values) {
-    return IdSet(values.begin(), values.end());
-  }
-
-  static bool equal(const std::vector<std::size_t>& values,
-                    const IdSet& expected) {
-    return to_set(values) == expected;
+  std::size_t canonical_place(std::size_t place) const {
+    if (place >= place_alias_.size()) return place;
+    return place_alias_[place];
   }
 
   static bool subset(const IdSet& values, const IdSet& containing) {
@@ -627,15 +615,25 @@ class PetriToPowlBuilder {
     return false;
   }
 
-  std::pair<std::size_t, std::size_t> validate_boundaries() const {
-    const auto source = net_.source();
-    const auto sink = net_.sink();
-    if (source >= net_.place_count() || sink >= net_.place_count() ||
-        source == sink) {
-      throw std::invalid_argument(
-          "workflow-net conversion requires distinct source and sink places");
+  PetriNet copy_with_boundaries(const Boundary& boundary) const {
+    PetriNet copy;
+    copy.set_activities(net_.activities());
+    for (std::size_t place = 0; place < net_.place_count(); ++place)
+      (void)copy.add_place();
+    copy.set_source(boundary.source);
+    copy.set_sink(boundary.sink);
+    for (const auto& transition : net_.transitions()) {
+      const auto index = copy.add_transition(
+          transition.activity, transition.inputs, transition.outputs);
+      for (const auto place : transition.reset_inputs)
+        copy.add_reset_arc(index, place);
+      for (const auto place : transition.inhibitor_inputs)
+        copy.add_inhibitor_arc(index, place);
     }
+    return copy;
+  }
 
+  Boundary validate_boundaries() const {
     const std::size_t node_count =
         net_.place_count() + net_.transitions().size();
     std::vector<std::vector<std::size_t>> outgoing(node_count);
@@ -667,19 +665,60 @@ class PetriToPowlBuilder {
       }
     }
 
+    // PetriNet keeps source and sink as lightweight metadata with a zero
+    // value before either boundary is assigned. In that state, recover the
+    // workflow boundaries from the ordinary incidence graph. A workflow net
+    // has exactly one place without a producer and one without a consumer;
+    // accepting more than one would make the conversion dependent on place
+    // insertion order.
+    const bool infer_boundaries = !net_.has_source() && !net_.has_sink();
+    if (!infer_boundaries && net_.has_source() != net_.has_sink()) {
+      throw std::invalid_argument(
+          "workflow-net conversion requires both source and sink metadata");
+    }
+    std::vector<std::size_t> structural_sources;
+    std::vector<std::size_t> structural_sinks;
+    for (std::size_t place = 0; place < net_.place_count(); ++place) {
+      if (incoming[place].empty()) structural_sources.push_back(place);
+      if (outgoing[place].empty()) structural_sinks.push_back(place);
+    }
+
+    Boundary boundary;
+    if (infer_boundaries) {
+      if (structural_sources.size() != 1) {
+        throw std::invalid_argument(
+            "workflow-net conversion requires a unique structural source place");
+      }
+      if (structural_sinks.size() != 1) {
+        throw std::invalid_argument(
+            "workflow-net conversion requires a unique structural sink place");
+      }
+      boundary.source = structural_sources.front();
+      boundary.sink = structural_sinks.front();
+    } else {
+      boundary.source = net_.source();
+      boundary.sink = net_.sink();
+    }
+    if (boundary.source >= net_.place_count() ||
+        boundary.sink >= net_.place_count() ||
+        boundary.source == boundary.sink) {
+      throw std::invalid_argument(
+          "workflow-net conversion requires distinct source and sink places");
+    }
+
     for (const auto& transition : net_.transitions()) {
       if (std::find(transition.outputs.begin(), transition.outputs.end(),
-                    sink) != transition.outputs.end()) {
+                    boundary.sink) != transition.outputs.end()) {
         continue;
       }
-      if (std::find(transition.inputs.begin(), transition.inputs.end(), sink) !=
-          transition.inputs.end()) {
+      if (std::find(transition.inputs.begin(), transition.inputs.end(),
+                    boundary.sink) != transition.inputs.end()) {
         throw std::invalid_argument(
             "workflow-net conversion rejects transitions leaving the sink");
       }
       if (!transition.silent() &&
           std::find(transition.outputs.begin(), transition.outputs.end(),
-                    source) != transition.outputs.end()) {
+                    boundary.source) != transition.outputs.end()) {
         throw std::invalid_argument(
             "workflow-net conversion rejects visible returns into the source");
       }
@@ -702,19 +741,83 @@ class PetriToPowlBuilder {
       }
       return seen;
     };
-    const auto from_source = visit(source, outgoing);
-    const auto to_sink = visit(sink, incoming);
+    const auto from_source = visit(boundary.source, outgoing);
+    const auto to_sink = visit(boundary.sink, incoming);
     for (std::size_t node = 0; node < node_count; ++node) {
       if (!from_source[node] || !to_sink[node]) {
         throw std::invalid_argument(
             "workflow-net conversion found a node outside the source-to-sink region");
       }
     }
-    if (!final_marking_reachable(net_)) {
+    if (!final_marking_reachable(copy_with_boundaries(boundary))) {
       throw std::invalid_argument(
           "workflow-net conversion requires a reachable final marking");
     }
-    return {source, sink};
+    return boundary;
+  }
+
+  void initialize_topology(const Boundary& boundary) {
+    const auto place_count = net_.place_count();
+    place_alias_.resize(place_count);
+    for (std::size_t place = 0; place < place_count; ++place)
+      place_alias_[place] = place;
+
+    // Places with the same producer and consumer transition multisets are
+    // local duplicates. Use the first place as their deterministic
+    // representative, while keeping the designated boundaries protected.
+    // The conversion works on incidence sets, so this normalization also
+    // prevents an otherwise harmless duplicate place from creating a false
+    // partial-order cut.
+    std::vector<std::map<std::size_t, std::size_t>> producers(place_count);
+    std::vector<std::map<std::size_t, std::size_t>> consumers(place_count);
+    for (std::size_t transition = 0;
+         transition < net_.transitions().size(); ++transition) {
+      const auto& model_transition = net_.transitions()[transition];
+      for (const auto place : model_transition.outputs)
+        ++producers[place][transition];
+      for (const auto place : model_transition.inputs)
+        ++consumers[place][transition];
+    }
+
+    for (std::size_t place = 0; place < place_count; ++place) {
+      if (place == boundary.source || place == boundary.sink) continue;
+      for (std::size_t candidate = 0; candidate < place; ++candidate) {
+        if (candidate == boundary.source || candidate == boundary.sink)
+          continue;
+        if (producers[place] == producers[candidate] &&
+            consumers[place] == consumers[candidate]) {
+          place_alias_[place] = place_alias_[candidate];
+          break;
+        }
+      }
+    }
+
+    transition_inputs_.clear();
+    transition_outputs_.clear();
+    transition_inputs_.reserve(net_.transitions().size());
+    transition_outputs_.reserve(net_.transitions().size());
+    for (const auto& transition : net_.transitions()) {
+      IdSet inputs;
+      IdSet outputs;
+      for (const auto place : transition.inputs)
+        inputs.insert(canonical_place(place));
+      for (const auto place : transition.outputs)
+        outputs.insert(canonical_place(place));
+      transition_inputs_.push_back(std::move(inputs));
+      transition_outputs_.push_back(std::move(outputs));
+    }
+
+    place_out_.assign(place_count, {});
+    for (std::size_t transition = 0;
+         transition < transition_inputs_.size(); ++transition) {
+      for (const auto place : transition_inputs_[transition])
+        place_out_[place].push_back(transition);
+    }
+    for (auto& transitions : place_out_) {
+      std::sort(transitions.begin(), transitions.end());
+      transitions.erase(std::unique(transitions.begin(), transitions.end()),
+                        transitions.end());
+    }
   }
 
   bool all_inputs_available(std::size_t transition,
@@ -896,7 +999,7 @@ class PetriToPowlBuilder {
         if (intersects(transition_outputs_[transition], fragment.starts))
           has_return_to_start = true;
         if (!net_.transitions()[transition].silent() ||
-            !equal(net_.transitions()[transition].inputs, fragment.starts)) {
+            transition_inputs_[transition] != fragment.starts) {
           continue;
         }
         ++entry_count;
@@ -921,7 +1024,7 @@ class PetriToPowlBuilder {
         if (intersects(transition_inputs_[transition], fragment.ends))
           has_continuation_from_end = true;
         if (!net_.transitions()[transition].silent() ||
-            !equal(net_.transitions()[transition].outputs, fragment.ends)) {
+            transition_outputs_[transition] != fragment.ends) {
           continue;
         }
         ++exit_count;
@@ -975,7 +1078,7 @@ class PetriToPowlBuilder {
     if (fragment.starts.size() != 1) return std::nullopt;
     std::vector<std::size_t> entries;
     for (const auto transition : fragment.transitions) {
-      if (equal(net_.transitions()[transition].inputs, fragment.starts))
+      if (transition_inputs_[transition] == fragment.starts)
         entries.push_back(transition);
     }
     std::sort(entries.begin(), entries.end());
