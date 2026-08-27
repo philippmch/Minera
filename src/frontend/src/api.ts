@@ -5435,6 +5435,10 @@ export async function requestOcelDescription(
 
 export interface OcelConformanceOptions {
   variant?: OcelConformanceVariant;
+  /** Kind of the real-side input; omitted to preserve the OCEL upload default. */
+  real?: "ocel" | "graph";
+  /** Graph representation used by the real-side input when `real` is `graph`. */
+  real_graph_kind?: OcelConformanceVariant;
   alpha?: number;
   beta?: number;
   gamma?: number;
@@ -5452,10 +5456,27 @@ export interface OcelConformanceOptions {
 
 export function ocelConformanceQuery(options: OcelConformanceOptions = {}): string {
   const query = new URLSearchParams();
+  if (options.real !== undefined && options.real !== "ocel" && options.real !== "graph") {
+    throw new Error("real must be ocel or graph");
+  }
+  if (options.real_graph_kind !== undefined &&
+      !["etot", "ocdfg", "otg"].includes(options.real_graph_kind)) {
+    throw new Error("real_graph_kind must be etot, ocdfg, or otg");
+  }
+  if (options.real !== "graph" && options.real_graph_kind !== undefined) {
+    throw new Error("real_graph_kind applies only when real is graph");
+  }
+  if (options.real === "graph" && options.real_graph_kind !== undefined &&
+      options.variant !== undefined &&
+      options.real_graph_kind !== options.variant) {
+    throw new Error("real_graph_kind must match variant");
+  }
   const add = (name: string, value: number | string | undefined) => {
     if (value !== undefined) query.set(name, String(value));
   };
   add("variant", options.variant);
+  add("real", options.real);
+  add("real_graph_kind", options.real_graph_kind);
   add("alpha", options.alpha);
   add("beta", options.beta);
   add("gamma", options.gamma);
@@ -5486,7 +5507,8 @@ export async function requestOcelConformance(
   const form = new FormData();
   const logName = typeof File !== "undefined" && log instanceof File ? log.name : "ocel.json";
   const normativeName = typeof File !== "undefined" && normative instanceof File ? normative.name : "normative.json";
-  form.append("log", log, logName);
+  const realField = options.real === "graph" ? "real_graph" : "log";
+  form.append(realField, log, logName);
   form.append("normative", normative, normativeName);
   const query = ocelConformanceQuery(options);
   const response = await fetch(`/api/ocel/conformance${query ? `?${query}` : ""}`, {

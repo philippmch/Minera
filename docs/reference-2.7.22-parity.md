@@ -67,7 +67,7 @@ are reconciled.
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
-| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, headless OCEL CLI output, and multipart local-server/frontend API adapters; broader OCEL schema coverage remains |
+| Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Complete** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
 | Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, graph-recursive `dfg`, and direct-DFG IMd entry points share deterministic native semantics; request/CLI/frontend selectors cover event-log paths |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
@@ -309,8 +309,13 @@ triple shapes, negative frequencies, non-finite performance values, and invalid
 graph envelopes. Direct-OCEL conformance adapters and explicit graph inputs
 therefore share one validated native surface. The standalone OCEL conformance
 command and local multipart conformance route now accept either an ordinary
-OCEL document or the matching ETOT, OTG, or OCDFG graph JSON as the normative
-input; CSV/XML/SQLite normative imports continue to use the OCEL path.
+OCEL document or the matching ETOT, OTG, or OCDFG graph JSON on either side.
+CLI callers select `--real graph` and an optional `--real-graph-kind`; multipart
+callers select `real=graph`, provide a `real_graph` part, and may declare
+`real_graph_kind`. The default `log` upload continues to use the OCEL path, and
+CSV/XML/SQLite normative imports continue to use the OCEL path. Graph readers
+reject cross-family envelopes, so an empty graph cannot silently pass as a
+different representation.
 
 Annotated object-centric Petri-net evidence: `discover_ocpn` now retains the
 deterministic OCDFG activity, start/end, and directly-followed-event metrics

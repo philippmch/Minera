@@ -213,6 +213,22 @@ int main() {
     bad_graph = true;
   }
   assert(bad_graph);
+  bad_graph = false;
+  try {
+    (void)minera::parse_otg_json(
+        R"({"activities":[],"object_types":[],"edges":[]})");
+  } catch (...) {
+    bad_graph = true;
+  }
+  assert(bad_graph);
+  bad_graph = false;
+  try {
+    (void)minera::parse_etot_json(
+        R"({"activities":[],"object_types":[],"activities_indep":{},"edges":{}})");
+  } catch (...) {
+    bad_graph = true;
+  }
+  assert(bad_graph);
 
   // Associations are keyed by event/object identity, not relation qualifier.
   // The event-couple performance projection is unique per pair, while the
