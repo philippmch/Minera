@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "../src/types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "../src/types";
 
 describe("isProcessTreePlayoutSetResult", () => {
   const valid = {
@@ -305,6 +305,42 @@ describe("isOcelObjectGraphResult", () => {
     expect(isOcelObjectGraphResult({ ...valid, variant: "unknown" })).toBe(false);
     expect(isOcelObjectGraphResult({ ...valid, edges: [["i1"]] })).toBe(false);
     expect(isOcelObjectGraphResult({ ...valid, object_ids: [1] })).toBe(false);
+  });
+});
+
+describe("isOcelHeterogeneousGraphResult", () => {
+  const valid = {
+    family: "OCEL_GRAPH", variant: "HETEROGENEOUS",
+    include_df: true, include_object_changes: true,
+    nodes: [
+      { id: "e1", type: "EVENT", activity: "create", timestamp: "2024-01-01T00:00:00Z", attributes: {} },
+      { id: "o1", type: "OBJECT", object_type: "order", attributes: { region: "EU" } },
+      { id: "@@change##0", type: "CHANGE", object_id: "o1", object_type: "order", timestamp: "2024-01-01T00:00:00Z", field: "status", value: null },
+    ],
+    edges: [
+      { source: "e1", target: "o1", type: "E2O", qualifier: "" },
+      { source: "e1", target: "e1", type: "DF", object: "o1" },
+    ],
+  };
+  it("accepts event, object, change and derived-flow records", () => {
+    expect(isOcelHeterogeneousGraphResult(valid)).toBe(true);
+  });
+  it("rejects malformed node and edge records", () => {
+    expect(isOcelHeterogeneousGraphResult({ ...valid, nodes: [{ id: "e1", type: "OTHER" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, nodes: [{ id: "e1", type: "EVENT", activity: "create" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, nodes: [{ id: "o1", type: "OBJECT", object_type: "order" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, nodes: [{ id: "@@change##0", type: "CHANGE", object_id: "o1" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "o1", type: "OTHER" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "o1", type: "E2O" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "e2", type: "DF" }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, include_df: "true" })).toBe(false);
   });
 });
 

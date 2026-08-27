@@ -1656,6 +1656,42 @@ void handle_ocel_graph(const httplib::Request& request,
   }
 }
 
+void handle_ocel_event_object_graph(const httplib::Request& request,
+                                    httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "variant", "include_df", "include_object_changes"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown OCEL event/object graph parameter: " + key);
+    }
+    if (request.has_param("variant")) {
+      const auto variant = request.get_param_value("variant");
+      if (variant != "heterogeneous" && variant != "HETEROGENEOUS" &&
+          variant != "event_object") {
+        throw std::invalid_argument(
+            "variant expects heterogeneous for the event/object graph");
+      }
+    }
+    minera::OcelHeterogeneousGraphOptions options;
+    options.include_df = ocel_query_bool(request, "include_df", true);
+    options.include_object_changes =
+        ocel_query_bool(request, "include_object_changes", true);
+    const auto body = ocel_request_body(request, "log");
+    if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
+    response.set_content(
+        minera::serialize_ocel_heterogeneous_graph_json(
+            minera::discover_ocel_heterogeneous_graph(
+                minera::parse_ocel_json(body), options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_ocel_playout(const httplib::Request& request,
                          httplib::Response& response) {
   try {
@@ -6055,6 +6091,7 @@ int main(int argc, char** argv) {
   server.Options("/api/ocel/split", preflight);
   server.Options("/api/ocel/enrich", preflight);
   server.Options("/api/ocel/graph", preflight);
+  server.Options("/api/ocel/event-object-graph", preflight);
   server.Options("/api/ocel/playout", preflight);
   server.Options("/api/ocel/features", preflight);
   server.Options("/api/ocel/statistics", preflight);
@@ -6140,6 +6177,7 @@ int main(int argc, char** argv) {
   server.Post("/api/ocel/split", handle_ocel_split);
   server.Post("/api/ocel/enrich", handle_ocel_enrichment);
   server.Post("/api/ocel/graph", handle_ocel_graph);
+  server.Post("/api/ocel/event-object-graph", handle_ocel_event_object_graph);
   server.Post("/api/ocel/playout", handle_ocel_playout);
   server.Post("/api/ocel/features", handle_ocel_features);
   server.Post("/api/ocel/statistics", handle_ocel_statistics);

@@ -39,6 +39,37 @@ void write_json_string(std::ostringstream& out, const std::string& value) {
   out << '"';
 }
 
+void write_json_value(std::ostringstream& out, const OcelValue& value) {
+  if (std::holds_alternative<std::nullptr_t>(value)) {
+    out << "null";
+  } else if (const auto* boolean = std::get_if<bool>(&value)) {
+    out << (*boolean ? "true" : "false");
+  } else if (const auto* integer = std::get_if<std::int64_t>(&value)) {
+    out << *integer;
+  } else if (const auto* real = std::get_if<double>(&value)) {
+    out.precision(17);
+    out << *real;
+  } else {
+    write_json_string(out, std::get<std::string>(value));
+  }
+}
+
+void write_json_attributes(std::ostringstream& out,
+                           const std::vector<OcelAttribute>& attributes) {
+  std::map<std::string, const OcelValue*> values;
+  for (const auto& attribute : attributes) values[attribute.key] = &attribute.value;
+  out << '{';
+  bool first = true;
+  for (const auto& [key, value] : values) {
+    if (!first) out << ',';
+    first = false;
+    write_json_string(out, key);
+    out << ':';
+    write_json_value(out, *value);
+  }
+  out << '}';
+}
+
 std::string variant_name(OcelSplitVariant variant) {
   switch (variant) {
     case OcelSplitVariant::kConnectedComponents:
@@ -565,6 +596,167 @@ std::string serialize_ocel_object_graph_json(const OcelObjectGraph& graph) {
     out << ',';
     write_json_string(out, graph.edges[index].second);
     out << ']';
+  }
+  out << "]}";
+  return out.str();
+}
+
+OcelHeterogeneousGraph discover_ocel_heterogeneous_graph(
+    const Ocel& log, const OcelHeterogeneousGraphOptions& options) {
+  OcelHeterogeneousGraph result;
+  result.include_df = options.include_df;
+  result.include_object_changes = options.include_object_changes;
+  result.nodes.reserve(log.events.size() + log.objects.size() +
+                       (options.include_object_changes
+                            ? log.object_changes.size()
+                            : 0));
+  std::map<std::string, std::size_t> node_indices;
+  const auto add_node = [&](OcelGraphNode node) {
+    const auto [it, inserted] =
+        node_indices.emplace(node.id, result.nodes.size());
+    if (inserted) {
+      result.nodes.push_back(std::move(node));
+    } else {
+      // Graph node identifiers are keys: preserve first insertion position
+      // while letting later records update the node payload.
+      result.nodes[it->second] = std::move(node);
+    }
+  };
+
+  for (const auto& event : log.events) {
+    OcelGraphNode node;
+    node.id = event.id;
+    node.type = "EVENT";
+    node.activity = event.activity;
+    node.timestamp = event.timestamp;
+    node.attributes = event.attributes;
+    add_node(std::move(node));
+  }
+  for (const auto& object : log.objects) {
+    OcelGraphNode node;
+    node.id = object.id;
+    node.type = "OBJECT";
+    node.object_type = object.type;
+    node.attributes = object.attributes;
+    add_node(std::move(node));
+  }
+  if (options.include_object_changes) {
+    for (std::size_t index = 0; index < log.object_changes.size(); ++index) {
+      const auto& change = log.object_changes[index];
+      OcelGraphNode node;
+      node.id = "@@change##" + std::to_string(index);
+      node.type = "CHANGE";
+      node.object_id = change.object_id;
+      node.object_type = change.object_type;
+      node.timestamp = change.timestamp;
+      node.field = change.field;
+      node.value = change.value;
+      add_node(std::move(node));
+    }
+  }
+
+  result.edges.reserve(log.relations.size() + log.o2o.size() +
+                       (options.include_df ? log.relations.size() : 0) +
+                       (options.include_object_changes
+                            ? log.object_changes.size()
+                            : 0));
+  for (const auto& relation : log.relations) {
+    result.edges.push_back(
+        {relation.event_id, relation.object_id, "E2O", relation.qualifier, {}});
+  }
+  for (const auto& relation : log.o2o) {
+    result.edges.push_back(
+        {relation.source_id, relation.target_id, "O2O", relation.qualifier, {}});
+  }
+  if (options.include_df) {
+    // Keep the first-seen object order, while retaining every relation's
+    // order within its object stream (including repeated event references).
+    std::vector<std::string> object_order;
+    std::map<std::string, std::vector<std::string>> event_streams;
+    for (const auto& relation : log.relations) {
+      auto [stream, inserted] = event_streams.try_emplace(relation.object_id);
+      if (inserted) object_order.push_back(relation.object_id);
+      stream->second.push_back(relation.event_id);
+    }
+    for (const auto& object_id : object_order) {
+      const auto& stream = event_streams.at(object_id);
+      for (std::size_t index = 1; index < stream.size(); ++index) {
+        result.edges.push_back(
+            {stream[index - 1], stream[index], "DF", {}, object_id});
+      }
+    }
+  }
+  if (options.include_object_changes) {
+    for (std::size_t index = 0; index < log.object_changes.size(); ++index) {
+      result.edges.push_back({"@@change##" + std::to_string(index),
+                              log.object_changes[index].object_id, "CHANGE", {}, {}});
+    }
+  }
+  return result;
+}
+
+std::string serialize_ocel_heterogeneous_graph_json(
+    const OcelHeterogeneousGraph& graph) {
+  std::ostringstream out;
+  out << "{\"family\":\"OCEL_GRAPH\",\"variant\":\"HETEROGENEOUS\""
+      << ",\"include_df\":" << (graph.include_df ? "true" : "false")
+      << ",\"include_object_changes\":"
+      << (graph.include_object_changes ? "true" : "false") << ",\"nodes\":[";
+  for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& node = graph.nodes[index];
+    out << "{\"id\":";
+    write_json_string(out, node.id);
+    out << ",\"type\":";
+    write_json_string(out, node.type);
+    if (node.type == "EVENT") {
+      out << ",\"activity\":";
+      write_json_string(out, node.activity);
+      out << ",\"timestamp\":";
+      write_json_string(out, node.timestamp);
+      out << ",\"attributes\":";
+      write_json_attributes(out, node.attributes);
+    } else if (node.type == "OBJECT") {
+      out << ",\"object_type\":";
+      write_json_string(out, node.object_type);
+      out << ",\"attributes\":";
+      write_json_attributes(out, node.attributes);
+    } else if (node.type == "CHANGE") {
+      out << ",\"object_id\":";
+      write_json_string(out, node.object_id);
+      out << ",\"object_type\":";
+      write_json_string(out, node.object_type);
+      out << ",\"timestamp\":";
+      write_json_string(out, node.timestamp);
+      out << ",\"field\":";
+      write_json_string(out, node.field);
+      out << ",\"value\":";
+      if (node.value) {
+        write_json_value(out, *node.value);
+      } else {
+        out << "null";
+      }
+    }
+    out << '}';
+  }
+  out << "],\"edges\":[";
+  for (std::size_t index = 0; index < graph.edges.size(); ++index) {
+    if (index != 0) out << ',';
+    const auto& edge = graph.edges[index];
+    out << "{\"source\":";
+    write_json_string(out, edge.source);
+    out << ",\"target\":";
+    write_json_string(out, edge.target);
+    out << ",\"type\":";
+    write_json_string(out, edge.type);
+    if (edge.type == "E2O" || edge.type == "O2O") {
+      out << ",\"qualifier\":";
+      write_json_string(out, edge.qualifier);
+    } else if (edge.type == "DF") {
+      out << ",\"object\":";
+      write_json_string(out, edge.object);
+    }
+    out << '}';
   }
   out << "]}";
   return out.str();
