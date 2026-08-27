@@ -17,6 +17,31 @@ namespace {
 using Marking = std::vector<std::uint64_t>;
 constexpr std::size_t kSilentSearchCap = 4096;
 
+// Resolve the activity label selected by the caller.  The event model keeps
+// the common resource, timestamp, and lifecycle values in dedicated fields;
+// aliases for those fields therefore need to be handled before falling back
+// to the generic attribute bag.
+const std::string* selected_activity_value(const Event& event,
+                                           std::string_view attribute) {
+  if (attribute.empty() || attribute == "activity" ||
+      attribute == "concept:name") {
+    return &event.activity;
+  }
+  if (attribute == "resource" || attribute == "org:resource") {
+    if (const auto* generic = event.attribute(attribute)) return generic;
+    return &event.resource;
+  }
+  if (attribute == "timestamp" || attribute == "time:timestamp") {
+    if (const auto* generic = event.attribute(attribute)) return generic;
+    return &event.timestamp;
+  }
+  if (attribute == "lifecycle" || attribute == "lifecycle:transition") {
+    if (const auto* generic = event.attribute(attribute)) return generic;
+    return &event.lifecycle;
+  }
+  return event.attribute(attribute);
+}
+
 struct MarkingHash {
   std::size_t operator()(const Marking& marking) const noexcept {
     std::size_t hash = 1469598103934665603ull;
@@ -196,7 +221,8 @@ std::vector<std::size_t> silent_path(const Marking& start,
 ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
                        const std::unordered_map<std::string, std::size_t>& activities,
                        const Marking& initial_marking,
-                       const Marking& final_marking) {
+                       const Marking& final_marking,
+                       std::string_view activity_attribute) {
   ReplayUsage usage{std::vector<std::uint64_t>(net.transitions().size(), 0),
                     std::vector<std::uint64_t>(net.place_count(), 0)};
   std::vector<std::vector<std::size_t>> transitions_by_activity(net.activities().size());
@@ -210,7 +236,10 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
     Marking marking = initial_marking;
     std::vector<std::size_t> activated;
     for (const auto& event : trace.events) {
-      const auto activity = activities.find(event.activity);
+      const auto* selected_activity =
+          selected_activity_value(event, activity_attribute);
+      if (!selected_activity) continue;
+      const auto activity = activities.find(*selected_activity);
       if (activity == activities.end() || transitions_by_activity[activity->second].empty()) {
         continue;  // unknown log activity is a deviation but activates no model element
       }
@@ -318,8 +347,10 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
   for (std::size_t i = 0; i < net.activities().size(); ++i) {
     activities.emplace(net.activities()[i], i);
   }
-  const auto usage1 = replay_log(log1, net, activities, initial_marking, final_marking);
-  const auto usage2 = replay_log(log2, net, activities, initial_marking, final_marking);
+  const auto usage1 = replay_log(log1, net, activities, initial_marking,
+                                 final_marking, options.activity_attribute);
+  const auto usage2 = replay_log(log2, net, activities, initial_marking,
+                                 final_marking, options.activity_attribute);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {

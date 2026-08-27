@@ -206,6 +206,14 @@ EventLog import_csv_event_log(
     if (lifecycle_index) {
       event.lifecycle = field_at(fields, *lifecycle_index, line_number);
     }
+    // Preserve a non-default activity column in the generic bag as well. This
+    // lets downstream consumers use the same selector on logs imported with a
+    // custom canonical activity column.
+    if (options.activity_column != "activity" &&
+        options.activity_column != "concept:name") {
+      event.attributes.push_back(EventAttribute{
+          options.activity_column, event.activity, AttributeKind::kString});
+    }
     for (const auto index : attribute_indices) {
       // A blank cell means the event simply has no such attribute; a short row
       // reads the same way rather than erroring, since these columns are extra.

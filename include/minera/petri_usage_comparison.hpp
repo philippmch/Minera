@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -46,6 +47,11 @@ struct PetriUsageComparison {
 struct PetriUsageComparisonOptions {
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::uint32_t> final_marking;
+  // Optional event attribute used as the activity label during replay. The
+  // canonical Event::activity field is used when this is empty, "activity",
+  // or "concept:name". Events without the selected attribute are treated as
+  // unknown labels and do not activate a model transition.
+  std::string activity_attribute;
 };
 
 // Compares forward token-replay element activations for two logs.  Replay is

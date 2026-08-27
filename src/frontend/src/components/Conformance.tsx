@@ -389,6 +389,7 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
 function PetriUsageComparisonPanel() {
   const [reference, setReference] = useState<File | null>(null);
   const [miner, setMiner] = useState("inductive");
+  const [activityAttribute, setActivityAttribute] = useState("");
   const [initialMarking, setInitialMarking] = useState("");
   const [finalMarking, setFinalMarking] = useState("");
   const [result, setResult] = useState<PetriUsageComparison | null>(null);
@@ -403,6 +404,7 @@ function PetriUsageComparisonPanel() {
     };
     try {
       setResult(await comparePetriUsage(reference, miner, {
+        activity_attribute: activityAttribute.trim() || undefined,
         initial_marking: parseMarking(initialMarking),
         final_marking: parseMarking(finalMarking),
       }));
@@ -418,6 +420,7 @@ function PetriUsageComparisonPanel() {
     <div className="align-settings-grid">
       <label>Reference log<input type="file" accept=".csv,.xes" onChange={e => { setReference(e.target.files?.[0] ?? null); setResult(null); setError(null); }} /></label>
       <label>Miner<select value={miner} onChange={e => { setMiner(e.target.value); setResult(null); setError(null); }}><option value="inductive">Inductive</option><option value="alpha">Alpha</option><option value="heuristic">Heuristic</option><option value="powl">POWL</option></select></label>
+      <label>Activity attribute<input value={activityAttribute} placeholder="optional: business_activity" onChange={e => { setActivityAttribute(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Initial marking<input value={initialMarking} placeholder="optional: 1,0,…" onChange={e => { setInitialMarking(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Final marking<input value={finalMarking} placeholder="optional: 0,…,1" onChange={e => { setFinalMarking(e.target.value); setResult(null); setError(null); }} /></label>
     </div>

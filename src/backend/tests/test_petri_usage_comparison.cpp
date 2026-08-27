@@ -1,9 +1,12 @@
 #include <cassert>
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/petri_usage_comparison.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
 
@@ -171,6 +174,95 @@ void marking_dimensions_are_checked() {
   assert(rejected);
 }
 
+void custom_activity_attribute_controls_replay() {
+  const auto net = simple_net();
+  minera::EventLog selected;
+  minera::Trace trace;
+  trace.case_id = "custom";
+  minera::Event event;
+  event.case_id = trace.case_id;
+  event.activity = "ignored";
+  event.attributes.push_back({"business_activity", "A",
+                              minera::AttributeKind::kString});
+  trace.events.push_back(std::move(event));
+  selected.traces.push_back(std::move(trace));
+
+  minera::PetriUsageComparisonOptions options;
+  options.activity_attribute = "business_activity";
+  const auto custom = compare_petri_usage(net, selected, log_of({}), options);
+  assert(custom.transitions[0].log1_occurrences == 1);
+  assert(custom.transitions[1].log1_occurrences == 1);
+
+  options.activity_attribute = "missing_activity";
+  const auto missing = compare_petri_usage(net, selected, log_of({}), options);
+  assert(missing.transitions[0].log1_occurrences == 0);
+  assert(missing.transitions[1].log1_occurrences == 0);
+
+  options.activity_attribute = "concept:name";
+  const auto canonical = compare_petri_usage(net, log_of({"A"}), log_of({}),
+                                             options);
+  assert(canonical.transitions[0].log1_occurrences == 1);
+
+  selected.traces.front().events.front().attributes.clear();
+  selected.traces.front().events.front().resource = "A";
+  for (const auto attribute : {"resource", "org:resource"}) {
+    options.activity_attribute = attribute;
+    const auto resource =
+        compare_petri_usage(net, selected, log_of({}), options);
+    assert(resource.transitions[0].log1_occurrences == 1);
+  }
+
+  selected.traces.front().events.front().resource.clear();
+  selected.traces.front().events.front().timestamp = "A";
+  for (const auto attribute : {"timestamp", "time:timestamp"}) {
+    options.activity_attribute = attribute;
+    const auto timestamp =
+        compare_petri_usage(net, selected, log_of({}), options);
+    assert(timestamp.transitions[0].log1_occurrences == 1);
+  }
+
+  selected.traces.front().events.front().attributes.clear();
+  selected.traces.front().events.front().timestamp.clear();
+  selected.traces.front().events.front().lifecycle = "A";
+  for (const auto attribute : {"lifecycle", "lifecycle:transition"}) {
+    options.activity_attribute = attribute;
+    const auto lifecycle =
+        compare_petri_usage(net, selected, log_of({}), options);
+    assert(lifecycle.transitions[0].log1_occurrences == 1);
+  }
+}
+
+void imported_custom_activity_attributes_are_replayable() {
+  const auto net = simple_net();
+
+  minera::CsvImportOptions csv_options;
+  csv_options.activity_column = "business_activity";
+  std::istringstream csv("case_id,business_activity\ncase-1,A\n");
+  const auto csv_log = minera::import_csv_event_log(csv, csv_options);
+  assert(csv_log.traces.size() == 1);
+  assert(csv_log.traces.front().events.front().activity == "A");
+  assert(csv_log.traces.front().events.front().attribute("business_activity") !=
+         nullptr);
+
+  minera::PetriUsageComparisonOptions options;
+  options.activity_attribute = "business_activity";
+  const auto csv_result = compare_petri_usage(net, csv_log, log_of({}), options);
+  assert(csv_result.transitions[0].log1_occurrences == 1);
+
+  minera::XesImportOptions xes_options;
+  xes_options.activity_attribute = "business_activity";
+  std::istringstream xes(
+      "<log><trace><string key=\"concept:name\" value=\"case-1\"/>"
+      "<event><string key=\"business_activity\" value=\"A\"/>"
+      "</event></trace></log>");
+  const auto xes_log = minera::import_xes_event_log(xes, xes_options);
+  assert(xes_log.traces.front().events.front().activity == "A");
+  assert(xes_log.traces.front().events.front().attribute("business_activity") !=
+         nullptr);
+  const auto xes_result = compare_petri_usage(net, xes_log, log_of({}), options);
+  assert(xes_result.transitions[0].log1_occurrences == 1);
+}
+
 void invalid_net_indices_are_rejected() {
   minera::PetriNet net;
   const auto p0 = net.add_place();
@@ -232,6 +324,8 @@ int main() {
   extended_arcs_are_replayed_and_counted();
   inhibitor_arcs_gate_silent_completion();
   marking_dimensions_are_checked();
+  custom_activity_attribute_controls_replay();
+  imported_custom_activity_attributes_are_replayable();
   invalid_net_indices_are_rejected();
   silent_search_budget_is_reported();
 }

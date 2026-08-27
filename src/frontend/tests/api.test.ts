@@ -14,6 +14,7 @@ describe("Petri usage comparison API", () => {
       expect(init?.method).toBe("POST");
       const form = init?.body as FormData;
       expect(form.get("miner")).toBe("alpha");
+      expect(form.get("activity_attribute")).toBe("business_activity");
       expect(form.get("initial_marking")).toBe("1,0,2");
       expect(form.get("final_marking")).toBe("0,0,1");
       return { ok: true, json: async () => payload };
@@ -21,7 +22,7 @@ describe("Petri usage comparison API", () => {
     await expect(comparePetriUsage(
       new File(["case_id,activity\nc1,A\n"], "reference.csv"),
       "alpha",
-      { initial_marking: [1, 0, 2], final_marking: [0, 0, 1] },
+      { activity_attribute: " business_activity ", initial_marking: [1, 0, 2], final_marking: [0, 0, 1] },
     )).resolves.toMatchObject({ family: "PETRI_USAGE_COMPARISON" });
     vi.unstubAllGlobals();
   });
@@ -30,6 +31,12 @@ describe("Petri usage comparison API", () => {
     await expect(comparePetriUsage(
       new File([""], "reference.csv"), "inductive", { final_marking: [1, Number.NaN] },
     )).rejects.toThrow(/uint32/);
+  });
+
+  it("rejects an empty custom activity attribute before upload", async () => {
+    await expect(comparePetriUsage(
+      new File([""], "reference.csv"), "inductive", { activity_attribute: "   " },
+    )).rejects.toThrow(/activity_attribute/);
   });
 });
 

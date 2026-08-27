@@ -141,6 +141,13 @@ namespace {
 using minera::error_json;
 using minera::looks_like_xes;
 
+std::string trim_text(std::string_view value) {
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string_view::npos) return {};
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return std::string(value.substr(first, last - first + 1));
+}
+
 // The most recently mined log and its discovered nets, kept so the costly
 // alignment of a model can be computed on demand (POST /api/align) instead of
 // eagerly for every miner on every mine. The app is local and single-user, so
@@ -4156,13 +4163,34 @@ void handle_compare_petri(const httplib::Request& request,
     constexpr std::size_t kMaxComparisonTransitions = 10'000;
     constexpr std::size_t kMaxComparisonWork = 500'000'000;
     constexpr std::size_t kSilentRoutingStateCap = 4'096;
+    minera::PetriUsageComparisonOptions comparison_options;
+    if (request.has_param("activity_attribute")) {
+      comparison_options.activity_attribute =
+          trim_text(request.get_param_value("activity_attribute"));
+    } else if (request.has_file("activity_attribute")) {
+      comparison_options.activity_attribute =
+          trim_text(request.get_file_value("activity_attribute").content);
+    }
+    if (comparison_options.activity_attribute.empty() &&
+        (request.has_param("activity_attribute") ||
+         request.has_file("activity_attribute"))) {
+      throw std::invalid_argument(
+          "activity_attribute: expected a non-empty name when supplied");
+    }
+    const auto selector = comparison_options.activity_attribute;
     minera::EventLog reference;
     if (minera::looks_like_xes(reference_file.filename, reference_file.content)) {
       std::istringstream input(reference_file.content);
-      reference = minera::import_xes_event_log(input);
+      minera::XesImportOptions reference_options;
+      if (!selector.empty() && selector != "concept:name")
+        reference_options.activity_attribute = selector;
+      reference = minera::import_xes_event_log(input, reference_options);
     } else {
       std::istringstream input(reference_file.content);
-      reference = minera::import_csv_event_log(input);
+      minera::CsvImportOptions reference_options;
+      if (!selector.empty() && selector != "activity")
+        reference_options.activity_column = selector;
+      reference = minera::import_csv_event_log(input, reference_options);
     }
     if (session->log.trace_count() > kMaxComparisonTraces ||
         session->log.event_count() > kMaxComparisonEvents ||
@@ -4182,7 +4210,6 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "Petri usage comparison exceeds the server work budget");
     }
-    minera::PetriUsageComparisonOptions comparison_options;
     comparison_options.initial_marking =
         parse_playout_marking(request, "initial_marking");
     comparison_options.final_marking =

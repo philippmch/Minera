@@ -3207,6 +3207,11 @@ export async function comparePetriUsage(
   const form = new FormData();
   form.append("reference_log", reference, reference.name);
   form.append("miner", miner);
+  if (options.activity_attribute !== undefined) {
+    const key = options.activity_attribute.trim();
+    if (!key) throw new Error("activity_attribute must not be empty");
+    form.append("activity_attribute", key);
+  }
   if (options.initial_marking !== undefined) {
     form.append("initial_marking", serializeComparisonMarking(
       "initial_marking", options.initial_marking));
