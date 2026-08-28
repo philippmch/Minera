@@ -28,6 +28,47 @@ minera::EventLog query() {
                                          {"released-id-2", "D", "", "", 1, {}, ""}}});
   return q;
 }
+
+minera::EventLog matching_source() {
+  minera::EventLog log;
+  log.traces.push_back({"source-ab", {{"source-ab", "A", "", "r1", 0, {}, ""},
+                                      {"source-ab", "B", "", "r1", 1, {}, ""}}});
+  log.traces.push_back({"source-acd", {{"source-acd", "A", "", "r2", 0, {}, ""},
+                                       {"source-acd", "C", "", "r2", 1, {}, ""},
+                                       {"source-acd", "D", "", "r2", 2, {}, ""}}});
+  return log;
+}
+
+minera::EventLog matching_query() {
+  minera::EventLog log;
+  // The first query is closer to source-ab in isolation. A one-to-one
+  // assignment must reserve source-ab for the exact second query and use
+  // source-acd for this trace instead.
+  log.traces.push_back({"query-abc", {{"query-abc", "A", "", "", 0, {}, ""},
+                                      {"query-abc", "B", "", "", 1, {}, ""},
+                                      {"query-abc", "C", "", "", 2, {}, ""}}});
+  log.traces.push_back({"query-ab", {{"query-ab", "A", "", "", 0, {}, ""},
+                                     {"query-ab", "B", "", "", 1, {}, ""}}});
+  return log;
+}
+
+void matching_is_one_to_one() {
+  minera::PripelOptions options;
+  options.epsilon = 100.0;
+  options.seed = 13;
+  options.max_distance = 3;
+  const auto result =
+      minera::anonymize_pripel(matching_source(), matching_query(), options);
+  assert(result.diagnostics.exact_matches == 1);
+  assert(result.diagnostics.nearest_matches == 1);
+  assert(result.diagnostics.synthesized_events == 1);
+  assert(result.log.trace_count() == 2);
+  // Query order is intentional: the globally optimal assignment gives the
+  // longer first query to r2 and the exact second query to r1.
+  assert(result.log.traces[0].events[0].resource == "r2");
+  assert(result.log.traces[0].events[2].resource == "r2");
+  assert(result.log.traces[1].events[0].resource == "r1");
+}
 }
 
 int main() {
@@ -59,5 +100,6 @@ int main() {
   try { (void)minera::anonymize_pripel(source(), query(), options); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
+  matching_is_one_to_one();
   return 0;
 }

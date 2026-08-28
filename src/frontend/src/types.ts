@@ -454,6 +454,7 @@ export interface TraceVariantQueryTrace {
 }
 export interface TraceVariantQueryDiagnostics {
   candidate_count: number;
+  selected_violation_count?: number;
   retained_variant_count: number;
   released_trace_count: number;
   secure_random?: boolean;
@@ -498,6 +499,8 @@ export function isTraceVariantQueryResult(value: unknown): value is TraceVariant
       && Number.isInteger(entry.count) && (entry.count as number) >= 1)) return false;
   const d = c.diagnostics as Partial<TraceVariantQueryDiagnostics>;
   if (!Number.isInteger(d.candidate_count) || (d.candidate_count as number) < 0
+      || (d.selected_violation_count !== undefined &&
+        (!Number.isInteger(d.selected_violation_count) || (d.selected_violation_count as number) < 0))
       || !Number.isInteger(d.retained_variant_count) || (d.retained_variant_count as number) < 0
       || !Number.isInteger(d.released_trace_count) || (d.released_trace_count as number) < 0
       || (d.secure_random !== undefined && typeof d.secure_random !== "boolean")

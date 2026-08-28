@@ -42,6 +42,7 @@ struct TraceVariantQueryDiagnostics {
   std::uint64_t seed = 0;
   bool secure_random = false;
   std::size_t candidate_count = 0;
+  std::size_t selected_violation_count = 0;
   std::size_t retained_variant_count = 0;
   std::uint64_t released_trace_count = 0;
   bool output_truncated = false;

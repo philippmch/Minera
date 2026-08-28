@@ -5742,6 +5742,7 @@ void trace_variant_query_json_is_standalone_and_deterministic() {
   assert(first.find("\"family\":\"TRACE_VARIANT_QUERY\"") != std::string::npos);
   assert(first.find("\"variant\":\"laplace\"") != std::string::npos);
   assert(first.find("\"secure_random\":false") != std::string::npos);
+  assert(first.find("\"selected_violation_count\":") != std::string::npos);
   assert(first.find("\"frequencies\":") != std::string::npos);
   assert(first.find("\"log\":") != std::string::npos);
 }
