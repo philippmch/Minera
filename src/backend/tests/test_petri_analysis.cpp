@@ -269,6 +269,7 @@ void positive_invariant_diagnostics() {
   assert(serialized.find("\"reachability_edges\"") != std::string::npos);
   assert(sequential.handled_pairs.has_value());
   assert(sequential.handled_pairs->empty());
+  assert(sequential.not_well_handled_pairs == sequential.handled_pairs);
   assert(sequential.completion_witness == std::vector<std::size_t>({0, 1}));
   assert(sequential.structural_node_labels.size() == 10);
   assert(sequential.structural_node_labels[0] == "place:0:in");
@@ -538,6 +539,37 @@ void woflan_short_circuit_diagnostics() {
   assert(invalid_result.status == SoundnessStatus::UNSOUND);
 }
 
+void woflan_ignores_dead_silent_tasks() {
+  PetriNet net;
+  net.set_activities({"A"});
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source}, {sink});
+  // This silent transition is structurally on the workflow path but needs
+  // two source tokens, so it is never enabled from the single-token initial
+  // marking. Woflan task diagnostics intentionally ignore silent routing.
+  net.add_transition(std::nullopt, {source, source}, {sink, sink});
+
+  const auto ordinary = analyze_soundness(net);
+  assert(ordinary.status == SoundnessStatus::UNSOUND);
+  assert(ordinary.dead_transitions == std::vector<std::size_t>({1}));
+
+  SoundnessOptions options;
+  options.variant = SoundnessVariant::kWoflan;
+  options.diagnostics = true;
+  const auto woflan = analyze_soundness(net, options);
+  assert(woflan.status == SoundnessStatus::SOUND);
+  assert(woflan.dead_transitions == std::vector<std::size_t>({1}));
+  assert(woflan.dead_tasks.empty());
+  assert(woflan.not_well_handled_pairs == woflan.handled_pairs);
+  const auto json = petri_analysis_json(woflan);
+  assert(json.find("\"dead_tasks\":[]") != std::string::npos);
+  assert(json.find("\"not_well_handled_pairs\":[]") !=
+         std::string::npos);
+}
+
 void woflan_restricted_tree_artifacts() {
   SoundnessOptions options;
   options.variant = SoundnessVariant::kWoflan;
@@ -756,6 +788,7 @@ int main() {
   uniform_invariant_search_exhaustion_is_explicit();
   structural_pair_diagnostics();
   woflan_short_circuit_diagnostics();
+  woflan_ignores_dead_silent_tasks();
   woflan_restricted_tree_artifacts();
   unsound_models();
   caps_markings_determinism_and_weights();

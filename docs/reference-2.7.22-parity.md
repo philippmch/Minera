@@ -779,8 +779,13 @@ node-split unit-capacity flow graph and report both directions whose maximum flo
 exceeds one, preserving the duplicated-node coordinates in the JSON contract.
 Bounded exploration also returns every shortest path to a marking that cannot
 reach the final marking as `locking_scenarios`, alongside the compact first
-witness and the `dead_tasks` alias for never-enabled transitions. Every pair
-coordinate also has a stable place/transition input-output label for renderers.
+witness and the `dead_tasks` alias for never-enabled transitions. Woflan's task
+projection is derived from the short-circuited coverability graph and reports
+visible tasks, while the generic `dead_transitions` field retains the exact
+original-net firing result. The native `not_well_handled_pairs` name is
+serialized alongside the historical `handled_pairs` compatibility field.
+Every pair coordinate also has a stable place/transition input-output label for
+renderers.
 Woflan now also exposes its `left` decision and a deterministic restricted
 coverability-tree projection. The tree preserves one first-seen edge per
 transition at each node, accelerates only against ancestors using the omega

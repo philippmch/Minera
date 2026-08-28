@@ -186,6 +186,11 @@ struct SoundnessResult {
   // graph: element n has input node 2*n and output node 2*n+1. The vector is
   // engaged for a structurally valid workflow net, including when empty.
   std::optional<std::vector<std::vector<std::size_t>>> handled_pairs;
+  // Woflan's native name for the same structural pair projection.  The
+  // compatibility field above is retained for callers that already consume
+  // the generic soundness result shape.
+  std::optional<std::vector<std::vector<std::size_t>>>
+      not_well_handled_pairs;
   // Human-readable labels for the node coordinates used by handled_pairs.
   std::vector<std::string> structural_node_labels;
   // Woflan exposes the short-circuited workflow as an explicit diagnostic

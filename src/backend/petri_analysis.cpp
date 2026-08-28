@@ -1721,6 +1721,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   result.structural_node_labels = structural_node_labels(*structural_net);
   result.handled_pairs = structural_pair_diagnostics(*structural_net);
+  // Keep the generic projection and the Woflan-named projection in lockstep
+  // so adapters can use either contract without recomputing diagnostics.
+  result.not_well_handled_pairs = result.handled_pairs;
   if (options.variant == SoundnessVariant::kWoflan &&
       result.s_components.has_value()) {
     if (result.uniform_invariant_search_exhausted) {
@@ -1919,7 +1922,29 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   if (final_it != ids.end()) result.completion_witness = path_to(final_it->second);
   result.proper_completion = result.improper_markings.empty();
   for (std::size_t t = 0; t < fired.size(); ++t) if (!fired[t]) result.dead_transitions.push_back(t);
-  result.dead_tasks = result.dead_transitions;
+  if (options.variant == SoundnessVariant::kWoflan) {
+    // The structural Woflan task test is based on the short-circuited
+    // coverability graph and considers visible tasks only.  The exact
+    // original-net firing set remains available as dead_transitions for the
+    // ordinary soundness contract.  Extended-arc nets and capped searches do
+    // not expose a complete coverability graph, so use the exact graph as a
+    // conservative fallback once it has finished.
+    std::vector<bool> coverability_fired(net.transitions().size(), false);
+    if (!coverability.exhausted && !coverability.unbounded) {
+      for (const auto& edge : coverability.edges) {
+        if (edge.size() == 3 && edge[2] < coverability_fired.size())
+          coverability_fired[edge[2]] = true;
+      }
+    } else {
+      coverability_fired = fired;
+    }
+    for (std::size_t t = 0; t < coverability_fired.size(); ++t) {
+      if (coverability_fired[t] || net.transitions()[t].silent()) continue;
+      result.dead_tasks.push_back(t);
+    }
+  } else {
+    result.dead_tasks = result.dead_transitions;
+  }
   std::vector<std::vector<std::size_t>> reverse(nodes.size());
   for (std::size_t from = 0; from < edges.size(); ++from)
     for (const auto [to, transition] : edges[from]) { (void)transition; reverse[to].push_back(from); }
@@ -1938,8 +1963,11 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
       result.locking_scenarios.push_back(std::move(path));
     }
   }
+  const bool no_dead_tasks = options.variant == SoundnessVariant::kWoflan
+                                 ? result.dead_tasks.empty()
+                                 : result.dead_transitions.empty();
   const bool sound = result.final_reachable && result.option_to_complete &&
-                     result.proper_completion && result.dead_transitions.empty();
+                     result.proper_completion && no_dead_tasks;
   result.status = sound ? SoundnessStatus::SOUND : SoundnessStatus::UNSOUND;
   result.computed = true;
   if (options.diagnostics) {
@@ -1967,7 +1995,8 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (!result.uncovered_places_s_component.empty())
       result.diagnostic_messages.push_back(
           "S-component coverage is missing for one or more places");
-    if (!result.dead_transitions.empty())
+    if (options.variant != SoundnessVariant::kWoflan &&
+        !result.dead_transitions.empty())
       result.diagnostic_messages.push_back("the net contains dead transitions");
     if (!result.dead_tasks.empty())
       result.diagnostic_messages.push_back("dead tasks: " +
