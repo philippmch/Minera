@@ -189,6 +189,7 @@ describe("isDataPetriNetResult", () => {
   it("rejects malformed guard transitions", () => {
     expect(isDataPetriNetResult({ ...valid, transitions: [{ ...valid.transitions[0], guard: 4 }] })).toBe(false);
     expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, observed_traces: -1 } })).toBe(false);
+    expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, activity_attribute: 4 } })).toBe(false);
     expect(isDataPetriNetResult({ ...valid, decisions: { ...valid.decisions, aligned_traces: 2 } })).toBe(false);
     expect(isDataPetriNetResult({ ...valid, decision_tables: { ...valid.decision_tables, tables: [{ ...valid.decision_tables.tables[0], rows: [{ features: [], target: 3 }] }] } })).toBe(false);
   });

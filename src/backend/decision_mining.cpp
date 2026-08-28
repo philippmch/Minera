@@ -334,6 +334,9 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
   }
   DecisionMiningResult result;
   result.trace_count = log.trace_count();
+  result.activity_attribute = options.activity_attribute.empty()
+                                  ? "concept:name"
+                                  : options.activity_attribute;
 
   // Outgoing transitions per place; a place with several is a decision point.
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
@@ -354,7 +357,8 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
   // Every distinct activity variant is replayed once. Deviating variants
   // receive an alignment path, so both clean and non-fitting traces expose
   // the same model-choice observations to the tree learner.
-  const auto paths = detail::collect_decision_replay_paths(log, net);
+  const auto paths = detail::collect_decision_replay_paths(
+      log, net, options.activity_attribute);
   result.observed_traces = paths.observed_traces();
   result.replayed_traces = paths.replayed_traces;
   result.aligned_traces = paths.aligned_traces;

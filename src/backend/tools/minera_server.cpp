@@ -4629,6 +4629,7 @@ minera::DecisionMiningOptions decision_mining_options(
       "decision_min_leaf", "decision_max_categories",
       "decision_max_thresholds", "decision_min_gain",
       "decision_include_trace_attributes", "decision_attributes",
+      "decision_activity_attribute",
       "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
@@ -4656,6 +4657,13 @@ minera::DecisionMiningOptions decision_mining_options(
       options.include_trace_attributes);
   if (request.has_param("decision_attributes"))
     options.attributes = ocel_query_list(request, "decision_attributes");
+  if (request.has_param("decision_activity_attribute")) {
+    options.activity_attribute =
+        trim_text(request.get_param_value("decision_activity_attribute"));
+    if (options.activity_attribute.empty())
+      throw std::invalid_argument(
+          "decision_activity_attribute: expected a non-empty name");
+  }
   return options;
 }
 

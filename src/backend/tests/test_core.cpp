@@ -4224,6 +4224,80 @@ minera::EventLog decision_amount_log() {
   return log;
 }
 
+minera::PetriNet decision_activity_selector_net() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto choice = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"Register", "Approve", "Reject"});
+  net.add_transition(0, {source}, {choice});
+  net.add_transition(1, {choice}, {sink});
+  net.add_transition(2, {choice}, {sink});
+  return net;
+}
+
+minera::EventLog decision_activity_selector_log() {
+  minera::EventLog log;
+  for (std::size_t c = 0; c < 20; ++c) {
+    const bool approve = c < 12;
+    minera::Trace trace;
+    trace.case_id = std::to_string(c + 1);
+    minera::Event first{trace.case_id, "recorded", "", "", 0};
+    first.attributes.push_back(
+        {"stage", "Register", minera::AttributeKind::kString});
+    minera::Event branch{trace.case_id, "recorded", "", "", 1};
+    branch.attributes.push_back(
+        {"stage", approve ? "Approve" : "Reject",
+         minera::AttributeKind::kString});
+    trace.events.push_back(std::move(first));
+    trace.events.push_back(std::move(branch));
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+void decision_mining_supports_a_custom_activity_field() {
+  const auto log = decision_activity_selector_log();
+  const auto net = decision_activity_selector_net();
+
+  const auto default_result = minera::mine_decisions(log, net);
+  assert(default_result.activity_attribute == "concept:name");
+
+  minera::DecisionMiningOptions selected;
+  selected.activity_attribute = "stage";
+  const auto result = minera::mine_decisions(log, net, selected);
+  assert(result.activity_attribute == "stage");
+  assert(result.replayed_traces == 20);
+  assert(result.aligned_traces == 0);
+  assert(result.alignment_failures == 0);
+  assert(result.decision_points.size() == 1);
+  const auto& point = result.decision_points.front();
+  assert(point.observations == 20);
+  assert(point.branches.size() == 2);
+  const auto approve = std::find(point.branches.begin(), point.branches.end(),
+                                 "Approve");
+  const auto reject = std::find(point.branches.begin(), point.branches.end(),
+                                "Reject");
+  assert(approve != point.branches.end() && reject != point.branches.end());
+  const auto& counts = point.nodes.front().branch_counts;
+  assert(counts[static_cast<std::size_t>(approve - point.branches.begin())] ==
+         12);
+  assert(counts[static_cast<std::size_t>(reject - point.branches.begin())] == 8);
+
+  bool threw = false;
+  try {
+    minera::DecisionMiningOptions missing;
+    missing.activity_attribute = "does-not-exist";
+    (void)minera::mine_decisions(log, net, missing);
+  } catch (const std::invalid_argument& error) {
+    threw = std::string(error.what()).find("activity attribute") !=
+            std::string::npos;
+  }
+  assert(threw);
+}
+
 void decision_mining_recovers_a_numeric_rule() {
   const auto log = decision_amount_log();
   const auto net = minera::to_petri_net(minera::discover_process_tree(log));
@@ -4360,8 +4434,9 @@ void json_export_carries_the_decisions_contract() {
       "test", log, graph, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       nullptr, nullptr, &decisions);
   for (const char* key :
-       {"\"decisions\"", "\"miner\": \"inductive\"", "\"observed_traces\": 20",
+      {"\"decisions\"", "\"miner\": \"inductive\"", "\"observed_traces\": 20",
         "\"replayed_traces\": 20", "\"aligned_traces\": 0",
+        "\"activity_attribute\": \"concept:name\"",
         "\"decision_points\"", "\"branches\"", "\"tree\"",
         "\"key\": \"amount\"", "\"threshold\"", "\"branch\"",
         "\"accuracy\"", "\"majority_share\""}) {
@@ -5832,6 +5907,7 @@ int main() {
   json_export_carries_event_attributes();
   alignment_summary_tallies_moves_per_activity();
   replay_firing_sequences_walk_fitting_variants();
+  decision_mining_supports_a_custom_activity_field();
   decision_mining_recovers_a_numeric_rule();
   decision_mining_uses_prior_event_attributes_only();
   decision_mining_options_bound_tree_and_scope_attributes();

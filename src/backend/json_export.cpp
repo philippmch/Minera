@@ -1399,7 +1399,11 @@ void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
     write_json_string(out, decisions.miner);
     out << ", ";
   }
-  out << "\"observed_traces\": " << decisions.observed_traces
+  out << "\"activity_attribute\": ";
+  write_json_string(out, decisions.activity_attribute.empty()
+                             ? "concept:name"
+                             : decisions.activity_attribute);
+  out << ", \"observed_traces\": " << decisions.observed_traces
       << ", \"replayed_traces\": " << decisions.replayed_traces
       << ", \"aligned_traces\": " << decisions.aligned_traces
       << ", \"alignment_failures\": " << decisions.alignment_failures

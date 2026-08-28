@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "minera/conformance.hpp"
@@ -38,6 +39,7 @@ struct DecisionReplayPaths {
 };
 
 [[nodiscard]] DecisionReplayPaths collect_decision_replay_paths(
-    const EventLog& log, const PetriNet& net);
+    const EventLog& log, const PetriNet& net,
+    std::string_view activity_attribute = "concept:name");
 
 }  // namespace minera::detail

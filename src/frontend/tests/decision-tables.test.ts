@@ -49,8 +49,22 @@ describe("decision table API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("serializes a custom activity field for replay", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe(
+        "/api/decision-tables?miner=alpha&decision_activity_attribute=phase",
+      );
+      return { ok: true, json: async () => payload };
+    }));
+    await expect(requestDecisionTables("alpha", {
+      activity_attribute: "  phase  ",
+    })).resolves.toMatchObject({ family: "DECISION_TABLES" });
+    vi.unstubAllGlobals();
+  });
+
   it("rejects unsafe decision controls before fetching", async () => {
     await expect(requestDecisionTables({ max_depth: 65 })).rejects.toThrow(/at most 64/);
     await expect(requestDecisionTables({ attributes: ["amount,region"] })).rejects.toThrow(/comma-free/);
+    await expect(requestDecisionTables({ activity_attribute: "  " })).rejects.toThrow(/activity_attribute/);
   });
 });
