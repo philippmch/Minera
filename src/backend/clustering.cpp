@@ -684,6 +684,62 @@ double profile_squared_distance(const std::vector<double>& left,
   return result;
 }
 
+std::uint64_t profile_splitmix64(std::uint64_t& state) {
+  state += 0x9e3779b97f4a7c15ULL;
+  std::uint64_t value = state;
+  value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+  return value ^ (value >> 31);
+}
+
+double profile_uniform01(std::uint64_t& state) {
+  constexpr double denominator = 9007199254740992.0;
+  return (static_cast<double>(profile_splitmix64(state) >> 11) + 0.5) /
+         denominator;
+}
+
+std::vector<std::size_t> profile_kmeans_plus_plus(
+    const std::vector<std::vector<double>>& rows, std::size_t cluster_count,
+    std::uint64_t seed) {
+  std::vector<std::size_t> centers(cluster_count, 0);
+  std::uint64_t random_state = seed;
+  centers[0] = std::min(
+      rows.size() - 1,
+      static_cast<std::size_t>(profile_uniform01(random_state) * rows.size()));
+
+  std::vector<double> nearest(rows.size(), std::numeric_limits<double>::infinity());
+  for (std::size_t center = 1; center < cluster_count; ++center) {
+    double potential = 0.0;
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+      nearest[row] = std::min(
+          nearest[row], profile_squared_distance(rows[row], rows[centers[center - 1]]));
+      potential += nearest[row];
+    }
+
+    if (!(potential > 0.0) || !std::isfinite(potential)) {
+      std::set<std::size_t> selected(centers.begin(), centers.begin() +
+                                                   static_cast<std::ptrdiff_t>(center));
+      auto candidate = std::size_t{0};
+      while (candidate < rows.size() && selected.contains(candidate)) ++candidate;
+      centers[center] = candidate < rows.size() ? candidate : centers[center - 1];
+      continue;
+    }
+
+    const double target = profile_uniform01(random_state) * potential;
+    double cumulative = 0.0;
+    std::size_t selected = rows.size() - 1;
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+      cumulative += nearest[row];
+      if (target < cumulative) {
+        selected = row;
+        break;
+      }
+    }
+    centers[center] = selected;
+  }
+  return centers;
+}
+
 }  // namespace
 
 ProfileClusteringResult discover_profile_clustering(
@@ -715,24 +771,7 @@ ProfileClusteringResult discover_profile_clustering(
     throw std::invalid_argument("profile clustering: feature representation is empty");
   const std::size_t k = options.cluster_count;
   result.centroids.assign(k, std::vector<double>(features.names.size(), 0.0));
-  const std::size_t first = static_cast<std::size_t>(options.seed % features.rows.size());
-  std::vector<std::size_t> centers(k);
-  centers[0] = first;
-  for (std::size_t c = 1; c < k; ++c) {
-    double best_distance = -1.0;
-    std::size_t best_index = 0;
-    for (std::size_t row = 0; row < features.rows.size(); ++row) {
-      double nearest = std::numeric_limits<double>::infinity();
-      for (std::size_t previous = 0; previous < c; ++previous)
-        nearest = std::min(nearest, profile_squared_distance(features.rows[row], features.rows[centers[previous]]));
-      if (nearest > best_distance + 1e-12 ||
-          (std::abs(nearest - best_distance) <= 1e-12 && row < best_index)) {
-        best_distance = nearest;
-        best_index = row;
-      }
-    }
-    centers[c] = best_index;
-  }
+  const auto centers = profile_kmeans_plus_plus(features.rows, k, options.seed);
   for (std::size_t c = 0; c < k; ++c) result.centroids[c] = features.rows[centers[c]];
   result.labels.assign(features.rows.size(), 0);
   for (std::size_t iteration = 0; iteration < options.max_iterations; ++iteration) {
