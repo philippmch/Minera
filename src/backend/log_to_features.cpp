@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <chrono>
+#include <cctype>
+#include <cstdint>
+#include <ctime>
 #include <limits>
 #include <map>
 #include <set>
@@ -260,6 +264,197 @@ double instant(const Event& e, const std::string& key, bool required) {
   return *parsed;
 }
 
+enum class TemporalFrequencyUnit { kSecond, kMinute, kHour, kDay, kWeek,
+                                  kMonth, kQuarter, kYear };
+
+struct TemporalFrequency {
+  TemporalFrequencyUnit unit = TemporalFrequencyUnit::kWeek;
+  std::int64_t multiple = 1;
+  bool label_start = false;
+  int week_end_day = 0;  // std::tm convention: Sunday = 0.
+};
+
+std::string uppercase_ascii(std::string value) {
+  for (auto& character : value)
+    character = static_cast<char>(std::toupper(
+        static_cast<unsigned char>(character)));
+  return value;
+}
+
+std::int64_t floor_division(std::int64_t numerator,
+                            std::int64_t denominator) {
+  if (denominator <= 0) throw std::invalid_argument("log_to_features: invalid temporal frequency");
+  std::int64_t quotient = numerator / denominator;
+  const std::int64_t remainder = numerator % denominator;
+  if (remainder < 0) --quotient;
+  return quotient;
+}
+
+TemporalFrequency parse_temporal_frequency(const std::string& raw) {
+  if (raw.empty())
+    throw std::invalid_argument("log_to_features: temporal frequency must not be empty");
+  const auto value = uppercase_ascii(raw);
+  std::size_t suffix_begin = 0;
+  while (suffix_begin < value.size() &&
+         std::isdigit(static_cast<unsigned char>(value[suffix_begin])))
+    ++suffix_begin;
+  std::int64_t multiple = 1;
+  if (suffix_begin != 0) {
+    try {
+      multiple = std::stoll(value.substr(0, suffix_begin));
+    } catch (...) {
+      throw std::invalid_argument("log_to_features: invalid temporal frequency");
+    }
+  }
+  if (multiple <= 0 || suffix_begin == value.size())
+    throw std::invalid_argument("log_to_features: temporal frequency multiplier must be positive");
+  const auto suffix = value.substr(suffix_begin);
+  TemporalFrequency result;
+  result.multiple = multiple;
+  if (suffix == "S" || suffix == "SEC" || suffix == "SECOND" ||
+      suffix == "SECONDS") {
+    result.unit = TemporalFrequencyUnit::kSecond;
+  } else if (suffix == "T" || suffix == "MIN" || suffix == "MINS" ||
+             suffix == "MINUTE" || suffix == "MINUTES") {
+    result.unit = TemporalFrequencyUnit::kMinute;
+  } else if (suffix == "H" || suffix == "HR" || suffix == "HOUR" ||
+             suffix == "HOURS") {
+    result.unit = TemporalFrequencyUnit::kHour;
+  } else if (suffix == "D" || suffix == "DAY" || suffix == "DAYS") {
+    result.unit = TemporalFrequencyUnit::kDay;
+  } else if (suffix.rfind("W", 0) == 0) {
+    result.unit = TemporalFrequencyUnit::kWeek;
+    const auto day = suffix.substr(1);
+    if (!day.empty()) {
+      if (day.front() != '-')
+        throw std::invalid_argument("log_to_features: invalid weekly temporal frequency");
+      const auto weekday = day.substr(1);
+      static const std::map<std::string, int> weekdays = {
+          {"SUN", 0}, {"MON", 1}, {"TUE", 2}, {"WED", 3},
+          {"THU", 4}, {"FRI", 5}, {"SAT", 6}};
+      const auto found = weekdays.find(weekday);
+      if (found == weekdays.end())
+        throw std::invalid_argument("log_to_features: invalid weekly temporal frequency");
+      result.week_end_day = found->second;
+    }
+  } else if (suffix == "M" || suffix == "ME" || suffix == "MONTH" ||
+             suffix == "MONTHS") {
+    result.unit = TemporalFrequencyUnit::kMonth;
+  } else if (suffix == "MS" || suffix == "MONTHSTART") {
+    result.unit = TemporalFrequencyUnit::kMonth;
+    result.label_start = true;
+  } else if (suffix == "Q" || suffix == "QE" || suffix == "QUARTER" ||
+             suffix == "QUARTERS") {
+    result.unit = TemporalFrequencyUnit::kQuarter;
+  } else if (suffix == "QS" || suffix == "QUARTERSTART") {
+    result.unit = TemporalFrequencyUnit::kQuarter;
+    result.label_start = true;
+  } else if (suffix == "Y" || suffix == "A" || suffix == "YE" ||
+             suffix == "YEAR" || suffix == "YEARS") {
+    result.unit = TemporalFrequencyUnit::kYear;
+  } else if (suffix == "YS" || suffix == "AS" || suffix == "YEARSTART") {
+    result.unit = TemporalFrequencyUnit::kYear;
+    result.label_start = true;
+  } else {
+    throw std::invalid_argument("log_to_features: unsupported temporal frequency '" + raw + "'");
+  }
+  return result;
+}
+
+std::tm utc_calendar(double seconds) {
+  const auto integral = static_cast<std::time_t>(std::floor(seconds));
+  std::tm calendar{};
+#if defined(_WIN32)
+  if (gmtime_s(&calendar, &integral) != 0)
+    throw std::invalid_argument("log_to_features: timestamp is outside the calendar range");
+#else
+  if (gmtime_r(&integral, &calendar) == nullptr)
+    throw std::invalid_argument("log_to_features: timestamp is outside the calendar range");
+#endif
+  return calendar;
+}
+
+std::chrono::sys_days calendar_day(const std::tm& calendar) {
+  using namespace std::chrono;
+  return sys_days{year{calendar.tm_year + 1900} /
+                  month{static_cast<unsigned>(calendar.tm_mon + 1)} /
+                  day{static_cast<unsigned>(calendar.tm_mday)}};
+}
+
+std::int64_t epoch_seconds(std::chrono::sys_days day) {
+  using namespace std::chrono;
+  return duration_cast<seconds>(day.time_since_epoch()).count();
+}
+
+std::int64_t temporal_bucket_label(double seconds,
+                                   const TemporalFrequency& frequency) {
+  using namespace std::chrono;
+  const auto calendar = utc_calendar(seconds);
+  const auto date = calendar_day(calendar);
+  switch (frequency.unit) {
+    case TemporalFrequencyUnit::kSecond:
+      return floor_division(static_cast<std::int64_t>(std::floor(seconds)),
+                            frequency.multiple) * frequency.multiple;
+    case TemporalFrequencyUnit::kMinute:
+      return floor_division(static_cast<std::int64_t>(std::floor(seconds)),
+                            frequency.multiple * 60) * frequency.multiple * 60;
+    case TemporalFrequencyUnit::kHour:
+      return floor_division(static_cast<std::int64_t>(std::floor(seconds)),
+                            frequency.multiple * 3600) * frequency.multiple * 3600;
+    case TemporalFrequencyUnit::kDay:
+      return floor_division(epoch_seconds(date), frequency.multiple * 86400) *
+             frequency.multiple * 86400;
+    case TemporalFrequencyUnit::kWeek: {
+      const int delta = (frequency.week_end_day - calendar.tm_wday + 7) % 7;
+      const auto end_date = date + days{delta};
+      const auto anchor_date =
+          sys_days{year{1970} / month{1} / day{4}} +
+          days{frequency.week_end_day};
+      const auto weeks = floor_division(epoch_seconds(end_date) -
+                                            epoch_seconds(anchor_date),
+                                        7 * 86400);
+      const auto bucket = floor_division(weeks, frequency.multiple);
+      return epoch_seconds(anchor_date +
+                           days{bucket * frequency.multiple * 7});
+    }
+    case TemporalFrequencyUnit::kMonth:
+    case TemporalFrequencyUnit::kQuarter:
+    case TemporalFrequencyUnit::kYear: {
+      const std::int64_t months_per_period =
+          frequency.unit == TemporalFrequencyUnit::kMonth
+              ? 1
+              : frequency.unit == TemporalFrequencyUnit::kQuarter ? 3 : 12;
+      const std::int64_t month_index =
+          static_cast<std::int64_t>(calendar.tm_year + 1900) * 12 +
+          calendar.tm_mon;
+      const auto period = floor_division(
+          month_index, months_per_period * frequency.multiple);
+      const auto first_month =
+          period * months_per_period * frequency.multiple;
+      const auto label_month = frequency.label_start
+                                   ? first_month
+                                   : first_month +
+                                         months_per_period * frequency.multiple - 1;
+      const auto year = floor_division(label_month, 12);
+      const auto month = label_month - year * 12;
+      const auto first_day = sys_days{
+          std::chrono::year{static_cast<int>(year)} /
+          std::chrono::month{static_cast<unsigned>(month + 1)} /
+          std::chrono::day{1}};
+      if (frequency.label_start) return epoch_seconds(first_day);
+      const auto next_month = first_day + days{32};
+      const auto next_calendar = utc_calendar(
+          static_cast<double>(epoch_seconds(next_month)));
+      const auto next_first = sys_days{
+          std::chrono::year{next_calendar.tm_year + 1900} /
+          std::chrono::month{static_cast<unsigned>(next_calendar.tm_mon + 1)} /
+          std::chrono::day{1}};
+      return epoch_seconds(next_first - days{1});
+    }
+  }
+  throw std::invalid_argument("log_to_features: invalid temporal frequency");
+}
+
 }  // namespace
 
 LogToFeaturesResult log_to_features(const EventLog& log,
@@ -269,7 +464,8 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     throw std::invalid_argument("log_to_features: keys must not be empty");
   if (!std::isfinite(options.default_not_present))
     throw std::invalid_argument("log_to_features: default_not_present must be finite");
-  if (!std::isfinite(options.window_seconds) || options.window_seconds <= 0.0)
+  if (options.grouper_freq.empty() &&
+      (!std::isfinite(options.window_seconds) || options.window_seconds <= 0.0))
     throw std::invalid_argument("log_to_features: window_seconds must be finite and positive");
   if (!std::isfinite(options.epsilon) || options.epsilon < 0.0)
     throw std::invalid_argument("log_to_features: epsilon must be finite and non-negative");
@@ -648,6 +844,11 @@ LogToFeaturesResult log_to_features(const EventLog& log,
   }
 
   if (options.variant != LogToFeaturesVariant::TEMPORAL) throw std::invalid_argument("log_to_features: unknown variant");
+  const std::optional<TemporalFrequency> temporal_frequency =
+      options.grouper_freq.empty()
+          ? std::nullopt
+          : std::optional<TemporalFrequency>(
+                parse_temporal_frequency(options.grouper_freq));
   std::vector<TimedEvent> events;
   double origin = std::numeric_limits<double>::infinity();
   struct CaseTemporal {
@@ -716,13 +917,25 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     arrival_rate[arrival_order[i]] = cases[arrival_order[i]].start - cases[arrival_order[i - 1]].start;
   for (std::size_t i = 1; i < finish_order.size(); ++i)
     finish_rate[finish_order[i]] = cases[finish_order[i]].finish - cases[finish_order[i - 1]].finish;
-  std::map<long long,std::vector<const TimedEvent*>> buckets;
-  for (const auto& event : events)
-    buckets[static_cast<long long>(std::floor((event.start-origin)/options.window_seconds))].push_back(&event);
+  std::map<long long, std::vector<const TimedEvent*>> buckets;
+  std::map<long long, double> bucket_timestamps;
+  for (const auto& event : events) {
+    if (temporal_frequency) {
+      const auto label = temporal_bucket_label(event.start, *temporal_frequency);
+      buckets[label].push_back(&event);
+      bucket_timestamps[label] = static_cast<double>(label);
+    } else {
+      const auto bucket = static_cast<long long>(
+          std::floor((event.start - origin) / options.window_seconds));
+      buckets[bucket].push_back(&event);
+      bucket_timestamps[bucket] =
+          origin + static_cast<double>(bucket) * options.window_seconds;
+    }
+  }
   std::unordered_map<std::string,std::size_t> index; for (std::size_t i=0;i<out.feature_names.size();++i) index[out.feature_names[i]]=i;
   for (const auto& [bucket, bucket_events] : buckets) {
     TemporalFeatureRow row;
-    row.timestamp = origin + static_cast<double>(bucket) * options.window_seconds;
+    row.timestamp = bucket_timestamps.at(bucket);
     row.values.assign(out.feature_names.size(), options.default_not_present);
     auto add = [&](const std::string& name, double value) {
       if (const auto it = index.find(name); it != index.end()) row.values[it->second] = value;
