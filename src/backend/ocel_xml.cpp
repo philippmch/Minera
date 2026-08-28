@@ -39,11 +39,6 @@ std::string attr_or(const Node& n, std::string_view key, std::string fallback = 
   return fallback;
 }
 
-bool is_standard_epoch(std::string_view value) {
-  return value == "0" || value == "1970-01-01T00:00:00Z" ||
-         value == "1970-01-01T00:00:00.000Z";
-}
-
 Node parse_tree(std::string_view xml) {
   detail::XmlPullParser parser(xml, true);
   Node root;
@@ -371,8 +366,8 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
           if (entries.empty()) continue;
           o.attributes.push_back({key, entries.front().value});
           for (std::size_t i = 1; i < entries.size(); ++i) {
-            if (!entries[i].has_time || is_standard_epoch(entries[i].time))
-              throw std::invalid_argument("OCEL XML object attribute has duplicate static value");
+            if (!entries[i].has_time)
+              throw std::invalid_argument("OCEL XML object attribute change requires a timestamp");
             log.object_changes.push_back({id, type, entries[i].time, key,
                                            entries[i].value});
           }

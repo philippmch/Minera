@@ -455,7 +455,8 @@ likewise emits and imports the `ocel:eventTypes` and `ocel:objectTypes`
 catalogs; observed attributes fill in missing declarations with deterministic
 scalar types while explicit catalog types are preserved;
 typed values are coerced on import, static object attributes use the epoch
-baseline, and later timed values remain object changes. CSV import validates
+baseline, and every later timed value remains an ordered object change,
+including entries that repeat the epoch baseline. CSV import validates
 headers, object-list cells, timestamps, ids, and cross-type references; SQLite
 round-trips the core relational tables plus typed attributes, event-to-event
 links, object changes, and globals, and writes/imports standard type-specific

@@ -381,11 +381,6 @@ OcelValue standard_scalar(const Json& value, std::string_view field,
   return scalar(value, field);
 }
 
-bool is_standard_epoch(std::string_view value) {
-  return value == "0" || value == "1970-01-01T00:00:00Z" ||
-         value == "1970-01-01T00:00:00.000Z";
-}
-
 Ocel parse_classic(const Json::Object& root) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
@@ -484,9 +479,9 @@ Ocel parse_standard(const Json::Object& root) {
         if (entries.empty()) continue;
         object.attributes.push_back({name, entries.front().value});
         for (std::size_t i = 1; i < entries.size(); ++i) {
-          if (!entries[i].has_time || is_standard_epoch(entries[i].time))
+          if (!entries[i].has_time)
             throw std::invalid_argument(
-                "OCEL object attribute has duplicate static value");
+                "OCEL object attribute change requires a timestamp");
           log.object_changes.push_back(
               {id, type, entries[i].time, name, entries[i].value});
         }
