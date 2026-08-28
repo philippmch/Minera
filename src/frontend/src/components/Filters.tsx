@@ -482,6 +482,8 @@ export function Filters({
   const [dfgCausalVariants, setDfgCausalVariants] = useState<Set<string>>(new Set());
   const [dfgWindow, setDfgWindow] = useState("1");
   const [dfgKeepOncePerCase, setDfgKeepOncePerCase] = useState(false);
+  const [dfgActivityAttribute, setDfgActivityAttribute] = useState("concept:name");
+  const [dfgTimestampAttribute, setDfgTimestampAttribute] = useState("time:timestamp");
   const [dfgPerformanceAggregation, setDfgPerformanceAggregation] = useState<NonNullable<MinerOptions["dfgPerformanceAggregation"]>>("mean");
   const [dfgStartTimestampAttribute, setDfgStartTimestampAttribute] = useState("start_timestamp");
   const [dfgBusinessHours, setDfgBusinessHours] = useState(false);
@@ -495,6 +497,14 @@ export function Filters({
   const dfgPerformanceOptionsActive =
     dfgStatisticalVariants.has("performance") ||
     dfgStatisticalVariants.has("performance_greedy");
+  const dfgActivityOptionsActive =
+    dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0;
+  const dfgTimestampOptionsActive =
+    dfgStatisticalVariants.has("performance") ||
+    dfgStatisticalVariants.has("performance_greedy") ||
+    dfgStatisticalVariants.has("clean") ||
+    dfgStatisticalVariants.has("clean_polars") ||
+    dfgStatisticalVariants.has("clean_time");
   const dfgCaseAttributeOptionsActive =
     dfgStatisticalVariants.has("case_attributes");
   const correlationNames = [
@@ -991,6 +1001,10 @@ export function Filters({
         ? toPowlActivityLimit(dfgWindow) : undefined,
       dfgKeepOncePerCase: dfgFrequencyOptionsActive && dfgKeepOncePerCase
         ? true : undefined,
+      dfgActivityAttribute: dfgActivityOptionsActive
+        ? dfgActivityAttribute.trim() || undefined : undefined,
+      dfgTimestampAttribute: dfgTimestampOptionsActive
+        ? dfgTimestampAttribute.trim() || undefined : undefined,
       dfgPerformanceAggregation: dfgPerformanceOptionsActive
         ? dfgPerformanceAggregation : undefined,
       dfgStartTimestampAttribute: dfgPerformanceOptionsActive
@@ -1326,7 +1340,9 @@ export function Filters({
     FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS.some((name) => !footprintsDiscoveryVariants.has(name)) ||
     footprintsConformanceVariants.size !== 1 || !footprintsConformanceVariants.has("log_model");
   const dfgDirty =
-    dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0;
+    dfgStatisticalVariants.size > 0 || dfgCausalVariants.size > 0 ||
+    dfgActivityAttribute.trim() !== "concept:name" ||
+    dfgTimestampAttribute.trim() !== "time:timestamp";
   const correlationDirty = correlationVariants.size > 0;
   const spectrumActive = spectrumActivities.trim() !== "";
   const temporalDirty =
@@ -1885,6 +1901,18 @@ export function Filters({
             </div>
           </div>
           <div className="filters-row">
+            <label className="filters-field">
+              <span>Activity attribute</span>
+              <input type="text" value={dfgActivityAttribute}
+                disabled={!dfgActivityOptionsActive}
+                onChange={(event) => setDfgActivityAttribute(event.target.value)} />
+            </label>
+            <label className="filters-field">
+              <span>Timestamp attribute</span>
+              <input type="text" value={dfgTimestampAttribute}
+                disabled={!dfgTimestampOptionsActive}
+                onChange={(event) => setDfgTimestampAttribute(event.target.value)} />
+            </label>
             <label className="filters-field">
               <span>DFG window</span>
               <input type="number" min={0} step={1} value={dfgWindow}

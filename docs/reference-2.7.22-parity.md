@@ -104,6 +104,14 @@ deterministic. The selectors and labels are available through strict request
 parsing, standalone CLI flags, the local playout endpoint, and typed frontend
 controls.
 
+Statistical DFG evidence: frequency, frequency-triple, performance,
+case-attribute, clean, and clean-time variants accept independent activity and
+completion timestamp selectors. Standard XES names continue to use the native
+first-class fields; custom selectors read typed event attributes, participate in
+timestamp ordering and business-hour elapsed time, and reject missing fields
+deterministically. Strict request parsing, standalone CLI flags, cached-server
+mining, and typed frontend controls serialize the selectors consistently.
+
 Extensive process-tree playout also supports an opt-in set-string result. The
 native result helper returns the deduplicated activity-word set while the
 legacy EventLog API remains unchanged; the export CLI, cached local server,

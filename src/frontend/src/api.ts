@@ -458,6 +458,8 @@ export interface MinerOptions {
   dfgCausalVariants?: string[];
   dfgWindow?: number;
   dfgKeepOncePerCase?: boolean;
+  dfgActivityAttribute?: string;
+  dfgTimestampAttribute?: string;
   dfgPerformanceAggregation?:
     | "mean" | "median" | "min" | "max" | "stdev" | "sum" | "raw_values" | "all";
   dfgStartTimestampAttribute?: string;
@@ -1018,6 +1020,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("dfg_statistical_variants", selectedDfgStatistical.join(","));
   if (selectedDfgCausal.length)
     add("dfg_causal_variants", selectedDfgCausal.join(","));
+  if (selectedDfgStatistical.length || selectedDfgCausal.length) {
+    const activityAttribute = options.dfgActivityAttribute?.trim();
+    if (activityAttribute && activityAttribute !== "concept:name")
+      add("dfg_activity_attribute", activityAttribute);
+  }
   if (hasDfgFrequency) {
     if (options.dfgWindow !== undefined && Number.isInteger(options.dfgWindow) && options.dfgWindow >= 0 && options.dfgWindow !== 1)
       add("dfg_window", String(options.dfgWindow));
@@ -1044,6 +1051,13 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       });
       if (validSlots) add("dfg_business_hour_slots", businessHourSlots);
     }
+  }
+  const hasDfgTimestampSelector = selectedDfgStatistical.some((name) =>
+    ["performance", "performance_greedy", "clean", "clean_polars", "clean_time"].includes(name));
+  if (hasDfgTimestampSelector) {
+    const timestampAttribute = options.dfgTimestampAttribute?.trim();
+    if (timestampAttribute && timestampAttribute !== "time:timestamp")
+      add("dfg_timestamp_attribute", timestampAttribute);
   }
   if (hasDfgCaseAttributes) {
     const caseAttributes = options.dfgCaseAttributes?.map((name) => name.trim()).filter(Boolean);

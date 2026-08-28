@@ -1755,6 +1755,8 @@ void parse_mine_params_maps_dfg_variant_options() {
       {"dfg_causal_variants", "heuristic,alpha,heuristic"},
       {"dfg_window", "0"},
       {"dfg_keep_once_per_case", "true"},
+      {"dfg_activity_attribute", "event:name"},
+      {"dfg_timestamp_attribute", "event:when"},
       {"dfg_performance_aggregation", "all"},
       {"dfg_start_timestamp_attribute", "start:timestamp"},
       {"dfg_business_hours", "1"},
@@ -1770,6 +1772,8 @@ void parse_mine_params_maps_dfg_variant_options() {
           std::vector<std::string>{"alpha", "heuristic"}));
   assert(params.dfg_statistics.window == 0);
   assert(params.dfg_statistics.keep_once_per_case);
+  assert(params.dfg_statistics.activity_attribute == "event:name");
+  assert(params.dfg_statistics.timestamp_attribute == "event:when");
   assert(params.dfg_statistics.performance_aggregation ==
          minera::DfgPerformanceAggregation::kAll);
   assert(params.dfg_statistics.start_timestamp_attribute ==
@@ -1789,6 +1793,8 @@ void parse_mine_params_maps_dfg_variant_options() {
   assert(defaults.dfg_causal_variants.empty());
   assert(defaults.dfg_statistics.window == 1);
   assert(!defaults.dfg_statistics.keep_once_per_case);
+  assert(defaults.dfg_statistics.activity_attribute == "concept:name");
+  assert(defaults.dfg_statistics.timestamp_attribute == "time:timestamp");
   assert(defaults.dfg_statistics.performance_aggregation ==
          minera::DfgPerformanceAggregation::kMean);
   assert(defaults.dfg_statistics.start_timestamp_attribute ==
@@ -1817,6 +1823,25 @@ void parse_mine_params_preserves_explicit_empty_dfg_attributes() {
   assert(params.dfg_statistics.start_timestamp_attribute.empty());
   assert(params.dfg_statistics.business_hour_slots.empty());
   assert(params.dfg_statistics.case_attributes.empty());
+
+  for (const std::string name : {"dfg_activity_attribute",
+                                 "dfg_timestamp_attribute"}) {
+    const std::map<std::string, std::string> empty_value = {{name, ""}};
+    const auto empty_lookup = [&empty_value](std::string_view key) {
+      const auto it = empty_value.find(std::string(key));
+      return it == empty_value.end() ? std::string{} : it->second;
+    };
+    const auto empty_present = [&empty_value](std::string_view key) {
+      return empty_value.contains(std::string(key));
+    };
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(empty_lookup, empty_present);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
 }
 
 void parse_mine_params_rejects_invalid_dfg_variant_options() {

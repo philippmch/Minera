@@ -35,7 +35,51 @@ std::string_view start_timestamp(const Event& event,
       return *value;
     }
   }
-  return event.timestamp;
+  if (options.timestamp_attribute.empty() ||
+      options.timestamp_attribute == "time:timestamp" ||
+      options.timestamp_attribute == "timestamp") {
+    return event.timestamp;
+  }
+  if (const auto* value = event.attribute(options.timestamp_attribute)) {
+    return *value;
+  }
+  throw std::invalid_argument(
+      "DFG discovery: event is missing timestamp attribute '" +
+      options.timestamp_attribute + "'");
+}
+
+bool standard_activity_attribute(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+const std::string& activity_value(const Event& event,
+                                  const DfgStatisticalOptions& options) {
+  if (standard_activity_attribute(options.activity_attribute)) {
+    return event.activity;
+  }
+  if (const auto* value = event.attribute(options.activity_attribute)) {
+    return *value;
+  }
+  throw std::invalid_argument(
+      "DFG discovery: event is missing activity attribute '" +
+      options.activity_attribute + "'");
+}
+
+bool standard_timestamp_attribute(std::string_view key) {
+  return key.empty() || key == "time:timestamp" || key == "timestamp";
+}
+
+const std::string& timestamp_value(const Event& event,
+                                   const DfgStatisticalOptions& options) {
+  if (standard_timestamp_attribute(options.timestamp_attribute)) {
+    return event.timestamp;
+  }
+  if (const auto* value = event.attribute(options.timestamp_attribute)) {
+    return *value;
+  }
+  throw std::invalid_argument(
+      "DFG discovery: event is missing timestamp attribute '" +
+      options.timestamp_attribute + "'");
 }
 
 std::optional<double> local_wall_timestamp(std::string_view text) {
@@ -184,12 +228,14 @@ struct TimedEventRef {
   std::size_t position = 0;
 };
 
-std::vector<TimedEventRef> sorted_strict_events(const Trace& trace) {
+std::vector<TimedEventRef> sorted_strict_events(
+    const Trace& trace, const DfgStatisticalOptions& options) {
   std::vector<TimedEventRef> events;
   events.reserve(trace.events.size());
   for (std::size_t i = 0; i < trace.events.size(); ++i) {
     events.push_back({&trace.events[i],
-                      required_timestamp(trace.events[i].timestamp, "event"),
+                      required_timestamp(timestamp_value(trace.events[i], options),
+                                         "event"),
                       i});
   }
   std::stable_sort(events.begin(), events.end(), [](const auto& lhs,
@@ -220,26 +266,29 @@ DfgFrequency discover_frequency_dfg(const EventLog& log,
     if (options.keep_once_per_case) {
       std::set<DfgActivityPair> observed;
       for (std::size_t i = options.window; i < trace.events.size(); ++i) {
-        observed.emplace(trace.events[i - options.window].activity,
-                         trace.events[i].activity);
+        observed.emplace(
+            activity_value(trace.events[i - options.window], options),
+            activity_value(trace.events[i], options));
       }
       for (const auto& pair : observed) ++result[pair];
     } else {
       for (std::size_t i = options.window; i < trace.events.size(); ++i) {
-        ++result[{trace.events[i - options.window].activity,
-                  trace.events[i].activity}];
+        ++result[{activity_value(trace.events[i - options.window], options),
+                  activity_value(trace.events[i], options)}];
       }
     }
   }
   return result;
 }
 
-DfgTripleFrequency discover_frequency_triples(const EventLog& log) {
+DfgTripleFrequency discover_frequency_triples(
+    const EventLog& log, const DfgStatisticalOptions& options) {
   DfgTripleFrequency result;
   for (const auto& trace : log.traces) {
     for (std::size_t i = 2; i < trace.events.size(); ++i) {
-      ++result[{trace.events[i - 2].activity, trace.events[i - 1].activity,
-                trace.events[i].activity}];
+      ++result[{activity_value(trace.events[i - 2], options),
+                activity_value(trace.events[i - 1], options),
+                activity_value(trace.events[i], options)}];
     }
   }
   return result;
@@ -255,14 +304,16 @@ DfgPerformance discover_performance_dfg(
     for (std::size_t i = 1; i < trace.events.size(); ++i) {
       const auto& previous = trace.events[i - 1];
       const auto& current = trace.events[i];
+      const auto previous_complete_text = timestamp_value(previous, options);
       const double previous_complete =
-          required_timestamp(previous.timestamp, "completion");
+          required_timestamp(previous_complete_text, "completion");
       const auto current_start_text = start_timestamp(current, options);
       const double current_start =
           required_timestamp(current_start_text, "start");
       double elapsed = current_start - previous_complete;
       if (options.use_business_hours) {
-        const auto previous_local = local_wall_timestamp(previous.timestamp);
+        const auto previous_local =
+            local_wall_timestamp(previous_complete_text);
         const auto current_local = local_wall_timestamp(current_start_text);
         if (!previous_local || !current_local) {
           throw std::invalid_argument(
@@ -270,7 +321,8 @@ DfgPerformance discover_performance_dfg(
         }
         elapsed = business_elapsed(*previous_local, *current_local, slots);
       }
-      observations[{previous.activity, current.activity}].push_back(
+      observations[{activity_value(previous, options),
+                    activity_value(current, options)}].push_back(
           std::max(0.0, elapsed));
     }
   }
@@ -297,12 +349,12 @@ DfgCaseAttributeAnalysis discover_case_attribute_dfg(
       const auto value = case_attribute_value(trace, attribute);
       if (!value) continue;
       for (std::size_t i = 1; i < trace.events.size(); ++i) {
-        ++result.edges[{trace.events[i - 1].activity,
-                        trace.events[i].activity}][attribute][*value];
+        ++result.edges[{activity_value(trace.events[i - 1], options),
+                        activity_value(trace.events[i], options)}][attribute][*value];
       }
       if (options.return_node_attributes) {
         for (const auto& event : trace.events) {
-          ++result.nodes[event.activity][attribute][*value];
+          ++result.nodes[activity_value(event, options)][attribute][*value];
         }
       }
     }
@@ -310,31 +362,34 @@ DfgCaseAttributeAnalysis discover_case_attribute_dfg(
   return result;
 }
 
-DfgCleanAnalysis discover_clean_dfg(const EventLog& log) {
+DfgCleanAnalysis discover_clean_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options) {
   DfgCleanAnalysis result;
   for (const auto& trace : log.traces) {
-    const auto events = sorted_strict_events(trace);
+    const auto events = sorted_strict_events(trace, options);
     if (events.empty()) continue;
-    ++result.start_activities[events.front().event->activity];
-    ++result.end_activities[events.back().event->activity];
+    ++result.start_activities[activity_value(*events.front().event, options)];
+    ++result.end_activities[activity_value(*events.back().event, options)];
     // Intentional CLEAN oddity: the first event never owns an edge and
     // the last event cannot own one. A length-three case keeps middle->last.
     for (std::size_t i = 1; i + 1 < events.size(); ++i) {
-      ++result.graph[{events[i].event->activity,
-                      events[i + 1].event->activity}];
+      ++result.graph[{activity_value(*events[i].event, options),
+                      activity_value(*events[i + 1].event, options)}];
     }
   }
   return result;
 }
 
-DfgCleanTime discover_clean_time_dfg(const EventLog& log) {
+DfgCleanTime discover_clean_time_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options) {
   std::map<std::string, std::vector<double>> case_offsets;
   for (const auto& trace : log.traces) {
-    const auto events = sorted_strict_events(trace);
+    const auto events = sorted_strict_events(trace, options);
     if (events.empty()) continue;
     std::map<std::string, std::vector<double>> activity_instants;
     for (const auto& item : events) {
-      activity_instants[item.event->activity].push_back(item.timestamp);
+      activity_instants[activity_value(*item.event, options)].push_back(
+          item.timestamp);
     }
     const double case_start = events.front().timestamp;
     for (const auto& [activity, instants] : activity_instants) {
@@ -360,16 +415,16 @@ DfgStatisticalAnalysis discover_dfg_statistics(
   if (options.variant == DfgStatisticalVariant::kNative) {
     result.frequency_dfg = discover_frequency_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kFrequencyTriples) {
-    result.frequency_triples = discover_frequency_triples(log);
+    result.frequency_triples = discover_frequency_triples(log, options);
   } else if (options.variant == DfgStatisticalVariant::kPerformance) {
     result.performance_dfg = discover_performance_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kCaseAttributes) {
     result.case_attributes = discover_case_attribute_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kClean) {
-    result.clean = discover_clean_dfg(log);
+    result.clean = discover_clean_dfg(log, options);
     result.frequency_dfg = result.clean.graph;
   } else if (options.variant == DfgStatisticalVariant::kCleanTime) {
-    result.clean_time = discover_clean_time_dfg(log);
+    result.clean_time = discover_clean_time_dfg(log, options);
   }
   return result;
 }

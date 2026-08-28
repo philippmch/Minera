@@ -1023,6 +1023,8 @@ describe("mineFormEntries", () => {
       dfgCausalVariants: ["heuristic", "bogus", "alpha"],
       dfgWindow: 0,
       dfgKeepOncePerCase: true,
+      dfgActivityAttribute: "event:name",
+      dfgTimestampAttribute: "event:when",
       dfgPerformanceAggregation: "all",
       dfgStartTimestampAttribute: "time:start",
       dfgBusinessHours: true,
@@ -1032,12 +1034,14 @@ describe("mineFormEntries", () => {
     })).toEqual([
       ["dfg_statistical_variants", "frequency,performance,case_attributes,clean_time"],
       ["dfg_causal_variants", "alpha,heuristic"],
+      ["dfg_activity_attribute", "event:name"],
       ["dfg_window", "0"],
       ["dfg_keep_once_per_case", "true"],
       ["dfg_performance_aggregation", "all"],
       ["dfg_start_timestamp_attribute", "time:start"],
       ["dfg_business_hours", "true"],
       ["dfg_business_hour_slots", "25200-61200,111600-147600"],
+      ["dfg_timestamp_attribute", "event:when"],
       ["dfg_case_attributes", "concept:name,region"],
       ["dfg_return_node_attributes", "true"],
     ]);
