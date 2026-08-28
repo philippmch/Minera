@@ -3556,9 +3556,11 @@ LogToFeaturesParams parse_log_to_features_params(const FieldLookup& field,
   assign_string("timestamp_key", params.timestamp_key);
   assign_string("start_timestamp_key", params.start_timestamp_key);
   assign_string("resource_key", params.resource_key);
+  assign_string("grouper_freq", params.grouper_freq);
   if (supplied("window_seconds")) {
     params.window_seconds = parse_finite_double(require("window_seconds"), key_for("window_seconds"));
     if (params.window_seconds <= 0.0) throw std::invalid_argument("features_window_seconds must be positive");
+    if (!supplied("grouper_freq")) params.grouper_freq.clear();
   }
   if (supplied("default_not_present"))
     params.default_not_present = parse_finite_double(require("default_not_present"), key_for("default_not_present"));

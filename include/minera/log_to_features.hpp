@@ -29,6 +29,10 @@ struct LogToFeaturesOptions {
   std::string start_timestamp_key;
   std::string resource_key = "org:resource";
   double window_seconds = 604800.0;
+  // Calendar frequency for temporal rows (for example "W", "D", "H",
+  // "MS", or "Q").  The default is weekly; an empty value keeps the
+  // fixed-width window_seconds projection for compatibility.
+  std::string grouper_freq = "W";
 
   std::vector<std::string> event_string_attributes;
   std::vector<std::string> event_numeric_attributes;

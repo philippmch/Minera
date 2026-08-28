@@ -620,7 +620,9 @@ int usage(const char* program) {
                "  --features-variant <id>  event_based (default), trace_based, temporal\n"
                "  --features-activity-key <name> Activity attribute\n"
                "  --features-timestamp-key <name> Timestamp attribute\n"
-               "  --features-window-seconds <f> Temporal bucket width\n"
+               "  --features-grouper-freq <id> Calendar temporal frequency\n"
+               "                            (default: W)\n"
+               "  --features-window-seconds <f> Fixed temporal bucket width\n"
                "  --embeddings              Emit case/event embeddings JSON\n"
                "  --embedding-variant <id>  cases (default) or events\n"
                "  --embedding-provider <id> hashing (default) or transformer (mock_transformer model for CLI)\n"
@@ -2333,7 +2335,8 @@ int main(int argc, char** argv) {
       static const std::set<std::string> feature_option_names = {
           "features_variant", "features_activity_key", "features_timestamp_key",
           "features_start_timestamp_key", "features_resource_key",
-          "features_window_seconds", "features_default_not_present",
+          "features_grouper_freq", "features_window_seconds",
+          "features_default_not_present",
           "features_event_string_attributes", "features_event_numeric_attributes",
           "features_case_string_attributes", "features_case_numeric_attributes",
           "features_event_attributes", "features_case_attributes", "features_event_successor_attributes",
@@ -2348,6 +2351,7 @@ int main(int argc, char** argv) {
           "features_min_num_different_string_values", "features_max_num_different_string_values",
           "feature_variant", "feature_activity_key", "feature_timestamp_key",
           "feature_start_timestamp_key", "feature_resource_key", "feature_window_seconds",
+          "feature_grouper_freq",
           "feature_default_not_present", "feature_event_string_attributes",
           "feature_event_numeric_attributes", "feature_case_string_attributes",
           "feature_case_numeric_attributes", "feature_event_attributes",

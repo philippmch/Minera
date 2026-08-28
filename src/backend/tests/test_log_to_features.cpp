@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "minera/json_export.hpp"
+#include "minera/timestamp.hpp"
 
 using namespace minera;
 
@@ -173,6 +174,64 @@ static void overlap_extras_use_case_intervals_and_other_events() {
   assert(result.trace_rows[1][index(workload)] == 2.0);
 }
 
+static void temporal_calendar_frequency_uses_period_boundaries() {
+  EventLog log;
+  Trace first;
+  first.case_id = "c1";
+  first.events = {timed_event("c1", "A", "2024-01-01T12:00:00Z",
+                               "2024-01-01T12:01:00Z", 0)};
+  log.traces.push_back(first);
+  Trace second;
+  second.case_id = "c2";
+  second.events = {timed_event("c2", "B", "2024-01-08T12:00:00Z",
+                                "2024-01-08T12:01:00Z", 0)};
+  log.traces.push_back(second);
+
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TEMPORAL;
+  options.start_timestamp_key = "start_time";
+  options.grouper_freq = "W";
+  options.feature_names = {"num_events", "number_of_cases"};
+  const auto weekly = log_to_features(log, options);
+  assert(weekly.temporal_rows.size() == 2);
+  const auto jan7 = parse_timestamp("2024-01-07T00:00:00Z");
+  const auto jan14 = parse_timestamp("2024-01-14T00:00:00Z");
+  assert(jan7 && jan14);
+  assert(weekly.temporal_rows[0].timestamp == *jan7);
+  assert(weekly.temporal_rows[1].timestamp == *jan14);
+  assert(weekly.temporal_rows[0].values[0] == 1.0 &&
+         weekly.temporal_rows[1].values[1] == 1.0);
+
+  options.grouper_freq = "MS";
+  const auto month_start = log_to_features(log, options);
+  assert(month_start.temporal_rows.size() == 1);
+  const auto jan1 = parse_timestamp("2024-01-01T00:00:00Z");
+  assert(jan1 && month_start.temporal_rows[0].timestamp == *jan1);
+
+  options.grouper_freq = "M";
+  const auto month_end = log_to_features(log, options);
+  const auto jan31 = parse_timestamp("2024-01-31T00:00:00Z");
+  assert(jan31 && month_end.temporal_rows.size() == 1 &&
+         month_end.temporal_rows[0].timestamp == *jan31);
+
+  options.grouper_freq = "W-MON";
+  const auto monday = log_to_features(log, options);
+  const auto first_monday = parse_timestamp("2024-01-01T00:00:00Z");
+  const auto second_monday = parse_timestamp("2024-01-08T00:00:00Z");
+  assert(first_monday && second_monday && monday.temporal_rows.size() == 2 &&
+         monday.temporal_rows[0].timestamp == *first_monday &&
+         monday.temporal_rows[1].timestamp == *second_monday);
+
+  options.grouper_freq = "unsupported";
+  bool threw = false;
+  try {
+    (void)log_to_features(log, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 int main() {
   const auto log = fixture();
   LogToFeaturesOptions e; e.variant = LogToFeaturesVariant::EVENT_BASED; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
@@ -202,7 +261,7 @@ int main() {
   assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@caseDuration") != rich.feature_names.end());
   assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "@@max_concurrent_activities_general") != rich.feature_names.end());
   assert(std::find(rich.feature_names.begin(), rich.feature_names.end(), "succession:activity@A#B") != rich.feature_names.end());
-  e.variant = LogToFeaturesVariant::TEMPORAL; e.window_seconds = 3600;
+  e.variant = LogToFeaturesVariant::TEMPORAL; e.grouper_freq.clear(); e.window_seconds = 3600;
   const auto tm = log_to_features(log, e);
   assert(tm.temporal_rows.size() == 2 && tm.temporal_rows[0].values.size() == tm.feature_names.size());
   assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "average_service_time") != tm.feature_names.end());
@@ -220,4 +279,5 @@ int main() {
   observed_path_timing_uses_configured_starts();
   trace_defaults_infer_case_attributes_and_scope_missing_values();
   overlap_extras_use_case_intervals_and_other_events();
+  temporal_calendar_frequency_uses_period_boundaries();
 }

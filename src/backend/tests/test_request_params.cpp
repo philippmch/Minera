@@ -2836,6 +2836,7 @@ void log_to_features_params_contract() {
   const auto parsed = minera::parse_log_to_features_params(fields({
       {"features_variant", "temporal"},
       {"features_activity_key", "concept:name"},
+      {"features_grouper_freq", "W-MON"},
       {"features_window_seconds", "60"},
       {"features_event_numeric_attributes", "cost,amount"},
       {"features_enable_all_extra_features", "true"},
@@ -2845,10 +2846,14 @@ void log_to_features_params_contract() {
       {"features_max_num_different_string_values", "7"},
       {"features_feature_names", "arrivals,finishes"}}));
   assert(parsed.variant == minera::LogToFeaturesVariant::TEMPORAL);
-  assert(parsed.activity_key == "concept:name" && parsed.window_seconds == 60.0);
+  assert(parsed.activity_key == "concept:name" && parsed.window_seconds == 60.0 &&
+         parsed.grouper_freq == "W-MON");
   assert(parsed.event_numeric_attributes.size() == 2 && parsed.feature_names.size() == 2);
   assert(parsed.enable_all_extra_features && parsed.event_successor_attributes.size() == 1 &&
          parsed.epsilon == 0.25 && parsed.max_num_different_string_values == 7);
+  const auto fixed_width = minera::parse_log_to_features_params(
+      fields({{"features_window_seconds", "60"}}));
+  assert(fixed_width.grouper_freq.empty() && fixed_width.window_seconds == 60.0);
   bool threw = false;
   try { (void)minera::parse_log_to_features_params(fields({{"features_variant", "bogus"}})); }
   catch (const std::invalid_argument&) { threw = true; }

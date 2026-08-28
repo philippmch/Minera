@@ -1154,11 +1154,12 @@ describe("log-to-features API", () => {
   it("serializes trace representation and extra feature controls", () => {
     expect(logToFeaturesQuery({
       features_enable_all_extra_features: true,
+      features_grouper_freq: "W-MON",
       features_event_successor_attributes: ["concept:name"],
       features_epsilon: 0.25,
       features_min_num_different_string_values: 1,
       features_max_num_different_string_values: 8,
-    })).toBe("features_enable_all_extra_features=true&features_epsilon=0.25&features_event_successor_attributes=concept%3Aname&features_max_num_different_string_values=8&features_min_num_different_string_values=1");
+    })).toBe("features_enable_all_extra_features=true&features_epsilon=0.25&features_event_successor_attributes=concept%3Aname&features_grouper_freq=W-MON&features_max_num_different_string_values=8&features_min_num_different_string_values=1");
     expect(() => logToFeaturesQuery({ features_epsilon: -1 })).toThrow(/epsilon/);
     expect(() => logToFeaturesQuery({ features_min_num_different_string_values: 3, features_max_num_different_string_values: 2 })).toThrow(/bounds/);
   });
