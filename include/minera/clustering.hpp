@@ -18,6 +18,7 @@ enum class TraceAttributeClusteringVariant {
 
 struct TraceAttributeClusteringOptions {
   std::string trace_attribute;
+  std::string activity_attribute = "concept:name";
   TraceAttributeClusteringVariant variant = TraceAttributeClusteringVariant::kDmmLeven;
   double alpha = 0.5;
   double percent = 1.0;
@@ -70,6 +71,7 @@ enum class ProfileClusteringVariant {
 
 struct ProfileClusteringOptions {
   ProfileClusteringVariant variant = ProfileClusteringVariant::kSklearnProfiles;
+  std::string activity_attribute = "concept:name";
   std::size_t cluster_count = 2;
   std::size_t max_iterations = 100;
   std::size_t max_traces = 100000;

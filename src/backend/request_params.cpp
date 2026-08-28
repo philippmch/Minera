@@ -4172,6 +4172,7 @@ TraceAttributeClusteringOptions parse_clustering_params(const FieldLookup& field
   const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();};
   const auto req=[&](std::string_view n){auto v=field(n); if(v.empty()) throw std::invalid_argument(std::string(n)+": expected a value"); return v;};
   if(supplied("clustering_trace_attribute")) o.trace_attribute=req("clustering_trace_attribute");
+  if(supplied("clustering_activity_attribute")) o.activity_attribute=req("clustering_activity_attribute");
   if(supplied("clustering_variant")) { const auto v=req("clustering_variant");
     if(v=="DMM_LEVEN"||v=="dmm_leven") o.variant=TraceAttributeClusteringVariant::kDmmLeven;
     else if(v=="AVG_LEVEN"||v=="avg_leven") o.variant=TraceAttributeClusteringVariant::kAvgLeven;
@@ -4214,6 +4215,8 @@ ProfileClusteringOptions parse_profile_clustering_params(
           "profile_variant: expected sklearn_profiles");
     options.variant = ProfileClusteringVariant::kSklearnProfiles;
   }
+  if (supplied("profile_activity_attribute"))
+    options.activity_attribute = require("profile_activity_attribute");
   if (supplied("profile_cluster_count"))
     options.cluster_count = parse_positive_size(
         require("profile_cluster_count"), "profile_cluster_count");

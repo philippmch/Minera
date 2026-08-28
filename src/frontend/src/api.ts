@@ -2176,6 +2176,9 @@ export function requestVariantStatistics(options: VariantStatisticsOptions = {})
 }
 export const discoverVariantStatistics = requestVariantStatistics;
 export function clusteringQuery(options: ClusteringOptions = {}): string {
+  if (options.clustering_activity_attribute !== undefined && !options.clustering_activity_attribute) {
+    throw new Error("clustering_activity_attribute must be non-empty");
+  }
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options)) if (value !== undefined) query.set(key, String(value));
   return query.toString();
@@ -2197,6 +2200,9 @@ export function profileClusteringQuery(options: ProfileClusteringOptions = {}): 
   if (options.profile_variant !== undefined && options.profile_variant !== "sklearn_profiles") {
     throw new Error("profile_variant must be sklearn_profiles");
   }
+  if (options.profile_activity_attribute !== undefined && !options.profile_activity_attribute) {
+    throw new Error("profile_activity_attribute must be non-empty");
+  }
   const positive = [
     ["profile_cluster_count", options.profile_cluster_count],
     ["profile_max_iterations", options.profile_max_iterations],
@@ -2212,6 +2218,7 @@ export function profileClusteringQuery(options: ProfileClusteringOptions = {}): 
   if (options.profile_tolerance !== undefined && (!Number.isFinite(options.profile_tolerance) || options.profile_tolerance < 0))
     throw new Error("profile_tolerance must be finite and non-negative");
   const values: Record<string, string | undefined> = {
+    profile_activity_attribute: options.profile_activity_attribute,
     profile_variant: options.profile_variant,
     profile_cluster_count: options.profile_cluster_count === undefined ? undefined : String(options.profile_cluster_count),
     profile_event_numeric_attributes: profileAttributeList(options.profile_event_numeric_attributes, "profile_event_numeric_attributes"),
