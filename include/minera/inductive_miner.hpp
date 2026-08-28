@@ -30,13 +30,14 @@ struct InductiveMinerOptions {
   // Noise filter in [0, 1], the Inductive Miner – infrequent (IMf) threshold.
   // Cuts are always sought on the unfiltered relations first; only when a
   // sublog exhibits no cut is the filter applied and the search retried. The
-  // filter keeps a directly-follows edge a->b only when its frequency is at
-  // least this fraction of a's strongest observed behaviour (its heaviest
-  // outgoing edge, or how often the trace ends at a); rare start/end
-  // activities, rare empty traces, and rare repetitions are likewise treated
-  // as noise. 0.0 disables filtering and reproduces the classic Inductive
-  // Miner; higher values resist noise that would otherwise collapse to a
-  // flower model. Applies to both variants.
+  // filter keeps a directly-follows edge a->b only when its frequency is
+  // strictly greater than this fraction of a's strongest observed behaviour
+  // (its heaviest outgoing edge, or how often the trace ends at a). Start
+  // activities use an inclusive comparison; observed end activities remain
+  // available to the endpoint cut. Empty traces are retained when their share
+  // is strictly greater than the threshold. 0.0 disables filtering and
+  // reproduces the classic Inductive Miner; higher values resist noise that
+  // would otherwise collapse to a flower model. Applies to both variants.
   double noise_threshold = 0.0;
   InductiveMinerVariant variant = InductiveMinerVariant::kLog;
   // When enabled, use the normal sequence cut instead of the stricter cut

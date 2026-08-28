@@ -69,7 +69,7 @@ are reconciled.
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
 | Conformance: object-centric | ETOT, OCDFG and OTG graph comparison | **Partial** — deterministic ETOT, OCDFG, and OTG graph comparisons with strict thresholds, weighted fitness, diagnostics, direct-OCEL and explicit-graph native APIs, graph-vs-graph and OCEL-vs-graph headless CLI/local-server/frontend adapters, and cross-family envelope rejection; broader OCEL schema coverage remains |
 | Discovery: Alpha | classic and Alpha+ | **Complete** — event-log and direct-DFG classic entry points are available; Alpha+ remains an explicit event-log variant |
-| Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, graph-recursive `dfg`, and direct-DFG IMd entry points share deterministic native semantics; request/CLI/frontend selectors cover event-log paths |
+| Discovery: Inductive | IM, IMf, IMd | **Complete** — `log`, explicit `imf`, graph-recursive `dfg`, and direct-DFG IMd entry points share deterministic native semantics; IMf uses strict edge-noise cutoffs, inclusive start handling, preserved observed ends, and total-trace empty-share weighting; request/CLI/frontend selectors cover event-log paths |
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Complete (core)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP now supports one-trace-per-variant normalization, default silent `▶`/`■` boundaries (with explicit opt-out), cumulative alpha sequence encoding, derived one-way causal edges, optional causal overrides, and frequency-based noise filtering, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Complete (core)** |
@@ -1150,6 +1150,19 @@ callers that need to preserve workflow metadata, malformed nets are left
 unchanged, and focused regressions cover chains, fan-out/fan-in, shared-place
 guards, markings, mixed extended arcs, series fusion, parallel transitions and
 places, abstraction, self-loops, invalid inputs, and deterministic output.
+
+## Inductive discovery parity evidence
+
+The infrequent Inductive Miner retries cut detection on a filtered graph only
+after the unfiltered graph has no cut. Edge retention is strict (`count >
+threshold * strongest outgoing count`), start activities use an inclusive
+boundary, and every observed end activity remains available to endpoint-aware
+cuts while its end count still raises the outgoing noise baseline. Empty-trace
+retention compares the empty share with the total trace count and separates the
+optional tau branch before recursive cut discovery; graph-recursive discovery
+preserves its source skip flag independently of the threshold. Focused Release
+regressions cover exact edge boundaries, rare observed ends, total-share empty
+thresholds, and graph/log recursion consistency.
 
 ## ILP discovery parity evidence
 

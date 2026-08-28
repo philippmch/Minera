@@ -50,12 +50,12 @@ struct LocalDfg {
 
 // Recomputes the boolean relations the cut detectors use from the raw counts,
 // dropping behaviour that falls below the noise threshold:
-//   * an edge a->b survives only when its count is at least `f` times a's
+//   * an edge a->b survives only when its count is greater than `f` times a's
 //     strongest outgoing behaviour -- its heaviest outgoing edge or how often
 //     the trace ends at a, whichever is larger (so a node always keeps its
 //     dominant successor, and an end activity's stray edges count as noise);
-//   * an activity counts as a start/end only when its start/end count clears
-//     `f` times the most frequent start/end.
+//   * an activity counts as a start when its start count clears `f` times the
+//     most frequent start; every observed end activity remains an end.
 // With f == 0 nothing is dropped: every observed edge and every observed
 // start/end is kept, exactly reproducing the classic Inductive Miner.
 void apply_noise_filter(LocalDfg& dfg, double f) {
@@ -76,7 +76,7 @@ void apply_noise_filter(LocalDfg& dfg, double f) {
     const double cutoff = f * static_cast<double>(max_out);
     for (std::size_t b = 0; b < n; ++b) {
       const std::uint64_t count = dfg.edge_count[a][b];
-      if (count > 0 && static_cast<double>(count) >= cutoff) {
+      if (count > 0 && static_cast<double>(count) > cutoff) {
         dfg.follows[a][b] = 1;
         dfg.succ[a].push_back(b);
       }
@@ -84,20 +84,18 @@ void apply_noise_filter(LocalDfg& dfg, double f) {
   }
 
   std::uint64_t max_start = 0;
-  std::uint64_t max_end = 0;
   for (std::size_t a = 0; a < n; ++a) {
     max_start = std::max(max_start, dfg.start_count[a]);
-    max_end = std::max(max_end, dfg.end_count[a]);
   }
   for (std::size_t a = 0; a < n; ++a) {
     if (dfg.start_count[a] > 0 &&
         static_cast<double>(dfg.start_count[a]) >= f * static_cast<double>(max_start)) {
       dfg.is_start[a] = 1;
     }
-    if (dfg.end_count[a] > 0 &&
-        static_cast<double>(dfg.end_count[a]) >= f * static_cast<double>(max_end)) {
-      dfg.is_end[a] = 1;
-    }
+    // The infrequent variant filters start activities but preserves every
+    // observed end activity. End counts still participate in the outgoing
+    // edge baseline above, so stray departures from an end remain removable.
+    if (dfg.end_count[a] > 0) dfg.is_end[a] = 1;
   }
 }
 
@@ -832,12 +830,10 @@ ProcessTreeNode flower(const std::vector<ActId>& activities) {
   return node;
 }
 
-// Standard Inductive Miner recursion: base cases, then the four cut detectors
-// in order, then the fall-throughs (empty trace, single activity, flower). The
-// directly-follows graph ignores empty traces, so empty traces ride through any
-// cut that fits the non-empty behaviour and are only modelled explicitly when
-// no cut applies -- this matches the canonical algorithm rather than skipping
-// the empty trace eagerly.
+// Standard Inductive Miner recursion: empty traces are separated first, then
+// base cases and the four cut detectors run on the non-empty sublog, followed
+// by the remaining fall-throughs. Keeping the empty-trace decision outside the
+// cut search preserves the optional skip as one explicit branch.
 ProcessTreeNode mine(const Sublog& log, double f,
                      const InductiveMinerOptions& options) {
   std::uint64_t empty_weight = 0;
@@ -850,6 +846,25 @@ ProcessTreeNode mine(const Sublog& log, double f,
   // Base case: an empty log (or only empty traces) is a silent step.
   if (nonempty_weight == 0) {
     return ProcessTreeNode::tau();
+  }
+
+  if (has_empty) {
+    const auto total_weight = empty_weight + nonempty_weight;
+    Sublog nonempty;
+    nonempty.reserve(log.size());
+    for (const auto& wt : log) {
+      if (!wt.activities.empty()) nonempty.push_back(wt);
+    }
+    // Empty traces are retained when their share is strictly larger than the
+    // configured noise threshold. The comparison uses all traces, not only
+    // the non-empty denominator; at threshold zero every observed empty trace
+    // is therefore part of the discovered language.
+    if (static_cast<double>(empty_weight) >
+        f * static_cast<double>(total_weight)) {
+      return make_node(ProcessTreeOperator::kExclusive,
+                       {ProcessTreeNode::tau(), mine(nonempty, f, options)});
+    }
+    return mine(nonempty, f, options);
   }
 
   LocalDfg dfg = build_local_dfg(log);
@@ -904,7 +919,8 @@ ProcessTreeNode mine(const Sublog& log, double f,
 
   // IMf: filtering is a fall-through, not a preprocessing step. Cuts are
   // sought on the full relations first, and only a sublog that has no cut
-  // gets its weak edges (and rare starts/ends) dropped for a second attempt.
+  // gets its weak edges and rare starts dropped for a second attempt; observed
+  // end activities remain available to endpoint-aware cuts.
   // Filtering up front can erase structure the unfiltered relations exhibit,
   // collapsing a merely noisy log to a flower.
   if (f > 0.0) {
@@ -912,25 +928,6 @@ ProcessTreeNode mine(const Sublog& log, double f,
     if (auto node = try_cuts(dfg)) {
       return std::move(*node);
     }
-  }
-
-  // Fall-through for empty traces. When they are frequent enough they are kept
-  // as an explicit skip around the rest of the log; when they are noise (below
-  // the threshold) they are dropped and the non-empty behaviour is re-mined.
-  if (has_empty) {
-    Sublog nonempty;
-    nonempty.reserve(log.size());
-    for (const auto& wt : log) {
-      if (!wt.activities.empty()) {
-        nonempty.push_back(wt);
-      }
-    }
-    if (static_cast<double>(empty_weight) >
-        f * static_cast<double>(nonempty_weight)) {
-      return make_node(ProcessTreeOperator::kExclusive,
-                       {ProcessTreeNode::tau(), mine(nonempty, f, options)});
-    }
-    return mine(nonempty, f, options);
   }
 
   // The native fall-through set already consists of the empty-trace handling
@@ -1108,9 +1105,8 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
 
 // IMd entry: one pass over the (variant-compressed) log builds the root graph,
 // then the recursion never touches traces again. Empty traces are invisible to
-// a directly-follows graph, so the option to skip everything is decided here at
-// the root — the one place the log itself is still in hand — mirroring the
-// empty-trace fall-through of the log recursion.
+// a directly-follows graph, so their explicit skip branch is decided here —
+// the one place the log itself is still in hand.
 ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
                               const InductiveMinerOptions& options) {
   std::uint64_t empty_weight = 0;
@@ -1123,8 +1119,10 @@ ProcessTreeNode mine_dfg_root(const Sublog& log, double f,
   }
 
   ProcessTreeNode root = mine_dfg(build_local_dfg(log), f, options);
-  if (static_cast<double>(empty_weight) >
-      f * static_cast<double>(nonempty_weight)) {
+  // The graph-backed variant carries the UVCL skip flag independently of the
+  // infrequent threshold: if an empty trace was observed, retain it as the
+  // optional tau branch.
+  if (empty_weight > 0) {
     return make_node(ProcessTreeOperator::kExclusive,
                      {ProcessTreeNode::tau(), std::move(root)});
   }
