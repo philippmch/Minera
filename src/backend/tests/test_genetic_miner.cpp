@@ -1,6 +1,7 @@
 #include "minera/genetic_miner.hpp"
 #include "minera/json_export.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 
@@ -170,6 +171,12 @@ int main() {
   assert(custom.diagnostics.computed);
   assert(custom.diagnostics.activity_count == 2);
   assert(custom.diagnostics.best_fitness > 0.99);
+  assert(custom.net.transitions().size() > custom.net.activities().size());
+  assert(std::any_of(custom.net.transitions().begin(),
+                     custom.net.transitions().end(),
+                     [](const auto& transition) { return transition.silent(); }));
+  assert(custom.markings.initial[custom.net.source()] == 1);
+  assert(custom.markings.final[custom.net.sink()] == 1);
   auto standard_case = custom_options;
   standard_case.case_id_key = "case:concept:name";
   const auto standard_case_result =
