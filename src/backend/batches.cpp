@@ -4,6 +4,7 @@
 #include <cmath>
 #include <map>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 
 #include "minera/timestamp.hpp"
@@ -16,6 +17,60 @@ struct IndexedEvent {
   std::string activity;
   std::string resource;
 };
+
+const std::string* event_value(const Event& event, std::string_view key,
+                               std::string_view kind) {
+  if (key.empty()) {
+    if (kind == "activity") return &event.activity;
+    if (kind == "resource") return &event.resource;
+    return &event.timestamp;
+  }
+  if (kind == "activity" &&
+      (key == "activity" || key == "concept:name")) {
+    return &event.activity;
+  }
+  if (kind == "resource" &&
+      (key == "resource" || key == "org:resource")) {
+    return &event.resource;
+  }
+  if (kind == "timestamp" &&
+      (key == "timestamp" || key == "time:timestamp")) {
+    return &event.timestamp;
+  }
+  return event.attribute(key);
+}
+
+const std::string* trace_value(const Trace& trace, std::string_view key) {
+  if (key.empty() || key == "case_id" || key == "case:id" ||
+      key == "case:concept:name" || key == "concept:name") {
+    return &trace.case_id;
+  }
+  if (const auto* value = trace.attribute(key)) return value;
+  if (!trace.events.empty()) return trace.events.front().attribute(key);
+  return nullptr;
+}
+
+const std::string& required_event_value(const Event& event,
+                                        std::string_view key,
+                                        std::string_view kind) {
+  const auto* value = event_value(event, key, kind);
+  if (value == nullptr) {
+    throw std::invalid_argument("batches: event is missing " +
+                                std::string(kind) + " attribute '" +
+                                std::string(key) + "'");
+  }
+  return *value;
+}
+
+const std::string& required_trace_value(const Trace& trace,
+                                        std::string_view key) {
+  const auto* value = trace_value(trace, key);
+  if (value == nullptr) {
+    throw std::invalid_argument("batches: trace is missing case-id attribute '" +
+                                std::string(key) + "'");
+  }
+  return *value;
+}
 
 BatchType classify(const std::vector<BatchEvent>& events) {
   if (events.empty()) return BatchType::kConcurrent;
@@ -60,19 +115,31 @@ BatchDiscovery discover_batches(const EventLog& log,
   if (options.min_batch_size < 2) {
     throw std::invalid_argument("batches: min_batch_size must be at least two");
   }
+  if (options.activity_attribute.empty() || options.resource_attribute.empty() ||
+      options.timestamp_attribute.empty() || options.case_id_attribute.empty()) {
+    throw std::invalid_argument(
+        "batches: activity, resource, timestamp, and case-id attributes must not be empty");
+  }
 
   std::map<std::pair<std::string, std::string>, std::vector<IndexedEvent>> grouped;
   for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
     const auto& trace = log.traces[ti];
     for (std::size_t ei = 0; ei < trace.events.size(); ++ei) {
       const auto& event = trace.events[ei];
-      const auto complete = parse_timestamp(event.timestamp);
+      const auto& activity = required_event_value(
+          event, options.activity_attribute, "activity");
+      const auto& resource = required_event_value(
+          event, options.resource_attribute, "resource");
+      const auto& completion_text = required_event_value(
+          event, options.timestamp_attribute, "timestamp");
+      const auto complete = parse_timestamp(completion_text);
       if (!complete || !std::isfinite(*complete)) {
         throw std::invalid_argument("batches: event has an invalid completion timestamp");
       }
       double start = *complete;
       if (!options.start_timestamp_attribute.empty()) {
-        const auto* value = event.attribute(options.start_timestamp_attribute);
+        const auto* value = event_value(event, options.start_timestamp_attribute,
+                                        "timestamp");
         if (value == nullptr || value->empty()) {
           throw std::invalid_argument("batches: configured start timestamp is missing");
         }
@@ -88,9 +155,10 @@ BatchDiscovery discover_batches(const EventLog& log,
       if (start > *complete) {
         throw std::invalid_argument("batches: start timestamp is after completion");
       }
-      BatchEvent batch_event{start, *complete, trace.case_id, ti, ei};
-      grouped[{event.activity, event.resource}].push_back(
-          IndexedEvent{std::move(batch_event), event.activity, event.resource});
+      const auto& case_id = required_trace_value(trace, options.case_id_attribute);
+      BatchEvent batch_event{start, *complete, case_id, ti, ei};
+      grouped[{activity, resource}].push_back(
+          IndexedEvent{std::move(batch_event), activity, resource});
     }
   }
 

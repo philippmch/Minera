@@ -1844,6 +1844,33 @@ std::string_view batch_variant_name(BatchDiscoveryVariant variant) {
   throw std::invalid_argument("batch discovery contains an unknown variant");
 }
 
+const std::string* batch_event_value(const Event& event, std::string_view key,
+                                     std::string_view kind) {
+  if (kind == "activity" &&
+      (key.empty() || key == "activity" || key == "concept:name")) {
+    return &event.activity;
+  }
+  if (kind == "resource" &&
+      (key.empty() || key == "resource" || key == "org:resource")) {
+    return &event.resource;
+  }
+  if (kind == "timestamp" &&
+      (key.empty() || key == "timestamp" || key == "time:timestamp")) {
+    return &event.timestamp;
+  }
+  return event.attribute(key);
+}
+
+const std::string* batch_trace_value(const Trace& trace, std::string_view key) {
+  if (key.empty() || key == "case_id" || key == "case:id" ||
+      key == "case:concept:name" || key == "concept:name") {
+    return &trace.case_id;
+  }
+  if (const auto* value = trace.attribute(key)) return value;
+  if (!trace.events.empty()) return trace.events.front().attribute(key);
+  return nullptr;
+}
+
 BatchType classify_batch_events(const std::vector<BatchEvent>& events) {
   const double first_start = events.front().start;
   const double first_complete = events.front().complete;
@@ -1877,7 +1904,11 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
   }
   if (!std::isfinite(discovery.options.merge_distance_seconds) ||
       discovery.options.merge_distance_seconds < 0.0 ||
-      discovery.options.min_batch_size < 2) {
+      discovery.options.min_batch_size < 2 ||
+      discovery.options.activity_attribute.empty() ||
+      discovery.options.resource_attribute.empty() ||
+      discovery.options.timestamp_attribute.empty() ||
+      discovery.options.case_id_attribute.empty()) {
     throw std::invalid_argument("batch discovery options are invalid");
   }
   std::set<std::pair<std::size_t, std::size_t>> identities;
@@ -1886,8 +1917,11 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
   std::string previous_group_resource;
   bool first_group = true;
   for (const auto& group : discovery.groups) {
-    if (!graph.activity_id(group.activity)) {
+    if (discovery.options.activity_attribute == "activity" ||
+        discovery.options.activity_attribute == "concept:name") {
+      if (!graph.activity_id(group.activity)) {
       throw std::invalid_argument("batch discovery activity is not registered: " + group.activity);
+      }
     }
     std::size_t total = 0;
     if (group.batch_count != group.batches.size()) {
@@ -1933,10 +1967,18 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
           throw std::invalid_argument("batch discovery event index is out of range");
         }
         const auto& source = log.traces[event.trace_index].events[event.event_index];
-        if (source.activity != group.activity || source.resource != group.resource) {
+        const auto* source_activity = batch_event_value(
+            source, discovery.options.activity_attribute, "activity");
+        const auto* source_resource = batch_event_value(
+            source, discovery.options.resource_attribute, "resource");
+        if (source_activity == nullptr || source_resource == nullptr ||
+            *source_activity != group.activity ||
+            *source_resource != group.resource) {
           throw std::invalid_argument("batch discovery event does not match its group");
         }
-        if (event.case_id != log.traces[event.trace_index].case_id) {
+        const auto* source_case = batch_trace_value(
+            log.traces[event.trace_index], discovery.options.case_id_attribute);
+        if (source_case == nullptr || event.case_id != *source_case) {
           throw std::invalid_argument("batch discovery event case_id does not match trace");
         }
         if (event.start < previous_event_start) {
@@ -1961,7 +2003,14 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
   for (std::size_t i = 0; i < discovery.groups.size(); ++i) {
     const auto& group = discovery.groups[i];
     const auto activity = graph.activity_id(group.activity);
-    out << "{\"activity\": " << *activity << ", \"resource\": ";
+    out << "{\"activity\": ";
+    if (activity)
+      out << *activity;
+    else
+      out << "null";
+    out << ", \"activity_label\": ";
+    write_json_string(out, group.activity);
+    out << ", \"resource\": ";
     write_json_string(out, group.resource);
     out << ", \"event_count\": " << group.event_count
         << ", \"batch_count\": " << group.batch_count << ", \"batches\": [";
@@ -1986,6 +2035,16 @@ void write_batch_discovery(std::ostream& out, const BatchDiscovery& discovery,
   }
   out << "], \"variant\": ";
   write_json_string(out, batch_variant_name(discovery.variant));
+  out << ", \"activity_attribute\": ";
+  write_json_string(out, discovery.options.activity_attribute);
+  out << ", \"resource_attribute\": ";
+  write_json_string(out, discovery.options.resource_attribute);
+  out << ", \"timestamp_attribute\": ";
+  write_json_string(out, discovery.options.timestamp_attribute);
+  out << ", \"case_id_attribute\": ";
+  write_json_string(out, discovery.options.case_id_attribute);
+  out << ", \"start_timestamp_attribute\": ";
+  write_json_string(out, discovery.options.start_timestamp_attribute);
   out << "}";
 }
 

@@ -64,6 +64,14 @@ struct BatchDiscoveryOptions {
   std::size_t min_batch_size = 2;
   // Empty means use the event timestamp as completion and start.
   std::string start_timestamp_attribute;
+  // Event/trace selectors. Standard aliases resolve to the first-class event
+  // and trace fields; any other name is read from the generic attributes.
+  // The completion timestamp defaults to the event timestamp and the case id
+  // defaults to the trace's case identifier.
+  std::string activity_attribute = "concept:name";
+  std::string resource_attribute = "org:resource";
+  std::string timestamp_attribute = "time:timestamp";
+  std::string case_id_attribute = "case:concept:name";
 };
 
 struct BatchDiscovery {

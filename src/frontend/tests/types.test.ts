@@ -985,6 +985,28 @@ describe("isMineraExport", () => {
     ).toBe(true);
   });
 
+  it("accepts custom-selector batch groups and rejects malformed ids", () => {
+    const batch = {
+      activity: null,
+      activity_label: "phase-A",
+      resource: "team-1",
+      batch_count: 1,
+      event_count: 2,
+      batches: [{
+        type: "simultaneous", start: 0, complete: 1,
+        events: [],
+      }],
+    };
+    expect(isMineraExport({ ...valid,
+      batch_discovery: {
+        activity_attribute: "phase", groups: [batch],
+      },
+    })).toBe(true);
+    expect(isMineraExport({ ...valid,
+      batch_discovery: { groups: [{ ...batch, activity: -1 }] },
+    })).toBe(false);
+  });
+
   it("validates the minimum self-distance adapter selector", () => {
     expect(isMineraExport({
       ...valid,

@@ -760,6 +760,10 @@ int usage(const char* program) {
                "  --variant-statistics-max-variants <n> Limit returned variants\n"
                "  --batch-merge-distance-seconds <f> Non-negative merge distance\n"
                "  --batch-min-size <n>      Minimum batch size (default: 2)\n"
+               "  --batch-activity-attribute <name> Activity selector\n"
+               "  --batch-resource-attribute <name> Resource selector\n"
+               "  --batch-timestamp-attribute <name> Completion timestamp selector\n"
+               "  --batch-case-id-attribute <name> Case-id selector\n"
                "  --batch-start-timestamp-attribute <name> Optional start-time attribute\n"
                "  --no-alignments           Skip the standard per-model alignment\n"
                "                            section; token replay, footprints, and\n"
@@ -1483,6 +1487,26 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--batch-activity-attribute" ||
+        arg == "--batch-resource-attribute" ||
+        arg == "--batch-timestamp-attribute" ||
+        arg == "--batch-case-id-attribute") {
+      batch_option_used = true;
+      const auto* value = next();
+      if (!value || std::string_view(value).empty()) {
+        std::cerr << "error: " << arg << " expects a non-empty attribute name\n";
+        return 2;
+      }
+      if (arg == "--batch-activity-attribute")
+        batch_options.activity_attribute = value;
+      else if (arg == "--batch-resource-attribute")
+        batch_options.resource_attribute = value;
+      else if (arg == "--batch-timestamp-attribute")
+        batch_options.timestamp_attribute = value;
+      else
+        batch_options.case_id_attribute = value;
+      continue;
+    }
     if (arg == "--pnml-to-ptml" || arg == "--bpmn-to-ptml") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
