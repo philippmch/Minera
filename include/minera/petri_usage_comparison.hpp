@@ -18,6 +18,8 @@ struct PetriUsageRecord {
   std::uint64_t log2_occurrences = 0;
   std::uint64_t total_occurrences = 0;
   double direction = 0.0;  // (log2 - log1) / total, or zero for total == 0
+  std::string label;
+  std::string color;
 };
 
 // Arc usage is associated with the transition that owns the arc.  `id` is a
@@ -32,6 +34,8 @@ struct PetriArcUsageRecord {
   std::uint64_t log2_occurrences = 0;
   std::uint64_t total_occurrences = 0;
   double direction = 0.0;
+  std::string label;
+  std::string color;
 };
 
 struct PetriUsageComparison {

@@ -47,6 +47,11 @@ void usage_directions_and_silent_activation() {
   assert(equal.transitions[0].log1_occurrences == 1);
   assert(equal.transitions[0].log2_occurrences == 1);
   assert(equal.transitions[0].direction == 0.0);
+  assert(equal.transitions[0].label == "A (1/1/2)");
+  assert(equal.transitions[0].color == "#AAAAAA");
+  assert(equal.transitions[1].label == "(1/1/2)");
+  assert(equal.arcs[0].label == equal.transitions[0].label);
+  assert(equal.arcs[0].color == equal.transitions[0].color);
   assert(equal.transitions[1].log1_occurrences == 1);  // silent routing
   assert(equal.places[3].total_occurrences == 0);
   assert(equal.places[3].direction == 0.0);  // zero-total is finite and neutral
@@ -54,8 +59,10 @@ void usage_directions_and_silent_activation() {
   const auto negative = minera::compare_element_usage_two_logs(net, one, empty);
   assert(negative.transitions[0].direction == -1.0);
   assert(negative.transitions[1].direction == -1.0);
+  assert(negative.transitions[0].color == "#00BFFF");
   const auto positive = minera::compare_petri_usage(net, empty, one);
   assert(positive.transitions[0].direction == 1.0);
+  assert(positive.transitions[0].color == "#FF6347");
   assert(std::isfinite(positive.places[0].direction));
 }
 

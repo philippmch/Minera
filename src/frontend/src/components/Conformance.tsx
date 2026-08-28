@@ -426,7 +426,7 @@ function PetriUsageComparisonPanel() {
     </div>
     <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
     {error && <p className="conf-inline-note">{error}</p>}
-    {rows.length > 0 && <table className="activity-table deviation-table"><thead><tr><th>Transition</th><th className="num">Log 1</th><th className="num">Log 2</th><th className="num">Δ</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td>{row.id}</td><td className="num">{numberFormat.format(row.log1_occurrences)}</td><td className="num">{numberFormat.format(row.log2_occurrences)}</td><td className="num">{row.delta > 0 ? "+" : ""}{numberFormat.format(row.delta)}</td></tr>)}</tbody></table>}
+    {rows.length > 0 && <table className="activity-table deviation-table"><thead><tr><th>Transition</th><th className="num">Log 1</th><th className="num">Log 2</th><th className="num">Δ</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><span style={{ color: row.color ?? "inherit" }}>{row.label ?? row.id}</span></td><td className="num">{numberFormat.format(row.log1_occurrences)}</td><td className="num">{numberFormat.format(row.log2_occurrences)}</td><td className="num">{row.delta > 0 ? "+" : ""}{numberFormat.format(row.delta)}</td></tr>)}</tbody></table>}
   </section>;
 }
 

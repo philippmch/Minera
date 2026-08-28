@@ -59,7 +59,7 @@ are reconciled.
 | Analysis | marking equation (classic), extended marking equation (classic), workflow-net check, Woflan soundness with reachability/coverability/invariants | **Partial** — native marking/extended-equation/workflow/soundness cores now include deterministic structural pair diagnostics, explicit Woflan selection, short-circuit construction, reachability liveness projection, strong-connectivity diagnostics, single-place marking validation, early unsound-witness return, and strict CLI/server/frontend adapters; full differential edge-contract review remains |
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
-| Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, extended arcs, and a selectable event activity attribute; broader differential semantics remain |
+| Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, extended arcs, a selectable event activity attribute, renderer labels, and direction colors; broader differential semantics remain |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial** — the explicit `BOSE` selector, seeded permutation windows, timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
@@ -858,7 +858,10 @@ and lifecycle aliases resolve to their first-class event fields, while the
 CSV/XES import paths accept either short or qualified standard keys even when
 the default activity column/key is absent. Custom CSV/XES keys are retained
 through import. Replay uses normal, reset, and inhibitor arc semantics and
-preserves weighted arcs in the usage records.
+preserves weighted arcs in the usage records. Every element also carries a
+deterministic `(log1/log2/total)` label and a signed-direction color generated
+from the bounded blue-to-red palette; arc decorations mirror their owning
+transition.
 Native replay, importer coverage, standalone JSON, CLI, server, and frontend
 request/response guards are covered; richer differential semantics remain
 outside this adapter.

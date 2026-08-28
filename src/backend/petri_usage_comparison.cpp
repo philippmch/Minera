@@ -1,6 +1,7 @@
 #include "minera/petri_usage_comparison.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <queue>
@@ -16,6 +17,59 @@ namespace {
 
 using Marking = std::vector<std::uint64_t>;
 constexpr std::size_t kSilentSearchCap = 4096;
+
+struct Rgb {
+  double red;
+  double green;
+  double blue;
+};
+
+std::string color_component(double value) {
+  const auto channel = static_cast<int>(
+      std::ceil(std::clamp(value, 0.0, 1.0) * 255.0));
+  constexpr char digits[] = "0123456789ABCDEF";
+  std::string result;
+  result.push_back(digits[(channel >> 4) & 0xF]);
+  result.push_back(digits[channel & 0xF]);
+  return result;
+}
+
+std::string direction_color(double direction) {
+  constexpr std::array<double, 9> stops = {
+      0.0, 0.01, 0.25, 0.4, 0.45, 0.55, 0.75, 0.99, 1.0};
+  constexpr std::array<Rgb, 9> colors = {
+      Rgb{0.0, 191.0 / 255.0, 1.0},
+      Rgb{135.0 / 255.0, 206.0 / 255.0, 235.0 / 255.0},
+      Rgb{224.0 / 255.0, 1.0, 1.0},
+      Rgb{211.0 / 255.0, 211.0 / 255.0, 211.0 / 255.0},
+      Rgb{128.0 / 255.0, 128.0 / 255.0, 128.0 / 255.0},
+      Rgb{211.0 / 255.0, 211.0 / 255.0, 211.0 / 255.0},
+      Rgb{1.0, 228.0 / 255.0, 225.0 / 255.0},
+      Rgb{250.0 / 255.0, 128.0 / 255.0, 114.0 / 255.0},
+      Rgb{1.0, 99.0 / 255.0, 71.0 / 255.0}};
+  const double position = std::clamp(0.5 + 0.5 * direction, 0.0, 1.0);
+  std::size_t segment = 0;
+  while (segment + 1 < stops.size() && position > stops[segment + 1])
+    ++segment;
+  if (segment + 1 == stops.size()) segment = stops.size() - 2;
+  const double width = stops[segment + 1] - stops[segment];
+  const double ratio = width > 0.0 ? (position - stops[segment]) / width : 0.0;
+  const Rgb rgb{
+      colors[segment].red + ratio *
+          (colors[segment + 1].red - colors[segment].red),
+      colors[segment].green + ratio *
+          (colors[segment + 1].green - colors[segment].green),
+      colors[segment].blue + ratio *
+          (colors[segment + 1].blue - colors[segment].blue)};
+  return "#" + color_component(rgb.red) + color_component(rgb.green) +
+         color_component(rgb.blue);
+}
+
+std::string occurrence_label(std::uint64_t log1, std::uint64_t log2,
+                             std::uint64_t total) {
+  return "(" + std::to_string(log1) + "/" + std::to_string(log2) + "/" +
+         std::to_string(total) + ")";
+}
 
 // Resolve the activity label selected by the caller.  The event model keeps
 // the common resource, timestamp, and lifecycle values in dedicated fields;
@@ -326,8 +380,12 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
   return usage;
 }
 
-PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2) {
-  PetriUsageRecord result{id, log1, log2, 0, 0.0};
+PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2,
+                        std::string label_prefix = {}) {
+  PetriUsageRecord result;
+  result.id = id;
+  result.log1_occurrences = log1;
+  result.log2_occurrences = log2;
   if (log2 > std::numeric_limits<std::uint64_t>::max() - log1) {
     throw std::overflow_error("Petri usage total overflow");
   }
@@ -338,6 +396,11 @@ PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2) 
         static_cast<long double>(result.total_occurrences));
   }
   if (!std::isfinite(result.direction)) throw std::overflow_error("Petri usage direction is not finite");
+  result.label = std::move(label_prefix) +
+                 occurrence_label(result.log1_occurrences,
+                                   result.log2_occurrences,
+                                   result.total_occurrences);
+  result.color = direction_color(result.direction);
   return result;
 }
 
@@ -368,7 +431,13 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
   }
   result.transitions.reserve(net.transitions().size());
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-    result.transitions.push_back(record(t, usage1.transitions[t], usage2.transitions[t]));
+    std::string label_prefix;
+    const auto& transition = net.transitions()[t];
+    if (transition.activity && *transition.activity < net.activities().size())
+      label_prefix = net.activities()[*transition.activity] + " ";
+    result.transitions.push_back(record(t, usage1.transitions[t],
+                                        usage2.transitions[t],
+                                        std::move(label_prefix)));
   }
   std::size_t arc_id = 0;
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
@@ -377,13 +446,13 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
       const auto stats = result.transitions[t];
       result.arcs.push_back({arc_id++, t, p, true, stats.log1_occurrences,
                              stats.log2_occurrences, stats.total_occurrences,
-                             stats.direction});
+                             stats.direction, stats.label, stats.color});
     }
     for (const auto p : transition.outputs) {
       const auto stats = result.transitions[t];
       result.arcs.push_back({arc_id++, t, p, false, stats.log1_occurrences,
                              stats.log2_occurrences, stats.total_occurrences,
-                             stats.direction});
+                             stats.direction, stats.label, stats.color});
     }
   }
   return result;

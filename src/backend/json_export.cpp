@@ -3669,7 +3669,12 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
     out << "{\"id\":" << r.id << ",\"log1_occurrences\":"
         << r.log1_occurrences << ",\"log2_occurrences\":"
         << r.log2_occurrences << ",\"total_occurrences\":"
-        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+        << r.total_occurrences << ",\"direction\":" << r.direction
+        << ",\"label\":";
+    write_json_string(out, r.label);
+    out << ",\"color\":";
+    write_json_string(out, r.color);
+    out << '}';
   }
   out << "],\"transitions\":[";
   for (std::size_t i = 0; i < result.transitions.size(); ++i) {
@@ -3678,7 +3683,12 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
     out << "{\"id\":" << r.id << ",\"log1_occurrences\":"
         << r.log1_occurrences << ",\"log2_occurrences\":"
         << r.log2_occurrences << ",\"total_occurrences\":"
-        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+        << r.total_occurrences << ",\"direction\":" << r.direction
+        << ",\"label\":";
+    write_json_string(out, r.label);
+    out << ",\"color\":";
+    write_json_string(out, r.color);
+    out << '}';
   }
   out << "],\"arcs\":[";
   for (std::size_t i = 0; i < result.arcs.size(); ++i) {
@@ -3689,7 +3699,12 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
         << (r.input ? "true" : "false") << ",\"log1_occurrences\":"
         << r.log1_occurrences << ",\"log2_occurrences\":"
         << r.log2_occurrences << ",\"total_occurrences\":"
-        << r.total_occurrences << ",\"direction\":" << r.direction << '}';
+        << r.total_occurrences << ",\"direction\":" << r.direction
+        << ",\"label\":";
+    write_json_string(out, r.label);
+    out << ",\"color\":";
+    write_json_string(out, r.color);
+    out << '}';
   }
   out << "]}";
   return out.str();
