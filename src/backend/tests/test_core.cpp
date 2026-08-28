@@ -4781,7 +4781,7 @@ void heuristic_miner_min_frequency_drops_rare_edges() {
   assert(net_edge(net, "A", "B") != nullptr);
   assert(net_edge(net, "A", "B")->frequency == 10);
 
-  // PM creates nodes from accepted endpoints only when at least one edge
+  // Discovery creates nodes from accepted endpoints only when at least one edge
   // survives, so the isolated C remains in activities but is not active.
   assert(net_edge(net, "A", "C") == nullptr);
   const auto c = net_activity(net, "C");

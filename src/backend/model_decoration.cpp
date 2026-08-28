@@ -3,6 +3,8 @@
 #include <deque>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <stdexcept>
 #include <unordered_map>
 #include <utility>
 
@@ -11,7 +13,39 @@
 
 namespace minera {
 
-ModelDecoration decorate_model(const EventLog& log, const PetriNet& net) {
+namespace {
+
+bool standard_activity_attribute(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+const std::string& selected_activity(const Event& event,
+                                     std::string_view activity_attribute) {
+  if (standard_activity_attribute(activity_attribute)) return event.activity;
+  if (const auto* value = event.attribute(activity_attribute)) return *value;
+  throw std::invalid_argument(
+      "model decoration: event is missing activity attribute '" +
+      std::string(activity_attribute) + "'");
+}
+
+bool standard_timestamp_attribute(std::string_view key) {
+  return key.empty() || key == "time:timestamp" || key == "timestamp";
+}
+
+const std::string& selected_timestamp(const Event& event,
+                                      std::string_view timestamp_attribute) {
+  if (standard_timestamp_attribute(timestamp_attribute)) return event.timestamp;
+  if (const auto* value = event.attribute(timestamp_attribute)) return *value;
+  throw std::invalid_argument(
+      "model decoration: event is missing timestamp attribute '" +
+      std::string(timestamp_attribute) + "'");
+}
+
+}  // namespace
+
+ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
+                               std::string_view activity_attribute,
+                               std::string_view timestamp_attribute) {
   ModelDecoration result;
   result.transition_counts.assign(net.transitions().size(), 0);
   result.place_counts.assign(net.place_count(), 0);
@@ -26,7 +60,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net) {
     std::string key;
     for (const auto& event : log.traces[i].events) {
       key.push_back('\x1f');
-      key += event.activity;
+      key += selected_activity(event, activity_attribute);
     }
     const auto [it, inserted] =
         variant_ids.emplace(std::move(key), variants.size());
@@ -34,7 +68,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net) {
       std::vector<std::string> activities;
       activities.reserve(log.traces[i].events.size());
       for (const auto& event : log.traces[i].events) {
-        activities.push_back(event.activity);
+        activities.push_back(selected_activity(event, activity_attribute));
       }
       variants.push_back(std::move(activities));
     }
@@ -62,12 +96,14 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net) {
     // back to some epoch.
     std::optional<double> first_instant;
     for (const auto& event : trace.events) {
-      first_instant = parse_timestamp(event.timestamp);
+      first_instant = parse_timestamp(
+          selected_timestamp(event, timestamp_attribute));
       if (first_instant) break;
     }
     std::optional<double> last_instant;
     for (auto it = trace.events.rbegin(); it != trace.events.rend(); ++it) {
-      last_instant = parse_timestamp(it->timestamp);
+      last_instant = parse_timestamp(
+          selected_timestamp(*it, timestamp_attribute));
       if (last_instant) break;
     }
     tokens[net.source()].push_back(first_instant);
@@ -77,7 +113,8 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net) {
     // for the routing to the sink, at the case's last instant.
     for (std::size_t step = 0; step < sequence->size(); ++step) {
       const auto now = step < trace.events.size()
-                           ? parse_timestamp(trace.events[step].timestamp)
+                           ? parse_timestamp(selected_timestamp(
+                                 trace.events[step], timestamp_attribute))
                            : last_instant;
       for (const auto transition_id : (*sequence)[step]) {
         ++result.transition_counts[transition_id];

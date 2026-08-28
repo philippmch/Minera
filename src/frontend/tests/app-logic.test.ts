@@ -727,6 +727,8 @@ describe("hasActiveMinerOptions", () => {
       heuristicPerformanceAggregation: "mean",
       heuristicDfgPreCleaningNoiseThreshold: 0.05,
       heuristicLoopLengthTwoThreshold: 0.5,
+      heuristicActivityAttribute: "concept:name",
+      heuristicTimestampAttribute: "time:timestamp",
       heuristicStartTimestampAttribute: "start_timestamp",
       heuristicLifecycleInstanceAttribute: "concept:instance",
     })).toBe(false);
@@ -752,6 +754,8 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ inductiveVariant: "dfg" })).toBe(true);
     expect(hasActiveMinerOptions({ alphaVariant: "plus" })).toBe(true);
     expect(hasActiveMinerOptions({ heuristicVariant: "plusplus" })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicActivityAttribute: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ heuristicTimestampAttribute: "finished_at" })).toBe(true);
     // Zero is a meaningful heuristic threshold, not "off".
     expect(hasActiveMinerOptions({ dependencyThreshold: 0 })).toBe(true);
     expect(hasActiveMinerOptions({ andThreshold: 0 })).toBe(true);
@@ -819,6 +823,8 @@ describe("mineFormEntries", () => {
       inductiveVariant: "dfg",
       alphaVariant: "plus",
       heuristicVariant: "plusplus",
+      heuristicActivityAttribute: "phase",
+      heuristicTimestampAttribute: "finished_at",
       dependencyThreshold: 0.75,
       andThreshold: 0,
       minEdgeFrequency: 2,
@@ -837,6 +843,8 @@ describe("mineFormEntries", () => {
       ["inductive_variant", "dfg"],
       ["alpha_variant", "plus"],
       ["heuristic_variant", "plusplus"],
+      ["heuristic_activity_attribute", "phase"],
+      ["heuristic_timestamp_attribute", "finished_at"],
       ["dependency_threshold", "0.75"],
       ["and_threshold", "0"],
       ["min_edge_frequency", "2"],
@@ -850,6 +858,15 @@ describe("mineFormEntries", () => {
       ["heuristic_start_timestamp_attribute", "started_at"],
       ["heuristic_lifecycle_instance_attribute", "instance"],
     ]);
+  });
+
+  it("rejects blank heuristic selectors", () => {
+    expect(() => mineFormEntries({ heuristicActivityAttribute: "   " })).toThrow(
+      "heuristicActivityAttribute must not be empty",
+    );
+    expect(() => mineFormEntries({ heuristicTimestampAttribute: "" })).toThrow(
+      "heuristicTimestampAttribute must not be empty",
+    );
   });
 
   it("maps temporal analyses and gates dependent defaults", () => {

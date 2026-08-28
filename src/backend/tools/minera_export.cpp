@@ -481,6 +481,12 @@ int usage(const char* program) {
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
                "  --heuristic-variant <id>  classic (default) or plusplus\n"
                "                            (interval/eventual-follow semantics)\n"
+               "  --heuristic-activity-attribute <name>\n"
+               "                            Event field used as activity label\n"
+               "                            (default: concept:name)\n"
+               "  --heuristic-timestamp-attribute <name>\n"
+               "                            Event field used as completion time\n"
+               "                            (default: time:timestamp)\n"
                "  --dependency-threshold <f>  Heuristic Miner: minimum dependency\n"
                "                            measure (default: 0.5)\n"
                "  --and-threshold <f>       Heuristic Miner: minimum AND measure\n"
@@ -1521,6 +1527,21 @@ int main(int argc, char** argv) {
       } else {
         token_replay_options.activity_attribute = trimmed;
       }
+      continue;
+    }
+    if (arg == "--heuristic-activity-attribute" ||
+        arg == "--heuristic-timestamp-attribute") {
+      const auto* value = next();
+      const auto trimmed = value == nullptr ? std::string{} : trim_text(value);
+      if (trimmed.empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty name\n";
+        return 2;
+      }
+      if (arg == "--heuristic-activity-attribute")
+        heuristic_options.activity_attribute = trimmed;
+      else
+        heuristic_options.timestamp_attribute = trimmed;
       continue;
     }
     if (arg == "--batch-activity-attribute" ||
@@ -5241,6 +5262,8 @@ int main(int argc, char** argv) {
                                       token_replay_options.activity_attribute);
     register_activity_selector_values(graph, log,
                                       alignment_options.activity_attribute);
+    register_activity_selector_values(graph, log,
+                                      heuristic_options.activity_attribute);
     std::optional<minera::DfgAlignmentLogResult> dfg_alignment_result;
     std::optional<minera::DfgAlignmentProjection> dfg_projection_result;
     std::optional<minera::EventLog> dfg_projected_log;
@@ -5418,9 +5441,14 @@ int main(int argc, char** argv) {
                    "(--no-alignments skips this export section)\n";
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      auto replay_options = token_replay_options;
+      if (id == "heuristic" &&
+          replay_options.activity_attribute == "concept:name") {
+        replay_options.activity_attribute = heuristic_options.activity_attribute;
+      }
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(petri),
-          minera::check_conformance(log, petri, token_replay_options),
+          minera::check_conformance(log, petri, replay_options),
           minera::check_footprints(log, petri),
           no_alignments ? std::optional<minera::AlignmentResult>{}
                         : std::optional<minera::AlignmentResult>(
@@ -5671,7 +5699,9 @@ int main(int argc, char** argv) {
     // even when the alpha net (the classic view) fits nothing of a real log.
     const auto petri_decoration = minera::decorate_model(log, net);
     const auto inductive_decoration = minera::decorate_model(log, inductive_net);
-    const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
+    const auto heuristic_decoration = minera::decorate_model(
+        log, heuristic_net, heuristic_options.activity_attribute,
+        heuristic_options.timestamp_attribute);
     const auto powl_decoration = minera::decorate_model(log, powl_net);
 
     // Optionally compute the performance spectrum over an activity pattern.

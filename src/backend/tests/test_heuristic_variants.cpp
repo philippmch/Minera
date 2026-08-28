@@ -1,4 +1,5 @@
 #include "minera/heuristic_miner.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
 
 #include <cassert>
@@ -573,6 +574,62 @@ void classic_performance_aggregations_and_validation() {
   assert(invalid);
 }
 
+void configurable_activity_and_timestamp_fields() {
+  auto a = event("canonical-a", "not-a-canonical-time");
+  auto b = event("canonical-b", "also-not-a-canonical-time");
+  attr(a, "phase", "A");
+  attr(b, "phase", "B");
+  attr(a, "finished_at", "2026-06-01T00:00:01Z");
+  attr(b, "finished_at", "2026-06-01T00:05:01Z");
+
+  HeuristicMinerOptions classic;
+  classic.activity_attribute = "phase";
+  classic.timestamp_attribute = "finished_at";
+  classic.decoration = HeuristicNetDecoration::kPerformance;
+  const auto net = discover_heuristics_net(log({trace({a, b})}), classic);
+  assert((net.activities == std::vector<std::string>{"A", "B"}));
+  assert(net.activity_attribute == "phase");
+  assert(net.timestamp_attribute == "finished_at");
+  assert(net.activity_ids_are_local);
+  assert(edge(net, "A", "B") != nullptr);
+  assert(std::abs(edge(net, "A", "B")->representation - 300.0) < 1e-9);
+
+  auto interval_a = event("canonical-a", "invalid-completion");
+  auto interval_b = event("canonical-b", "invalid-completion");
+  attr(interval_a, "phase", "A");
+  attr(interval_b, "phase", "B");
+  attr(interval_a, "finished_at", "2026-06-02T00:00:05Z");
+  attr(interval_b, "finished_at", "2026-06-02T00:00:09Z");
+  attr(interval_a, "started_at", "2026-06-02T00:00:00Z");
+  attr(interval_b, "started_at", "2026-06-02T00:00:06Z");
+  auto plus = plus_options();
+  plus.activity_attribute = "phase";
+  plus.timestamp_attribute = "finished_at";
+  plus.start_timestamp_attribute = "started_at";
+  const auto plus_net =
+      discover_heuristics_net(log({trace({interval_a, interval_b})}), plus);
+  assert((plus_net.activities == std::vector<std::string>{"A", "B"}));
+  assert(plus_net.activity_ids_are_local);
+  assert(std::abs(activity_stat(plus_net, "A").mean_sojourn_seconds - 5.0) <
+         1e-9);
+  assert(std::abs(activity_stat(plus_net, "B").mean_sojourn_seconds - 3.0) <
+         1e-9);
+  const auto decorated = decorate_model(
+      log({trace({interval_a, interval_b})}), to_petri_net(plus_net), "phase",
+      "finished_at");
+  assert(decorated.trace_count == 1);
+  assert(decorated.decorated_traces == 1);
+
+  auto missing = event("canonical", "2026-06-02T00:00:10Z");
+  bool threw = false;
+  try {
+    (void)discover_heuristics_net(log({trace({missing, b})}), classic);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -589,5 +646,6 @@ int main() {
   classic_length_two_rescue_and_reference_quirk();
   classic_active_nodes_conversion_and_dfg_inference();
   classic_performance_aggregations_and_validation();
+  configurable_activity_and_timestamp_fields();
   std::cout << "heuristic variant tests passed\n";
 }

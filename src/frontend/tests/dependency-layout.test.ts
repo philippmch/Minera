@@ -66,4 +66,26 @@ describe("computeDependencyLayout", () => {
     expect(graph.edges.some((edge) => edge.key === edgeKey(-1, 0))).toBe(true);
     expect(graph.edges.some((edge) => edge.key === edgeKey(1, -2))).toBe(true);
   });
+
+  it("uses a local label table for alternate activity fields", () => {
+    const net: HeuristicsNet = {
+      variant: "classic",
+      activity_ids_are_local: true,
+      activities: ["phase-a", "phase-b"],
+      active_activities: [0, 1],
+      edges: [{ source: 0, target: 1, dependency: 0.8, frequency: 2 }],
+      start_activities: [0],
+      end_activities: [1],
+      activity_statistics: [
+        { activity: 0, occurrences: 2, start_occurrences: 1, end_occurrences: 0, mean_sojourn_seconds: 0 },
+        { activity: 1, occurrences: 2, start_occurrences: 0, end_occurrences: 1, mean_sojourn_seconds: 0 },
+      ],
+    };
+    const { graph, dependency } = computeDependencyLayout(
+      net,
+      data([act("canonical-a"), act("canonical-b")]),
+    );
+    expect(graph.nodes.map((node) => node.name)).toEqual(["phase-a", "phase-b"]);
+    expect(dependency.get(edgeKey(0, 1))).toBe(0.8);
+  });
 });

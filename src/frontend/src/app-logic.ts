@@ -63,6 +63,10 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       (options.inductiveVariant && options.inductiveVariant !== "log") ||
       (options.alphaVariant && options.alphaVariant !== "classic") ||
       (options.heuristicVariant && options.heuristicVariant !== "classic") ||
+      (options.heuristicActivityAttribute &&
+        options.heuristicActivityAttribute.trim() !== "concept:name") ||
+      (options.heuristicTimestampAttribute &&
+        options.heuristicTimestampAttribute.trim() !== "time:timestamp") ||
       options.dependencyThreshold !== undefined ||
       options.andThreshold !== undefined ||
       options.minEdgeFrequency !== undefined ||
