@@ -322,6 +322,20 @@ LogToFeaturesResult log_to_features(const EventLog& log,
 
   if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
     const auto activities = categories_for_events(log, options.activity_key);
+    std::set<std::pair<std::string, std::string>> observed_direct_paths;
+    std::set<std::pair<std::string, std::string>> observed_indirect_paths;
+    for (const auto& trace : log.traces) {
+      for (std::size_t i = 1; i < trace.events.size(); ++i) {
+        observed_direct_paths.emplace(
+            value_for(trace.events[i - 1], options.activity_key),
+            value_for(trace.events[i], options.activity_key));
+      }
+      for (std::size_t i = 0; i + 2 < trace.events.size(); ++i) {
+        observed_indirect_paths.emplace(
+            value_for(trace.events[i], options.activity_key),
+            value_for(trace.events[i + 2], options.activity_key));
+      }
+    }
     std::vector<std::string> names;
     auto add_name = [&](std::string name) {
       if (std::find(names.begin(), names.end(), name) == names.end())
@@ -383,12 +397,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (last_times) for (const auto& a : activities) {
       add_name("startToLastOcc@@" + a); add_name("lastOccToEnd@@" + a);
     }
-    if (direct_paths || indirect_paths) {
-      for (const auto& from : activities) for (const auto& to : activities) if (from != to) {
-        if (direct_paths) add_name("directPathPerformanceLastOcc@@" + from + "##" + to);
-        if (indirect_paths) add_name("indirectPathPerformanceLastOcc@@" + from + "##" + to);
-      }
-    }
+    if (direct_paths)
+      for (const auto& [from, to] : observed_direct_paths)
+        add_name("directPathPerformanceLastOcc@@" + from + "##" + to);
+    if (indirect_paths)
+      for (const auto& [from, to] : observed_indirect_paths)
+        add_name("indirectPathPerformanceLastOcc@@" + from + "##" + to);
     if (wip) add_name("@@work_in_progress");
     if (indexes) for (const auto& a : activities) {
       add_name("firstIndexAct@@" + a); add_name("lastIndexAct@@" + a);
@@ -413,7 +427,6 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       double case_start = std::numeric_limits<double>::infinity();
       double case_end = -std::numeric_limits<double>::infinity();
       std::map<std::string, double> first_time, last_time;
-      std::map<std::string, double> direct_path_values, indirect_path_values;
       std::vector<TimedEvent> timed;
       std::map<std::string, int> resource_count;
       for (std::size_t i = 0; i < t.events.size(); ++i) {
@@ -455,15 +468,32 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         if (first_times && std::isfinite(case_start) && std::isfinite(case_end)) { set("startToFirstOcc@@"+a, first_value-case_start); set("firstOccToEnd@@"+a, case_end-first_value); }
         if (last_times && std::isfinite(case_start) && std::isfinite(case_end)) { const auto last_value = last_time[a]; set("startToLastOcc@@"+a, last_value-case_start); set("lastOccToEnd@@"+a, case_end-last_value); }
       }
-      for (std::size_t i=1;i<t.events.size();++i) {
-        const auto from=value_for(t.events[i-1],options.activity_key), to=value_for(t.events[i],options.activity_key);
-        const auto lhs = instant(t.events[i-1], options.timestamp_key, false), rhs = instant(t.events[i], options.timestamp_key, false);
-        if (std::isfinite(lhs) && std::isfinite(rhs)) set("directPathPerformanceLastOcc@@"+from+"##"+to, std::max(0.0,rhs-lhs));
+      const auto path_start = [&](const Event& event) {
+        return instant(event,
+                       options.start_timestamp_key.empty()
+                           ? options.timestamp_key
+                           : options.start_timestamp_key,
+                       false);
+      };
+      if (direct_paths) for (std::size_t i = 1; i < t.events.size(); ++i) {
+        const auto from = value_for(t.events[i - 1], options.activity_key);
+        const auto to = value_for(t.events[i], options.activity_key);
+        const auto finish = instant(t.events[i - 1], options.timestamp_key, false);
+        const auto start = path_start(t.events[i]);
+        if (std::isfinite(finish) && std::isfinite(start) && start > finish)
+          set("directPathPerformanceLastOcc@@" + from + "##" + to,
+              start - finish);
       }
-      if (indirect_paths) for (std::size_t i=0;i<t.events.size();++i) for (std::size_t j=i+2;j<t.events.size();++j) {
-        const auto lhs=instant(t.events[i],options.timestamp_key,false), rhs=instant(t.events[j],options.timestamp_key,false);
-        if (std::isfinite(lhs)&&std::isfinite(rhs)) set("indirectPathPerformanceLastOcc@@"+value_for(t.events[i],options.activity_key)+"##"+value_for(t.events[j],options.activity_key), std::max(0.0,rhs-lhs));
-      }
+      if (indirect_paths)
+        for (std::size_t i = 0; i + 2 < t.events.size(); ++i) {
+          const auto from = value_for(t.events[i], options.activity_key);
+          const auto to = value_for(t.events[i + 2], options.activity_key);
+          const auto finish = instant(t.events[i], options.timestamp_key, false);
+          const auto start = path_start(t.events[i + 2]);
+          if (std::isfinite(finish) && std::isfinite(start) && start > finish)
+            set("indirectPathPerformanceLastOcc@@" + from + "##" + to,
+                start - finish);
+        }
       if (wip || max_concurrent || max_per_activity) {
         int general = 0; std::map<std::string,int> per_activity;
         for (const auto& event : timed) {

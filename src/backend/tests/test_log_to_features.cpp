@@ -21,6 +21,59 @@ static EventLog fixture() {
   t.events = {a, b}; log.traces.push_back(t); return log;
 }
 
+static Event timed_event(const std::string& case_id, const std::string& activity,
+                         const std::string& start, const std::string& finish,
+                         std::size_t order) {
+  Event event{case_id, activity, finish, "r1", order};
+  event.attributes.push_back({"start_time", start, AttributeKind::kDate});
+  return event;
+}
+
+static void observed_path_timing_uses_configured_starts() {
+  EventLog log;
+  Trace paths;
+  paths.case_id = "paths";
+  paths.events = {
+      timed_event("paths", "A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z", 0),
+      timed_event("paths", "B", "2024-01-01T00:00:15Z", "2024-01-01T00:00:30Z", 1),
+      timed_event("paths", "A", "2024-01-01T00:00:35Z", "2024-01-01T00:00:40Z", 2),
+      timed_event("paths", "B", "2024-01-01T00:00:20Z", "2024-01-01T00:00:42Z", 3),
+      timed_event("paths", "C", "2024-01-01T00:00:50Z", "2024-01-01T00:01:00Z", 4),
+  };
+  log.traces.push_back(paths);
+  Trace self_loop;
+  self_loop.case_id = "self";
+  self_loop.events = {
+      timed_event("self", "A", "2024-01-01T00:01:00Z", "2024-01-01T00:01:10Z", 0),
+      timed_event("self", "A", "2024-01-01T00:01:15Z", "2024-01-01T00:01:20Z", 1),
+  };
+  log.traces.push_back(self_loop);
+
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TRACE_BASED;
+  options.start_timestamp_key = "start_time";
+  options.enable_succ_def_representation = false;
+  options.enable_direct_paths_times_last_occ = true;
+  options.enable_indirect_paths_times_last_occ = true;
+  const auto result = log_to_features(log, options);
+
+  const auto find_feature = [&](const std::string& name) {
+    return std::find(result.feature_names.begin(), result.feature_names.end(), name);
+  };
+  const auto direct_ab = find_feature("directPathPerformanceLastOcc@@A##B");
+  assert(direct_ab != result.feature_names.end());
+  assert(result.trace_rows.front()[static_cast<std::size_t>(direct_ab - result.feature_names.begin())] == 5.0);
+  assert(find_feature("directPathPerformanceLastOcc@@A##C") == result.feature_names.end());
+  assert(find_feature("directPathPerformanceLastOcc@@A##A") != result.feature_names.end());
+
+  const auto indirect_ac = find_feature("indirectPathPerformanceLastOcc@@A##C");
+  assert(indirect_ac != result.feature_names.end());
+  assert(result.trace_rows.front()[static_cast<std::size_t>(indirect_ac - result.feature_names.begin())] == 10.0);
+  const auto indirect_aa = find_feature("indirectPathPerformanceLastOcc@@A##A");
+  assert(indirect_aa != result.feature_names.end());
+  assert(result.trace_rows.front()[static_cast<std::size_t>(indirect_aa - result.feature_names.begin())] == 25.0);
+}
+
 int main() {
   const auto log = fixture();
   LogToFeaturesOptions e; e.variant = LogToFeaturesVariant::EVENT_BASED; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
@@ -65,4 +118,5 @@ int main() {
   EventLog empty;
   const auto empty_temporal = log_to_features(empty, e);
   assert(empty_temporal.temporal_rows.empty() && !empty_temporal.feature_names.empty());
+  observed_path_timing_uses_configured_starts();
 }
