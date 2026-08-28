@@ -1236,23 +1236,27 @@ The bounded classic genetic miner is implemented as a deterministic causal
 matrix search with explicit population, generation, crossover, mutation,
 elitism, activity, and candidate-state limits. Seeded evolution repairs
 disconnected and inverse matrix projections, preserves partition grouping, and
-converts compatible places plus silent routing hubs into a replayable workflow
-net with canonical initial/final markings. Each mating step retains reciprocal
-offspring with deterministic inverse repair. Fitness is explicitly 0.4 token-
-replay fitness plus 0.6 fitting-trace coverage over the normalized log;
-diagnostics report the search bound and best candidate without fabricating an
-optimum after exhaustion. Optional strict timestamp and case-id selectors
+converts compatible matrix places with exact reciprocal checks, removes covered
+fallback edges, and adds deterministic visible-to-silent-to-visible routes for
+non-simple matrices. Source and sink activity sets follow the matrix graph;
+strongly connected candidates receive explicit entry/exit alternatives so their
+cycle can still complete at the workflow boundary. Each mating step retains
+reciprocal offspring, removes duplicate partition members, and updates both
+matrix projections. Fitness is explicitly 0.4 token-replay fitness plus 0.6
+fitting-trace coverage over the normalized log; diagnostics report the search
+bound and best candidate without fabricating an optimum after exhaustion.
+Optional strict timestamp and case-id selectors
 resolve standard fields plus generic event/trace attributes, including stable
 duplicate-timestamp ordering and deterministic regrouping by selected case.
 
 The native result has a standalone JSON contract and strict request parsing,
 CLI flags, cached-session server endpoints, and frontend types/query helpers.
 Focused tests cover deterministic output, chain fitness, disconnected repair,
-custom event/trace selectors, duplicate timestamp ordering, parameter
-rejection, candidate caps, and malformed frontend responses. The bounded
-adapter intentionally does not expose a separate fitness-log artifact in the
-standalone JSON contract; diagnostics remain scalar and the normalized log is
-used internally for scoring.
+cyclic boundary completion, silent fallback routing, custom event/trace
+selectors, duplicate timestamp ordering, parameter rejection, candidate caps,
+and malformed frontend responses. The bounded adapter intentionally does not
+expose a separate fitness-log artifact in the standalone JSON contract;
+diagnostics remain scalar and the normalized log is used internally for scoring.
 
 ## Organizational SNA parity evidence
 
