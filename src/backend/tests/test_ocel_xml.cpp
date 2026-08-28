@@ -143,5 +143,40 @@ int main() {
          "string");
   assert(typed.event_type_attributes.at("Create").at("planned_at") ==
          "datetime");
+
+  const auto repeated_epoch = minera::parse_ocel_xml(R"xml(
+<log>
+  <object-types><object-type name="Order"><attributes>
+    <attribute name="state" type="string"/>
+  </attributes></object-type></object-types>
+  <event-types/>
+  <objects><object id="o1" type="Order"><attributes>
+    <attribute name="state" time="1970-01-01T00:00:00Z" value="new"/>
+    <attribute name="state" time="1970-01-01T00:00:00Z" value="reopened"/>
+    <attribute name="state" time="0" value="queued"/>
+  </attributes></object></objects>
+  <events/>
+</log>
+)xml");
+  assert(repeated_epoch.objects.front().attributes.size() == 1);
+  assert(repeated_epoch.object_changes.size() == 2);
+  assert(repeated_epoch.object_changes[0].timestamp ==
+         "1970-01-01T00:00:00Z");
+  assert(repeated_epoch.object_changes[1].timestamp == "0");
+  assert(std::get<std::string>(repeated_epoch.object_changes[1].value) ==
+         "queued");
+  bool missing_change_time = false;
+  try {
+    (void)minera::parse_ocel_xml(R"xml(
+<log><object-types><object-type name="Order"/></object-types>
+<objects><object id="o1" type="Order"><attributes>
+  <attribute name="state" value="new"/>
+  <attribute name="state" value="queued"/>
+</attributes></object></objects><events/></log>
+)xml");
+  } catch (...) {
+    missing_change_time = true;
+  }
+  assert(missing_change_time);
   return 0;
 }

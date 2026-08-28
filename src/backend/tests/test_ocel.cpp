@@ -104,6 +104,34 @@ int main() {
   assert(typed_standard.e2e.size() == 1 &&
          typed_standard.e2e.front().qualifier == "self");
 
+  const auto repeated_epoch = minera::parse_ocel_json(R"json({
+    "objectTypes":[{"name":"Order","attributes":[{"name":"state","type":"string"}]}],
+    "objects":[{"id":"o1","type":"Order","attributes":[
+      {"name":"state","time":"1970-01-01T00:00:00Z","value":"new"},
+      {"name":"state","time":"1970-01-01T00:00:00Z","value":"reopened"},
+      {"name":"state","time":"0","value":"queued"}]}],
+    "events":[]
+  })json");
+  assert(repeated_epoch.objects.front().attributes.size() == 1);
+  assert(repeated_epoch.object_changes.size() == 2);
+  assert(repeated_epoch.object_changes[0].timestamp ==
+         "1970-01-01T00:00:00Z");
+  assert(repeated_epoch.object_changes[1].timestamp == "0");
+  assert(std::get<std::string>(repeated_epoch.object_changes[1].value) ==
+         "queued");
+  bool missing_change_time = false;
+  try {
+    (void)minera::parse_ocel_json(R"json({
+      "objects":[{"id":"o1","type":"Order","attributes":[
+        {"name":"state","value":"new"},
+        {"name":"state","value":"queued"}]}],
+      "events":[]
+    })json");
+  } catch (...) {
+    missing_change_time = true;
+  }
+  assert(missing_change_time);
+
   bool duplicate_type = false;
   try {
     (void)minera::parse_ocel_json(
