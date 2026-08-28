@@ -90,8 +90,10 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
         (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold !== 0) ||
         (options.powlOrderFrequencyRatio !== undefined && options.powlOrderFrequencyRatio !== 1) ||
         (options.powlBruteForceActivityLimit !== undefined && options.powlBruteForceActivityLimit !== 0) ||
-        (options.tokenReplayVariant && options.tokenReplayVariant !== "forward") ||
+      (options.tokenReplayVariant && options.tokenReplayVariant !== "forward") ||
       options.tokenReplayStopImmediatelyUnfit === true ||
+      Boolean(options.tokenReplayActivityAttribute?.trim() &&
+        options.tokenReplayActivityAttribute.trim() !== "concept:name") ||
       options.logSkeletonNoiseThreshold !== undefined &&
         options.logSkeletonNoiseThreshold !== 0 ||
       logSkeletonConstraintsActive ||

@@ -43,6 +43,10 @@ struct ConformanceResult {
   std::vector<std::uint64_t> transition_frequencies;
 
   std::vector<VariantConformance> variants;  // worst-fitting first
+  // Event field used to form replay variants. Standard aliases such as
+  // "concept:name" and "activity" use Event::activity; other names resolve
+  // through Event::attribute.
+  std::string activity_attribute = "concept:name";
 };
 
 // Token-replay implementation variation. FORWARD is the modern replay used
@@ -57,6 +61,10 @@ enum class TokenReplayVariant {
 struct TokenReplayOptions {
   TokenReplayVariant variant = TokenReplayVariant::kForward;
   bool stop_immediately_unfit = false;
+  // Event field used to form replay variants. Standard aliases such as
+  // "concept:name" and "activity" use Event::activity; other names resolve
+  // through Event::attribute.
+  std::string activity_attribute = "concept:name";
 };
 
 // Per-place token accounting for a replayed log.  The four counters use the
@@ -187,6 +195,10 @@ struct AlignmentOptions {
   std::function<double(const std::string&, std::size_t)> trace_cost_function;
   std::function<double(const std::string&, std::size_t)> model_cost_function;
   std::function<double(const std::string&, std::size_t)> sync_cost_function;
+  // Event field used to form alignment variants. Standard aliases such as
+  // "concept:name" and "activity" use Event::activity; other names resolve
+  // through Event::attribute.
+  std::string activity_attribute = "concept:name";
 };
 
 struct AlignmentDiagnostics {
@@ -250,6 +262,8 @@ struct AlignmentResult {
   AlignmentVariant variant = AlignmentVariant::kStateEquationAStar;
   AlignmentDiagnostics diagnostics;
   std::vector<VariantAlignment> variants;  // worst-fitting first
+  // Event field used to form alignment variants.
+  std::string activity_attribute = "concept:name";
 };
 
 // Replays each trace variant (a sequence of activity names) against the net

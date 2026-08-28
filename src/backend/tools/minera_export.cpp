@@ -139,6 +139,21 @@ std::string trim_text(std::string_view value) {
   return std::string(value.substr(first, last - first + 1));
 }
 
+void register_activity_selector_values(
+    minera::DirectlyFollowsGraph& graph, const minera::EventLog& log,
+    std::string_view activity_attribute) {
+  if (activity_attribute.empty() || activity_attribute == "concept:name" ||
+      activity_attribute == "activity") {
+    return;
+  }
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      if (const auto* value = event.attribute(activity_attribute))
+        graph.ensure_activity(*value);
+    }
+  }
+}
+
 const minera::PetriNet* select_decision_model(
     std::string_view miner, const minera::PetriNet& inductive,
     const minera::PetriNet& alpha, const minera::PetriNet& heuristic,
@@ -857,6 +872,7 @@ int usage(const char* program) {
                "  --alignment-model-cost <f> Visible model move cost\n"
                "  --alignment-silent-model-cost <f> Silent model move cost\n"
                "  --alignment-sync-cost <f> Synchronous move cost\n"
+               "  --alignment-activity-attribute <name> Event field for variants\n"
                "  --align-decomposed        Embed recompos_maximal decomposed alignment\n"
                "  --decomposed-variant <id> recompos_maximal\n"
                "  --decomposed-max-states <n> State bound\n"
@@ -890,6 +906,7 @@ int usage(const char* program) {
                "  --token-replay-stop-immediately-unfit\n"
                "                            Stop a backwards replay trace at its\n"
                "                            first event that cannot be enabled\n"
+               "  --token-replay-activity-attribute <name> Event field for variants\n"
                "  --log-skeleton-noise-threshold <f> Log-skeleton noise in [0,1]\n"
                "  --log-skeleton-constraints <a,b,...> Constraint families:\n"
                "                            equivalence, always_after, always_before,\n"
@@ -1488,6 +1505,24 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    if (arg == "--alignment-activity-attribute" ||
+        arg == "--token-replay-activity-attribute") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const auto trimmed = trim_text(value);
+      if (trimmed.empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty name\n";
+        return 2;
+      }
+      if (arg == "--alignment-activity-attribute") {
+        alignment_options.activity_attribute = trimmed;
+        alignment_option_used = true;
+      } else {
+        token_replay_options.activity_attribute = trimmed;
+      }
+      continue;
+    }
     if (arg == "--batch-activity-attribute" ||
         arg == "--batch-resource-attribute" ||
         arg == "--batch-timestamp-attribute" ||
@@ -5202,6 +5237,10 @@ int main(int argc, char** argv) {
       return 0;
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    register_activity_selector_values(graph, log,
+                                      token_replay_options.activity_attribute);
+    register_activity_selector_values(graph, log,
+                                      alignment_options.activity_attribute);
     std::optional<minera::DfgAlignmentLogResult> dfg_alignment_result;
     std::optional<minera::DfgAlignmentProjection> dfg_projection_result;
     std::optional<minera::EventLog> dfg_projected_log;

@@ -64,6 +64,13 @@ bool parse_boolean(std::string_view value, std::string_view name) {
                               std::string(value) + "'");
 }
 
+std::string trim_text(std::string_view value) {
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string_view::npos) return {};
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return std::string(value.substr(first, last - first + 1));
+}
+
 std::vector<std::string> parse_strict_csv(std::string_view value,
                                           std::string_view name) {
   if (value.empty())
@@ -506,6 +513,14 @@ AlignmentOptions parse_alignment_params(const FieldLookup& field,
     }
     return value;
   };
+  if (supplied("alignment_activity_attribute")) {
+    options.activity_attribute =
+        trim_text(require("alignment_activity_attribute"));
+    if (options.activity_attribute.empty()) {
+      throw std::invalid_argument(
+          "alignment_activity_attribute: expected a non-empty name");
+    }
+  }
   if (supplied("alignment_variant")) {
     const auto value = field("alignment_variant");
     if (value == "state_equation_a_star" || value == "VERSION_STATE_EQUATION_A_STAR") options.variant = AlignmentVariant::kStateEquationAStar;
@@ -1794,6 +1809,14 @@ MineParams parse_mine_params(const FieldLookup& field,
       throw std::invalid_argument(
           "token_replay_variant: expected forward or backwards, got '" +
           value + "'");
+  }
+  if (supplied("token_replay_activity_attribute")) {
+    params.token_replay.activity_attribute =
+        trim_text(field("token_replay_activity_attribute"));
+    if (params.token_replay.activity_attribute.empty()) {
+      throw std::invalid_argument(
+          "token_replay_activity_attribute: expected a non-empty name");
+    }
   }
   if (const auto value = field("token_replay_stop_immediately_unfit");
       !value.empty()) {

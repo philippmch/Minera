@@ -2095,6 +2095,8 @@ export interface Conformance {
   remaining: number;
   /** Variants worst-fitting first. */
   variants: VariantConformance[];
+  /** Event field used to form replay variants; absent in older exports. */
+  activity_attribute?: string;
 }
 
 /** One move of an optimal alignment between a trace and the model. */
@@ -2127,6 +2129,8 @@ export interface AlignmentOptions {
   model_cost?: number;
   silent_model_cost?: number;
   sync_cost?: number;
+  /** Event field used to form alignment variants. */
+  activity_attribute?: string;
 }
 
 export const DEFAULT_ALIGNMENT_OPTIONS: Required<Pick<AlignmentOptions, "variant" | "cost_profile">> = {
@@ -2201,6 +2205,8 @@ export interface Alignments {
    * in exports from older minera versions.
    */
   activity_deviations?: ActivityDeviation[];
+  /** Event field used to form alignment variants; absent in older exports. */
+  activity_attribute?: string;
 }
 
 /** One directly-follows succession (b follows a); indexes into activities. */

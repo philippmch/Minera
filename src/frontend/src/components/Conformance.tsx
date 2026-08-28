@@ -1061,6 +1061,12 @@ function TokenReplay({
           can't be computed for it at all.
         </p>
       )}
+      {conformance.activity_attribute &&
+        conformance.activity_attribute !== "concept:name" && (
+          <p className="conf-inline-note">
+            Replay activity field: <code>{conformance.activity_attribute}</code>
+          </p>
+        )}
       <section className="conf-metrics">
         {metrics.map((metric) => (
           <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>
@@ -1506,8 +1512,18 @@ function Alignments({
 }) {
   const embedded = model.alignments;
   const [fetched, setFetched] = useState<AlignmentsResult | null>(embedded ?? null);
-  const [draftOptions, setDraftOptions] = useState<AlignmentOptions>({ ...DEFAULT_ALIGNMENT_OPTIONS });
-  const [appliedOptions, setAppliedOptions] = useState<AlignmentOptions>({ ...DEFAULT_ALIGNMENT_OPTIONS });
+  const embeddedActivityAttribute = embedded?.activity_attribute &&
+    embedded.activity_attribute !== "concept:name"
+      ? embedded.activity_attribute
+      : undefined;
+  const initialAlignmentOptions: AlignmentOptions = {
+    ...DEFAULT_ALIGNMENT_OPTIONS,
+    ...(embeddedActivityAttribute
+      ? { activity_attribute: embeddedActivityAttribute }
+      : {}),
+  };
+  const [draftOptions, setDraftOptions] = useState<AlignmentOptions>(initialAlignmentOptions);
+  const [appliedOptions, setAppliedOptions] = useState<AlignmentOptions>(initialAlignmentOptions);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const requestRef = useRef(onRequestAlignment);
@@ -1515,7 +1531,7 @@ function Alignments({
 
   useEffect(() => {
     const isDefault = isDefaultAlignmentOptions(appliedOptions);
-    if (embedded && isDefault) {
+    if (embedded && isDefault && !embeddedActivityAttribute) {
       setFetched(embedded);
       return;
     }
@@ -1597,7 +1613,10 @@ const ALIGNMENT_VARIANTS: { value: AlignmentVariant; label: string }[] = [
 function isDefaultAlignmentOptions(options: AlignmentOptions): boolean {
   return options.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
     options.cost_profile === DEFAULT_ALIGNMENT_OPTIONS.cost_profile &&
-    Object.keys(options).every((key) => key === "variant" || key === "cost_profile");
+    (options.activity_attribute === undefined ||
+      options.activity_attribute.trim() === "concept:name") &&
+    Object.keys(options).every((key) =>
+      key === "variant" || key === "cost_profile" || key === "activity_attribute");
 }
 
 function AlignmentSettings({
@@ -1638,6 +1657,7 @@ function AlignmentSettings({
         <label>Cost profile<select value={draft.cost_profile ?? "legacy"} onChange={(e) => onChange({ ...draft, cost_profile: e.target.value as AlignmentCostProfile })}>
           <option value="legacy">Legacy (unit deviations)</option><option value="standard">Standard costs</option>
         </select></label>
+        <label>Activity field<input value={value("activity_attribute")} onChange={(e) => onChange({ ...draft, activity_attribute: e.target.value })} placeholder="concept:name" /></label>
         <label>State limit<input type="number" min={1} step={1} value={value("max_states")} onChange={(e) => numeric("max_states", e.target.value)} placeholder="default" /></label>
         <label>Global timeout (s)<input type="number" min={0} step={0.1} value={value("max_align_time")} onChange={(e) => numeric("max_align_time", e.target.value)} placeholder="none" /></label>
         <label>Per-trace timeout (s)<input type="number" min={0} step={0.1} value={value("max_align_time_trace")} onChange={(e) => numeric("max_align_time_trace", e.target.value)} placeholder="none" /></label>
@@ -1666,6 +1686,7 @@ export function isInvalidAlignmentOptions(draft: AlignmentOptions): boolean {
   const generator = variant.startsWith("generator_");
   const discounted = variant === "discounted_a_star";
   return (
+    (draft.activity_attribute !== undefined && draft.activity_attribute.trim() === "") ||
     (draft.max_states !== undefined && (!Number.isInteger(draft.max_states) || draft.max_states < 1)) ||
     (draft.max_align_time !== undefined && (!Number.isFinite(draft.max_align_time) || draft.max_align_time < 0)) ||
     (draft.max_align_time_trace !== undefined && (!Number.isFinite(draft.max_align_time_trace) || draft.max_align_time_trace < 0)) ||
@@ -1682,6 +1703,9 @@ export function cleanAlignmentOptions(options: AlignmentOptions): AlignmentOptio
     variant: options.variant ?? DEFAULT_ALIGNMENT_OPTIONS.variant,
     cost_profile: options.cost_profile ?? DEFAULT_ALIGNMENT_OPTIONS.cost_profile,
   };
+  const activityAttribute = options.activity_attribute?.trim();
+  if (activityAttribute && activityAttribute !== "concept:name")
+    clean.activity_attribute = activityAttribute;
   for (const key of ["max_states", "max_align_time", "max_align_time_trace", "trace_cost", "model_cost", "silent_model_cost", "sync_cost"] as const) {
     if (options[key] !== undefined) clean[key] = options[key];
   }
@@ -1812,6 +1836,12 @@ function AlignmentResultView({
           )}
         </section>
       )}
+      {alignments.activity_attribute &&
+        alignments.activity_attribute !== "concept:name" && (
+          <p className="conf-inline-note">
+            Alignment activity field: <code>{alignments.activity_attribute}</code>
+          </p>
+        )}
       <section className="conf-metrics">
         {metrics.map((metric) => (
           <div className={`conf-gauge ${grade(metric.value)}`} key={metric.label}>

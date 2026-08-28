@@ -1506,17 +1506,20 @@ void parse_mine_params_maps_token_replay_options() {
   const auto params = minera::parse_mine_params(fields({
       {"token_replay_variant", "backwards"},
       {"token_replay_stop_immediately_unfit", "1"},
+      {"token_replay_activity_attribute", " phase "},
   }));
   assert(params.token_replay.variant ==
          minera::TokenReplayVariant::kBackwards);
   assert(params.token_replay.stop_immediately_unfit);
+  assert(params.token_replay.activity_attribute == "phase");
 }
 
 void parse_mine_params_rejects_invalid_token_replay_fields() {
   for (const auto& item : {
            std::pair{"token_replay_variant", "backward"},
            std::pair{"token_replay_variant", "bad"},
-           std::pair{"token_replay_stop_immediately_unfit", "yes"}}) {
+           std::pair{"token_replay_stop_immediately_unfit", "yes"},
+           std::pair{"token_replay_activity_attribute", "   "}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));
@@ -1915,6 +1918,7 @@ void parse_mine_params_rejects_invalid_dfg_variant_options() {
 void parse_alignment_params_maps_variants_and_costs() {
   const auto p = minera::parse_alignment_params(fields({
       {"alignment_variant", "discounted_a_star"},
+      {"alignment_activity_attribute", " phase "},
       {"max_states", "17"}, {"max_align_time", "1.5"},
       {"max_align_time_trace", "0.5"}, {"exponent", "2.5"},
       {"synchronous_dijkstra", "true"}, {"cost_profile", "standard"},
@@ -1925,6 +1929,7 @@ void parse_alignment_params_maps_variants_and_costs() {
   assert(p.max_time_seconds == 0.5 && p.exponent == 2.5);
   assert(p.synchronous_dijkstra && p.default_trace_cost.value() == 3.0);
   assert(p.default_model_cost.value() == 4.0 && p.default_silent_cost.value() == 2.0);
+  assert(p.activity_attribute == "phase");
 }
 
 void parse_alignment_params_rejects_invalid_and_dependent_values() {
@@ -1942,6 +1947,10 @@ void parse_alignment_params_rejects_invalid_and_dependent_values() {
   assert(threw);
   threw = false;
   try { (void)minera::parse_alignment_params(fields({{"alignment_variant", "discounted_a_star"}, {"exponent", "2"}, {"theta", "3"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_alignment_params(fields({{"alignment_activity_attribute", "   "}})); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 }
