@@ -1973,7 +1973,7 @@ reproducibility.
 
 ## Heuristics Miner parity evidence
 
-Classic discovery uses PM's `0.5` dependency, `0.65` AND, `0.05` DFG
+Classic discovery uses the reference `0.5` dependency, `0.65` AND, `0.05` DFG
 pre-cleaning, and `0.5` length-two-loop defaults. It preserves raw trace order,
 raw lifecycle events, activity/start/end counts, direct and window-two DFGs,
 frequency triples, optional per-case DFG deduplication, protected most-common
@@ -2006,13 +2006,17 @@ times, and the exact Miner++ dependency and split/join formulas. Dependency and
 AND thresholds are strict and the default dependency is `0.5`. AND bindings are
 deterministic overlapping maximal cliques rather than transitive components.
 Frequency and performance decorations, filtered and raw abstraction statistics,
-variant selection, minimum activity/path counts, and configurable start-time
-and lifecycle-instance attributes are exposed in the native model, JSON,
-request parser, CLI, local server, and frontend.
+variant selection, minimum activity/path counts, configurable activity and
+completion-time selectors, and configurable start-time and lifecycle-instance
+attributes are exposed in the native model, JSON, request parser, CLI, local
+server, and frontend. Generic activity selectors carry a local label table in
+JSON, so custom labels remain renderable and replayable without colliding with
+the canonical event graph.
 
 Focused Release tests cover classic defaults and equality boundaries, exact
 noise removal/exemptions, filters, self-loops, per-case deduplication,
-length-two rescue and false cases, lifecycle and pre-interval modes, invalid
+length-two rescue and false cases, lifecycle and pre-interval modes, custom
+activity/time selectors, invalid
 and missing timestamps, first-following and boundary-touch concurrency, the
 concurrency denominator, all performance summaries, raw statistics, absence
 of default connect-all repair, DFG inference/overrides, and overlapping maximal

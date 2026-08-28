@@ -888,13 +888,22 @@ void write_petri_net(std::ostream& out,
 void write_heuristics_net(std::ostream& out,
                           const HeuristicsNet& net,
                           const DirectlyFollowsGraph& graph) {
-  // Resolve the net's internal activity ids to the ids used everywhere else in
-  // the document by going through the activity name.
+  // Canonical nets share the document-wide activity ids; nets built from a
+  // generic activity field keep a self-contained local id space.
   const auto resolve = [&](std::size_t local) {
+    if (net.activity_ids_are_local) return local;
+    if (local >= net.activities.size()) return local;
     const auto id = graph.activity_id(net.activities[local]);
     return id ? *id : local;
   };
   const auto resolve_name = [&](const std::string& name) {
+    if (net.activity_ids_are_local) {
+      const auto it = std::find(net.activities.begin(), net.activities.end(),
+                               name);
+      return it == net.activities.end()
+                 ? std::size_t{0}
+                 : static_cast<std::size_t>(it - net.activities.begin());
+    }
     const auto id = graph.activity_id(name);
     return id ? *id : std::size_t{0};
   };
@@ -928,7 +937,22 @@ void write_heuristics_net(std::ostream& out,
       break;
     case HeuristicPerformanceAggregation::kAll: out << "all"; break;
   }
-  out << "\", \"edges\": [";
+  out << "\", \"activity_attribute\": ";
+  write_json_string(out, net.activity_attribute.empty()
+                             ? "concept:name"
+                             : net.activity_attribute);
+  out << ", \"timestamp_attribute\": ";
+  write_json_string(out, net.timestamp_attribute.empty()
+                             ? "time:timestamp"
+                             : net.timestamp_attribute);
+  out << ", \"activity_ids_are_local\": "
+      << (net.activity_ids_are_local ? "true" : "false")
+      << ", \"activities\": [";
+  for (std::size_t i = 0; i < net.activities.size(); ++i) {
+    write_json_string(out, net.activities[i]);
+    if (i + 1 < net.activities.size()) out << ", ";
+  }
+  out << "], \"edges\": [";
   for (std::size_t i = 0; i < net.edges.size(); ++i) {
     const auto& edge = net.edges[i];
     out << "{\"source\": " << resolve(edge.source)

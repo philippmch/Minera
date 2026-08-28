@@ -386,6 +386,10 @@ export function Filters({
   const [alphaVariant, setAlphaVariant] = useState<"plus" | "classic">("classic");
   const [heuristicVariant, setHeuristicVariant] =
     useState<"classic" | "plusplus">("classic");
+  const [heuristicActivityAttribute, setHeuristicActivityAttribute] =
+    useState("concept:name");
+  const [heuristicTimestampAttribute, setHeuristicTimestampAttribute] =
+    useState("time:timestamp");
   const [dependencyThreshold, setDependencyThreshold] = useState("");
   const [andThreshold, setAndThreshold] = useState("");
   const [minEdgeFrequency, setMinEdgeFrequency] = useState("");
@@ -939,6 +943,14 @@ export function Filters({
       alphaVariant: alphaVariant !== "classic" ? alphaVariant : undefined,
       heuristicVariant:
         heuristicVariant !== "classic" ? heuristicVariant : undefined,
+      heuristicActivityAttribute:
+        heuristicActivityAttribute.trim() !== "concept:name"
+          ? heuristicActivityAttribute.trim() || undefined
+          : undefined,
+      heuristicTimestampAttribute:
+        heuristicTimestampAttribute.trim() !== "time:timestamp"
+          ? heuristicTimestampAttribute.trim() || undefined
+          : undefined,
       dependencyThreshold: toFloat(dependencyThreshold),
       andThreshold: toFloat(andThreshold),
       minEdgeFrequency: toInt(minEdgeFrequency),
@@ -1321,6 +1333,8 @@ export function Filters({
     inductiveVariant !== "log" ||
     alphaVariant !== "classic" ||
     heuristicVariant !== "classic" ||
+    heuristicActivityAttribute.trim() !== "concept:name" ||
+    heuristicTimestampAttribute.trim() !== "time:timestamp" ||
     dependencyThreshold !== "" ||
     andThreshold !== "" ||
     minEdgeFrequency !== "" ||
@@ -2843,6 +2857,24 @@ export function Filters({
                 <option value="classic">classic (default)</option>
                 <option value="plusplus">Miner++ (interval concurrency)</option>
               </select>
+            </label>
+            <label className="filters-field">
+              <span>Heuristic: activity field</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={heuristicActivityAttribute}
+                onChange={(e) => setHeuristicActivityAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Heuristic: completion-time field</span>
+              <input
+                type="text"
+                placeholder="time:timestamp"
+                value={heuristicTimestampAttribute}
+                onChange={(e) => setHeuristicTimestampAttribute(e.target.value)}
+              />
             </label>
             <label className="filters-field">
               <span>Heuristic: dependency threshold</span>

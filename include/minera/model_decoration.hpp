@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include "minera/event_log.hpp"
@@ -38,6 +39,10 @@ struct ModelDecoration {
 // of the event whose consumption triggered it (the routing to the sink at the
 // case's last instant).
 [[nodiscard]] ModelDecoration decorate_model(const EventLog& log,
-                                             const PetriNet& net);
+                                             const PetriNet& net,
+                                             std::string_view activity_attribute =
+                                                 "concept:name",
+                                             std::string_view timestamp_attribute =
+                                                 "time:timestamp");
 
 }  // namespace minera

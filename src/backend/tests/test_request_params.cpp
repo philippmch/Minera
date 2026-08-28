@@ -887,6 +887,8 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
       {"heuristic_variant", "plusplus"},
+      {"heuristic_activity_attribute", "phase"},
+      {"heuristic_timestamp_attribute", "finished_at"},
       {"dependency_threshold", "0.75"},
       {"and_threshold", "0.5"},
       {"min_edge_frequency", "3"},
@@ -911,6 +913,8 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(!params.alpha.short_loops);
   assert(params.heuristic.variant ==
          minera::HeuristicMinerVariant::kPlusPlus);
+  assert(params.heuristic.activity_attribute == "phase");
+  assert(params.heuristic.timestamp_attribute == "finished_at");
   assert(params.heuristic.dependency_threshold == 0.75);
   assert(params.heuristic.and_threshold == 0.5);
   assert(params.heuristic.min_frequency == 3);
@@ -2269,6 +2273,8 @@ void parse_mine_params_rejects_unknown_heuristic_settings() {
   for (const auto& [name, value] :
        std::vector<std::pair<std::string, std::string>>{
            {"heuristic_variant", "bogus"},
+           {"heuristic_activity_attribute", "   "},
+           {"heuristic_timestamp_attribute", "   "},
            {"heuristic_decoration", "bogus"},
            {"heuristic_performance_aggregation", "bogus"},
            {"heuristic_keep_once_per_case", "maybe"},

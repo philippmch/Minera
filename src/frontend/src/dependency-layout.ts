@@ -15,9 +15,13 @@ export function computeDependencyLayout(
   net: HeuristicsNet,
   data: MineraExport,
 ): DependencyLayout {
+  const localNames =
+    net.activity_ids_are_local && net.activities ? net.activities : undefined;
   const selected =
     net.active_activities ??
-    data.activities.map((_, id) => id);
+    (localNames
+      ? localNames.map((_, id) => id)
+      : data.activities.map((_, id) => id));
   const remap = new Map(selected.map((id, compact) => [id, compact]));
   const starts = new Set(
     net.start_activities
@@ -30,11 +34,29 @@ export function computeDependencyLayout(
       .filter((id): id is number => id !== undefined),
   );
 
-  const activities = selected.map((original, id) => ({
-    ...data.activities[original],
-    start_count: starts.has(id) ? 1 : 0,
-    end_count: ends.has(id) ? 1 : 0,
-  }));
+  const activities = selected.map((original, id) => {
+    const statistics = net.activity_statistics?.find(
+      (stat) => stat.activity === original,
+    );
+    const fallback = data.activities[original];
+    return {
+      ...(localNames
+        ? {
+            name: localNames[original] ?? `Activity ${original}`,
+            count: statistics?.occurrences ?? 0,
+            start_count: 0,
+            end_count: 0,
+          }
+        : fallback ?? {
+            name: `Activity ${original}`,
+            count: statistics?.occurrences ?? 0,
+            start_count: 0,
+            end_count: 0,
+          }),
+      start_count: starts.has(id) ? 1 : 0,
+      end_count: ends.has(id) ? 1 : 0,
+    };
+  });
   const edges = net.edges.flatMap((edge) => {
     const source = remap.get(edge.source);
     const target = remap.get(edge.target);

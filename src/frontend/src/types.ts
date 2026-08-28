@@ -2007,6 +2007,11 @@ export interface HeuristicEdge {
 export interface HeuristicsNet {
   variant?: "classic" | "plusplus";
   decoration?: "frequency" | "performance";
+  /** Event fields used to build the net; generic labels use local ids. */
+  activity_attribute?: string;
+  timestamp_attribute?: string;
+  activity_ids_are_local?: boolean;
+  activities?: string[];
   performance_aggregation?:
     | "mean"
     | "median"

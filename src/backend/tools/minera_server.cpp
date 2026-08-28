@@ -525,6 +525,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     auto graph = minera::discover_directly_follows_graph(log);
     register_activity_selector_values(graph, log,
                                       params.token_replay.activity_attribute);
+    register_activity_selector_values(graph, log,
+                                      params.heuristic.activity_attribute);
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!params.dfg_statistical_variants.empty() ||
         !params.dfg_causal_variants.empty()) {
@@ -616,10 +618,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      auto replay_options = params.token_replay;
+      if (id == "heuristic" &&
+          replay_options.activity_attribute == "concept:name") {
+        replay_options.activity_attribute = params.heuristic.activity_attribute;
+      }
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
                                       minera::check_conformance(
-                                          log, petri, params.token_replay),
+                                          log, petri, replay_options),
                                       minera::check_footprints(log, petri),
                                       std::nullopt};
     };
@@ -631,7 +638,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // one more token replay per net, cheap enough to compute up front.
     const auto petri_decoration = minera::decorate_model(log, net);
     const auto inductive_decoration = minera::decorate_model(log, inductive_net);
-    const auto heuristic_decoration = minera::decorate_model(log, heuristic_net);
+    const auto heuristic_decoration = minera::decorate_model(
+        log, heuristic_net, params.heuristic.activity_attribute,
+        params.heuristic.timestamp_attribute);
     const auto powl_decoration = minera::decorate_model(log, powl_net);
 
     const std::string body = minera::analysis_json(

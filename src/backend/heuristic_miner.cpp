@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -142,6 +143,56 @@ std::string ascii_lower(std::string value) {
   return value;
 }
 
+bool standard_activity_attribute(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+const std::string& selected_activity(const Event& event,
+                                     const HeuristicMinerOptions& options) {
+  if (standard_activity_attribute(options.activity_attribute))
+    return event.activity;
+  if (const auto* value = event.attribute(options.activity_attribute))
+    return *value;
+  throw std::invalid_argument(
+      "Heuristics Miner: event is missing activity attribute '" +
+      options.activity_attribute + "'");
+}
+
+bool standard_timestamp_attribute(std::string_view key) {
+  return key.empty() || key == "time:timestamp" || key == "timestamp";
+}
+
+const std::string& selected_timestamp(const Event& event,
+                                      const HeuristicMinerOptions& options) {
+  if (standard_timestamp_attribute(options.timestamp_attribute))
+    return event.timestamp;
+  if (const auto* value = event.attribute(options.timestamp_attribute))
+    return *value;
+  throw std::invalid_argument(
+      "Heuristics Miner: event is missing timestamp attribute '" +
+      options.timestamp_attribute + "'");
+}
+
+const std::string* selected_start_timestamp(
+    const Event& event, const HeuristicMinerOptions& options) {
+  if (options.start_timestamp_attribute.empty()) return nullptr;
+  if (standard_timestamp_attribute(options.start_timestamp_attribute))
+    return &event.timestamp;
+  return event.attribute(options.start_timestamp_attribute);
+}
+
+std::string canonical_activity_attribute(
+    const HeuristicMinerOptions& options) {
+  return options.activity_attribute.empty() ? "concept:name"
+                                            : options.activity_attribute;
+}
+
+std::string canonical_timestamp_attribute(
+    const HeuristicMinerOptions& options) {
+  return options.timestamp_attribute.empty() ? "time:timestamp"
+                                             : options.timestamp_attribute;
+}
+
 double required_timestamp(const std::string& value,
                           const std::string& description) {
   const auto parsed = parse_timestamp(value);
@@ -164,22 +215,23 @@ IntervalTrace to_intervals(const Trace& trace,
   std::vector<Interval> intervals;
   for (const auto& event : trace.events) {
     const double timestamp =
-        required_timestamp(event.timestamp, "event");
+        required_timestamp(selected_timestamp(event, options), "event");
+    const auto& activity = selected_activity(event, options);
     if (pre_interval_mode) {
-      const auto* value = event.attribute(options.start_timestamp_attribute);
+      const auto* value = selected_start_timestamp(event, options);
       if (value == nullptr)
         throw std::invalid_argument(
             "Heuristics Miner PLUSPLUS interval input is missing the "
             "configured start timestamp");
       intervals.push_back(
-          {event.activity, required_timestamp(*value, "start"), timestamp});
+          {activity, required_timestamp(*value, "start"), timestamp});
       continue;
     }
     std::string instance;
     if (const auto* value = event.attribute(
             options.lifecycle_instance_attribute))
       instance = *value;
-    const LifecycleKey key{event.activity, instance};
+    const LifecycleKey key{activity, instance};
     const std::string lifecycle = ascii_lower(event.lifecycle);
     if (lifecycle == "start") {
       pending_starts[key].push_back(timestamp);
@@ -193,7 +245,7 @@ IntervalTrace to_intervals(const Trace& trace,
       start = pending->second.front();
       pending->second.pop_front();
     }
-    intervals.push_back({event.activity, start, timestamp});
+    intervals.push_back({activity, start, timestamp});
   }
   IntervalTrace result;
   result.sorted = intervals;
@@ -212,14 +264,14 @@ PlusAbstraction build_plus_abstraction(
   std::set<std::string> known;
   const bool pre_interval_mode =
       !log.traces.empty() && !log.traces.front().events.empty() &&
-      log.traces.front().events.front().attribute(
-          options.start_timestamp_attribute) != nullptr;
+      selected_start_timestamp(log.traces.front().events.front(), options) !=
+          nullptr;
   for (const auto& trace : log.traces) {
     const auto converted =
         to_intervals(trace, options, pre_interval_mode);
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
-    // In pre-interval mode PM preserves trace order for start/end/attribute
+    // In pre-interval mode discovery preserves trace order for start/end/attribute
     // statistics; lifecycle conversion has already produced start-sorted
     // traces, represented here by performance_order as well.
     const auto& converted_order = converted.performance_order;
@@ -415,41 +467,42 @@ HeuristicClassicDfgInput build_classic_input(
     input.performance_dfg.emplace();
   for (const auto& trace : log.traces) {
     if (!trace.events.empty()) {
-      ++starts[trace.events.front().activity];
-      ++ends[trace.events.back().activity];
+      ++starts[selected_activity(trace.events.front(), options)];
+      ++ends[selected_activity(trace.events.back(), options)];
     }
     std::set<NamePair> seen_direct;
     std::set<NamePair> seen_window_two;
     for (const auto& event : trace.events) {
-      if (known.insert(event.activity).second)
-        activities.push_back(event.activity);
-      ++occurrences[event.activity];
+      const auto& activity = selected_activity(event, options);
+      if (known.insert(activity).second) activities.push_back(activity);
+      ++occurrences[activity];
     }
     for (std::size_t i = 1; i < trace.events.size(); ++i) {
-      const NamePair pair{trace.events[i - 1].activity,
-                          trace.events[i].activity};
+      const NamePair pair{selected_activity(trace.events[i - 1], options),
+                          selected_activity(trace.events[i], options)};
       if (!options.keep_once_per_case || seen_direct.insert(pair).second)
         ++input.dfg[pair];
       if (options.decoration == HeuristicNetDecoration::kPerformance) {
         const double complete = required_timestamp(
-            trace.events[i - 1].timestamp, "event");
+            selected_timestamp(trace.events[i - 1], options), "event");
         const auto* start_value =
-            trace.events[i].attribute(options.start_timestamp_attribute);
+            selected_start_timestamp(trace.events[i], options);
+        const auto& fallback = selected_timestamp(trace.events[i], options);
         const double start = required_timestamp(
-            start_value == nullptr ? trace.events[i].timestamp : *start_value,
+            start_value == nullptr ? fallback : *start_value,
             "start");
         (*input.performance_dfg)[pair].push_back(
             std::max(0.0, start - complete));
       }
     }
     for (std::size_t i = 2; i < trace.events.size(); ++i) {
-      const NamePair pair{trace.events[i - 2].activity,
-                          trace.events[i].activity};
+      const NamePair pair{selected_activity(trace.events[i - 2], options),
+                          selected_activity(trace.events[i], options)};
       if (!options.keep_once_per_case || seen_window_two.insert(pair).second)
         ++input.window_two_dfg[pair];
-      ++input.frequency_triples[{trace.events[i - 2].activity,
-                                 trace.events[i - 1].activity,
-                                 trace.events[i].activity}];
+      ++input.frequency_triples[{selected_activity(trace.events[i - 2], options),
+                                 selected_activity(trace.events[i - 1], options),
+                                 selected_activity(trace.events[i], options)}];
     }
   }
   input.activities = std::move(activities);
@@ -592,6 +645,8 @@ HeuristicsNet discover_classic_dfg(
   net.variant = HeuristicMinerVariant::kClassic;
   net.decoration = options.decoration;
   net.performance_aggregation = options.performance_aggregation;
+  net.activity_attribute = canonical_activity_attribute(options);
+  net.timestamp_attribute = canonical_timestamp_attribute(options);
   net.raw_dfg = input.dfg;
   net.window_two_dfg = input.window_two_dfg;
   net.frequency_triples = input.frequency_triples;
@@ -690,7 +745,7 @@ HeuristicsNet discover_classic_dfg(
                          dependencies.at(pair), count, representation, false});
   }
 
-  // Non-PM compatibility extension, disabled by default.
+  // Optional compatibility extension, disabled by default.
   if (options.connect_all) {
     for (std::size_t source = 0; source < net.activities.size(); ++source) {
       bool has_out = false;
@@ -722,7 +777,7 @@ HeuristicsNet discover_classic_dfg(
     }
   }
 
-  // Record AND pairs now; PM does not recompute them after loop-two rescue.
+  // Record AND pairs now; discovery does not recompute them after loop-two rescue.
   using AndKey = std::tuple<std::size_t, std::size_t, std::size_t>;
   std::set<AndKey> and_out;
   std::set<AndKey> and_in;
@@ -932,6 +987,10 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
   net.variant = HeuristicMinerVariant::kPlusPlus;
   net.decoration = options.decoration;
   net.performance_aggregation = options.performance_aggregation;
+  net.activity_attribute = canonical_activity_attribute(options);
+  net.timestamp_attribute = canonical_timestamp_attribute(options);
+  net.activity_ids_are_local =
+      !standard_activity_attribute(options.activity_attribute);
 
   std::unordered_map<std::string, std::size_t> ids;
   for (const auto& activity : abstraction.activity_order) {
@@ -958,7 +1017,7 @@ HeuristicsNet discover_plus_plus(const EventLog& log,
          abstraction.sojourn_sums.at(activity) /
              static_cast<double>(abstraction.occurrences.at(activity))});
   }
-  // PM keeps sojourn data before activity filtering. Preserve every activity
+  // Discovery keeps sojourn data before activity filtering. Preserve every activity
   // and attach an id only when it survived the node filter.
   for (const auto& activity : abstraction.activity_order) {
     net.raw_activity_statistics.push_back(
@@ -1054,7 +1113,10 @@ HeuristicsNet discover_heuristics_net(
     const HeuristicMinerOptions& options) {
   if (options.variant == HeuristicMinerVariant::kPlusPlus)
     return discover_plus_plus(log, options);
-  return discover_classic_dfg(build_classic_input(log, options), options);
+  auto net = discover_classic_dfg(build_classic_input(log, options), options);
+  net.activity_ids_are_local =
+      !standard_activity_attribute(options.activity_attribute);
+  return net;
 }
 
 HeuristicsNet discover_heuristics_net(

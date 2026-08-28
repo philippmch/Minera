@@ -1640,6 +1640,20 @@ MineParams parse_mine_params(const FieldLookup& field,
           "heuristic_variant: expected classic or plusplus, got '" + value +
           "'");
   }
+  if (supplied("heuristic_activity_attribute")) {
+    const auto value = trim_text(field("heuristic_activity_attribute"));
+    if (value.empty())
+      throw std::invalid_argument(
+          "heuristic_activity_attribute: expected a non-empty name");
+    params.heuristic.activity_attribute = value;
+  }
+  if (supplied("heuristic_timestamp_attribute")) {
+    const auto value = trim_text(field("heuristic_timestamp_attribute"));
+    if (value.empty())
+      throw std::invalid_argument(
+          "heuristic_timestamp_attribute: expected a non-empty name");
+    params.heuristic.timestamp_attribute = value;
+  }
   if (const auto value = field("dependency_threshold"); !value.empty()) {
     params.heuristic.dependency_threshold =
         parse_finite_double(value, "dependency_threshold");

@@ -115,11 +115,18 @@ struct HeuristicsNet {
   HeuristicNetDecoration decoration = HeuristicNetDecoration::kFrequency;
   HeuristicPerformanceAggregation performance_aggregation =
       HeuristicPerformanceAggregation::kMean;
+  // Names of the event fields used to construct this net. Empty selectors
+  // mean the canonical activity and completion-time fields. When activity
+  // labels come from a generic field, all ids in this object are local to
+  // `activities` and `activity_ids_are_local` is true.
+  std::string activity_attribute;
+  std::string timestamp_attribute;
+  bool activity_ids_are_local = false;
   std::vector<std::string> activities;
   std::vector<HeuristicDependency> edges;  // sorted by (source, target)
   std::vector<std::size_t> start_activities;
   std::vector<std::size_t> end_activities;
-  // Activities that PM created as heuristic nodes. CLASSIC can omit isolated
+  // Activities that discovery created as heuristic nodes. CLASSIC can omit isolated
   // filtered activities; PLUSPLUS creates all retained activities.
   std::vector<std::size_t> active_activities;
 
@@ -136,7 +143,7 @@ struct HeuristicsNet {
   std::vector<HeuristicActivityStatistics> activity_statistics;
   std::vector<HeuristicRelationStatistics> relation_statistics;
   std::vector<HeuristicConcurrencyStatistics> concurrency_statistics;
-  // PM retains these two abstractions before activity/path filtering.
+  // Discovery retains these two abstractions before activity/path filtering.
   std::vector<HeuristicRawActivityStatistics> raw_activity_statistics;
   std::vector<HeuristicRawConcurrencyStatistics>
       raw_concurrency_statistics;
@@ -148,9 +155,17 @@ struct HeuristicsNet {
 
 struct HeuristicMinerOptions {
   HeuristicMinerVariant variant = HeuristicMinerVariant::kClassic;
+  // Event field used as the activity label. The standard XES aliases
+  // `concept:name` and `activity` use Event::activity; any other name is
+  // resolved through Event::attribute.
+  std::string activity_attribute = "concept:name";
+  // Event field used as the completion timestamp. The standard XES aliases
+  // `time:timestamp` and `timestamp` use Event::timestamp; any other name is
+  // resolved through Event::attribute.
+  std::string timestamp_attribute = "time:timestamp";
   // Minimum dependency measure for an edge to be accepted. Higher values keep
   // only strongly directional relations.
-  // Both PM variants default to 0.5.
+  // Both variants default to 0.5.
   std::optional<double> dependency_threshold;
   // Minimum number of direct successions for an edge to be considered.
   std::uint64_t min_frequency = 1;

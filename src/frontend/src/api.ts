@@ -391,6 +391,10 @@ export interface MinerOptions {
   alphaVariant?: "plus" | "classic";
   /** Heuristic Miner algorithm variant (classic by default). */
   heuristicVariant?: "classic" | "plusplus";
+  /** Event field used as the heuristic activity label. */
+  heuristicActivityAttribute?: string;
+  /** Event field used as the heuristic completion timestamp. */
+  heuristicTimestampAttribute?: string;
   /** Heuristic Miner: minimum dependency measure for an edge. */
   dependencyThreshold?: number;
   /** Heuristic Miner: minimum AND measure for a parallel split (default 0.65). */
@@ -763,6 +767,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.alphaVariant) add("alpha_variant", options.alphaVariant);
   if (options.heuristicVariant && options.heuristicVariant !== "classic")
     add("heuristic_variant", options.heuristicVariant);
+  if (options.heuristicActivityAttribute !== undefined) {
+    const value = options.heuristicActivityAttribute.trim();
+    if (!value) throw new Error("heuristicActivityAttribute must not be empty");
+    if (value !== "concept:name") add("heuristic_activity_attribute", value);
+  }
+  if (options.heuristicTimestampAttribute !== undefined) {
+    const value = options.heuristicTimestampAttribute.trim();
+    if (!value) throw new Error("heuristicTimestampAttribute must not be empty");
+    if (value !== "time:timestamp") add("heuristic_timestamp_attribute", value);
+  }
   if (options.dependencyThreshold !== undefined)
     add("dependency_threshold", String(options.dependencyThreshold));
   if (options.andThreshold !== undefined)
