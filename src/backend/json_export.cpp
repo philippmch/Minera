@@ -4455,7 +4455,8 @@ std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
   }
   const auto& d = result.diagnostics;
   out << "],\"diagnostics\":{\"candidate_count\":"
-      << d.candidate_count << ",\"retained_variant_count\":"
+      << d.candidate_count << ",\"selected_violation_count\":"
+      << d.selected_violation_count << ",\"retained_variant_count\":"
       << d.retained_variant_count << ",\"released_trace_count\":"
       << d.released_trace_count << ",\"output_truncated\":"
       << (d.output_truncated ? "true" : "false")

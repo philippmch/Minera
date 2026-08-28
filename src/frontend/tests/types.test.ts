@@ -895,7 +895,7 @@ describe("isTraceVariantQueryResult", () => {
   const valid = {
     family: "TRACE_VARIANT_QUERY", variant: "sacofa", epsilon: 1, k: 1, p: 1, seed: 2,
     frequencies: [{ activities: ["A"], count: 1 }],
-    diagnostics: { candidate_count: 1, retained_variant_count: 1, released_trace_count: 1, output_truncated: false, message: "ok" },
+    diagnostics: { candidate_count: 1, selected_violation_count: 0, retained_variant_count: 1, released_trace_count: 1, output_truncated: false, message: "ok" },
     log: { traces: [{ case_id: "tvq-1", events: [event] }] },
   };
   it("accepts a released trace distribution", () => expect(isTraceVariantQueryResult(valid)).toBe(true));
@@ -903,6 +903,7 @@ describe("isTraceVariantQueryResult", () => {
     expect(isTraceVariantQueryResult({ ...valid, epsilon: 0 })).toBe(false);
     expect(isTraceVariantQueryResult({ ...valid, frequencies: [{ activities: ["A"], count: 0 }] })).toBe(false);
     expect(isTraceVariantQueryResult({ ...valid, log: { traces: [{ case_id: "x", events: [{ activity: "A" }] }] } })).toBe(false);
+    expect(isTraceVariantQueryResult({ ...valid, diagnostics: { ...valid.diagnostics, selected_violation_count: -1 } })).toBe(false);
   });
 });
 

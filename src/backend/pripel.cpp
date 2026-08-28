@@ -6,11 +6,12 @@
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include <unordered_map>
+#include <vector>
 
 #include "minera/timestamp.hpp"
 #include "minera/secure_random.hpp"
@@ -19,6 +20,8 @@ namespace minera {
 namespace {
 
 constexpr std::size_t kHardBound = 1000000;
+constexpr std::size_t kAssignmentCellBound = 2000000;
+constexpr std::size_t kNoMatch = std::numeric_limits<std::size_t>::max();
 
 std::uint64_t hash_text(std::uint64_t seed, std::string_view text) {
   std::uint64_t h = 1469598103934665603ULL ^ seed;
@@ -35,17 +38,6 @@ std::uint64_t hash_text(std::uint64_t seed, std::string_view text) {
 double unit(std::uint64_t x) {
   return (static_cast<double>(x) + .5) /
          (static_cast<double>(std::numeric_limits<std::uint64_t>::max()) + 1.0);
-}
-
-std::string variant_key(const Trace& t) {
-  std::string key;
-  for (const auto& e : t.events) {
-    key.append(std::to_string(e.activity.size()));
-    key.push_back(':');
-    key.append(e.activity);
-    key.push_back('|');
-  }
-  return key;
 }
 
 std::size_t levenshtein(const Trace& a, const Trace& b, std::size_t cutoff) {
@@ -67,6 +59,124 @@ std::size_t levenshtein(const Trace& a, const Trace& b, std::size_t cutoff) {
     std::swap(prev, cur);
   }
   return prev[m];
+}
+
+std::vector<std::size_t> greedy_matches(const EventLog& queries,
+                                        const EventLog& source,
+                                        std::size_t query_count,
+                                        std::size_t max_distance) {
+  std::vector<std::size_t> assignment(query_count, kNoMatch);
+  std::vector<bool> used(source.traces.size(), false);
+  for (std::size_t qi = 0; qi < query_count; ++qi) {
+    std::size_t best_source = kNoMatch;
+    std::size_t best_distance = max_distance + 1;
+    for (std::size_t si = 0; si < source.traces.size(); ++si) {
+      if (used[si]) continue;
+      const auto distance =
+          levenshtein(queries.traces[qi], source.traces[si], max_distance);
+      if (distance < best_distance ||
+          (distance == best_distance && si < best_source)) {
+        best_distance = distance;
+        best_source = si;
+      }
+    }
+    if (best_source != kNoMatch && best_distance <= max_distance) {
+      assignment[qi] = best_source;
+      used[best_source] = true;
+    }
+  }
+  return assignment;
+}
+
+// Hungarian assignment over a rectangular cost matrix. Dummy columns let a
+// query remain unmatched when every source trace exceeds the distance bound.
+std::vector<std::size_t> assignment_matches(const EventLog& queries,
+                                             const EventLog& source,
+                                             std::size_t query_count,
+                                             std::size_t max_distance) {
+  if (query_count == 0 || source.traces.empty())
+    return std::vector<std::size_t>(query_count, kNoMatch);
+
+  const auto source_count = source.traces.size();
+  const auto columns = source_count + query_count;
+  if (source_count > kAssignmentCellBound ||
+      query_count > kAssignmentCellBound ||
+      columns > kAssignmentCellBound ||
+      query_count > kAssignmentCellBound / columns) {
+    return greedy_matches(queries, source, query_count, max_distance);
+  }
+
+  const auto unmatched_cost = static_cast<std::int64_t>(max_distance) + 1;
+  const auto rejected_cost = unmatched_cost + 1;
+  std::vector<std::vector<std::int64_t>> costs(
+      query_count, std::vector<std::int64_t>(columns, unmatched_cost));
+  for (std::size_t qi = 0; qi < query_count; ++qi) {
+    for (std::size_t si = 0; si < source_count; ++si) {
+      const auto distance =
+          levenshtein(queries.traces[qi], source.traces[si], max_distance);
+      costs[qi][si] = distance <= max_distance
+                          ? static_cast<std::int64_t>(distance)
+                          : rejected_cost;
+    }
+  }
+
+  // This implementation uses one-indexed arrays, matching the standard
+  // shortest-augmenting-path formulation for rectangular assignment.
+  const auto rows = query_count;
+  const auto cols = columns;
+  std::vector<std::int64_t> u(rows + 1), v(cols + 1);
+  std::vector<std::size_t> p(cols + 1), way(cols + 1);
+  constexpr std::int64_t kInfinity =
+      std::numeric_limits<std::int64_t>::max() / 4;
+  for (std::size_t i = 1; i <= rows; ++i) {
+    p[0] = i;
+    std::size_t column = 0;
+    std::vector<std::int64_t> min_value(cols + 1, kInfinity);
+    std::vector<bool> used(cols + 1, false);
+    do {
+      used[column] = true;
+      const auto row = p[column];
+      std::int64_t delta = kInfinity;
+      std::size_t next_column = 0;
+      for (std::size_t j = 1; j <= cols; ++j) {
+        if (used[j]) continue;
+        const auto current = costs[row - 1][j - 1] - u[row] - v[j];
+        if (current < min_value[j]) {
+          min_value[j] = current;
+          way[j] = column;
+        }
+        if (min_value[j] < delta ||
+            (min_value[j] == delta && j < next_column)) {
+          delta = min_value[j];
+          next_column = j;
+        }
+      }
+      for (std::size_t j = 0; j <= cols; ++j) {
+        if (used[j]) {
+          u[p[j]] += delta;
+          v[j] -= delta;
+        } else {
+          min_value[j] -= delta;
+        }
+      }
+      column = next_column;
+    } while (p[column] != 0);
+    do {
+      const auto previous = way[column];
+      p[column] = p[previous];
+      column = previous;
+    } while (column != 0);
+  }
+
+  std::vector<std::size_t> assignment(query_count, kNoMatch);
+  for (std::size_t j = 1; j <= cols; ++j) {
+    if (p[j] == 0 || p[j] > query_count || j > source_count) continue;
+    const auto qi = p[j] - 1;
+    const auto distance = costs[qi][j - 1];
+    if (distance <= static_cast<std::int64_t>(max_distance))
+      assignment[qi] = j - 1;
+  }
+  return assignment;
 }
 
 bool blocked(std::string_view key, const std::set<std::string>& list) {
@@ -135,11 +245,12 @@ PripelResult anonymize_pripel(const EventLog& source,
   result.diagnostics.query_trace_count = released_query.traces.size();
 
   std::set<std::string> deny(options.blocklist.begin(), options.blocklist.end());
-  std::unordered_map<std::string, std::size_t> exact;
-  for (std::size_t i = 0; i < source.traces.size(); ++i) {
-    auto key = variant_key(source.traces[i]);
-    exact.emplace(std::move(key), i); // first source occurrence wins
-  }
+  const auto query_count = std::min(released_query.traces.size(),
+                                    options.max_output_traces);
+  result.diagnostics.output_truncated =
+      query_count < released_query.traces.size();
+  const auto matches = assignment_matches(released_query, source, query_count,
+                                          options.max_distance);
 
   std::map<std::string, std::set<std::string>> categorical;
   std::map<std::string, NumericBounds> numeric;
@@ -174,14 +285,18 @@ PripelResult anonymize_pripel(const EventLog& source,
   };
 
   auto randomized = [&](std::string value, std::string_view key,
-                        std::uint64_t salt) {
+                        std::uint64_t salt, bool binary = false) {
     auto it = categorical.find(std::string(key));
     if (it == categorical.end() || it->second.size() < 2) return value;
     const auto& domain = it->second;
-    const double keep = options.epsilon > 40.0
+    // Categorical utility has unit sensitivity; the exponential mechanism
+    // therefore uses epsilon/2 in the keep-vs-replace probability.
+    const double utility_exponent =
+        binary ? options.epsilon : options.epsilon / 2.0;
+    const double keep = utility_exponent > 40.0
                             ? 1.0
-                            : std::exp(options.epsilon) /
-                                  (std::exp(options.epsilon) +
+                            : std::exp(utility_exponent) /
+                                  (std::exp(utility_exponent) +
                                    static_cast<double>(domain.size() - 1));
     if (unit(random_value(salt, value)) < keep) return value;
     const std::size_t index = static_cast<std::size_t>(
@@ -214,28 +329,22 @@ PripelResult anonymize_pripel(const EventLog& source,
   };
 
   std::size_t emitted = 0;
-  for (std::size_t qi = 0; qi < released_query.traces.size(); ++qi) {
+  for (std::size_t qi = 0; qi < query_count; ++qi) {
     if (emitted >= options.max_output_traces) { result.diagnostics.output_truncated = true; break; }
     const auto& query = released_query.traces[qi];
-    const auto qkey = variant_key(query);
-    std::size_t source_index = std::numeric_limits<std::size_t>::max();
-    if (auto it = exact.find(qkey); it != exact.end()) {
-      source_index = it->second;
-      ++result.diagnostics.exact_matches;
-    } else {
-      std::size_t best = options.max_distance + 1;
-      for (std::size_t si = 0; si < source.traces.size(); ++si) {
-        const auto distance = levenshtein(query, source.traces[si], options.max_distance);
-        if (distance < best) { best = distance; source_index = si; }
-      }
-      if (source_index != std::numeric_limits<std::size_t>::max() && best <= options.max_distance)
+    const auto source_index = matches[qi];
+    if (source_index != kNoMatch) {
+      const auto distance =
+          levenshtein(query, source.traces[source_index], options.max_distance);
+      if (distance == 0)
+        ++result.diagnostics.exact_matches;
+      else
         ++result.diagnostics.nearest_matches;
-      else source_index = std::numeric_limits<std::size_t>::max();
     }
 
     Trace out_trace;
     out_trace.case_id = "pripel-" + std::to_string(emitted + 1);
-    const Trace* source_trace = source_index == std::numeric_limits<std::size_t>::max()
+    const Trace* source_trace = source_index == kNoMatch
                                     ? nullptr : &source.traces[source_index];
     std::vector<bool> used(source_trace ? source_trace->events.size() : 0, false);
     out_trace.events.reserve(query.events.size());
@@ -276,8 +385,9 @@ PripelResult anonymize_pripel(const EventLog& source,
         if (blocked(attr.key, deny)) continue;
         if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat)
           attr.value = next_numeric(attr.key, attr.value, (emitted + 1) * 1009 + ei + 101);
-        else attr.value = randomized(std::move(attr.value), attr.key,
-                                     (emitted + 1) * 1009 + ei + 101);
+        else attr.value = randomized(
+            std::move(attr.value), attr.key, (emitted + 1) * 1009 + ei + 101,
+            attr.kind == AttributeKind::kBoolean);
         attrs.push_back(std::move(attr));
       }
       out.attributes = std::move(attrs);

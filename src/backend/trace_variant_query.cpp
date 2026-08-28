@@ -226,8 +226,8 @@ std::size_t behavioral_violations(
     const Prefix& prefix, const std::vector<std::string>& activities,
     const std::set<std::string>& first_events, const RelationMatrix& follows,
     const RelationMatrix& precedes) {
+  if (prefix.activities.empty()) return 1;
   if (!prefix.ended && prefix.activities.size() <= 1) {
-    if (prefix.activities.empty()) return 1;
     return first_events.contains(prefix.activities.front()) ? 0 : 1;
   }
 
@@ -271,6 +271,14 @@ std::size_t behavioral_violations(
   return violations;
 }
 
+long double mechanism_weight(long double exponent) {
+  static const long double kDoubleMaxLog =
+      std::log(static_cast<long double>(std::numeric_limits<double>::max()));
+  if (exponent > kDoubleMaxLog)
+    return static_cast<long double>(std::numeric_limits<double>::max());
+  return std::exp(exponent);
+}
+
 std::size_t choose_universe(std::size_t violating_count, double epsilon,
                             std::uint64_t seed, std::size_t depth,
                             bool secure_random) {
@@ -280,17 +288,31 @@ std::size_t choose_universe(std::size_t violating_count, double epsilon,
   const auto sample = sample_value(seed, context, 0x510e527fade682d1ULL,
                                    secure_random);
   const long double step = static_cast<long double>(epsilon) / 2.0L;
+  const auto maximum =
+      mechanism_weight(step * static_cast<long double>(violating_count));
   long double total = 0.0L;
   for (std::size_t i = 0; i <= violating_count; ++i) {
-    const long double exponent = -step * static_cast<long double>(i);
-    total += exponent < -745.0L ? 0.0L : std::exp(exponent);
+    const long double score = static_cast<long double>(violating_count - i);
+    const long double exponent = step * score;
+    // The published exponential-mechanism implementation normalizes a
+    // second exponential after computing the score weights. Preserve that
+    // behavior while avoiding overflow for large epsilon values.
+    const long double raw = mechanism_weight(exponent);
+    const long double normalized = raw - maximum;
+    total += normalized < std::log(std::numeric_limits<long double>::min())
+                 ? 0.0L
+                 : std::exp(normalized);
   }
   if (!(total > 0.0L) || !std::isfinite(static_cast<double>(total))) return 0;
   const long double target = static_cast<long double>(uniform01(sample)) * total;
   long double cumulative = 0.0L;
   for (std::size_t i = 0; i <= violating_count; ++i) {
-    const long double exponent = -step * static_cast<long double>(i);
-    if (exponent >= -745.0L) cumulative += std::exp(exponent);
+    const long double score = static_cast<long double>(violating_count - i);
+    const long double exponent = step * score;
+    const long double raw = mechanism_weight(exponent);
+    const long double normalized = raw - maximum;
+    if (normalized >= std::log(std::numeric_limits<long double>::min()))
+      cumulative += std::exp(normalized);
     if (target < cumulative) return i;
   }
   return violating_count;
@@ -498,6 +520,11 @@ TraceVariantQueryResult anonymize_trace_variant_query(
                                           options.secure_random);
       const auto selected = select_violations(
           violating, budget, options.seed, depth, options.secure_random);
+      if (selected.size() >
+          kHardBound - result.diagnostics.selected_violation_count)
+        throw std::invalid_argument(
+            "trace variant query: selected-violation safety bound exceeded");
+      result.diagnostics.selected_violation_count += selected.size();
       output.reserve(raw.size());
       for (auto& state : conforming) {
         state.count = add_noise(

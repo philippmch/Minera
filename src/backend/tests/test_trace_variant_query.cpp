@@ -177,6 +177,39 @@ void empty_trace_variants_and_open_noise_boundary() {
   assert(released.frequencies.at({}) < 100);
 }
 
+void empty_completion_and_exponential_selection_contract() {
+  minera::EventLog only_empty;
+  only_empty.traces.push_back({"empty", {}});
+  minera::TraceVariantQueryOptions empty_options;
+  empty_options.variant = minera::TraceVariantQueryVariant::kSacofa;
+  empty_options.epsilon = 1.0;
+  empty_options.max_prefix_length = 1;
+  empty_options.seed = 5;
+  const auto empty_result =
+      minera::anonymize_trace_variant_query(only_empty, empty_options);
+  // The completion marker is a behavioral violation (it is not a first
+  // event), so with this seed the exponential choice leaves it unperturbed.
+  assert(empty_result.frequencies.contains({}));
+  assert(empty_result.frequencies.at({}) == 1);
+  assert(empty_result.diagnostics.selected_violation_count == 0);
+
+  minera::EventLog log;
+  log.traces.push_back({"ab", {{"ab", "A", "", "", 0, {}, ""},
+                               {"ab", "B", "", "", 1, {}, ""}}});
+  log.traces.push_back({"ac", {{"ac", "A", "", "", 0, {}, ""},
+                               {"ac", "C", "", "", 1, {}, ""}}});
+  minera::TraceVariantQueryOptions selection_options;
+  selection_options.variant = minera::TraceVariantQueryVariant::kSacofa;
+  selection_options.epsilon = 1.0;
+  selection_options.max_prefix_length = 1;
+  selection_options.seed = 1;
+  const auto selected = minera::anonymize_trace_variant_query(
+      log, selection_options);
+  // There are three violating depth-one candidates (B, C, and completion).
+  // The calibrated exponential mechanism selects exactly one for noise.
+  assert(selected.diagnostics.selected_violation_count == 1);
+}
+
 }  // namespace
 
 int main() {
@@ -187,4 +220,5 @@ int main() {
   sacofa_requires_complete_behaviorally_appropriate_variants();
   sacofa_checks_completed_single_activity_prefixes();
   empty_trace_variants_and_open_noise_boundary();
+  empty_completion_and_exponential_selection_contract();
 }

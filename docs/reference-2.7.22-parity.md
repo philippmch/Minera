@@ -903,8 +903,13 @@ Release tests cover
 both variants, explicit completion boundaries, intermediate pruning,
 behavioral-appropriateness regressions, malformed privacy settings, pruning,
 reproducibility, empty-trace completion, open-interval noise boundaries, and
-non-negative release counts. The PRIPEL-style adapter
-matches exact and bounded nearest variants, removes identity/blocklisted
+non-negative release counts. SaCoFa diagnostics also report the cumulative
+number of behaviorally violating candidates selected for noise, making the
+bounded privacy decision observable without exposing the random key. The
+PRIPEL-style adapter performs a deterministic one-to-one distance assignment
+between query traces and source traces (using an exact bounded assignment
+solver and a stable one-to-one fallback for oversized matrices, with
+synthesized traces for unmatched queries), removes identity/blocklisted
 attributes, preserves monotonic event time, and applies deterministic bounded
 categorical/numeric release noise, with the same transformations optionally
 keyed by secure OS entropy. Full differential edge-contract review remains
