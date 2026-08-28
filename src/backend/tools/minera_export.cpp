@@ -232,8 +232,10 @@ minera::DfgStatisticalVariant dfg_statistical_variant(
     return minera::DfgStatisticalVariant::kPerformance;
   if (name == "case_attributes")
     return minera::DfgStatisticalVariant::kCaseAttributes;
-  if (name == "clean" || name == "clean_polars")
+  if (name == "clean")
     return minera::DfgStatisticalVariant::kClean;
+  if (name == "clean_polars")
+    return minera::DfgStatisticalVariant::kCleanPolars;
   if (name == "clean_time")
     return minera::DfgStatisticalVariant::kCleanTime;
   return minera::DfgStatisticalVariant::kNative;

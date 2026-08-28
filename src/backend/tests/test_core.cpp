@@ -5211,7 +5211,7 @@ void json_export_carries_dfg_variants_contract() {
   variants.statistical.push_back({"case_attributes", case_attributes});
 
   minera::DfgStatisticalAnalysis clean;
-  clean.variant = minera::DfgStatisticalVariant::kClean;
+  clean.variant = minera::DfgStatisticalVariant::kCleanPolars;
   clean.clean.graph[{"a", "b"}] = 1;
   clean.clean.start_activities["a"] = 1;
   clean.clean.end_activities["b"] = 1;

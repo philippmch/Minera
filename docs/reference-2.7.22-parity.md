@@ -1554,8 +1554,10 @@ edges, maps `concept:name` to the native case id, skips missing attributes, and
 optionally returns per-event node annotations. CLEAN preserves the pinned
 columnar algorithm's unusual boundary rule: start/end counts include every
 non-empty case, while only a non-boundary current row owns an edge to its next
-row. CLEAN_POLARS is an adapter alias. CLEAN_TIME computes each activity's
-mean offset per case before averaging those case means.
+row. CLEAN_POLARS retains every within-case adjacency and derives boundary
+starts from the globally sorted row stream, including the columnar first-row
+compensation. CLEAN_TIME computes each activity's mean offset per case before
+averaging those case means.
 
 Causal ALPHA emits a relation only when its positive reverse is absent.
 Causal HEURISTIC emits both directions with

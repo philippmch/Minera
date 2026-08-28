@@ -312,8 +312,15 @@ void clean_preserves_boundaries_and_middle_owned_edges() {
   DfgStatisticalOptions options;
   options.variant = DfgStatisticalVariant::CLEAN_POLARS;
   const auto adapter = discover_dfg_statistics(source, options);
-  assert(adapter.clean.graph == clean.graph);
-  assert(adapter.frequency_dfg == clean.graph);
+  // The lazy-frame variant owns every within-case adjacency and derives starts
+  // from the row after each case boundary. It is intentionally distinct from
+  // CLEAN's middle-owned-edge projection.
+  assert(adapter.clean.graph != clean.graph);
+  assert(frequency(adapter.clean.graph, "A", "B") == 2);
+  assert(frequency(adapter.clean.graph, "B", "C") == 1);
+  assert(adapter.clean.start_activities.at("A") == 2);
+  assert(!adapter.clean.start_activities.contains("C"));
+  assert(adapter.frequency_dfg == adapter.clean.graph);
 
   bool invalid = false;
   try {
