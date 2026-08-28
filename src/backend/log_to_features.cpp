@@ -34,6 +34,15 @@ const EventAttribute* attr_for(const Trace& t, const std::string& key) {
   return nullptr;
 }
 
+bool event_attribute_present(const Event& event, const std::string& key) {
+  if (key == "activity" || key == "concept:name") return true;
+  if (key == "time:timestamp" || key == "timestamp")
+    return !event.timestamp.empty();
+  if (key == "org:resource" || key == "resource")
+    return !event.resource.empty();
+  return attr_for(event, key) != nullptr;
+}
+
 std::string trace_value_for(const Trace& trace, const std::string& key) {
   if (key == "case:concept:name" || key == "case_id" ||
       key == "concept:name")
@@ -57,9 +66,27 @@ std::string categorical_value(std::string value) {
 std::vector<std::string> distinct_event_values(const EventLog& log,
                                                const std::string& key) {
   std::set<std::string> values;
-  for (const auto& trace : log.traces)
-    for (const auto& event : trace.events)
+  for (const auto& trace : log.traces) {
+    bool present = false;
+    for (const auto& event : trace.events) {
+      if (event_attribute_present(event, key)) {
+        values.insert(categorical_value(event_attribute_value(event, key)));
+        present = true;
+      }
+    }
+    if (!present) values.insert("UNDEFINED");
+  }
+  return {values.begin(), values.end()};
+}
+
+std::vector<std::string> event_attribute_values_for_trace(
+    const Trace& trace, const std::string& key) {
+  std::set<std::string> values;
+  for (const auto& event : trace.events) {
+    if (event_attribute_present(event, key))
       values.insert(categorical_value(event_attribute_value(event, key)));
+  }
+  if (values.empty()) values.insert("UNDEFINED");
   return {values.begin(), values.end()};
 }
 
@@ -157,7 +184,8 @@ std::vector<std::string> categories_for_attr(const EventLog& log,
       if (const auto* a = attr_for(t, key)) values.insert(a->value);
     } else {
       for (const auto& e : t.events)
-        if (const auto* a = attr_for(e, key)) values.insert(a->value);
+        if (event_attribute_present(e, key))
+          values.insert(event_attribute_value(e, key));
     }
   }
   return {values.begin(), values.end()};
@@ -190,6 +218,25 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
     if (!numeric || count == event_count) result.push_back(key);
+  return result;
+}
+
+std::vector<std::string> inferred_trace_attributes(const EventLog& log,
+                                                   bool numeric) {
+  std::map<std::string, std::size_t> occurrences;
+  const auto trace_count = log.trace_count();
+  for (const auto& trace : log.traces) {
+    std::set<std::string> seen;
+    for (const auto& attribute : trace.attributes) {
+      if (is_numeric_kind(attribute.kind) != numeric ||
+          !seen.insert(attribute.key).second)
+        continue;
+      ++occurrences[attribute.key];
+    }
+  }
+  std::vector<std::string> result;
+  for (const auto& [key, count] : occurrences)
+    if (count == trace_count) result.push_back(key);
   return result;
 }
 
@@ -262,6 +309,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     event_strings = inferred_event_attributes(log, false);
   if (options.event_numeric_attributes.empty() && options.event_attributes.empty())
     event_numbers = inferred_event_attributes(log, true);
+  if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
+    if (options.case_string_attributes.empty() && options.case_attributes.empty())
+      case_strings = inferred_trace_attributes(log, false);
+    if (options.case_numeric_attributes.empty() && options.case_attributes.empty())
+      case_numbers = inferred_trace_attributes(log, true);
+  }
 
   if (options.variant == LogToFeaturesVariant::EVENT_BASED) {
     std::vector<std::string> names;
@@ -305,7 +358,9 @@ LogToFeaturesResult log_to_features(const EventLog& log,
             if (const auto* attribute = attr_for(t, n))
               set("case:" + n + "=" + attribute->value, 1.0);
         }
-        for (const auto& n : event_numbers) if (const auto* a = attr_for(e, n)) set("event:" + n, checked_number(a->value, options.default_not_present));
+        for (const auto& n : event_numbers)
+          if (event_attribute_present(e, n))
+            set("event:" + n, numeric_attribute_value(e, n, options.default_not_present));
         for (const auto& n : case_numbers) if (const auto* a = attr_for(t, n)) set("case:" + n, checked_number(a->value, options.default_not_present));
         if (const auto p = parse_timestamp(value_for(e, options.timestamp_key)); p && std::isfinite(*p)) set("timestamp", *p);
         else if (!value_for(e, options.timestamp_key).empty()) throw std::invalid_argument("log_to_features: invalid timestamp");
@@ -419,6 +474,41 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     if (options.feature_names.empty()) out.feature_names = names; else { validate_names(options.feature_names, "feature_names"); }
     std::unordered_map<std::string, std::size_t> index;
     for (std::size_t i = 0; i < out.feature_names.size(); ++i) index[out.feature_names[i]] = i;
+    const auto path_start = [&](const Event& event) {
+      return instant(event,
+                     options.start_timestamp_key.empty()
+                         ? options.timestamp_key
+                         : options.start_timestamp_key,
+                     false);
+    };
+    struct CaseInterval {
+      double start = std::numeric_limits<double>::quiet_NaN();
+      double finish = std::numeric_limits<double>::quiet_NaN();
+      bool valid = false;
+      std::set<std::string> resources;
+    };
+    std::vector<CaseInterval> case_intervals(log.traces.size());
+    std::map<std::string, std::vector<std::pair<double, double>>>
+        resource_intervals;
+    for (std::size_t ti = 0; ti < log.traces.size(); ++ti) {
+      const auto& trace = log.traces[ti];
+      if (trace.events.empty()) continue;
+      auto& interval = case_intervals[ti];
+      interval.start = path_start(trace.events.front());
+      interval.finish = instant(trace.events.back(), options.timestamp_key, false);
+      interval.valid = std::isfinite(interval.start) &&
+                       std::isfinite(interval.finish) &&
+                       interval.start <= interval.finish;
+      for (const auto& event : trace.events) {
+        const auto resource = value_for(event, options.resource_key);
+        if (!resource.empty()) interval.resources.insert(resource);
+      }
+      if (!interval.valid) continue;
+      for (const auto& resource : interval.resources)
+        resource_intervals[resource].emplace_back(interval.start,
+                                                   interval.finish);
+    }
+    std::size_t trace_index = 0;
     for (const auto& t : log.traces) {
       std::vector<double> row(out.feature_names.size(), options.default_not_present);
       auto set = [&](const std::string& n, double v) { if (auto i = index.find(n); i != index.end()) row[i->second] = v; };
@@ -452,7 +542,12 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         }
       }
       for (const auto& [a,c] : count) { set("activity_count:"+a,c); set("first_activity:"+a, first[a] == 0 ? 1.0 : 0.0); set("last_activity:"+a, !t.events.empty() && value_for(t.events.back(), options.activity_key)==a ? 1.0 : 0.0); set("activity_index:"+a, static_cast<double>(first[a])); set("activity:"+a, 1.0); if (indexes) { set("firstIndexAct@@"+a, static_cast<double>(first[a])); set("lastIndexAct@@"+a, static_cast<double>(last[a])); } }
-      for (const auto& n : event_strings) { const auto values = distinct_event_values(log, n); if (!within_cardinality(values, options)) continue; set("event:"+n+"@"+categorical_value(event_attribute_value(t.events.empty() ? Event{} : t.events.front(), n)), 1.0); for (const auto& e : t.events) set("event:"+n+"@"+categorical_value(event_attribute_value(e,n)), 1.0); }
+      for (const auto& n : event_strings) {
+        const auto values = distinct_event_values(log, n);
+        if (!within_cardinality(values, options)) continue;
+        for (const auto& value : event_attribute_values_for_trace(t, n))
+          set("event:" + n + "@" + value, 1.0);
+      }
       for (const auto& n : case_strings) { const auto values = distinct_trace_values(log, n); if (within_cardinality(values, options)) set("trace:"+n+"@"+categorical_value(trace_attribute_value(t,n)), 1.0); }
       for (const auto& n : successor_attributes) if (options.enable_succ_def_representation) for (std::size_t i=1;i<t.events.size();++i) set("succession:"+n+"@"+categorical_value(event_attribute_value(t.events[i-1],n))+"#"+categorical_value(event_attribute_value(t.events[i],n)), 1.0);
       if (have) {
@@ -461,20 +556,13 @@ LogToFeaturesResult log_to_features(const EventLog& log,
           set("@@caseDuration", case_end-case_start);
       }
       set("wip", static_cast<double>(t.events.size()));
-      for (const auto& n : event_numbers) { double value = options.default_not_present; bool found = false; for (const auto& e:t.events) if (attr_for(e,n) || !event_attribute_value(e,n).empty()) { value = numeric_attribute_value(e,n,options.default_not_present); found = true; } if (found) set("event:"+n,value); }
+      for (const auto& n : event_numbers) { double value = options.default_not_present; bool found = false; for (const auto& e:t.events) if (event_attribute_present(e,n)) { value = numeric_attribute_value(e,n,options.default_not_present); found = true; } if (found) set("event:"+n,value); }
       for (const auto& n : case_numbers) if (attr_for(t,n) || !trace_attribute_value(t,n).empty()) set("case:"+n,numeric_trace_value(t,n,options.default_not_present));
       for (const auto& [r, c] : resource_count) if (workload) set("resource_workload@@" + r, static_cast<double>(c));
       for (const auto& [a, first_value] : first_time) {
         if (first_times && std::isfinite(case_start) && std::isfinite(case_end)) { set("startToFirstOcc@@"+a, first_value-case_start); set("firstOccToEnd@@"+a, case_end-first_value); }
         if (last_times && std::isfinite(case_start) && std::isfinite(case_end)) { const auto last_value = last_time[a]; set("startToLastOcc@@"+a, last_value-case_start); set("lastOccToEnd@@"+a, case_end-last_value); }
       }
-      const auto path_start = [&](const Event& event) {
-        return instant(event,
-                       options.start_timestamp_key.empty()
-                           ? options.timestamp_key
-                           : options.start_timestamp_key,
-                       false);
-      };
       if (direct_paths) for (std::size_t i = 1; i < t.events.size(); ++i) {
         const auto from = value_for(t.events[i - 1], options.activity_key);
         const auto to = value_for(t.events[i], options.activity_key);
@@ -494,23 +582,67 @@ LogToFeaturesResult log_to_features(const EventLog& log,
             set("indirectPathPerformanceLastOcc@@" + from + "##" + to,
                 start - finish);
         }
-      if (wip || max_concurrent || max_per_activity) {
-        int general = 0; std::map<std::string,int> per_activity;
-        for (const auto& event : timed) {
-          int active = 0; int same_activity = 0;
-          for (const auto& other : timed) if (other.start <= event.finish + options.epsilon && other.finish + options.epsilon >= event.start) {
+      if (wip) {
+        const auto& interval = case_intervals[trace_index];
+        if (interval.valid) {
+          std::size_t overlapping = 0;
+          for (const auto& other : case_intervals) {
+            if (other.valid && other.start <= interval.finish + options.epsilon &&
+                other.finish + options.epsilon >= interval.start)
+              ++overlapping;
+          }
+          set("@@work_in_progress", static_cast<double>(overlapping));
+        }
+      }
+      if (workload) {
+        const auto& interval = case_intervals[trace_index];
+        if (interval.valid) {
+          for (const auto& resource : interval.resources) {
+            const auto found = resource_intervals.find(resource);
+            if (found == resource_intervals.end()) continue;
+            std::size_t overlapping = 0;
+            for (const auto& other : found->second) {
+              if (other.first <= interval.finish + options.epsilon &&
+                  other.second + options.epsilon >= interval.start)
+                ++overlapping;
+            }
+            set("resource_workload@@" + resource,
+                static_cast<double>(overlapping));
+          }
+        }
+      }
+      if (max_concurrent || max_per_activity) {
+        int general = 0;
+        std::map<std::string, int> per_activity;
+        for (std::size_t i = 0; i + 1 < t.events.size(); ++i) {
+          const auto finish = instant(t.events[i], options.timestamp_key, false);
+          if (!std::isfinite(finish)) continue;
+          const auto activity = value_for(t.events[i], options.activity_key);
+          int active = 0;
+          int same_activity = 0;
+          for (std::size_t j = i + 1; j < t.events.size(); ++j) {
+            const auto start = path_start(t.events[j]);
+            if (!std::isfinite(start) || start > finish + options.epsilon)
+              break;
             ++active;
-            if (value_for(*other.event, options.activity_key) == value_for(*event.event, options.activity_key)) ++same_activity;
+            if (value_for(t.events[j], options.activity_key) == activity)
+              ++same_activity;
           }
           general = std::max(general, active);
-          per_activity[value_for(*event.event, options.activity_key)] = std::max(per_activity[value_for(*event.event, options.activity_key)], same_activity);
+          per_activity[activity] =
+              std::max(per_activity[activity], same_activity);
         }
-        if (wip) set("@@work_in_progress", static_cast<double>(general));
-        if (max_concurrent) set("@@max_concurrent_activities_general", static_cast<double>(general));
-        if (max_per_activity) for (const auto& [a,c] : per_activity) set("@@max_concurrent_activities_like_"+a, static_cast<double>(c));
+        if (max_concurrent)
+          set("@@max_concurrent_activities_general",
+              static_cast<double>(general));
+        if (max_per_activity)
+          for (const auto& [activity, overlap_count] : per_activity)
+            set("@@max_concurrent_activities_like_" + activity,
+                static_cast<double>(overlap_count));
       }
       if (case_id) out.case_ids.push_back(t.case_id);
       out.trace_rows.push_back(std::move(row));
+      ++trace_index;
     }
     return out;
   }
