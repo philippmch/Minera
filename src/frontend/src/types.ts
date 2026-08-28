@@ -1805,6 +1805,8 @@ export interface PetriUsageRecord {
   log2_occurrences: number;
   total_occurrences: number;
   direction: number;
+  label?: string;
+  color?: string;
 }
 export interface PetriArcUsageRecord extends PetriUsageRecord {
   transition: number;
@@ -2524,7 +2526,9 @@ const isPetriUsageRecord = (value: unknown): value is PetriUsageRecord => {
     Number.isInteger(rec.log1_occurrences) && (rec.log1_occurrences as number) >= 0 &&
     Number.isInteger(rec.log2_occurrences) && (rec.log2_occurrences as number) >= 0 &&
     Number.isInteger(rec.total_occurrences) && (rec.total_occurrences as number) >= 0 &&
-    finite(rec.direction);
+    finite(rec.direction) &&
+    (rec.label === undefined || typeof rec.label === "string") &&
+    (rec.color === undefined || (typeof rec.color === "string" && /^#[0-9A-Fa-f]{6}$/.test(rec.color)));
 };
 export function isPetriUsageComparison(value: unknown): value is PetriUsageComparison {
   if (!isRecord(value) || value.family !== "PETRI_USAGE_COMPARISON" ||
