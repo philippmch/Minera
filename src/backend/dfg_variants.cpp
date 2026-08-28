@@ -380,6 +380,63 @@ DfgCleanAnalysis discover_clean_dfg(
   return result;
 }
 
+DfgCleanAnalysis discover_clean_polars_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options) {
+  // The lazy-frame form works on one globally sorted table. Reconstruct that
+  // table from the native trace representation so case boundaries are handled
+  // exactly once, including the first event of the next case.
+  struct Row {
+    std::string case_id;
+    std::string activity;
+    double timestamp = 0.0;
+    std::size_t input_order = 0;
+    std::size_t trace_position = 0;
+  };
+
+  std::vector<Row> rows;
+  for (std::size_t trace_index = 0; trace_index < log.traces.size();
+       ++trace_index) {
+    const auto& trace = log.traces[trace_index];
+    std::vector<TimedEventRef> events = sorted_strict_events(trace, options);
+    for (const auto& item : events) {
+      rows.push_back({trace.case_id,
+                      activity_value(*item.event, options),
+                      item.timestamp,
+                      item.event->input_order,
+                      trace_index});
+    }
+  }
+  std::stable_sort(rows.begin(), rows.end(), [](const Row& lhs, const Row& rhs) {
+    return std::tie(lhs.case_id, lhs.timestamp, lhs.input_order,
+                    lhs.trace_position) <
+           std::tie(rhs.case_id, rhs.timestamp, rhs.input_order,
+                    rhs.trace_position);
+  });
+
+  DfgCleanAnalysis result;
+  if (rows.empty()) return result;
+  const auto first_activity = rows.front().activity;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const auto next = i + 1 < rows.size() ? &rows[i + 1] : nullptr;
+    if (next != nullptr && rows[i].case_id == next->case_id) {
+      ++result.graph[{rows[i].activity, next->activity}];
+      continue;
+    }
+
+    ++result.end_activities[rows[i].activity];
+    // A boundary row contributes the first activity of the following case.
+    // The columnar implementation also compensates for a first activity that
+    // matches the first row of the globally sorted table; retain that
+    // observable edge behavior for parity.
+    if (next != nullptr) {
+      ++result.start_activities[next->activity];
+      if (next->activity == first_activity)
+        ++result.start_activities[next->activity];
+    }
+  }
+  return result;
+}
+
 DfgCleanTime discover_clean_time_dfg(
     const EventLog& log, const DfgStatisticalOptions& options) {
   std::map<std::string, std::vector<double>> case_offsets;
@@ -422,6 +479,9 @@ DfgStatisticalAnalysis discover_dfg_statistics(
     result.case_attributes = discover_case_attribute_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kClean) {
     result.clean = discover_clean_dfg(log, options);
+    result.frequency_dfg = result.clean.graph;
+  } else if (options.variant == DfgStatisticalVariant::kCleanPolars) {
+    result.clean = discover_clean_polars_dfg(log, options);
     result.frequency_dfg = result.clean.graph;
   } else if (options.variant == DfgStatisticalVariant::kCleanTime) {
     result.clean_time = discover_clean_time_dfg(log, options);

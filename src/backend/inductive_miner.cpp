@@ -497,115 +497,144 @@ std::optional<std::vector<std::vector<ActId>>> parallel_cut(
 // partition is stable; if no redo survives there is no loop cut.
 std::optional<std::vector<std::vector<ActId>>> loop_cut(const LocalDfg& dfg) {
   const std::size_t n = dfg.size();
-  constexpr std::size_t kBody = 0;
-
-  std::vector<std::size_t> group_of(n, kBody);
-  std::vector<char> assigned(n, 0);
-  for (std::size_t i = 0; i < n; ++i) {
-    if (dfg.is_start[i] || dfg.is_end[i]) {
-      assigned[i] = 1;
-    }
-  }
-
-  // Connected components of the activities outside the body become candidate
-  // redo paths, numbered from 1.
-  std::size_t next_group = 1;
-  std::vector<std::size_t> stack;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (assigned[i]) {
-      continue;
-    }
-    const std::size_t group = next_group++;
-    stack.assign(1, i);
-    assigned[i] = 1;
-    group_of[i] = group;
-    while (!stack.empty()) {
-      const std::size_t cur = stack.back();
-      stack.pop_back();
-      for (std::size_t j = 0; j < n; ++j) {
-        if (!assigned[j] && (dfg.follows[cur][j] || dfg.follows[j][cur])) {
-          assigned[j] = 1;
-          group_of[j] = group;
-          stack.push_back(j);
-        }
-      }
-    }
-  }
-
-  // Whether redo activity `a` meets the connection and completeness conditions
-  // against the current body. Re-evaluated as the body grows.
-  const auto redo_activity_valid = [&](std::size_t a) {
-    bool entered_from_end = false;
-    bool exits_to_start = false;
-    for (std::size_t b = 0; b < n; ++b) {
-      if (group_of[b] != kBody) {
-        continue;
-      }
-      if (dfg.follows[a][b] && !dfg.is_start[b]) {
-        return false;  // redo returns to a non-start body activity
-      }
-      if (dfg.follows[b][a] && !dfg.is_end[b]) {
-        return false;  // body enters redo from a non-end activity
-      }
-      if (dfg.follows[b][a]) {
-        entered_from_end = true;  // b is an end activity (checked above)
-      }
-      if (dfg.follows[a][b]) {
-        exits_to_start = true;  // b is a start activity (checked above)
-      }
-    }
-    // Completeness: an entry reachable from one end must be reachable from all
-    // end activities; an exit reaching one start must reach all of them.
-    if (entered_from_end) {
-      for (std::size_t e = 0; e < n; ++e) {
-        if (dfg.is_end[e] && group_of[e] == kBody && !dfg.follows[e][a]) {
-          return false;
-        }
-      }
-    }
-    if (exits_to_start) {
-      for (std::size_t s = 0; s < n; ++s) {
-        if (dfg.is_start[s] && group_of[s] == kBody && !dfg.follows[a][s]) {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
-
-  // Fold invalid redo paths back into the body until the partition is stable.
-  // Growing the body can invalidate a previously valid path, so we re-check.
-  bool changed = true;
-  while (changed) {
-    changed = false;
-    for (std::size_t a = 0; a < n && !changed; ++a) {
-      if (group_of[a] == kBody || redo_activity_valid(a)) {
-        continue;
-      }
-      const std::size_t fold = group_of[a];
-      for (std::size_t k = 0; k < n; ++k) {
-        if (group_of[k] == fold) {
-          group_of[k] = kBody;
-        }
-      }
-      changed = true;
-    }
-  }
-
-  std::unordered_map<std::size_t, std::size_t> group_index;
-  group_index.emplace(kBody, 0);  // body is always child 0
-  std::vector<std::vector<std::size_t>> local_groups(1);
-  for (std::size_t i = 0; i < n; ++i) {
-    auto [it, inserted] = group_index.emplace(group_of[i], local_groups.size());
-    if (inserted) {
-      local_groups.emplace_back();
-    }
-    local_groups[it->second].push_back(i);
-  }
-  if (local_groups.size() < 2) {
+  if (n == 0 || std::none_of(dfg.follows.begin(), dfg.follows.end(),
+                             [](const auto& row) {
+                               return std::any_of(row.begin(), row.end(),
+                                                  [](char value) { return value != 0; });
+                             })) {
     return std::nullopt;
   }
-  return to_global(dfg, local_groups);
+
+  // The body starts with the union of boundary activities. Removing boundary
+  // nodes and their incident edges leaves weakly connected redo components.
+  std::vector<std::vector<std::size_t>> groups(1);
+  for (std::size_t activity = 0; activity < n; ++activity)
+    if (dfg.is_start[activity] || dfg.is_end[activity])
+      groups.front().push_back(activity);
+
+  std::vector<char> assigned(n, 0);
+  for (const auto activity : groups.front()) assigned[activity] = 1;
+  std::vector<std::size_t> stack;
+  for (std::size_t seed = 0; seed < n; ++seed) {
+    if (assigned[seed]) continue;
+    groups.emplace_back();
+    const auto group = groups.size() - 1;
+    stack.assign(1, seed);
+    assigned[seed] = 1;
+    while (!stack.empty()) {
+      const auto current = stack.back();
+      stack.pop_back();
+      groups[group].push_back(current);
+      for (std::size_t next = 0; next < n; ++next) {
+        if (!assigned[next] &&
+            (dfg.follows[current][next] || dfg.follows[next][current])) {
+          assigned[next] = 1;
+          stack.push_back(next);
+        }
+      }
+    }
+  }
+
+  const auto group_containing = [&](std::size_t activity) {
+    for (std::size_t group = 0; group < groups.size(); ++group)
+      if (std::find(groups[group].begin(), groups[group].end(), activity) !=
+          groups[group].end())
+        return group;
+    return groups.size();
+  };
+  const auto merge_into_body = [&](std::size_t group) {
+    if (group == 0 || group >= groups.size()) return;
+    groups.front().insert(groups.front().end(), groups[group].begin(),
+                          groups[group].end());
+    groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(group));
+  };
+
+  // A start-only activity and every activity it directly enables belong to the
+  // do part. The symmetric rule applies to an end-only activity and its direct
+  // predecessors. These are deliberately staged before completeness checks.
+  for (std::size_t start = 0; start < n; ++start) {
+    if (!dfg.is_start[start] || dfg.is_end[start]) continue;
+    for (std::size_t target = 0; target < n; ++target) {
+      if (!dfg.follows[start][target]) continue;
+      const auto left = group_containing(start);
+      const auto right = group_containing(target);
+      if (left != right) {
+        // The body is always group zero; merging the other group into it keeps
+        // the boundary component stable even after earlier merges.
+        merge_into_body(std::max(left, right));
+      }
+    }
+  }
+  for (std::size_t end = 0; end < n; ++end) {
+    if (!dfg.is_end[end] || dfg.is_start[end]) continue;
+    for (std::size_t source = 0; source < n; ++source) {
+      if (!dfg.follows[source][end]) continue;
+      const auto left = group_containing(source);
+      const auto right = group_containing(end);
+      if (left != right) merge_into_body(std::max(left, right));
+    }
+  }
+
+  // A redo component that reaches one start/end must reach all activities in
+  // that boundary set. A failure folds the entire component into the body.
+  // Notice that edges from redo to an interior body activity are allowed; only
+  // the boundary completeness conditions constrain the loop cut.
+  for (std::size_t group = 1; group < groups.size();) {
+    bool merge = false;
+    for (const auto activity : groups[group]) {
+      for (std::size_t start = 0; start < n; ++start) {
+        if (!dfg.is_start[start] || !dfg.follows[activity][start]) continue;
+        for (std::size_t other = 0; other < n; ++other) {
+          if (dfg.is_start[other] && !dfg.follows[activity][other]) {
+            merge = true;
+            break;
+          }
+        }
+        if (merge) break;
+      }
+      if (merge) break;
+    }
+    if (merge) {
+      merge_into_body(group);
+      continue;
+    }
+    ++group;
+  }
+  for (std::size_t group = 1; group < groups.size();) {
+    bool merge = false;
+    for (const auto activity : groups[group]) {
+      for (std::size_t end = 0; end < n; ++end) {
+        if (!dfg.is_end[end] || !dfg.follows[end][activity]) continue;
+        for (std::size_t other = 0; other < n; ++other) {
+          if (dfg.is_end[other] && !dfg.follows[other][activity]) {
+            merge = true;
+            break;
+          }
+        }
+        if (merge) break;
+      }
+      if (merge) break;
+    }
+    if (merge) {
+      merge_into_body(group);
+      continue;
+    }
+    ++group;
+  }
+
+  groups.erase(std::remove_if(groups.begin(), groups.end(),
+                              [](const auto& group) { return group.empty(); }),
+               groups.end());
+  if (groups.size() < 2) return std::nullopt;
+  std::vector<std::vector<std::size_t>> result;
+  result.reserve(2);
+  result.push_back(std::move(groups.front()));
+  result.emplace_back();
+  for (std::size_t group = 1; group < groups.size(); ++group)
+    result.back().insert(result.back().end(), groups[group].begin(),
+                         groups[group].end());
+  if (result.back().empty()) return std::nullopt;
+  return to_global(dfg, result);
 }
 
 // --- Log splitting ---------------------------------------------------------

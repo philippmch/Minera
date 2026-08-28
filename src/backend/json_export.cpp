@@ -2725,6 +2725,7 @@ void write_dfg_statistical_analysis(
       break;
     }
     case DfgStatisticalVariant::kClean:
+    case DfgStatisticalVariant::kCleanPolars:
       out << ", \"clean\": {\"dfg\": ";
       write_dfg_frequency(out, analysis.clean.graph, graph);
       out << ", \"start_activities\": [";

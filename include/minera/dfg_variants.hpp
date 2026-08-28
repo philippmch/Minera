@@ -29,7 +29,7 @@ enum class DfgStatisticalVariant {
   kPerformanceGreedy = kPerformance,
   kCaseAttributes,
   kClean,
-  kCleanPolars = kClean,
+  kCleanPolars,
   kCleanTime,
 
   NATIVE = kNative,
@@ -161,11 +161,11 @@ struct DfgNamedStatisticalAnalysis {
 [[nodiscard]] DfgCleanAnalysis discover_clean_dfg(
     const EventLog& log, const DfgStatisticalOptions& options = {});
 
-// clean_polars is an adapter alias over CLEAN for EventLog input.
-[[nodiscard]] inline DfgCleanAnalysis discover_clean_polars_dfg(
-    const EventLog& log, const DfgStatisticalOptions& options = {}) {
-  return discover_clean_dfg(log, options);
-}
+// The lazy-frame implementation has its own boundary and adjacency contract.
+// EventLog callers use the same deterministic ordering and projection here,
+// without requiring a columnar runtime.
+[[nodiscard]] DfgCleanAnalysis discover_clean_polars_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options = {});
 
 [[nodiscard]] DfgCleanTime discover_clean_time_dfg(
     const EventLog& log, const DfgStatisticalOptions& options = {});
