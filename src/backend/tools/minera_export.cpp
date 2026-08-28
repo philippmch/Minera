@@ -918,6 +918,8 @@ int usage(const char* program) {
                "  --dfg-keep-once-per-case Count each frequency edge once/case\n"
                "  --dfg-performance-aggregation <id> mean, median, min, max,\n"
                "                            stdev, sum, raw_values, or all\n"
+               "  --dfg-activity-attribute <name> Use a custom event activity field\n"
+               "  --dfg-timestamp-attribute <name> Use a custom event timestamp field\n"
                "  --dfg-start-timestamp-attribute <name> Performance start time\n"
                "  --dfg-business-hours     Measure performance in business time\n"
                "  --dfg-business-hour-slots <start-end,...> Weekly seconds\n"
@@ -2668,6 +2670,21 @@ int main(int argc, char** argv) {
 
     // Keep the DFG playout option family outside the legacy parser chain;
     // that chain is already close to MSVC's block-nesting limit.
+    if (arg == "--dfg-activity-attribute" ||
+        arg == "--dfg-timestamp-attribute") {
+      const auto* value = next();
+      if (!value || trim_text(value).empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty name\n";
+        return 2;
+      }
+      if (arg == "--dfg-activity-attribute") {
+        dfg_statistics_options.activity_attribute = trim_text(value);
+      } else {
+        dfg_statistics_options.timestamp_attribute = trim_text(value);
+      }
+      continue;
+    }
     if (arg == "--dfg-playout-variant" || arg == "--dfg-playout-traces" ||
         arg == "--dfg-playout-max-events-per-trace" ||
         arg == "--dfg-playout-max-steps" ||

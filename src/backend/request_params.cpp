@@ -1990,6 +1990,22 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.dfg_statistics.keep_once_per_case =
         parse_boolean(value, "dfg_keep_once_per_case");
   }
+  if (const auto value = field("dfg_activity_attribute");
+      present ? present("dfg_activity_attribute") : !value.empty()) {
+    if (value.empty()) {
+      throw std::invalid_argument(
+          "dfg_activity_attribute: must not be empty when supplied");
+    }
+    params.dfg_statistics.activity_attribute = value;
+  }
+  if (const auto value = field("dfg_timestamp_attribute");
+      present ? present("dfg_timestamp_attribute") : !value.empty()) {
+    if (value.empty()) {
+      throw std::invalid_argument(
+          "dfg_timestamp_attribute: must not be empty when supplied");
+    }
+    params.dfg_statistics.timestamp_attribute = value;
+  }
   if (const auto value = field("dfg_performance_aggregation");
       present ? present("dfg_performance_aggregation") : !value.empty()) {
     if (value == "mean")

@@ -191,6 +191,78 @@ void performance_business_hours_use_weekly_slots() {
   assert(invalid);
 }
 
+void custom_activity_and_timestamp_selectors_cover_all_variants() {
+  auto first = event("raw-a", "not-a-time");
+  event_attribute(first, "label", "A");
+  event_attribute(first, "completed_at", "2026-01-05T00:00:01Z");
+  event_attribute(first, "started_at", "2026-01-05T00:00:01Z");
+  auto second = event("raw-b", "also-not-a-time");
+  event_attribute(second, "label", "B");
+  event_attribute(second, "completed_at", "2026-01-05T00:00:06Z");
+  event_attribute(second, "started_at", "2026-01-05T00:00:11Z");
+  auto third = event("raw-c", "still-not-a-time");
+  event_attribute(third, "label", "C");
+  event_attribute(third, "completed_at", "2026-01-05T00:00:16Z");
+  event_attribute(third, "started_at", "2026-01-05T00:00:21Z");
+  const auto source = log({trace("custom", {second, first, third})});
+
+  DfgStatisticalOptions options;
+  options.activity_attribute = "label";
+  options.timestamp_attribute = "completed_at";
+  options.start_timestamp_attribute = "started_at";
+
+  const auto frequency = discover_frequency_dfg(source, options);
+  assert(frequency.at({"B", "A"}) == 1);
+  assert(frequency.at({"A", "C"}) == 1);
+
+  const auto triples = discover_frequency_triples(source, options);
+  assert(triples.at({"B", "A", "C"}) == 1);
+
+  const auto performance = discover_performance_dfg(source, options);
+  assert(performance.at({"B", "A"}).summary.mean == 0.0);
+  assert(performance.at({"A", "C"}).summary.mean == 20.0);
+
+  auto attributed = source.traces.front();
+  trace_attribute(attributed, "region", "north");
+  options.variant = DfgStatisticalVariant::CASE_ATTRIBUTES;
+  options.case_attributes = {"region"};
+  const auto case_attributes = discover_dfg_statistics(
+      log({std::move(attributed)}), options);
+  assert(case_attributes.case_attributes.edges.at({"B", "A"})
+             .at("region")
+             .at("north") == 1);
+
+  options.variant = DfgStatisticalVariant::CLEAN;
+  const auto clean = discover_dfg_statistics(source, options);
+  assert(clean.clean.start_activities.at("A") == 1);
+  assert(clean.clean.end_activities.at("C") == 1);
+  assert(clean.clean.graph.at({"B", "C"}) == 1);
+
+  options.variant = DfgStatisticalVariant::CLEAN_TIME;
+  const auto clean_time = discover_dfg_statistics(source, options);
+  assert(clean_time.clean_time.at("A") == 0.0);
+  assert(clean_time.clean_time.at("C") == 15.0);
+
+  bool missing_activity = false;
+  options.activity_attribute = "unknown_label";
+  try {
+    (void)discover_frequency_dfg(source, options);
+  } catch (const std::invalid_argument&) {
+    missing_activity = true;
+  }
+  assert(missing_activity);
+
+  bool missing_timestamp = false;
+  options.activity_attribute = "label";
+  options.timestamp_attribute = "unknown_time";
+  try {
+    (void)discover_clean_time_dfg(source, options);
+  } catch (const std::invalid_argument&) {
+    missing_timestamp = true;
+  }
+  assert(missing_timestamp);
+}
+
 void case_attributes_cover_ids_custom_missing_and_nodes() {
   auto first = trace("case-1", {event("A"), event("B"), event("B")});
   trace_attribute(first, "region", "north");
@@ -310,6 +382,7 @@ int main() {
   triples_are_consecutive_and_never_deduplicated();
   performance_aggregations_start_fallback_and_validation();
   performance_business_hours_use_weekly_slots();
+  custom_activity_and_timestamp_selectors_cover_all_variants();
   case_attributes_cover_ids_custom_missing_and_nodes();
   clean_preserves_boundaries_and_middle_owned_edges();
   clean_stable_ties_and_clean_time_repeated_activities();

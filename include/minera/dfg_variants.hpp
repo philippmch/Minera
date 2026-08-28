@@ -111,6 +111,11 @@ struct DfgStatisticalOptions {
   std::size_t window = 1;
   bool keep_once_per_case = false;
 
+  // Event attributes used by the graph variants. The standard XES names map
+  // to Event::activity and Event::timestamp; any other name is read from the
+  // event's generic attribute list.
+  std::string activity_attribute = "concept:name";
+  std::string timestamp_attribute = "time:timestamp";
   std::string start_timestamp_attribute = "start_timestamp";
   DfgPerformanceAggregation performance_aggregation =
       DfgPerformanceAggregation::kMean;
@@ -145,7 +150,7 @@ struct DfgNamedStatisticalAnalysis {
     const EventLog& log, const DfgStatisticalOptions& options = {});
 
 [[nodiscard]] DfgTripleFrequency discover_frequency_triples(
-    const EventLog& log);
+    const EventLog& log, const DfgStatisticalOptions& options = {});
 
 [[nodiscard]] DfgPerformance discover_performance_dfg(
     const EventLog& log, const DfgStatisticalOptions& options = {});
@@ -153,15 +158,17 @@ struct DfgNamedStatisticalAnalysis {
 [[nodiscard]] DfgCaseAttributeAnalysis discover_case_attribute_dfg(
     const EventLog& log, const DfgStatisticalOptions& options = {});
 
-[[nodiscard]] DfgCleanAnalysis discover_clean_dfg(const EventLog& log);
+[[nodiscard]] DfgCleanAnalysis discover_clean_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options = {});
 
 // clean_polars is an adapter alias over CLEAN for EventLog input.
 [[nodiscard]] inline DfgCleanAnalysis discover_clean_polars_dfg(
-    const EventLog& log) {
-  return discover_clean_dfg(log);
+    const EventLog& log, const DfgStatisticalOptions& options = {}) {
+  return discover_clean_dfg(log, options);
 }
 
-[[nodiscard]] DfgCleanTime discover_clean_time_dfg(const EventLog& log);
+[[nodiscard]] DfgCleanTime discover_clean_time_dfg(
+    const EventLog& log, const DfgStatisticalOptions& options = {});
 
 [[nodiscard]] DfgStatisticalAnalysis discover_dfg_statistics(
     const EventLog& log, const DfgStatisticalOptions& options = {});
