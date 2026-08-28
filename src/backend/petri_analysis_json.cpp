@@ -278,7 +278,7 @@ std::string petri_analysis_json(const SoundnessResult& result) {
       << ",\"s_components\":" << optional_index_vectors(result.s_components)
       << ",\"handled_pairs\":" << optional_index_vectors(result.handled_pairs)
       << ",\"not_well_handled_pairs\":"
-      << optional_index_vectors(result.handled_pairs)
+      << optional_index_vectors(result.not_well_handled_pairs)
       << ",\"structural_node_labels\":[";
   for (std::size_t i = 0; i < result.structural_node_labels.size(); ++i) {
     if (i != 0) out << ',';
