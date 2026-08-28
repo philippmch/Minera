@@ -1335,8 +1335,9 @@ describe("network analysis API", () => {
 
 describe("trace clustering API", () => {
   it("serializes variant, distance, and safety options", () => {
-    expect(clusteringQuery({ clustering_trace_attribute: "segment", clustering_variant: "DMM_VEC", clustering_alpha: 0.25, clustering_percent: 0.8, clustering_max_groups: 4, clustering_max_output_nodes: 9 }))
-      .toBe("clustering_trace_attribute=segment&clustering_variant=DMM_VEC&clustering_alpha=0.25&clustering_percent=0.8&clustering_max_groups=4&clustering_max_output_nodes=9");
+    expect(clusteringQuery({ clustering_trace_attribute: "segment", clustering_activity_attribute: "phase", clustering_variant: "DMM_VEC", clustering_alpha: 0.25, clustering_percent: 0.8, clustering_max_groups: 4, clustering_max_output_nodes: 9 }))
+      .toBe("clustering_trace_attribute=segment&clustering_activity_attribute=phase&clustering_variant=DMM_VEC&clustering_alpha=0.25&clustering_percent=0.8&clustering_max_groups=4&clustering_max_output_nodes=9");
+    expect(() => clusteringQuery({ clustering_activity_attribute: "" })).toThrow(/non-empty/);
   });
   it("rejects malformed recursive results", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
@@ -1354,12 +1355,14 @@ describe("profile clustering API", () => {
   it("serializes deterministic profile settings and escaped lists", () => {
     expect(profileClusteringQuery({
       profile_variant: "sklearn_profiles",
+      profile_activity_attribute: "phase",
       profile_cluster_count: 3, profile_seed: 7,
       profile_include_activity: false,
       profile_trace_string_attributes: ["segment", "region"],
       profile_feature_names: ["a,b", "c"],
-    })).toBe("profile_cluster_count=3&profile_feature_names=a%5C%2Cb%2Cc&profile_include_activity=false&profile_seed=7&profile_trace_string_attributes=segment%2Cregion&profile_variant=sklearn_profiles");
+    })).toBe("profile_activity_attribute=phase&profile_cluster_count=3&profile_feature_names=a%5C%2Cb%2Cc&profile_include_activity=false&profile_seed=7&profile_trace_string_attributes=segment%2Cregion&profile_variant=sklearn_profiles");
     expect(() => profileClusteringQuery({ profile_cluster_count: 0 })).toThrow(/positive/);
+    expect(() => profileClusteringQuery({ profile_activity_attribute: "" })).toThrow(/non-empty/);
     expect(() => profileClusteringQuery({ profile_variant: "other" as "sklearn_profiles" })).toThrow(/profile_variant/);
     expect(() => profileClusteringQuery({ profile_feature_names: ["a", "a"] })).toThrow(/duplicates/);
   });

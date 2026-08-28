@@ -2796,7 +2796,7 @@ void handle_clustering(const httplib::Request& request, httplib::Response& respo
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) { response.status=409; response.set_content(error_json("no cached log; run /api/mine first"),"application/json"); return; }
-    static const std::set<std::string> allowed={"clustering_trace_attribute","clustering_variant","clustering_alpha","clustering_percent","clustering_max_groups","clustering_max_output_nodes"};
+    static const std::set<std::string> allowed={"clustering_trace_attribute","clustering_activity_attribute","clustering_variant","clustering_alpha","clustering_percent","clustering_max_groups","clustering_max_output_nodes"};
     for (const auto& [k,v] : request.params) { (void)v; if(!allowed.contains(k)) throw std::invalid_argument("unknown clustering parameter: "+k); }
     const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};};
     const auto present=[&](std::string_view n){return request.has_param(std::string(n));};
@@ -2819,6 +2819,7 @@ void handle_profile_clustering(const httplib::Request& request,
     static const std::set<std::string> allowed = {
         "profile_variant", "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
         "profile_max_features", "profile_seed", "profile_tolerance",
+        "profile_activity_attribute",
         "profile_include_activity", "profile_include_succession",
         "profile_trace_string_attributes", "profile_event_string_attributes",
         "profile_trace_numeric_attributes", "profile_event_numeric_attributes",

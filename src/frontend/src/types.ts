@@ -325,6 +325,7 @@ export interface LocalDiagnosticsResult { family: "LOCAL_DIAGNOSTICS"; group_rel
 export type ClusteringVariant = "DMM_LEVEN" | "AVG_LEVEN" | "DMM_VEC" | "AVG_VEC" | "DFG";
 export interface ClusteringOptions {
   clustering_trace_attribute?: string;
+  clustering_activity_attribute?: string;
   clustering_variant?: ClusteringVariant;
   clustering_alpha?: number;
   clustering_percent?: number;
@@ -375,6 +376,7 @@ export const isClusteringResult = (value: unknown): value is ClusteringResult =>
 };
 export interface ProfileClusteringOptions {
   profile_variant?: "sklearn_profiles";
+  profile_activity_attribute?: string;
   profile_cluster_count?: number;
   profile_max_iterations?: number;
   profile_max_traces?: number;

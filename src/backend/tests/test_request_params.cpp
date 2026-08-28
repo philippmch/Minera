@@ -263,12 +263,14 @@ void resource_profiles_params_contract() {
 void clustering_params_contract() {
   const auto parsed = minera::parse_clustering_params(fields({
       {"clustering_trace_attribute", "segment"},
+      {"clustering_activity_attribute", "phase"},
       {"clustering_variant", "DMM_VEC"},
       {"clustering_alpha", "0.25"},
       {"clustering_percent", "0.8"},
       {"clustering_max_groups", "12"},
       {"clustering_max_output_nodes", "24"}}));
   assert(parsed.trace_attribute == "segment");
+  assert(parsed.activity_attribute == "phase");
   assert(parsed.variant == minera::TraceAttributeClusteringVariant::kDmmVec);
   assert(parsed.alpha == 0.25 && parsed.percent == 0.8);
   assert(parsed.max_groups == 12 && parsed.max_output_nodes == 24);
@@ -283,6 +285,17 @@ void clustering_params_contract() {
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
   }
+  const auto empty_activity = fields({{"clustering_activity_attribute", ""}});
+  bool empty_activity_threw = false;
+  try {
+    (void)minera::parse_clustering_params(
+        empty_activity, [](std::string_view name) {
+          return name == "clustering_activity_attribute";
+        });
+  } catch (const std::invalid_argument&) {
+    empty_activity_threw = true;
+  }
+  assert(empty_activity_threw);
   bool missing = false;
   try { (void)minera::parse_clustering_params(fields({})); }
   catch (const std::invalid_argument&) { missing = true; }
@@ -292,6 +305,7 @@ void clustering_params_contract() {
 void profile_clustering_params_contract() {
   const auto parsed = minera::parse_profile_clustering_params(fields({
       {"profile_variant", "SKLEARN_PROFILES"},
+      {"profile_activity_attribute", "phase"},
       {"profile_cluster_count", "3"},
       {"profile_max_iterations", "17"},
       {"profile_max_traces", "99"},
@@ -307,6 +321,7 @@ void profile_clustering_params_contract() {
       {"profile_feature_names", "f1,f2"}}));
   assert(parsed.cluster_count == 3 && parsed.max_iterations == 17);
   assert(parsed.variant == minera::ProfileClusteringVariant::kSklearnProfiles);
+  assert(parsed.activity_attribute == "phase");
   assert(parsed.max_traces == 99 && parsed.max_features == 123);
   assert(parsed.seed == 42 && parsed.tolerance == 0.001);
   assert(!parsed.include_activity_representation &&
@@ -329,6 +344,17 @@ void profile_clustering_params_contract() {
     catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
   }
+  const auto empty_activity = fields({{"profile_activity_attribute", ""}});
+  bool empty_activity_threw = false;
+  try {
+    (void)minera::parse_profile_clustering_params(
+        empty_activity, [](std::string_view name) {
+          return name == "profile_activity_attribute";
+        });
+  } catch (const std::invalid_argument&) {
+    empty_activity_threw = true;
+  }
+  assert(empty_activity_threw);
 }
 
 void chaotic_activities_params_contract() {

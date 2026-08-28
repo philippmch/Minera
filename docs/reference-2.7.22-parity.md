@@ -1340,7 +1340,12 @@ iteration, trace, feature, and cluster bounds plus finite tolerance and typed
 representation flags are validated by the shared request parser. The
 `--profile-clustering` export mode, cached `POST /api/profile-clustering`, and
 frontend query/result guard expose labels, clusters, feature names, inertia,
-and convergence diagnostics without opening a GUI.
+and convergence diagnostics without opening a GUI. Both clustering contracts
+also accept `clustering_activity_attribute` / `profile_activity_attribute`;
+standard activity, timestamp,
+resource, and lifecycle fields and generic event attributes are projected
+consistently into sequence values and profile feature names, with deterministic
+errors for missing custom fields.
 
 Trace-attribute clustering keeps the input order of attribute groups and of
 equal-frequency variants before applying the five named distance families.

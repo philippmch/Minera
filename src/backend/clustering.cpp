@@ -51,6 +51,29 @@ double levenshtein(const Sequence& a, const Sequence& b) {
 }
 
 using Counts = std::map<std::string, double>;
+
+const std::string& selected_activity(const Event& event,
+                                     std::string_view selector,
+                                     std::string_view family) {
+  if (selector.empty() || selector == "activity" ||
+      selector == "concept:name") {
+    return event.activity;
+  }
+  if (selector == "time:timestamp" || selector == "timestamp") {
+    return event.timestamp;
+  }
+  if (selector == "org:resource" || selector == "resource") {
+    return event.resource;
+  }
+  if (selector == "lifecycle:transition" || selector == "lifecycle") {
+    return event.lifecycle;
+  }
+  if (const auto* value = event.attribute(selector)) return *value;
+  throw std::invalid_argument(std::string(family) +
+                              ": event is missing activity attribute '" +
+                              std::string(selector) + "'");
+}
+
 Counts activity_counts(const Sequence& seq) {
   Counts c; for (const auto& s : seq) ++c[s]; return c;
 }
@@ -135,7 +158,8 @@ double dmm_distance(const Profile& a, const Profile& b, Distance distance) {
   return weight > 0.0 ? std::clamp(sum / weight, 0.0, 1.0) : 0.0;
 }
 
-Profile profile(const std::vector<const Trace*>& traces, double percent) {
+Profile profile(const std::vector<const Trace*>& traces, double percent,
+                std::string_view activity_attribute) {
   // Variant statistics retain first-seen order for equal frequencies.  The
   // order is observable by the minimum-matching distance when two candidates
   // have the same distance, so a lexical map iteration would change the
@@ -146,7 +170,9 @@ Profile profile(const std::vector<const Trace*>& traces, double percent) {
   for (const auto* t : traces) {
     Sequence sequence;
     sequence.reserve(t->events.size());
-    for (const auto& event : t->events) sequence.push_back(event.activity);
+    for (const auto& event : t->events)
+      sequence.push_back(selected_activity(event, activity_attribute,
+                                            "clustering"));
     const auto [it, inserted] = indices.emplace(sequence, p.size());
     if (inserted) {
       p.push_back({std::move(sequence), 1});
@@ -262,7 +288,8 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
     profiles.push_back(profile(
         group.traces, o.variant == TraceAttributeClusteringVariant::kDfg
                           ? 1.0
-                          : o.percent));
+                          : o.percent,
+        o.activity_attribute));
     r.leaf_names.push_back(group.name);
   }
   if (groups.empty()) {
@@ -434,6 +461,9 @@ struct ProfileRows {
 
 ProfileRows profile_rows(const EventLog& log,
                          const ProfileClusteringOptions& options) {
+  const std::string activity_key = options.activity_attribute.empty()
+                                       ? "concept:name"
+                                       : options.activity_attribute;
   std::set<std::string> trace_keys, event_keys;
   std::map<std::string, AttributeKind> trace_kinds, event_kinds;
   for (const auto& trace : log.traces) {
@@ -518,10 +548,11 @@ ProfileRows profile_rows(const EventLog& log,
   if (options.include_activity_representation) {
     for (const auto& trace : log.traces)
       for (const auto& event : trace.events)
-        names.insert("event:concept:name@" + event.activity);
+        names.insert("event:" + activity_key + "@" +
+                     selected_activity(event, activity_key, "profile clustering"));
     if (std::any_of(log.traces.begin(), log.traces.end(),
                     [](const auto& trace) { return trace.events.empty(); }))
-      names.insert("event:concept:name@UNDEFINED");
+      names.insert("event:" + activity_key + "@UNDEFINED");
   }
   for (const auto& key : trace_strings)
     for (const auto& value : distinct_trace(key))
@@ -540,15 +571,19 @@ ProfileRows profile_rows(const EventLog& log,
   for (const auto& key : trace_strings)
     for (const auto& value : distinct_trace(key))
       ordered_names.push_back("trace:" + key + "@" + value);
-  for (const auto& key : event_strings)
+  for (const auto& key : event_strings) {
+    if (options.include_activity_representation && key == activity_key)
+      continue;
     for (const auto& value : distinct_event(key))
       ordered_names.push_back("event:" + key + "@" + value);
+  }
   for (const auto& key : trace_numbers) ordered_names.push_back("trace:" + key);
   for (const auto& key : event_numbers) ordered_names.push_back("event:" + key);
   if (options.include_activity_representation) {
     std::set<std::string> activity_names;
     for (const auto& name : names)
-      if (name.rfind("event:concept:name@", 0) == 0) activity_names.insert(name);
+      if (name.rfind("event:" + activity_key + "@", 0) == 0)
+        activity_names.insert(name);
     const auto numeric_begin = ordered_names.begin() +
                                static_cast<std::ptrdiff_t>(
                                    ordered_names.size() - trace_numbers.size() -
@@ -559,12 +594,16 @@ ProfileRows profile_rows(const EventLog& log,
     std::set<std::string> successions;
     for (const auto& trace : log.traces) {
       if (trace.events.size() < 2) {
-        successions.insert("succession:concept:name@UNDEFINED");
+        successions.insert("succession:" + activity_key + "@UNDEFINED");
         continue;
       }
       for (std::size_t i = 1; i < trace.events.size(); ++i)
-        successions.insert("succession:concept:name@" + trace.events[i - 1].activity +
-                           "#" + trace.events[i].activity);
+        successions.insert(
+            "succession:" + activity_key + "@" +
+            selected_activity(trace.events[i - 1], activity_key,
+                              "profile clustering") +
+            "#" + selected_activity(trace.events[i], activity_key,
+                                     "profile clustering"));
     }
     ordered_names.insert(ordered_names.end(), successions.begin(), successions.end());
   }
@@ -611,15 +650,24 @@ ProfileRows profile_rows(const EventLog& log,
       set(row, "event:" + key, profile_number(last->value, key));
     }
     if (options.include_activity_representation) {
-      if (trace.events.empty()) set(row, "event:concept:name@UNDEFINED", 1.0);
+      if (trace.events.empty())
+        set(row, "event:" + activity_key + "@UNDEFINED", 1.0);
       for (const auto& event : trace.events)
-        set(row, "event:concept:name@" + event.activity, 1.0);
+        set(row, "event:" + activity_key + "@" +
+                     selected_activity(event, activity_key,
+                                       "profile clustering"),
+            1.0);
     }
     if (options.include_succession_representation) {
-      if (trace.events.size() < 2) set(row, "succession:concept:name@UNDEFINED", 1.0);
+      if (trace.events.size() < 2)
+        set(row, "succession:" + activity_key + "@UNDEFINED", 1.0);
       for (std::size_t i = 1; i < trace.events.size(); ++i)
-        set(row, "succession:concept:name@" + trace.events[i - 1].activity +
-                     "#" + trace.events[i].activity, 1.0);
+        set(row, "succession:" + activity_key + "@" +
+                     selected_activity(trace.events[i - 1], activity_key,
+                                       "profile clustering") +
+                     "#" + selected_activity(trace.events[i], activity_key,
+                                              "profile clustering"),
+            1.0);
     }
     result.rows.push_back(std::move(row));
   }

@@ -2196,7 +2196,7 @@ int main(int argc, char** argv) {
     if (arg.rfind("--clustering-", 0) == 0) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
-      static const std::set<std::string> names = {"clustering_trace_attribute", "clustering_variant", "clustering_alpha", "clustering_percent", "clustering_max_groups", "clustering_max_output_nodes"};
+      static const std::set<std::string> names = {"clustering_trace_attribute", "clustering_activity_attribute", "clustering_variant", "clustering_alpha", "clustering_percent", "clustering_max_groups", "clustering_max_output_nodes"};
       if (!names.contains(key)) return usage(argv[0]); clustering_fields.insert_or_assign(std::move(key), value); clustering_requested = true; continue;
     }
     if (arg == "--profile-clustering") {
@@ -2212,6 +2212,7 @@ int main(int argc, char** argv) {
       static const std::set<std::string> names = {
           "profile_variant", "profile_cluster_count", "profile_max_iterations", "profile_max_traces",
           "profile_max_features", "profile_seed", "profile_tolerance",
+          "profile_activity_attribute",
           "profile_include_activity", "profile_include_succession",
           "profile_trace_string_attributes", "profile_event_string_attributes",
           "profile_trace_numeric_attributes", "profile_event_numeric_attributes",

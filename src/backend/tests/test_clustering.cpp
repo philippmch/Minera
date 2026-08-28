@@ -150,6 +150,38 @@ int main() {
   assert(dfg_full.tree.distance > 0.0);
   assert(std::abs(dfg_full.tree.distance - dfg_partial.tree.distance) < 1e-12);
 
+  // Both distance profiles accept a selected event attribute.  A custom
+  // selector must change the sequence values rather than silently falling
+  // back to Event::activity.
+  EventLog selected_activity_log;
+  selected_activity_log.traces.push_back(Trace{
+      "selected-left",
+      {Event{"selected-left", "same", "", "", 0,
+             {{"phase", "P1", AttributeKind::kString}}, ""}},
+      {{"segment", "left"}}});
+  selected_activity_log.traces.push_back(Trace{
+      "selected-right",
+      {Event{"selected-right", "same", "", "", 0,
+             {{"phase", "P2", AttributeKind::kString}}, ""}},
+      {{"segment", "right"}}});
+  auto selected_options = o;
+  selected_options.trace_attribute = "segment";
+  selected_options.activity_attribute = "phase";
+  selected_options.variant = TraceAttributeClusteringVariant::kAvgLeven;
+  const auto selected_result = discover_trace_attribute_clustering(
+      selected_activity_log, selected_options);
+  assert(std::abs(selected_result.tree.distance - 1.0) < 1e-12);
+  auto missing_selected = selected_options;
+  missing_selected.activity_attribute = "missing_phase";
+  bool missing_selected_threw = false;
+  try {
+    (void)discover_trace_attribute_clustering(selected_activity_log,
+                                              missing_selected);
+  } catch (const std::invalid_argument&) {
+    missing_selected_threw = true;
+  }
+  assert(missing_selected_threw);
+
   // Linkage child order follows the merge order, not lexical leaf names.
   assert(insertion_result.tree.children.size() == 2);
   assert(insertion_result.tree.children[0].name == "z");
@@ -197,6 +229,45 @@ int main() {
   assert(profile_clustering_json(profile_result) == profile_clustering_json(profile_repeat));
   assert(profile_clustering_json(profile_result).find(
              "\"variant\":\"sklearn_profiles\"") != std::string::npos);
+
+  EventLog selected_profile_log;
+  selected_profile_log.traces.push_back(Trace{
+      "profile-left",
+      {Event{"profile-left", "same", "", "", 0,
+             {{"phase", "P1", AttributeKind::kString}}, ""},
+       Event{"profile-left", "same", "", "", 1,
+             {{"phase", "P2", AttributeKind::kString}}, ""}},
+      {}});
+  selected_profile_log.traces.push_back(Trace{
+      "profile-right",
+      {Event{"profile-right", "same", "", "", 0,
+             {{"phase", "P2", AttributeKind::kString}}, ""},
+       Event{"profile-right", "same", "", "", 1,
+             {{"phase", "P1", AttributeKind::kString}}, ""}},
+      {}});
+  auto selected_profile_options = profile_options;
+  selected_profile_options.activity_attribute = "phase";
+  const auto selected_profile = discover_profile_clustering(
+      selected_profile_log, selected_profile_options);
+  assert(std::find(selected_profile.feature_names.begin(),
+                   selected_profile.feature_names.end(),
+                   "event:phase@P1") != selected_profile.feature_names.end());
+  assert(std::find(selected_profile.feature_names.begin(),
+                   selected_profile.feature_names.end(),
+                   "succession:phase@P1#P2") !=
+         selected_profile.feature_names.end());
+  assert(std::count(selected_profile.feature_names.begin(),
+                    selected_profile.feature_names.end(),
+                    "event:phase@P1") == 1);
+  auto missing_profile = selected_profile_options;
+  missing_profile.activity_attribute = "missing_phase";
+  bool missing_profile_threw = false;
+  try {
+    (void)discover_profile_clustering(selected_profile_log, missing_profile);
+  } catch (const std::invalid_argument&) {
+    missing_profile_threw = true;
+  }
+  assert(missing_profile_threw);
 
   ProfileClusteringOptions numeric_options;
   numeric_options.cluster_count = 2;
