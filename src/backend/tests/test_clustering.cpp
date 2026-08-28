@@ -281,6 +281,38 @@ int main() {
   assert(std::find(numeric_profile.feature_names.begin(), numeric_profile.feature_names.end(),
                    "event:cost") != numeric_profile.feature_names.end());
 
+  EventLog seeded_profile_log;
+  const std::vector<double> seeded_scores = {0.0, 0.5, 1.0, 9.0, 9.5, 10.0};
+  for (std::size_t i = 0; i < seeded_scores.size(); ++i) {
+    seeded_profile_log.traces.push_back(Trace{
+        "seeded-" + std::to_string(i),
+        {Event{"seeded-" + std::to_string(i), "row", "", "", 0,
+               {{"score", std::to_string(seeded_scores[i]), AttributeKind::kFloat}},
+               ""}},
+        {}});
+  }
+  ProfileClusteringOptions seeded_options;
+  seeded_options.cluster_count = 2;
+  seeded_options.include_activity_representation = false;
+  seeded_options.include_succession_representation = false;
+  seeded_options.event_numeric_attributes = {"score"};
+  seeded_options.seed = 17;
+  const auto seeded_result = discover_profile_clustering(seeded_profile_log,
+                                                          seeded_options);
+  const auto seeded_repeat = discover_profile_clustering(seeded_profile_log,
+                                                          seeded_options);
+  assert(seeded_result.labels == seeded_repeat.labels);
+  assert(seeded_result.centroids == seeded_repeat.centroids);
+  bool seed_changes_initialization = false;
+  for (std::uint64_t seed = 18; seed < 50 && !seed_changes_initialization; ++seed) {
+    seeded_options.seed = seed;
+    const auto other = discover_profile_clustering(seeded_profile_log,
+                                                    seeded_options);
+    seed_changes_initialization = other.labels != seeded_result.labels ||
+                                  other.centroids != seeded_result.centroids;
+  }
+  assert(seed_changes_initialization);
+
   bool profile_threw = false;
   try {
     auto bad = profile_options;

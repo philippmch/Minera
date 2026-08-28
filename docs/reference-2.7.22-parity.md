@@ -1341,6 +1341,9 @@ over activity/succession one-hot profiles, explicitly selected trace/event
 string or numeric attributes, or a caller-supplied feature list. Positive
 iteration, trace, feature, and cluster bounds plus finite tolerance and typed
 representation flags are validated by the shared request parser. The
+seed controls deterministic weighted k-means++ center sampling, so repeated
+runs replay exactly while changing the seed can select a different valid
+initialization before Lloyd convergence.
 `--profile-clustering` export mode, cached `POST /api/profile-clustering`, and
 frontend query/result guard expose labels, clusters, feature names, inertia,
 and convergence diagnostics without opening a GUI. Both clustering contracts
