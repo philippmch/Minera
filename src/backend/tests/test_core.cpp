@@ -643,10 +643,10 @@ void inductive_miner_models_optional_skip() {
   assert(mine_tree({{}, {"a"}, {"a", "a"}}) == "X(tau, *(a, tau))");
 }
 
-void inductive_miner_pushes_empty_trace_through_cut() {
-  // The canonical miner detects the a->b sequence first; the empty trace rides
-  // through the split and becomes an optional skip on each branch.
-  assert(mine_tree({{}, {"a", "b"}}) == "->(X(tau, a), X(tau, b))");
+void inductive_miner_models_empty_trace_before_cut() {
+  // The optional empty trace is separated before the a->b sequence cut, so it
+  // remains one explicit tau branch around the complete non-empty model.
+  assert(mine_tree({{}, {"a", "b"}}) == "X(tau, ->(a, b))");
 }
 
 void inductive_miner_falls_back_to_flower() {
@@ -685,12 +685,13 @@ void inductive_miner_infrequent_filters_an_edge_at_the_cutoff() {
   // 2. So a 0.15 threshold keeps the shortcut — b becomes skippable — while 0.25
   // drops it as noise and recovers the clean chain. This pins the direction of
   // the cutoff: raising the threshold removes infrequent behaviour, never adds
-  // it. (The exact integer boundary is left untested on purpose: f * weight lands
-  // on floating-point values like 0.1 * 10 whose side of >= is not meaningful.)
+  // it. The exact integer boundary is strict: a count equal to f * max_out is
+  // filtered rather than retained.
   std::vector<std::vector<std::string>> variants(10, {"a", "b", "c"});
   variants.push_back({"a", "c"});
   variants.push_back({"a", "c"});
   assert(mine_tree_imf(variants, 0.15) == "->(a, X(tau, b), c)");
+  assert(mine_tree_imf(variants, 0.2) == "->(a, b, c)");
   assert(mine_tree_imf(variants, 0.25) == "->(a, b, c)");
 }
 
@@ -707,11 +708,10 @@ void inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut() {
 }
 
 void inductive_miner_infrequent_keeps_structure_the_filter_would_destroy() {
-  // a and b are genuinely parallel, but at threshold 0.5 the filter drops b
-  // as a rare start and a as a rare end, which kills the parallel cut. IMf
-  // filters only when the unfiltered relations have no cut, so the parallel
-  // structure must survive a high threshold instead of collapsing to a
-  // flower.
+  // a and b are genuinely parallel, but at threshold 0.5 the start filter
+  // would drop the rarer branch and kill the parallel cut. IMf filters only
+  // when the unfiltered relations have no cut, so the parallel structure must
+  // survive a high threshold instead of collapsing to a flower.
   std::vector<std::vector<std::string>> variants(10, {"a", "b"});
   variants.push_back({"b", "a"});
   variants.push_back({"b", "a"});
@@ -788,6 +788,33 @@ void inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity() {
   std::vector<std::vector<std::string>> variants(20, {"a", "b", "c"});
   variants.push_back({"a", "c", "a", "b", "c"});
   assert(mine_tree_imf(variants, 0.2) == "->(a, b, c)");
+}
+
+void inductive_miner_infrequent_preserves_observed_end_activities() {
+  std::vector<std::vector<std::string>> variants(10, {"a", "b", "a"});
+  variants.push_back({"a", "b"});
+  // The rare b-ending trace remains an observed endpoint. Preserving it keeps
+  // the filtered cycle unresolved, so the flower fall-through is selected;
+  // treating rare ends as noise would incorrectly manufacture a loop(a,b).
+  assert(mine_tree_imf(variants, 0.5) == "*(tau, a, b)");
+}
+
+void inductive_miner_infrequent_uses_total_trace_weight_for_empty_noise() {
+  std::vector<std::vector<std::string>> boundary(9, {"a", "b"});
+  boundary.push_back({});
+  // 1/10 equals the threshold and is therefore dropped.
+  assert(mine_tree_imf(boundary, 0.1) == "->(a, b)");
+
+  boundary.assign(8, {"a", "b"});
+  boundary.push_back({});
+  // 1/9 is above the threshold and is retained as one optional branch.
+  assert(mine_tree_imf(boundary, 0.1) == "X(tau, ->(a, b))");
+
+  // Graph recursion carries the source UVCL skip flag independently of the
+  // noise threshold, so even a rare empty trace remains represented.
+  boundary.assign(9, {"a", "b"});
+  boundary.push_back({});
+  assert(mine_tree_imd(boundary, 0.5) == "X(tau, ->(a, b))");
 }
 
 minera::ProcessTree tree_from_variants(
@@ -5677,7 +5704,7 @@ int main() {
   inductive_miner_discovers_parallel();
   inductive_miner_discovers_loop();
   inductive_miner_models_optional_skip();
-  inductive_miner_pushes_empty_trace_through_cut();
+  inductive_miner_models_empty_trace_before_cut();
   inductive_miner_falls_back_to_flower();
   inductive_miner_infrequent_recovers_a_noisy_sequence();
   inductive_miner_infrequent_leaves_a_clean_log_untouched();
@@ -5685,6 +5712,8 @@ int main() {
   inductive_miner_infrequent_terminates_on_a_filtered_exclusive_cut();
   inductive_miner_infrequent_keeps_structure_the_filter_would_destroy();
   inductive_miner_infrequent_drops_a_stray_edge_from_an_end_activity();
+  inductive_miner_infrequent_preserves_observed_end_activities();
+  inductive_miner_infrequent_uses_total_trace_weight_for_empty_noise();
   inductive_miner_dfg_matches_log_recursion_on_structured_logs();
   inductive_miner_dfg_skips_empty_traces_at_the_root();
   inductive_miner_dfg_filters_noise_on_fallthrough();
