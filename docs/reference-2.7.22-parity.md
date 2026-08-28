@@ -1054,6 +1054,12 @@ for:
 - one merged redo group; and
 - multiplicity-preserving, alternating contiguous do/redo projections.
 
+Dynamic-clustering repair rounds use one canonical merge operation for reverse
+cycles, choices, and equal-neighborhood groups: both source groups are removed,
+their activity order is concatenated, and the result is appended before the
+next deterministic sort. This keeps multi-round projected child ordering
+stable across all dynamic variants.
+
 Focused regressions cover ordered multi-activity redo behavior, different
 start/end boundary activities, prefix/suffix false positives, incomplete
 start- and end-side boundary reachability, split return components, single
