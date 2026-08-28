@@ -74,6 +74,105 @@ static void observed_path_timing_uses_configured_starts() {
   assert(result.trace_rows.front()[static_cast<std::size_t>(indirect_aa - result.feature_names.begin())] == 25.0);
 }
 
+static void trace_defaults_infer_case_attributes_and_scope_missing_values() {
+  EventLog log;
+  Trace first;
+  first.case_id = "c1";
+  first.attributes = {{"segment", "gold", AttributeKind::kString},
+                      {"priority", "2", AttributeKind::kInt}};
+  Event first_a{"c1", "A", "2024-01-01T00:00:00Z", "r1", 0};
+  first_a.attributes.push_back({"kind", "x", AttributeKind::kString});
+  Event first_b{"c1", "B", "2024-01-01T00:01:00Z", "r1", 1};
+  first.events = {first_a, first_b};
+  log.traces.push_back(first);
+
+  Trace second;
+  second.case_id = "c2";
+  second.attributes = {{"segment", "silver", AttributeKind::kString},
+                       {"priority", "3", AttributeKind::kInt}};
+  Event second_a{"c2", "A", "2024-01-02T00:00:00Z", "r2", 0};
+  second_a.attributes.push_back({"kind", "y", AttributeKind::kString});
+  Event second_b{"c2", "B", "2024-01-02T00:01:00Z", "r2", 1};
+  second_b.attributes.push_back({"kind", "y", AttributeKind::kString});
+  second.events = {second_a, second_b};
+  log.traces.push_back(second);
+
+  Trace third;
+  third.case_id = "c3";
+  third.attributes = {{"segment", "bronze", AttributeKind::kString},
+                      {"priority", "4", AttributeKind::kInt}};
+  third.events = {Event{"c3", "C", "2024-01-03T00:00:00Z", "r3", 0}};
+  log.traces.push_back(third);
+
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TRACE_BASED;
+  options.enable_succ_def_representation = false;
+  const auto result = log_to_features(log, options);
+  const auto find_feature = [&](const std::string& name) {
+    return std::find(result.feature_names.begin(), result.feature_names.end(), name);
+  };
+  const auto segment = find_feature("trace:segment@gold");
+  const auto priority = find_feature("case:priority");
+  const auto undefined = find_feature("event:kind@UNDEFINED");
+  const auto kind_x = find_feature("event:kind@x");
+  assert(segment != result.feature_names.end());
+  assert(priority != result.feature_names.end());
+  assert(undefined != result.feature_names.end());
+  assert(kind_x != result.feature_names.end());
+  assert(result.trace_rows[0][static_cast<std::size_t>(segment - result.feature_names.begin())] == 1.0);
+  assert(result.trace_rows[0][static_cast<std::size_t>(priority - result.feature_names.begin())] == 2.0);
+  assert(result.trace_rows[0][static_cast<std::size_t>(kind_x - result.feature_names.begin())] == 1.0);
+  assert(result.trace_rows[0][static_cast<std::size_t>(undefined - result.feature_names.begin())] == 0.0);
+  assert(result.trace_rows[2][static_cast<std::size_t>(undefined - result.feature_names.begin())] == 1.0);
+}
+
+static void overlap_extras_use_case_intervals_and_other_events() {
+  EventLog log;
+  Trace first;
+  first.case_id = "c1";
+  first.events = {
+      timed_event("c1", "A", "2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z", 0),
+      timed_event("c1", "A", "2024-01-01T00:00:05Z", "2024-01-01T00:00:20Z", 1),
+  };
+  log.traces.push_back(first);
+  Trace second;
+  second.case_id = "c2";
+  second.events = {
+      timed_event("c2", "C", "2024-01-01T00:00:08Z", "2024-01-01T00:00:15Z", 0),
+  };
+  log.traces.push_back(second);
+
+  LogToFeaturesOptions options;
+  options.variant = LogToFeaturesVariant::TRACE_BASED;
+  options.start_timestamp_key = "start_time";
+  options.enable_succ_def_representation = false;
+  options.enable_work_in_progress = true;
+  options.enable_resource_workload = true;
+  options.enable_max_concurrent_events = true;
+  options.enable_max_concurrent_events_per_activity = true;
+  const auto result = log_to_features(log, options);
+  const auto find_feature = [&](const std::string& name) {
+    return std::find(result.feature_names.begin(), result.feature_names.end(), name);
+  };
+  const auto wip = find_feature("@@work_in_progress");
+  const auto workload = find_feature("resource_workload@@r1");
+  const auto concurrent = find_feature("@@max_concurrent_activities_general");
+  const auto concurrent_a = find_feature("@@max_concurrent_activities_like_A");
+  assert(wip != result.feature_names.end());
+  assert(workload != result.feature_names.end());
+  assert(concurrent != result.feature_names.end());
+  assert(concurrent_a != result.feature_names.end());
+  const auto index = [&](decltype(wip) feature) {
+    return static_cast<std::size_t>(feature - result.feature_names.begin());
+  };
+  assert(result.trace_rows[0][index(wip)] == 2.0);
+  assert(result.trace_rows[0][index(workload)] == 2.0);
+  assert(result.trace_rows[0][index(concurrent)] == 1.0);
+  assert(result.trace_rows[0][index(concurrent_a)] == 1.0);
+  assert(result.trace_rows[1][index(wip)] == 2.0);
+  assert(result.trace_rows[1][index(workload)] == 2.0);
+}
+
 int main() {
   const auto log = fixture();
   LogToFeaturesOptions e; e.variant = LogToFeaturesVariant::EVENT_BASED; e.event_numeric_attributes = {"amount"}; e.event_string_attributes = {"kind"}; e.case_string_attributes = {"segment"};
@@ -119,4 +218,6 @@ int main() {
   const auto empty_temporal = log_to_features(empty, e);
   assert(empty_temporal.temporal_rows.empty() && !empty_temporal.feature_names.empty());
   observed_path_timing_uses_configured_starts();
+  trace_defaults_infer_case_attributes_and_scope_missing_values();
+  overlap_extras_use_case_intervals_and_other_events();
 }
