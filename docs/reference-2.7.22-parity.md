@@ -76,7 +76,7 @@ are reconciled.
 | Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Complete (core)** — all statistical DFG aliases, both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses are available |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Complete (core)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Complete (core)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
-| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; columnar/lazyframe paths are adapters |
+| Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Complete (core)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; batch activity/resource/timestamp/case-id selectors and columnar/lazyframe adapters share the native contract |
 | Discovery: object-centric | ETOT, timestamp interleavings, link analysis, OCDFG, OCPN annotated/unannotated, OTG, SAW nets | **Partial** — classic ETOT, strict timestamp interleavings over related event logs, deterministic link analysis (including the configurable generated index-column contract), OCDFG metrics (explicit total-object associations plus separate event-couple and total-object performance projections), annotated and unannotated OCPN per-object-type nets (IM/IMd) with opt-in per-object token-replay diagnostics and custom scalar activity/object-type selectors, OTG discovery, and classic stochastic arc-weight nets are available through native/headless adapters; SAW weight distributions retain per-event transition multiplicity (including final routing) and merged-net arc ownership decorations; broader object-centric schema and visualization coverage remains |
 | Evaluation | replay fitness token/alignment; precision token/alignment/automaton/DFG; generalization token; simplicity arc-degree/Cardoso/cyclomatic; composite weighted metrics/F-score; earth-mover distance | **Complete** — dynamic soundness-based fitness/precision dispatch, exact token and prefix-stop alignment precision, aligned-automaton precision (including task identities), escaping-transition DFG precision, transition-frequency generalization, all three simplicity metrics, normalized composite fitness/precision/generalization/simplicity weights with F-score, and exact optimal-transport distance; strict request parsing, JSON, CLI, local-server, and frontend adapters cover every setting and externally supplied comparison logs |
 | Label splitting | contextual | **Complete (core)** — deterministic native contextual splitting with token-aware contexts, weighted greedy-modularity clustering, strict edge thresholds, custom classifiers/targets, JSON/CLI/local-server/frontend adapters, and focused regressions for weighted gains, zero-edge graphs, zero-gain merges, and deterministic ties |
@@ -1872,9 +1872,10 @@ the wrapper defect. Columnar and lazyframe implementations otherwise remain
 input adapters to the native behavior.
 
 Batch discovery exposes LOG, PANDAS, and POLARS selectors over the same
-deterministic interval core. Each variant groups events by activity and
-resource, using completion time
-as the default start or a configured interval-start attribute. It first merges
+deterministic interval core. Each variant groups events by selected activity
+and resource, using the selected completion timestamp (and completion time as
+the default start) or a configured interval-start attribute. Standard aliases
+and generic event/trace attributes are resolved consistently. It first merges
 strictly overlapping intervals transitively, then merges non-overlapping
 intervals whose gap is at most the configured distance. Groups smaller than
 the minimum batch size are removed. Classification priority is simultaneous,
@@ -1893,11 +1894,12 @@ frontend controls; all three adapters preserve the activity, distance, and
 witness contract.
 
 Spectrum variant, sampling, sorting, selected activity/timestamp/case-id
-attributes, batch variant/enablement, merge distance, minimum size, and start
-attribute are available through strict request parsing, CLI, local server,
-deterministic prevalidated JSON, and frontend controls. Batch JSON retains the
-selected variant name, while footprint JSON keeps separate dataframe and
-lazyframe discovery keys for adapter callers.
+attributes, batch variant/enablement, all four batch selectors, merge distance,
+minimum size, and start attribute are available through strict request parsing,
+CLI, local server, deterministic prevalidated JSON, and frontend controls.
+Batch JSON retains the selected variant and selector metadata, while custom
+activity groups carry a text label when no native graph id exists. Footprint
+JSON keeps separate dataframe and lazyframe discovery keys for adapter callers.
 Disconnected observations retain their per-point labels and explicit requested
 pattern offset in the JSON/UI, including when activity labels repeat. Batch
 JSON/UI exposes all five categories, group batch/event counts, resources,
@@ -1906,8 +1908,9 @@ ranges, and case evidence.
 Focused regressions cover stable sorting and its disable switch, overlapping
 connected windows, full and partial disconnected matches, loops, non-adjacent
 rejection, longest-first suppression, exact midpoint/extreme sampling, all five
-batch types and all three batch selectors, strict-overlap/touching/gap/transitive
-merging, custom starts, minimum size, empty resources, duplicate event identities, malformed
+batch types and all three batch selectors, custom activity/resource/timestamp/
+case-id columns, strict-overlap/touching/gap/transitive merging, custom starts,
+minimum size, empty resources, duplicate event identities, malformed
 timestamps/options, JSON rejection before output, request boundaries, and
 frontend rendering.
 

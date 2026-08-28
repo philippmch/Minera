@@ -16,7 +16,9 @@ function instant(value: number): string {
 }
 
 function Group({ group, data }: { group: BatchGroup; data: MineraExport }) {
-  const activity = data.activities[group.activity]?.name ?? `Activity ${group.activity}`;
+  const activity = group.activity_label ??
+    (group.activity === null ? "(custom activity)" :
+      data.activities[group.activity]?.name ?? `Activity ${group.activity}`);
   const resource = group.resource?.trim() || "(missing resource)";
   const batches = group.batches ?? [];
   const batchCount = Number.isFinite(group.batch_count) ? group.batch_count : batches.length;

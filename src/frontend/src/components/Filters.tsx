@@ -537,6 +537,10 @@ export function Filters({
   const [batchVariant, setBatchVariant] = useState<"log" | "pandas" | "polars">("log");
   const [batchMergeDistanceSeconds, setBatchMergeDistanceSeconds] = useState("900");
   const [batchMinSize, setBatchMinSize] = useState("2");
+  const [batchActivityAttribute, setBatchActivityAttribute] = useState("");
+  const [batchResourceAttribute, setBatchResourceAttribute] = useState("");
+  const [batchTimestampAttribute, setBatchTimestampAttribute] = useState("");
+  const [batchCaseIdAttribute, setBatchCaseIdAttribute] = useState("");
   const [batchStartTimestampAttribute, setBatchStartTimestampAttribute] = useState("");
   const [minimumSelfDistanceVariant, setMinimumSelfDistanceVariant] =
     useState<"log" | "pandas" | "polars">("log");
@@ -1053,6 +1057,10 @@ export function Filters({
       batchMinSize: batches
         ? (() => { const n = Number(batchMinSize); return Number.isInteger(n) && n >= 2 ? n : undefined; })()
         : undefined,
+      batchActivityAttribute: batches ? batchActivityAttribute.trim() || undefined : undefined,
+      batchResourceAttribute: batches ? batchResourceAttribute.trim() || undefined : undefined,
+      batchTimestampAttribute: batches ? batchTimestampAttribute.trim() || undefined : undefined,
+      batchCaseIdAttribute: batches ? batchCaseIdAttribute.trim() || undefined : undefined,
       batchStartTimestampAttribute: batches ? batchStartTimestampAttribute.trim() || undefined : undefined,
       minimumSelfDistanceVariant: minimumSelfDistanceVariant !== "log"
         ? minimumSelfDistanceVariant : undefined,
@@ -1199,6 +1207,10 @@ export function Filters({
     setBatchVariant("log");
     setBatchMergeDistanceSeconds("900");
     setBatchMinSize("2");
+    setBatchActivityAttribute("");
+    setBatchResourceAttribute("");
+    setBatchTimestampAttribute("");
+    setBatchCaseIdAttribute("");
     setBatchStartTimestampAttribute("");
     setMinimumSelfDistanceVariant("log");
     setMinimumSelfDistanceActivityKey("");
@@ -3171,6 +3183,46 @@ export function Filters({
                 value={batchMinSize}
                 disabled={!batches}
                 onChange={(e) => setBatchMinSize(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch activity attribute</span>
+              <input
+                type="text"
+                placeholder="concept:name"
+                value={batchActivityAttribute}
+                disabled={!batches}
+                onChange={(e) => setBatchActivityAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch resource attribute</span>
+              <input
+                type="text"
+                placeholder="org:resource"
+                value={batchResourceAttribute}
+                disabled={!batches}
+                onChange={(e) => setBatchResourceAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch timestamp attribute</span>
+              <input
+                type="text"
+                placeholder="time:timestamp"
+                value={batchTimestampAttribute}
+                disabled={!batches}
+                onChange={(e) => setBatchTimestampAttribute(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>Batch case-id attribute</span>
+              <input
+                type="text"
+                placeholder="case:concept:name"
+                value={batchCaseIdAttribute}
+                disabled={!batches}
+                onChange={(e) => setBatchCaseIdAttribute(e.target.value)}
               />
             </label>
             <label className="filters-field">

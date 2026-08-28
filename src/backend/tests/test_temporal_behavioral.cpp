@@ -282,6 +282,56 @@ int main() {
   assert(type_of("seq") == minera::BatchType::kSequential);
   assert(type_of("con") == minera::BatchType::kConcurrent);
 
+  // All batch selectors can target generic event/trace attributes, matching
+  // the column-oriented variants while keeping the native event log shape.
+  minera::EventLog selected_batch_log;
+  minera::Trace selected_trace;
+  selected_trace.case_id = "source-case";
+  selected_trace.attributes.push_back(
+      {"case_ref", "selected-case", minera::AttributeKind::kString});
+  auto add_selected = [&](const char* phase, const char* team,
+                          const char* start, const char* finish) {
+    minera::Event event;
+    event.case_id = selected_trace.case_id;
+    event.activity = "ignored";
+    event.resource = "ignored";
+    event.timestamp = "1970-01-01T00:00:00Z";
+    event.attributes.push_back(
+        {"phase", phase, minera::AttributeKind::kString});
+    event.attributes.push_back(
+        {"team", team, minera::AttributeKind::kString});
+    event.attributes.push_back(
+        {"started_at", start, minera::AttributeKind::kDate});
+    event.attributes.push_back(
+        {"finished_at", finish, minera::AttributeKind::kDate});
+    selected_trace.events.push_back(std::move(event));
+  };
+  add_selected("phase-A", "team-1", "1970-01-01T00:00:00Z",
+               "1970-01-01T00:01:00Z");
+  add_selected("phase-A", "team-1", "1970-01-01T00:00:00Z",
+               "1970-01-01T00:01:00Z");
+  selected_batch_log.traces.push_back(std::move(selected_trace));
+  minera::BatchDiscoveryOptions selected_options;
+  selected_options.activity_attribute = "phase";
+  selected_options.resource_attribute = "team";
+  selected_options.timestamp_attribute = "finished_at";
+  selected_options.case_id_attribute = "case_ref";
+  selected_options.start_timestamp_attribute = "started_at";
+  selected_options.merge_distance_seconds = 0.0;
+  const auto selected_result =
+      minera::discover_batches(selected_batch_log, selected_options);
+  assert(selected_result.groups.size() == 1);
+  assert(selected_result.groups.front().activity == "phase-A");
+  assert(selected_result.groups.front().resource == "team-1");
+  assert(selected_result.groups.front().batches.front().events.front().case_id ==
+         "selected-case");
+  assert(selected_result.groups.front().batches.front().complete == 60.0);
+  assert(throws([&] {
+    auto bad = selected_options;
+    bad.activity_attribute = "missing_phase";
+    (void)minera::discover_batches(selected_batch_log, bad);
+  }));
+
   // Overlap, touching, threshold gaps, transitivity, duplicate identity and
   // validation behavior.
   minera::EventLog merge_log;

@@ -37,4 +37,21 @@ describe("Batches", () => {
     expect(html).toContain("5 events");
     expect(html).toContain("2023");
   });
+
+  it("renders custom activity labels when no graph id exists", () => {
+    const data = baseData();
+    data.batch_discovery = {
+      activity_attribute: "phase",
+      groups: [{
+        activity: null, activity_label: "phase-A", resource: "team-1",
+        batch_count: 1, event_count: 2,
+        batches: [{
+          type: "simultaneous", start: 0, complete: 1,
+          events: [{ start: 0, complete: 1, case_id: "custom", trace_index: 0, event_index: 0 },
+            { start: 0, complete: 1, case_id: "custom", trace_index: 0, event_index: 1 }],
+        }],
+      }],
+    };
+    expect(renderToStaticMarkup(createElement(Batches, { data }))).toContain("phase-A");
+  });
 });

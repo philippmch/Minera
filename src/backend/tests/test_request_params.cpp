@@ -2289,6 +2289,10 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
       {"batch_variant", "polars"},
       {"batch_merge_distance_seconds", "12.5"},
       {"batch_min_size", "3"},
+      {"batch_activity_attribute", "phase"},
+      {"batch_resource_attribute", "team"},
+      {"batch_timestamp_attribute", "finished_at"},
+      {"batch_case_id_attribute", "case_ref"},
       {"batch_start_timestamp_attribute", "started_at"},
       {"minimum_self_distance_variant", "polars"},
       {"minimum_self_distance_activity_key", "phase"},
@@ -2305,6 +2309,10 @@ void parse_mine_params_maps_spectrum_and_batch_options() {
   assert(params.batch_options.variant == minera::BatchDiscoveryVariant::kPolars);
   assert(params.batch_options.merge_distance_seconds == 12.5);
   assert(params.batch_options.min_batch_size == 3);
+  assert(params.batch_options.activity_attribute == "phase");
+  assert(params.batch_options.resource_attribute == "team");
+  assert(params.batch_options.timestamp_attribute == "finished_at");
+  assert(params.batch_options.case_id_attribute == "case_ref");
   assert(params.batch_options.start_timestamp_attribute == "started_at");
   assert(params.minimum_self_distance.variant ==
          minera::MinimumSelfDistanceVariant::kPolars);
@@ -2362,7 +2370,11 @@ void parse_mine_params_rejects_invalid_spectrum_and_batch_options() {
     assert(threw);
   }
   for (const auto& name : {std::string("minimum_self_distance_activity_key"),
-                           std::string("minimum_self_distance_case_id_key")}) {
+                           std::string("minimum_self_distance_case_id_key"),
+                           std::string("batch_activity_attribute"),
+                           std::string("batch_resource_attribute"),
+                           std::string("batch_timestamp_attribute"),
+                           std::string("batch_case_id_attribute")}) {
     const std::map<std::string, std::string> empty_value = {{name, ""}};
     const auto lookup = [&empty_value](std::string_view key) -> std::string {
       const auto it = empty_value.find(std::string(key));
@@ -2404,7 +2416,11 @@ void parse_mine_params_rejects_dependent_options_without_opt_in() {
            std::pair{"spectrum_sort_log", "true"},
            std::pair{"batch_variant", "log"},
            std::pair{"batch_merge_distance_seconds", "1"},
-           std::pair{"batch_min_size", "2"}}) {
+           std::pair{"batch_min_size", "2"},
+           std::pair{"batch_activity_attribute", "phase"},
+           std::pair{"batch_resource_attribute", "team"},
+           std::pair{"batch_timestamp_attribute", "finished_at"},
+           std::pair{"batch_case_id_attribute", "case_ref"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));

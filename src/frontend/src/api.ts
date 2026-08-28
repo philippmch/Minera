@@ -487,6 +487,10 @@ export interface MinerOptions {
   batchVariant?: "log" | "pandas" | "polars";
   batchMergeDistanceSeconds?: number;
   batchMinSize?: number;
+  batchActivityAttribute?: string;
+  batchResourceAttribute?: string;
+  batchTimestampAttribute?: string;
+  batchCaseIdAttribute?: string;
   batchStartTimestampAttribute?: string;
   /** Minimum self-distance adapter selector included in the analysis export. */
   minimumSelfDistanceVariant?: "log" | "pandas" | "polars";
@@ -1119,6 +1123,14 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("batch_merge_distance_seconds", String(options.batchMergeDistanceSeconds));
     if (options.batchMinSize !== undefined && Number.isInteger(options.batchMinSize) && options.batchMinSize >= 2 && options.batchMinSize !== 2)
       add("batch_min_size", String(options.batchMinSize));
+    if (options.batchActivityAttribute?.trim())
+      add("batch_activity_attribute", options.batchActivityAttribute.trim());
+    if (options.batchResourceAttribute?.trim())
+      add("batch_resource_attribute", options.batchResourceAttribute.trim());
+    if (options.batchTimestampAttribute?.trim())
+      add("batch_timestamp_attribute", options.batchTimestampAttribute.trim());
+    if (options.batchCaseIdAttribute?.trim())
+      add("batch_case_id_attribute", options.batchCaseIdAttribute.trim());
     if (options.batchStartTimestampAttribute?.trim())
       add("batch_start_timestamp_attribute", options.batchStartTimestampAttribute.trim());
   }

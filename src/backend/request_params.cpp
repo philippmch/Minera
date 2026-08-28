@@ -2231,6 +2231,24 @@ MineParams parse_mine_params(const FieldLookup& field,
     // fallback in the batch miner.
     params.batch_options.start_timestamp_attribute = value;
   }
+  for (const auto [name, target] : {
+           std::pair<std::string_view, std::string*>{
+               "batch_activity_attribute", &params.batch_options.activity_attribute},
+           std::pair<std::string_view, std::string*>{
+               "batch_resource_attribute", &params.batch_options.resource_attribute},
+           std::pair<std::string_view, std::string*>{
+               "batch_timestamp_attribute", &params.batch_options.timestamp_attribute},
+           std::pair<std::string_view, std::string*>{
+               "batch_case_id_attribute", &params.batch_options.case_id_attribute}}) {
+    if (present ? present(name) : !field(name).empty()) {
+      const auto value = field(name);
+      if (value.empty()) {
+        throw std::invalid_argument(std::string(name) +
+                                    ": expected a non-empty attribute name");
+      }
+      *target = value;
+    }
+  }
   if (const auto value = field("minimum_self_distance_variant");
       present ? present("minimum_self_distance_variant") : !value.empty()) {
     if (value == "log" || value == "LOG") {
@@ -2265,7 +2283,11 @@ MineParams parse_mine_params(const FieldLookup& field,
   for (const auto name : {std::string_view{"batch_variant"},
                           std::string_view{"batch_merge_distance_seconds"},
                           std::string_view{"batch_min_size"},
-                          std::string_view{"batch_start_timestamp_attribute"}}) {
+                          std::string_view{"batch_start_timestamp_attribute"},
+                          std::string_view{"batch_activity_attribute"},
+                          std::string_view{"batch_resource_attribute"},
+                          std::string_view{"batch_timestamp_attribute"},
+                          std::string_view{"batch_case_id_attribute"}}) {
     const bool supplied = present ? present(name) : !field(name).empty();
     if (supplied && (!batches_supplied || !params.batches)) {
       throw std::invalid_argument(std::string(name) + ": requires batches=true");

@@ -3789,7 +3789,8 @@ export interface BatchInstance {
   events: BatchEvent[];
 }
 export interface BatchGroup {
-  activity: number;
+  activity: number | null;
+  activity_label?: string;
   resource: string;
   batch_count: number;
   event_count: number;
@@ -3797,6 +3798,11 @@ export interface BatchGroup {
 }
 export interface BatchDiscoveryExport {
   variant?: "log" | "pandas" | "polars";
+  activity_attribute?: string;
+  resource_attribute?: string;
+  timestamp_attribute?: string;
+  case_id_attribute?: string;
+  start_timestamp_attribute?: string;
   groups: BatchGroup[];
 }
 
@@ -4576,6 +4582,38 @@ export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null) return false;
   const data = value as MineraExport;
   const overlap = data.overlap;
+  const batches = data.batch_discovery;
+  const validBatches = batches === undefined || (
+    typeof batches === "object" && batches !== null &&
+    Array.isArray(batches.groups) &&
+    (batches.variant === undefined ||
+      batches.variant === "log" || batches.variant === "pandas" ||
+      batches.variant === "polars") &&
+    [batches.activity_attribute, batches.resource_attribute,
+      batches.timestamp_attribute, batches.case_id_attribute,
+      batches.start_timestamp_attribute].every((attribute) =>
+        attribute === undefined || typeof attribute === "string") &&
+    batches.groups.every((group) => {
+      if (typeof group !== "object" || group === null ||
+          !(typeof group.activity === "number" || group.activity === null) ||
+          (typeof group.activity === "number" &&
+            (!Number.isSafeInteger(group.activity) || group.activity < 0)) ||
+          (group.activity_label !== undefined &&
+            typeof group.activity_label !== "string") ||
+          typeof group.resource !== "string" ||
+          !Number.isSafeInteger(group.batch_count) || group.batch_count < 0 ||
+          !Number.isSafeInteger(group.event_count) || group.event_count < 0 ||
+          !Array.isArray(group.batches)) return false;
+      return group.batches.every((batch) =>
+        typeof batch === "object" && batch !== null &&
+        (batch.type === "simultaneous" ||
+          batch.type === "batching_on_start" ||
+          batch.type === "batching_on_end" || batch.type === "sequential" ||
+          batch.type === "concurrent") &&
+        typeof batch.start === "number" && Number.isFinite(batch.start) &&
+        typeof batch.complete === "number" && Number.isFinite(batch.complete) &&
+        Array.isArray(batch.events));
+    }));
   return Array.isArray(data.activities) &&
     Array.isArray(data.edges) &&
     Array.isArray(data.variants) &&
@@ -4586,6 +4624,7 @@ export function isMineraExport(value: unknown): value is MineraExport {
       data.minimum_self_distance_variant === "polars") &&
     (data.powl === undefined || isPowlNode(data.powl, data.activities.length)) &&
     (data.decision_tables === undefined || isDecisionTablesResult(data.decision_tables)) &&
+    validBatches &&
     (overlap === undefined || (
       typeof overlap === "object" && overlap !== null &&
       Array.isArray(overlap.interval_events) &&
