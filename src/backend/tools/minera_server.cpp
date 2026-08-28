@@ -148,6 +148,21 @@ std::string trim_text(std::string_view value) {
   return std::string(value.substr(first, last - first + 1));
 }
 
+void register_activity_selector_values(
+    minera::DirectlyFollowsGraph& graph, const minera::EventLog& log,
+    std::string_view activity_attribute) {
+  if (activity_attribute.empty() || activity_attribute == "concept:name" ||
+      activity_attribute == "activity") {
+    return;
+  }
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      if (const auto* value = event.attribute(activity_attribute))
+        graph.ensure_activity(*value);
+    }
+  }
+}
+
 // The most recently mined log and its discovered nets, kept so the costly
 // alignment of a model can be computed on demand (POST /api/align) instead of
 // eagerly for every miner on every mine. The app is local and single-user, so
@@ -508,6 +523,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       log = minera::filter_ltl_event_log(log, *params.ltl);
     }
     auto graph = minera::discover_directly_follows_graph(log);
+    register_activity_selector_values(graph, log,
+                                      params.token_replay.activity_attribute);
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!params.dfg_statistical_variants.empty() ||
         !params.dfg_causal_variants.empty()) {
@@ -3528,7 +3545,10 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     const auto options = minera::parse_alignment_params(lookup, present);
     const auto alignment =
         minera::check_alignment(session->log, selected, options);
-    response.set_content(minera::alignment_json(alignment, session->graph),
+    auto graph = session->graph;
+    register_activity_selector_values(graph, session->log,
+                                      options.activity_attribute);
+    response.set_content(minera::alignment_json(alignment, graph),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

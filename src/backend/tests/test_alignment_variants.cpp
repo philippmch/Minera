@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -23,11 +24,45 @@ minera::ProcessTree chain() {
       {minera::ProcessTreeOperator::kSequence, 0,
        {minera::ProcessTreeNode::leaf(0), minera::ProcessTreeNode::leaf(1)}});
 }
+
+minera::EventLog log_with_activity_attribute() {
+  minera::Trace trace;
+  trace.case_id = "1";
+  trace.events.push_back(
+      minera::Event{"1", "raw-a", {}, {}, 0,
+                    {{"phase", "a", minera::AttributeKind::kString}}});
+  trace.events.push_back(
+      minera::Event{"1", "raw-b", {}, {}, 1,
+                    {{"phase", "b", minera::AttributeKind::kString}}});
+  return minera::EventLog{{std::move(trace)}};
+}
 }
 
 int main() {
   const auto model = chain();
   const auto exact = log_of({"a", "b"});
+  const auto attributed = log_with_activity_attribute();
+  minera::AlignmentOptions attributed_options;
+  attributed_options.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;
+  attributed_options.activity_attribute = "phase";
+  const auto attributed_result =
+      minera::check_alignment(attributed, model, attributed_options);
+  assert(attributed_result.computed && attributed_result.total_cost == 0.0);
+  assert(attributed_result.activity_attribute == "phase");
+  minera::TokenReplayOptions replay_options;
+  replay_options.activity_attribute = "phase";
+  const auto replay_result = minera::check_conformance(
+      attributed, minera::to_petri_net(model), replay_options);
+  assert(replay_result.fitness == 1.0);
+  assert(replay_result.activity_attribute == "phase");
+  bool missing_attribute_threw = false;
+  attributed_options.activity_attribute = "missing";
+  try {
+    (void)minera::check_alignment(attributed, model, attributed_options);
+  } catch (const std::invalid_argument&) {
+    missing_attribute_threw = true;
+  }
+  assert(missing_attribute_threw);
   for (const auto variant : {minera::AlignmentVariant::kDijkstraNoHeuristics,
                              minera::AlignmentVariant::kDijkstraLessMemory,
                              minera::AlignmentVariant::kDiscountedAStar,

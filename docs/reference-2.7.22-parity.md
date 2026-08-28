@@ -61,9 +61,9 @@ are reconciled.
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Partial** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, extended arcs, a selectable event activity attribute, renderer labels, and direction colors; broader differential semantics remain |
 | Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial** — the explicit `BOSE` selector, seeded permutation windows, timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
-| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior |
+| Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
-| Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the deprecated backwards variation, reverse silent routing, weak firing, duplicate-label behavior, and immediate-stop option are selectable |
+| Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
 | Conformance: relational | footprints log-model/log-extensive/trace-extensive; log skeleton; Declare | **Complete (core)** — all three footprint checks, classic log-skeleton conformance, and classic Declare conformance are available with per-trace diagnostics |
 | Conformance: temporal | temporal profile log/dataframe adapters, zeta threshold, business-hour slots | **Complete (core)** |
 | Conformance: advanced | Petri-net anti-alignments and multi-alignments (discounted A*) | **Complete** — both pinned `VERSION_DISCOUNTED_A_STAR` algorithms, objectives, precision/distance diagnostics, marking limits, arbitrary markings, and JSON/CLI/server/frontend adapters are implemented |
@@ -2075,6 +2075,12 @@ LP solving, less-memory dominance, discounted exponent and scheduling parity,
 generator optima and caps, timeout/state diagnostics, tau moves, weighted arcs,
 and invalid-cost handling; request, CLI, and frontend tests cover the exposed
 adapters.
+
+Both token replay and Petri-net alignment also accept a named event activity
+field in addition to the native activity column. Request and CLI adapters trim
+and validate the selector, missing event fields fail deterministically, and the
+selected field is retained in JSON provenance so custom labels remain
+addressable by the frontend.
 
 ## Process-tree alignment parity evidence
 

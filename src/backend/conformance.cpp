@@ -11,6 +11,8 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <string_view>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -772,21 +774,37 @@ struct Variant {
   std::uint64_t count = 0;
 };
 
+bool standard_activity_attribute(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+std::string selected_activity(const Event& event,
+                              std::string_view activity_attribute) {
+  if (standard_activity_attribute(activity_attribute)) return event.activity;
+  if (const auto* value = event.attribute(activity_attribute)) return *value;
+  throw std::invalid_argument(
+      "conformance: event is missing activity attribute '" +
+      std::string(activity_attribute) + "'");
+}
+
 // `resolver.activity_id(name)` maps an activity name to its model id (or
 // std::nullopt when absent), so this works for any net wrapper.
 template <typename Resolver>
 std::vector<Variant> collect_variants(const EventLog& log,
-                                      const Resolver& resolver) {
+                                      const Resolver& resolver,
+                                      std::string_view activity_attribute =
+                                          "concept:name") {
   std::vector<Variant> variants;
   std::unordered_map<std::string, std::size_t> index;
   for (const auto& trace : log.traces) {
     std::string key;
     Variant variant;
     for (const auto& event : trace.events) {
-      variant.ids.push_back(resolver.activity_id(event.activity));
-      variant.names.push_back(event.activity);
+      const auto activity = selected_activity(event, activity_attribute);
+      variant.ids.push_back(resolver.activity_id(activity));
+      variant.names.push_back(activity);
       key.push_back('\x1f');
-      key += event.activity;
+      key += activity;
     }
     auto [it, inserted] = index.emplace(std::move(key), variants.size());
     if (inserted) {
@@ -2408,12 +2426,17 @@ ConformanceResult check_conformance(const EventLog& event_log,
                                     const PetriNet& net,
                                     TokenReplayOptions options) {
   const Replayer replayer(net);
-  const auto variants = collect_variants(event_log, replayer);
+  const std::string activity_attribute =
+      options.activity_attribute.empty() ? "concept:name"
+                                         : options.activity_attribute;
+  const auto variants = collect_variants(event_log, replayer,
+                                          activity_attribute);
 
   ConformanceResult result;
   result.trace_count = event_log.trace_count();
   result.fitness = 1.0;
   result.precision = 1.0;
+  result.activity_attribute = activity_attribute;
 
   std::vector<std::uint64_t> executions(net.transitions().size(), 0);
   std::vector<std::uint64_t> variant_executions;
@@ -2476,6 +2499,9 @@ TokenReplayDiagnostics replay_token_diagnostics(
     const EventLog& event_log, const PetriNet& net,
     TokenReplayOptions options) {
   const Replayer replayer(net);
+  const std::string activity_attribute =
+      options.activity_attribute.empty() ? "concept:name"
+                                         : options.activity_attribute;
   TokenReplayDiagnostics result;
   result.trace_count = event_log.trace_count();
   result.places.resize(net.place_count());
@@ -2483,8 +2509,10 @@ TokenReplayDiagnostics replay_token_diagnostics(
   for (const auto& trace : event_log.traces) {
     std::vector<std::optional<std::size_t>> ids;
     ids.reserve(trace.events.size());
-    for (const auto& event : trace.events)
-      ids.push_back(replayer.activity_id(event.activity));
+    for (const auto& event : trace.events) {
+      const auto activity = selected_activity(event, activity_attribute);
+      ids.push_back(replayer.activity_id(activity));
+    }
 
     std::vector<std::uint64_t> executions(net.transitions().size(), 0);
     const bool backwards = options.variant == TokenReplayVariant::kBackwards;
@@ -2600,6 +2628,10 @@ AlignmentResult check_alignment(const EventLog& event_log,
   AlignmentResult result;
   AlignmentOptions options = input_options;
   result.variant = options.variant;
+  const std::string activity_attribute =
+      options.activity_attribute.empty() ? "concept:name"
+                                         : options.activity_attribute;
+  result.activity_attribute = activity_attribute;
   result.trace_count = event_log.trace_count();
   if (result.trace_count == 0) return result;
   const auto total_start = std::chrono::steady_clock::now();
@@ -2671,7 +2703,8 @@ AlignmentResult check_alignment(const EventLog& event_log,
     result.exhausted = aligner.reachability_exhausted();
     return result;
   }
-  const auto variants = collect_variants(event_log, aligner);
+  const auto variants = collect_variants(event_log, aligner,
+                                          activity_attribute);
   std::vector<std::vector<Marking>> variant_markings;
   variant_markings.reserve(variants.size());
   double total_worst = 0.0;

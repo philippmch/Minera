@@ -428,6 +428,8 @@ export function Filters({
     tokenReplayStopImmediatelyUnfit,
     setTokenReplayStopImmediatelyUnfit,
   ] = useState(false);
+  const [tokenReplayActivityAttribute, setTokenReplayActivityAttribute] =
+    useState("concept:name");
   const logSkeletonFamilies = [
     ["equivalence", "Equivalence"],
     ["always_after", "Always-after"],
@@ -974,6 +976,10 @@ export function Filters({
         tokenReplayVariant !== "forward" ? tokenReplayVariant : undefined,
       tokenReplayStopImmediatelyUnfit:
         tokenReplayStopImmediatelyUnfit || undefined,
+      tokenReplayActivityAttribute:
+        tokenReplayActivityAttribute.trim() !== "concept:name"
+          ? tokenReplayActivityAttribute.trim() || undefined
+          : undefined,
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
       logSkeletonConstraints:
         logSkeletonConstraints.size === logSkeletonFamilies.length
@@ -1170,6 +1176,7 @@ export function Filters({
     setPowlBruteForceActivityLimit("");
     setTokenReplayVariant("forward");
     setTokenReplayStopImmediatelyUnfit(false);
+    setTokenReplayActivityAttribute("concept:name");
     setLogSkeletonNoiseThreshold("");
     setLogSkeletonConstraints(new Set(logSkeletonFamilies.map(([name]) => name)));
     setDeclareConsideredActivities("");
@@ -1337,7 +1344,8 @@ export function Filters({
     powlOrderFrequencyRatio !== "" && powlOrderFrequencyRatio !== "1" ||
     powlBruteForceActivityLimit !== "" && powlBruteForceActivityLimit !== "0";
   const tokenReplayDirty =
-    tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit;
+    tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
+    tokenReplayActivityAttribute.trim() !== "concept:name";
   const logSkeletonDirty =
     logSkeletonNoiseThreshold !== "" ||
     logSkeletonConstraints.size !== logSkeletonFamilies.length;
@@ -1505,6 +1513,14 @@ export function Filters({
                 <option value="continue">continue replay (default)</option>
                 <option value="stop">stop the trace immediately</option>
               </select>
+            </label>
+            <label className="filters-field">
+              <span>Activity field</span>
+              <input
+                value={tokenReplayActivityAttribute}
+                placeholder="concept:name"
+                onChange={(e) => setTokenReplayActivityAttribute(e.target.value)}
+              />
             </label>
           </div>
 

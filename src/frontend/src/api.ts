@@ -437,6 +437,8 @@ export interface MinerOptions {
   /** Reference-compatible token-replay variation used for model conformance. */
   tokenReplayVariant?: "forward" | "backwards";
   tokenReplayStopImmediatelyUnfit?: boolean;
+  /** Event field used to form token-replay variants. */
+  tokenReplayActivityAttribute?: string;
   /** Classic log-skeleton noise threshold (default 0). */
   logSkeletonNoiseThreshold?: number;
   /** Selected log-skeleton constraint families; all six is the default. */
@@ -869,6 +871,11 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("token_replay_variant", options.tokenReplayVariant);
   if (options.tokenReplayStopImmediatelyUnfit)
     add("token_replay_stop_immediately_unfit", "true");
+  if (options.tokenReplayActivityAttribute !== undefined) {
+    const value = options.tokenReplayActivityAttribute.trim();
+    if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");
+    if (value !== "concept:name") add("token_replay_activity_attribute", value);
+  }
   if (
     options.logSkeletonNoiseThreshold !== undefined &&
     Number.isFinite(options.logSkeletonNoiseThreshold) &&
@@ -1213,6 +1220,11 @@ export function alignmentQuery(options: AlignmentOptions = {}): string {
   add("model_cost", options.model_cost);
   add("silent_model_cost", options.silent_model_cost);
   add("sync_cost", options.sync_cost);
+  if (options.activity_attribute !== undefined) {
+    const value = options.activity_attribute.trim();
+    if (!value) throw new Error("activity_attribute must not be empty");
+    if (value !== "concept:name") add("alignment_activity_attribute", value);
+  }
   return query.toString();
 }
 

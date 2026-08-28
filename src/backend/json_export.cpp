@@ -1067,7 +1067,12 @@ void write_conformance(std::ostream& out,
       << ", \"produced\": " << conformance.produced
       << ", \"consumed\": " << conformance.consumed
       << ", \"missing\": " << conformance.missing
-      << ", \"remaining\": " << conformance.remaining << ", \"variants\": [";
+      << ", \"remaining\": " << conformance.remaining
+      << ", \"activity_attribute\": ";
+  write_json_string(out, conformance.activity_attribute.empty()
+                             ? "concept:name"
+                             : conformance.activity_attribute);
+  out << ", \"variants\": [";
   const auto& variants = conformance.variants;
   for (std::size_t i = 0; i < variants.size(); ++i) {
     out << "{\"activities\": [";
@@ -1132,6 +1137,11 @@ void write_alignments(std::ostream& out,
       << ", \"trace_count\": " << alignments.trace_count
       << ", \"total_cost\": " << alignments.total_cost
       << ", \"variant\": \"" << variant_name(alignments.variant) << "\""
+      << ", \"activity_attribute\": ";
+  write_json_string(out, alignments.activity_attribute.empty()
+                             ? "concept:name"
+                             : alignments.activity_attribute);
+  out
       << ", \"diagnostics\": {\"visited_states\": "
       << alignments.diagnostics.visited_states
       << ", \"queued_states\": " << alignments.diagnostics.queued_states

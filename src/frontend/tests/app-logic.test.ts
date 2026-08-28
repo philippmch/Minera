@@ -508,6 +508,7 @@ describe("alignmentQuery", () => {
       model_cost: 10000,
       silent_model_cost: 1,
       sync_cost: 0,
+      activity_attribute: "phase",
     });
     const params = new URLSearchParams(query);
     expect(params.get("process_tree_variant")).toBeNull();
@@ -518,6 +519,7 @@ describe("alignmentQuery", () => {
     expect(params.get("synchronous_dijkstra")).toBe("true");
     expect(params.get("cost_profile")).toBe("standard");
     expect(params.get("silent_model_cost")).toBe("1");
+    expect(params.get("alignment_activity_attribute")).toBe("phase");
   });
 
   it("omits unset controls so the legacy request remains compatible", () => {
@@ -786,6 +788,7 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ powlBruteForceActivityLimit: 3 })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayVariant: "backwards" })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayStopImmediatelyUnfit: true })).toBe(true);
+    expect(hasActiveMinerOptions({ tokenReplayActivityAttribute: "phase" })).toBe(true);
     expect(hasActiveMinerOptions({ logSkeletonNoiseThreshold: 0.2 })).toBe(true);
     expect(hasActiveMinerOptions({ logSkeletonConstraints: ["equivalence"] })).toBe(true);
     expect(hasActiveMinerOptions({ declareConsideredActivities: ["A"] })).toBe(true);
@@ -930,9 +933,11 @@ describe("mineFormEntries", () => {
     expect(mineFormEntries({
       tokenReplayVariant: "backwards",
       tokenReplayStopImmediatelyUnfit: true,
+      tokenReplayActivityAttribute: "phase",
     })).toEqual([
       ["token_replay_variant", "backwards"],
       ["token_replay_stop_immediately_unfit", "true"],
+      ["token_replay_activity_attribute", "phase"],
     ]);
     expect(mineFormEntries({
       tokenReplayVariant: "forward",

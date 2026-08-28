@@ -2602,7 +2602,7 @@ void json_export_carries_the_alignment_contract() {
   for (const char* key : {"\"alignments\"", "\"total_cost\"", "\"moves\"",
                           "\"cost\"", "\"type\"", "\"model\"", "\"sync\"",
                           "\"variant\"", "\"diagnostics\"",
-                          "\"optimal_alignments\""}) {
+                          "\"optimal_alignments\"", "\"activity_attribute\""}) {
     assert(json.find(key) != std::string::npos);
   }
 
