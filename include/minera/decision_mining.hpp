@@ -60,6 +60,10 @@ struct DecisionMiningOptions {
   double min_gain = 1e-9;
   bool include_trace_attributes = true;
   std::vector<std::string> attributes;
+  // Event field used to form replay variants and match model transitions.
+  // Empty, "activity", and "concept:name" select Event::activity; any other
+  // value selects a generic event attribute with that key.
+  std::string activity_attribute = "concept:name";
 };
 
 // Decision mining over a log and a model (Rozinat & van der Aalst): where the
@@ -79,6 +83,8 @@ struct DecisionMiningResult {
   std::uint64_t alignment_failures = 0;
   std::uint64_t trace_count = 0;
   std::vector<DecisionPoint> decision_points;  // only points observed at all
+  // Field used to form the replay variants, retained for export provenance.
+  std::string activity_attribute = "concept:name";
 };
 
 // Mines the decision points of `net` from `log`. Clean variants use their

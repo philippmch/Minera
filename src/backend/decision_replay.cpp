@@ -1,6 +1,8 @@
 #include "decision_replay.hpp"
 
 #include <string>
+#include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -14,6 +16,19 @@ std::string variant_key(const std::vector<std::string>& activities) {
     key += activity;
   }
   return key;
+}
+
+bool standard_activity_attribute(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+const std::string& activity_value(const Event& event,
+                                  std::string_view activity_attribute) {
+  if (standard_activity_attribute(activity_attribute)) return event.activity;
+  if (const auto* value = event.attribute(activity_attribute)) return *value;
+  throw std::invalid_argument(
+      "decision mining: event is missing activity attribute '" +
+      std::string(activity_attribute) + "'");
 }
 
 std::vector<AlignmentMove> exact_path(
@@ -40,7 +55,8 @@ std::vector<AlignmentMove> exact_path(
 }  // namespace
 
 DecisionReplayPaths collect_decision_replay_paths(const EventLog& log,
-                                                  const PetriNet& net) {
+                                                  const PetriNet& net,
+                                                  std::string_view activity_attribute) {
   DecisionReplayPaths result;
   result.variant_of.resize(log.traces.size());
   std::vector<std::uint64_t> variant_counts;
@@ -50,7 +66,7 @@ DecisionReplayPaths collect_decision_replay_paths(const EventLog& log,
     std::vector<std::string> activities;
     activities.reserve(log.traces[trace_index].events.size());
     for (const auto& event : log.traces[trace_index].events)
-      activities.push_back(event.activity);
+      activities.push_back(activity_value(event, activity_attribute));
     const auto [it, inserted] =
         variant_ids.emplace(variant_key(activities), result.variants.size());
     if (inserted) {

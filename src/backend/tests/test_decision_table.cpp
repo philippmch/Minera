@@ -9,12 +9,13 @@
 namespace {
 
 minera::Event event(std::string activity, std::string amount,
-                    std::string region = {}) {
+                    std::string region = {}, std::string stage = {}) {
   minera::Event result;
   result.activity = std::move(activity);
   result.timestamp = "2024-01-01T00:00:00Z";
   if (!amount.empty()) result.attributes.push_back({"amount", std::move(amount)});
   if (!region.empty()) result.attributes.push_back({"region", std::move(region)});
+  if (!stage.empty()) result.attributes.push_back({"stage", std::move(stage)});
   return result;
 }
 
@@ -114,6 +115,17 @@ minera::EventLog sample_log() {
   log.traces.push_back({"c2", {event("A", "30", "south"), event("C", "40")}, {}});
   log.traces.push_back({"c3", {event("A", "50", "north"), event("B", "60")}, {}});
   log.traces.push_back({"bad", {event("A", "70", "north"), event("D", "80")}, {}});
+  return log;
+}
+
+minera::EventLog custom_activity_log() {
+  minera::EventLog log;
+  log.traces.push_back({
+      "c1", {event("recorded", "", {}, "A"),
+             event("recorded", "", {}, "B")}, {}});
+  log.traces.push_back({
+      "c2", {event("recorded", "", {}, "A"),
+             event("recorded", "", {}, "C")}, {}});
   return log;
 }
 
@@ -239,6 +251,19 @@ int main() {
   assert(json.find("feature_names") != std::string::npos);
   assert(json.find("region=north") != std::string::npos);
   assert(json.find("aligned_traces") != std::string::npos);
+
+  minera::DecisionTableOptions custom;
+  custom.mining.activity_attribute = "stage";
+  const auto custom_result =
+      minera::mine_decision_tables(custom_activity_log(), branching_net(), custom);
+  assert(custom_result.activity_attribute == "stage");
+  assert(custom_result.observed_traces == 2);
+  assert(custom_result.replayed_traces == 2);
+  assert(custom_result.aligned_traces == 0);
+  const auto custom_json =
+      minera::serialize_decision_tables_json(custom_result);
+  assert(custom_json.find("\"activity_attribute\":\"stage\"") !=
+         std::string::npos);
 
   // Alignment-backed observations retain hidden branch transitions. The
   // deviating trace has no visible B/C event, but its optimal model path still

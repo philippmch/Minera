@@ -952,6 +952,7 @@ int usage(const char* program) {
                "  --decision-min-gain <f>  Minimum Gini gain\n"
                "  --decision-no-trace-attributes Exclude case attributes\n"
                "  --decision-attributes <a,b,...> Restrict context keys\n"
+               "  --decision-activity-attribute <name> Event field for replay\n"
                "  --decision-lookback <n>  Prior context snapshots for tables (1..64)\n"
                "  --playout <path>          Simulate a discovered model to XES\n"
                "  --playout-miner <id>      Model for --playout: inductive\n"
@@ -2690,6 +2691,20 @@ int main(int argc, char** argv) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
+      continue;
+    }
+
+    // Keep the decision activity selector outside the legacy parser chain,
+    // which is already close to MSVC's block-nesting limit.
+    if (arg == "--decision-activity-attribute") {
+      const auto* value = next();
+      if (!value || trim_text(value).empty()) {
+        std::cerr << "error: " << arg
+                  << " expects a non-empty name\n";
+        return 2;
+      }
+      decision_options.activity_attribute = trim_text(value);
+      decision_option_used = true;
       continue;
     }
 

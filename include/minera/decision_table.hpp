@@ -55,6 +55,8 @@ struct DecisionTablesResult {
   std::uint64_t alignment_failures = 0;
   std::uint64_t trace_count = 0;
   std::vector<EncodedDecisionTable> tables;
+  // Field used to form replay variants, retained for export provenance.
+  std::string activity_attribute = "concept:name";
 };
 
 [[nodiscard]] DecisionTablesResult mine_decision_tables(

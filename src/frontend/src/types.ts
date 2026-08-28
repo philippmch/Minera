@@ -4380,6 +4380,8 @@ export interface Decisions {
   alignment_failures?: number;
   trace_count: number;
   decision_points: DecisionPoint[];
+  /** Event field used to form replay variants; absent in older responses. */
+  activity_attribute?: string;
 }
 
 export interface DataPetriNetTransition {
@@ -4408,6 +4410,8 @@ export interface EncodedDecisionTable {
 export interface DecisionTablesResult {
   family: "DECISION_TABLES";
   variant: "encoded";
+  /** Event field used to form replay variants; absent in older responses. */
+  activity_attribute?: string;
   trace_count: number;
   observed_traces: number;
   replayed_traces?: number;
@@ -4440,6 +4444,8 @@ export function isDecisionTablesResult(value: unknown): value is DecisionTablesR
   if (!isOcelRecord(value) || value.family !== "DECISION_TABLES" ||
       value.variant !== "encoded" || !Number.isSafeInteger(value.trace_count) ||
       (value.trace_count as number) < 0 || !Number.isSafeInteger(value.observed_traces) ||
+      (value.activity_attribute !== undefined &&
+        typeof value.activity_attribute !== "string") ||
       !Array.isArray(value.tables)) return false;
   if (!validDecisionDiagnostics(value, value.trace_count as number,
                                value.observed_traces as number)) return false;
@@ -4656,6 +4662,8 @@ export function isDataPetriNetResult(value: unknown): value is DataPetriNetResul
                                 value.decisions.trace_count as number,
                                 value.decisions.observed_traces as number) ||
       !Array.isArray(value.decisions.decision_points) ||
+      (value.decisions.activity_attribute !== undefined &&
+        typeof value.decisions.activity_attribute !== "string") ||
       (value.decision_tables !== undefined && !isDecisionTablesResult(value.decision_tables))) return false;
   return value.transitions.every((transition) => isOcelRecord(transition) &&
     Number.isSafeInteger(transition.index) && (transition.index as number) >= 0 &&

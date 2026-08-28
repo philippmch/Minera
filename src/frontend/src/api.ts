@@ -2337,6 +2337,8 @@ export interface DecisionMiningOptions {
   min_gain?: number;
   include_trace_attributes?: boolean;
   attributes?: string[];
+  /** Event field used to form replay variants; defaults to concept:name. */
+  activity_attribute?: string;
 }
 
 export interface DecisionTablesRequestOptions extends DecisionMiningOptions {
@@ -2348,6 +2350,12 @@ export interface DecisionTablesRequestOptions extends DecisionMiningOptions {
 export function decisionMiningQuery(options: DecisionMiningOptions = {}): string {
   const query = new URLSearchParams();
   setProcessTreePetriNetVariant(query, options.process_tree_variant);
+  if (options.activity_attribute !== undefined) {
+    if (typeof options.activity_attribute !== "string" ||
+        !options.activity_attribute.trim())
+      throw new Error("decision_activity_attribute must not be empty");
+    query.set("decision_activity_attribute", options.activity_attribute.trim());
+  }
   const integer = (name: string, value: number | undefined, minimum: number) => {
     if (value === undefined) return;
     if (!Number.isSafeInteger(value) || value < minimum)

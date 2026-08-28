@@ -1343,7 +1343,12 @@ function DecisionsView({
     setOptions((current) => ({ ...current, [name]: raw === "" ? undefined : Number(raw) }));
   const applyOptions = () => {
     const attributes = (options.attributes ?? []).map((value) => value.trim()).filter(Boolean);
-    setRequestedOptions({ ...options, attributes: attributes.length > 0 ? attributes : undefined });
+    const activityAttribute = options.activity_attribute?.trim();
+    setRequestedOptions({
+      ...options,
+      attributes: attributes.length > 0 ? attributes : undefined,
+      activity_attribute: activityAttribute || undefined,
+    });
   };
   return <>
     {!embedded && onRequestDecisions && <section className="panel conf-panel">
@@ -1353,6 +1358,7 @@ function DecisionsView({
         <label>Min split<input type="number" min={2} value={options.min_split ?? ""} onChange={(event) => setNumber("min_split", event.target.value)} /></label>
         <label>Min leaf<input type="number" min={1} value={options.min_leaf ?? ""} onChange={(event) => setNumber("min_leaf", event.target.value)} /></label>
         <label>Min gain<input type="number" min={0} step={0.000001} value={options.min_gain ?? ""} onChange={(event) => setNumber("min_gain", event.target.value)} /></label>
+        <label>Activity field<input placeholder="concept:name" value={options.activity_attribute ?? ""} onChange={(event) => setOptions((current) => ({ ...current, activity_attribute: event.target.value }))} /></label>
         <label>Context attributes<input placeholder="amount,region" value={(options.attributes ?? []).join(",")} onChange={(event) => setOptions((current) => ({ ...current, attributes: event.target.value.split(",") }))} /></label>
         <label className="checkbox-label"><input type="checkbox" checked={options.include_trace_attributes ?? true} onChange={(event) => setOptions((current) => ({ ...current, include_trace_attributes: event.target.checked }))} /> Include case attributes</label>
       </div>
@@ -1416,6 +1422,12 @@ function DecisionsResultView({
 
   return (
     <div className="conformance reveal">
+      {decisions.activity_attribute &&
+        decisions.activity_attribute !== "concept:name" && (
+          <p className="conf-inline-note">
+            Replay activity field: <code>{decisions.activity_attribute}</code>
+          </p>
+        )}
       {decisions.observed_traces < decisions.trace_count && (
         <p className="conf-inline-note">
           Mined from the {numberFormat.format(decisions.observed_traces)} of{" "}

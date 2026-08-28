@@ -94,7 +94,8 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
     }
   }
 
-  const auto paths = detail::collect_decision_replay_paths(log, net);
+  const auto paths = detail::collect_decision_replay_paths(
+      log, net, options.mining.activity_attribute);
   std::vector<std::vector<RawRow>> rows(decision_places.size());
   std::uint64_t observed = 0;
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
@@ -254,6 +255,9 @@ DecisionTablesResult mine_decision_tables(const EventLog& log,
   result.aligned_traces = raw.aligned_traces;
   result.alignment_failures = raw.alignment_failures;
   result.trace_count = log.trace_count();
+  result.activity_attribute = options.mining.activity_attribute.empty()
+                                 ? "concept:name"
+                                 : options.mining.activity_attribute;
   std::map<std::size_t, const DecisionPoint*> points;
   for (const auto& point : decisions.decision_points) points[point.place] = &point;
   for (std::size_t i = 0; i < raw.decision_places.size(); ++i) {
@@ -276,6 +280,11 @@ std::string serialize_decision_tables_json(const DecisionTablesResult& result) {
     throw std::invalid_argument("decision table observed trace count is invalid");
   std::ostringstream out;
   out << "{\"family\":\"DECISION_TABLES\",\"variant\":\"encoded\","
+      << "\"activity_attribute\":";
+  write_json_string(out, result.activity_attribute.empty()
+                            ? "concept:name"
+                            : result.activity_attribute);
+  out << ","
       << "\"trace_count\":" << result.trace_count
       << ",\"observed_traces\":" << result.observed_traces
       << ",\"replayed_traces\":" << result.replayed_traces

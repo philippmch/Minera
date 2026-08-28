@@ -33,6 +33,7 @@ describe("encoded decision table guards", () => {
 
   it("rejects invalid rows and counters", () => {
     expect(isDecisionTablesResult({ ...valid, observed_traces: 2 })).toBe(false);
+    expect(isDecisionTablesResult({ ...valid, activity_attribute: 7 })).toBe(false);
     expect(isDecisionTablesResult({ ...valid, aligned_traces: 2 })).toBe(false);
     expect(isDecisionTablesResult({
       ...valid,
