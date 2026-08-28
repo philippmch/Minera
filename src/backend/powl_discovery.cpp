@@ -989,6 +989,35 @@ std::optional<DynamicOrderResult> dynamic_cluster_order(
       }
     }
 
+    // Dynamic clustering removes both source groups and appends their
+    // concatenation.  The next round re-sorts groups, but the concatenation
+    // order remains part of the deterministic projected structure.
+    const auto merge_by_activity = [](Groups& target,
+                                      std::size_t left_activity,
+                                      std::size_t right_activity) {
+      std::size_t left = target.size();
+      std::size_t right = target.size();
+      for (std::size_t index = 0; index < target.size(); ++index) {
+        if (std::find(target[index].begin(), target[index].end(),
+                      left_activity) != target[index].end())
+          left = index;
+        if (std::find(target[index].begin(), target[index].end(),
+                      right_activity) != target[index].end())
+          right = index;
+      }
+      if (left == target.size() || right == target.size() || left == right)
+        return false;
+      std::vector<std::size_t> merged;
+      merged.reserve(target[left].size() + target[right].size());
+      merged.insert(merged.end(), target[left].begin(), target[left].end());
+      merged.insert(merged.end(), target[right].begin(), target[right].end());
+      if (left > right) std::swap(left, right);
+      target.erase(target.begin() + static_cast<std::ptrdiff_t>(right));
+      target.erase(target.begin() + static_cast<std::ptrdiff_t>(left));
+      target.push_back(std::move(merged));
+      return true;
+    };
+
     // Close the relation transitively.  If the missing edge is contradicted
     // by reverse evidence, merge the two endpoint groups and rebuild from
     // the new partition; this is the key dynamic-clustering repair.
@@ -1005,9 +1034,9 @@ std::optional<DynamicOrderResult> dynamic_cluster_order(
                                               : any[k][i];
             if (reverse_evidence) {
               auto merged = groups;
-              merged[i].insert(merged[i].end(), groups[k].begin(),
-                               groups[k].end());
-              merged.erase(merged.begin() + static_cast<std::ptrdiff_t>(k));
+              if (!merge_by_activity(merged, groups[i].front(),
+                                     groups[k].front()))
+                return std::nullopt;
               return generate(std::move(merged));
             }
             edges[i][k] = true;
@@ -1025,34 +1054,14 @@ std::optional<DynamicOrderResult> dynamic_cluster_order(
       for (std::size_t j = i + 1; j < n; ++j) {
         if (!edges[i][j] || !edges[j][i]) continue;
         auto merged = groups;
-        merged[i].insert(merged[i].end(), groups[j].begin(), groups[j].end());
-        merged.erase(merged.begin() + static_cast<std::ptrdiff_t>(j));
+        if (!merge_by_activity(merged, groups[i].front(), groups[j].front()))
+          return std::nullopt;
         return generate(std::move(merged));
       }
     }
 
     // Activities with no eventual-follows evidence in either direction are a
     // choice and are coarsened before the next order attempt.
-    const auto merge_by_activity = [](Groups& target, std::size_t left_activity,
-                                      std::size_t right_activity) {
-      std::size_t left = target.size();
-      std::size_t right = target.size();
-      for (std::size_t index = 0; index < target.size(); ++index) {
-        if (std::find(target[index].begin(), target[index].end(),
-                      left_activity) != target[index].end())
-          left = index;
-        if (std::find(target[index].begin(), target[index].end(),
-                      right_activity) != target[index].end())
-          right = index;
-      }
-      if (left == target.size() || right == target.size() || left == right)
-        return false;
-      if (left > right) std::swap(left, right);
-      target[left].insert(target[left].end(), target[right].begin(),
-                          target[right].end());
-      target.erase(target.begin() + static_cast<std::ptrdiff_t>(right));
-      return true;
-    };
     bool choice_merge = false;
     Groups choice_groups = groups;
     for (std::size_t i = 0; i < n; ++i) {

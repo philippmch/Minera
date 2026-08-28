@@ -285,6 +285,60 @@ int main() {
   assert(dynamic_choice.children()[0].kind() == PowlNodeKind::kXor);
   assert(dynamic_choice.children()[0].children().size() == 2);
   assert(dynamic_choice.children()[1].label() == "B");
+
+  // Multi-round choice merges keep the canonical child order after a merged
+  // group moves past unrelated groups between rounds.
+  const auto merge_order_probe = discover_powl(
+      log({{"A", "D"}, {"B", "D"}, {"C", "D"}, {"D", "E"}}), plain);
+  assert(merge_order_probe.serialize() ==
+         "PO=(nodes={X(tau,T(\"A\"),T(\"B\"),T(\"C\")),T(\"D\"),"
+         "X(tau,T(\"E\"))},order={X(tau,T(\"A\"),T(\"B\"),T(\"C\"))-->"
+         "D,X(tau,T(\"A\"),T(\"B\"),T(\"C\"))-->"
+         "X(tau,T(\"E\")),D-->X(tau,T(\"E\"))})");
+
+  // A reverse-supported transitive cycle must merge the conflicting groups
+  // before the remaining order is materialized.
+  const auto cycle_probe = discover_powl(
+      log({{"A", "B"}, {"B", "C"}, {"C", "A"}, {"A", "D"}}), plain);
+  assert(cycle_probe.serialize() ==
+         "PO=(nodes={X(tau,T(\"B\"),T(\"D\")),X(tau,T(\"A\")),"
+         "X(tau,T(\"C\"))},"
+         "order={X(tau,T(\"C\"))-->X(tau,T(\"A\"))})");
+
+  // Equal predecessor/successor neighborhoods form stable XOR groups while
+  // preserving the surrounding chain.
+  const auto equal_probe = discover_powl(
+      log({{"A", "C"}, {"B", "C"}, {"A", "D"}, {"B", "D"},
+           {"C", "E"}, {"D", "E"}}), plain);
+  assert(equal_probe.serialize() ==
+         "PO=(nodes={X(tau,T(\"A\"),T(\"B\")),X(T(\"C\"),T(\"D\")),"
+         "X(tau,T(\"E\"))},order={X(tau,T(\"A\"),T(\"B\"))-->"
+         "X(T(\"C\"),T(\"D\")),X(tau,T(\"A\"),T(\"B\"))-->"
+         "X(tau,T(\"E\")),X(T(\"C\"),T(\"D\"))-->"
+         "X(tau,T(\"E\"))})");
+
+  // Reverse choice evidence must not introduce an artificial order between
+  // the merged alternatives and their common successor.
+  const auto reverse_choice_probe = discover_powl(
+      log({{"A", "D"}, {"B", "D"}, {"C", "D"}, {"D", "A"},
+           {"D", "B"}}), plain);
+  assert(reverse_choice_probe.serialize() ==
+         "PO=(nodes={X(T(\"A\"),T(\"B\"),T(\"C\")),T(\"D\")},order={})");
+
+  // A later merge that targets a group already appended by an earlier merge
+  // retains activity-argument order rather than vector-position order.
+  const auto canonical_multi_merge_probe = discover_powl(
+      log({{"A", "B"}, {"A", "C"}, {"A", "C2"}, {"A", "D"},
+           {"B", "C2"}, {"C2", "D"}}), plain);
+  assert(canonical_multi_merge_probe.serialize() ==
+         "PO=(nodes={X(tau,T(\"A\")),X(PO=(nodes={X(tau,T(\"B\")),"
+         "X(tau,T(\"C2\")),X(tau,T(\"D\"))},order={X(tau,T(\"B\"))-->"
+         "X(tau,T(\"C2\")),X(tau,T(\"B\"))-->X(tau,T(\"D\")),"
+         "X(tau,T(\"C2\"))-->X(tau,T(\"D\"))}),T(\"C\"))},"
+         "order={X(tau,T(\"A\"))-->X(PO=(nodes={X(tau,T(\"B\")),"
+         "X(tau,T(\"C2\")),X(tau,T(\"D\"))},order={X(tau,T(\"B\"))-->"
+         "X(tau,T(\"C2\")),X(tau,T(\"B\"))-->X(tau,T(\"D\")),"
+         "X(tau,T(\"C2\"))-->X(tau,T(\"D\"))}),T(\"C\"))})");
   // Plain keeps the two-node bidirectional relation as an unordered PO;
   // frequency uses multiplicity-weighted directional support.
   EventLog ratio_log;
