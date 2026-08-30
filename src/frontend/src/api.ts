@@ -40,6 +40,8 @@ import {
   isWorkflowHistoryResult,
   type EnterpriseHistoryResult,
   isEnterpriseHistoryResult,
+  type CommunicationHistoryResult,
+  isCommunicationHistoryResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -4803,6 +4805,14 @@ export async function requestEnterpriseHistory(
   const payload: unknown = await response.json();
   if (!isEnterpriseHistoryResult(payload)) throw new Error("the Minera backend returned invalid enterprise history");
   return payload;
+}
+export interface CommunicationHistoryOptions { communication_variant: "mailbox" | "calendar"; communication_include_reminders?: boolean; communication_current_time?: string; communication_max_items?: number; communication_max_events?: number; }
+export async function requestCommunicationHistory(csv: string, options: CommunicationHistoryOptions): Promise<CommunicationHistoryResult> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b))) if (value !== undefined) query.set(key, String(value));
+  const response = await fetch(`/api/communication-history?${query}`, { method: "POST", headers: { "Content-Type": "text/csv" }, body: csv });
+  if (!response.ok) { const payload: unknown = await response.json().catch(() => null); if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error)); throw new Error(`the Minera backend answered with status ${response.status}`); }
+  const payload: unknown = await response.json(); if (!isCommunicationHistoryResult(payload)) throw new Error("the Minera backend returned invalid communication history"); return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {
   if (options.embedding_provider !== undefined &&
