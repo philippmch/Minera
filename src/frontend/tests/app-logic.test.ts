@@ -148,8 +148,9 @@ describe("native alignment adapters", () => {
   });
   it("serializes trie controls and validates recursive responses", async () => {
     expect(trieQuery({ trie_activity_key: "concept:name", trie_max_path_length: 3 })).toBe("trie_activity_key=concept%3Aname&trie_max_path_length=3");
-    const valid = { family: "LOG_TO_TRIE", root: { label: "", depth: 0, final: false, children: [{ label: "A", depth: 1, final: true, children: [] }] } };
+    const valid = { family: "LOG_TO_TRIE", input_traces: 1, distinct_variants: 1, node_count: 2, truncated: false, root: { label: "", depth: 0, final: false, children: [{ label: "A", depth: 1, final: true, children: [] }] } };
     expect(isTrieResult(valid)).toBe(true);
+    expect(isTrieResult({ ...valid, node_count: 0 })).toBe(false);
     expect(isTrieResult({ ...valid, root: { ...valid.root, depth: -1 } })).toBe(false);
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => valid }));
     vi.stubGlobal("fetch", fetchMock);

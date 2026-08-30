@@ -1169,6 +1169,10 @@ export interface TrieNode {
 }
 export interface TrieResult {
   family: "LOG_TO_TRIE";
+  input_traces: number;
+  distinct_variants: number;
+  node_count: number;
+  truncated: boolean;
   root: TrieNode;
 }
 export interface TriePetriConversionTransition {
@@ -1193,8 +1197,13 @@ function isTrieNode(value: unknown): value is TrieNode {
     && node.children.every(isTrieNode);
 }
 export function isTrieResult(value: unknown): value is TrieResult {
-  return !!value && typeof value === "object" && (value as Partial<TrieResult>).family === "LOG_TO_TRIE"
-    && isTrieNode((value as Partial<TrieResult>).root);
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<TrieResult>;
+  return result.family === "LOG_TO_TRIE"
+    && Number.isInteger(result.input_traces) && result.input_traces! >= 0
+    && Number.isInteger(result.distinct_variants) && result.distinct_variants! >= 0
+    && Number.isInteger(result.node_count) && result.node_count! >= 1
+    && typeof result.truncated === "boolean" && isTrieNode(result.root);
 }
 export function isTriePetriConversionResult(value: unknown): value is TriePetriConversionResult {
   if (!value || typeof value !== "object") return false;

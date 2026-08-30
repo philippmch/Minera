@@ -4335,7 +4335,11 @@ void write_trie_node_json(std::ostream& out, const TrieNode& node) {
 
 std::string trie_json(const TrieModel& result) {
   std::ostringstream out;
-  out << "{\"family\":\"LOG_TO_TRIE\",\"root\":";
+  out << "{\"family\":\"LOG_TO_TRIE\",\"input_traces\":"
+      << result.input_traces << ",\"distinct_variants\":"
+      << result.distinct_variants << ",\"node_count\":" << result.node_count
+      << ",\"truncated\":" << (result.truncated ? "true" : "false")
+      << ",\"root\":";
   write_trie_node_json(out, result.root);
   out << '}';
   return out.str();
