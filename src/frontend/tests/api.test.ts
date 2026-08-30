@@ -17,12 +17,22 @@ describe("Petri usage comparison API", () => {
       expect(form.get("activity_attribute")).toBe("business_activity");
       expect(form.get("initial_marking")).toBe("1,0,2");
       expect(form.get("final_marking")).toBe("0,0,1");
+      expect(form.get("walk_through_hidden_trans")).toBe("false");
+      expect(form.get("try_to_reach_final_marking_through_hidden")).toBe("true");
+      expect(form.get("stop_immediately_unfit")).toBe("true");
       return { ok: true, json: async () => payload };
     }));
     await expect(comparePetriUsage(
       new File(["case_id,activity\nc1,A\n"], "reference.csv"),
       "alpha",
-      { activity_attribute: " business_activity ", initial_marking: [1, 0, 2], final_marking: [0, 0, 1] },
+      {
+        activity_attribute: " business_activity ",
+        initial_marking: [1, 0, 2],
+        final_marking: [0, 0, 1],
+        walk_through_hidden_trans: false,
+        try_to_reach_final_marking_through_hidden: true,
+        stop_immediately_unfit: true,
+      },
     )).resolves.toMatchObject({ family: "PETRI_USAGE_COMPARISON" });
     vi.unstubAllGlobals();
   });

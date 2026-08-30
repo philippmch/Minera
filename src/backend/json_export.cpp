@@ -3792,8 +3792,17 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
   for (std::size_t i = 0; i < result.arcs.size(); ++i) {
     if (i) out << ',';
     const auto& r = result.arcs[i];
+    const char* kind = "input";
+    switch (r.kind) {
+      case PetriArcUsageKind::kInput: kind = "input"; break;
+      case PetriArcUsageKind::kOutput: kind = "output"; break;
+      case PetriArcUsageKind::kReset: kind = "reset"; break;
+      case PetriArcUsageKind::kInhibitor: kind = "inhibitor"; break;
+    }
     out << "{\"id\":" << r.id << ",\"transition\":" << r.transition
-        << ",\"place\":" << r.place << ",\"input\":"
+        << ",\"place\":" << r.place << ",\"kind\":";
+    write_json_string(out, kind);
+    out << ",\"input\":"
         << (r.input ? "true" : "false") << ",\"log1_occurrences\":"
         << r.log1_occurrences << ",\"log2_occurrences\":"
         << r.log2_occurrences << ",\"total_occurrences\":"

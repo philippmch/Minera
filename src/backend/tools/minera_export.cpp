@@ -850,6 +850,9 @@ int usage(const char* program) {
                "                            Event attribute used as the activity label\n"
                "  --compare-petri-initial-marking <n,...> Initial place marking\n"
                "  --compare-petri-final-marking <n,...>   Final place marking\n"
+               "  --compare-petri-walk-through-hidden <bool> Route silently before visible events\n"
+               "  --compare-petri-reach-final-through-hidden <bool> Route silently after a trace\n"
+               "  --compare-petri-stop-immediately-unfit <bool> Stop a trace after its first deviation\n"
                "  --align-process-tree     Embed process-tree alignments\n"
                "  --pt-alignment-variant <id> SEARCH_GRAPH_PT (default),\n"
                "                            DYNAMIC_PROGRAMMING, MILP, or\n"
@@ -1243,6 +1246,10 @@ int main(int argc, char** argv) {
   std::vector<std::uint32_t> compare_petri_final_marking;
   bool compare_petri_initial_marking_used = false;
   bool compare_petri_final_marking_used = false;
+  bool compare_petri_walk_through_hidden = true;
+  bool compare_petri_reach_final_through_hidden = true;
+  bool compare_petri_stop_immediately_unfit = false;
+  bool compare_petri_replay_option_used = false;
   minera::EmdOptions emd_options;
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
@@ -2730,6 +2737,27 @@ int main(int argc, char** argv) {
       }
       continue;
     }
+    if (arg == "--compare-petri-walk-through-hidden" ||
+        arg == "--compare-petri-reach-final-through-hidden" ||
+        arg == "--compare-petri-stop-immediately-unfit") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        const bool parsed = parse_boolean(value, arg);
+        if (arg == "--compare-petri-walk-through-hidden") {
+          compare_petri_walk_through_hidden = parsed;
+        } else if (arg == "--compare-petri-reach-final-through-hidden") {
+          compare_petri_reach_final_through_hidden = parsed;
+        } else {
+          compare_petri_stop_immediately_unfit = parsed;
+        }
+        compare_petri_replay_option_used = true;
+      } catch (const std::invalid_argument& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
     if (arg == "--emd-normalize-masses" ||
         arg == "--emd-strict-equal-mass" ||
         arg == "--emd-use-fast-emd") {
@@ -4139,7 +4167,8 @@ int main(int argc, char** argv) {
   if (compare_petri_reference.empty() &&
       (compare_petri_miner != "inductive" ||
        !compare_petri_activity_attribute.empty() ||
-       compare_petri_initial_marking_used || compare_petri_final_marking_used)) {
+       compare_petri_initial_marking_used || compare_petri_final_marking_used ||
+       compare_petri_replay_option_used)) {
     std::cerr << "error: --compare-petri options require --compare-petri-reference <file>\n";
     return 2;
   }
@@ -5525,6 +5554,12 @@ int main(int argc, char** argv) {
       }();
       minera::PetriUsageComparisonOptions comparison_options;
       comparison_options.activity_attribute = compare_petri_activity_attribute;
+      comparison_options.walk_through_hidden_trans =
+          compare_petri_walk_through_hidden;
+      comparison_options.try_to_reach_final_marking_through_hidden =
+          compare_petri_reach_final_through_hidden;
+      comparison_options.stop_immediately_unfit =
+          compare_petri_stop_immediately_unfit;
       if (compare_petri_initial_marking_used)
         comparison_options.initial_marking = compare_petri_initial_marking;
       if (compare_petri_final_marking_used)

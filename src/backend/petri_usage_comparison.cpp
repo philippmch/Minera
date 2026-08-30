@@ -284,7 +284,10 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
                        const std::unordered_map<std::string, std::size_t>& activities,
                        const Marking& initial_marking,
                        const Marking& final_marking,
-                       std::string_view activity_attribute) {
+                       std::string_view activity_attribute,
+                       bool walk_through_hidden_trans,
+                       bool try_to_reach_final_marking_through_hidden,
+                       bool stop_immediately_unfit) {
   ReplayUsage usage{std::vector<std::uint64_t>(net.transitions().size(), 0),
                     std::vector<std::uint64_t>(net.place_count(), 0)};
   std::vector<std::vector<std::size_t>> transitions_by_activity(net.activities().size());
@@ -300,32 +303,42 @@ ReplayUsage replay_log(const EventLog& log, const PetriNet& net,
     for (const auto& event : trace.events) {
       const auto* selected_activity =
           selected_activity_value(event, activity_attribute);
-      if (!selected_activity) continue;
+      if (!selected_activity) {
+        if (stop_immediately_unfit) break;
+        continue;
+      }
       const auto activity = activities.find(*selected_activity);
       if (activity == activities.end() || transitions_by_activity[activity->second].empty()) {
-        continue;  // unknown log activity is a deviation but activates no model element
+        // An unknown log activity is a deviation but activates no model
+        // element. Immediate-stop mode prevents later events from contributing.
+        if (stop_immediately_unfit) break;
+        continue;
       }
       const auto& targets = transitions_by_activity[activity->second];
       if (!std::any_of(targets.begin(), targets.end(), [&](const auto t) {
             return enabled(marking, net.transitions()[t]);
-          })) {
+          }) && walk_through_hidden_trans) {
         const auto path = silent_path(marking, targets, net);
         for (const auto t : path) fire(marking, t, net, usage, activated);
       }
       std::size_t chosen = targets.front();
+      bool forced = true;
       for (const auto t : targets) {
         if (enabled(marking, net.transitions()[t])) {
           chosen = t;
+          forced = false;
           break;
         }
       }
       fire(marking, chosen, net, usage, activated);
+      if (forced && stop_immediately_unfit) break;
     }
 
     const auto is_final_marking = [&](const Marking& candidate) {
       return candidate == final_marking;
     };
-    if (!is_final_marking(marking)) {
+    if (try_to_reach_final_marking_through_hidden &&
+        !is_final_marking(marking)) {
       // Route silently until the exact workflow final marking is reached.
       struct FinishNode {
         Marking marking;
@@ -421,9 +434,15 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
     activities.emplace(net.activities()[i], i);
   }
   const auto usage1 = replay_log(log1, net, activities, initial_marking,
-                                 final_marking, activity_attribute);
+                                 final_marking, activity_attribute,
+                                 options.walk_through_hidden_trans,
+                                 options.try_to_reach_final_marking_through_hidden,
+                                 options.stop_immediately_unfit);
   const auto usage2 = replay_log(log2, net, activities, initial_marking,
-                                 final_marking, activity_attribute);
+                                 final_marking, activity_attribute,
+                                 options.walk_through_hidden_trans,
+                                 options.try_to_reach_final_marking_through_hidden,
+                                 options.stop_immediately_unfit);
   PetriUsageComparison result;
   result.places.reserve(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {
@@ -442,18 +461,22 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
   std::size_t arc_id = 0;
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
     const auto& transition = net.transitions()[t];
-    for (const auto p : transition.inputs) {
+    const auto append_arc = [&](std::size_t place, PetriArcUsageKind kind) {
       const auto stats = result.transitions[t];
-      result.arcs.push_back({arc_id++, t, p, true, stats.log1_occurrences,
+      result.arcs.push_back({arc_id++, t, place, kind,
+                             kind != PetriArcUsageKind::kOutput,
+                             stats.log1_occurrences,
                              stats.log2_occurrences, stats.total_occurrences,
                              stats.direction, stats.label, stats.color});
-    }
-    for (const auto p : transition.outputs) {
-      const auto stats = result.transitions[t];
-      result.arcs.push_back({arc_id++, t, p, false, stats.log1_occurrences,
-                             stats.log2_occurrences, stats.total_occurrences,
-                             stats.direction, stats.label, stats.color});
-    }
+    };
+    for (const auto place : transition.inputs)
+      append_arc(place, PetriArcUsageKind::kInput);
+    for (const auto place : transition.outputs)
+      append_arc(place, PetriArcUsageKind::kOutput);
+    for (const auto place : transition.reset_inputs)
+      append_arc(place, PetriArcUsageKind::kReset);
+    for (const auto place : transition.inhibitor_inputs)
+      append_arc(place, PetriArcUsageKind::kInhibitor);
   }
   return result;
 }

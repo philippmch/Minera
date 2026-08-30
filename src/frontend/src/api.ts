@@ -3287,6 +3287,13 @@ export async function comparePetriUsage(
     form.append("final_marking", serializeComparisonMarking(
       "final_marking", options.final_marking));
   }
+  for (const [name, value] of [
+    ["walk_through_hidden_trans", options.walk_through_hidden_trans],
+    ["try_to_reach_final_marking_through_hidden", options.try_to_reach_final_marking_through_hidden],
+    ["stop_immediately_unfit", options.stop_immediately_unfit],
+  ] as const) {
+    if (value !== undefined) form.append(name, value ? "true" : "false");
+  }
   let response: Response;
   try {
     response = await fetch("/api/compare-petri", { method: "POST", body: form });
