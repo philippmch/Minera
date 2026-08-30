@@ -38,6 +38,11 @@ struct LogToTargetResult {
   // requested zero-padding rows.
   std::vector<std::vector<std::vector<double>>> rows;
   std::vector<std::string> classes;
+  // Stable dimensions make adapter consumers independent of empty-log and
+  // empty-trace corner cases when constructing ML tensors.
+  std::size_t trace_count = 0;
+  std::size_t target_width = 0;
+  bool padded = false;
 };
 
 [[nodiscard]] LogToTargetResult log_to_target(

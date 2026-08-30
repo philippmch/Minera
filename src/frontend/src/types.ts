@@ -656,6 +656,9 @@ export type LogToTargetVariant = "next_activity" | "next_time" | "remaining_time
 export interface LogToTargetResult {
   family: "LOG_TO_TARGET";
   variant: LogToTargetVariant;
+  trace_count: number;
+  target_width: number;
+  padded: boolean;
   classes: string[];
   rows: number[][][];
 }
@@ -664,6 +667,9 @@ export function isLogToTargetResult(value: unknown): value is LogToTargetResult 
   const candidate = value as Partial<LogToTargetResult>;
   return candidate.family === "LOG_TO_TARGET"
     && (candidate.variant === "next_activity" || candidate.variant === "next_time" || candidate.variant === "remaining_time")
+    && Number.isInteger(candidate.trace_count) && candidate.trace_count! >= 0
+    && Number.isInteger(candidate.target_width) && candidate.target_width! >= 0
+    && typeof candidate.padded === "boolean"
     && Array.isArray(candidate.classes) && candidate.classes.every((entry) => typeof entry === "string")
     && Array.isArray(candidate.rows)
     && candidate.rows.every((trace) => Array.isArray(trace) && trace.every((row) => Array.isArray(row) && row.every((entry) => typeof entry === "number" && Number.isFinite(entry))));
