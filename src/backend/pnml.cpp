@@ -5,7 +5,10 @@
 #include <cstdint>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <numeric>
 #include <optional>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -37,6 +40,7 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
 void write_pnml_impl(std::ostream& out, const PetriNet& net,
                      const std::vector<std::int64_t>& initial_marking,
                      const std::vector<std::int64_t>& final_marking,
+                     const StochasticMap* stochastic_map,
                      std::string_view name) {
   if (initial_marking.size() != net.place_count() ||
       final_marking.size() != net.place_count())
@@ -46,6 +50,8 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
       std::any_of(final_marking.begin(), final_marking.end(),
                   [](std::int64_t value) { return value < 0; }))
     throw std::invalid_argument("PNML markings must be non-negative");
+  if (stochastic_map)
+    validate_stochastic_map(*stochastic_map, net.transitions().size());
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   out << "<pnml xmlns=\"http://www.pnml.org/version-2009/grammar/pnml\">\n";
   out << "  <net id=\"net1\" "
@@ -85,6 +91,38 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
              "activity=\"$invisible$\" localNodeID=\"t"
           << t << "\"/>\n";
     }
+    if (stochastic_map) {
+      const auto& record = stochastic_map->transitions[t];
+      std::string type;
+      switch (record.distribution) {
+        case StochasticMapDistribution::kDeterministic: type = "DETERMINISTIC"; break;
+        case StochasticMapDistribution::kExponential: type = "EXPONENTIAL"; break;
+        case StochasticMapDistribution::kConstant0: type = "IMMEDIATE"; break;
+        case StochasticMapDistribution::kImmediate: type = "IMMEDIATE"; break;
+        case StochasticMapDistribution::kNormal: type = "NORMAL"; break;
+        case StochasticMapDistribution::kUniform: type = "UNIFORM"; break;
+        case StochasticMapDistribution::kLogNormal: type = "LOGNORMAL"; break;
+        case StochasticMapDistribution::kGamma: type = "GAMMA"; break;
+      }
+      out << "        <toolspecific tool=\"StochasticPetriNet\" version=\"0.2\">\n"
+          << "          <property key=\"distributionType\">" << type
+          << "</property>\n";
+      if (type != "IMMEDIATE") {
+        out << "          <property key=\"distributionParameters\">"
+            << record.parameter;
+        if (record.secondary_parameter != 0.0 || record.tertiary_parameter != 0.0)
+          out << ';' << record.secondary_parameter;
+        if (record.tertiary_parameter != 0.0)
+          out << ';' << record.tertiary_parameter;
+        out << "</property>\n";
+      }
+      out << "          <property key=\"priority\">" << record.priority
+          << "</property>\n"
+          << "          <property key=\"invisible\">"
+          << (transition.silent() ? "true" : "false") << "</property>\n"
+          << "          <property key=\"weight\">" << record.activation_weight
+          << "</property>\n        </toolspecific>\n";
+    }
     out << "      </transition>\n";
   }
 
@@ -93,28 +131,40 @@ void write_pnml_impl(std::ostream& out, const PetriNet& net,
   // unique across the whole net.
   std::size_t arc_id = 0;
   const auto write_input_arc = [&](std::size_t place, std::size_t t,
-                                   PetriArcType type) {
+                                   PetriArcType type, std::size_t weight = 1) {
     out << "      <arc id=\"a" << arc_id++ << "\" source=\"p" << place
         << "\" target=\"t" << t << "\"";
-    if (type == PetriArcType::kNormal) {
+    if (type == PetriArcType::kNormal && weight == 1) {
       out << "/>\n";
     } else {
-      out << "><type><text>"
-          << (type == PetriArcType::kReset ? "reset" : "inhibitor")
-          << "</text></type></arc>\n";
+      out << ">";
+      if (weight != 1)
+        out << "<inscription><text>" << weight << "</text></inscription>";
+      if (type != PetriArcType::kNormal)
+        out << "<type><text>"
+            << (type == PetriArcType::kReset ? "reset" : "inhibitor")
+            << "</text></type>";
+      out << "</arc>\n";
     }
   };
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     const auto& transition = transitions[t];
-    for (const auto place : transition.inputs)
-      write_input_arc(place, t, PetriArcType::kNormal);
+    std::map<std::size_t, std::size_t> input_weights;
+    for (const auto place : transition.inputs) ++input_weights[place];
+    for (const auto& [place, weight] : input_weights)
+      write_input_arc(place, t, PetriArcType::kNormal, weight);
     for (const auto place : transition.reset_inputs)
       write_input_arc(place, t, PetriArcType::kReset);
     for (const auto place : transition.inhibitor_inputs)
       write_input_arc(place, t, PetriArcType::kInhibitor);
-    for (const auto place : transition.outputs) {
+    std::map<std::size_t, std::size_t> output_weights;
+    for (const auto place : transition.outputs) ++output_weights[place];
+    for (const auto& [place, weight] : output_weights) {
       out << "      <arc id=\"a" << arc_id++ << "\" source=\"t" << t
-          << "\" target=\"p" << place << "\"/>\n";
+          << "\" target=\"p" << place << "\"";
+      if (weight == 1) out << "/>\n";
+      else out << "><inscription><text>" << weight
+               << "</text></inscription></arc>\n";
     }
   }
 
@@ -139,14 +189,22 @@ void write_pnml(std::ostream& out, const PetriNet& net,
   std::vector<std::int64_t> final(net.place_count(), 0);
   initial[net.source()] = 1;
   final[net.sink()] = 1;
-  write_pnml_impl(out, net, initial, final, name);
+  write_pnml_impl(out, net, initial, final, nullptr, name);
 }
 
 void write_pnml(std::ostream& out, const PetriNet& net,
                 const std::vector<std::int64_t>& initial_marking,
                 const std::vector<std::int64_t>& final_marking,
                 std::string_view name) {
-  write_pnml_impl(out, net, initial_marking, final_marking, name);
+  write_pnml_impl(out, net, initial_marking, final_marking, nullptr, name);
+}
+
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const std::vector<std::int64_t>& initial_marking,
+                const std::vector<std::int64_t>& final_marking,
+                const StochasticMap& stochastic_map, std::string_view name) {
+  write_pnml_impl(out, net, initial_marking, final_marking, &stochastic_map,
+                  name);
 }
 
 std::string to_pnml(const PetriNet& net, std::string_view name) {
@@ -164,6 +222,16 @@ std::string to_pnml(const PetriNet& net,
   return out.str();
 }
 
+std::string to_pnml(const PetriNet& net,
+                    const std::vector<std::int64_t>& initial_marking,
+                    const std::vector<std::int64_t>& final_marking,
+                    const StochasticMap& stochastic_map,
+                    std::string_view name) {
+  std::ostringstream out;
+  write_pnml(out, net, initial_marking, final_marking, stochastic_map, name);
+  return out.str();
+}
+
 namespace {
 
 // What the first pass collects from the document before the net is assembled.
@@ -176,19 +244,36 @@ struct ParsedTransition {
   std::string id;
   std::string label;
   bool invisible = false;
+  std::string distribution_type;
+  std::string distribution_parameters;
+  int priority = 0;
+  double weight = 1.0;
+  bool has_stochastic_data = false;
 };
 
 struct ParsedArc {
   std::string source;
   std::string target;
   PetriArcType type = PetriArcType::kNormal;
+  std::size_t weight = 1;
 };
 
 std::uint64_t parse_token_count(const std::string& text) {
   try {
-    return std::stoull(text);
+    const auto first = text.find_first_not_of(" \t\r\n");
+    const auto last = text.find_last_not_of(" \t\r\n");
+    if (first == std::string::npos)
+      throw std::runtime_error("empty PNML token count");
+    const auto trimmed = text.substr(first, last - first + 1);
+    if (!trimmed.empty() && trimmed.front() == '-')
+      throw std::runtime_error("negative PNML token count");
+    std::size_t consumed = 0;
+    const auto value = std::stoull(trimmed, &consumed);
+    if (consumed != trimmed.size())
+      throw std::runtime_error("PNML marking contains a non-integer token count");
+    return value;
   } catch (const std::exception&) {
-    return 0;
+    throw std::runtime_error("PNML marking contains an invalid token count");
   }
 }
 
@@ -206,7 +291,8 @@ bool stack_ends_with(const std::vector<std::string>& stack,
 
 }  // namespace
 
-PetriNet parse_pnml(std::string_view xml) {
+PnmlDocument parse_pnml_document(std::string_view xml,
+                                 const PnmlImportOptions& options) {
   detail::XmlPullParser parser(xml, /*emit_character_data=*/true);
 
   std::vector<ParsedPlace> places;
@@ -279,6 +365,7 @@ PetriNet parse_pnml(std::string_view xml) {
     return true;
   };
 
+  std::string stochastic_property_key;
   const auto text = [&](const std::string& value) {
     if (!in_net) return;
     if (stack_ends_with(stack, {"place", "initialMarking", "text"}) &&
@@ -293,6 +380,26 @@ PetriNet parse_pnml(std::string_view xml) {
       else if (value == "inhibitor") arcs.back().type = PetriArcType::kInhibitor;
       else if (value == "normal" || value == "") arcs.back().type = PetriArcType::kNormal;
       else throw std::runtime_error("PNML arc has an unknown type '" + value + "'");
+    } else if (stack_ends_with(stack, {"arc", "inscription", "text"}) &&
+               !arcs.empty()) {
+      const auto weight = parse_token_count(value);
+      if (weight == 0 || weight > std::numeric_limits<std::size_t>::max())
+        throw std::runtime_error("PNML arc weight must be a positive size value");
+      arcs.back().weight = static_cast<std::size_t>(weight);
+    } else if (stack_ends_with(stack, {"transition", "toolspecific", "property"}) &&
+               !transitions.empty() && !stochastic_property_key.empty()) {
+      auto& transition = transitions.back();
+      transition.has_stochastic_data = true;
+      if (stochastic_property_key == "distributionType")
+        transition.distribution_type = value;
+      else if (stochastic_property_key == "distributionParameters")
+        transition.distribution_parameters = value;
+      else if (stochastic_property_key == "priority")
+        transition.priority = std::stoi(value);
+      else if (stochastic_property_key == "weight")
+        transition.weight = std::stod(value);
+      else if (stochastic_property_key == "invisible" && value == "true")
+        transition.invisible = true;
     } else if (stack_ends_with(stack, {"marking", "place", "text"}) &&
                markings_seen == 1 && !final_marking.empty() &&
                final_marking.back().first == final_place_ref) {
@@ -308,6 +415,11 @@ PetriNet parse_pnml(std::string_view xml) {
       continue;
     }
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
+      if (token.name == "property" &&
+          stack_ends_with(stack, {"transition", "toolspecific"})) {
+        const auto* key = detail::attribute(token.attributes, "key");
+        stochastic_property_key = key ? *key : std::string{};
+      }
       const bool entered = open(token);
       if (!token.self_closing) stack.push_back(token.name);
       if (!entered) {
@@ -330,6 +442,7 @@ PetriNet parse_pnml(std::string_view xml) {
     // EndElement: unwind to the matching open element.
     while (!stack.empty() && stack.back() != token.name) stack.pop_back();
     if (!stack.empty()) stack.pop_back();
+    if (token.name == "property") stochastic_property_key.clear();
     if (token.name == "net") in_net = false;
   }
 
@@ -358,18 +471,25 @@ PetriNet parse_pnml(std::string_view xml) {
     const auto to_transition = transition_index.find(arc.target);
     if (from_place != place_index.end() &&
         to_transition != transition_index.end()) {
-      if (arc.type == PetriArcType::kNormal)
-        inputs[to_transition->second].push_back(from_place->second);
+      if (arc.type == PetriArcType::kNormal) {
+        inputs[to_transition->second].insert(
+            inputs[to_transition->second].end(), arc.weight,
+            from_place->second);
+      }
       else if (arc.type == PetriArcType::kReset)
         reset_inputs[to_transition->second].push_back(from_place->second);
       else
         inhibitor_inputs[to_transition->second].push_back(from_place->second);
+      if (arc.type != PetriArcType::kNormal && arc.weight != 1)
+        throw std::runtime_error("PNML extended arcs cannot have multiplicity");
       place_has_out[from_place->second] = true;
     } else if (from_transition != transition_index.end() &&
                to_place != place_index.end()) {
       if (arc.type != PetriArcType::kNormal)
         throw std::runtime_error("PNML extended arc must enter a transition");
-      outputs[from_transition->second].push_back(to_place->second);
+      outputs[from_transition->second].insert(
+          outputs[from_transition->second].end(), arc.weight,
+          to_place->second);
       place_has_in[to_place->second] = true;
     } else {
       throw std::runtime_error("PNML arc '" + arc.source + "' -> '" +
@@ -393,18 +513,22 @@ PetriNet parse_pnml(std::string_view xml) {
   }
   net.set_activities(std::move(activities));
 
-  // Source: the single-token initial marking, or the only place no arc feeds.
+  PnmlDocument document;
+  document.initial_marking.assign(places.size(), 0);
+  document.final_marking.assign(places.size(), 0);
   std::vector<std::size_t> marked;
   for (std::size_t p = 0; p < places.size(); ++p) {
+    if (places[p].initial_tokens >
+        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+      throw std::runtime_error("PNML initial marking exceeds signed range");
+    }
+    document.initial_marking[p] =
+        static_cast<std::int64_t>(places[p].initial_tokens);
     if (places[p].initial_tokens > 0) marked.push_back(p);
   }
-  if (marked.size() == 1 && places[marked.front()].initial_tokens == 1) {
+  if (!marked.empty()) {
     net.set_source(marked.front());
-  } else if (!marked.empty()) {
-    throw std::runtime_error(
-        "PNML initial marking is not a single token on one place; only "
-        "workflow nets can be checked");
-  } else {
+  } else if (options.infer_initial_marking) {
     std::vector<std::size_t> sources;
     for (std::size_t p = 0; p < places.size(); ++p) {
       if (!place_has_in[p]) sources.push_back(p);
@@ -414,21 +538,42 @@ PetriNet parse_pnml(std::string_view xml) {
           "PNML has no initial marking and no unique source place");
     }
     net.set_source(sources.front());
+    document.initial_marking[sources.front()] = 1;
+  } else {
+    std::vector<std::size_t> sources;
+    for (std::size_t p = 0; p < places.size(); ++p)
+      if (!place_has_in[p]) sources.push_back(p);
+    if (sources.size() != 1)
+      throw std::runtime_error("PNML has no unique structural source place");
+    net.set_source(sources.front());
   }
 
-  // Sink: the recorded final marking, or the only place with no outgoing arc.
-  if (final_marking.size() == 1 && final_marking.front().second == 1) {
-    const auto it = place_index.find(final_marking.front().first);
-    if (it == place_index.end()) {
-      throw std::runtime_error("PNML final marking references unknown place '" +
-                               final_marking.front().first + "'");
+  if (!final_marking.empty()) {
+    for (const auto& [id, tokens] : final_marking) {
+      const auto it = place_index.find(id);
+      if (it == place_index.end()) {
+        throw std::runtime_error("PNML final marking references unknown place '" +
+                                 id + "'");
+      }
+      if (tokens >
+          static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+        throw std::runtime_error("PNML final marking exceeds signed range");
+      }
+      const auto signed_tokens = static_cast<std::int64_t>(tokens);
+      if (document.final_marking[it->second] >
+          std::numeric_limits<std::int64_t>::max() - signed_tokens) {
+        throw std::runtime_error("PNML final marking exceeds signed range");
+      }
+      document.final_marking[it->second] += signed_tokens;
     }
-    net.set_sink(it->second);
-  } else if (!final_marking.empty()) {
-    throw std::runtime_error(
-        "PNML final marking is not a single token on one place; only "
-        "workflow nets can be checked");
-  } else {
+    const auto first = std::find_if(
+        document.final_marking.begin(), document.final_marking.end(),
+        [](std::int64_t tokens) { return tokens > 0; });
+    if (first == document.final_marking.end()) {
+      throw std::runtime_error("PNML final marking contains no tokens");
+    }
+    net.set_sink(static_cast<std::size_t>(first - document.final_marking.begin()));
+  } else if (options.infer_final_marking) {
     std::vector<std::size_t> sinks;
     for (std::size_t p = 0; p < places.size(); ++p) {
       if (!place_has_out[p]) sinks.push_back(p);
@@ -438,12 +583,96 @@ PetriNet parse_pnml(std::string_view xml) {
           "PNML has no final marking and no unique sink place");
     }
     net.set_sink(sinks.front());
+    document.final_marking[sinks.front()] = 1;
+  } else {
+    std::vector<std::size_t> sinks;
+    for (std::size_t p = 0; p < places.size(); ++p)
+      if (!place_has_out[p]) sinks.push_back(p);
+    if (sinks.size() != 1)
+      throw std::runtime_error("PNML has no unique structural sink place");
+    net.set_sink(sinks.front());
   }
 
-  return net;
+  if (options.import_stochastic_map) {
+    StochasticMap map;
+    map.transitions.reserve(transitions.size());
+    bool any = false;
+    for (std::size_t index = 0; index < transitions.size(); ++index) {
+      const auto& parsed = transitions[index];
+      StochasticMapTransition record;
+      record.transition = index;
+      record.activation_weight = parsed.weight;
+      record.priority = parsed.priority;
+      if (parsed.has_stochastic_data) any = true;
+      const auto type = parsed.distribution_type;
+      if (type == "IMMEDIATE") {
+        record.timing = StochasticMapTiming::kImmediate;
+        record.distribution = StochasticMapDistribution::kImmediate;
+        record.parameter = 0.0;
+      } else if (type == "DETERMINISTIC") {
+        record.distribution = StochasticMapDistribution::kDeterministic;
+      } else if (type == "NORMAL") {
+        record.distribution = StochasticMapDistribution::kNormal;
+      } else if (type == "UNIFORM") {
+        record.distribution = StochasticMapDistribution::kUniform;
+      } else if (type == "LOGNORMAL") {
+        record.distribution = StochasticMapDistribution::kLogNormal;
+      } else if (type == "GAMMA") {
+        record.distribution = StochasticMapDistribution::kGamma;
+      } else {
+        record.distribution = StochasticMapDistribution::kExponential;
+      }
+      if (!parsed.distribution_parameters.empty()) {
+        std::string normalized = parsed.distribution_parameters;
+        std::replace(normalized.begin(), normalized.end(), ';', ' ');
+        std::replace(normalized.begin(), normalized.end(), ',', ' ');
+        std::istringstream parameters(normalized);
+        if (!(parameters >> record.parameter) || !std::isfinite(record.parameter))
+          throw std::runtime_error("PNML stochastic parameters are invalid");
+        if (parameters >> record.secondary_parameter) {
+          if (!std::isfinite(record.secondary_parameter))
+            throw std::runtime_error("PNML stochastic parameters are invalid");
+          if (parameters >> record.tertiary_parameter) {
+            if (!std::isfinite(record.tertiary_parameter))
+              throw std::runtime_error("PNML stochastic parameters are invalid");
+          }
+        }
+      }
+      map.transitions.push_back(record);
+    }
+    if (any) {
+      validate_stochastic_map(map, transitions.size());
+      document.stochastic_map = std::move(map);
+    }
+  }
+
+  document.net = std::move(net);
+  return document;
 }
 
-PetriNet import_pnml(const std::filesystem::path& path) {
+PetriNet parse_pnml(std::string_view xml) {
+  auto document = parse_pnml_document(xml);
+  const auto initial_tokens = std::accumulate(document.initial_marking.begin(),
+                                              document.initial_marking.end(),
+                                              std::int64_t{0});
+  const auto final_tokens = std::accumulate(document.final_marking.begin(),
+                                            document.final_marking.end(),
+                                            std::int64_t{0});
+  if (initial_tokens != 1 || document.initial_marking[document.net.source()] != 1) {
+    throw std::runtime_error(
+        "PNML initial marking is not a single token on one place; only "
+        "workflow nets can be checked");
+  }
+  if (final_tokens != 1 || document.final_marking[document.net.sink()] != 1) {
+    throw std::runtime_error(
+        "PNML final marking is not a single token on one place; only "
+        "workflow nets can be checked");
+  }
+  return std::move(document.net);
+}
+
+PnmlDocument import_pnml_document(const std::filesystem::path& path,
+                                  const PnmlImportOptions& options) {
   std::ifstream input(path, std::ios::binary);
   if (!input) {
     throw std::runtime_error("Unable to open PNML file: " + path.string());
@@ -455,7 +684,23 @@ PetriNet import_pnml(const std::filesystem::path& path) {
       static_cast<unsigned char>(xml[2]) == 0xBF) {
     xml.erase(0, 3);
   }
-  return parse_pnml(xml);
+  return parse_pnml_document(xml, options);
+}
+
+PetriNet import_pnml(const std::filesystem::path& path) {
+  auto document = import_pnml_document(path);
+  const auto initial_tokens = std::accumulate(document.initial_marking.begin(),
+                                              document.initial_marking.end(),
+                                              std::int64_t{0});
+  const auto final_tokens = std::accumulate(document.final_marking.begin(),
+                                            document.final_marking.end(),
+                                            std::int64_t{0});
+  if (initial_tokens != 1 || document.initial_marking[document.net.source()] != 1 ||
+      final_tokens != 1 || document.final_marking[document.net.sink()] != 1) {
+    throw std::runtime_error(
+        "PNML markings do not describe a single-token workflow net");
+  }
+  return std::move(document.net);
 }
 
 }  // namespace minera

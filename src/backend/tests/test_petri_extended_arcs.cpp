@@ -110,7 +110,19 @@ void playout_and_pnml_round_trip() {
          std::string::npos);
   assert(marked_xml.find("<place idref=\"p3\"><text>3</text>") !=
          std::string::npos);
+  const auto marked_document = parse_pnml_document(marked_xml);
+  assert(marked_document.initial_marking == initial);
+  assert(marked_document.final_marking == final);
+  assert(marked_document.net.source() == net.source());
+  assert(marked_document.net.sink() == net.sink());
   bool rejected = false;
+  try {
+    (void)parse_pnml(marked_xml);
+  } catch (const std::runtime_error&) {
+    rejected = true;
+  }
+  assert(rejected);
+  rejected = false;
   try {
     (void)to_pnml(net, std::vector<std::int64_t>{1}, final, "bad");
   } catch (const std::invalid_argument&) {
@@ -135,6 +147,126 @@ void playout_and_pnml_round_trip() {
   const auto json = ilp_miner_json(json_result);
   assert(json.find("\"reset_inputs\":[2]") != std::string::npos);
   assert(json.find("\"inhibitor_inputs\":[]") != std::string::npos);
+}
+
+void weighted_arc_round_trip() {
+  PetriNet net;
+  net.set_activities({"weighted"});
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source, source, source}, {sink, sink});
+
+  const auto xml = to_pnml(net, "weighted");
+  assert(xml.find("<inscription><text>3</text></inscription>") !=
+         std::string::npos);
+  assert(xml.find("<inscription><text>2</text></inscription>") !=
+         std::string::npos);
+  const auto reread = parse_pnml(xml);
+  assert(reread.transitions().size() == 1);
+  assert(reread.transitions()[0].inputs.size() == 3);
+  assert(reread.transitions()[0].outputs.size() == 2);
+
+  const auto spaced = parse_pnml_document(R"(<pnml><net id="n"><page id="p">
+    <place id="p0"><initialMarking><text> 2 </text></initialMarking></place>
+    <place id="p1"/><transition id="t0"><name><text>A</text></name></transition>
+    <arc id="a0" source="p0" target="t0"><inscription><text>
+      2
+    </text></inscription></arc><arc id="a1" source="t0" target="p1"/>
+    <finalmarkings><marking><place idref="p1"><text> 3 </text></place></marking></finalmarkings>
+  </page></net></pnml>)");
+  assert(spaced.initial_marking[0] == 2);
+  assert(spaced.final_marking[1] == 3);
+  assert(spaced.net.transitions()[0].inputs.size() == 2);
+
+  bool rejected = false;
+  try {
+    (void)parse_pnml_document(R"(<pnml><net id="n"><page id="p">
+      <place id="p0"><initialMarking><text>1</text></initialMarking></place>
+      <place id="p1"/><transition id="t0"/>
+      <arc id="a0" source="p0" target="t0"><inscription><text>0</text></inscription></arc>
+      <arc id="a1" source="t0" target="p1"/>
+      <finalmarkings><marking><place idref="p1"><text>1</text></place></marking></finalmarkings>
+    </page></net></pnml>)");
+  } catch (const std::runtime_error&) {
+    rejected = true;
+  }
+  assert(rejected);
+
+  rejected = false;
+  try {
+    (void)parse_pnml_document(R"(<pnml><net id="n"><page id="p">
+      <place id="p0"><initialMarking><text>-1</text></initialMarking></place>
+      <place id="p1"/><transition id="t0"/>
+      <arc id="a0" source="p0" target="t0"/><arc id="a1" source="t0" target="p1"/>
+    </page></net></pnml>)");
+  } catch (const std::runtime_error&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
+void import_options_and_stochastic_metadata() {
+  const std::string xml = R"(<pnml><net id="n"><page id="p">
+    <place id="p0"/><place id="p1"/>
+    <transition id="t0"><name><text>A</text></name>
+      <toolspecific tool="StochasticPetriNet" version="0.2">
+        <property key="distributionType">EXPONENTIAL</property>
+        <property key="distributionParameters">2.5</property>
+        <property key="priority">4</property><property key="weight">3.5</property>
+      </toolspecific>
+    </transition>
+    <arc id="a0" source="p0" target="t0"/><arc id="a1" source="t0" target="p1"/>
+  </page></net></pnml>)";
+
+  PnmlImportOptions options;
+  options.infer_initial_marking = false;
+  options.infer_final_marking = false;
+  options.import_stochastic_map = true;
+  const auto document = parse_pnml_document(xml, options);
+  assert(document.initial_marking == std::vector<std::int64_t>({0, 0}));
+  assert(document.final_marking == std::vector<std::int64_t>({0, 0}));
+  assert(document.stochastic_map.has_value());
+  const auto& transition = document.stochastic_map->transitions.front();
+  assert(transition.distribution == StochasticMapDistribution::kExponential);
+  assert(transition.parameter == 2.5);
+  assert(transition.priority == 4);
+  assert(transition.activation_weight == 3.5);
+
+  const auto inferred = parse_pnml_document(xml);
+  assert(inferred.initial_marking == std::vector<std::int64_t>({1, 0}));
+  assert(inferred.final_marking == std::vector<std::int64_t>({0, 1}));
+  assert(!inferred.stochastic_map.has_value());
+
+  StochasticMap map;
+  StochasticMapTransition record;
+  record.transition = 0;
+  record.distribution = StochasticMapDistribution::kGamma;
+  record.parameter = 2.0;
+  record.secondary_parameter = 5.0;
+  record.activation_weight = 1.75;
+  record.priority = 7;
+  map.transitions.push_back(record);
+  std::vector<std::int64_t> initial{1, 0};
+  std::vector<std::int64_t> final{0, 1};
+  const auto exported = to_pnml(inferred.net, initial, final, map, "stochastic");
+  assert(exported.find("<property key=\"distributionType\">GAMMA</property>") !=
+         std::string::npos);
+  PnmlImportOptions roundtrip_options;
+  roundtrip_options.import_stochastic_map = true;
+  const auto roundtrip = parse_pnml_document(exported, roundtrip_options);
+  assert(roundtrip.stochastic_map.has_value());
+  const auto& imported = roundtrip.stochastic_map->transitions.front();
+  assert(imported.distribution == StochasticMapDistribution::kGamma);
+  assert(imported.parameter == 2.0);
+  assert(imported.secondary_parameter == 5.0);
+  assert(imported.activation_weight == 1.75);
+  assert(imported.priority == 7);
+  const auto json = pnml_document_json(roundtrip);
+  assert(json.find("\"family\":\"PNML_DOCUMENT\"") != std::string::npos);
+  assert(json.find("\"initial_marking\":[1,0]") != std::string::npos);
+  assert(json.find("\"distribution\":\"gamma\"") != std::string::npos);
 }
 
 void equation_guard_and_workflow_topology() {
@@ -162,6 +294,8 @@ void normal_alignment_smoke() {
 int main() {
   reset_and_inhibitor_enablement();
   playout_and_pnml_round_trip();
+  weighted_arc_round_trip();
+  import_options_and_stochastic_metadata();
   equation_guard_and_workflow_topology();
   normal_alignment_smoke();
 }
