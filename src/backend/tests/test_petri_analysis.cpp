@@ -77,12 +77,15 @@ void classic_equation() {
   const auto net = chain();
   auto result = solve_marking_equation(net);
   assert(result.computed && result.feasible && !result.exhausted);
+  assert(result.solver_nodes > 0);
   assert(std::abs(result.objective) < 1e-5);
   assert(result.transition_counts.size() == 2);
   assert(std::abs(result.transition_counts[0] - 1) < 1e-7);
   assert(result.firing_sequence == std::vector<std::size_t>({0, 1}));
   assert(result.reaches_final && result.activated_transitions.size() == 2);
   assert(std::all_of(result.residual.begin(), result.residual.end(), [](double x) { return std::abs(x) < 1e-7; }));
+  const auto json = petri_analysis_json(result);
+  assert(json.find("\"solver_nodes\":") != std::string::npos);
 
   MarkingEquationOptions changed;
   changed.initial_marking = {0, 1, 0}; changed.final_marking = {0, 0, 1};
@@ -121,7 +124,7 @@ void incidence_feasible_not_realizable() {
   assert(result.recovery_attempted && !result.reaches_final && result.firing_sequence.empty());
 }
 
-void classic_equation_allows_fractional_solutions() {
+void classic_equation_requires_integer_solutions() {
   PetriNet net;
   net.set_activities({"double", "single"});
   const auto source = net.add_place(), sink = net.add_place();
@@ -136,13 +139,14 @@ void classic_equation_allows_fractional_solutions() {
   options.transition_costs = {1, 3};
   const auto result = solve_marking_equation(net, options);
   assert(result.computed && result.feasible && !result.exhausted);
-  assert(std::abs(result.objective - 0.5) < 1e-7);
-  assert(std::abs(result.lower_bound - result.objective) < 1e-7);
-  assert(std::abs(result.transition_counts[0] - 0.5) < 1e-7);
-  assert(std::abs(result.transition_counts[1]) < 1e-7);
-  assert(!result.recovery_attempted && !result.reaches_final);
-  assert(result.firing_sequence.empty());
-  assert(result.activated_transitions == std::vector<std::size_t>({0}));
+  assert(std::abs(result.objective - 3.0) < 1e-7);
+  assert(std::abs(result.lower_bound - 0.5) < 1e-7);
+  assert(std::abs(result.transition_counts[0]) < 1e-7);
+  assert(std::abs(result.transition_counts[1] - 1.0) < 1e-7);
+  assert(result.recovery_attempted && result.reaches_final);
+  assert(result.firing_sequence == std::vector<std::size_t>({1}));
+  assert(result.activated_transitions == std::vector<std::size_t>({1}));
+  assert(result.solver_nodes >= 2);
   assert(std::all_of(result.residual.begin(), result.residual.end(),
                      [](double value) { return std::abs(value) < 1e-7; }));
 }
@@ -151,10 +155,23 @@ void extended_equation() {
   const auto net = chain();
   auto matching = solve_extended_marking_equation({"A", "B"}, net);
   assert(matching.computed && matching.feasible && matching.reaches_final);
+  assert(matching.solver_nodes > 0);
   assert(std::abs(matching.objective) < 1e-8);
   assert(matching.firing_sequence == std::vector<std::size_t>({0, 1}));
   assert(matching.segment_count == 2 &&
          matching.retained_splits == std::vector<std::size_t>({1}));
+  assert(petri_analysis_json(matching).find("\"solver_nodes\":") !=
+         std::string::npos);
+
+  auto malformed = matching;
+  malformed.segment_count = 3;
+  bool malformed_rejected = false;
+  try {
+    (void)petri_analysis_json(malformed);
+  } catch (const std::invalid_argument&) {
+    malformed_rejected = true;
+  }
+  assert(malformed_rejected);
 
   const auto deviation = solve_extended_marking_equation({"A", "X", "B"}, net);
   assert(deviation.feasible && std::abs(deviation.objective - 10000.0) < 1e-7);
@@ -804,7 +821,7 @@ void caps_markings_determinism_and_weights() {
 int main() {
   classic_equation();
   incidence_feasible_not_realizable();
-  classic_equation_allows_fractional_solutions();
+  classic_equation_requires_integer_solutions();
   extended_equation();
   workflow_structure();
   sound_models();

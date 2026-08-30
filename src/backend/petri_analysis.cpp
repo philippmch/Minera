@@ -1352,15 +1352,20 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
     inequalities.push_back(std::move(negative));
     bounds.push_back(-delta);
   }
-  const auto program = solve_linear_program(inequalities, bounds, costs);
+  const auto program = solve_integer_program(inequalities, bounds, costs,
+                                             options.realizability_limit);
+  result.solver_nodes = program.nodes_explored;
+  result.exhausted = program.exhausted;
   if (!program.feasible) {
     result.feasible = false;
-    result.error = "marking equation is infeasible";
+    result.error = program.exhausted
+                       ? "marking equation node limit reached"
+                       : "marking equation is infeasible";
     return result;
   }
   result.feasible = true;
   result.objective = program.objective;
-  result.lower_bound = program.objective;
+  result.lower_bound = program.root_lower_bound;
   result.transition_counts = program.solution;
   result.residual.resize(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {
@@ -1370,16 +1375,13 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
   }
   for (std::size_t t = 0; t < result.transition_counts.size(); ++t)
     if (result.transition_counts[t] > kEps) result.activated_transitions.push_back(t);
-  const bool integral = std::all_of(
-      result.transition_counts.begin(), result.transition_counts.end(),
-      [](double value) { return std::abs(value - std::round(value)) <= 1e-7; });
-  result.recovery_attempted = integral;
-  if (integral) {
+  result.recovery_attempted = true;
+  {
     bool recovery_exhausted = false;
     result.firing_sequence = recover_sequence(
         net, markings.initial, markings.final, result.transition_counts,
         options.realizability_limit, recovery_exhausted);
-    result.exhausted = recovery_exhausted;
+    if (recovery_exhausted) result.exhausted = true;
     if (result.firing_sequence.empty()) {
       result.reaches_final = markings.initial == markings.final &&
           std::all_of(result.transition_counts.begin(),
@@ -1561,6 +1563,7 @@ ExtendedMarkingEquationResult solve_extended_marking_equation(
 
   const auto program = solve_integer_program(inequalities, bounds, costs,
                                              options.realizability_limit);
+  result.solver_nodes = program.nodes_explored;
   result.exhausted = program.exhausted;
   if (!program.feasible) {
     result.error = program.exhausted

@@ -4,6 +4,8 @@
     "commit": "0715c31f3f1d85924107d6aa5329806db69df899"
   },
   "artifact_required_packages": [
+    "algo.analysis.extended_marking_equation",
+    "algo.analysis.marking_equation",
     "algo.simulation.tree_generator",
     "algo.simulation.playout.process_tree",
     "algo.simulation.playout.dfg",
@@ -24,16 +26,48 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "include/minera/petri_analysis_json.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/petri_analysis_json.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_petri_analysis.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/PetriAnalysis.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.analysis.marking_equation",
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "include/minera/petri_analysis_json.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/petri_analysis_json.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_petri_analysis.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/components/PetriAnalysis.tsx",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.analysis.woflan",
