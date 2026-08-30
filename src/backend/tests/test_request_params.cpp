@@ -669,6 +669,17 @@ void browser_history_params_contract() {
   assert(threw);
 }
 
+void windows_event_log_params_contract() {
+  const auto parsed = minera::parse_windows_event_log_params(fields({
+      {"windows_events_path", "events.xml"},
+      {"windows_events_max_events", "20"}}));
+  assert(parsed.path == "events.xml" && parsed.max_events == 20);
+  bool threw = false;
+  try { (void)minera::parse_windows_event_log_params(fields({})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void log_to_target_params_contract() {
   const auto p = minera::parse_log_to_target_params(fields({
       {"target_variant", "remaining_time"},
@@ -3699,6 +3710,7 @@ int main() {
   native_json_contracts();
   concept_drift_params_contract();
   browser_history_params_contract();
+  windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();
   interval_tree_params_contract();

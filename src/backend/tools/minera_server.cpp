@@ -137,6 +137,7 @@
 #include "minera/transition_system.hpp"
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/windows_event_log.hpp"
 #include "minera/xes_export.hpp"
 
 namespace {
@@ -3881,6 +3882,33 @@ void handle_browser_history(const httplib::Request& request,
   }
 }
 
+void handle_windows_events(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "windows_events_path", "windows_events_max_events"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown Windows events parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_windows_event_log_params(lookup, present);
+    response.set_content(minera::windows_event_log_json(
+                             minera::import_windows_event_log(options)),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -6640,6 +6668,7 @@ int main(int argc, char** argv) {
   server.Options("/api/anonymize-pripel", preflight);
   server.Options("/api/concept-drift", preflight);
   server.Options("/api/browser-history", preflight);
+  server.Options("/api/windows-events", preflight);
   server.Options("/api/transform-target", preflight);
   server.Options("/api/log-to-features", preflight);
   server.Options("/api/features", preflight);
@@ -6732,6 +6761,7 @@ int main(int argc, char** argv) {
   server.Post("/api/anonymize-pripel", handle_pripel);
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/browser-history", handle_browser_history);
+  server.Post("/api/windows-events", handle_windows_events);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);

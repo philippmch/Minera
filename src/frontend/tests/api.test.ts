@@ -4,6 +4,7 @@ import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetri
 import { isStochasticMapResult } from "../src/types";
 import { fetchXes } from "../src/api";
 import { browserHistoryQuery, requestBrowserHistory } from "../src/api";
+import { requestWindowsEvents, windowsEventsQuery } from "../src/api";
 
 describe("browser history API", () => {
   it("serializes explicit local connector options", () => {
@@ -18,6 +19,23 @@ describe("browser history API", () => {
     }) })));
     await expect(requestBrowserHistory({ browser_history_variant: "chrome_history",
       browser_history_path: "history.db" })).resolves.toMatchObject({ type: "BROWSER_HISTORY" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Windows events API", () => {
+  it("serializes the explicit export path and bound", () => {
+    expect(windowsEventsQuery({ windows_events_path: "C:/exports/system.xml",
+      windows_events_max_events: 100 }))
+      .toBe("windows_events_max_events=100&windows_events_path=C%3A%2Fexports%2Fsystem.xml");
+  });
+  it("validates imported event records", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({
+      type: "WINDOWS_EVENTS", variant: "windows_events", trace_count: 0,
+      event_count: 0, traces: [],
+    }) })));
+    await expect(requestWindowsEvents({ windows_events_path: "events.xml" }))
+      .resolves.toMatchObject({ type: "WINDOWS_EVENTS" });
     vi.unstubAllGlobals();
   });
 });
