@@ -18,6 +18,37 @@ struct EventAttribute {
   std::string key;
   std::string value;
   AttributeKind kind = AttributeKind::kString;
+  // A present null differs from a missing attribute and from an empty string.
+  // Text formats that cannot represent null values omit such attributes.
+  bool is_null = false;
+
+  bool operator==(const EventAttribute&) const = default;
+};
+
+struct LogExtension {
+  std::string name;
+  std::string prefix;
+  std::string uri;
+
+  bool operator==(const LogExtension&) const = default;
+};
+
+struct LogClassifier {
+  std::string name;
+  std::vector<std::string> keys;
+
+  bool operator==(const LogClassifier&) const = default;
+};
+
+// Metadata shared by trace logs, flat streams, and tabular event data.
+struct EventDataMetadata {
+  std::vector<LogExtension> extensions;
+  std::vector<LogClassifier> classifiers;
+  std::vector<EventAttribute> trace_globals;
+  std::vector<EventAttribute> event_globals;
+  std::vector<EventAttribute> properties;
+
+  bool operator==(const EventDataMetadata&) const = default;
 };
 
 struct Event {
@@ -32,11 +63,11 @@ struct Event {
   // stay valid.
   std::string lifecycle;
 
-  // The value of the named generic attribute, or nullptr when the event does
-  // not carry it. Linear, but events carry only a handful of attributes.
+  // The value of the named generic attribute, or nullptr when it is missing
+  // or explicitly null. Linear, but events carry only a handful of attributes.
   [[nodiscard]] const std::string* attribute(std::string_view key) const {
     for (const auto& entry : attributes) {
-      if (entry.key == key) return &entry.value;
+      if (entry.key == key) return entry.is_null ? nullptr : &entry.value;
     }
     return nullptr;
   }
@@ -48,12 +79,13 @@ struct Trace {
   // Case-level attributes beyond the id: any other scalar XES trace attribute,
   // or a `case:`-prefixed CSV column (constant per case, first value wins).
   std::vector<EventAttribute> attributes;
+  std::vector<EventAttribute> properties;
 
-  // The value of the named case attribute, or nullptr when the trace does not
-  // carry it. Linear, but traces carry only a handful of attributes.
+  // The value of the named case attribute, or nullptr when it is missing or
+  // explicitly null. Linear, but traces carry only a handful of attributes.
   [[nodiscard]] const std::string* attribute(std::string_view key) const {
     for (const auto& entry : attributes) {
-      if (entry.key == key) return &entry.value;
+      if (entry.key == key) return entry.is_null ? nullptr : &entry.value;
     }
     return nullptr;
   }
@@ -73,10 +105,11 @@ struct EventLog {
   // Kept after traces so existing aggregate initializers that provide only
   // the trace vector remain source-compatible.
   std::vector<EventAttribute> attributes;
+  EventDataMetadata metadata;
 
   [[nodiscard]] const std::string* attribute(std::string_view key) const {
     for (const auto& entry : attributes) {
-      if (entry.key == key) return &entry.value;
+      if (entry.key == key) return entry.is_null ? nullptr : &entry.value;
     }
     return nullptr;
   }
@@ -93,5 +126,10 @@ struct EventLog {
     return count;
   }
 };
+
+inline void copy_event_log_context(const EventLog& source, EventLog& target) {
+  target.attributes = source.attributes;
+  target.metadata = source.metadata;
+}
 
 }  // namespace minera

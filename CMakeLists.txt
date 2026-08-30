@@ -58,6 +58,7 @@ add_library(minera_core
   src/backend/dfg_variants.cpp
   src/backend/directly_follows_graph.cpp
   src/backend/embeddings.cpp
+  src/backend/event_data.cpp
   src/backend/edit_distance_alignment.cpp
   src/backend/evaluation.cpp
   src/backend/event_ordering.cpp
@@ -313,6 +314,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_xes_io_tests PRIVATE cxx_std_20)
   target_compile_options(minera_xes_io_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_xes_io_tests COMMAND minera_xes_io_tests)
+
+  add_executable(minera_event_data_tests
+    src/backend/tests/test_event_data.cpp
+  )
+  target_link_libraries(minera_event_data_tests PRIVATE minera::core)
+  target_compile_features(minera_event_data_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_event_data_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_event_data_tests COMMAND minera_event_data_tests)
 
   add_executable(minera_ocel_tests
     src/backend/tests/test_ocel.cpp

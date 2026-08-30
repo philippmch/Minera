@@ -35,7 +35,7 @@ std::set<std::string> get_all_event_attributes_from_log(const EventLog& log) {
       if (!event.resource.empty()) result.insert("org:resource");
       // Keep the transition field out of this event-attribute inventory.
       for (const auto& attribute : event.attributes)
-        if (attribute.key != "lifecycle:transition")
+        if (!attribute.is_null && attribute.key != "lifecycle:transition")
           result.insert(attribute.key);
     }
   }
@@ -46,6 +46,7 @@ std::set<std::string> get_all_trace_attributes_from_log(const EventLog& log) {
   std::set<std::string> result;
   for (const auto& trace : log.traces) {
     for (const auto& attribute : trace.attributes) {
+      if (attribute.is_null) continue;
       if (attribute.key != "concept:name" &&
           attribute.key != "case:concept:name")
         result.insert(attribute.key);

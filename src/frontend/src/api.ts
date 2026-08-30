@@ -4341,6 +4341,11 @@ export interface LogConversionOptions {
   log_conversion_include_case_attributes?: boolean;
   log_conversion_case_attribute_prefix?: string;
   log_conversion_case_id_key?: string;
+  log_conversion_stream_postprocessing?: boolean;
+  log_conversion_max_rows_to_materialize?: number;
+  log_conversion_deep_copy?: boolean;
+  log_conversion_compress?: boolean;
+  log_conversion_lazy_output?: boolean;
   log_conversion_graph_case_id_attribute?: string;
   log_conversion_include_df?: boolean;
   log_conversion_case_attributes_as_nodes?: string[];
@@ -4378,6 +4383,11 @@ export function logConversionQuery(options: LogConversionOptions = {}): string {
         || options.log_conversion_max_variants_to_return < 0
         || options.log_conversion_max_variants_to_return > 100_000))
     throw new Error("log_conversion_max_variants_to_return must be a non-negative integer within the safety limit");
+  if (options.log_conversion_max_rows_to_materialize !== undefined
+      && (!Number.isSafeInteger(options.log_conversion_max_rows_to_materialize)
+        || options.log_conversion_max_rows_to_materialize < 0
+        || options.log_conversion_max_rows_to_materialize > 1_000_000))
+    throw new Error("log_conversion_max_rows_to_materialize must be a non-negative integer within the safety limit");
   const encode = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(options).sort(([left], [right]) => left.localeCompare(right))) {

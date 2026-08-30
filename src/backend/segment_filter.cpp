@@ -24,7 +24,7 @@ std::unordered_set<std::string> activity_set(
 
 EventLog with_trace_attributes(const EventLog& source) {
   EventLog result;
-  result.attributes = source.attributes;
+  copy_event_log_context(source, result);
   return result;
 }
 
@@ -160,6 +160,7 @@ EventLog filter_between(const EventLog& event_log,
     for (std::size_t i = 0; i < segments.size(); ++i) {
       auto& segment = segments[i];
       segment.attributes = trace.attributes;
+      segment.properties = trace.properties;
       segment.case_id = segments.size() == 1
                             ? trace.case_id
                             : trace.case_id + separator + std::to_string(i + 1);

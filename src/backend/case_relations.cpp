@@ -181,6 +181,7 @@ EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
     if (out.trace.case_id.empty()) {
       out.trace.case_id = selected_case_id;
       out.trace.attributes = source.attributes;
+      out.trace.properties = source.properties;
     }
     for (const auto& source_event : source.events) {
       Event event = source_event;
@@ -205,7 +206,7 @@ EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
   }
 
   EventLog result;
-  result.attributes = base.attributes;
+  copy_event_log_context(base, result);
   result.traces.reserve(grouped.size());
   for (auto& [case_id, output] : grouped) {
     for (const auto& tagged : output.events)

@@ -32,6 +32,7 @@ void set_activity_value(Event& event, const std::string& key,
     if (attribute.key == key) {
       attribute.value = value;
       attribute.kind = AttributeKind::kString;
+      attribute.is_null = false;
       return;
     }
   }

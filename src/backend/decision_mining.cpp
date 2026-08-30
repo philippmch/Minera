@@ -376,6 +376,7 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
     std::unordered_map<std::string, std::string> context;
     if (options.include_trace_attributes) {
       for (const auto& attribute : trace.attributes) {
+        if (attribute.is_null) continue;
         context[attribute.key] = attribute.value;
       }
     }
@@ -412,6 +413,7 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
           const auto& event = trace.events[event_index];
           if (!event.resource.empty()) context["resource"] = event.resource;
           for (const auto& attribute : event.attributes) {
+            if (attribute.is_null) continue;
             context[attribute.key] = attribute.value;
           }
         }

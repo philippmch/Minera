@@ -3343,6 +3343,11 @@ void log_conversion_params_contract() {
       {"log_conversion_include_case_attributes", "false"},
       {"log_conversion_case_attribute_prefix", "case_"},
       {"log_conversion_case_id_key", "case:id"},
+      {"log_conversion_stream_postprocessing", "true"},
+      {"log_conversion_max_rows_to_materialize", "78"},
+      {"log_conversion_deep_copy", "false"},
+      {"log_conversion_compress", "true"},
+      {"log_conversion_lazy_output", "true"},
       {"log_conversion_graph_case_id_attribute", "case_id"},
       {"log_conversion_include_df", "0"},
       {"log_conversion_return_variants", "1"},
@@ -3355,6 +3360,12 @@ void log_conversion_params_contract() {
   assert(!parsed.include_case_attributes);
   assert(parsed.case_attribute_prefix == "case_");
   assert(parsed.case_id_key == "case:id");
+  assert(parsed.remove_null_fields);
+  assert(parsed.max_rows_to_materialize &&
+         *parsed.max_rows_to_materialize == 78);
+  assert(!parsed.deep_copy);
+  assert(parsed.compress);
+  assert(parsed.lazy_output);
   assert(parsed.graph_case_id_attribute == "case_id");
   assert(!parsed.include_directly_follows);
   assert(parsed.return_variants);
@@ -3384,6 +3395,11 @@ void log_conversion_params_contract() {
   for (const auto& item : {
            std::pair{"log_conversion_variant", "bad"},
            std::pair{"log_conversion_include_df", "yes"},
+           std::pair{"log_conversion_stream_postprocessing", "yes"},
+           std::pair{"log_conversion_max_rows_to_materialize", "-1"},
+           std::pair{"log_conversion_deep_copy", "maybe"},
+           std::pair{"log_conversion_compress", "maybe"},
+           std::pair{"log_conversion_lazy_output", "maybe"},
            std::pair{"log_conversion_max_graph_nodes", "0"},
            std::pair{"log_conversion_max_graph_edges", "NaN"},
            std::pair{"log_conversion_max_variants_to_return", "-1"},

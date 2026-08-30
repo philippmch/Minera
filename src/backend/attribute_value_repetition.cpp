@@ -35,7 +35,7 @@ EventLog filter_attribute_value_repetition(
     const AttributeValueRepetitionOptions& options) {
   validate_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     std::uint64_t repetitions = 0;

@@ -26,6 +26,11 @@ minera::EventLog attributed_log() {
 
 void stream_round_trip_preserves_typed_attributes() {
   auto source = attributed_log();
+  source.metadata.extensions.push_back(
+      {"demo", "d", "urn:demo"});
+  source.metadata.classifiers.push_back({"activity", {"concept:name"}});
+  source.metadata.event_globals.push_back(
+      {"nullable", "", minera::AttributeKind::kString, true});
   source.traces[0].events[0].attributes.push_back(
       {"case:region", "event-value"});
   const auto stream = minera::event_log_to_event_stream(source);
@@ -49,6 +54,22 @@ void stream_round_trip_preserves_typed_attributes() {
          minera::AttributeKind::kFloat);
   assert(restored.traces[0].events[1].lifecycle == "complete");
   assert(*restored.attribute("source") == "unit");
+  assert(restored.metadata == source.metadata);
+}
+
+void empty_prefix_and_trace_properties_follow_flattening_contract() {
+  auto source = attributed_log();
+  source.traces[0].properties.push_back({"internal", "not-an-event"});
+  minera::LogConversionOptions options;
+  options.case_attribute_prefix.clear();
+  const auto stream = minera::event_log_to_event_stream(source, options);
+  assert(stream.events[0].field("internal") == nullptr);
+  const auto restored = minera::event_stream_to_event_log(stream, options);
+  assert(restored.traces.size() == 1);
+  assert(restored.traces[0].properties.empty());
+  assert(restored.traces[0].events[0].activity.empty());
+  assert(restored.traces[0].events[0].attributes.empty());
+  assert(restored.traces[0].attribute("concept:name") != nullptr);
 }
 
 void stream_grouping_is_first_seen_and_first_event_wins() {
@@ -117,6 +138,38 @@ void stream_without_case_attributes_uses_stable_trace_indexes() {
          "preserved");
 }
 
+void custom_case_glue_and_prefix_round_trip() {
+  auto source = attributed_log();
+  minera::LogConversionOptions options;
+  options.case_id_key = "trace-id";
+  options.case_attribute_prefix = "trace.";
+  const auto stream = minera::event_log_to_event_stream(source, options);
+  assert(stream.events[0].field("trace-id")->value == "case-1");
+  assert(stream.events[0].field("trace.region")->value == "west");
+  const auto restored = minera::event_stream_to_event_log(stream, options);
+  assert(restored.traces.size() == 1);
+  assert(restored.traces[0].case_id == "case-1");
+  assert(*restored.traces[0].attribute("region") == "west");
+  assert(restored.traces[0].events[0].activity == "A");
+}
+
+void null_prefixed_case_label_does_not_erase_glue() {
+  minera::ConvertedEventStream stream;
+  minera::LogConversionRecord record;
+  record.fields = {
+      {"case:id", "c1", minera::AttributeKind::kString},
+      {"case:concept:name", "", minera::AttributeKind::kString, true},
+      {"concept:name", "A"},
+  };
+  stream.events.push_back(std::move(record));
+  minera::LogConversionOptions options;
+  options.case_id_key = "case:id";
+  const auto log = minera::event_stream_to_event_log(stream, options);
+  assert(log.traces.size() == 1);
+  assert(log.traces[0].case_id == "c1");
+  assert(log.traces[0].attribute("concept:name") == nullptr);
+}
+
 void table_projection_is_rectangular_and_typed() {
   auto source = attributed_log();
   source.traces[0].events[1].attributes.push_back(
@@ -142,6 +195,81 @@ void table_projection_is_rectangular_and_typed() {
   assert(!result.table.rows[1][cost]);
   assert(result.table.rows[1][approved]->kind ==
          minera::AttributeKind::kBoolean);
+}
+
+void lazy_output_and_metadata_json_are_explicit() {
+  auto source = attributed_log();
+  source.metadata.extensions.push_back({"demo", "d", "urn:demo"});
+  minera::LogConversionOptions options;
+  options.variant = minera::LogConversionVariant::kToDataFrame;
+  options.lazy_output = true;
+  const auto result = minera::convert_event_log(source, options);
+  assert(result.lazy_table.has_value());
+  assert(result.lazy_table->materialize().rows == result.table.rows);
+  const auto json = minera::log_conversion_json(result);
+  assert(json.find("\"metadata\":") != std::string::npos);
+  assert(json.find("\"extensions\":[{\"name\":\"demo\"") !=
+         std::string::npos);
+  assert(json.find("\"lazy\":true") != std::string::npos);
+}
+
+void dataframe_row_cap_counts_events_and_is_deterministic() {
+  // A flattened EventLog has exactly one table row per event, regardless of
+  // how many traces contain those events.
+  auto source = attributed_log();
+  minera::LogConversionOptions options;
+  options.variant = minera::LogConversionVariant::kToDataFrame;
+  options.max_rows_to_materialize = 1;
+  bool threw = false;
+  try {
+    (void)minera::convert_event_log(source, options);
+  } catch (const std::length_error& error) {
+    threw = true;
+    assert(std::string(error.what()) ==
+           "log conversion: row materialization cap exceeded");
+  }
+  assert(threw);
+
+  options.max_rows_to_materialize = 2;
+  options.lazy_output = true;
+  const auto result = minera::convert_event_log(source, options);
+  assert(result.table.rows.size() == 2);
+  assert(result.lazy_table && result.lazy_table->row_count() == 2);
+
+  options.max_rows_to_materialize = 0;
+  threw = false;
+  try {
+    (void)minera::convert_event_log(source, options);
+  } catch (const std::length_error&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
+void graph_null_selectors_are_absent() {
+  auto source = attributed_log();
+  source.traces[0].attributes.push_back(
+      {"nullable_case", "", minera::AttributeKind::kString, true});
+  source.traces[0].events[0].attributes.push_back(
+      {"nullable_event", "", minera::AttributeKind::kString, true});
+
+  minera::LogConversionOptions options;
+  options.graph_case_id_attribute = "nullable_case";
+  bool threw = false;
+  try {
+    (void)minera::event_log_to_attributed_graph(source, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  options.graph_case_id_attribute = "concept:name";
+  options.case_attributes_as_nodes = {"nullable_case"};
+  options.event_attributes_as_nodes = {"nullable_event"};
+  const auto graph = minera::event_log_to_attributed_graph(source, options);
+  // Only the case and two event nodes plus their membership/DF edges remain.
+  assert(graph.nodes.size() == 3);
+  assert(graph.edges.size() == 3);
 }
 
 void graph_projection_builds_cases_events_attributes_and_df() {
@@ -305,6 +433,8 @@ void variant_projections_preserve_frequency_contracts() {
          std::vector<std::size_t>({0, 1}));
   assert(all_result.variants[1].trace_indexes ==
          std::vector<std::size_t>({2}));
+  assert(all_result.log.attributes.empty());
+  assert(all_result.log.metadata == minera::EventDataMetadata{});
 
   all.max_variants_to_return = 1;
   const auto limited = minera::convert_event_log(variant_log(), all);
@@ -385,9 +515,15 @@ void selectors_json_and_failures_are_strict() {
 
 int main() {
   stream_round_trip_preserves_typed_attributes();
+  empty_prefix_and_trace_properties_follow_flattening_contract();
   stream_grouping_is_first_seen_and_first_event_wins();
   stream_without_case_attributes_uses_stable_trace_indexes();
+  custom_case_glue_and_prefix_round_trip();
+  null_prefixed_case_label_does_not_erase_glue();
   table_projection_is_rectangular_and_typed();
+  lazy_output_and_metadata_json_are_explicit();
+  dataframe_row_cap_counts_events_and_is_deterministic();
+  graph_null_selectors_are_absent();
   graph_projection_builds_cases_events_attributes_and_df();
   graph_projection_handles_thousands_of_indexed_edges();
   variant_projections_preserve_frequency_contracts();

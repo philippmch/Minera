@@ -38,6 +38,7 @@ void set_event_value(Event& event, const std::string& key,
   for (auto& attribute : event.attributes) {
     if (attribute.key == key) {
       attribute.value = value;
+      attribute.is_null = false;
       return;
     }
   }
@@ -56,12 +57,13 @@ EventLog group_consecutive_activities(
     const EventLog& event_log,
     const ConsecutiveActivityGroupingOptions& options) {
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     Trace output;
     output.case_id = trace.case_id;
     output.attributes = trace.attributes;
+    output.properties = trace.properties;
     if (trace.events.empty()) {
       result.traces.push_back(std::move(output));
       continue;
@@ -98,12 +100,13 @@ EventLog group_same_timestamp_events(
     const TimestampCaseGroupingOptions& options) {
   validate_concat_separator(options.concat_separator);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     Trace output;
     output.case_id = trace.case_id;
     output.attributes = trace.attributes;
+    output.properties = trace.properties;
     std::map<std::string, std::vector<const Event*>> groups;
     std::vector<std::string> order;
     for (const auto& event : trace.events) {

@@ -434,6 +434,9 @@ int usage(const char* program) {
                "                            to_data_frame, to_nx, df_to_event_log_1v,\n"
                "                            or df_to_event_log_nv\n"
                "  --log-conversion-* <v>   Conversion attributes, flags, and bounds\n"
+               "  --log-conversion-stream-postprocessing <bool> Drop null fields\n"
+               "  --log-conversion-lazy-output <bool> Use restartable table output\n"
+               "  --log-conversion-max-rows-to-materialize <n> Table row cap\n"
                "  --log-conversion-max-variants-to-return <n> Variant output cap\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
@@ -2254,6 +2257,10 @@ int main(int argc, char** argv) {
       static const std::set<std::string> names = {
           "log_conversion_variant", "log_conversion_include_case_attributes",
           "log_conversion_case_attribute_prefix", "log_conversion_case_id_key",
+          "log_conversion_stream_postprocessing",
+          "log_conversion_max_rows_to_materialize",
+          "log_conversion_deep_copy", "log_conversion_compress",
+          "log_conversion_lazy_output",
           "log_conversion_graph_case_id_attribute", "log_conversion_include_df",
           "log_conversion_case_attributes_as_nodes",
           "log_conversion_event_attributes_as_nodes",

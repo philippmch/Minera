@@ -16,7 +16,7 @@ namespace {
 
 EventLog with_log_attributes(const EventLog& source) {
   EventLog result;
-  result.attributes = source.attributes;
+  copy_event_log_context(source, result);
   return result;
 }
 
@@ -105,6 +105,7 @@ LogPrefixResult get_log_with_prefixes(const EventLog& log) {
     Trace cumulative;
     cumulative.case_id = source.case_id;
     cumulative.attributes = source.attributes;
+    cumulative.properties = source.properties;
     std::vector<std::size_t> changes;
     changes.reserve(source.events.size());
     for (const auto& event : source.events) {
@@ -223,10 +224,11 @@ LogFeatureSelectionResult select_log_features(
       add_event(trace, "resource", event.resource, AttributeKind::kString);
       add_event(trace, "lifecycle", event.lifecycle, AttributeKind::kString);
       for (const auto& attribute : event.attributes)
-        add_event(trace, attribute.key, attribute.value, attribute.kind);
+        if (!attribute.is_null)
+          add_event(trace, attribute.key, attribute.value, attribute.kind);
     }
     for (const auto& attribute : trace.attributes) {
-      if (attribute.value.empty()) continue;
+      if (attribute.is_null || attribute.value.empty()) continue;
       auto& summary = case_summaries[attribute.key];
       summary.values.insert(attribute.value);
       summary.cases.insert(trace.case_id);

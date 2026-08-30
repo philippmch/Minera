@@ -91,6 +91,7 @@ Trace project_events(const Trace& trace,
   Trace result;
   result.case_id = trace.case_id;
   result.attributes = trace.attributes;
+  result.properties = trace.properties;
   for (const auto& event : trace.events) {
     if (!keep_activities.empty() &&
         keep_activities.find(event.activity) == keep_activities.end()) {
@@ -189,6 +190,7 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
                               ? trace.case_id
                               : trace.case_id + "#" + std::to_string(i + 1);
     segments[i].attributes = trace.attributes;
+    segments[i].properties = trace.properties;
   }
   return segments;
 }
@@ -478,6 +480,7 @@ Trace project_frequency_attributes(
   Trace result;
   result.case_id = trace.case_id;
   result.attributes = trace.attributes;
+  result.properties = trace.properties;
   for (const auto& event : trace.events) {
     if (top_allowed != nullptr) {
       const auto* value = frequency_attribute_value(event, top_key);
@@ -582,6 +585,7 @@ std::optional<Trace> cut_trace(const Trace& trace,
   Trace result;
   result.case_id = trace.case_id;
   result.attributes = trace.attributes;
+  result.properties = trace.properties;
   result.events.insert(result.events.end(), trace.events.begin() + begin,
                        trace.events.begin() + end);
   return result;
@@ -713,7 +717,7 @@ EventLog filter_trace_patterns(const EventLog& event_log,
                                const TracePatternFilterOptions& options) {
   if (options.patterns.empty()) return event_log;
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     const bool found = trace_matches_any_pattern(trace, options.patterns);
     if (found == options.positive) result.traces.push_back(trace);
@@ -727,7 +731,7 @@ EventLog filter_admitted_variants(
   if (options.variants.empty()) return event_log;
   validate_admitted_variants(options.variants);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     const bool found = trace_matches_admitted_variant(trace, options.variants);
     if (found == options.positive) result.traces.push_back(trace);
@@ -741,7 +745,7 @@ EventLog filter_case_performance(
   if (!options.min_duration_seconds && !options.max_duration_seconds)
     return event_log;
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     if (case_duration_matches(trace, options)) result.traces.push_back(trace);
   }
@@ -752,7 +756,7 @@ EventLog filter_case_size(const EventLog& event_log,
                           const CaseSizeFilterOptions& options) {
   validate_case_size_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     if (case_size_matches(trace, options)) result.traces.push_back(trace);
   }
@@ -770,7 +774,7 @@ EventLog filter_numeric_attribute(
     const NumericAttributeFilterOptions& options) {
   validate_numeric_attribute_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     if (options.mode == AttributeFilterMode::traces) {
       if (numeric_trace_matches(trace, options) && !trace.events.empty())
@@ -780,6 +784,7 @@ EventLog filter_numeric_attribute(
     Trace projected;
     projected.case_id = trace.case_id;
     projected.attributes = trace.attributes;
+    projected.properties = trace.properties;
     for (const auto& event : trace.events) {
       if (numeric_attribute_event_survives(event, options))
         projected.events.push_back(event);
@@ -797,7 +802,7 @@ EventLog filter_top_activities(
   if (!projection_needed) return event_log;
 
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     auto projected = project_frequency_attributes(
         trace, options.attribute_key, &allowed, {}, nullptr, {}, nullptr);
@@ -813,7 +818,7 @@ EventLog filter_relative_attribute_occurrence(
   const auto allowed = relative_attribute_values(event_log, options);
 
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     auto projected = project_frequency_attributes(
         trace, {}, nullptr, options.attribute_key, &allowed, {}, nullptr);
@@ -827,7 +832,7 @@ EventLog filter_attribute_occurrence_threshold(
     const AttributeOccurrenceThresholdFilterOptions& options) {
   const auto allowed = threshold_attribute_values(event_log, options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     auto projected = project_frequency_attributes(
         trace, {}, nullptr, {}, nullptr, options.attribute_key, &allowed);
@@ -845,7 +850,7 @@ EventLog filter_start_activities(const EventLog& event_log,
   }
   const auto allowed = to_set(activities);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     if (trace.events.empty()) continue;
     const bool found = allowed.find(trace.events.front().activity) != allowed.end();
@@ -863,7 +868,7 @@ EventLog filter_end_activities(const EventLog& event_log,
   }
   const auto allowed = to_set(activities);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     if (trace.events.empty()) continue;
     const bool found = allowed.find(trace.events.back().activity) != allowed.end();
@@ -875,7 +880,7 @@ EventLog filter_end_activities(const EventLog& event_log,
 EventLog filter_variants_top_k(const EventLog& event_log, std::size_t k) {
   if (k == 0) {
     EventLog result;
-    result.attributes = event_log.attributes;
+    copy_event_log_context(event_log, result);
     return result;
   }
   LogFilterOptions options;
@@ -913,7 +918,7 @@ EventLog filter_prefix(const EventLog& event_log,
                        const PrefixSuffixFilterOptions& options) {
   validate_prefix_suffix_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     const auto cut = cut_trace(trace, options, true);
     if (cut) result.traces.push_back(*cut);
@@ -925,7 +930,7 @@ EventLog filter_suffix(const EventLog& event_log,
                        const PrefixSuffixFilterOptions& options) {
   validate_prefix_suffix_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   for (const auto& trace : event_log.traces) {
     const auto cut = cut_trace(trace, options, false);
     if (cut) result.traces.push_back(*cut);
@@ -935,7 +940,7 @@ EventLog filter_suffix(const EventLog& event_log,
 
 EventLog filter_ncases(const EventLog& event_log, std::size_t max_cases) {
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   const auto count = std::min(max_cases, event_log.traces.size());
   result.traces.insert(result.traces.end(), event_log.traces.begin(),
                        event_log.traces.begin() + count);
@@ -1080,6 +1085,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
         case TimeFilterMode::events: {
           timed.case_id = trace.case_id;
           timed.attributes = trace.attributes;
+          timed.properties = trace.properties;
           for (const auto& event : trace.events) {
             const auto instant = parse_timestamp(event.timestamp);
             if (instant && *instant >= time_from && *instant <= time_to) {
@@ -1259,7 +1265,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     split_options.cut_mode = options.activity_split_cut_mode;
     EventLog split_log;
     split_log.traces = std::move(kept);
-    split_log.attributes = log.attributes;
+    copy_event_log_context(log, split_log);
     split_log = split_activity(split_log, split_options);
     kept = std::move(split_log.traces);
   }
@@ -1267,7 +1273,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   if (options.attribute_value_repetition) {
     EventLog repetition_log;
     repetition_log.traces = std::move(kept);
-    repetition_log.attributes = log.attributes;
+    copy_event_log_context(log, repetition_log);
     repetition_log = filter_attribute_value_repetition(
         repetition_log, *options.attribute_value_repetition);
     kept = std::move(repetition_log.traces);
@@ -1276,7 +1282,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   if (options.consecutive_activity_grouping) {
     EventLog grouped;
     grouped.traces = std::move(kept);
-    grouped.attributes = log.attributes;
+    copy_event_log_context(log, grouped);
     grouped = group_consecutive_activities(
         grouped, *options.consecutive_activity_grouping);
     kept = std::move(grouped.traces);
@@ -1284,7 +1290,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   if (options.timestamp_case_grouping) {
     EventLog grouped;
     grouped.traces = std::move(kept);
-    grouped.attributes = log.attributes;
+    copy_event_log_context(log, grouped);
     grouped = group_same_timestamp_events(grouped,
                                           *options.timestamp_case_grouping);
     kept = std::move(grouped.traces);
@@ -1300,7 +1306,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       !by_max_coverage && !by_percentage) {
     EventLog result;
     result.traces = std::move(kept);
-    result.attributes = log.attributes;
+    copy_event_log_context(log, result);
     if (options.max_cases && result.traces.size() > *options.max_cases)
       result.traces.resize(*options.max_cases);
     return result;
@@ -1378,7 +1384,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
   }
 
   EventLog result;
-  result.attributes = log.attributes;
+  copy_event_log_context(log, result);
   for (auto& trace : kept) {
     if (allowed.find(variant_key(trace)) != allowed.end()) {
       result.traces.push_back(std::move(trace));

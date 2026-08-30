@@ -4,20 +4,34 @@ import { logConversionQuery, requestLogConversion } from "../src/api";
 import { isLogConversionResult } from "../src/types";
 
 const attribute = { key: "concept:name", value: "A", kind: "string" as const };
+const metadata = {
+  extensions: [{ name: "Concept", prefix: "concept", uri: "https://example.invalid/concept" }],
+  classifiers: [{ name: "Activity", keys: ["concept:name"] }],
+  trace_globals: [],
+  event_globals: [{ key: "org:resource", value: "", kind: "string" as const, null: true as const }],
+  properties: [{ key: "case_id_key", value: "case:concept:name", kind: "string" as const }],
+};
 
 describe("traditional log conversion API", () => {
   it("serializes every option deterministically and escapes attribute lists", () => {
     const query = logConversionQuery({
       log_conversion_variant: "to_nx",
       log_conversion_case_attributes_as_nodes: ["region", "segment,detail"],
+      log_conversion_compress: true,
+      log_conversion_deep_copy: false,
       log_conversion_include_df: false,
+      log_conversion_lazy_output: true,
       log_conversion_max_graph_nodes: 12,
+      log_conversion_max_rows_to_materialize: 50,
       log_conversion_max_variants_to_return: 3,
+      log_conversion_stream_postprocessing: true,
     });
     expect(query).toBe(
       "log_conversion_case_attributes_as_nodes=region%2Csegment%5C%2Cdetail"
-      + "&log_conversion_include_df=false&log_conversion_max_graph_nodes=12"
-      + "&log_conversion_max_variants_to_return=3"
+      + "&log_conversion_compress=true&log_conversion_deep_copy=false"
+      + "&log_conversion_include_df=false&log_conversion_lazy_output=true"
+      + "&log_conversion_max_graph_nodes=12&log_conversion_max_rows_to_materialize=50"
+      + "&log_conversion_max_variants_to_return=3&log_conversion_stream_postprocessing=true"
       + "&log_conversion_variant=to_nx",
     );
     expect(() => logConversionQuery({ log_conversion_variant: "future" as never }))
@@ -30,6 +44,8 @@ describe("traditional log conversion API", () => {
       .toThrow(/safety limit/);
     expect(() => logConversionQuery({ log_conversion_max_variants_to_return: -1 }))
       .toThrow(/non-negative/);
+    expect(() => logConversionQuery({ log_conversion_max_rows_to_materialize: 1_000_001 }))
+      .toThrow(/safety limit/);
     expect(logConversionQuery({ log_conversion_max_variants_to_return: 0 }))
       .toBe("log_conversion_max_variants_to_return=0");
   });
@@ -38,17 +54,23 @@ describe("traditional log conversion API", () => {
     expect(isLogConversionResult({
       family: "LOG_CONVERSION",
       variant: "TO_EVENT_LOG",
-      log: { attributes: [], traces: [] },
+      log: { attributes: [], metadata, traces: [] },
     })).toBe(true);
     expect(isLogConversionResult({
       family: "LOG_CONVERSION",
       variant: "TO_EVENT_STREAM",
-      stream: { attributes: [], events: [{ fields: [attribute] }] },
+      stream: { attributes: [], metadata, events: [{ fields: [attribute] }] },
     })).toBe(true);
     expect(isLogConversionResult({
       family: "LOG_CONVERSION",
       variant: "TO_DATA_FRAME",
-      table: { columns: ["concept:name", "cost"], rows: [[attribute, null]] },
+      table: {
+        columns: ["concept:name", "cost"],
+        attributes: [],
+        metadata,
+        lazy: true,
+        rows: [[{ value: "A", kind: "string" }, { value: "", kind: "float", null: true }]],
+      },
     })).toBe(true);
     expect(isLogConversionResult({
       family: "LOG_CONVERSION",
@@ -68,6 +90,11 @@ describe("traditional log conversion API", () => {
       family: "LOG_CONVERSION",
       variant: "TO_DATA_FRAME",
       table: { columns: ["a", "b"], rows: [[attribute]] },
+    })).toBe(false);
+    expect(isLogConversionResult({
+      family: "LOG_CONVERSION",
+      variant: "TO_EVENT_STREAM",
+      stream: { attributes: [], metadata: { ...metadata, classifiers: [{ name: "bad", keys: [1] }] }, events: [] },
     })).toBe(false);
     expect(isLogConversionResult({
       family: "LOG_CONVERSION",

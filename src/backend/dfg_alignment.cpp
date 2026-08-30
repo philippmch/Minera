@@ -76,7 +76,7 @@ void set_reserved(std::vector<EventAttribute>& attrs, const std::string& key,
     return true;
   }), attrs.end());
   if (set) {
-    for (auto& a : attrs) if (a.key == key) { a.value = value; a.kind = kind; break; }
+    for (auto& a : attrs) if (a.key == key) { a.value = value; a.kind = kind; a.is_null = false; break; }
   } else attrs.push_back({key, value, kind});
 }
 
@@ -147,9 +147,9 @@ DfgAlignmentLogResult align_log_on_dfg(const EventLog& log,const DfgFrequency& d
 }
 
 EventLog project_log_on_dfg(const EventLog& log,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){
-  auto ars=align_log_on_dfg(log,d,s,e,o); EventLog out; out.attributes = log.attributes;
+  auto ars=align_log_on_dfg(log,d,s,e,o); EventLog out; copy_event_log_context(log, out);
   set_reserved(out.attributes, "@@aligned_dfg", "DFG alignment projection", AttributeKind::kString);
-  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; t.case_id=in.case_id; t.attributes=in.attributes; std::size_t z=0; std::string ts; if(!in.events.empty())ts=in.events.front().timestamp;
+  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; t.case_id=in.case_id; t.attributes=in.attributes; t.properties=in.properties; std::size_t z=0; std::string ts; if(!in.events.empty())ts=in.events.front().timestamp;
     std::string original; for(std::size_t j=0;j<in.events.size();++j){if(j)original+=",";original+=in.events[j].activity;}
     set_reserved(t.attributes, "@@original_trace", original, AttributeKind::kString);
     for(const auto& mv:ars.alignments[i].alignment){if(mv.model==kGap){++z;continue;} bool sync=mv.log!=kGap; Event ev; ev.case_id=in.case_id; ev.activity=mv.model; ev.timestamp=sync?in.events[z].timestamp:ts; ev.input_order=t.events.size();

@@ -565,11 +565,11 @@ export CLI, the cached local server route, and typed frontend controls.
 
 | Surface | Required variations | Minera status |
 |---|---|---|
-| Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog, ordered typed event streams, rectangular typed tables, and restartable CSV/XES event/trace readers are available; third-party dataframe/lazyframe identity and extension adapters remain |
+| Event data | Event, trace, event stream, typed attributes, lifecycle, dataframe/lazyframe adapters | **Partial** — native EventLog, value-semantic EventStream/EventTable, restartable bounded LazyEventTable, explicit missing/null/empty cells, full extension/classifier/global/property metadata, and restartable CSV/XES event/trace readers are available; third-party runtime object identity remains adapter-specific |
 | Object-centric data | OCEL events/objects/relations/o2o/e2e/object changes and OCEL 1/2 schema | **Partial** — bounded events/objects/event-object and event-to-event relations, o2o links, object changes, scalar globals, classic/standard JSON/XML, declared event/object type catalogs with empty-type schemas, and a typed OCEL 2 relational SQLite projection are present; remaining schema coverage remains |
 | Models | Petri nets incl reset/inhibitor, markings, process trees, BPMN, DFG, transition systems, heuristics nets, POWL, declarative models, OCPN/OC causal nets, trie, stochastic nets | **Partial** — ordinary and extended reset/inhibitor Petri arcs now round-trip through PNML/JSON and are honored by replay, alignment search, soundness reachability, and Petri playout; reusable stochastic maps now round-trip distribution/rate metadata and derive tangible CTMC options, while object-centric, trie, and broader stochastic model-family coverage remains |
-| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/genetic-matrix/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — all six traditional log conversion selectors now cover EventLog identity, ordered event streams, rectangular tables, attributed directed graphs, and one/all-trace variant projections; tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, genetic causal-matrix to workflow-net conversion, trie-to-Petri conversion, tree to POWL, tree/net to BPMN, structured inclusive BPMN split/join import with every non-empty branch subset, typed heterogeneous OCEL event/object graphs with optional DF and object-change families, and object-type OCEL flattening to typed XES traces are present; third-party columnar identities and broader object-centric conversions remain |
-| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — all six XES importer selectors share a standards-compliant native parser with document-order defaults, optional forward/reverse timestamp sorting, trace limits, scalar projection, custom first-class selectors, and strict adapters; both XES exporter selectors and bounded native gzip interchange are available through native, CLI, server, and frontend surfaces; broader interchange variants remain |
+| Conversions | log/stream/table; tree to Petri/BPMN/POWL; BPMN/DFG/genetic-matrix/heuristics/trie/WF-net conversions; OCEL graph/features | **Partial** — all six traditional log conversion selectors now cover EventLog identity, ordered event streams, rectangular and restartable lazy tables, bounded polymorphic log/stream/table normalization, attributed directed graphs, and one/all-trace variant projections; tree/heuristics/POWL/BPMN, deterministic POWL-to-process-tree layering, strict block-structured workflow-net-to-process-tree reconstruction (with non-block rejection), ordinary workflow-net-to-POWL reconstruction for structured fragments, both classic DFG-to-Petri constructions, genetic causal-matrix to workflow-net conversion, trie-to-Petri conversion, tree to POWL, tree/net to BPMN, structured inclusive BPMN split/join import with every non-empty branch subset, typed heterogeneous OCEL event/object graphs with optional DF and object-change families, and object-type OCEL flattening to typed XES traces are present; third-party columnar identities and broader object-centric conversions remain |
+| Traditional I/O | XES parser variants, PNML, PTML, BPMN, DFG read/write | **Partial** — all six XES importer selectors share a standards-compliant native parser with document-order defaults, optional forward/reverse timestamp sorting, trace limits, scalar projection, custom first-class selectors, and strict adapters; extensions, classifiers, trace/event globals, selector properties, typed scalar metadata, and empty-versus-null behavior now survive native import/export cycles; both XES exporter selectors and bounded native gzip interchange are available through native, CLI, server, and frontend surfaces; broader interchange variants remain |
 | Object-centric I/O | OCEL CSV, JSON, XML, SQLite and OCEL 2 JSON/XML/SQLite | **Partial** — classic and standard JSON/XML now round-trip deterministic type catalogs, including empty types and declared attributes without observed values, typed scalar attributes, epoch-baselined object histories, event/object relations, and event-to-event links; typed OCEL 2 relational SQLite persists the exact declared schemas alongside inferred type-table columns, deterministic extended-table CSV (with an optional object table), and bounded CLI/local-server/frontend adapters for every JSON/XML/CSV/SQLite direction are present; remaining schema-specific adapters remain |
 | Filtering | attributes/cases/endpoints/variants/paths/LTL/time/case performance/between/rework/prefix/suffix/segments; trace-pattern filters; DFG filters; OCEL filters | **Partial** — broad traditional-log filters, inclusive numeric, absolute-frequency, and relative-occurrence attribute ranges, deterministic top-activity selection, strict/non-strict first/last prefix and suffix cuts, positive/negative endpoint selection, per-variant minimum/maximum coverage and cumulative percentage selection, exact admitted-variant selection (including empty variants and polarity) plus exact/prefix/suffix/infix trace-pattern matching with `...` spans through native/request/CLI/server/frontend mining surfaces, native/CLI/server/frontend adjacent-path filtering with custom activity/timestamp attribute selectors and inclusive performance bounds, prefix/suffix/between segment variants, all four LTL predicates through native/CLI/server/frontend adapters, connected DFG activity/path/dependency/boundary and noise-threshold filters through native, CLI, server, and frontend export surfaces, and complete native/CLI/server/frontend OCEL filters; OCEL adapter query values now preserve nested delimiters and typed scalar overflow is rejected under a bounded recursive level; broader filter families remain |
 | Statistics | endpoints/attributes/variants, calendar attribute distributions, numeric/date KDE, case statistics, passed time, service/cycle/arrival/overlap/rework, concurrent/eventually-follows, process cube, OCEL statistics, chaotic activities | **Partial** — deterministic calendar event distributions across all six time buckets, numeric/date attribute KDE grids, case timing rows with sorting/limits/business-hour durations, passed-time variants, per-activity service-time aggregation, both activity/case rework variants, interval-event/case-envelope/concurrent-activity overlap, entropy-based chaotic-activity ranking, typed numeric/categorical/composite process cubes, and OCEL object-type summaries, activity/object associations, and edge metrics with configurable business-hour durations are available through native/CLI/server/frontend adapters; broader statistical aggregation extensions remain |
@@ -889,6 +889,37 @@ validating member checksums and sizes. Focused fixtures cover both exporter
 selectors, typed metadata round trips, independently compressed dynamic-Huffman
 input, corrupt trailers, expansion bounds, filename detection, and compressed
 file adapters.
+
+## Native event-data interoperability evidence
+
+The traditional event-data layer now has four explicit native forms: trace
+logs, ordered flat streams, rectangular eager tables, and restartable lazy
+tables. A tagged non-owning view normalizes any form to the other three while
+preserving row order, typed scalar kinds, log attributes, and shared metadata.
+Lazy scans validate every row, restart from the beginning, and enforce an
+optional hard materialization cap without truncation. Compatibility aliases
+keep the original stream and table API source-compatible.
+
+Table cells distinguish a missing column value, a present null, and a present
+empty string. Optional stream post-processing removes only present nulls.
+Conversions validate unique non-empty columns, rectangular rows, non-null case
+glue, custom case selectors and prefixes, and stable type-aware case identity.
+Extension, classifier, trace-global, event-global, log-property, and
+trace-property metadata is carried by the native log model and retained by
+log-preserving transformations. Synthetic variant projections deliberately
+remain metadata-free.
+
+The XML log reader and writer preserve extension declarations, quoted
+classifier keys, typed trace/event globals, and selector properties in
+deterministic order. Empty scalar strings remain values; explicit nulls are
+omitted because the interchange format has no null scalar. Stored declarations
+are retained, while canonical prefixes are generated only when undeclared. The
+new stream post-processing, copy/compression compatibility controls, lazy
+output selector, and row cap are exposed through strict request parsing, the
+headless export CLI, bounded local-server queries, and typed frontend guards.
+Focused native fixtures cover metadata cycles, interleaved grouping, typed case
+identities, missing/null/empty distinctions, malformed tables, restartable
+scans, and cap failures.
 
 ## Extended Petri-arc evidence
 

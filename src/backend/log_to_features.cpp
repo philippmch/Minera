@@ -29,12 +29,12 @@ std::string value_for(const Event& e, const std::string& key) {
 
 const EventAttribute* attr_for(const Event& e, const std::string& key) {
   for (const auto& a : e.attributes)
-    if (a.key == key) return &a;
+    if (!a.is_null && a.key == key) return &a;
   return nullptr;
 }
 const EventAttribute* attr_for(const Trace& t, const std::string& key) {
   for (const auto& a : t.attributes)
-    if (a.key == key) return &a;
+    if (!a.is_null && a.key == key) return &a;
   return nullptr;
 }
 
@@ -212,7 +212,7 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
     for (const auto& event : trace.events) {
       std::set<std::string> seen;
       for (const auto& attribute : event.attributes) {
-        if (is_numeric_kind(attribute.kind) != numeric ||
+        if (attribute.is_null || is_numeric_kind(attribute.kind) != numeric ||
             !seen.insert(attribute.key).second)
           continue;
         ++occurrences[attribute.key];
@@ -232,7 +232,7 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
   for (const auto& trace : log.traces) {
     std::set<std::string> seen;
     for (const auto& attribute : trace.attributes) {
-      if (is_numeric_kind(attribute.kind) != numeric ||
+      if (attribute.is_null || is_numeric_kind(attribute.kind) != numeric ||
           !seen.insert(attribute.key).second)
         continue;
       ++occurrences[attribute.key];
