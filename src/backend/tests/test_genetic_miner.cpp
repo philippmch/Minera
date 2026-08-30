@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -229,6 +230,13 @@ int main() {
   invalid_case.case_id_key = "missing_case";
   threw = false;
   try { (void)minera::mine_genetic(custom_fields_log(), invalid_case); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  auto malformed = first;
+  malformed.diagnostics.best_fitness =
+      std::numeric_limits<double>::quiet_NaN();
+  threw = false;
+  try { (void)minera::genetic_miner_json(malformed); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   return 0;

@@ -2441,6 +2441,32 @@ activity, and succession features, explicit schemas, convergence diagnostics,
 and stable partitions. Serializers verify tree leaves and node diagnostics as
 well as complete, non-overlapping cluster membership and finite centroids.
 
+## Privacy, optimization discovery, and simulation parity
+
+Privacy transformations include bounded trace-to-source assignment with
+attribute suppression and synthesis, plus Laplace and behavior-aware
+trace-variant release. Both deterministic seeds and operating-system entropy
+are supported. Result contracts verify positive finite privacy parameters,
+released-log and frequency totals, retained-variant counts, matching and
+synthesis partitions, and non-empty activity labels.
+
+Classic genetic discovery exposes bounded population, generation, elitism,
+crossover, mutation, state, selector, and seed controls. Its causal matrix,
+workflow conversion, markings, and diagnostics are serialized together and
+validated for dimensions, activity identity, member indices, and finite
+fitness. Classic integer-programming discovery covers sequence encoding,
+artificial boundaries, support and noise filtering, causal-region restriction,
+bounded branch-and-bound search, workflow markings, and exhaustion
+diagnostics; output validation rejects malformed arcs, markings, and search
+counters.
+
+The virtual-time FIFO simulation supports all declared duration families,
+fitted or explicit stochastic maps, token-replay variants, custom markings,
+resource pools, seeded transition selection, case arrivals, bounded execution,
+and optional diagnostics. Serialized results require a complete case-outcome
+partition, finite non-negative timing metrics, valid execution samples, and
+contiguous finite place and transition interval trees.
+
 ## Browser-history connector evidence
 
 The native connector reads Chrome `History` and Firefox `places.sqlite`

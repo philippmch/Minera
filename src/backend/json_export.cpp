@@ -4509,6 +4509,19 @@ std::string random_tree_json(const std::vector<ProcessTree>& results,
 
 std::string ilp_miner_json(const ILPMinerResult& result) {
   const auto& net = result.net;
+  if (result.markings.initial.size() != net.place_count() ||
+      result.markings.final.size() != net.place_count() ||
+      result.diagnostics.lp_solved > result.diagnostics.visited_nodes ||
+      result.diagnostics.branch_and_bound_nodes > result.diagnostics.visited_nodes)
+    throw std::invalid_argument("ILP miner result is inconsistent");
+  for (const auto& transition : net.transitions())
+    for (const auto place : transition.inputs)
+      if (place >= net.place_count())
+        throw std::invalid_argument("ILP miner transition input is invalid");
+  for (const auto& transition : net.transitions())
+    for (const auto place : transition.outputs)
+      if (place >= net.place_count())
+        throw std::invalid_argument("ILP miner transition output is invalid");
   std::ostringstream out;
   out << "{\"family\":\"ILP\",\"net\":{\"place_count\":"
       << net.place_count() << ",\"source\":" << net.source()
@@ -4570,6 +4583,29 @@ std::string ilp_miner_json(const ILPMinerResult& result) {
 
 std::string genetic_miner_json(const GeneticMinerResult& result) {
   const auto& net = result.net;
+  const auto activity_count = result.matrix.activities.size();
+  if (result.matrix.input_map.size() != activity_count ||
+      result.matrix.output_map.size() != activity_count ||
+      result.markings.initial.size() != net.place_count() ||
+      result.markings.final.size() != net.place_count() ||
+      result.diagnostics.activity_count != activity_count ||
+      !std::isfinite(result.diagnostics.best_fitness) ||
+      result.diagnostics.best_fitness < 0.0 ||
+      result.diagnostics.best_fitness > 1.0)
+    throw std::invalid_argument("genetic miner result is inconsistent");
+  std::set<std::string> activities;
+  for (const auto& activity : result.matrix.activities)
+    if (activity.empty() || !activities.insert(activity).second)
+      throw std::invalid_argument("genetic miner activities are invalid");
+  const auto validate_map = [&](const GeneticMatrixMap& map) {
+    for (const auto& groups : map)
+      for (const auto& group : groups)
+        for (const auto member : group)
+          if (member >= activity_count)
+            throw std::invalid_argument("genetic miner matrix member is invalid");
+  };
+  validate_map(result.matrix.input_map);
+  validate_map(result.matrix.output_map);
   std::ostringstream out;
   const auto write_matrix_map = [&](const GeneticMatrixMap& map) {
     out << '[';
@@ -4661,10 +4697,30 @@ std::string genetic_miner_json(const GeneticMinerResult& result) {
 }
 
 std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
-  const auto variant_name = result.diagnostics.variant ==
-                                    TraceVariantQueryVariant::kSacofa
-                                ? "sacofa"
-                                : "laplace";
+  const auto variant_name = [&]() -> std::string_view {
+    switch (result.diagnostics.variant) {
+      case TraceVariantQueryVariant::kLaplace: return "laplace";
+      case TraceVariantQueryVariant::kSacofa: return "sacofa";
+    }
+    throw std::invalid_argument("trace variant query result has invalid variant");
+  }();
+  if (!std::isfinite(result.diagnostics.epsilon) ||
+      result.diagnostics.epsilon <= 0.0 ||
+      result.diagnostics.retained_variant_count != result.frequencies.size() ||
+      result.diagnostics.released_trace_count != result.log.trace_count())
+    throw std::invalid_argument("trace variant query result is inconsistent");
+  std::uint64_t released = 0;
+  for (const auto& [prefix, count] : result.frequencies) {
+    if (count > std::numeric_limits<std::uint64_t>::max() - released)
+      throw std::invalid_argument("trace variant query frequency total overflows");
+    released += count;
+    for (const auto& activity : prefix)
+      if (activity.empty())
+        throw std::invalid_argument("trace variant query contains an empty activity");
+  }
+  if (!result.diagnostics.output_truncated &&
+      released != result.diagnostics.released_trace_count)
+    throw std::invalid_argument("trace variant query frequencies do not match the log");
   std::ostringstream out;
   out << "{\"family\":\"TRACE_VARIANT_QUERY\",\"variant\":";
   write_json_string(out, variant_name);
@@ -4702,6 +4758,14 @@ std::string trace_variant_query_json(const TraceVariantQueryResult& result) {
 }
 
 std::string pripel_json(const PripelResult& result) {
+  const auto& diagnostics = result.diagnostics;
+  if (!std::isfinite(diagnostics.epsilon) || diagnostics.epsilon <= 0.0 ||
+      diagnostics.released_trace_count != result.log.trace_count() ||
+      diagnostics.exact_matches + diagnostics.nearest_matches +
+              diagnostics.synthesized_traces !=
+          diagnostics.released_trace_count ||
+      diagnostics.synthesized_events > result.log.event_count())
+    throw std::invalid_argument("pripel result is inconsistent");
   std::ostringstream out;
   out << "{\"family\":\"PRIPEL\",\"diagnostics\":"
       << result.diagnostics.to_json() << ",\"log\":";

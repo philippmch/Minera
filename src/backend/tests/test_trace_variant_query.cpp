@@ -1,4 +1,5 @@
 #include "minera/trace_variant_query.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -221,4 +222,11 @@ int main() {
   sacofa_checks_completed_single_activity_prefixes();
   empty_trace_variants_and_open_noise_boundary();
   empty_completion_and_exponential_selection_contract();
+  auto malformed = minera::anonymize_trace_variant_query(
+      sample(), minera::TraceVariantQueryOptions{});
+  ++malformed.diagnostics.retained_variant_count;
+  bool threw = false;
+  try { (void)minera::trace_variant_query_json(malformed); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
 }

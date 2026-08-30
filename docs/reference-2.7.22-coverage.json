@@ -130,7 +130,7 @@
       "variants": [
         "PRIPEL"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -139,7 +139,7 @@
         "LAPLACE",
         "SACOFA"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -396,7 +396,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -413,7 +413,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -702,7 +702,7 @@
       "variants": [
         "PETRI_SEMAPH_FIFO"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {

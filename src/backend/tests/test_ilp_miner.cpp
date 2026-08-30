@@ -1,6 +1,7 @@
 #include "minera/ilp_miner.hpp"
 #include "minera/conformance.hpp"
 #include "minera/petri_analysis.hpp"
+#include "minera/json_export.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -458,5 +459,11 @@ int main() {
     invalid_alpha = true;
   }
   assert(invalid_alpha);
+  auto malformed = sequence;
+  malformed.markings.initial.pop_back();
+  bool malformed_rejected = false;
+  try { (void)minera::ilp_miner_json(malformed); }
+  catch (const std::invalid_argument&) { malformed_rejected = true; }
+  assert(malformed_rejected);
   return 0;
 }

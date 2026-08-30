@@ -28,10 +28,13 @@ void write_intervals(std::ostream& out,
 
 void write_place_trees(std::ostream& out,
                        const std::vector<MonteCarloPlaceIntervalTree>& trees) {
+  std::size_t expected = 0;
   out << '[';
   for (std::size_t index = 0; index < trees.size(); ++index) {
     if (index) out << ',';
     const auto& tree = trees[index];
+    if (tree.place_index != expected++)
+      throw std::invalid_argument("Monte Carlo place trees are not contiguous");
     out << "{\"place_index\":" << tree.place_index << ",\"intervals\":";
     write_intervals(out, tree.intervals);
     out << '}';
@@ -42,10 +45,13 @@ void write_place_trees(std::ostream& out,
 void write_transition_trees(
     std::ostream& out,
     const std::vector<MonteCarloTransitionIntervalTree>& trees) {
+  std::size_t expected = 0;
   out << '[';
   for (std::size_t index = 0; index < trees.size(); ++index) {
     if (index) out << ',';
     const auto& tree = trees[index];
+    if (tree.transition_index != expected++)
+      throw std::invalid_argument("Monte Carlo transition trees are not contiguous");
     out << "{\"transition_index\":" << tree.transition_index
         << ",\"intervals\":";
     write_intervals(out, tree.intervals);
@@ -58,6 +64,26 @@ void write_transition_trees(
 
 std::string monte_carlo_json(const MonteCarloResult& result) {
   const auto& diagnostics = result.diagnostics;
+  const auto finite_non_negative = [](double value) {
+    return std::isfinite(value) && value >= 0.0;
+  };
+  if (diagnostics.completed_cases + diagnostics.deadlocked_cases +
+          diagnostics.step_limited_cases !=
+      diagnostics.simulated_cases ||
+      result.log.trace_count() != diagnostics.simulated_cases ||
+      !finite_non_negative(diagnostics.case_arrival_seconds) ||
+      !finite_non_negative(diagnostics.total_cases_seconds) ||
+      !finite_non_negative(diagnostics.median_case_execution_seconds) ||
+      !finite_non_negative(diagnostics.case_arrival_ratio) ||
+      !finite_non_negative(diagnostics.total_cases_time) ||
+      !finite_non_negative(diagnostics.median_cases_ex_time))
+    throw std::invalid_argument("Monte Carlo diagnostics are inconsistent");
+  for (const auto value : diagnostics.case_execution_seconds)
+    if (!finite_non_negative(value))
+      throw std::invalid_argument("Monte Carlo case duration is invalid");
+  for (const auto value : diagnostics.cases_ex_time)
+    if (!finite_non_negative(value))
+      throw std::invalid_argument("Monte Carlo execution time is invalid");
   std::ostringstream out;
   out << std::setprecision(17);
   out << "{\"family\":\"MONTE_CARLO\",\"variant\":\"PETRI_SEMAPH_FIFO\"";
