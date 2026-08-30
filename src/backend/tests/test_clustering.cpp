@@ -229,6 +229,18 @@ int main() {
   assert(profile_clustering_json(profile_result) == profile_clustering_json(profile_repeat));
   assert(profile_clustering_json(profile_result).find(
              "\"variant\":\"sklearn_profiles\"") != std::string::npos);
+  auto malformed_profile = profile_result;
+  malformed_profile.clusters[0].push_back(l.traces.size());
+  bool malformed_profile_rejected = false;
+  try { (void)profile_clustering_json(malformed_profile); }
+  catch (const std::invalid_argument&) { malformed_profile_rejected = true; }
+  assert(malformed_profile_rejected);
+  auto malformed_tree = nested_result;
+  malformed_tree.diagnostics.node_count += 1;
+  bool malformed_tree_rejected = false;
+  try { (void)trace_attribute_clustering_json(malformed_tree); }
+  catch (const std::invalid_argument&) { malformed_tree_rejected = true; }
+  assert(malformed_tree_rejected);
 
   EventLog selected_profile_log;
   selected_profile_log.traces.push_back(Trace{

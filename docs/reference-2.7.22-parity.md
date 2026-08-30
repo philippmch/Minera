@@ -2416,6 +2416,31 @@ payloads that conflict with their request flags or contain empty activities or
 object identities. Causal marker groups retain conjunctive and alternative
 bindings, cardinalities, support counts, and object-exclusion keys.
 
+## Feature transformation and clustering parity
+
+Feature extraction supports event, trace, and temporal projections with
+categorical and numeric selectors, explicit schemas, activity and succession
+representations, trace timing and concurrency families, calendar or fixed
+windows, workload features, and strict cardinality and numeric controls.
+Result serialization enforces one row family per variation, rectangular finite
+matrices, unique non-empty feature names, aligned case identifiers, and finite
+temporal coordinates.
+
+Case- and event-level embeddings support deterministic local encoders and an
+injectable transformer runtime with inferred or explicit dimensions. Model,
+provider, attribute, identifier, result-size, and vector-shape contracts are
+validated consistently for transformation, similarity ranking, filtering, and
+JSON output. Similarity results reject duplicate identifiers, non-finite or
+out-of-range cosine scores, and rows exceeding the requested result bound.
+
+Trace-attribute clustering covers all five distance/profile variations,
+including edit, vector, and directly-follows representations, deterministic
+hierarchical merging, bounded output, and label selectors. Profile clustering
+provides deterministic seeded centroid initialization, categorical, numeric,
+activity, and succession features, explicit schemas, convergence diagnostics,
+and stable partitions. Serializers verify tree leaves and node diagnostics as
+well as complete, non-overlapping cluster membership and finite centroids.
+
 ## Browser-history connector evidence
 
 The native connector reads Chrome `History` and Firefox `places.sqlite`

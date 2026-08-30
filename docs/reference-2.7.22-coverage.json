@@ -147,7 +147,7 @@
       "variants": [
         "SKLEARN_PROFILES"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -159,7 +159,7 @@
         "VARIANT_AVG_VEC",
         "DFG"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -843,7 +843,7 @@
         "TRACE_BASED",
         "TEMPORAL"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -1013,7 +1013,7 @@
         "CASES_TRANSFORMERS",
         "EVENTS_TRANSFORMERS"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     }
   ]

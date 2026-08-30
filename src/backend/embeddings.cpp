@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <limits>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -177,14 +178,19 @@ void write_json_string(std::ostringstream& out, std::string_view value) {
 }
 
 std::string variant_name(EmbeddingVariant variant) {
-  return variant == EmbeddingVariant::EVENTS_TRANSFORMERS
-             ? "events_transformers"
-             : "cases_transformers";
+  switch (variant) {
+    case EmbeddingVariant::CASES_TRANSFORMERS: return "cases_transformers";
+    case EmbeddingVariant::EVENTS_TRANSFORMERS: return "events_transformers";
+  }
+  throw std::invalid_argument("embeddings: unknown result variant");
 }
 
 std::string provider_name(EmbeddingProvider provider) {
-  return provider == EmbeddingProvider::TRANSFORMER ? "transformer"
-                                                    : "hashing";
+  switch (provider) {
+    case EmbeddingProvider::HASHING: return "hashing";
+    case EmbeddingProvider::TRANSFORMER: return "transformer";
+  }
+  throw std::invalid_argument("embeddings: unknown result provider");
 }
 
 void validate_embedding_vector(const std::vector<double>& values,
@@ -208,6 +214,20 @@ void validate_embedding_vector(const std::vector<double>& values,
     throw std::invalid_argument(std::string("embeddings: ") +
                                 std::string(source) +
                                 " returned a non-finite value");
+}
+
+void validate_serialized_result(const EmbeddingResult& result) {
+  (void)variant_name(result.variant);
+  (void)provider_name(result.provider);
+  if (result.embedding_model.empty() || result.attribute_key.empty() ||
+      result.dimensions == 0 || result.dimensions > 4096)
+    throw std::invalid_argument("embeddings: malformed serialized result");
+  std::set<std::string> ids;
+  for (const auto& item : result.items) {
+    if (item.id.empty() || !ids.insert(item.id).second)
+      throw std::invalid_argument("embeddings: result ids must be unique and non-empty");
+    validate_embedding_vector(item.values, result.dimensions, "result vector");
+  }
 }
 
 void validate_result(const EmbeddingResult& result,
@@ -423,6 +443,7 @@ EventLog filter_embeddings_top_k(const EventLog& log,
 }
 
 std::string serialize_embeddings_json(const EmbeddingResult& result) {
+  validate_serialized_result(result);
   std::ostringstream out;
   out << std::setprecision(17);
   out << "{\"family\":\"TO_EMBEDDINGS\",\"variant\":";
@@ -452,6 +473,14 @@ std::string serialize_embeddings_json(const EmbeddingResult& result) {
 std::string serialize_embedding_similarity_json(
     std::string_view target_text, const EmbeddingResult& result,
     const std::vector<EmbeddingSimilarity>& matches, std::size_t top_k) {
+  validate_serialized_result(result);
+  if (top_k != 0 && matches.size() > top_k)
+    throw std::invalid_argument("embeddings: similarity result exceeds top_k");
+  std::set<std::string> ids;
+  for (const auto& match : matches)
+    if (match.id.empty() || !ids.insert(match.id).second ||
+        !std::isfinite(match.score) || match.score < -1.0 || match.score > 1.0)
+      throw std::invalid_argument("embeddings: malformed similarity result");
   std::ostringstream out;
   out << std::setprecision(17);
   out << "{\"family\":\"TO_EMBEDDINGS_SIMILARITY\",\"variant\":";

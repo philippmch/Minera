@@ -268,6 +268,18 @@ int main() {
   assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "number_of_cases") != tm.feature_names.end());
   assert(std::find(tm.feature_names.begin(), tm.feature_names.end(), "unique_resources") != tm.feature_names.end());
   assert(log_to_features_json(tm).find("\"temporal_rows\"") != std::string::npos);
+  auto malformed_features = tr;
+  malformed_features.trace_rows[0].pop_back();
+  bool malformed_rejected = false;
+  try { (void)log_to_features_json(malformed_features); }
+  catch (const std::invalid_argument&) { malformed_rejected = true; }
+  assert(malformed_rejected);
+  malformed_features = tr;
+  malformed_features.variant = static_cast<LogToFeaturesVariant>(99);
+  malformed_rejected = false;
+  try { (void)log_to_features_json(malformed_features); }
+  catch (const std::invalid_argument&) { malformed_rejected = true; }
+  assert(malformed_rejected);
   bool threw = false; try { e.window_seconds = 0; (void)log_to_features(log, e); } catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   EventLog bad = log; bad.traces[0].events[0].timestamp = "nonsense"; e.window_seconds = 3600; threw = false;
