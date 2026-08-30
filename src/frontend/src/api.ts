@@ -36,6 +36,8 @@ import {
   type WindowsEventsResult,
   type RepositoryHistoryResult,
   isRepositoryHistoryResult,
+  type WorkflowHistoryResult,
+  isWorkflowHistoryResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -4759,6 +4761,26 @@ export async function requestRepositoryHistory(
   const payload: unknown = await response.json();
   if (!isRepositoryHistoryResult(payload))
     throw new Error("the Minera backend returned invalid repository history");
+  return payload;
+}
+export async function requestWorkflowHistory(
+  csv: string, maxEvents?: number,
+): Promise<WorkflowHistoryResult> {
+  if (maxEvents !== undefined && (!Number.isSafeInteger(maxEvents) || maxEvents <= 0 || maxEvents > 10_000_000))
+    throw new Error("workflow_max_events must be in [1,10000000]");
+  const query = maxEvents === undefined ? "" : `?workflow_max_events=${maxEvents}`;
+  const response = await fetch(`/api/workflow-history${query}`, {
+    method: "POST", headers: { "Content-Type": "text/csv" }, body: csv,
+  });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isWorkflowHistoryResult(payload))
+    throw new Error("the Minera backend returned invalid workflow history");
   return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {

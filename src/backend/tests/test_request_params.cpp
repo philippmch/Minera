@@ -684,6 +684,16 @@ void repository_history_params_contract() {
   assert(rejected);
 }
 
+void workflow_history_params_contract() {
+  const auto parsed = minera::parse_workflow_history_params(
+      fields({{"workflow_max_events", "123"}}));
+  assert(parsed.max_events == 123);
+  bool rejected = false;
+  try { (void)minera::parse_workflow_history_params(fields({{"workflow_max_events", "0"}})); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 void windows_event_log_params_contract() {
   const auto parsed = minera::parse_windows_event_log_params(fields({
       {"windows_events_path", "events.xml"},
@@ -3726,6 +3736,7 @@ int main() {
   concept_drift_params_contract();
   browser_history_params_contract();
   repository_history_params_contract();
+  workflow_history_params_contract();
   windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();

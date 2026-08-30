@@ -155,6 +155,7 @@ add_library(minera_core
   src/backend/xes_event_log_importer.cpp
   src/backend/xes_export.cpp
   src/backend/windows_event_log.cpp
+  src/backend/workflow_history.cpp
 )
 
 add_library(minera::core ALIAS minera_core)
@@ -953,6 +954,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_repository_history_tests PRIVATE cxx_std_20)
   target_compile_options(minera_repository_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_repository_history_tests COMMAND minera_repository_history_tests)
+
+  add_executable(minera_workflow_history_tests
+    src/backend/tests/test_workflow_history.cpp
+  )
+  target_link_libraries(minera_workflow_history_tests PRIVATE minera::core)
+  target_compile_features(minera_workflow_history_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_workflow_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_workflow_history_tests COMMAND minera_workflow_history_tests)
 
   add_executable(minera_alignment_variants_tests
     src/backend/tests/test_alignment_variants.cpp
