@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "minera/petri_net.hpp"
 
@@ -19,9 +20,17 @@ namespace minera {
 void write_pnml(std::ostream& out,
                 const PetriNet& net,
                 std::string_view name = "net");
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const std::vector<std::int64_t>& initial_marking,
+                const std::vector<std::int64_t>& final_marking,
+                std::string_view name = "net");
 
 [[nodiscard]] std::string to_pnml(const PetriNet& net,
                                   std::string_view name = "net");
+[[nodiscard]] std::string to_pnml(
+    const PetriNet& net, const std::vector<std::int64_t>& initial_marking,
+    const std::vector<std::int64_t>& final_marking,
+    std::string_view name = "net");
 
 // Parses a PNML workflow net, so a model discovered or drawn elsewhere can be
 // checked against a log. Reads the first <net>: places, transitions, and arcs

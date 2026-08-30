@@ -1,4 +1,5 @@
 #include "minera/json_export.hpp"
+#include "minera/pnml.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -3864,6 +3865,41 @@ std::string petri_usage_comparison_json(const PetriUsageComparison& result) {
     out << '}';
   }
   out << "]}";
+  return out.str();
+}
+
+std::string petri_net_reduction_json(const PetriNetReductionResult& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"PETRI_NET_REDUCTION\",\"variant\":\"complete\""
+      << ",\"changed\":" << (result.changed ? "true" : "false")
+      << ",\"place_count\":" << result.net.place_count()
+      << ",\"transition_count\":" << result.net.transitions().size()
+      << ",\"source\":" << result.net.source()
+      << ",\"sink\":" << result.net.sink()
+      << ",\"initial_marking\":[";
+  for (std::size_t i = 0; i < result.markings.initial.size(); ++i) {
+    if (i) out << ',';
+    out << result.markings.initial[i];
+  }
+  out << "],\"final_marking\":[";
+  for (std::size_t i = 0; i < result.markings.final.size(); ++i) {
+    if (i) out << ',';
+    out << result.markings.final[i];
+  }
+  out << "],\"old_to_new_place\":[";
+  for (std::size_t i = 0; i < result.old_to_new_place.size(); ++i) {
+    if (i) out << ',';
+    if (result.old_to_new_place[i] == kRemovedPlace) out << "null";
+    else out << result.old_to_new_place[i];
+  }
+  out << "],\"pnml\":";
+  if (result.markings.initial.empty() && result.markings.final.empty()) {
+    write_json_string(out, to_pnml(result.net, "reduced net"));
+  } else {
+    write_json_string(out, to_pnml(result.net, result.markings.initial,
+                                   result.markings.final, "reduced net"));
+  }
+  out << '}';
   return out.str();
 }
 

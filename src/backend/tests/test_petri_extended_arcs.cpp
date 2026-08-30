@@ -98,6 +98,34 @@ void playout_and_pnml_round_trip() {
   const auto inhibitor_reread = parse_pnml(inhibitor_xml);
   assert(inhibitor_reread.transitions()[1].inhibitor_inputs.size() == 1);
 
+  std::vector<std::int64_t> initial(net.place_count(), 0);
+  std::vector<std::int64_t> final(net.place_count(), 0);
+  initial[net.source()] = 2;
+  initial[2] = 4;
+  final[net.sink()] = 3;
+  const auto marked_xml = to_pnml(net, initial, final, "marked");
+  assert(marked_xml.find("<initialMarking><text>2</text>") !=
+         std::string::npos);
+  assert(marked_xml.find("<initialMarking><text>4</text>") !=
+         std::string::npos);
+  assert(marked_xml.find("<place idref=\"p3\"><text>3</text>") !=
+         std::string::npos);
+  bool rejected = false;
+  try {
+    (void)to_pnml(net, std::vector<std::int64_t>{1}, final, "bad");
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+  rejected = false;
+  initial[0] = -1;
+  try {
+    (void)to_pnml(net, initial, final, "bad");
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+
   ILPMinerResult json_result;
   json_result.net = net;
   json_result.markings.initial.assign(net.place_count(), 0);

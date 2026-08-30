@@ -32,6 +32,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/petri_net_reduction.hpp"
 #include "minera/process_tree_playout.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
@@ -421,6 +422,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
     const FieldLookup& field);
 [[nodiscard]] ProcessTreeReductionOptions parse_process_tree_reduction_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] PetriNetReductionOptions parse_petri_net_reduction_params(
+    const FieldLookup& field);
+[[nodiscard]] PetriNetReductionOptions parse_petri_net_reduction_params(
     const FieldLookup& field, const FieldPresence& present);
 
 // Parse the model-quality evaluation request contract. Every supplied option

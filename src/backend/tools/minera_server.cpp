@@ -106,6 +106,7 @@
 #include "minera/performance_spectrum.hpp"
 #include "minera/batches.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/petri_net_reduction.hpp"
 #include "minera/petri_analysis_json.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
@@ -3766,6 +3767,46 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
   }
 }
 
+void handle_reduce_petri_net(const httplib::Request& request,
+                             httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "petri_reduction_initial_marking",
+        "petri_reduction_final_marking",
+        "petri_reduction_parallel_place_fusion",
+        "petri_reduction_abstraction"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument(
+            "unknown Petri reduction parameter: " + key);
+    }
+    const std::string model_xml = request.has_file("model")
+                                      ? request.get_file_value("model").content
+                                      : request.body;
+    if (model_xml.empty())
+      throw std::invalid_argument("missing form field: model");
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options =
+        minera::parse_petri_net_reduction_params(lookup, present);
+    const auto net = minera::parse_pnml(model_xml);
+    response.set_content(
+        minera::petri_net_reduction_json(
+            minera::reduce_petri_net(net, options)),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_concept_drift(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -6590,6 +6631,7 @@ int main(int argc, char** argv) {
   server.Options("/api/align-petri-anti", preflight);
   server.Options("/api/align-petri-multi", preflight);
   server.Options("/api/reduce-process-tree", preflight);
+  server.Options("/api/reduce-petri-net", preflight);
   server.Options("/api/align-dfg", preflight);
   server.Options("/api/align-edit-distance", preflight);
   server.Options("/api/decide", preflight);
@@ -6680,6 +6722,7 @@ int main(int argc, char** argv) {
   server.Post("/api/align-petri-anti", handle_align_petri_anti);
   server.Post("/api/align-petri-multi", handle_align_petri_multi);
   server.Post("/api/reduce-process-tree", handle_reduce_process_tree);
+  server.Post("/api/reduce-petri-net", handle_reduce_petri_net);
   server.Post("/api/align-dfg", handle_align_dfg);
   server.Post("/api/align-edit-distance", handle_align_edit_distance);
   server.Post("/api/decide", handle_decide);

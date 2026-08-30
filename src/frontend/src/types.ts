@@ -1966,6 +1966,47 @@ export interface PetriNetModel {
   transitions: PetriTransition[];
 }
 
+export interface PetriNetReductionResult {
+  family: "PETRI_NET_REDUCTION";
+  variant: "complete";
+  changed: boolean;
+  place_count: number;
+  transition_count: number;
+  source: number;
+  sink: number;
+  initial_marking: number[];
+  final_marking: number[];
+  old_to_new_place: Array<number | null>;
+  pnml: string;
+}
+
+export function isPetriNetReductionResult(
+  value: unknown,
+): value is PetriNetReductionResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Partial<PetriNetReductionResult>;
+  const nonnegativeInteger = (item: unknown): item is number =>
+    Number.isSafeInteger(item) && (item as number) >= 0;
+  if (result.family !== "PETRI_NET_REDUCTION" ||
+      result.variant !== "complete" || typeof result.changed !== "boolean" ||
+      !nonnegativeInteger(result.place_count) ||
+      !nonnegativeInteger(result.transition_count) ||
+      !nonnegativeInteger(result.source) || !nonnegativeInteger(result.sink) ||
+      result.place_count === 0 || result.source >= result.place_count ||
+      result.sink >= result.place_count ||
+      !Array.isArray(result.initial_marking) ||
+      !Array.isArray(result.final_marking) ||
+      result.initial_marking.length !== result.place_count ||
+      result.final_marking.length !== result.place_count ||
+      !result.initial_marking.every(nonnegativeInteger) ||
+      !result.final_marking.every(nonnegativeInteger) ||
+      !Array.isArray(result.old_to_new_place) ||
+      !result.old_to_new_place.every((place) =>
+        place === null || (nonnegativeInteger(place) && place < result.place_count!)) ||
+      typeof result.pnml !== "string" || !result.pnml.includes("<pnml")) return false;
+  return true;
+}
+
 export type ProcessTreePetriNetVariant = "standard" | "transition_bordered";
 
 export interface ProcessTreePetriNetConversionResult extends PetriNetModel {

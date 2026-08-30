@@ -65,6 +65,7 @@ import {
   type TriePetriConversionResult,
   type ProcessTreePetriNetVariant,
   type ProcessTreePetriNetConversionResult,
+  type PetriNetReductionResult,
   type ILPMinerOptions,
   type ILPMinerResult,
   type GeneticMinerOptions,
@@ -112,6 +113,7 @@ import {
   isProcessCubeTable,
   isTriePetriConversionResult,
   isProcessTreePetriNetConversionResult,
+  isPetriNetReductionResult,
   isDfgPrecisionResult,
   isILPMinerResult,
   isGeneticMinerResult,
@@ -2699,6 +2701,61 @@ export async function fetchPtml(miner?: string): Promise<string> {
 export interface XesExportOptions {
   variant?: "line_by_line" | "etree";
   compress?: boolean;
+}
+
+export interface PetriNetReductionOptions {
+  initial_marking?: number[];
+  final_marking?: number[];
+  parallel_place_fusion?: boolean;
+  abstraction?: boolean;
+}
+
+export function petriNetReductionQuery(
+  options: PetriNetReductionOptions = {},
+): string {
+  const params = new URLSearchParams();
+  const marking = (name: string, values: number[] | undefined) => {
+    if (values === undefined) return;
+    if (values.length === 0 ||
+        !values.every((value) => Number.isSafeInteger(value) && value >= 0))
+      throw new Error(`${name} must be a non-empty list of non-negative integers`);
+    params.set(name, values.join(","));
+  };
+  marking("petri_reduction_initial_marking", options.initial_marking);
+  marking("petri_reduction_final_marking", options.final_marking);
+  if (options.parallel_place_fusion !== undefined)
+    params.set("petri_reduction_parallel_place_fusion",
+               String(options.parallel_place_fusion));
+  if (options.abstraction !== undefined)
+    params.set("petri_reduction_abstraction", String(options.abstraction));
+  return params.toString();
+}
+
+export async function reducePetriNet(
+  model: Blob,
+  options: PetriNetReductionOptions = {},
+): Promise<PetriNetReductionResult> {
+  const query = petriNetReductionQuery(options);
+  const form = new FormData();
+  form.append("model", model, "model.pnml");
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/reduce-petri-net${query ? `?${query}` : ""}`,
+      { method: "POST", body: form },
+    );
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (payload !== null && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  if (!isPetriNetReductionResult(payload))
+    throw new Error("the Minera backend returned an invalid Petri-net reduction");
+  return payload;
 }
 
 export function xesExportQuery(options: XesExportOptions = {}): string {

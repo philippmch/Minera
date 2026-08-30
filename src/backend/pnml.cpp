@@ -1,6 +1,8 @@
 #include "minera/pnml.hpp"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <optional>
@@ -32,9 +34,18 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
 
 }  // namespace
 
-void write_pnml(std::ostream& out,
-                const PetriNet& net,
-                std::string_view name) {
+void write_pnml_impl(std::ostream& out, const PetriNet& net,
+                     const std::vector<std::int64_t>& initial_marking,
+                     const std::vector<std::int64_t>& final_marking,
+                     std::string_view name) {
+  if (initial_marking.size() != net.place_count() ||
+      final_marking.size() != net.place_count())
+    throw std::invalid_argument("PNML marking size must match the place count");
+  if (std::any_of(initial_marking.begin(), initial_marking.end(),
+                  [](std::int64_t value) { return value < 0; }) ||
+      std::any_of(final_marking.begin(), final_marking.end(),
+                  [](std::int64_t value) { return value < 0; }))
+    throw std::invalid_argument("PNML markings must be non-negative");
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   out << "<pnml xmlns=\"http://www.pnml.org/version-2009/grammar/pnml\">\n";
   out << "  <net id=\"net1\" "
@@ -48,9 +59,9 @@ void write_pnml(std::ostream& out,
   for (std::size_t place = 0; place < net.place_count(); ++place) {
     out << "      <place id=\"p" << place << "\">\n";
     out << "        <name><text>p" << place << "</text></name>\n";
-    if (place == net.source()) {
-      out << "        <initialMarking><text>1</text></initialMarking>\n";
-    }
+    if (initial_marking[place] != 0)
+      out << "        <initialMarking><text>" << initial_marking[place]
+          << "</text></initialMarking>\n";
     out << "      </place>\n";
   }
 
@@ -109,12 +120,12 @@ void write_pnml(std::ostream& out,
 
   out << "    </page>\n";
 
-  // The final marking (one token on the sink) under the convention used by
-  // ProM for accepting workflow nets.
   out << "    <finalmarkings>\n";
   out << "      <marking>\n";
-  out << "        <place idref=\"p" << net.sink()
-      << "\"><text>1</text></place>\n";
+  for (std::size_t place = 0; place < final_marking.size(); ++place)
+    if (final_marking[place] != 0)
+      out << "        <place idref=\"p" << place << "\"><text>"
+          << final_marking[place] << "</text></place>\n";
   out << "      </marking>\n";
   out << "    </finalmarkings>\n";
 
@@ -122,9 +133,34 @@ void write_pnml(std::ostream& out,
   out << "</pnml>\n";
 }
 
+void write_pnml(std::ostream& out, const PetriNet& net,
+                std::string_view name) {
+  std::vector<std::int64_t> initial(net.place_count(), 0);
+  std::vector<std::int64_t> final(net.place_count(), 0);
+  initial[net.source()] = 1;
+  final[net.sink()] = 1;
+  write_pnml_impl(out, net, initial, final, name);
+}
+
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const std::vector<std::int64_t>& initial_marking,
+                const std::vector<std::int64_t>& final_marking,
+                std::string_view name) {
+  write_pnml_impl(out, net, initial_marking, final_marking, name);
+}
+
 std::string to_pnml(const PetriNet& net, std::string_view name) {
   std::ostringstream out;
   write_pnml(out, net, name);
+  return out.str();
+}
+
+std::string to_pnml(const PetriNet& net,
+                    const std::vector<std::int64_t>& initial_marking,
+                    const std::vector<std::int64_t>& final_marking,
+                    std::string_view name) {
+  std::ostringstream out;
+  write_pnml(out, net, initial_marking, final_marking, name);
   return out.str();
 }
 

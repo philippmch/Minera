@@ -49,6 +49,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/process_tree_reduction.hpp"
+#include "minera/petri_net_reduction.hpp"
 #include "minera/petri_usage_comparison.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/log_to_target.hpp"
@@ -286,6 +287,8 @@ void write_analysis_json(std::ostream& out,
 
 [[nodiscard]] std::string petri_usage_comparison_json(
     const PetriUsageComparison& result);
+[[nodiscard]] std::string petri_net_reduction_json(
+    const PetriNetReductionResult& result);
 [[nodiscard]] std::string serialize_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_playout_visited_json(

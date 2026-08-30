@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "../src/types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
 import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 
 describe("isProcessTreePlayoutSetResult", () => {
@@ -943,6 +943,22 @@ describe("embedding result guards", () => {
     expect(isEmbeddingResult({ family: "TO_EMBEDDINGS", variant: "cases_transformers", embedding_provider: "unknown", embedding_model: "hashing-v1", attribute_key: "concept:name", dimensions: 2, items: [{ id: "c1", embedding: [0, 1] }] })).toBe(false);
     expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", top_k: 1, items: [{ id: "0", score: Number.NaN }] })).toBe(false);
     expect(isEmbeddingSimilarityResult({ family: "TO_EMBEDDINGS_SIMILARITY", variant: "events_transformers", target: "A", dimensions: 0, top_k: 1, items: [] })).toBe(false);
+  });
+});
+
+describe("Petri-net reduction result guard", () => {
+  const valid = {
+    family: "PETRI_NET_REDUCTION", variant: "complete", changed: true,
+    place_count: 2, transition_count: 1, source: 0, sink: 1,
+    initial_marking: [1, 0], final_marking: [0, 1],
+    old_to_new_place: [0, null, 1], pnml: "<?xml version=\"1.0\"?><pnml></pnml>",
+  };
+  it("accepts remapped places and PNML", () =>
+    expect(isPetriNetReductionResult(valid)).toBe(true));
+  it("rejects malformed mappings and markings", () => {
+    expect(isPetriNetReductionResult({ ...valid, old_to_new_place: [0, 2] })).toBe(false);
+    expect(isPetriNetReductionResult({ ...valid, initial_marking: [1] })).toBe(false);
+    expect(isPetriNetReductionResult({ ...valid, pnml: "not xml" })).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 #include "minera/petri_net_reduction.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -509,5 +510,14 @@ int main() {
     const auto second = reduce_petri_net(silent_chain());
     assert(same_net(first.net, second.net));
     assert(first.old_to_new_place == second.old_to_new_place);
+    const auto json = petri_net_reduction_json(first);
+    assert(json.find("\"family\":\"PETRI_NET_REDUCTION\"") !=
+           std::string::npos);
+    assert(json.find("\"variant\":\"complete\"") !=
+           std::string::npos);
+    assert(json.find("\"changed\":true") != std::string::npos);
+    assert(json.find("\"old_to_new_place\":[") != std::string::npos);
+    assert(json.find("\"pnml\":\"<?xml") != std::string::npos);
+
   }
 }
