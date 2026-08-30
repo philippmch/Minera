@@ -3533,6 +3533,45 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field) {
   return parse_concept_drift_params(field, {});
 }
 
+BrowserHistoryParams parse_browser_history_params(const FieldLookup& field) {
+  return parse_browser_history_params(field, {});
+}
+
+BrowserHistoryParams parse_browser_history_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  BrowserHistoryParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (!supplied("browser_history_variant"))
+    throw std::invalid_argument("browser_history_variant: expected chrome_history or firefox_history");
+  const auto variant = require("browser_history_variant");
+  if (variant == "chrome" || variant == "chrome_history")
+    params.variant = BrowserHistoryVariant::kChrome;
+  else if (variant == "firefox" || variant == "firefox_history")
+    params.variant = BrowserHistoryVariant::kFirefox;
+  else
+    throw std::invalid_argument(
+        "browser_history_variant: expected chrome_history or firefox_history");
+  if (!supplied("browser_history_path"))
+    throw std::invalid_argument("browser_history_path: expected a value");
+  params.history_path = require("browser_history_path");
+  if (supplied("browser_history_max_events")) {
+    params.max_events = parse_positive_size(
+        require("browser_history_max_events"), "browser_history_max_events");
+    if (params.max_events > 10'000'000)
+      throw std::invalid_argument(
+          "browser_history_max_events must be in [1, 10000000]");
+  }
+  return params;
+}
+
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {
   ConceptDriftParams params;

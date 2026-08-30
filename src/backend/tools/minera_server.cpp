@@ -34,6 +34,7 @@
 #include "minera/attribute_statistics.hpp"
 #include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
+#include "minera/browser_history.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/case_arrival.hpp"
@@ -3851,6 +3852,35 @@ void handle_concept_drift(const httplib::Request& request,
   }
 }
 
+void handle_browser_history(const httplib::Request& request,
+                            httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "browser_history_variant", "browser_history_path",
+        "browser_history_max_events"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown browser history parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto options = minera::parse_browser_history_params(lookup, present);
+    response.set_content(
+        minera::browser_history_json(
+            minera::import_browser_history(options), options.variant),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -6609,6 +6639,7 @@ int main(int argc, char** argv) {
   server.Options("/api/pripel", preflight);
   server.Options("/api/anonymize-pripel", preflight);
   server.Options("/api/concept-drift", preflight);
+  server.Options("/api/browser-history", preflight);
   server.Options("/api/transform-target", preflight);
   server.Options("/api/log-to-features", preflight);
   server.Options("/api/features", preflight);
@@ -6700,6 +6731,7 @@ int main(int argc, char** argv) {
   server.Post("/api/pripel", handle_pripel);
   server.Post("/api/anonymize-pripel", handle_pripel);
   server.Post("/api/concept-drift", handle_concept_drift);
+  server.Post("/api/browser-history", handle_browser_history);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);

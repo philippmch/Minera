@@ -867,6 +867,47 @@ export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
 }
 
 export type EmbeddingVariant = "cases_transformers" | "events_transformers";
+
+export type BrowserHistoryVariant = "chrome_history" | "firefox_history";
+export interface BrowserHistoryEvent {
+  activity: string;
+  timestamp: string;
+  attributes: Record<string, string>;
+}
+export interface BrowserHistoryTrace {
+  case_id: string;
+  events: BrowserHistoryEvent[];
+}
+export interface BrowserHistoryResult {
+  type: "BROWSER_HISTORY";
+  variant: BrowserHistoryVariant;
+  trace_count: number;
+  event_count: number;
+  traces: BrowserHistoryTrace[];
+}
+export function isBrowserHistoryResult(value: unknown): value is BrowserHistoryResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<BrowserHistoryResult>;
+  if (result.type !== "BROWSER_HISTORY" ||
+      (result.variant !== "chrome_history" && result.variant !== "firefox_history") ||
+      !Number.isSafeInteger(result.trace_count) || (result.trace_count as number) < 0 ||
+      !Number.isSafeInteger(result.event_count) || (result.event_count as number) < 0 ||
+      !Array.isArray(result.traces) || result.traces.length !== result.trace_count) return false;
+  let events = 0;
+  for (const trace of result.traces) {
+    if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" ||
+        !Array.isArray(trace.events)) return false;
+    events += trace.events.length;
+    for (const event of trace.events) {
+      if (!event || typeof event !== "object" || typeof event.activity !== "string" ||
+          typeof event.timestamp !== "string" || !event.attributes ||
+          typeof event.attributes !== "object" || Array.isArray(event.attributes) ||
+          !Object.values(event.attributes).every((item) => typeof item === "string")) return false;
+    }
+  }
+  return events === result.event_count;
+}
+
 export type EmbeddingProvider = "hashing" | "transformer";
 export interface EmbeddingItem { id: string; embedding: number[]; }
 export interface EmbeddingResult {
