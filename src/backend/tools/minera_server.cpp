@@ -54,6 +54,7 @@
 #include "minera/dfg_alignment.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/json_export.hpp"
+#include "minera/knowledge_injection.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/eventually_follows.hpp"
@@ -3010,6 +3011,36 @@ void handle_resource_profiles(const httplib::Request& request, httplib::Response
     const auto options = minera::parse_resource_profiles_params(lookup, present);
     response.set_content(minera::resource_profiles_json(minera::discover_resource_profiles(session->log, options)), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
+}
+
+void handle_knowledge_injection(const httplib::Request& request,
+                                httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "knowledge_variant", "knowledge_description", "knowledge_query",
+        "knowledge_database_schema", "knowledge_max_input_bytes",
+        "knowledge_max_prompt_bytes"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown knowledge parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    response.set_content(
+        minera::knowledge_injection_json(minera::build_knowledge_prompt(
+            minera::parse_knowledge_injection_params(lookup, present))),
+        "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_local_diagnostics(const httplib::Request& request, httplib::Response& response) {
@@ -6806,6 +6837,7 @@ int main(int argc, char** argv) {
   server.Options("/api/streaming-footprints", preflight);
   server.Options("/api/streaming-temporal", preflight);
   server.Options("/api/streaming-tbr", preflight);
+  server.Options("/api/knowledge-injection", preflight);
 
   server.Post("/api/mine", handle_mine);
   server.Post("/api/ocel/discover", handle_ocel_discovery);
@@ -6834,6 +6866,7 @@ int main(int argc, char** argv) {
   server.Post("/api/link-analysis", handle_link_analysis);
   server.Post("/api/roles", handle_roles);
   server.Post("/api/resource-profiles", handle_resource_profiles);
+  server.Post("/api/knowledge-injection", handle_knowledge_injection);
   server.Post("/api/local-diagnostics", handle_local_diagnostics);
   server.Post("/api/clustering", handle_clustering);
   server.Post("/api/profile-clustering", handle_profile_clustering);

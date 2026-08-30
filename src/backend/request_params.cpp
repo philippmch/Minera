@@ -5259,6 +5259,28 @@ VariantStatisticsOptions parse_variant_statistics_params(
   return options;
 }
 
+KnowledgeInjectionOptions parse_knowledge_injection_params(
+    const FieldLookup& field) {
+  return parse_knowledge_injection_params(field, {});
+}
+
+KnowledgeInjectionOptions parse_knowledge_injection_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  KnowledgeInjectionOptions options;
+  if (const auto value = field("knowledge_variant"); !value.empty())
+    options.variant = knowledge_injection_variant_from_string(value);
+  options.description = field("knowledge_description");
+  options.query = field("knowledge_query");
+  options.database_schema = field("knowledge_database_schema");
+  if (present && present("knowledge_max_input_bytes"))
+    options.max_input_bytes = parse_positive_size(
+        field("knowledge_max_input_bytes"), "knowledge_max_input_bytes");
+  if (present && present("knowledge_max_prompt_bytes"))
+    options.max_prompt_bytes = parse_positive_size(
+        field("knowledge_max_prompt_bytes"), "knowledge_max_prompt_bytes");
+  return options;
+}
+
 LogConversionOptions parse_log_conversion_params(const FieldLookup& field) {
   return parse_log_conversion_params(field, FieldPresence{});
 }

@@ -19,6 +19,7 @@
 #include "minera/workflow_history.hpp"
 #include "minera/enterprise_history.hpp"
 #include "minera/communication_history.hpp"
+#include "minera/knowledge_injection.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -537,6 +538,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] CommunicationHistoryOptions parse_communication_history_params(
     const FieldLookup& field);
 [[nodiscard]] CommunicationHistoryOptions parse_communication_history_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] KnowledgeInjectionOptions parse_knowledge_injection_params(
+    const FieldLookup& field);
+[[nodiscard]] KnowledgeInjectionOptions parse_knowledge_injection_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] LogToTargetParams parse_log_to_target_params(
