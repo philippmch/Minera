@@ -3505,6 +3505,7 @@ export interface ProcessTreePlayoutSetResult {
   family: "PROCESS_TREE_PLAYOUT";
   variant: "EXTENSIVE";
   return_set_strings: true;
+  truncated: boolean;
   traces: string[][];
 }
 
@@ -3515,6 +3516,7 @@ export function isProcessTreePlayoutSetResult(
   const result = value as Partial<ProcessTreePlayoutSetResult>;
   if (result.family !== "PROCESS_TREE_PLAYOUT" ||
       result.variant !== "EXTENSIVE" || result.return_set_strings !== true ||
+      typeof result.truncated !== "boolean" ||
       !Array.isArray(result.traces) ||
       !result.traces.every((trace) =>
         Array.isArray(trace) && trace.every((activity) => typeof activity === "string"))) {

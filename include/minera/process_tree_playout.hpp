@@ -46,6 +46,10 @@ struct ProcessTreePlayoutOptions {
 struct ProcessTreePlayoutResult {
   EventLog log;
   std::vector<std::vector<std::string>> trace_strings;
+  // Extensive enumeration is finite only under the configured language and
+  // loop bounds. This flag makes a safety-budget cutoff observable instead of
+  // presenting a truncated language as complete.
+  bool truncated = false;
 };
 
 [[nodiscard]] ProcessTreePlayoutResult process_tree_playout_result(

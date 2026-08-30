@@ -4111,7 +4111,8 @@ std::string serialize_stochastic_petri_distribution_json(
 std::string serialize_process_tree_playout_json(
     const ProcessTreePlayoutResult& result) {
   std::ostringstream out;
-  out << "{\"family\":\"PROCESS_TREE_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"return_set_strings\":true,\"traces\":[";
+  out << "{\"family\":\"PROCESS_TREE_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"return_set_strings\":true,\"truncated\":"
+      << (result.truncated ? "true" : "false") << ",\"traces\":[";
   for (std::size_t i = 0; i < result.trace_strings.size(); ++i) {
     if (i) out << ',';
     out << '[';
