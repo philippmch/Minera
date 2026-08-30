@@ -121,6 +121,32 @@ void incidence_feasible_not_realizable() {
   assert(result.recovery_attempted && !result.reaches_final && result.firing_sequence.empty());
 }
 
+void classic_equation_allows_fractional_solutions() {
+  PetriNet net;
+  net.set_activities({"double", "single"});
+  const auto source = net.add_place(), sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.add_transition(0, {source, source}, {sink, sink});
+  net.add_transition(1, {source}, {sink});
+
+  MarkingEquationOptions options;
+  options.initial_marking = {1, 0};
+  options.final_marking = {0, 1};
+  options.transition_costs = {1, 3};
+  const auto result = solve_marking_equation(net, options);
+  assert(result.computed && result.feasible && !result.exhausted);
+  assert(std::abs(result.objective - 0.5) < 1e-7);
+  assert(std::abs(result.lower_bound - result.objective) < 1e-7);
+  assert(std::abs(result.transition_counts[0] - 0.5) < 1e-7);
+  assert(std::abs(result.transition_counts[1]) < 1e-7);
+  assert(!result.recovery_attempted && !result.reaches_final);
+  assert(result.firing_sequence.empty());
+  assert(result.activated_transitions == std::vector<std::size_t>({0}));
+  assert(std::all_of(result.residual.begin(), result.residual.end(),
+                     [](double value) { return std::abs(value) < 1e-7; }));
+}
+
 void extended_equation() {
   const auto net = chain();
   auto matching = solve_extended_marking_equation({"A", "B"}, net);
@@ -778,6 +804,7 @@ void caps_markings_determinism_and_weights() {
 int main() {
   classic_equation();
   incidence_feasible_not_realizable();
+  classic_equation_allows_fractional_solutions();
   extended_equation();
   workflow_structure();
   sound_models();
