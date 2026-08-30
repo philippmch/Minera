@@ -263,7 +263,7 @@
       "variants": [
         "GRAPH_COMPARISON"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -271,7 +271,7 @@
       "variants": [
         "GRAPH_COMPARISON"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -279,7 +279,7 @@
       "variants": [
         "GRAPH_COMPARISON"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -447,7 +447,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -455,7 +455,7 @@
       "variants": [
         "TIMESTAMP_INTERLEAVINGS"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -463,7 +463,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -471,7 +471,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -480,7 +480,7 @@
         "WO_ANNOTATION",
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -488,7 +488,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -496,7 +496,7 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -754,7 +754,7 @@
       "variants": [
         "EXTENSIVE"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {
@@ -762,7 +762,7 @@
       "variants": [
         "EXTENSIVE"
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md"
     },
     {

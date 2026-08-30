@@ -2392,6 +2392,30 @@ their traces remain represented by aggregate diagnostics. The standalone JSON
 family is `ROLE_DISCOVERY` with `roles[].activities` and
 `roles[].resources[{name,count}]`.
 
+## Object-centric graph mining parity
+
+The native object-centric suite covers classic event-to-object-type, type,
+directly-follows, process-net, and stochastic-arc discovery. Process-net
+discovery exposes both annotated and unannotated forms, log- and graph-based
+inductive variants, variable and double arcs, label selectors, noise controls,
+and optional token-replay diagnostics. Graph comparison supports direct model
+inputs and deterministic discovery from object-centric logs, including
+weighted structural and measure differences with strict finite thresholds.
+
+Timestamp interleavings and event-link discovery preserve deterministic source
+indices, configurable fields and direction, propagation and first-occurrence
+behavior, and strict output bounds. Their serializers reject inconsistent row
+indices, empty endpoints, invalid directions, non-finite time differences, and
+results that exceed the requested limits.
+
+Extensive process-net and causal-net playout support independent, shared, and
+synchronized bindings; explicit object sets and markings; bounded seeded
+branching; reachability-only queries; and optional sequence and transition
+witnesses. Result serialization validates binding variants and rejects witness
+payloads that conflict with their request flags or contain empty activities or
+object identities. Causal marker groups retain conjunctive and alternative
+bindings, cardinalities, support counts, and object-exclusion keys.
+
 ## Browser-history connector evidence
 
 The native connector reads Chrome `History` and Firefox `places.sqlite`

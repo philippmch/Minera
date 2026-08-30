@@ -998,6 +998,7 @@ std::string serialize_ocpn_playout_json(const Ocel& log) {
 
 std::string serialize_ocpn_playout_json(const Ocel& log,
                                         OcpnEventBinding binding) {
+  (void)ocpn_event_binding_name(binding);
   return std::string("{\"family\":\"OCEL_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"event_binding\":\"") +
          ocpn_event_binding_name(binding) + "\",\"log\":" +
          serialize_ocel_json(log) + "}";
@@ -1005,6 +1006,28 @@ std::string serialize_ocpn_playout_json(const Ocel& log,
 
 std::string serialize_ocpn_playout_json(const OcpnPlayoutResult& result,
                                         OcpnEventBinding binding) {
+  (void)ocpn_event_binding_name(binding);
+  if (!result.return_sequences_requested && !result.sequences.empty())
+    throw std::invalid_argument("OCPN playout has unrequested sequences");
+  if (!result.return_traces_requested && !result.traces.empty())
+    throw std::invalid_argument("OCPN playout has unrequested traces");
+  const auto valid_objects = [](const auto& objects) {
+    for (const auto& [type, id] : objects)
+      if (type.empty() || id.empty()) return false;
+    return true;
+  };
+  for (const auto& sequence : result.sequences)
+    for (const auto& step : sequence)
+      if (step.activity.empty() || !valid_objects(step.objects))
+        throw std::invalid_argument("OCPN playout contains an invalid sequence step");
+  for (const auto& trace : result.traces)
+    for (const auto& step : trace) {
+      if (step.activity.empty() || !valid_objects(step.objects))
+        throw std::invalid_argument("OCPN playout contains an invalid trace step");
+      for (const auto& fired : step.transitions)
+        if (fired.object_type.empty() || fired.object_id.empty())
+          throw std::invalid_argument("OCPN playout contains an invalid transition witness");
+    }
   std::ostringstream out;
   out << "{\"family\":\"OCEL_PLAYOUT\",\"variant\":\"EXTENSIVE\",\"event_binding\":";
   write_json_string(out, ocpn_event_binding_name(binding));

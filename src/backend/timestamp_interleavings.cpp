@@ -216,6 +216,18 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
 
 std::string timestamp_interleavings_json(
     const TimestampInterleavingsResult& result) {
+  if (result.options.timestamp_key.empty() ||
+      result.options.max_interleavings == 0 ||
+      result.interleavings.size() > result.options.max_interleavings)
+    throw std::invalid_argument("timestamp interleavings result has invalid bounds");
+  for (const auto& row : result.interleavings) {
+    if (row.source_activity.empty() || row.target_activity.empty() ||
+        row.source_timestamp.empty() || row.target_timestamp.empty() ||
+        !std::isfinite(row.timestamp_diff_seconds) ||
+        (row.direction != TimestampInterleavingDirection::kLeftToRight &&
+         row.direction != TimestampInterleavingDirection::kRightToLeft))
+      throw std::invalid_argument("timestamp interleavings result contains an invalid row");
+  }
   std::ostringstream out;
   out << std::setprecision(17);
   out << "{\"family\":\"TIMESTAMP_INTERLEAVINGS\",\"variant\":\"TIMESTAMP\","

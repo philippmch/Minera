@@ -133,6 +133,24 @@ void invalid_columns_and_bound() {
              .find("LINK_ANALYSIS") != std::string::npos);
 }
 
+void malformed_result_is_rejected() {
+  minera::LinkAnalysisResult result;
+  result.event_count = 1;
+  result.links.push_back({minera::LinkAnalysisEvent{},
+                          minera::LinkAnalysisEvent{}});
+  bool threw = false;
+  try { (void)minera::link_analysis_json(result); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+
+  result.links.clear();
+  result.options.max_links = 0;
+  threw = false;
+  try { (void)minera::link_analysis_json(result); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -141,5 +159,6 @@ int main() {
   look_backward_and_custom_trace_attribute();
   event_index_is_trace_local_not_input_order();
   invalid_columns_and_bound();
+  malformed_result_is_rejected();
   return 0;
 }
