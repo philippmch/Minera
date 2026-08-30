@@ -693,6 +693,15 @@ void workflow_history_params_contract() {
   catch (const std::invalid_argument&) { rejected = true; }
   assert(rejected);
 }
+void enterprise_history_params_contract() {
+  const auto parsed = minera::parse_enterprise_history_params(fields({
+      {"enterprise_variant", "accounting"}, {"enterprise_max_events", "45"}}));
+  assert(parsed.variant == minera::EnterpriseHistoryVariant::kAccounting && parsed.max_events == 45);
+  bool rejected = false;
+  try { (void)minera::parse_enterprise_history_params(fields({{"enterprise_variant", "other"}})); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
 
 void windows_event_log_params_contract() {
   const auto parsed = minera::parse_windows_event_log_params(fields({
@@ -3737,6 +3746,7 @@ int main() {
   browser_history_params_contract();
   repository_history_params_contract();
   workflow_history_params_contract();
+  enterprise_history_params_contract();
   windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();

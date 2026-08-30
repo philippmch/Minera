@@ -6,6 +6,7 @@ import { fetchXes } from "../src/api";
 import { browserHistoryQuery, requestBrowserHistory } from "../src/api";
 import { requestWindowsEvents, windowsEventsQuery } from "../src/api";
 import { requestWorkflowHistory } from "../src/api";
+import { requestEnterpriseHistory } from "../src/api";
 
 describe("browser history API", () => {
   it("serializes explicit local connector options", () => {
@@ -50,6 +51,16 @@ describe("workflow history API", () => {
       return { ok: true, json: async () => ({ type: "WORKFLOW_HISTORY", variant: "activity_instances", trace_count: 0, event_count: 0, traces: [] }) };
     }));
     await expect(requestWorkflowHistory(csv, 50)).resolves.toMatchObject({ type: "WORKFLOW_HISTORY" });
+    vi.unstubAllGlobals();
+  });
+});
+describe("enterprise history API", () => {
+  it("posts the selected normalized enterprise variant", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toBe("/api/enterprise-history?enterprise_variant=accounting&enterprise_max_events=25");
+      return { ok: true, json: async () => ({ type: "ENTERPRISE_HISTORY", variant: "accounting", trace_count: 0, event_count: 0, traces: [] }) };
+    }));
+    await expect(requestEnterpriseHistory("header\n", "accounting", 25)).resolves.toMatchObject({ variant: "accounting" });
     vi.unstubAllGlobals();
   });
 });

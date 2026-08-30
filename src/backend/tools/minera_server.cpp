@@ -140,6 +140,7 @@
 #include "minera/windows_event_log.hpp"
 #include "minera/repository_history.hpp"
 #include "minera/workflow_history.hpp"
+#include "minera/enterprise_history.hpp"
 #include "repository_history_runtime.hpp"
 #include "minera/xes_export.hpp"
 
@@ -3972,6 +3973,24 @@ void handle_workflow_history(const httplib::Request& request,
     response.set_content(error_json(error.what()), "application/json");
   }
 }
+void handle_enterprise_history(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {"enterprise_variant", "enterprise_max_events"};
+    for (const auto& [key, value] : request.params) {
+      (void)value; if (!allowed.contains(key)) throw std::invalid_argument("unknown enterprise history parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
+    const auto options = minera::parse_enterprise_history_params(lookup, present);
+    response.set_content(minera::enterprise_history_json(
+        minera::import_enterprise_history_csv(request.body, options), options.variant), "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400; response.set_content(error_json(error.what()), "application/json");
+  }
+}
 
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
@@ -6828,6 +6847,7 @@ int main(int argc, char** argv) {
   server.Post("/api/windows-events", handle_windows_events);
   server.Post("/api/repository-history", handle_repository_history);
   server.Post("/api/workflow-history", handle_workflow_history);
+  server.Post("/api/enterprise-history", handle_enterprise_history);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);

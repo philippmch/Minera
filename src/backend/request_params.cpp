@@ -3652,6 +3652,27 @@ WorkflowHistoryOptions parse_workflow_history_params(
   return params;
 }
 
+EnterpriseHistoryOptions parse_enterprise_history_params(const FieldLookup& field) {
+  return parse_enterprise_history_params(field, {});
+}
+EnterpriseHistoryOptions parse_enterprise_history_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  EnterpriseHistoryOptions params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto variant = field("enterprise_variant");
+  if (variant == "order_to_cash") params.variant = EnterpriseHistoryVariant::kOrderToCash;
+  else if (variant == "accounting") params.variant = EnterpriseHistoryVariant::kAccounting;
+  else throw std::invalid_argument("enterprise_variant: expected order_to_cash or accounting");
+  if (supplied("enterprise_max_events")) {
+    params.max_events = parse_positive_size(field("enterprise_max_events"), "enterprise_max_events");
+    if (params.max_events > 10'000'000)
+      throw std::invalid_argument("enterprise_max_events must be in [1,10000000]");
+  }
+  return params;
+}
+
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {
   ConceptDriftParams params;

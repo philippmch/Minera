@@ -64,6 +64,7 @@ add_library(minera_core
   src/backend/evaluation.cpp
   src/backend/event_ordering.cpp
   src/backend/eventually_follows.cpp
+  src/backend/enterprise_history.cpp
   src/backend/footprints.cpp
   src/backend/genetic_matrix_conversion.cpp
   src/backend/genetic_miner.cpp
@@ -962,6 +963,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_workflow_history_tests PRIVATE cxx_std_20)
   target_compile_options(minera_workflow_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_workflow_history_tests COMMAND minera_workflow_history_tests)
+
+  add_executable(minera_enterprise_history_tests
+    src/backend/tests/test_enterprise_history.cpp
+  )
+  target_link_libraries(minera_enterprise_history_tests PRIVATE minera::core)
+  target_compile_features(minera_enterprise_history_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_enterprise_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_enterprise_history_tests COMMAND minera_enterprise_history_tests)
 
   add_executable(minera_alignment_variants_tests
     src/backend/tests/test_alignment_variants.cpp

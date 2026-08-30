@@ -946,6 +946,31 @@ export function isWorkflowHistoryResult(value: unknown): value is WorkflowHistor
   }
   return count === result.event_count;
 }
+export interface EnterpriseHistoryResult {
+  type: "ENTERPRISE_HISTORY";
+  variant: "order_to_cash" | "accounting";
+  trace_count: number;
+  event_count: number;
+  traces: Array<{ case_id: string; events: Array<RepositoryHistoryEvent & { attributes: Record<string, string> }> }>;
+}
+export function isEnterpriseHistoryResult(value: unknown): value is EnterpriseHistoryResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<EnterpriseHistoryResult>;
+  if (result.type !== "ENTERPRISE_HISTORY" || (result.variant !== "order_to_cash" && result.variant !== "accounting") ||
+      !Number.isSafeInteger(result.trace_count) || (result.trace_count as number) < 0 ||
+      !Number.isSafeInteger(result.event_count) || (result.event_count as number) < 0 ||
+      !Array.isArray(result.traces) || result.traces.length !== result.trace_count) return false;
+  let count = 0;
+  for (const trace of result.traces) {
+    if (!trace || typeof trace.case_id !== "string" || !Array.isArray(trace.events) ||
+        !trace.events.every((event) => !!event && typeof event.activity === "string" &&
+          typeof event.timestamp === "string" && typeof event.resource === "string" &&
+          !!event.attributes && typeof event.attributes === "object" && !Array.isArray(event.attributes) &&
+          Object.values(event.attributes).every((attribute) => typeof attribute === "string"))) return false;
+    count += trace.events.length;
+  }
+  return count === result.event_count;
+}
 export function isRepositoryHistoryResult(value: unknown): value is RepositoryHistoryResult {
   if (!value || typeof value !== "object") return false;
   const result = value as Partial<RepositoryHistoryResult>;
