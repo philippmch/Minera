@@ -91,6 +91,7 @@
 #include "minera/petri_anti_alignment.hpp"
 #include "minera/petri_multi_alignment.hpp"
 #include "minera/petri_usage_comparison.hpp"
+#include "minera/petri_net_reduction.hpp"
 #include "minera/petri_analysis_json.hpp"
 #include "minera/process_tree_reduction.hpp"
 #include "minera/resource_analysis.hpp"
@@ -714,6 +715,11 @@ int usage(const char* program) {
                "  --interval-query-point <f> Point diagnostic query\n"
                "  --interval-query-start <f> Range diagnostic lower bound\n"
                "  --interval-query-end <f> Range diagnostic upper bound\n"
+               "  --reduce-petri-net <file> Reduce a PNML model and emit JSON\n"
+               "  --petri-reduction-initial-marking <m> Comma-separated marking\n"
+               "  --petri-reduction-final-marking <m> Comma-separated marking\n"
+               "  --petri-reduction-parallel-place-fusion <bool>\n"
+               "  --petri-reduction-abstraction <bool>\n"
                "  --merge-case-relations <file> Merge incoming CSV/XES log\n"
                "  --case-relations <file>       Relation CSV for merge\n"
                "  --merge-timestamp-key <name>  Sort timestamp attribute\n"
@@ -1252,6 +1258,8 @@ int main(int argc, char** argv) {
   std::filesystem::path ptml_output;
   std::filesystem::path powl_ptml_output;
   std::filesystem::path pnml_to_ptml_input;
+  std::filesystem::path petri_reduction_input;
+  std::map<std::string, std::string> petri_reduction_fields;
   std::filesystem::path bpmn_to_ptml_input;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
@@ -1630,6 +1638,29 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       if (arg == "--pnml-to-ptml") pnml_to_ptml_input = value;
       else bpmn_to_ptml_input = value;
+      continue;
+    }
+    if (arg == "--reduce-petri-net") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      petri_reduction_input = value;
+      continue;
+    }
+    if (arg == "--petri-reduction-initial-marking" ||
+        arg == "--petri-reduction-final-marking" ||
+        arg == "--petri-reduction-parallel-place-fusion" ||
+        arg == "--petri-reduction-abstraction") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string key =
+          arg == "--petri-reduction-initial-marking"
+              ? "petri_reduction_initial_marking"
+          : arg == "--petri-reduction-final-marking"
+              ? "petri_reduction_final_marking"
+          : arg == "--petri-reduction-parallel-place-fusion"
+              ? "petri_reduction_parallel_place_fusion"
+              : "petri_reduction_abstraction";
+      petri_reduction_fields.insert_or_assign(key, value);
       continue;
     }
     if (arg == "--ltl-variant" || arg == "--ltl-attribute-key" ||
@@ -4631,7 +4662,19 @@ int main(int argc, char** argv) {
                  "with an event-log input or random-tree generation\n";
     return 2;
   }
-  if (input.empty() && !random_tree_requested && reverse_tree_inputs == 0) {
+  if (!petri_reduction_input.empty() &&
+      (!input.empty() || random_tree_requested || reverse_tree_inputs != 0)) {
+    std::cerr << "error: Petri-net reduction cannot be combined with an "
+                 "event-log input, random-tree generation, or reverse conversion\n";
+    return 2;
+  }
+  if (!petri_reduction_fields.empty() && petri_reduction_input.empty()) {
+    std::cerr << "error: --petri-reduction-* options require "
+                 "--reduce-petri-net\n";
+    return 2;
+  }
+  if (input.empty() && !random_tree_requested && reverse_tree_inputs == 0 &&
+      petri_reduction_input.empty()) {
     return usage(argv[0]);
   }
   if (process_tree_variant !=
@@ -4691,6 +4734,22 @@ int main(int argc, char** argv) {
         }
         file << body;
       }
+      return 0;
+    }
+    if (!petri_reduction_input.empty()) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = petri_reduction_fields.find(std::string(name));
+        return it == petri_reduction_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return petri_reduction_fields.contains(std::string(name));
+      };
+      const auto options =
+          minera::parse_petri_net_reduction_params(lookup, present);
+      const auto result =
+          minera::reduce_petri_net(minera::import_pnml(petri_reduction_input),
+                                   options);
+      std::cout << minera::petri_net_reduction_json(result) << '\n';
       return 0;
     }
     if (random_tree_requested) {

@@ -277,6 +277,20 @@ std::vector<std::size_t> parse_marking(std::string_view value,
   return result;
 }
 
+Marking parse_signed_marking(std::string_view value, std::string_view name) {
+  const auto parsed = parse_marking(value, name);
+  Marking result;
+  result.reserve(parsed.size());
+  for (const auto tokens : parsed) {
+    if (tokens > static_cast<std::uint64_t>(
+                     std::numeric_limits<std::int64_t>::max()))
+      throw std::invalid_argument(std::string(name) +
+                                  ": value exceeds signed marking range");
+    result.push_back(static_cast<std::int64_t>(tokens));
+  }
+  return result;
+}
+
 std::vector<std::uint32_t> parse_uint32_marking(std::string_view value,
                                                 std::string_view name) {
   const auto parsed = parse_marking(value, name);
@@ -714,6 +728,42 @@ PetriMultiAlignmentOptions parse_petri_multi_alignment_params(const FieldLookup&
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field) { return parse_process_tree_reduction_params(field, FieldPresence{}); }
 ProcessTreeReductionOptions parse_process_tree_reduction_params(const FieldLookup& field,const FieldPresence& present) {
   ProcessTreeReductionOptions o; const auto supplied=[&](std::string_view n){return present?present(n):!field(n).empty();}; if(supplied("variant")){auto v=field("variant");if(v!="tree_tr_based"&&v!="TREE_TR_BASED")throw std::invalid_argument("variant: expected tree_tr_based");} if(supplied("activity_key"))o.activity_key=field("activity_key"); return o;
+}
+
+PetriNetReductionOptions parse_petri_net_reduction_params(
+    const FieldLookup& field) {
+  return parse_petri_net_reduction_params(field, FieldPresence{});
+}
+
+PetriNetReductionOptions parse_petri_net_reduction_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  PetriNetReductionOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    auto value = field(name);
+    if (!supplied(name) || value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("petri_reduction_initial_marking"))
+    options.initial_marking = parse_signed_marking(
+        require("petri_reduction_initial_marking"),
+        "petri_reduction_initial_marking");
+  if (supplied("petri_reduction_final_marking"))
+    options.final_marking = parse_signed_marking(
+        require("petri_reduction_final_marking"),
+        "petri_reduction_final_marking");
+  if (supplied("petri_reduction_parallel_place_fusion"))
+    options.enable_parallel_place_fusion = parse_boolean(
+        require("petri_reduction_parallel_place_fusion"),
+        "petri_reduction_parallel_place_fusion");
+  if (supplied("petri_reduction_abstraction"))
+    options.enable_abstraction = parse_boolean(
+        require("petri_reduction_abstraction"),
+        "petri_reduction_abstraction");
+  return options;
 }
 
 EvaluationParams parse_evaluation_params(const FieldLookup& field) {

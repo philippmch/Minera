@@ -2080,6 +2080,37 @@ void parse_native_adapter_params_contract() {
   const auto r = minera::parse_process_tree_reduction_params(fields({
       {"variant", "tree_tr_based"}, {"activity_key", "concept:name"}}));
   assert(r.activity_key == "concept:name");
+  const auto net_reduction = minera::parse_petri_net_reduction_params(fields({
+      {"petri_reduction_initial_marking", "1,0,2"},
+      {"petri_reduction_final_marking", "0,0,1"},
+      {"petri_reduction_parallel_place_fusion", "true"},
+      {"petri_reduction_abstraction", "1"}}));
+  assert((net_reduction.initial_marking == minera::Marking{1, 0, 2}));
+  assert((net_reduction.final_marking == minera::Marking{0, 0, 1}));
+  assert(net_reduction.enable_parallel_place_fusion &&
+         net_reduction.enable_abstraction);
+  for (const auto& invalid : {
+           std::pair{"petri_reduction_initial_marking", "1,-1"},
+           std::pair{"petri_reduction_parallel_place_fusion", "maybe"}}) {
+    bool rejected = false;
+    try {
+      (void)minera::parse_petri_net_reduction_params(fields({invalid}));
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+  bool rejected_empty = false;
+  try {
+    (void)minera::parse_petri_net_reduction_params(
+        fields({{"petri_reduction_abstraction", ""}}),
+        [](std::string_view name) {
+          return name == "petri_reduction_abstraction";
+        });
+  } catch (const std::invalid_argument&) {
+    rejected_empty = true;
+  }
+  assert(rejected_empty);
 }
 
 void parse_evaluation_params_defaults_and_variants() {
