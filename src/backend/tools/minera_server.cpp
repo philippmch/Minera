@@ -5954,33 +5954,16 @@ void handle_playout(const httplib::Request& request,
       reject("mode=extensive is not supported for Declare playout");
       return;
     }
-    minera::DeclarePlayoutOptions options;
-    if (request.has_param("traces")) {
-      const auto parsed = parse_bounded("traces", 1, 10000);
-      if (!parsed) return;
-      options.n_traces = static_cast<int>(*parsed);
-    }
-    if (request.has_param("min_length")) {
-      const auto parsed = parse_bounded("min_length", 0, 1000);
-      if (!parsed) return;
-      options.min_length = static_cast<int>(*parsed);
-    }
-    if (request.has_param("max_length")) {
-      const auto parsed = parse_bounded("max_length", 0, 1000);
-      if (!parsed) return;
-      options.max_length = static_cast<int>(*parsed);
-    }
-    if (request.has_param("seed")) {
-      const auto parsed =
-          parse_bounded("seed", 0, std::numeric_limits<std::uint64_t>::max());
-      if (!parsed) return;
-      options.seed = *parsed;
-    }
-    if (options.min_length > options.max_length) {
-      reject("min_length must not exceed max_length");
-      return;
-    }
     try {
+      const auto lookup = [&](std::string_view name) {
+        return request.has_param(std::string(name))
+                   ? request.get_param_value(std::string(name))
+                   : std::string{};
+      };
+      const auto present = [&](std::string_view name) {
+        return request.has_param(std::string(name));
+      };
+      const auto options = minera::parse_declare_playout_params(lookup, present);
       const auto log = minera::declare_playout(session->declare, options);
       response.set_content(minera::to_xes(log, "declare playout"),
                            "application/xml");

@@ -301,12 +301,9 @@ void playout_contract() {
   }
   assert((lengths == std::set<std::size_t>{2, 3, 4}));
 
-  options.n_traces = -1;
+  options.n_traces = 0;
   assert(declare_playout(unknown, options).traces.empty());
   options.n_traces = 1;
-  options.min_length = -2;
-  options.max_length = -1;
-  assert(declare_playout(unknown, options).traces[0].events.empty());
   options.min_length = 4;
   options.max_length = 3;
   bool threw = false;

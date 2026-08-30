@@ -2727,6 +2727,33 @@ void parse_process_tree_playout_params_maps_variants_and_limits() {
   assert(parsed.return_set_strings);
 }
 
+void parse_declare_playout_params_is_strict_and_bounded() {
+  const auto parsed = minera::parse_declare_playout_params(fields({
+      {"traces", "12"}, {"min_length", "2"}, {"max_length", "8"},
+      {"seed", "7"}}));
+  assert(parsed.n_traces == 12 && parsed.min_length == 2 &&
+         parsed.max_length == 8 && parsed.seed == 7);
+  for (const auto& item : {std::pair{"traces", "100001"},
+                           std::pair{"min_length", "-1"},
+                           std::pair{"max_length", "10001"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_declare_playout_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool threw = false;
+  try {
+    (void)minera::parse_declare_playout_params(
+        fields({{"min_length", "4"}, {"max_length", "2"}}));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void parse_process_tree_playout_params_rejects_bad_values() {
   for (const auto& item : {
            std::pair{"playout_variant", "not-a-variant"},
@@ -3728,6 +3755,7 @@ int main() {
   parse_petri_analysis_params_accepts_woflan_alias();
   parse_petri_analysis_params_rejects_bad_values();
   parse_process_tree_playout_params_maps_variants_and_limits();
+  parse_declare_playout_params_is_strict_and_bounded();
   parse_process_tree_playout_params_rejects_bad_values();
   parse_extensive_playout_params_maps_controls_and_rejects_zero();
   parse_ocpn_playout_params_maps_return_traces();

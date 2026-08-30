@@ -10,9 +10,9 @@
 namespace minera {
 
 struct DeclarePlayoutOptions {
-  int n_traces = 1000;
-  int min_length = 3;
-  int max_length = 15;
+  std::size_t n_traces = 1000;
+  std::size_t min_length = 3;
+  std::size_t max_length = 15;
   std::optional<std::uint64_t> seed;
 };
 

@@ -164,6 +164,7 @@ import {
   type ProcessTreeReductionOptions,
   type ProcessTreeReductionResult,
   type ProcessTreePlayoutOptions,
+  type DeclarePlayoutOptions,
   type ProcessTreePlayoutSetResult,
   type BasicPlayoutOptions,
   type BasicPlayoutVisitedResult,
@@ -3576,6 +3577,25 @@ export function processTreePlayoutQuery(options: ProcessTreePlayoutOptions = {})
   return params.toString();
 }
 
+export function declarePlayoutQuery(options: DeclarePlayoutOptions = {}): string {
+  const params = new URLSearchParams();
+  const bounded = (name: keyof DeclarePlayoutOptions, value: number | undefined,
+                   maximum: number) => {
+    if (value === undefined) return;
+    if (!Number.isSafeInteger(value) || value < 0 || value > maximum)
+      throw new Error(`${name} must be an integer between 0 and ${maximum}`);
+    params.set(name, String(value));
+  };
+  bounded("traces", options.traces, 100000);
+  bounded("min_length", options.min_length, 10000);
+  bounded("max_length", options.max_length, 10000);
+  bounded("seed", options.seed, Number.MAX_SAFE_INTEGER);
+  if (options.min_length !== undefined && options.max_length !== undefined &&
+      options.min_length > options.max_length)
+    throw new Error("min_length must not exceed max_length");
+  return params.toString();
+}
+
 export function stochasticPlayoutQuery(options: StochasticPlayoutOptions = {}): string {
   const params = new URLSearchParams();
   setProcessTreePetriNetVariant(params, options.process_tree_variant);
@@ -3971,12 +3991,12 @@ export function fetchPlayout(
 export function fetchPlayout(
   miner: string,
   options?: BasicPlayoutOptions | ProcessTreePlayoutOptions |
-    StochasticPlayoutOptions | DfgPlayoutOptions,
+    DeclarePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions,
 ): Promise<string>;
 export async function fetchPlayout(
   miner: string,
   options: BasicPlayoutOptions | ProcessTreePlayoutOptions |
-    StochasticPlayoutOptions | DfgPlayoutOptions | MonteCarloOptions = {},
+    DeclarePlayoutOptions | StochasticPlayoutOptions | DfgPlayoutOptions | MonteCarloOptions = {},
 ): Promise<string> {
   if (miner === "monte_carlo") {
     return fetchMonteCarloPlayout("inductive", options as MonteCarloOptions);
@@ -4001,8 +4021,10 @@ export async function fetchPlayout(
   } else {
     query = miner === "dfg"
       ? dfgPlayoutQuery(options as DfgPlayoutOptions)
-      : miner === "process_tree" || miner === "declare"
+      : miner === "process_tree"
         ? processTreePlayoutQuery(options as ProcessTreePlayoutOptions)
+        : miner === "declare"
+          ? declarePlayoutQuery(options as DeclarePlayoutOptions)
         : basicPlayoutQuery(options as BasicPlayoutOptions);
   }
   return fetchPlayoutText(

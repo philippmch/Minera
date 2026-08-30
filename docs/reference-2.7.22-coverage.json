@@ -6,7 +6,8 @@
   "artifact_required_packages": [
     "algo.simulation.tree_generator",
     "algo.simulation.playout.process_tree",
-    "algo.simulation.playout.dfg"
+    "algo.simulation.playout.dfg",
+    "algo.simulation.playout.declare"
   ],
   "packages": [
     {
@@ -620,8 +621,21 @@
       "variants": [
         "CLASSIC"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/declare_playout.hpp",
+        "src/backend/declare_playout.cpp",
+        "include/minera/request_params.hpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_declare_variants.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts"
+      ]
     },
     {
       "package": "algo.simulation.playout.dfg",
