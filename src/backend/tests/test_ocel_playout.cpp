@@ -504,6 +504,39 @@ void legacy_branching_rejects_incomplete_object_products() {
   assert(found_mixed_feasibility);
 }
 
+void malformed_result_is_rejected() {
+  minera::OcpnPlayoutResult result;
+  result.sequences.push_back({});
+  bool threw = false;
+  try {
+    (void)minera::serialize_ocpn_playout_json(
+        result, minera::OcpnEventBinding::kIndependent);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  result.return_sequences_requested = true;
+  result.sequences = {{{"", {{"order", "o1"}}}}};
+  threw = false;
+  try {
+    (void)minera::serialize_ocpn_playout_json(
+        result, minera::OcpnEventBinding::kIndependent);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    (void)minera::serialize_ocpn_playout_json(
+        result.log, static_cast<minera::OcpnEventBinding>(99));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -519,4 +552,5 @@ int main() {
   legacy_branching_is_seeded_for_independent_and_shared_modes();
   legacy_transition_sampling_is_per_object();
   legacy_branching_rejects_incomplete_object_products();
+  malformed_result_is_rejected();
 }

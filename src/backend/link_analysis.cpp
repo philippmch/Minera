@@ -250,6 +250,18 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
 }
 
 std::string link_analysis_json(const LinkAnalysisResult& result) {
+  if (result.options.index_column.empty() || result.options.max_links == 0)
+    throw std::invalid_argument("link analysis result has invalid options");
+  if (result.links.size() > result.options.max_links)
+    throw std::invalid_argument("link analysis result exceeds max_links");
+  const auto valid_event = [&](const LinkAnalysisEvent& event) {
+    return event.index < result.event_count && !event.case_id.empty() &&
+           !event.activity.empty();
+  };
+  for (const auto& link : result.links) {
+    if (!valid_event(link.source) || !valid_event(link.target))
+      throw std::invalid_argument("link analysis result contains an invalid endpoint");
+  }
   std::ostringstream out;
   out << "{\"family\":\"LINK_ANALYSIS\",\"variant\":\"CLASSIC\""
       << ",\"out_column\":";

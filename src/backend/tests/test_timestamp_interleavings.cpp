@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <initializer_list>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -140,6 +141,26 @@ void invalid_timestamps_and_json_contract() {
   assert(json.find("timestamp_diff") != std::string::npos);
 }
 
+void malformed_result_is_rejected() {
+  minera::TimestampInterleavingsResult result;
+  result.interleavings.push_back({
+      "A", "B", "2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z", 0, 0,
+      static_cast<minera::TimestampInterleavingDirection>(99), 1.0});
+  bool threw = false;
+  try { (void)minera::timestamp_interleavings_json(result); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+
+  result.interleavings.front().direction =
+      minera::TimestampInterleavingDirection::kLeftToRight;
+  result.interleavings.front().timestamp_diff_seconds =
+      std::numeric_limits<double>::quiet_NaN();
+  threw = false;
+  try { (void)minera::timestamp_interleavings_json(result); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 }  // namespace
 
 int main() {
@@ -147,5 +168,6 @@ int main() {
   equality_and_unrelated_relations_are_excluded();
   custom_timestamp_and_bound_are_strict();
   invalid_timestamps_and_json_contract();
+  malformed_result_is_rejected();
   return 0;
 }
