@@ -160,6 +160,7 @@ import {
   type StochasticPetriDistributionResult,
   type StochasticMapOptions,
   type StochasticMapResult,
+  type StochasticMapTransition,
   type MonteCarloOptions,
   type MonteCarloResult,
   type ChaoticActivitiesResult,
@@ -3582,10 +3583,88 @@ export async function fetchStochasticPlayoutVisited(
   return payload;
 }
 
+function monteCarloMarking(name: string, marking: number[] | undefined): string | undefined {
+  if (marking === undefined) return undefined;
+  if (!Array.isArray(marking) || marking.length === 0 ||
+      marking.some((count) => !Number.isSafeInteger(count) || count < 0 || count > 0xffffffff)) {
+    throw new Error(`${name} must be a non-empty list of uint32 token counts`);
+  }
+  return marking.join(",");
+}
+
+function validateMonteCarloMapTransition(
+  transition: StochasticMapTransition,
+  seen: Set<number>,
+): void {
+  if (!transition || !Number.isSafeInteger(transition.transition) ||
+      transition.transition < 0 || seen.has(transition.transition)) {
+    throw new Error("provided_stochastic_map must use unique non-negative transition indexes");
+  }
+  seen.add(transition.transition);
+  if (transition.timing !== "timed" && transition.timing !== "immediate") {
+    throw new Error("provided_stochastic_map contains an invalid timing");
+  }
+  if (!["deterministic", "exponential", "constant0", "immediate", "normal",
+        "uniform", "lognormal", "gamma"].includes(transition.distribution)) {
+    throw new Error("provided_stochastic_map contains an invalid distribution");
+  }
+  const { parameter, secondary_parameter: secondary,
+    tertiary_parameter: tertiary, activation_weight: weight, priority } = transition;
+  if (![parameter, secondary, tertiary, weight].every(Number.isFinite) ||
+      secondary < 0 || tertiary < 0 || weight < 0 ||
+      !Number.isSafeInteger(priority) || priority < -2147483648 ||
+      priority > 2147483647) {
+    throw new Error("provided_stochastic_map contains invalid numeric fields");
+  }
+  switch (transition.distribution) {
+    case "exponential":
+      if (parameter < 0 || (transition.timing === "timed" && parameter <= 0))
+        throw new Error("provided_stochastic_map exponential rates must be positive when timed");
+      break;
+    case "uniform":
+      if (parameter < 0 || secondary < parameter)
+        throw new Error("provided_stochastic_map uniform bounds must be ordered and non-negative");
+      break;
+    case "normal":
+    case "deterministic":
+      if (parameter < 0)
+        throw new Error("provided_stochastic_map duration means must be non-negative");
+      break;
+    case "gamma":
+      if (parameter <= 0 || secondary <= 0)
+        throw new Error("provided_stochastic_map gamma scale and shape must be positive");
+      break;
+    case "constant0":
+    case "immediate":
+      if (parameter !== 0 || secondary !== 0 || tertiary !== 0)
+        throw new Error("provided_stochastic_map immediate distributions must have zero parameters");
+      break;
+    case "lognormal":
+      break;
+  }
+}
+
+function monteCarloStochasticMap(map: StochasticMapTransition[] | undefined): string | undefined {
+  if (map === undefined) return undefined;
+  if (!Array.isArray(map)) throw new Error("provided_stochastic_map must be an array");
+  if (map.length === 0) return "empty";
+  const seen = new Set<number>();
+  for (const transition of map) validateMonteCarloMapTransition(transition, seen);
+  return [...map]
+    .sort((left, right) => left.transition - right.transition)
+    .map((transition) => [
+      transition.transition, transition.timing, transition.distribution,
+      transition.parameter, transition.secondary_parameter,
+      transition.tertiary_parameter, transition.activation_weight,
+      transition.priority,
+    ].join(":"))
+    .join(",");
+}
+
 export function monteCarloQuery(options: MonteCarloOptions = {}): string {
   const params = new URLSearchParams();
   setProcessTreePetriNetVariant(params, options.process_tree_variant);
-  const positiveIntegers: Array<keyof MonteCarloOptions> = ["simulations"];
+  const positiveIntegers: Array<keyof MonteCarloOptions> = ["simulations", "diagnostic_interval"];
   for (const name of positiveIntegers) {
     const value = options[name];
     if (value !== undefined) {
@@ -3600,14 +3679,46 @@ export function monteCarloQuery(options: MonteCarloOptions = {}): string {
       params.set(`monte_carlo_${name}`, String(value));
     }
   }
-  for (const name of ["case_arrival_seconds", "start", "default_duration_seconds"] as const) {
+  if (options.case_arrival_ratio !== undefined && options.case_arrival_seconds !== undefined) {
+    throw new Error("case_arrival_ratio and case_arrival_seconds are aliases; supply only one");
+  }
+  for (const name of ["case_arrival_ratio", "case_arrival_seconds", "start",
+    "default_duration_seconds", "small_scale_factor", "max_thread_execution_time"] as const) {
     const value = options[name];
     if (value !== undefined) {
-      if (!Number.isFinite(value) || (name !== "start" && value < 0)) {
-        throw new Error(`${name} must be a finite ${name === "start" ? "number" : "non-negative number"}`);
+      const positive = name === "small_scale_factor" || name === "max_thread_execution_time";
+      if (!Number.isFinite(value) || (name !== "start" && value < 0) || (positive && value === 0)) {
+        throw new Error(`${name} must be a finite ${name === "start" ? "number" : positive ? "positive number" : "non-negative number"}`);
       }
       params.set(`monte_carlo_${name}`, String(value));
     }
+  }
+  for (const [name, value] of [
+    ["activity_key", options.activity_key],
+    ["timestamp_key", options.timestamp_key],
+  ] as const) {
+    if (value !== undefined) {
+      const trimmed = value.trim();
+      if (!trimmed) throw new Error(`${name} must not be empty`);
+      params.set(`monte_carlo_${name}`, trimmed);
+    }
+  }
+  for (const [name, marking] of [
+    ["initial_marking", options.initial_marking],
+    ["final_marking", options.final_marking],
+  ] as const) {
+    const encoded = monteCarloMarking(name, marking);
+    if (encoded !== undefined) params.set(`monte_carlo_${name}`, encoded);
+  }
+  if (options.token_replay_variant !== undefined) {
+    if (options.token_replay_variant !== "forward" && options.token_replay_variant !== "backwards") {
+      throw new Error("token_replay_variant must be forward or backwards");
+    }
+    params.set("monte_carlo_token_replay_variant", options.token_replay_variant);
+  }
+  const stochasticMap = monteCarloStochasticMap(options.provided_stochastic_map);
+  if (stochasticMap !== undefined) {
+    params.set("monte_carlo_provided_stochastic_map", stochasticMap);
   }
   if (options.force_distribution !== undefined) {
     if (!["normal", "uniform", "exponential"].includes(options.force_distribution)) {
@@ -3745,30 +3856,10 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
   return params.toString();
 }
 
-export async function fetchPlayout(miner: string, options: BasicPlayoutOptions | ProcessTreePlayoutOptions | StochasticPlayoutOptions | MonteCarloOptions | DfgPlayoutOptions = {}): Promise<string> {
-  const monteCarlo = miner === "monte_carlo" || "simulations" in options ||
-    "default_duration_seconds" in options || "transition_durations" in options ||
-    "force_distribution" in options ||
-    "resources_per_place" in options;
-  const stochastic = miner === "stochastic" || "transition_weights" in options ||
-    "fit_from_log" in options || "stop_at_final" in options;
-  let query: string;
-  if (monteCarlo) {
-    const controls = monteCarloQuery(options as MonteCarloOptions);
-    query = `mode=monte_carlo${controls ? `&${controls}` : ""}`;
-  } else if (stochastic) {
-    const controls = stochasticPlayoutQuery(options as StochasticPlayoutOptions);
-    query = `mode=stochastic${controls ? `&${controls}` : ""}`;
-  } else {
-    query = miner === "dfg"
-      ? dfgPlayoutQuery(options as DfgPlayoutOptions)
-      : miner === "process_tree" || miner === "declare"
-        ? processTreePlayoutQuery(options as ProcessTreePlayoutOptions)
-        : basicPlayoutQuery(options as BasicPlayoutOptions);
-  }
+async function fetchPlayoutText(path: string, init?: RequestInit): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(`/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`);
+    response = init === undefined ? await fetch(path) : await fetch(path, init);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -3782,6 +3873,71 @@ export async function fetchPlayout(miner: string, options: BasicPlayoutOptions |
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
   return response.text();
+}
+
+/** Fetches Monte Carlo XES from the playout endpoint with an explicit mode. */
+export async function fetchMonteCarloPlayout(
+  miner = "inductive", options: MonteCarloOptions = {},
+): Promise<string> {
+  const params = new URLSearchParams(monteCarloQuery(options));
+  params.set("miner", miner);
+  params.set("mode", "monte_carlo");
+  return fetchPlayoutText("/api/playout", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+}
+
+/**
+ * Compatibility overload for callers that used the mode name as the miner.
+ * Monte Carlo controls are intentionally only exposed for this literal
+ * discriminator; callers with an ordinary miner must use the dedicated
+ * function so ambiguous controls cannot be silently reinterpreted.
+ */
+export function fetchPlayout(
+  miner: "monte_carlo", options?: MonteCarloOptions,
+): Promise<string>;
+export function fetchPlayout(
+  miner: string,
+  options?: BasicPlayoutOptions | ProcessTreePlayoutOptions |
+    StochasticPlayoutOptions | DfgPlayoutOptions,
+): Promise<string>;
+export async function fetchPlayout(
+  miner: string,
+  options: BasicPlayoutOptions | ProcessTreePlayoutOptions |
+    StochasticPlayoutOptions | DfgPlayoutOptions | MonteCarloOptions = {},
+): Promise<string> {
+  if (miner === "monte_carlo") {
+    return fetchMonteCarloPlayout("inductive", options as MonteCarloOptions);
+  }
+  const monteCarloOnly = [
+    "simulations", "case_arrival_ratio", "case_arrival_seconds",
+    "default_duration_seconds", "force_distribution", "transition_durations",
+    "resources_per_place", "default_resources_per_place", "provided_stochastic_map",
+    "token_replay_variant", "diagnostic_interval", "small_scale_factor",
+    "max_thread_execution_time", "enable_diagnostics",
+  ] as const;
+  const unsupported = monteCarloOnly.find((name) => name in options);
+  if (unsupported !== undefined) {
+    throw new Error(`${unsupported} is Monte Carlo-only; use fetchMonteCarloPlayout`);
+  }
+  const stochastic = miner === "stochastic" || "transition_weights" in options ||
+    "fit_from_log" in options || "stop_at_final" in options;
+  let query: string;
+  if (stochastic) {
+    const controls = stochasticPlayoutQuery(options as StochasticPlayoutOptions);
+    query = `mode=stochastic${controls ? `&${controls}` : ""}`;
+  } else {
+    query = miner === "dfg"
+      ? dfgPlayoutQuery(options as DfgPlayoutOptions)
+      : miner === "process_tree" || miner === "declare"
+        ? processTreePlayoutQuery(options as ProcessTreePlayoutOptions)
+        : basicPlayoutQuery(options as BasicPlayoutOptions);
+  }
+  return fetchPlayoutText(
+    `/api/playout?miner=${encodeURIComponent(miner)}${query ? `&${query}` : ""}`,
+  );
 }
 
 /** Fetches the structured visitation sequence emitted by basic Petri playout. */
@@ -4085,10 +4241,15 @@ export async function fetchDfgPlayout(
 export async function fetchMonteCarloResult(
   miner = "inductive", options: MonteCarloOptions = {},
 ): Promise<MonteCarloResult> {
-  const controls = monteCarloQuery(options);
+  const params = new URLSearchParams(monteCarloQuery(options));
+  params.set("miner", miner);
   let response: Response;
   try {
-    response = await fetch(`/api/monte-carlo?miner=${encodeURIComponent(miner)}${controls ? `&${controls}` : ""}`);
+    response = await fetch("/api/monte-carlo", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }

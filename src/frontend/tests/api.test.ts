@@ -4,7 +4,7 @@ import { fetchStochasticPetri, fetchStochasticPetriDistribution, stochasticPetri
 import { isStochasticMapResult } from "../src/types";
 import { fetchXes } from "../src/api";
 import { geneticMatrixConversionQuery, requestGeneticMatrixConversion } from "../src/api";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFlattenQuery, requestOcelFlatten, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFlattenQuery, requestOcelFlatten, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloPlayout, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage } from "../src/api";
 
 describe("XES export API", () => {
   it("requests the selected exporter as a binary-safe blob", async () => {
@@ -1156,15 +1156,197 @@ describe("Monte Carlo API", () => {
     })).toBe("monte_carlo_simulations=4&monte_carlo_max_steps=8&monte_carlo_seed=7&monte_carlo_case_arrival_seconds=2.5&monte_carlo_default_duration_seconds=3&monte_carlo_force_distribution=exponential&monte_carlo_transition_weights=0.25%2C1&monte_carlo_transition_durations=deterministic%3A1%2Cexponential%3A2%2Cnormal%3A3%3B1%2Clognormal%3A0.5%3B0%3B1&monte_carlo_resources_per_place=0%3D2%2C3%3D4&monte_carlo_enable_diagnostics=false");
   });
 
+  it("serializes selectors, markings, sparse maps, and compatibility controls", () => {
+    const query = new URLSearchParams(monteCarloQuery({
+      case_arrival_ratio: 15,
+      activity_key: " custom:name ", timestamp_key: "custom:time",
+      initial_marking: [1, 0, 2], final_marking: [0, 1, 0],
+      token_replay_variant: "backwards", diagnostic_interval: 16,
+      small_scale_factor: 1000, max_thread_execution_time: 30,
+      provided_stochastic_map: [
+        { transition: 1, timing: "timed", distribution: "deterministic",
+          parameter: 4, secondary_parameter: 0, tertiary_parameter: 0,
+          activation_weight: 2, priority: 0 },
+        { transition: 0, timing: "immediate", distribution: "immediate",
+          parameter: 0, secondary_parameter: 0, tertiary_parameter: 0,
+          activation_weight: 1, priority: 3 },
+      ],
+    }));
+    expect(Object.fromEntries(query)).toEqual({
+      monte_carlo_case_arrival_ratio: "15",
+      monte_carlo_small_scale_factor: "1000",
+      monte_carlo_max_thread_execution_time: "30",
+      monte_carlo_activity_key: "custom:name",
+      monte_carlo_timestamp_key: "custom:time",
+      monte_carlo_initial_marking: "1,0,2",
+      monte_carlo_final_marking: "0,1,0",
+      monte_carlo_token_replay_variant: "backwards",
+      monte_carlo_diagnostic_interval: "16",
+      monte_carlo_provided_stochastic_map:
+        "0:immediate:immediate:0:0:0:1:3,1:timed:deterministic:4:0:0:2:0",
+    });
+    expect(new URLSearchParams(monteCarloQuery({ provided_stochastic_map: [] }))
+      .get("monte_carlo_provided_stochastic_map")).toBe("empty");
+  });
+
+  it("rejects conflicting and malformed extended controls", () => {
+    expect(() => monteCarloQuery({ case_arrival_ratio: 1, case_arrival_seconds: 1 }))
+      .toThrow(/supply only one/);
+    expect(() => monteCarloQuery({ initial_marking: [] })).toThrow(/non-empty/);
+    expect(() => monteCarloQuery({ final_marking: [0x1_0000_0000] })).toThrow(/uint32/);
+    expect(() => monteCarloQuery({ activity_key: " " })).toThrow(/must not be empty/);
+    expect(() => monteCarloQuery({ diagnostic_interval: 0 })).toThrow(/positive/);
+    expect(() => monteCarloQuery({ small_scale_factor: 0 })).toThrow(/positive/);
+    const transition = { transition: 0, timing: "timed" as const,
+      distribution: "exponential" as const, parameter: 0,
+      secondary_parameter: 0, tertiary_parameter: 0,
+      activation_weight: 1, priority: 0 };
+    expect(() => monteCarloQuery({ provided_stochastic_map: [transition] }))
+      .toThrow(/rates must be positive/);
+    expect(() => monteCarloQuery({ provided_stochastic_map: [
+      { ...transition, parameter: 1 }, { ...transition, parameter: 2 },
+    ] })).toThrow(/unique/);
+    expect(() => monteCarloQuery({ provided_stochastic_map: [
+      { ...transition, priority: -2147483649 },
+    ] })).toThrow(/invalid numeric fields/);
+    expect(() => monteCarloQuery({ provided_stochastic_map: [
+      { ...transition, priority: 2147483648 },
+    ] })).toThrow(/invalid numeric fields/);
+  });
+
+  it("accepts the signed 32-bit priority boundaries", () => {
+    const transition = { transition: 0, timing: "immediate" as const,
+      distribution: "immediate" as const, parameter: 0,
+      secondary_parameter: 0, tertiary_parameter: 0,
+      activation_weight: 1, priority: -2147483648 };
+    expect(new URLSearchParams(monteCarloQuery({
+      provided_stochastic_map: [transition],
+    })).get("monte_carlo_provided_stochastic_map")).toBe(
+      "0:immediate:immediate:0:0:0:1:-2147483648",
+    );
+    expect(new URLSearchParams(monteCarloQuery({
+      provided_stochastic_map: [{ ...transition, priority: 2147483647 }],
+    })).get("monte_carlo_provided_stochastic_map")).toBe(
+      "0:immediate:immediate:0:0:0:1:2147483647",
+    );
+  });
+
+  it("posts every ambiguous Monte Carlo control explicitly", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/playout");
+      expect(path.length).toBeLessThan(8192);
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({
+        "Content-Type": "application/x-www-form-urlencoded",
+      });
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("miner")).toBe("inductive");
+      expect(body.get("mode")).toBe("monte_carlo");
+      expect(body.get("monte_carlo_activity_key")).toBe("custom:activity");
+      expect(body.get("monte_carlo_timestamp_key")).toBe("custom:time");
+      expect(body.get("monte_carlo_initial_marking")).toBe("1,0");
+      expect(body.get("monte_carlo_final_marking")).toBe("0,1");
+      expect(body.get("monte_carlo_stop_at_final")).toBe("true");
+      expect(body.get("monte_carlo_token_replay_variant")).toBe("backwards");
+      expect(body.get("monte_carlo_case_arrival_ratio")).toBe("3");
+      expect(body.get("monte_carlo_enable_diagnostics")).toBe("false");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchMonteCarloPlayout("inductive", {
+      activity_key: "custom:activity", timestamp_key: "custom:time",
+      initial_marking: [1, 0], final_marking: [0, 1], stop_at_final: true,
+      token_replay_variant: "backwards", case_arrival_ratio: 3,
+      enable_diagnostics: false,
+    })).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the legacy Monte Carlo discriminator on the explicit POST path", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/playout");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({
+        "Content-Type": "application/x-www-form-urlencoded",
+      });
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("miner")).toBe("inductive");
+      expect(body.get("mode")).toBe("monte_carlo");
+      expect(body.get("monte_carlo_simulations")).toBe("2");
+      expect(body.get("monte_carlo_case_arrival_seconds")).toBe("3");
+      expect(body.get("monte_carlo_provided_stochastic_map")).toBe("empty");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchPlayout("monte_carlo", {
+      simulations: 2,
+      case_arrival_seconds: 3,
+      provided_stochastic_map: [],
+    })).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps Monte Carlo-only controls out of ordinary playout dispatch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchPlayout("inductive", { simulations: 1 } as never))
+      .rejects.toThrow(/fetchMonteCarloPlayout/);
+    await expect(fetchPlayout("inductive", { case_arrival_seconds: 3 } as never))
+      .rejects.toThrow(/fetchMonteCarloPlayout/);
+    await expect(fetchPlayout("inductive", { provided_stochastic_map: [] } as never))
+      .rejects.toThrow(/fetchMonteCarloPlayout/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps a large supplied stochastic map in the POST body", async () => {
+    const provided_stochastic_map = Array.from({ length: 500 }, (_, transition) => ({
+      transition, timing: "immediate" as const, distribution: "immediate" as const,
+      parameter: 0, secondary_parameter: 0, tertiary_parameter: 0,
+      activation_weight: 1, priority: 0,
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/playout");
+      expect(path.length).toBeLessThan(8192);
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({
+        "Content-Type": "application/x-www-form-urlencoded",
+      });
+      const body = new URLSearchParams(String(init?.body));
+      const encodedMap = body.get("monte_carlo_provided_stochastic_map");
+      expect(encodedMap).not.toBeNull();
+      expect(encodedMap!.length).toBeGreaterThan(8192);
+      expect(encodedMap!.split(",")).toHaveLength(provided_stochastic_map.length);
+      expect(body.get("monte_carlo_simulations")).toBe("2");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchMonteCarloPlayout("inductive", {
+      simulations: 2, provided_stochastic_map,
+    })).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+
   it("validates simulation results", async () => {
     const result = {
       family: "MONTE_CARLO", variant: "PETRI_SEMAPH_FIFO",
       log: { trace_count: 2, event_count: 3 },
-      diagnostics: { simulated_cases: 2, completed_cases: 2, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 3, median_case_execution_seconds: 1, case_execution_seconds: [1, 1] },
+      diagnostics: { simulated_cases: 2, completed_cases: 2, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 3, median_case_execution_seconds: 1, case_execution_seconds: [1, 1], case_arrival_ratio: 1, total_cases_time: 3, median_cases_ex_time: 1, cases_ex_time: [1, 1] },
+      output_places_interval_trees: [{ place_index: 0, intervals: [{ start: 1, end: 2 }] }],
+      output_transitions_interval_trees: [{ transition_index: 0, intervals: [] }],
     };
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => result })));
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/monte-carlo");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({
+        "Content-Type": "application/x-www-form-urlencoded",
+      });
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("miner")).toBe("inductive");
+      expect(body.get("monte_carlo_simulations")).toBe("2");
+      return { ok: true, json: async () => result };
+    }));
     await expect(fetchMonteCarloResult("inductive", { simulations: 2 })).resolves.toEqual(result);
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ...result, diagnostics: { ...result.diagnostics, case_execution_seconds: ["bad"] } }) })));
+    await expect(fetchMonteCarloResult()).rejects.toThrow(/invalid Monte Carlo/);
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ...result, output_places_interval_trees: [{ place_index: 1, intervals: [] }] }) })));
     await expect(fetchMonteCarloResult()).rejects.toThrow(/invalid Monte Carlo/);
     vi.unstubAllGlobals();
   });

@@ -241,6 +241,20 @@ std::uint64_t parse_nonnegative_u64(std::string_view value,
   return parsed;
 }
 
+int parse_signed_int(std::string_view value, std::string_view name) {
+  if (value.empty())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a signed integer");
+  int parsed = 0;
+  const auto r = std::from_chars(value.data(), value.data() + value.size(),
+                                 parsed);
+  if (r.ec != std::errc{} || r.ptr != value.data() + value.size())
+    throw std::invalid_argument(std::string(name) +
+                                ": expected a signed integer, got '" +
+                                std::string(value) + "'");
+  return parsed;
+}
+
 std::vector<std::size_t> parse_marking(std::string_view value,
                                        std::string_view name) {
   if (value.empty())
@@ -3032,6 +3046,13 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field) {
 
 MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
                                           const FieldPresence& present) {
+  return parse_monte_carlo_params(field, present,
+                                  kMonteCarloRequestMapMaxRecords);
+}
+
+MonteCarloParams parse_monte_carlo_params(
+    const FieldLookup& field, const FieldPresence& present,
+    std::size_t max_stochastic_map_records) {
   MonteCarloParams params;
   const auto supplied = [&](std::string_view name) {
     return present ? present(name) : !field(name).empty();
@@ -3056,12 +3077,33 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
     return value;
   };
 
+  const auto nonempty_trimmed = [&](std::string_view name) {
+    const auto value = std::string(trim(require(name)));
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty value");
+    return value;
+  };
+
+  const bool arrival_ratio_supplied =
+      supplied("monte_carlo_case_arrival_ratio");
+  const bool arrival_seconds_supplied =
+      supplied("monte_carlo_case_arrival_seconds");
+  if (arrival_ratio_supplied && arrival_seconds_supplied)
+    throw std::invalid_argument(
+        "monte_carlo_case_arrival_ratio and "
+        "monte_carlo_case_arrival_seconds cannot both be supplied");
+
   if (supplied("monte_carlo_simulations"))
     params.simulations = parse_positive_size(require("monte_carlo_simulations"),
                                              "monte_carlo_simulations");
-  if (supplied("monte_carlo_case_arrival_seconds"))
+  if (arrival_ratio_supplied) {
+    params.case_arrival_ratio =
+        nonnegative("monte_carlo_case_arrival_ratio");
+  } else if (arrival_seconds_supplied) {
     params.case_arrival_seconds =
         nonnegative("monte_carlo_case_arrival_seconds");
+  }
   if (supplied("monte_carlo_max_steps"))
     params.max_steps =
         parse_nonnegative_size(require("monte_carlo_max_steps"),
@@ -3086,6 +3128,53 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
   if (supplied("monte_carlo_stop_at_final"))
     params.stop_at_final = parse_boolean(require("monte_carlo_stop_at_final"),
                                          "monte_carlo_stop_at_final");
+  if (supplied("monte_carlo_activity_key"))
+    params.activity_key = nonempty_trimmed("monte_carlo_activity_key");
+  if (supplied("monte_carlo_timestamp_key"))
+    params.timestamp_key = nonempty_trimmed("monte_carlo_timestamp_key");
+  if (supplied("monte_carlo_initial_marking"))
+    params.initial_marking = parse_uint32_marking(
+        require("monte_carlo_initial_marking"),
+        "monte_carlo_initial_marking");
+  if (supplied("monte_carlo_final_marking"))
+    params.final_marking = parse_uint32_marking(
+        require("monte_carlo_final_marking"), "monte_carlo_final_marking");
+  if (supplied("monte_carlo_diagnostic_interval"))
+    params.diagnostic_interval = parse_positive_size(
+        require("monte_carlo_diagnostic_interval"),
+        "monte_carlo_diagnostic_interval");
+  if (supplied("monte_carlo_small_scale_factor")) {
+    params.small_scale_factor = parse_finite_double(
+        require("monte_carlo_small_scale_factor"),
+        "monte_carlo_small_scale_factor");
+    if (params.small_scale_factor <= 0.0)
+      throw std::invalid_argument(
+          "monte_carlo_small_scale_factor must be positive");
+  }
+  if (supplied("monte_carlo_max_thread_execution_time")) {
+    params.max_thread_execution_time = parse_finite_double(
+        require("monte_carlo_max_thread_execution_time"),
+        "monte_carlo_max_thread_execution_time");
+    if (params.max_thread_execution_time <= 0.0)
+      throw std::invalid_argument(
+          "monte_carlo_max_thread_execution_time must be positive");
+  }
+  if (supplied("monte_carlo_token_replay_variant")) {
+    std::string variant =
+        std::string(trim(require("monte_carlo_token_replay_variant")));
+    std::transform(variant.begin(), variant.end(), variant.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (variant == "forward" || variant == "token_replay") {
+      params.token_replay_variant = TokenReplayVariant::kForward;
+    } else if (variant == "backwards") {
+      params.token_replay_variant = TokenReplayVariant::kBackwards;
+    } else {
+      throw std::invalid_argument(
+          "monte_carlo_token_replay_variant: expected forward, token_replay, or backwards");
+    }
+  }
   if (supplied("monte_carlo_force_distribution")) {
     std::string distribution =
         std::string(trim(require("monte_carlo_force_distribution")));
@@ -3184,8 +3273,8 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
           if (parameter_index < parameter_text.size() &&
               parameter_text[parameter_index] != ';')
             continue;
-          const auto parameter = trim(parameter_text.substr(
-              parameter_begin, parameter_index - parameter_begin));
+          const auto parameter = std::string(trim(parameter_text.substr(
+              parameter_begin, parameter_index - parameter_begin)));
           if (parameter.empty())
             throw std::invalid_argument(
                 "monte_carlo_transition_durations: expected finite parameters");
@@ -3263,6 +3352,129 @@ MonteCarloParams parse_monte_carlo_params(const FieldLookup& field,
     if (params.resources_per_place.empty())
       throw std::invalid_argument(
           "monte_carlo_resources_per_place: expected a non-empty map");
+  }
+
+  if (supplied("monte_carlo_provided_stochastic_map")) {
+    constexpr std::string_view map_name =
+        "monte_carlo_provided_stochastic_map";
+    const auto value = std::string(trim(require(map_name)));
+    std::string lowered(value);
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    if (lowered == "empty") {
+      params.stochastic_map = StochasticMap{};
+    } else {
+      StochasticMap map;
+      std::set<std::size_t> indexes;
+      std::size_t record_begin = 0;
+      for (std::size_t i = 0; i <= value.size(); ++i) {
+        if (i < value.size() && value[i] != ',') continue;
+        auto record = value.substr(record_begin, i - record_begin);
+        const auto record_first = record.find_first_not_of(" \t\r\n");
+        if (record_first == std::string_view::npos)
+          throw std::invalid_argument(std::string(map_name) +
+                                      ": expected map records");
+        const auto record_last = record.find_last_not_of(" \t\r\n");
+        record = record.substr(record_first,
+                               record_last - record_first + 1);
+
+        if (map.transitions.size() >= max_stochastic_map_records) {
+          throw std::invalid_argument(
+              std::string(map_name) +
+              ": supplied transition map exceeds the record limit");
+        }
+
+        std::vector<std::string> fields;
+        std::size_t field_begin = 0;
+        for (std::size_t j = 0; j <= record.size(); ++j) {
+          if (j < record.size() && record[j] != ':') continue;
+          if (fields.size() >= 8)
+            throw std::invalid_argument(
+                std::string(map_name) +
+                ": expected index:timing:distribution:p1:p2:p3:weight:priority records");
+          auto part = record.substr(field_begin, j - field_begin);
+          const auto first = part.find_first_not_of(" \t\r\n");
+          if (first == std::string_view::npos)
+            throw std::invalid_argument(std::string(map_name) +
+                                        ": map fields must not be empty");
+          const auto last = part.find_last_not_of(" \t\r\n");
+          fields.emplace_back(part.substr(first, last - first + 1));
+          field_begin = j + 1;
+        }
+        if (fields.size() != 8)
+          throw std::invalid_argument(
+              std::string(map_name) +
+              ": expected index:timing:distribution:p1:p2:p3:weight:priority records");
+
+        const auto index = parse_nonnegative_size(fields[0], map_name);
+        std::string timing(fields[1]);
+        std::transform(timing.begin(), timing.end(), timing.begin(),
+                       [](unsigned char c) {
+                         return static_cast<char>(std::tolower(c));
+                       });
+        StochasticMapTiming timing_value;
+        if (timing == "timed") {
+          timing_value = StochasticMapTiming::kTimed;
+        } else if (timing == "immediate") {
+          timing_value = StochasticMapTiming::kImmediate;
+        } else {
+          throw std::invalid_argument(std::string(map_name) +
+                                      ": timing must be timed or immediate");
+        }
+
+        std::string distribution(fields[2]);
+        std::transform(distribution.begin(), distribution.end(),
+                       distribution.begin(), [](unsigned char c) {
+                         return static_cast<char>(std::tolower(c));
+                       });
+        StochasticMapDistribution distribution_value;
+        if (distribution == "deterministic") {
+          distribution_value = StochasticMapDistribution::kDeterministic;
+        } else if (distribution == "exponential") {
+          distribution_value = StochasticMapDistribution::kExponential;
+        } else if (distribution == "constant0") {
+          distribution_value = StochasticMapDistribution::kConstant0;
+        } else if (distribution == "immediate") {
+          distribution_value = StochasticMapDistribution::kImmediate;
+        } else if (distribution == "normal") {
+          distribution_value = StochasticMapDistribution::kNormal;
+        } else if (distribution == "uniform") {
+          distribution_value = StochasticMapDistribution::kUniform;
+        } else if (distribution == "lognormal") {
+          distribution_value = StochasticMapDistribution::kLogNormal;
+        } else if (distribution == "gamma") {
+          distribution_value = StochasticMapDistribution::kGamma;
+        } else {
+          throw std::invalid_argument(std::string(map_name) +
+                                      ": unknown distribution '" +
+                                      distribution + "'");
+        }
+
+        StochasticMapTransition transition;
+        transition.transition = index;
+        transition.timing = timing_value;
+        transition.distribution = distribution_value;
+        transition.parameter = parse_finite_double(fields[3], map_name);
+        transition.secondary_parameter =
+            parse_finite_double(fields[4], map_name);
+        transition.tertiary_parameter =
+            parse_finite_double(fields[5], map_name);
+        transition.activation_weight =
+            parse_finite_double(fields[6], map_name);
+        transition.priority = parse_signed_int(fields[7], map_name);
+        if (!indexes.insert(index).second)
+          throw std::invalid_argument(std::string(map_name) +
+                                      ": duplicate transition index");
+        map.transitions.push_back(transition);
+        record_begin = i + 1;
+      }
+      if (map.transitions.empty())
+        throw std::invalid_argument(std::string(map_name) +
+                                    ": expected a non-empty map");
+      params.stochastic_map = std::move(map);
+    }
   }
   return params;
 }

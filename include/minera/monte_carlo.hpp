@@ -7,8 +7,10 @@
 #include <string>
 #include <vector>
 
+#include "minera/conformance.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/stochastic_map.hpp"
 
 namespace minera {
 
@@ -62,8 +64,20 @@ struct MonteCarloOptions {
   // Number of independent cases to schedule.  A zero count returns an empty
   // log and diagnostics without performing any simulation.
   std::size_t simulations = 100;
-  // Every case is inserted into the virtual scheduler at this interval.
-  double case_arrival_seconds = 60.0;
+  // Every case is inserted into the virtual scheduler at this interval. The
+  // two names are wire-compatible aliases; at most one may be supplied.
+  // A missing value is inferred from a source log, or is 60 seconds for a
+  // net-only simulation.
+  std::optional<double> case_arrival_ratio;
+  std::optional<double> case_arrival_seconds;
+  // Attribute selectors used when fitting from a source log and when adding
+  // aliases to generated events. Canonical names use the first-class fields.
+  std::string activity_key = "concept:name";
+  std::string timestamp_key = "time:timestamp";
+  // Empty markings resolve to one token on the net source/sink. Non-empty
+  // markings must have one entry per place.
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
   // A case cannot fire more than this many transitions, including silent
   // transitions.  This bounds unsound nets and zero-duration loops.
   std::size_t max_steps = 1000;
@@ -85,12 +99,22 @@ struct MonteCarloOptions {
   // Diagnostics are inexpensive aggregate values, but callers may disable
   // the per-case vector for very large simulations.
   bool enable_diagnostics = true;
-  // Stop a case at the exact workflow final marking.  When false, the case
-  // continues until max_steps or a deadlock.
+  // Stop a case when its marking covers every token required by final_marking.
+  // When false, the case continues until max_steps or a deadlock.
   bool stop_at_final = true;
   // Optional distribution used only when fitting missing durations from a
   // source event log. Explicit transition_durations take precedence.
   std::optional<MonteCarloDurationDistribution> force_distribution;
+  // Optional sparse transition map. Missing records use weight 1 and an
+  // immediate duration; explicit vectors take precedence over map records.
+  std::optional<StochasticMap> stochastic_map;
+  // The replay implementation used to derive fitted activation weights.
+  TokenReplayVariant token_replay_variant = TokenReplayVariant::kForward;
+  // Compatibility controls retained for callers of the timed simulator.
+  // They are validated but intentionally inert in this bounded implementation.
+  std::size_t diagnostic_interval = 32;
+  double small_scale_factor = 864000.0;
+  double max_thread_execution_time = 60.0;
 };
 
 struct MonteCarloDiagnostics {

@@ -12,6 +12,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -60,11 +61,28 @@ int usage(const char* program) {
                "  --add-trace-if-takes-new-edges <bool> Keep edge-covering traces\n"
                "  --monte-carlo      Use bounded virtual-time Monte Carlo\n"
                "  --monte-carlo-simulations <n> Case count\n"
+               "  --monte-carlo-activity-key <name> Generated activity attribute\n"
+               "  --monte-carlo-timestamp-key <name> Generated timestamp attribute\n"
+               "  --monte-carlo-initial-marking <n,...> Initial marker vector\n"
+               "  --monte-carlo-final-marking <n,...> Final marker vector\n"
                "  --monte-carlo-max-steps <n> Firing cap\n"
                "  --monte-carlo-seed <u64> RNG seed\n"
+               "  --monte-carlo-case-arrival-ratio <f> Arrival ratio\n"
                "  --monte-carlo-case-arrival-seconds <f> Arrival interval\n"
+               "  --monte-carlo-start <f> First case arrival epoch seconds\n"
                "  --monte-carlo-default-duration-seconds <f> Default duration\n"
+               "  --monte-carlo-force-distribution <name> Fitted duration family\n"
+               "  --monte-carlo-transition-weights <w,...> Transition weights\n"
                "  --monte-carlo-transition-durations <d:v,...> Durations\n"
+               "  --monte-carlo-resources-per-place <p=n,...> Resource pools\n"
+               "  --monte-carlo-default-resources-per-place <n> Default pool size\n"
+               "  --monte-carlo-enable-diagnostics <bool> Include diagnostics\n"
+               "  --monte-carlo-stop-at-final <bool> Stop at final marking\n"
+               "  --monte-carlo-provided-stochastic-map <records|empty> Explicit map\n"
+               "  --monte-carlo-diagnostic-interval <n> Diagnostic cadence\n"
+               "  --monte-carlo-small-scale-factor <f> Timing scale factor\n"
+               "  --monte-carlo-max-thread-execution-time <f> Runtime cap\n"
+               "  --monte-carlo-token-replay-variant <forward|backwards> Replay mode\n"
                "  --stochastic-petri      Emit tangible CTMC JSON\n"
                "  --stochastic-petri-rates <r,...> Exponential rates\n"
                "  --stochastic-petri-initial-marking <n,...> Initial marking\n"
@@ -92,6 +110,22 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> stochastic_petri_fields;
   std::map<std::string, std::string> dfg_fields;
   std::map<std::string, std::string> monte_carlo_fields;
+  const std::set<std::string> monte_carlo_field_names = {
+      "monte_carlo_simulations", "monte_carlo_activity_key",
+      "monte_carlo_timestamp_key", "monte_carlo_initial_marking",
+      "monte_carlo_final_marking", "monte_carlo_max_steps",
+      "monte_carlo_seed", "monte_carlo_case_arrival_ratio",
+      "monte_carlo_case_arrival_seconds", "monte_carlo_start",
+      "monte_carlo_default_duration_seconds",
+      "monte_carlo_force_distribution", "monte_carlo_transition_weights",
+      "monte_carlo_transition_durations",
+      "monte_carlo_resources_per_place",
+      "monte_carlo_default_resources_per_place",
+      "monte_carlo_enable_diagnostics", "monte_carlo_stop_at_final",
+      "monte_carlo_diagnostic_interval", "monte_carlo_small_scale_factor",
+      "monte_carlo_max_thread_execution_time",
+      "monte_carlo_token_replay_variant",
+      "monte_carlo_provided_stochastic_map"};
   const auto parse_marking = [](const char* value, const char* option) {
     if (!value || *value == '\0')
       throw std::invalid_argument(std::string(option) +
@@ -163,10 +197,14 @@ int main(int argc, char** argv) {
       stochastic_petri_fields[key] = value;
       stochastic_petri = true;
     } else if (arg.rfind("--monte-carlo-", 0) == 0) {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));
       std::replace(key.begin(), key.end(), '-', '_');
+      if (!monte_carlo_field_names.contains(key)) {
+        std::cerr << "error: unknown Monte Carlo option: --" << key << '\n';
+        return 2;
+      }
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
       monte_carlo_fields.insert_or_assign(std::move(key), value);
       monte_carlo = true;
     } else if (arg == "--variant") {

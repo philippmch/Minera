@@ -1073,15 +1073,28 @@ int usage(const char* program) {
                "  --stochastic-map-conversion-variant <name> DFG Petri conversion\n"
                "  --stochastic-map-max-states <n> CTMC state cap\n"
                "  --monte-carlo-simulations <n> Virtual-time cases\n"
+               "  --monte-carlo-activity-key <name> Generated activity attribute\n"
+               "  --monte-carlo-timestamp-key <name> Generated timestamp attribute\n"
+               "  --monte-carlo-initial-marking <n,...> Initial marker vector\n"
+               "  --monte-carlo-final-marking <n,...> Final marker vector\n"
                "  --monte-carlo-max-steps <n> Firing cap per case\n"
                "  --monte-carlo-seed <u64> RNG seed\n"
+               "  --monte-carlo-case-arrival-ratio <f> Arrival ratio\n"
                "  --monte-carlo-case-arrival-seconds <f> Case arrival interval\n"
+               "  --monte-carlo-start <f> First case arrival epoch seconds\n"
                "  --monte-carlo-default-duration-seconds <f> Default duration\n"
                "  --monte-carlo-force-distribution <name> Fitted duration distribution\n"
                "  --monte-carlo-transition-weights <w,...> Transition weights\n"
                "  --monte-carlo-transition-durations <d:v,...> Durations\n"
                "  --monte-carlo-resources-per-place <p=n,...> Resource pools\n"
                "  --monte-carlo-default-resources-per-place <n> Default pool size\n"
+               "  --monte-carlo-enable-diagnostics <bool> Include diagnostics\n"
+               "  --monte-carlo-stop-at-final <bool> Stop at final marking\n"
+               "  --monte-carlo-provided-stochastic-map <records|empty> Explicit map\n"
+               "  --monte-carlo-diagnostic-interval <n> Diagnostic cadence\n"
+               "  --monte-carlo-small-scale-factor <f> Timing scale factor\n"
+               "  --monte-carlo-max-thread-execution-time <f> Runtime cap\n"
+               "  --monte-carlo-token-replay-variant <forward|backwards> Replay mode\n"
                "  --monte-carlo-json        Emit Monte Carlo diagnostics as JSON\n"
                "  --dfg-playout-variant <name> classic or performance\n"
                "  --dfg-playout-traces <n> DFG generated cases\n"
@@ -3050,7 +3063,12 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--monte-carlo-simulations" ||
+        arg == "--monte-carlo-activity-key" ||
+        arg == "--monte-carlo-timestamp-key" ||
+        arg == "--monte-carlo-initial-marking" ||
+        arg == "--monte-carlo-final-marking" ||
         arg == "--monte-carlo-case-arrival-seconds" ||
+        arg == "--monte-carlo-case-arrival-ratio" ||
         arg == "--monte-carlo-max-steps" || arg == "--monte-carlo-seed" ||
         arg == "--monte-carlo-start" ||
         arg == "--monte-carlo-default-duration-seconds" ||
@@ -3060,7 +3078,12 @@ int main(int argc, char** argv) {
         arg == "--monte-carlo-resources-per-place" ||
         arg == "--monte-carlo-default-resources-per-place" ||
         arg == "--monte-carlo-enable-diagnostics" ||
-        arg == "--monte-carlo-stop-at-final") {
+        arg == "--monte-carlo-stop-at-final" ||
+        arg == "--monte-carlo-provided-stochastic-map" ||
+        arg == "--monte-carlo-diagnostic-interval" ||
+        arg == "--monte-carlo-small-scale-factor" ||
+        arg == "--monte-carlo-max-thread-execution-time" ||
+        arg == "--monte-carlo-token-replay-variant") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       std::string key(arg.substr(2));

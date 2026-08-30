@@ -217,6 +217,11 @@ using OcpnPlayoutParams = OcpnPlayoutOptions;
 using StochasticPetriParams = StochasticPetriOptions;
 using MonteCarloParams = MonteCarloOptions;
 
+// Conservative bound for a supplied transition map when no target net is
+// available to provide a tighter limit. Server callers should pass the
+// selected net's transition count, capped by this value.
+inline constexpr std::size_t kMonteCarloRequestMapMaxRecords = 100'000;
+
 enum class StochasticMapSource { kLog, kPerformanceDfg };
 
 struct StochasticMapParams {
@@ -481,11 +486,15 @@ using FieldPresence = std::function<bool(std::string_view)>;
 // `monte_carlo_` prefix. Transition durations are comma-separated
 // `distribution:param[;param...]` entries for deterministic, exponential,
 // constant0, immediate, normal, uniform, lognormal, and gamma families;
-// resource capacities use `place=count` pairs.
+// resource capacities use `place=count` pairs. A provided stochastic map is
+// encoded as `index:timing:distribution:p1:p2:p3:weight:priority` records.
 [[nodiscard]] MonteCarloParams parse_monte_carlo_params(
     const FieldLookup& field);
 [[nodiscard]] MonteCarloParams parse_monte_carlo_params(
     const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] MonteCarloParams parse_monte_carlo_params(
+    const FieldLookup& field, const FieldPresence& present,
+    std::size_t max_stochastic_map_records);
 
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(
     const FieldLookup& field);

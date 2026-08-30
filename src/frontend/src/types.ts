@@ -3512,6 +3512,8 @@ export function isStochasticMapResult(
       Number.isFinite(transition.activation_weight) &&
       (transition.activation_weight as number) >= 0 &&
       Number.isSafeInteger(transition.priority) &&
+      (transition.priority as number) >= -2147483648 &&
+      (transition.priority as number) <= 2147483647 &&
       (distribution === "lognormal" ||
        (transition.parameter as number) >= 0) &&
       (distribution !== "exponential" || transition.timing === "immediate" ||
@@ -3598,7 +3600,12 @@ export function isStochasticPetriDistributionResult(
 export interface MonteCarloOptions {
   process_tree_variant?: ProcessTreePetriNetVariant;
   simulations?: number;
+  case_arrival_ratio?: number;
   case_arrival_seconds?: number;
+  activity_key?: string;
+  timestamp_key?: string;
+  initial_marking?: number[];
+  final_marking?: number[];
   max_steps?: number;
   seed?: number;
   start?: number;
@@ -3614,6 +3621,11 @@ export interface MonteCarloOptions {
   }>;
   resources_per_place?: Record<number, number>;
   default_resources_per_place?: number;
+  provided_stochastic_map?: StochasticMapTransition[];
+  token_replay_variant?: "forward" | "backwards";
+  diagnostic_interval?: number;
+  small_scale_factor?: number;
+  max_thread_execution_time?: number;
   enable_diagnostics?: boolean;
   stop_at_final?: boolean;
 }
@@ -3627,6 +3639,25 @@ export interface MonteCarloDiagnostics {
   total_cases_seconds: number;
   median_case_execution_seconds: number;
   case_execution_seconds: number[];
+  case_arrival_ratio: number;
+  total_cases_time: number;
+  median_cases_ex_time: number;
+  cases_ex_time: number[];
+}
+
+export interface MonteCarloInterval {
+  start: number;
+  end: number;
+}
+
+export interface MonteCarloPlaceIntervalTree {
+  place_index: number;
+  intervals: MonteCarloInterval[];
+}
+
+export interface MonteCarloTransitionIntervalTree {
+  transition_index: number;
+  intervals: MonteCarloInterval[];
 }
 
 export interface MonteCarloResult {
@@ -3634,6 +3665,8 @@ export interface MonteCarloResult {
   variant: "PETRI_SEMAPH_FIFO";
   log: { trace_count: number; event_count: number };
   diagnostics: MonteCarloDiagnostics;
+  output_places_interval_trees: MonteCarloPlaceIntervalTree[];
+  output_transitions_interval_trees: MonteCarloTransitionIntervalTree[];
 }
 
 export function isMonteCarloResult(value: unknown): value is MonteCarloResult {
@@ -3649,10 +3682,28 @@ export function isMonteCarloResult(value: unknown): value is MonteCarloResult {
     if (!Number.isSafeInteger(d[name]) || d[name] < 0) return false;
   }
   if (![d.case_arrival_seconds, d.total_cases_seconds,
-        d.median_case_execution_seconds].every(Number.isFinite) ||
+        d.median_case_execution_seconds, d.case_arrival_ratio,
+        d.total_cases_time, d.median_cases_ex_time].every((item) =>
+          Number.isFinite(item) && item >= 0) ||
       !Array.isArray(d.case_execution_seconds) ||
-      d.case_execution_seconds.some((item) => !Number.isFinite(item) || item < 0)) return false;
-  return true;
+      d.case_execution_seconds.some((item) => !Number.isFinite(item) || item < 0) ||
+      !Array.isArray(d.cases_ex_time) ||
+      d.cases_ex_time.some((item) => !Number.isFinite(item) || item < 0)) return false;
+  const validIntervals = (value: unknown, indexKey: "place_index" | "transition_index") =>
+    Array.isArray(value) && value.every((item, index) => {
+      if (!item || typeof item !== "object") return false;
+      const tree = item as Record<string, unknown>;
+      if (tree[indexKey] !== index || !Array.isArray(tree.intervals)) return false;
+      return tree.intervals.every((interval) => {
+        if (!interval || typeof interval !== "object") return false;
+        const bounds = interval as Record<string, unknown>;
+        return typeof bounds.start === "number" && Number.isFinite(bounds.start) &&
+          typeof bounds.end === "number" && Number.isFinite(bounds.end) &&
+          bounds.end >= bounds.start;
+      });
+    });
+  return validIntervals(result.output_places_interval_trees, "place_index") &&
+    validIntervals(result.output_transitions_interval_trees, "transition_index");
 }
 
 export type DfgPlayoutVariant = "classic" | "performance";
