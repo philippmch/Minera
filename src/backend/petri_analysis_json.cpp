@@ -1,7 +1,10 @@
 #include "minera/petri_analysis_json.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 namespace minera {
 namespace {
@@ -97,6 +100,55 @@ std::string doubles(const std::vector<double>& values) {
   return out.str();
 }
 
+void validate_finite(const std::vector<double>& values, const char* name) {
+  if (std::any_of(values.begin(), values.end(),
+                  [](double value) { return !std::isfinite(value); }))
+    throw std::invalid_argument(std::string(name) + " must be finite");
+}
+
+void validate_equation_result(const MarkingEquationResult& result) {
+  if (!std::isfinite(result.objective) || !std::isfinite(result.lower_bound) ||
+      result.objective < 0.0 || result.lower_bound < 0.0 ||
+      result.objective + 1e-7 < result.lower_bound)
+    throw std::invalid_argument("marking equation objective is invalid");
+  validate_finite(result.transition_counts, "marking equation transition counts");
+  validate_finite(result.residual, "marking equation residual");
+  if (!result.residual.empty() && result.computed && result.feasible &&
+      result.transition_counts.empty())
+    throw std::invalid_argument("marking equation dimensions are inconsistent");
+  if (std::any_of(result.activated_transitions.begin(),
+                  result.activated_transitions.end(), [&](std::size_t index) {
+                    return index >= result.transition_counts.size();
+                  }) ||
+      std::any_of(result.firing_sequence.begin(), result.firing_sequence.end(),
+                  [&](std::size_t index) {
+                    return index >= result.transition_counts.size();
+                  }))
+    throw std::invalid_argument("marking equation transition index is invalid");
+}
+
+void validate_equation_result(const ExtendedMarkingEquationResult& result) {
+  if (!std::isfinite(result.objective) || !std::isfinite(result.lower_bound) ||
+      result.objective < 0.0 || result.lower_bound < 0.0 ||
+      result.objective + 1e-7 < result.lower_bound)
+    throw std::invalid_argument("extended marking equation objective is invalid");
+  validate_finite(result.transition_counts,
+                  "extended marking equation transition counts");
+  if (result.segment_count != result.retained_splits.size() + 1 ||
+      !std::is_sorted(result.retained_splits.begin(),
+                      result.retained_splits.end()) ||
+      std::adjacent_find(result.retained_splits.begin(),
+                         result.retained_splits.end()) !=
+          result.retained_splits.end())
+    throw std::invalid_argument("extended marking equation splits are inconsistent");
+  if (std::any_of(result.firing_sequence.begin(), result.firing_sequence.end(),
+                  [&](std::size_t index) {
+                    return index >= result.transition_counts.size();
+                  }))
+    throw std::invalid_argument(
+        "extended marking equation transition index is invalid");
+}
+
 const char* status(SoundnessStatus value) {
   switch (value) {
     case SoundnessStatus::SOUND: return "sound";
@@ -133,12 +185,14 @@ std::string workflow(const WorkflowNetResult& result) {
 }  // namespace
 
 std::string petri_analysis_json(const MarkingEquationResult& result) {
+  validate_equation_result(result);
   std::ostringstream out;
   out << std::setprecision(17)
       << "{\"family\":\"marking_equation\",\"variant\":\"classic\","
          "\"computed\":" << (result.computed ? "true" : "false")
       << ",\"feasible\":" << (result.feasible ? "true" : "false")
       << ",\"exhausted\":" << (result.exhausted ? "true" : "false")
+      << ",\"solver_nodes\":" << result.solver_nodes
       << ",\"objective\":" << result.objective
       << ",\"lower_bound\":" << result.lower_bound
       << ",\"transition_counts\":" << doubles(result.transition_counts)
@@ -154,12 +208,14 @@ std::string petri_analysis_json(const MarkingEquationResult& result) {
 }
 
 std::string petri_analysis_json(const ExtendedMarkingEquationResult& result) {
+  validate_equation_result(result);
   std::ostringstream out;
   out << std::setprecision(17)
       << "{\"family\":\"extended_marking_equation\",\"variant\":\"classic\","
          "\"computed\":" << (result.computed ? "true" : "false")
       << ",\"feasible\":" << (result.feasible ? "true" : "false")
       << ",\"exhausted\":" << (result.exhausted ? "true" : "false")
+      << ",\"solver_nodes\":" << result.solver_nodes
       << ",\"objective\":" << result.objective
       << ",\"lower_bound\":" << result.lower_bound
       << ",\"retained_splits\":" << numbers(result.retained_splits)

@@ -503,6 +503,34 @@ describe("isPetriAnalysisResult structural diagnostics", () => {
   });
 });
 
+describe("isPetriAnalysisResult marking equations", () => {
+  const classic = {
+    family: "marking_equation", variant: "classic", computed: true,
+    feasible: true, exhausted: false, solver_nodes: 1, objective: 2,
+    lower_bound: 1, transition_counts: [1, 1], residual: [0, 0],
+    activated_transitions: [0, 1], firing_sequence: [0, 1],
+    recovery_attempted: true, reaches_final: true, error: "",
+  };
+  it("accepts complete finite classic contracts", () =>
+    expect(isPetriAnalysisResult(classic)).toBe(true));
+  it("rejects incomplete, non-finite, and inconsistent contracts", () => {
+    expect(isPetriAnalysisResult({ ...classic, solver_nodes: -1 })).toBe(false);
+    expect(isPetriAnalysisResult({ ...classic, transition_counts: [Number.NaN] })).toBe(false);
+    expect(isPetriAnalysisResult({ ...classic, objective: 0, lower_bound: 1 })).toBe(false);
+    expect(isPetriAnalysisResult({ ...classic, variant: "other" })).toBe(false);
+  });
+  it("checks extended split dimensions", () => {
+    const extended = {
+      family: "extended_marking_equation", variant: "classic", computed: true,
+      feasible: true, exhausted: false, solver_nodes: 2, objective: 0,
+      lower_bound: 0, retained_splits: [1], segment_count: 2,
+      transition_counts: [1], firing_sequence: [0], reaches_final: true, error: "",
+    };
+    expect(isPetriAnalysisResult(extended)).toBe(true);
+    expect(isPetriAnalysisResult({ ...extended, segment_count: 3 })).toBe(false);
+  });
+});
+
 describe("isPetriAnalysisResult soundness graph diagnostics", () => {
   it("accepts invariant families and compact graph projections", () => {
     expect(isPetriAnalysisResult({

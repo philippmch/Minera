@@ -33,6 +33,7 @@ struct MarkingEquationResult {
   bool computed = false;
   bool feasible = false;
   bool exhausted = false;
+  std::size_t solver_nodes = 0;
   double objective = 0.0;
   double lower_bound = 0.0;
   std::vector<double> transition_counts;
@@ -66,6 +67,7 @@ struct ExtendedMarkingEquationResult {
   bool computed = false;
   bool feasible = false;
   bool exhausted = false;
+  std::size_t solver_nodes = 0;
   double objective = 0.0;
   double lower_bound = 0.0;
   std::vector<std::size_t> retained_splits;

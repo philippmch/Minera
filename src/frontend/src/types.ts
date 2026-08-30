@@ -4106,9 +4106,18 @@ export interface PetriAnalysisResult {
   computed?: boolean;
   feasible?: boolean;
   exhausted?: boolean;
+  solver_nodes?: number;
   returned_asap?: boolean;
   objective?: number;
   lower_bound?: number;
+  transition_counts?: number[];
+  residual?: number[];
+  activated_transitions?: number[];
+  firing_sequence?: number[];
+  recovery_attempted?: boolean;
+  reaches_final?: boolean;
+  retained_splits?: number[];
+  segment_count?: number;
   status?: "sound" | "unsound" | "unknown";
   dead_transitions?: number[];
   dead_tasks?: number[];
@@ -4153,7 +4162,33 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   const family = (value as { family?: unknown }).family;
   if (family !== "marking_equation" && family !== "extended_marking_equation" &&
       family !== "workflow_net" && family !== "soundness" && family !== "woflan") return false;
-  if (family !== "soundness" && family !== "woflan") return true;
+  if (family === "marking_equation" || family === "extended_marking_equation") {
+    const result = value as PetriAnalysisResult;
+    const finiteNonNegative = (item: unknown) =>
+      typeof item === "number" && Number.isFinite(item) && item >= 0;
+    const finiteVector = (item: unknown) => Array.isArray(item) &&
+      item.every((entry) => typeof entry === "number" && Number.isFinite(entry));
+    const indexVector = (item: unknown) => Array.isArray(item) &&
+      item.every((entry) => Number.isSafeInteger(entry) && entry >= 0);
+    if (result.variant !== "classic" || typeof result.computed !== "boolean" ||
+        typeof result.feasible !== "boolean" || typeof result.exhausted !== "boolean" ||
+        !finiteNonNegative(result.objective) || !finiteNonNegative(result.lower_bound) ||
+        !Number.isSafeInteger(result.solver_nodes) || result.solver_nodes! < 0 ||
+        !finiteVector(result.transition_counts) || !indexVector(result.firing_sequence) ||
+        typeof result.reaches_final !== "boolean" || typeof result.error !== "string") return false;
+    if (result.objective! + Number.EPSILON < result.lower_bound!) return false;
+    if (family === "marking_equation") {
+      return finiteVector(result.residual) && indexVector(result.activated_transitions) &&
+        typeof result.recovery_attempted === "boolean";
+    }
+    return indexVector(result.retained_splits) &&
+      Number.isSafeInteger(result.segment_count) && result.segment_count! >= 1 &&
+      result.segment_count === (result.retained_splits as number[]).length + 1;
+  }
+  if (family === "workflow_net") {
+    const workflow = value as PetriAnalysisResult;
+    return !!workflow.result && typeof workflow.result === "object";
+  }
   if ("variant" in value && value.variant !== undefined &&
       value.variant !== "soundness" && value.variant !== "woflan") return false;
   if ("returned_asap" in value && value.returned_asap !== undefined &&
