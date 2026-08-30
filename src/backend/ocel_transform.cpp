@@ -988,6 +988,8 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
     throw std::invalid_argument(
         "OCEL split max_degree_centrality must be in [0,1]");
   }
+  if (options.max_objects == 0)
+    throw std::invalid_argument("OCEL split max_objects must be positive");
   OcelSplitResult result;
   result.variant = options.variant;
   if (options.variant == OcelSplitVariant::kConnectedComponents) {
@@ -996,15 +998,22 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
              interaction_edges(log, types), options.max_degree_centrality)) {
       result.logs.push_back(filter_objects(log, component));
     }
+    result.candidate_count = result.logs.size();
   } else {
     if (options.object_type.empty())
       throw std::invalid_argument(
           "OCEL ancestors/descendants split requires object_type");
-    for (const auto& [center, component] : ancestors_descendants(log, options)) {
+    auto unbounded = options;
+    unbounded.max_objects = std::numeric_limits<std::size_t>::max();
+    const auto candidates = ancestors_descendants(log, unbounded);
+    result.candidate_count = candidates.size();
+    for (const auto& [center, component] : candidates) {
+      if (result.logs.size() >= options.max_objects) break;
       if (component.empty()) continue;
       result.central_objects.push_back(center);
       result.logs.push_back(filter_objects(log, component));
     }
+    result.truncated = result.logs.size() < result.candidate_count;
   }
   return result;
 }
@@ -1012,7 +1021,10 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
 std::string serialize_ocel_split_json(const OcelSplitResult& result) {
   std::ostringstream out;
   out << "{\"family\":\"OCEL_SPLIT\",\"variant\":\""
-      << variant_name(result.variant) << "\",\"logs\":[";
+      << variant_name(result.variant) << "\",\"candidate_count\":"
+      << result.candidate_count << ",\"returned_count\":" << result.logs.size()
+      << ",\"truncated\":" << (result.truncated ? "true" : "false")
+      << ",\"logs\":[";
   for (std::size_t index = 0; index < result.logs.size(); ++index) {
     if (index != 0) out << ',';
     if (result.variant == OcelSplitVariant::kAncestorsDescendants) {

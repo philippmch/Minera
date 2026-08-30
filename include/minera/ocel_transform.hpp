@@ -149,6 +149,8 @@ struct OcelSplitResult {
   // Empty for connected components; aligned with logs for
   // ancestors/descendants projections.
   std::vector<std::string> central_objects;
+  std::size_t candidate_count = 0;
+  bool truncated = false;
 };
 
 [[nodiscard]] OcelSplitResult split_ocel(

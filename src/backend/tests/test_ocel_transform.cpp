@@ -35,6 +35,7 @@ void connected_components_contract() {
   options.variant = minera::OcelSplitVariant::kConnectedComponents;
   const auto result = minera::split_ocel(sample(), options);
   assert(result.logs.size() == 2);
+  assert(result.candidate_count == 2 && !result.truncated);
   assert(result.central_objects.empty());
   assert(result.logs[0].objects.size() == 4);
   assert(result.logs[1].objects.size() == 2);
@@ -54,6 +55,7 @@ void ancestors_descendants_contract() {
   options.max_objects = 1;
   const auto result = minera::split_ocel(sample(), options);
   assert(result.logs.size() == 1 && result.central_objects.size() == 1);
+  assert(result.candidate_count == 2 && result.truncated);
   assert(result.central_objects[0] == "o1");
   assert(result.logs[0].objects.size() == 4);
   assert(result.logs[0].o2o.size() == 1);
@@ -69,6 +71,16 @@ void validation_contract() {
   minera::OcelSplitOptions options;
   options.variant = minera::OcelSplitVariant::kAncestorsDescendants;
   bool threw = false;
+  try {
+    (void)minera::split_ocel(sample(), options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  options.variant = minera::OcelSplitVariant::kAncestorsDescendants;
+  options.object_type = "order";
+  options.max_objects = 0;
+  threw = false;
   try {
     (void)minera::split_ocel(sample(), options);
   } catch (const std::invalid_argument&) {
