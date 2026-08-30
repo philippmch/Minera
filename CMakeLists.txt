@@ -210,6 +210,10 @@ add_executable(minera_log_util src/backend/tools/minera_log_util.cpp)
 target_link_libraries(minera_log_util PRIVATE minera::core)
 target_compile_features(minera_log_util PRIVATE cxx_std_20)
 
+add_executable(minera_knowledge src/backend/tools/minera_knowledge.cpp)
+target_link_libraries(minera_knowledge PRIVATE minera::core)
+target_compile_features(minera_knowledge PRIVATE cxx_std_20)
+
 add_executable(minera_dfg
   src/backend/tools/minera_dfg.cpp
 )
