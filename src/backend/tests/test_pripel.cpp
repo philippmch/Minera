@@ -1,4 +1,5 @@
 #include "minera/pripel.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -98,6 +99,12 @@ int main() {
   options.epsilon = 0.0;
   bool threw = false;
   try { (void)minera::anonymize_pripel(source(), query(), options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  auto malformed = result;
+  ++malformed.diagnostics.released_trace_count;
+  threw = false;
+  try { (void)minera::pripel_json(malformed); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   matching_is_one_to_one();

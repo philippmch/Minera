@@ -208,6 +208,10 @@ struct NumericBounds { double lo = 0.0, hi = 0.0; bool valid = false; };
 }  // namespace
 
 std::string PripelDiagnostics::to_json() const {
+  if (!std::isfinite(epsilon) || epsilon <= 0.0 ||
+      exact_matches + nearest_matches + synthesized_traces !=
+          released_trace_count)
+    throw std::invalid_argument("pripel diagnostics are inconsistent");
   std::ostringstream out;
   out << "{\"epsilon\":" << std::setprecision(17) << epsilon
       << ",\"seed\":" << seed << ",\"query_trace_count\":"

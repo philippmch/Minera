@@ -909,6 +909,12 @@ void json_contract_is_stable() {
   assert(json.find("output_transitions_interval_trees") != std::string::npos);
   assert(json.find("case_arrival_ratio") != std::string::npos);
   assert(json.find("cases_ex_time") != std::string::npos);
+  auto malformed = result;
+  ++malformed.diagnostics.completed_cases;
+  assert(throws_invalid([&] { (void)minera::monte_carlo_json(malformed); }));
+  malformed = result;
+  malformed.output_places_interval_trees.front().place_index = 1;
+  assert(throws_invalid([&] { (void)minera::monte_carlo_json(malformed); }));
 }
 
 }  // namespace
