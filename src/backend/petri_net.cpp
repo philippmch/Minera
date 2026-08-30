@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -125,6 +126,28 @@ void build(const ProcessTreeNode& node,
       net.add_transition(std::nullopt, branch_out, {out});
       return;
     }
+    case ProcessTreeOperator::kInterleaving: {
+      if (node.children.empty()) {
+        net.add_transition(std::nullopt, {in}, {out});
+        return;
+      }
+      if (node.children.size() >= std::numeric_limits<std::size_t>::digits)
+        throw std::invalid_argument("process-tree interleaving has too many children");
+      const std::size_t states = std::size_t{1} << node.children.size();
+      std::vector<std::size_t> state(states);
+      state.front() = in;
+      state.back() = out;
+      for (std::size_t mask = 1; mask + 1 < states; ++mask)
+        state[mask] = net.add_place();
+      for (std::size_t mask = 0; mask < states; ++mask) {
+        for (std::size_t child = 0; child < node.children.size(); ++child) {
+          const auto bit = std::size_t{1} << child;
+          if ((mask & bit) == 0)
+            build(node.children[child], state[mask], state[mask | bit], net);
+        }
+      }
+      return;
+    }
     case ProcessTreeOperator::kLoop: {
       // child[0] is the body (executed at least once between in and out);
       // child[1..] are redo paths that lead from the exit back to the entry.
@@ -210,6 +233,9 @@ BorderedFragment build_transition_bordered(const ProcessTreeNode& node,
     case ProcessTreeOperator::kInclusiveChoice:
       throw std::invalid_argument(
           "transition-bordered process-tree conversion does not support inclusive choice");
+    case ProcessTreeOperator::kInterleaving:
+      throw std::invalid_argument(
+          "transition-bordered process-tree conversion does not support interleaving");
     case ProcessTreeOperator::kParallel: {
       if (node.children.empty()) {
         throw std::invalid_argument(

@@ -55,6 +55,7 @@ std::string_view operator_name(ProcessTreeOperator op) {
     case ProcessTreeOperator::kExclusive: return "exclusive";
     case ProcessTreeOperator::kInclusiveChoice: return "inclusive_or";
     case ProcessTreeOperator::kParallel: return "parallel";
+    case ProcessTreeOperator::kInterleaving: return "interleaving";
     case ProcessTreeOperator::kLoop: return "loop";
   }
   return "tau";
@@ -705,6 +706,8 @@ void write_footprint(std::ostream& out, const Footprint& footprint,
   write_footprint_pairs(out, footprint.sequence, graph);
   field("parallel");
   write_footprint_pairs(out, footprint.parallel, graph);
+  field("atomic_interleaving");
+  write_footprint_pairs(out, footprint.atomic_interleaving, graph);
   if (footprint.start_activities_present) {
     field("start_activities");
     write_footprint_ids(out, footprint.start_activities, graph);

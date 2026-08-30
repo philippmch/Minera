@@ -19,6 +19,7 @@ struct Metadata {
 bool is_flattenable(ProcessTreeOperator op) {
   return op == ProcessTreeOperator::kSequence ||
          op == ProcessTreeOperator::kParallel ||
+         op == ProcessTreeOperator::kInterleaving ||
          op == ProcessTreeOperator::kExclusive ||
          op == ProcessTreeOperator::kInclusiveChoice;
 }
@@ -41,9 +42,10 @@ Metadata inspect(const ProcessTreeNode& node,
     case ProcessTreeOperator::kExclusive:
     case ProcessTreeOperator::kInclusiveChoice:
     case ProcessTreeOperator::kParallel:
+    case ProcessTreeOperator::kInterleaving:
       if (node.children.empty()) {
         throw std::invalid_argument(
-            "process tree sequence, exclusive, inclusive, and parallel operators require "
+            "process tree sequence, exclusive, inclusive, parallel, and interleaving operators require "
             "at least one child");
       }
       break;
@@ -79,7 +81,8 @@ Metadata inspect(const ProcessTreeNode& node,
       result.skippable = false;
       break;
     case ProcessTreeOperator::kSequence:
-    case ProcessTreeOperator::kParallel: {
+    case ProcessTreeOperator::kParallel:
+    case ProcessTreeOperator::kInterleaving: {
       result.skippable = true;
       for (const auto& child : result.children) {
         result.skippable = result.skippable && child.skippable;

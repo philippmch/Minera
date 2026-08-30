@@ -57,6 +57,19 @@ describe("computeTreeLayout", () => {
     expect(op.operator).toBe("inclusive_or");
   });
 
+  it("renders interleaving separately from parallel", () => {
+    const layout = computeTreeLayout({
+      operator: "interleaving",
+      children: [
+        { operator: "activity", activity: 0 },
+        { operator: "activity", activity: 1 },
+      ],
+    }, data(["a", "b"]));
+    const op = layout.nodes.find((node) => node.kind === "operator")!;
+    expect(op.operator).toBe("interleaving");
+    expect(op.label).toBe("↔");
+  });
+
   it("labels a tau leaf and a single-leaf tree", () => {
     const layout = computeTreeLayout({ operator: "tau" }, data([]));
     expect(layout.nodes).toHaveLength(1);

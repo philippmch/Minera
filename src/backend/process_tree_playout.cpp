@@ -4,6 +4,7 @@
 #include <functional>
 #include <cmath>
 #include <optional>
+#include <numeric>
 #include <random>
 #include <set>
 #include <stdexcept>
@@ -43,6 +44,7 @@ void validate_node(const ProcessTreeNode& n, const ProcessTree& t) {
     case ProcessTreeOperator::kExclusive:
     case ProcessTreeOperator::kInclusiveChoice:
     case ProcessTreeOperator::kParallel:
+    case ProcessTreeOperator::kInterleaving:
       if (n.children.empty())
         throw std::invalid_argument("process-tree operator requires at least one child");
       break;
@@ -136,6 +138,15 @@ std::optional<Word> first_word(const ProcessTreeNode& n,
       }
       return result;
     }
+    case ProcessTreeOperator::kInterleaving: {
+      Word result;
+      for (const auto& child : n.children) {
+        const auto word = first_word(child, tree);
+        if (!word) return std::nullopt;
+        result.insert(result.end(), word->begin(), word->end());
+      }
+      return result;
+    }
     case ProcessTreeOperator::kLoop:
       if (n.children.empty()) return std::nullopt;
       return first_word(n.children.front(), tree);
@@ -212,6 +223,33 @@ Words enumerate(const ProcessTreeNode& n, const ProcessTree& tree,
         Words child = enumerate(c, tree, max_length, max_loops, budget);
         out = combine_parallel(out, child, max_length, budget);
       }
+      return out;
+    }
+    case ProcessTreeOperator::kInterleaving: {
+      std::vector<Words> children;
+      children.reserve(n.children.size());
+      for (const auto& child : n.children)
+        children.push_back(enumerate(child, tree, max_length, max_loops, budget));
+      std::vector<std::size_t> order(n.children.size());
+      std::iota(order.begin(), order.end(), 0);
+      Words out;
+      do {
+        Words current{Word{}};
+        for (const auto index : order) {
+          Words next;
+          for (const auto& prefix : current) {
+            for (const auto& suffix : children[index]) {
+              Word word = prefix;
+              word.insert(word.end(), suffix.begin(), suffix.end());
+              append_unique(next, std::move(word), max_length, budget);
+            }
+          }
+          current = std::move(next);
+        }
+        out.insert(out.end(), std::make_move_iterator(current.begin()),
+                   std::make_move_iterator(current.end()));
+      } while (budget.remaining != 0 &&
+               std::next_permutation(order.begin(), order.end()));
       return out;
     }
     case ProcessTreeOperator::kLoop: {
@@ -322,6 +360,20 @@ bool sample_node(const ProcessTreeNode& n, const ProcessTree& tree,
         if (ready.empty()) break;
         const auto i = ready[choose(ready.size())];
         out.push_back(parts[i].front()); parts[i].erase(parts[i].begin());
+      }
+      return out.size() <= max_length;
+    }
+    case ProcessTreeOperator::kInterleaving: {
+      std::vector<std::size_t> order(n.children.size());
+      std::iota(order.begin(), order.end(), 0);
+      std::shuffle(order.begin(), order.end(), rng);
+      for (const auto index : order) {
+        Word part;
+        if (!sample_node(n.children[index], tree,
+                         max_length - std::min(max_length, out.size()),
+                         max_loops, rng, part, top_bottom))
+          return false;
+        out.insert(out.end(), part.begin(), part.end());
       }
       return out.size() <= max_length;
     }

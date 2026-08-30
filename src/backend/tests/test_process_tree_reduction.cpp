@@ -127,6 +127,12 @@ int main() {
                                    ProcessTreeNode::leaf(1)}));
   assert(same(minera::reduce_process_tree(mandatory, trace({"A"})).root(),
               mandatory.root()));
+  const ProcessTree interleaving(
+      {"A", "B"}, ProcessTreeNode{ProcessTreeOperator::kInterleaving, 0,
+                                    {ProcessTreeNode::leaf(0),
+                                     ProcessTreeNode::leaf(1)}});
+  assert(same(minera::reduce_process_tree(interleaving, trace({"A", "B"})).root(),
+              interleaving.root()));
 
   // Custom activity keys accept strings and reject missing/non-string values.
   const ProcessTree custom({"A"}, ProcessTreeNode::leaf(0));
@@ -181,6 +187,8 @@ int main() {
       {}, ProcessTreeNode{ProcessTreeOperator::kSequence, 0, {}}));
   expect_invalid(ProcessTree(
       {}, ProcessTreeNode{ProcessTreeOperator::kParallel, 0, {}}));
+  expect_invalid(ProcessTree(
+      {}, ProcessTreeNode{ProcessTreeOperator::kInterleaving, 0, {}}));
   expect_invalid(ProcessTree(
       {}, ProcessTreeNode{ProcessTreeOperator::kExclusive, 0, {}}));
   expect_invalid(ProcessTree(

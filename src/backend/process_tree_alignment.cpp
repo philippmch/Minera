@@ -7,6 +7,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -80,7 +81,7 @@ void validate(const ProcessTreeNode& n, const ProcessTree& t, ProcessTreeAlignme
   h=std::max<std::size_t>(h,1);
   if(n.op==Op::kActivity){if(!n.children.empty()||n.activity>=t.activities().size()) throw std::invalid_argument("process-tree alignment: invalid activity leaf"); return;}
   if(n.op==Op::kTau){if(!n.children.empty()) throw std::invalid_argument("process-tree alignment: tau cannot have children"); return;}
-  if((n.op==Op::kSequence||n.op==Op::kExclusive||n.op==Op::kInclusiveChoice||n.op==Op::kParallel) && n.children.empty()) throw std::invalid_argument("process-tree alignment: operator requires children");
+  if((n.op==Op::kSequence||n.op==Op::kExclusive||n.op==Op::kInclusiveChoice||n.op==Op::kParallel||n.op==Op::kInterleaving) && n.children.empty()) throw std::invalid_argument("process-tree alignment: operator requires children");
   if(n.op==Op::kLoop && n.children.empty()) throw std::invalid_argument("process-tree alignment: loop requires a body");
   if(v==ProcessTreeAlignmentVariant::kMilp && n.op==Op::kLoop && n.children.size()!=2) throw std::invalid_argument("process-tree alignment MILP supports only binary loops");
   for(const auto& c:n.children){std::size_t ch=0;validate(c,t,v,ch);h=std::max(h,ch+1);} }
@@ -92,6 +93,7 @@ EP compile(const ProcessTreeNode& n, const ProcessTree& t, ExprFactory& f) {
     case Op::kExclusive:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.xorr(x);}
     case Op::kInclusiveChoice:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.inclusive(x);}
     case Op::kParallel:{std::vector<EP>x;for(auto&c:n.children)x.push_back(compile(c,t,f));return f.par(x);}
+    case Op::kInterleaving:{if(n.children.size()>8)throw std::invalid_argument("process-tree alignment: interleaving exceeds the expansion limit of 8 children");std::vector<std::size_t>o(n.children.size());std::iota(o.begin(),o.end(),0);std::vector<EP>a;do{std::vector<EP>x;for(auto i:o)x.push_back(compile(n.children[i],t,f));a.push_back(f.seq(x));}while(std::next_permutation(o.begin(),o.end()));return f.xorr(std::move(a));}
     case Op::kLoop:{EP body=compile(n.children[0],t,f);if(n.children.size()==1)return body;std::vector<EP> rs;for(std::size_t i=1;i<n.children.size();++i)rs.push_back(compile(n.children[i],t,f));return f.seq({body,f.star(f.seq({f.xorr(rs),body}))});}
   } return f.eps();
 }
@@ -433,6 +435,7 @@ struct RecursiveAligner {
         out = align_parallel(node, trace, approximate);
         break;
       case Op::kInclusiveChoice:
+      case Op::kInterleaving:
         out = exact_subtree(node, trace);
         break;
       case Op::kLoop:

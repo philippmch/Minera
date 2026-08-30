@@ -11,7 +11,7 @@ namespace minera {
 
 // Serializes a process tree as PTML, the process-tree interchange format ProM
 // and other process-mining tools read: one element per node — sequence, xor,
-// and, or, xorLoop for the operators; manualTask for an activity leaf,
+// and, or, interleaving, xorLoop for the operators; manualTask for an activity leaf,
 // automaticTask for a silent step — and one <parentsNode> edge per
 // parent-child link, whose document order fixes the child order. A loop is
 // written in the three-child shape those tools expect (body, redo, silent
@@ -30,8 +30,9 @@ void write_ptml(std::ostream& out,
 // body + redo; the three-child form's exit follows the loop in sequence (a
 // silent exit simply disappears). An unnamed manualTask is a silent step,
 // like an automaticTask. Operators with no children, dangling references, a
-// node with two parents, cycles, and node kinds without an equivalent here
-// (or, interleaving) all throw std::runtime_error.
+// node with two parents, cycles, and unknown node kinds all throw
+// std::runtime_error. Interleaving preserves whole-child atomicity while
+// allowing every child order.
 [[nodiscard]] ProcessTree parse_ptml(std::string_view xml);
 
 // Reads and parses a PTML file.

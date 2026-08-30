@@ -42,6 +42,7 @@ const OPERATOR_GLYPH: Record<ProcessTreeOperator, string> = {
   exclusive: "×",
   inclusive_or: "⊻",
   parallel: "∧",
+  interleaving: "↔",
   loop: "↺",
   activity: "",
   tau: "τ",

@@ -27,6 +27,9 @@ struct Footprint {
   bool dfg_present = true;
   std::set<FootprintPair> sequence;
   std::set<FootprintPair> parallel;
+  // Both child orders are allowed, but only one whole child executes at a
+  // time. This is distinct from event-level parallelism.
+  std::set<FootprintPair> atomic_interleaving;
   std::set<std::string> start_activities;
   std::set<std::string> end_activities;
   bool start_activities_present = true;

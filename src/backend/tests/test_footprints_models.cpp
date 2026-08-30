@@ -57,6 +57,21 @@ int main() {
           {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
   const auto par = discover_footprints(par_tree);
   assert(par.parallel.count({"A", "B"}) && par.parallel.count({"B", "A"}));
+  const ProcessTree interleaving_tree({"A", "B"},
+      ProcessTreeNode{ProcessTreeOperator::kInterleaving, 0,
+          {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  const auto interleaving = discover_footprints(interleaving_tree);
+  assert(interleaving.sequence.count({"A", "B"}) &&
+         interleaving.sequence.count({"B", "A"}));
+  assert(interleaving.parallel.empty());
+  assert(interleaving.atomic_interleaving.count({"A", "B"}) &&
+         interleaving.atomic_interleaving.count({"B", "A"}));
+  const ProcessTree nested_interleaving({"A", "B", "C"},
+      ProcessTreeNode{ProcessTreeOperator::kSequence, 0,
+          {interleaving_tree.root(), ProcessTreeNode::leaf(2)}});
+  const auto nested_interleaving_fp = discover_footprints(nested_interleaving);
+  assert(nested_interleaving_fp.atomic_interleaving.count({"A", "B"}) &&
+         nested_interleaving_fp.atomic_interleaving.count({"B", "A"}));
   const ProcessTree loop_tree({"A"},
       ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
           {ProcessTreeNode::leaf(0), ProcessTreeNode::tau()}});

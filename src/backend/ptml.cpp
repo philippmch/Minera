@@ -72,11 +72,13 @@ class PtmlWriter {
       case ProcessTreeOperator::kSequence:
       case ProcessTreeOperator::kExclusive:
       case ProcessTreeOperator::kInclusiveChoice:
-      case ProcessTreeOperator::kParallel: {
+      case ProcessTreeOperator::kParallel:
+      case ProcessTreeOperator::kInterleaving: {
         const char* element =
             node.op == ProcessTreeOperator::kSequence   ? "sequence"
             : node.op == ProcessTreeOperator::kExclusive ? "xor"
             : node.op == ProcessTreeOperator::kInclusiveChoice ? "or"
+            : node.op == ProcessTreeOperator::kInterleaving ? "interleaving"
                                                          : "and";
         const auto id = operator_node(element);
         for (const auto& child : node.children) {
@@ -145,7 +147,7 @@ namespace {
 
 // What the parse pass collects per node before the tree is assembled.
 struct ParsedPtmlNode {
-  std::string kind;  // element name: sequence, xor, or, and, xorLoop, manualTask, automaticTask
+  std::string kind;  // element name: sequence, xor, or, and, interleaving, xorLoop, manualTask, automaticTask
   std::string name;
   std::vector<std::string> children;  // child ids, in edge document order
   bool has_parent = false;
@@ -158,6 +160,7 @@ std::string_view local_name(std::string_view name) {
 
 bool is_ptml_node(std::string_view kind) {
   return kind == "sequence" || kind == "xor" || kind == "or" || kind == "and" ||
+         kind == "interleaving" ||
          kind == "xorLoop" || kind == "manualTask" || kind == "automaticTask";
 }
 
@@ -221,6 +224,7 @@ class PtmlBuilder {
       node.op = parsed.kind == "sequence" ? ProcessTreeOperator::kSequence
                 : parsed.kind == "xor"    ? ProcessTreeOperator::kExclusive
                 : parsed.kind == "or"     ? ProcessTreeOperator::kInclusiveChoice
+                : parsed.kind == "interleaving" ? ProcessTreeOperator::kInterleaving
                                           : ProcessTreeOperator::kParallel;
       if (parsed.children.empty()) {
         throw std::runtime_error("PTML operator node '" + id +

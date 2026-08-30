@@ -19,7 +19,9 @@ void fix_relations(Footprint& fp) {
   for (const auto& p : fp.parallel) fp.sequence.erase(p);
   std::vector<FootprintPair> conflict;
   for (const auto& p : fp.sequence) {
-    if (fp.sequence.find({p.second, p.first}) != fp.sequence.end()) conflict.push_back(p);
+    if (fp.sequence.find({p.second, p.first}) != fp.sequence.end() &&
+        fp.atomic_interleaving.find(p) == fp.atomic_interleaving.end())
+      conflict.push_back(p);
   }
   for (const auto& p : conflict) {
     fp.sequence.erase(p);
@@ -28,7 +30,7 @@ void fix_relations(Footprint& fp) {
 }
 
 struct ModelFp {
-  PairSet sequence, parallel;
+  PairSet sequence, parallel, atomic_interleaving;
   std::set<std::string> starts, ends, activities, aah;
   bool skippable = true;
   std::size_t min_length = 0;
@@ -39,7 +41,9 @@ void fix_relations(ModelFp& fp) {
   for (const auto& p : fp.parallel) fp.sequence.erase(p);
   std::vector<FootprintPair> conflict;
   for (const auto& p : fp.sequence)
-    if (fp.sequence.find({p.second, p.first}) != fp.sequence.end()) conflict.push_back(p);
+    if (fp.sequence.find({p.second, p.first}) != fp.sequence.end() &&
+        fp.atomic_interleaving.find(p) == fp.atomic_interleaving.end())
+      conflict.push_back(p);
   for (const auto& p : conflict) { fp.sequence.erase(p); fp.parallel.insert(p); }
 }
 
@@ -48,6 +52,7 @@ Footprint to_public(const ModelFp& m, bool include_max) {
   fp.dfg_present = false;
   fp.sequence = m.sequence;
   fp.parallel = m.parallel;
+  fp.atomic_interleaving = m.atomic_interleaving;
   fp.start_activities = m.starts;
   fp.end_activities = m.ends;
   fp.activities = m.activities;
@@ -69,6 +74,8 @@ ModelFp merge_parallel(const std::vector<ModelFp>& children) {
     out.activities.insert(c.activities.begin(), c.activities.end());
     out.sequence.insert(c.sequence.begin(), c.sequence.end());
     out.parallel.insert(c.parallel.begin(), c.parallel.end());
+    out.atomic_interleaving.insert(c.atomic_interleaving.begin(),
+                                   c.atomic_interleaving.end());
     out.skippable = out.skippable && c.skippable;
     out.min_length += c.min_length;
     if (c.max_length) { if (out.max_length) *out.max_length += *c.max_length; }
@@ -96,6 +103,8 @@ ModelFp merge_xor(const std::vector<ModelFp>& children) {
     out.activities.insert(c.activities.begin(), c.activities.end());
     out.sequence.insert(c.sequence.begin(), c.sequence.end());
     out.parallel.insert(c.parallel.begin(), c.parallel.end());
+    out.atomic_interleaving.insert(c.atomic_interleaving.begin(),
+                                   c.atomic_interleaving.end());
     out.skippable = out.skippable || c.skippable;
     if (first) {
       out.min_length = c.min_length;
@@ -135,6 +144,8 @@ ModelFp merge_inclusive(const std::vector<ModelFp>& children) {
     out.activities.insert(child.activities.begin(), child.activities.end());
     out.sequence.insert(child.sequence.begin(), child.sequence.end());
     out.parallel.insert(child.parallel.begin(), child.parallel.end());
+    out.atomic_interleaving.insert(child.atomic_interleaving.begin(),
+                                   child.atomic_interleaving.end());
     out.skippable = out.skippable || child.skippable;
     if (first) {
       out.min_length = child.min_length;
@@ -191,9 +202,39 @@ ModelFp tree_fp(const ProcessTreeNode& n, const std::vector<std::string>& names)
     return merge_inclusive(cs);
   }
   if (n.op == ProcessTreeOperator::kParallel) return merge_parallel(cs);
+  if (n.op == ProcessTreeOperator::kInterleaving) {
+    ModelFp out;
+    out.skippable = true;
+    out.max_length = std::size_t{0};
+    for (const auto& child : cs) {
+      out.activities.insert(child.activities.begin(), child.activities.end());
+      out.starts.insert(child.starts.begin(), child.starts.end());
+      out.ends.insert(child.ends.begin(), child.ends.end());
+      out.sequence.insert(child.sequence.begin(), child.sequence.end());
+      out.parallel.insert(child.parallel.begin(), child.parallel.end());
+      out.atomic_interleaving.insert(child.atomic_interleaving.begin(),
+                                     child.atomic_interleaving.end());
+      out.skippable = out.skippable && child.skippable;
+      out.min_length += child.min_length;
+      if (out.max_length && child.max_length) *out.max_length += *child.max_length;
+      else out.max_length.reset();
+      if (!child.skippable) out.aah.insert(child.aah.begin(), child.aah.end());
+    }
+    for (std::size_t i = 0; i < cs.size(); ++i) {
+      for (std::size_t j = 0; j < cs.size(); ++j) {
+        if (i == j) continue;
+        for (const auto& a : cs[i].ends)
+          for (const auto& b : cs[j].starts) {
+            out.sequence.insert({a, b});
+            out.atomic_interleaving.insert({a, b});
+          }
+      }
+    }
+    return out;
+  }
   if (n.op == ProcessTreeOperator::kSequence) {
     ModelFp out; out.skippable = true; out.max_length = std::size_t{0};
-    for (const auto& c : cs) { out.activities.insert(c.activities.begin(), c.activities.end()); out.sequence.insert(c.sequence.begin(), c.sequence.end()); out.parallel.insert(c.parallel.begin(), c.parallel.end()); out.skippable = out.skippable && c.skippable; out.min_length += c.min_length; if (out.max_length && c.max_length) *out.max_length += *c.max_length; else out.max_length.reset(); if (!c.skippable) out.aah.insert(c.aah.begin(), c.aah.end()); }
+    for (const auto& c : cs) { out.activities.insert(c.activities.begin(), c.activities.end()); out.sequence.insert(c.sequence.begin(), c.sequence.end()); out.parallel.insert(c.parallel.begin(), c.parallel.end()); out.atomic_interleaving.insert(c.atomic_interleaving.begin(), c.atomic_interleaving.end()); out.skippable = out.skippable && c.skippable; out.min_length += c.min_length; if (out.max_length && c.max_length) *out.max_length += *c.max_length; else out.max_length.reset(); if (!c.skippable) out.aah.insert(c.aah.begin(), c.aah.end()); }
     for (std::size_t i = 0; i < cs.size(); ++i) {
       for (std::size_t j = i + 1; j < cs.size(); ++j) { for (const auto& a : cs[i].ends) for (const auto& b : cs[j].starts) out.sequence.insert({a,b}); if (!cs[j].skippable) break; }
     }
@@ -205,7 +246,7 @@ ModelFp tree_fp(const ProcessTreeNode& n, const std::vector<std::string>& names)
   ModelFp out; if (cs.empty()) return out;
   const ModelFp& do_fp = cs[0]; ModelFp redo;
   if (cs.size() == 2) redo = cs[1]; else { std::vector<ModelFp> rest(cs.begin()+1, cs.end()); redo = merge_xor(rest); }
-  out = do_fp; out.activities.insert(redo.activities.begin(), redo.activities.end()); out.sequence.insert(redo.sequence.begin(), redo.sequence.end()); out.parallel.insert(redo.parallel.begin(), redo.parallel.end()); out.skippable = do_fp.skippable; out.min_length = do_fp.min_length; out.max_length = do_fp.max_length; out.aah = do_fp.skippable ? std::set<std::string>{} : do_fp.aah;
+  out = do_fp; out.activities.insert(redo.activities.begin(), redo.activities.end()); out.sequence.insert(redo.sequence.begin(), redo.sequence.end()); out.parallel.insert(redo.parallel.begin(), redo.parallel.end()); out.atomic_interleaving.insert(redo.atomic_interleaving.begin(), redo.atomic_interleaving.end()); out.skippable = do_fp.skippable; out.min_length = do_fp.min_length; out.max_length = do_fp.max_length; out.aah = do_fp.skippable ? std::set<std::string>{} : do_fp.aah;
   out.starts = do_fp.starts; out.ends = do_fp.ends;
   if (do_fp.skippable) { out.starts.insert(redo.starts.begin(), redo.starts.end()); out.ends.insert(redo.ends.begin(), redo.ends.end()); }
   for (const auto& a : do_fp.ends) for (const auto& b : redo.starts) out.sequence.insert({a,b});
@@ -376,7 +417,7 @@ Footprint discover_footprints(const PetriNet& net) {
   for (const auto& pair : predecessor_pairs)
     if (predecessor_pairs.count({pair.second, pair.first}) && output_pairs.count(pair))
       fp.parallel.insert({label(pair.first), label(pair.second)});
-  fix_relations(fp);
+  for (const auto& p : fp.parallel) fp.sequence.erase(p);
   return fp;
 }
 

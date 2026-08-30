@@ -153,6 +153,18 @@ void process_tree_to_powl_variations() {
   }
   assert(saw_a && saw_b && saw_ab);
 
+  const auto interleaving_model = minera::to_powl(ProcessTree(
+      {"A", "B", "C"}, ProcessTreeNode{Op::kInterleaving, 0,
+          {ProcessTreeNode{Op::kSequence, 0,
+                           {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}},
+           ProcessTreeNode::leaf(2)}}));
+  assert(interleaving_model.kind() == minera::PowlNodeKind::kXor);
+  assert(interleaving_model.children().size() == 2);
+  const auto interleaving_language = enumerate_language(
+      minera::to_petri_net(interleaving_model), 3);
+  assert(interleaving_language.traces ==
+         traces({t({"A", "B", "C"}), t({"C", "A", "B"})}));
+
   bool invalid = false;
   try {
     (void)minera::to_powl(ProcessTree({"A"}, ProcessTreeNode::leaf(1)));
