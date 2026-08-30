@@ -50,6 +50,7 @@ struct IntervalTreeQueryResult {
   std::vector<OpenPathInterval> intervals;
   std::vector<std::size_t> point_matches;
   std::vector<std::size_t> range_matches;
+  std::size_t interval_count = 0;
   friend bool operator==(const IntervalTreeQueryResult&,
                          const IntervalTreeQueryResult&) = default;
 };

@@ -37,6 +37,13 @@ double require_timestamp(const Event& event, const std::string& key) {
 IntervalTreeQueryResult query_open_path_intervals(
     const std::vector<OpenPathInterval>& intervals,
     const IntervalTreeQueryOptions& options) {
+  for (const auto& interval : intervals) {
+    if (!std::isfinite(interval.start) || !std::isfinite(interval.end) ||
+        interval.start > interval.end) {
+      throw std::invalid_argument(
+          "interval tree: intervals must have finite ordered boundaries");
+    }
+  }
   if (options.point && !std::isfinite(*options.point))
     throw std::invalid_argument("interval tree: query point must be finite");
   if (options.range) {
@@ -52,6 +59,7 @@ IntervalTreeQueryResult query_open_path_intervals(
   result.point = options.point;
   result.range = options.range;
   result.intervals = intervals;
+  result.interval_count = intervals.size();
   if (options.point) {
     for (std::size_t index = 0; index < intervals.size(); ++index) {
       const auto& interval = intervals[index];

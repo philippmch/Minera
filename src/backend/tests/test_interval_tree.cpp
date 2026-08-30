@@ -88,7 +88,8 @@ void invalid_and_empty() {
 
 void json_shape_is_stable() {
   const auto json = interval_tree_json(discover_open_path_intervals(sample()));
-  assert(json.find(R"({"family":"LOG_TO_INTERVAL_TREE","intervals":[)" ) !=
+  assert(json.find(
+             R"({"family":"LOG_TO_INTERVAL_TREE","interval_count":2,"intervals":[)") !=
          std::string::npos);
   assert(json.find(R"("case_id":"case-1")") != std::string::npos);
   assert(json.find(R"("source_activity":"A")") != std::string::npos);
@@ -104,6 +105,7 @@ void query_diagnostics_are_inclusive_and_indexed() {
   options.range = std::pair{epoch + 0.5, epoch + 1.5};
   const auto result = query_open_path_intervals(intervals, options);
   assert(result.intervals == intervals);
+  assert(result.interval_count == 2);
   assert(result.point && *result.point == epoch + 2.0);
   assert(result.point_matches == std::vector<std::size_t>{1});
   assert(result.range_matches == std::vector<std::size_t>({0, 1}));
@@ -125,6 +127,16 @@ void query_diagnostics_are_inclusive_and_indexed() {
     options.point.reset();
     options.range = std::pair{2.0, 1.0};
     (void)query_open_path_intervals(intervals, options);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    auto invalid = intervals;
+    invalid[0].start = invalid[0].end + 1.0;
+    (void)query_open_path_intervals(invalid);
   } catch (const std::invalid_argument&) {
     threw = true;
   }

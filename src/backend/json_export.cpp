@@ -4376,14 +4376,14 @@ void write_index_array(std::ostream& out, const std::vector<std::size_t>& values
 }  // namespace
 
 std::string interval_tree_json(const std::vector<OpenPathInterval>& result) {
-  IntervalTreeQueryResult query_result;
-  query_result.intervals = result;
+  const auto query_result = query_open_path_intervals(result);
   return interval_tree_json(query_result);
 }
 
 std::string interval_tree_json(const IntervalTreeQueryResult& result) {
   std::ostringstream out;
-  out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"intervals\":[";
+  out << "{\"family\":\"LOG_TO_INTERVAL_TREE\",\"interval_count\":"
+      << result.interval_count << ",\"intervals\":[";
   write_interval_tree_intervals(out, result.intervals);
   out << ']';
   if (result.point) {
