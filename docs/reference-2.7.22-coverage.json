@@ -12,7 +12,8 @@
     "algo.transformation.log_to_target",
     "algo.transformation.log_to_trie",
     "algo.transformation.log_to_interval_tree",
-    "algo.transformation.ocel.description"
+    "algo.transformation.ocel.description",
+    "algo.transformation.ocel.split_ocel"
   ],
   "packages": [
     {
@@ -877,8 +878,18 @@
         "CONNECTED_COMPONENTS",
         "ANCESTORS_DESCENDANTS"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_transform.hpp",
+        "src/backend/ocel_transform.cpp",
+        "src/backend/tools/minera_ocel.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_ocel_transform.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts"
+      ]
     },
     {
       "package": "algo.transformation.to_embeddings",

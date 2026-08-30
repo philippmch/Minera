@@ -2217,7 +2217,8 @@ describe("OCEL API", () => {
   it("posts an OCEL split request and validates the response", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
-      json: async () => ({ family: "OCEL_SPLIT", variant: "CONNECTED_COMPONENTS", logs: [] }),
+      json: async () => ({ family: "OCEL_SPLIT", variant: "CONNECTED_COMPONENTS",
+        candidate_count: 0, returned_count: 0, truncated: false, logs: [] }),
     })));
     await expect(requestOcelSplit(new File(["{}"], "log.json"), { variant: "connected_components" }))
       .resolves.toMatchObject({ family: "OCEL_SPLIT", variant: "CONNECTED_COMPONENTS" });

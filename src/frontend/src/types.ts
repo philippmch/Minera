@@ -1514,6 +1514,9 @@ export interface OcelExchangeResult {
 export interface OcelSplitResult {
   family: "OCEL_SPLIT";
   variant: OcelSplitVariant;
+  candidate_count: number;
+  returned_count: number;
+  truncated: boolean;
   logs: Array<Record<string, unknown>>;
 }
 export type OcelEnrichmentGraph =
@@ -1675,8 +1678,18 @@ export function isOcelExchangeResult(value: unknown): value is OcelExchangeResul
 export function isOcelSplitResult(value: unknown): value is OcelSplitResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_SPLIT" ||
       !["CONNECTED_COMPONENTS", "ANCESTORS_DESCENDANTS"].includes(String(value.variant)) ||
-      !Array.isArray(value.logs)) return false;
-  return value.logs.every((log) => isOcelRecord(log));
+      !Number.isInteger(value.candidate_count) || (value.candidate_count as number) < 0 ||
+      !Number.isInteger(value.returned_count) || (value.returned_count as number) < 0 ||
+      typeof value.truncated !== "boolean" || !Array.isArray(value.logs) ||
+      value.returned_count !== value.logs.length ||
+      (value.returned_count as number) > (value.candidate_count as number) ||
+      value.truncated !== ((value.returned_count as number) < (value.candidate_count as number))) return false;
+  if (value.variant === "CONNECTED_COMPONENTS")
+    return value.logs.every((log) => isOcelRecord(log) &&
+      isOcelRecord(log["ocel:events"]) && isOcelRecord(log["ocel:objects"]));
+  return value.logs.every((entry) => isOcelRecord(entry) &&
+    typeof entry.central_object === "string" && isOcelRecord(entry.log) &&
+    isOcelRecord(entry.log["ocel:events"]) && isOcelRecord(entry.log["ocel:objects"]));
 }
 export function isOcelEnrichmentResult(value: unknown): value is OcelEnrichmentResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_ENRICHMENT" ||
