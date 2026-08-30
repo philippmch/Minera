@@ -22,13 +22,22 @@ struct PetriUsageRecord {
   std::string color;
 };
 
-// Arc usage is associated with the transition that owns the arc.  `id` is a
-// deterministic ordinal in the flattened input/output arc lists; repeated
-// place IDs therefore preserve weighted arcs instead of being silently lost.
+enum class PetriArcUsageKind {
+  kInput,
+  kOutput,
+  kReset,
+  kInhibitor,
+};
+
+// Arc usage is associated with the transition that owns the arc. `id` is a
+// deterministic ordinal in the flattened ordinary/reset/inhibitor arc lists;
+// repeated place IDs therefore preserve weighted arcs instead of being lost.
 struct PetriArcUsageRecord {
   std::size_t id = 0;
   std::size_t transition = 0;
   std::size_t place = 0;
+  PetriArcUsageKind kind = PetriArcUsageKind::kInput;
+  // Compatibility projection: true for every place-to-transition arc.
   bool input = true;
   std::uint64_t log1_occurrences = 0;
   std::uint64_t log2_occurrences = 0;
@@ -58,6 +67,13 @@ struct PetriUsageComparisonOptions {
   // trailing whitespace is ignored; a non-empty all-whitespace selector is
   // rejected.
   std::string activity_attribute;
+  // Replay controls inherited by the comparison operation. Silent routing can
+  // be disabled independently before visible events and after the trace. When
+  // immediate stop is enabled, the first unknown or forced visible event ends
+  // that trace after recording the forced activation, if any.
+  bool walk_through_hidden_trans = true;
+  bool try_to_reach_final_marking_through_hidden = true;
+  bool stop_immediately_unfit = false;
 };
 
 // Compares forward token-replay element activations for two logs.  Replay is

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/json_export.hpp"
 #include "minera/petri_usage_comparison.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
@@ -128,6 +129,54 @@ void explicit_markings_control_replay_boundaries() {
   assert(result.places[alternate_final].log1_occurrences == 1);
 }
 
+void replay_controls_are_honored() {
+  minera::PetriNet routed;
+  const auto source = routed.add_place();
+  const auto entry = routed.add_place();
+  const auto sink = routed.add_place();
+  routed.set_source(source);
+  routed.set_sink(sink);
+  routed.set_activities({"A"});
+  routed.add_transition(std::nullopt, {source}, {entry});
+  routed.add_transition(0, {entry}, {sink});
+
+  const auto default_routing =
+      minera::compare_petri_usage(routed, log_of({"A"}), log_of({}));
+  assert(default_routing.transitions[0].log1_occurrences == 1);
+  assert(default_routing.transitions[1].log1_occurrences == 1);
+
+  minera::PetriUsageComparisonOptions no_entry_routing;
+  no_entry_routing.walk_through_hidden_trans = false;
+  const auto forced = minera::compare_petri_usage(
+      routed, log_of({"A"}), log_of({}), no_entry_routing);
+  assert(forced.transitions[0].log1_occurrences == 0);
+  assert(forced.transitions[1].log1_occurrences == 1);
+
+  minera::PetriUsageComparisonOptions no_final_routing;
+  no_final_routing.try_to_reach_final_marking_through_hidden = false;
+  const auto unfinished = minera::compare_petri_usage(
+      simple_net(), log_of({"A"}), log_of({}), no_final_routing);
+  assert(unfinished.transitions[0].log1_occurrences == 1);
+  assert(unfinished.transitions[1].log1_occurrences == 0);
+  assert(unfinished.places[1].log1_occurrences == 1);
+
+  minera::PetriUsageComparisonOptions stop;
+  stop.stop_immediately_unfit = true;
+  const auto stopped_on_unknown = minera::compare_petri_usage(
+      simple_net(), log_of({"unknown", "A"}), log_of({}), stop);
+  assert(stopped_on_unknown.transitions[0].log1_occurrences == 0);
+  const auto continued_after_unknown = minera::compare_petri_usage(
+      simple_net(), log_of({"unknown", "A"}), log_of({}));
+  assert(continued_after_unknown.transitions[0].log1_occurrences == 1);
+
+  const auto stopped_after_forced = minera::compare_petri_usage(
+      simple_net(), log_of({"A", "A", "A"}), log_of({}), stop);
+  assert(stopped_after_forced.transitions[0].log1_occurrences == 2);
+  const auto continued_after_forced = minera::compare_petri_usage(
+      simple_net(), log_of({"A", "A", "A"}), log_of({}));
+  assert(continued_after_forced.transitions[0].log1_occurrences == 3);
+}
+
 void extended_arcs_are_replayed_and_counted() {
   minera::PetriNet net;
   const auto source = net.add_place();
@@ -145,6 +194,14 @@ void extended_arcs_are_replayed_and_counted() {
       net, log_of({"A"}), log_of({}));
   assert(result.transitions[1].log1_occurrences == 1);
   assert(result.places[buffered].log1_occurrences == 2);
+  assert(result.arcs.size() == 7);
+  assert(result.arcs.back().transition == reset);
+  assert(result.arcs.back().place == buffered);
+  assert(result.arcs.back().kind == minera::PetriArcUsageKind::kReset);
+  assert(result.arcs.back().input);
+  assert(result.arcs.back().log1_occurrences == 1);
+  const auto json = minera::petri_usage_comparison_json(result);
+  assert(json.find("\"kind\":\"reset\"") != std::string::npos);
 }
 
 void inhibitor_arcs_gate_silent_completion() {
@@ -160,6 +217,14 @@ void inhibitor_arcs_gate_silent_completion() {
   const auto enabled_result = minera::compare_petri_usage(
       net, log_of({}), log_of({}));
   assert(enabled_result.transitions[0].log1_occurrences == 1);
+  assert(enabled_result.arcs.size() == 3);
+  assert(enabled_result.arcs.back().place == guard);
+  assert(enabled_result.arcs.back().kind ==
+         minera::PetriArcUsageKind::kInhibitor);
+  assert(enabled_result.arcs.back().input);
+  assert(enabled_result.arcs.back().log1_occurrences == 1);
+  assert(minera::petri_usage_comparison_json(enabled_result).find(
+             "\"kind\":\"inhibitor\"") != std::string::npos);
 
   minera::PetriUsageComparisonOptions blocked_options;
   blocked_options.initial_marking = {1, 1, 0};
@@ -419,6 +484,7 @@ int main() {
   weighted_arc_and_duplicate_label_contract();
   finish_routes_when_sink_has_a_token_and_other_work_remains();
   explicit_markings_control_replay_boundaries();
+  replay_controls_are_honored();
   extended_arcs_are_replayed_and_counted();
   inhibitor_arcs_gate_silent_completion();
   marking_dimensions_are_checked();

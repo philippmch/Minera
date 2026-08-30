@@ -392,6 +392,9 @@ function PetriUsageComparisonPanel() {
   const [activityAttribute, setActivityAttribute] = useState("");
   const [initialMarking, setInitialMarking] = useState("");
   const [finalMarking, setFinalMarking] = useState("");
+  const [walkThroughHidden, setWalkThroughHidden] = useState(true);
+  const [reachFinalThroughHidden, setReachFinalThroughHidden] = useState(true);
+  const [stopImmediatelyUnfit, setStopImmediatelyUnfit] = useState(false);
   const [result, setResult] = useState<PetriUsageComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -407,6 +410,9 @@ function PetriUsageComparisonPanel() {
         activity_attribute: activityAttribute.trim() || undefined,
         initial_marking: parseMarking(initialMarking),
         final_marking: parseMarking(finalMarking),
+        walk_through_hidden_trans: walkThroughHidden,
+        try_to_reach_final_marking_through_hidden: reachFinalThroughHidden,
+        stop_immediately_unfit: stopImmediatelyUnfit,
       }));
     }
     catch (cause) { setResult(null); setError(cause instanceof Error ? cause.message : String(cause)); }
@@ -423,6 +429,9 @@ function PetriUsageComparisonPanel() {
       <label>Activity attribute<input value={activityAttribute} placeholder="optional: business_activity" onChange={e => { setActivityAttribute(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Initial marking<input value={initialMarking} placeholder="optional: 1,0,…" onChange={e => { setInitialMarking(e.target.value); setResult(null); setError(null); }} /></label>
       <label>Final marking<input value={finalMarking} placeholder="optional: 0,…,1" onChange={e => { setFinalMarking(e.target.value); setResult(null); setError(null); }} /></label>
+      <label className="checkbox-label"><input type="checkbox" checked={walkThroughHidden} onChange={e => { setWalkThroughHidden(e.target.checked); setResult(null); }} /> Route hidden transitions before events</label>
+      <label className="checkbox-label"><input type="checkbox" checked={reachFinalThroughHidden} onChange={e => { setReachFinalThroughHidden(e.target.checked); setResult(null); }} /> Route hidden transitions after traces</label>
+      <label className="checkbox-label"><input type="checkbox" checked={stopImmediatelyUnfit} onChange={e => { setStopImmediatelyUnfit(e.target.checked); setResult(null); }} /> Stop each trace at first deviation</label>
     </div>
     <button className="button" disabled={!reference || busy} onClick={() => void run()}>{busy ? "Comparing…" : "Compare element usage"}</button>
     {error && <p className="conf-inline-note">{error}</p>}

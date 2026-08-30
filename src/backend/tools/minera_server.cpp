@@ -4275,6 +4275,22 @@ void handle_compare_petri(const httplib::Request& request,
     constexpr std::size_t kMaxComparisonWork = 500'000'000;
     constexpr std::size_t kSilentRoutingStateCap = 4'096;
     minera::PetriUsageComparisonOptions comparison_options;
+    const auto comparison_bool = [&](std::string_view name, bool fallback) {
+      const auto key = std::string(name);
+      std::string value;
+      if (request.has_param(key)) {
+        value = request.get_param_value(key);
+      } else if (request.has_file(key)) {
+        value = request.get_file_value(key).content;
+      } else {
+        return fallback;
+      }
+      value = lower_ascii(trim_text(value));
+      if (value == "true" || value == "1") return true;
+      if (value == "false" || value == "0") return false;
+      throw std::invalid_argument(
+          key + " expects true, false, 1, or 0");
+    };
     if (request.has_param("activity_attribute")) {
       comparison_options.activity_attribute =
           trim_text(request.get_param_value("activity_attribute"));
@@ -4288,6 +4304,16 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty name when supplied");
     }
+    comparison_options.walk_through_hidden_trans = comparison_bool(
+        "walk_through_hidden_trans",
+        comparison_options.walk_through_hidden_trans);
+    comparison_options.try_to_reach_final_marking_through_hidden =
+        comparison_bool(
+            "try_to_reach_final_marking_through_hidden",
+            comparison_options.try_to_reach_final_marking_through_hidden);
+    comparison_options.stop_immediately_unfit = comparison_bool(
+        "stop_immediately_unfit",
+        comparison_options.stop_immediately_unfit);
     const auto selector = comparison_options.activity_attribute;
     minera::EventLog reference;
     if (minera::looks_like_xes(reference_file.filename, reference_file.content)) {

@@ -203,11 +203,14 @@ describe("native alignment adapters", () => {
     expect(isProcessTreeReductionResult(reduced)).toBe(true);
   });
   it("validates deterministic Petri usage comparison responses", () => {
-    const result = { family: "PETRI_USAGE_COMPARISON", places: [{ id: 0, log1_occurrences: 1, log2_occurrences: 2, total_occurrences: 3, direction: 1 / 3, label: "(1/2/3)", color: "#FFAAAA" }], transitions: [], arcs: [] };
+    const usage = { id: 0, log1_occurrences: 1, log2_occurrences: 2, total_occurrences: 3, direction: 1 / 3, label: "(1/2/3)", color: "#FFAAAA" };
+    const result = { family: "PETRI_USAGE_COMPARISON", places: [usage], transitions: [], arcs: [{ ...usage, transition: 0, place: 0, kind: "reset", input: true }] };
     expect(isPetriUsageComparison(result)).toBe(true);
     expect(isPetriUsageComparison({ ...result, family: "DFG" })).toBe(false);
     expect(isPetriUsageComparison({ ...result, places: [{ ...result.places[0], direction: Number.NaN }] })).toBe(false);
     expect(isPetriUsageComparison({ ...result, places: [{ ...result.places[0], color: "red" }] })).toBe(false);
+    expect(isPetriUsageComparison({ ...result, arcs: [{ ...result.arcs[0], kind: "unknown" }] })).toBe(false);
+    expect(isPetriUsageComparison({ ...result, arcs: [{ ...result.arcs[0], input: false }] })).toBe(false);
   });
 });
 

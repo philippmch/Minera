@@ -1814,6 +1814,8 @@ export interface PetriUsageRecord {
 export interface PetriArcUsageRecord extends PetriUsageRecord {
   transition: number;
   place: number;
+  kind: "input" | "output" | "reset" | "inhibitor";
+  /** Compatibility projection: true for every place-to-transition arc. */
   input: boolean;
 }
 export interface PetriUsageComparison {
@@ -1829,6 +1831,12 @@ export interface PetriUsageComparisonOptions {
   final_marking?: number[];
   /** Optional event attribute used as the replay activity label. */
   activity_attribute?: string;
+  /** Route through silent transitions to enable visible events. */
+  walk_through_hidden_trans?: boolean;
+  /** Route through silent transitions after the last event. */
+  try_to_reach_final_marking_through_hidden?: boolean;
+  /** Stop replaying a trace after its first deviation. */
+  stop_immediately_unfit?: boolean;
 }
 
 /** Recursive POWL model emitted by the POWL discovery miner. */
@@ -2551,9 +2559,12 @@ export function isPetriUsageComparison(value: unknown): value is PetriUsageCompa
     value.arcs.every((arc) => {
       if (!isPetriUsageRecord(arc) || !isRecord(arc)) return false;
       const rec = arc as Record<string, unknown>;
+      const kind = rec.kind;
       return Number.isInteger(rec.transition) && (rec.transition as number) >= 0 &&
         Number.isInteger(rec.place) && (rec.place as number) >= 0 &&
-        typeof rec.input === "boolean";
+        ["input", "output", "reset", "inhibitor"].includes(kind as string) &&
+        typeof rec.input === "boolean" &&
+        rec.input === (kind !== "output");
     });
 }
 export function isDfgAlignmentResult(value: unknown): value is DfgAlignmentResult {
