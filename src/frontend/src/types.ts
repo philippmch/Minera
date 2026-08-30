@@ -163,6 +163,11 @@ export interface GeneticMinerNet {
   transitions: GeneticMinerTransition[];
 }
 export interface GeneticMinerMarkings { initial: number[]; final: number[]; }
+export interface GeneticCausalMatrix {
+  activities: string[];
+  input_map: number[][][];
+  output_map: number[][][];
+}
 export interface GeneticMinerDiagnostics {
   computed: boolean;
   exhausted: boolean;
@@ -176,6 +181,7 @@ export interface GeneticMinerDiagnostics {
 }
 export interface GeneticMinerResult {
   family: "GENETIC";
+  matrix: GeneticCausalMatrix;
   net: GeneticMinerNet;
   markings: GeneticMinerMarkings;
   diagnostics: GeneticMinerDiagnostics;
@@ -194,36 +200,66 @@ export interface GeneticMinerOptions {
   max_activities?: number;
   max_states?: number;
 }
+export interface GeneticMatrixConversionResult {
+  family: "GENETIC_MATRIX_CONVERSION";
+  variant: "TO_PETRI_NET";
+  matrix: GeneticCausalMatrix;
+  net: GeneticMinerNet;
+  markings: GeneticMinerMarkings;
+}
 function isNonnegativeFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
-export function isGeneticMinerResult(value: unknown): value is GeneticMinerResult {
+export function isGeneticCausalMatrix(value: unknown): value is GeneticCausalMatrix {
   if (!value || typeof value !== "object") return false;
-  const c = value as Partial<GeneticMinerResult>;
-  if (c.family !== "GENETIC" || !c.net || typeof c.net !== "object" ||
-      !c.markings || typeof c.markings !== "object" ||
-      !c.diagnostics || typeof c.diagnostics !== "object") return false;
-  const n = c.net as Partial<GeneticMinerNet>;
+  const matrix = value as Partial<GeneticCausalMatrix>;
+  if (!Array.isArray(matrix.activities) ||
+      !matrix.activities.every((activity) => typeof activity === "string") ||
+      !Array.isArray(matrix.input_map) || !Array.isArray(matrix.output_map) ||
+      matrix.input_map.length !== matrix.activities.length ||
+      matrix.output_map.length !== matrix.activities.length) return false;
+  const validMap = (map: number[][][]) => map.every((groups) =>
+    Array.isArray(groups) && groups.every((group) =>
+      Array.isArray(group) && group.length > 0 && group.every((member) =>
+        Number.isInteger(member) && member >= 0 &&
+        member < (matrix.activities as string[]).length)));
+  return validMap(matrix.input_map) && validMap(matrix.output_map);
+}
+function isGeneticNetAndMarkings(net: unknown, markings: unknown): boolean {
+  if (!net || typeof net !== "object" || !markings || typeof markings !== "object")
+    return false;
+  const n = net as Partial<GeneticMinerNet>;
   const placeCount = n.place_count;
   if (!Number.isInteger(placeCount) || (placeCount as number) <= 0 ||
       !Number.isInteger(n.source) || !Number.isInteger(n.sink) ||
       (n.source as number) < 0 || (n.sink as number) < 0 ||
       (n.source as number) >= (placeCount as number) ||
       (n.sink as number) >= (placeCount as number) ||
-      !Array.isArray(n.activities) || !n.activities.every((x) => typeof x === "string") ||
+      !Array.isArray(n.activities) ||
+      !n.activities.every((activity) => typeof activity === "string") ||
       !Array.isArray(n.transitions)) return false;
   const activities = n.activities as string[];
-  if (!n.transitions.every((t) => {
-    if (!t || typeof t !== "object" ||
-        !(t.activity === null || (Number.isInteger(t.activity) &&
-          (t.activity as number) >= 0 && (t.activity as number) < activities.length)) ||
-        !isFiniteIntegerArray(t.inputs) || !isFiniteIntegerArray(t.outputs)) return false;
-    return t.inputs.every((place) => place < (placeCount as number)) &&
-      t.outputs.every((place) => place < (placeCount as number));
+  if (!n.transitions.every((transition) => {
+    if (!transition || typeof transition !== "object" ||
+        !(transition.activity === null ||
+          (Number.isInteger(transition.activity) &&
+           (transition.activity as number) >= 0 &&
+           (transition.activity as number) < activities.length)) ||
+        !isFiniteIntegerArray(transition.inputs) ||
+        !isFiniteIntegerArray(transition.outputs)) return false;
+    return transition.inputs.every((place) => place < (placeCount as number)) &&
+      transition.outputs.every((place) => place < (placeCount as number));
   })) return false;
-  const m = c.markings as Partial<GeneticMinerMarkings>;
-  if (!isFiniteIntegerArray(m.initial) || !isFiniteIntegerArray(m.final) ||
-      m.initial.length !== placeCount || m.final.length !== placeCount) return false;
+  const m = markings as Partial<GeneticMinerMarkings>;
+  return isFiniteIntegerArray(m.initial) && isFiniteIntegerArray(m.final) &&
+    m.initial.length === placeCount && m.final.length === placeCount;
+}
+export function isGeneticMinerResult(value: unknown): value is GeneticMinerResult {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Partial<GeneticMinerResult>;
+  if (c.family !== "GENETIC" || !isGeneticCausalMatrix(c.matrix) ||
+      !isGeneticNetAndMarkings(c.net, c.markings) ||
+      !c.diagnostics || typeof c.diagnostics !== "object") return false;
   const d = c.diagnostics as Partial<GeneticMinerDiagnostics>;
   return typeof d.computed === "boolean" && typeof d.exhausted === "boolean" &&
     Number.isInteger(d.generations_completed) && (d.generations_completed as number) >= 0 &&
@@ -234,6 +270,19 @@ export function isGeneticMinerResult(value: unknown): value is GeneticMinerResul
     typeof d.message === "string";
 }
 export const isGeneticMiner = isGeneticMinerResult;
+
+export function isGeneticMatrixConversionResult(
+  value: unknown,
+): value is GeneticMatrixConversionResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<GeneticMatrixConversionResult>;
+  return result.family === "GENETIC_MATRIX_CONVERSION" &&
+    result.variant === "TO_PETRI_NET" &&
+    isGeneticCausalMatrix(result.matrix) &&
+    isGeneticNetAndMarkings(result.net, result.markings) &&
+    JSON.stringify(result.matrix.activities) ===
+      JSON.stringify((result.net as GeneticMinerNet).activities);
+}
 
 export type OrganizationalSnaVariant =
   | "handover" | "working_together" | "subcontracting" | "jointactivities"

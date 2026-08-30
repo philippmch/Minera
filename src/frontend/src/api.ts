@@ -68,6 +68,7 @@ import {
   type ILPMinerResult,
   type GeneticMinerOptions,
   type GeneticMinerResult,
+  type GeneticMatrixConversionResult,
   type TraceVariantQueryOptions,
   type TraceVariantQueryResult,
   type PripelOptions,
@@ -112,6 +113,7 @@ import {
   isDfgPrecisionResult,
   isILPMinerResult,
   isGeneticMinerResult,
+  isGeneticMatrixConversionResult,
   isTraceVariantQueryResult,
   isPripelResult,
   isOrganizationalSnaResult,
@@ -1834,6 +1836,29 @@ export function requestGeneticMine(options: GeneticMinerOptions = {}): Promise<G
 }
 export const mineGenetic = requestGeneticMine;
 export const requestGeneticMiner = requestGeneticMine;
+
+export function geneticMatrixConversionQuery(
+  options: GeneticMinerOptions = {},
+  variant: "to_petri_net" = "to_petri_net",
+): string {
+  if (variant !== "to_petri_net")
+    throw new Error("genetic matrix conversion variant is not supported");
+  const query = new URLSearchParams(geneticMinerQuery(options));
+  query.set("genetic_conversion_variant", variant);
+  return query.toString();
+}
+
+export function requestGeneticMatrixConversion(
+  options: GeneticMinerOptions = {},
+  variant: "to_petri_net" = "to_petri_net",
+): Promise<GeneticMatrixConversionResult> {
+  const query = geneticMatrixConversionQuery(options, variant);
+  return postChecked(
+    `/api/genetic-matrix-convert?${query}`,
+    isGeneticMatrixConversionResult,
+    "genetic matrix conversion",
+  );
+}
 /** Query string for the cached-session organizational SNA endpoint. */
 export function organizationalSnaQuery(options: OrganizationalSnaOptions = {}): string {
   const caseId = options.sna_case_id_attribute;
