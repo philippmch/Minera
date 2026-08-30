@@ -4099,10 +4099,22 @@ export function isDfgPlayoutVariantsResult(
 }
 
 /** Response from the standalone Petri-analysis endpoint. */
+export interface WorkflowNetAnalysis {
+  variant: "petri_net";
+  valid: boolean;
+  source_candidates: number[];
+  sink_candidates: number[];
+  offending_places: number[];
+  offending_transitions: number[];
+  unreachable_places: number[];
+  unreachable_transitions: number[];
+  reason: string;
+}
 export interface PetriAnalysisResult {
   family: PetriAnalysisFamily;
   variant?: string;
-  result?: Record<string, unknown>;
+  result?: WorkflowNetAnalysis;
+  workflow?: WorkflowNetAnalysis;
   computed?: boolean;
   feasible?: boolean;
   exhausted?: boolean;
@@ -4119,6 +4131,12 @@ export interface PetriAnalysisResult {
   retained_splits?: number[];
   segment_count?: number;
   status?: "sound" | "unsound" | "unknown";
+  bounded?: boolean;
+  final_reachable?: boolean;
+  option_to_complete?: boolean;
+  proper_completion?: boolean;
+  reachable_marking_count?: number;
+  coverability_node_count?: number;
   dead_transitions?: number[];
   dead_tasks?: number[];
   deadlock_witnesses?: number[][];
@@ -4187,8 +4205,22 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   }
   if (family === "workflow_net") {
     const workflow = value as PetriAnalysisResult;
-    return !!workflow.result && typeof workflow.result === "object";
+    return isWorkflowNetAnalysis(workflow.result);
   }
+  const envelope = value as PetriAnalysisResult;
+  if ((family === "soundness" && envelope.variant !== "soundness") ||
+      (family === "woflan" && envelope.variant !== "woflan") ||
+      !["sound", "unsound", "unknown"].includes(String(envelope.status)) ||
+      typeof envelope.computed !== "boolean" || typeof envelope.exhausted !== "boolean" ||
+      typeof envelope.returned_asap !== "boolean" ||
+      typeof envelope.bounded !== "boolean" || typeof envelope.final_reachable !== "boolean" ||
+      typeof envelope.option_to_complete !== "boolean" ||
+      typeof envelope.proper_completion !== "boolean" ||
+      !Number.isSafeInteger(envelope.reachable_marking_count) ||
+      envelope.reachable_marking_count! < 0 ||
+      !Number.isSafeInteger(envelope.coverability_node_count) ||
+      envelope.coverability_node_count! < 0 || typeof envelope.error !== "string" ||
+      !isWorkflowNetAnalysis(envelope.workflow)) return false;
   if ("variant" in value && value.variant !== undefined &&
       value.variant !== "soundness" && value.variant !== "woflan") return false;
   if ("returned_asap" in value && value.returned_asap !== undefined &&
@@ -4218,6 +4250,10 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
   if ("restricted_coverability_tree_exhausted" in value &&
       value.restricted_coverability_tree_exhausted !== undefined &&
       typeof value.restricted_coverability_tree_exhausted !== "boolean") return false;
+  return isSoundnessDiagnostics(envelope);
+}
+
+function isSoundnessDiagnostics(value: PetriAnalysisResult): boolean {
   const result = value as {
     handled_pairs?: unknown; not_well_handled_pairs?: unknown;
     structural_node_labels?: unknown;
@@ -4282,6 +4318,57 @@ export function isPetriAnalysisResult(value: unknown): value is PetriAnalysisRes
     validGraphEdges(result.reachability_edges) && validMessages &&
     validMarkings(result.short_circuit_reachability_markings, false) &&
     validGraphEdges(result.short_circuit_reachability_edges);
+}
+
+export function isPetriAnalysisDiagnosticsFragment(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const fragment = value as PetriAnalysisResult;
+  const family = fragment.family;
+  if (family !== "soundness" && family !== "woflan") return false;
+  if ("returned_asap" in fragment && fragment.returned_asap !== undefined &&
+      typeof fragment.returned_asap !== "boolean") return false;
+  if ("short_circuit_valid" in fragment && fragment.short_circuit_valid !== undefined &&
+      typeof fragment.short_circuit_valid !== "boolean") return false;
+  if ("short_circuit_strongly_connected" in fragment &&
+      fragment.short_circuit_strongly_connected !== undefined &&
+      typeof fragment.short_circuit_strongly_connected !== "boolean") return false;
+  if ("short_circuit_transition" in fragment && fragment.short_circuit_transition !== undefined &&
+      fragment.short_circuit_transition !== null &&
+      (!Number.isSafeInteger(fragment.short_circuit_transition) || fragment.short_circuit_transition < 0))
+    return false;
+  if ("short_circuit_reachability_exhausted" in fragment &&
+      fragment.short_circuit_reachability_exhausted !== undefined &&
+      typeof fragment.short_circuit_reachability_exhausted !== "boolean") return false;
+  if ("uniform_invariant_search_exhausted" in fragment &&
+      fragment.uniform_invariant_search_exhausted !== undefined &&
+      typeof fragment.uniform_invariant_search_exhausted !== "boolean") return false;
+  if ("short_circuit_reachability_strongly_connected" in fragment &&
+      fragment.short_circuit_reachability_strongly_connected !== undefined &&
+      typeof fragment.short_circuit_reachability_strongly_connected !== "boolean") return false;
+  if ("left" in fragment && fragment.left !== undefined && fragment.left !== null &&
+      typeof fragment.left !== "boolean") return false;
+  if ("restricted_coverability_tree_exhausted" in fragment &&
+      fragment.restricted_coverability_tree_exhausted !== undefined &&
+      typeof fragment.restricted_coverability_tree_exhausted !== "boolean") return false;
+  return isSoundnessDiagnostics(fragment);
+}
+
+function isWorkflowNetAnalysis(value: unknown): value is WorkflowNetAnalysis {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<WorkflowNetAnalysis>;
+  const indices = (items: unknown) => Array.isArray(items) &&
+    items.every((item) => Number.isSafeInteger(item) && item >= 0) &&
+    new Set(items).size === items.length;
+  if (result.variant !== "petri_net" || typeof result.valid !== "boolean" ||
+      !indices(result.source_candidates) || !indices(result.sink_candidates) ||
+      !indices(result.offending_places) || !indices(result.offending_transitions) ||
+      !indices(result.unreachable_places) || !indices(result.unreachable_transitions) ||
+      typeof result.reason !== "string") return false;
+  return !result.valid ||
+    (result.source_candidates!.length === 1 && result.sink_candidates!.length === 1 &&
+     result.offending_places!.length === 0 && result.offending_transitions!.length === 0 &&
+     result.unreachable_places!.length === 0 && result.unreachable_transitions!.length === 0 &&
+     result.reason.length === 0);
 }
 
 type EvaluationMetric = number | null;

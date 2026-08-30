@@ -11,7 +11,7 @@ import {
   logLifecycles,
   maxEdgeCount,
 } from "../src/app-logic";
-import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
+import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
 
 describe("native alignment adapters", () => {
   it("serializes the complete XES import contract", () => {
@@ -323,11 +323,11 @@ describe("evaluation adapters", () => {
     expect(() => petriAnalysisQuery({ max_states: 0 })).toThrow(/valid/);
     expect(() => petriAnalysisQuery({ invariant_search_limit: 0 })).toThrow(/valid/);
     expect(() => petriAnalysisQuery({ model_costs: [-1] })).toThrow(/costs/);
-    expect(isPetriAnalysisResult({ family: "soundness", status: "sound" })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", status: "sound", returned_asap: true })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "woflan", variant: "soundness", status: "sound" })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "woflan", variant: "other" })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "woflan", variant: "woflan", returned_asap: "true" })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", status: "sound" })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "woflan", variant: "woflan", status: "sound", returned_asap: true })).toBe(true);
+    expect(isPetriAnalysisResult({ family: "woflan", variant: "soundness", status: "sound" })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "woflan", variant: "other" })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "woflan", variant: "woflan", returned_asap: "true" })).toBe(false);
     expect(isPetriAnalysisResult({ family: "unknown" })).toBe(false);
   });
 

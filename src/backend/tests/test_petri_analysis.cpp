@@ -251,6 +251,18 @@ void workflow_structure() {
   assert(result.valid && result.source_candidates == std::vector<std::size_t>({0}));
   assert(is_workflow_net(net));
   assert(net.place_count() == before_places && net.transitions()[0].inputs == before_inputs);
+  assert(petri_analysis_json(result).find("\"variant\":\"petri_net\"") !=
+         std::string::npos);
+
+  auto malformed = result;
+  malformed.source_candidates.push_back(malformed.source_candidates.front());
+  bool malformed_rejected = false;
+  try {
+    (void)petri_analysis_json(malformed);
+  } catch (const std::invalid_argument&) {
+    malformed_rejected = true;
+  }
+  assert(malformed_rejected);
 
   PetriNet empty;
   assert(!check_workflow_net(empty).valid);
@@ -278,7 +290,19 @@ void sound_models() {
     assert(result.final_reachable && result.option_to_complete && result.proper_completion);
     assert(result.dead_transitions.empty() && result.deadlocks.empty());
     assert(!result.place_invariant_basis.empty());
+    assert(petri_analysis_json(result).find("\"status\":\"sound\"") !=
+           std::string::npos);
   }
+
+  auto malformed = analyze_soundness(chain());
+  malformed.dead_tasks.push_back(0);
+  bool malformed_rejected = false;
+  try {
+    (void)petri_analysis_json(malformed);
+  } catch (const std::invalid_argument&) {
+    malformed_rejected = true;
+  }
+  assert(malformed_rejected);
 }
 
 void positive_invariant_diagnostics() {

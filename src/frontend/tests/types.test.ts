@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
+import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
 import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 import { isBrowserHistoryResult } from "../src/types";
 import { isWindowsEventsResult } from "../src/types";
@@ -484,22 +484,22 @@ describe("isProcessCubeTable", () => {
 
 describe("isPetriAnalysisResult structural diagnostics", () => {
   it("accepts soundness pair diagnostics and null optional fields", () => {
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", status: "unsound",
       handled_pairs: [[1, 12]], not_well_handled_pairs: null,
     })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "soundness", status: "sound", handled_pairs: null })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "woflan", uniform_invariant_search_exhausted: true })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "soundness", dead_tasks: [0, 2], locking_scenarios: [[1], [0, 2]] })).toBe(true);
-    expect(isPetriAnalysisResult({ family: "soundness", structural_node_labels: ["place:0:in", "transition:0:A:in"] })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", status: "sound", handled_pairs: null })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "woflan", uniform_invariant_search_exhausted: true })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", dead_tasks: [0, 2], locking_scenarios: [[1], [0, 2]] })).toBe(true);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", structural_node_labels: ["place:0:in", "transition:0:A:in"] })).toBe(true);
   });
   it("rejects malformed structural pair diagnostics", () => {
-    expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1]] })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "soundness", not_well_handled_pairs: [[1, -1]] })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "soundness", handled_pairs: [[1, 2.5]] })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "soundness", dead_tasks: [-1] })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "soundness", locking_scenarios: [[0], [1, 2.5]] })).toBe(false);
-    expect(isPetriAnalysisResult({ family: "soundness", structural_node_labels: ["ok", 2] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", handled_pairs: [[1]] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", not_well_handled_pairs: [[1, -1]] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", handled_pairs: [[1, 2.5]] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", dead_tasks: [-1] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", locking_scenarios: [[0], [1, 2.5]] })).toBe(false);
+    expect(isPetriAnalysisDiagnosticsFragment({ family: "soundness", structural_node_labels: ["ok", 2] })).toBe(false);
   });
 });
 
@@ -533,7 +533,7 @@ describe("isPetriAnalysisResult marking equations", () => {
 
 describe("isPetriAnalysisResult soundness graph diagnostics", () => {
   it("accepts invariant families and compact graph projections", () => {
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness",
       uniform_place_invariants: [[1, 1, 0]],
       weighted_place_invariants: [[1, 2, 0]],
@@ -550,37 +550,37 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
   });
 
   it("rejects malformed invariant and graph diagnostics", () => {
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", uniform_place_invariants: [[1, -1]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", coverability_markings: [[1, -2]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", reachability_markings: [[1, -1]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", reachability_edges: [[0, 1]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "soundness", weighted_place_invariants: [[1, Number.NaN]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", left: "true",
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", restricted_coverability_tree_exhausted: "false",
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", restricted_coverability_markings: [[1, -2]],
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", restricted_coverability_edges: [[0, 1]],
     })).toBe(false);
   });
 
   it("accepts Woflan short-circuit projections", () => {
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", variant: "woflan",
       short_circuit_valid: true,
       short_circuit_strongly_connected: true,
@@ -591,10 +591,10 @@ describe("isPetriAnalysisResult soundness graph diagnostics", () => {
       short_circuit_reachability_markings: [[1, 0], [0, 1]],
       short_circuit_reachability_edges: [[0, 1, 0]],
     })).toBe(true);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", short_circuit_transition: -1,
     })).toBe(false);
-    expect(isPetriAnalysisResult({
+    expect(isPetriAnalysisDiagnosticsFragment({
       family: "woflan", short_circuit_diagnostic_messages: [2],
     })).toBe(false);
   });
