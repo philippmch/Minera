@@ -48,6 +48,10 @@ struct ConceptDriftResult {
   std::vector<std::vector<double>> feature_vectors;
   std::vector<EventLog> sublogs;
 
+  // Chronological partitions ending at selected drift boundaries, followed by
+  // the final remainder. Each input trace occurs in exactly one returned log.
+  std::vector<EventLog> returned_sublogs;
+
   // Cumulative logs ending at each raw sub-log. Trace and event metadata are
   // copied verbatim from the input log.
   std::vector<EventLog> cumulative_sublogs;

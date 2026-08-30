@@ -33,6 +33,7 @@ export interface ConceptDriftResult {
   activities: string[];
   feature_vectors: number[][];
   sublogs: ConceptDriftSublogSummary[];
+  returned_sublogs: ConceptDriftSublogSummary[];
   cumulative_sublogs: ConceptDriftSublogSummary[];
   sublog_start_timestamps: number[];
   change_points: ConceptDriftChangePoint[];
@@ -51,6 +52,10 @@ export function isConceptDriftResult(value: unknown): value is ConceptDriftResul
         row.every((x) => typeof x === "number" && Number.isFinite(x))) ||
       !Array.isArray(candidate.sublogs) ||
       !candidate.sublogs.every((row) => !!row && typeof row === "object" &&
+        Number.isInteger(row.trace_count) && (row.trace_count as number) >= 0 &&
+        Number.isInteger(row.event_count) && (row.event_count as number) >= 0) ||
+      !Array.isArray(candidate.returned_sublogs) ||
+      !candidate.returned_sublogs.every((row) => !!row && typeof row === "object" &&
         Number.isInteger(row.trace_count) && (row.trace_count as number) >= 0 &&
         Number.isInteger(row.event_count) && (row.event_count as number) >= 0) ||
       !Array.isArray(candidate.cumulative_sublogs) ||
