@@ -9,7 +9,8 @@
     "algo.simulation.playout.dfg",
     "algo.simulation.playout.declare",
     "algo.simulation.playout.petri_net",
-    "algo.transformation.log_to_target"
+    "algo.transformation.log_to_target",
+    "algo.transformation.log_to_trie"
   ],
   "packages": [
     {
@@ -795,8 +796,21 @@
       "variants": [
         "default"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/trie.hpp",
+        "src/backend/trie.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_trie.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts"
+      ]
     },
     {
       "package": "algo.transformation.ocel.description",

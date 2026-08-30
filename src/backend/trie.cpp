@@ -8,7 +8,7 @@ namespace minera {
 namespace {
 
 std::string event_label(const Event& event, std::string_view key) {
-  if (key.empty() || key == "activity" || key == "concept:name") {
+  if (key == "activity" || key == "concept:name") {
     return event.activity;
   }
   if (const auto* value = event.attribute(key)) return *value;
@@ -43,19 +43,32 @@ TrieModel discover_trie(const EventLog& log, const TrieOptions& options) {
   result.root.label.clear();
   result.root.depth = 0;
   result.root.final = false;
+  result.input_traces = log.traces.size();
 
   for (const auto& trace : log.traces) {
     const std::size_t limit = options.max_path_length.value_or(trace.events.size());
     const std::size_t length = std::min(limit, trace.events.size());
     if (length == 0) continue;
+    if (length < trace.events.size()) result.truncated = true;
 
     TrieNode* node = &result.root;
     for (std::size_t index = 0; index < length; ++index) {
       node = child_for(*node, event_label(trace.events[index],
                                           options.activity_key));
     }
-    node->final = true;
+    if (!node->final) {
+      node->final = true;
+      ++result.distinct_variants;
+    }
   }
+
+  const auto count_nodes = [&](const auto& self, const TrieNode& node)
+      -> std::size_t {
+    std::size_t count = 1;
+    for (const auto& child : node.children) count += self(self, child);
+    return count;
+  };
+  result.node_count = count_nodes(count_nodes, result.root);
 
   return result;
 }

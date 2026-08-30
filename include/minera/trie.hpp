@@ -30,6 +30,10 @@ struct TrieNode {
 
 struct TrieModel {
   TrieNode root;
+  std::size_t input_traces = 0;
+  std::size_t distinct_variants = 0;
+  std::size_t node_count = 1;
+  bool truncated = false;
 
   friend bool operator==(const TrieModel&, const TrieModel&) = default;
 };
