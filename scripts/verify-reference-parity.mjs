@@ -42,6 +42,10 @@ const catalogEntries = new Map(catalog.algorithm_packages.map((entry) => [
   { package: entry.package, variants: entry.declared_variants },
 ]));
 const manifestEntries = new Map();
+const artifactRequired = new Set(manifest.artifact_required_packages ?? []);
+if (!Array.isArray(manifest.artifact_required_packages ?? [])) {
+  fail("artifact_required_packages must be an array");
+}
 for (const entry of manifest.packages ?? []) {
   if (!entry || typeof entry.package !== "string" || !Array.isArray(entry.variants)) {
     fail("manifest contains a malformed package entry");
@@ -55,6 +59,33 @@ for (const entry of manifest.packages ?? []) {
   } else if (!existsSync(resolve(root, entry.evidence))) {
     fail(`${entry.package} evidence does not exist: ${entry.evidence}`);
   }
+  if (artifactRequired.has(entry.package) && entry.status !== "complete") {
+    fail(`${entry.package} requires artifacts but is not complete`);
+  }
+  if (artifactRequired.has(entry.package) && entry.artifacts === undefined) {
+    fail(`${entry.package} requires an artifact list`);
+  }
+  if (entry.status === "complete" && entry.artifacts !== undefined) {
+    if (!Array.isArray(entry.artifacts) || entry.artifacts.length === 0) {
+      fail(`${entry.package} has an invalid artifact list`);
+    } else {
+      const uniqueArtifacts = new Set();
+      for (const artifact of entry.artifacts) {
+        if (typeof artifact !== "string" || artifact.length === 0) {
+          fail(`${entry.package} has a malformed artifact path`);
+          continue;
+        }
+        if (uniqueArtifacts.has(artifact)) fail(`${entry.package} repeats artifact ${artifact}`);
+        uniqueArtifacts.add(artifact);
+        if (!existsSync(resolve(root, artifact))) {
+          fail(`${entry.package} artifact does not exist: ${artifact}`);
+        }
+      }
+    }
+  }
+}
+for (const packageName of artifactRequired) {
+  if (!manifestEntries.has(packageName)) fail(`artifact requirement names unknown package ${packageName}`);
 }
 
 for (const [packageName, expected] of catalogEntries) {
