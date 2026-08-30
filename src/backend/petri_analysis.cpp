@@ -446,21 +446,25 @@ class Simplex {
   bool run(int phase) {
     const std::size_t objective = phase == 1 ? m_ + 1 : m_;
     while (true) {
-      std::size_t col = 0;
-      for (std::size_t j = 1; j <= n_; ++j) {
+      std::optional<std::size_t> col;
+      for (std::size_t j = 0; j <= n_; ++j) {
         if (phase == 0 && nonbasis_[j] == -1) continue;
-        if (d_[objective][j] < d_[objective][col] - kEps ||
-            (std::abs(d_[objective][j] - d_[objective][col]) <= kEps && nonbasis_[j] < nonbasis_[col])) col = j;
+        if (!col ||
+            d_[objective][j] < d_[objective][*col] - kEps ||
+            (std::abs(d_[objective][j] - d_[objective][*col]) <= kEps &&
+             nonbasis_[j] < nonbasis_[*col])) {
+          col = j;
+        }
       }
-      if (d_[objective][col] >= -kEps) return true;
+      if (!col || d_[objective][*col] >= -kEps) return true;
       std::optional<std::size_t> row;
       for (std::size_t i = 0; i < m_; ++i) {
-        if (d_[i][col] <= kEps) continue;
-        if (!row || d_[i][n_ + 1] / d_[i][col] < d_[*row][n_ + 1] / d_[*row][col] - kEps ||
-            (std::abs(d_[i][n_ + 1] / d_[i][col] - d_[*row][n_ + 1] / d_[*row][col]) <= kEps && basis_[i] < basis_[*row])) row = i;
+        if (d_[i][*col] <= kEps) continue;
+        if (!row || d_[i][n_ + 1] / d_[i][*col] < d_[*row][n_ + 1] / d_[*row][*col] - kEps ||
+            (std::abs(d_[i][n_ + 1] / d_[i][*col] - d_[*row][n_ + 1] / d_[*row][*col]) <= kEps && basis_[i] < basis_[*row])) row = i;
       }
       if (!row) return false;
-      pivot(*row, col);
+      pivot(*row, *col);
     }
   }
 
@@ -525,6 +529,26 @@ IntegerProgramResult solve_integer_program(
   }
   result.nodes_explored = explored;
   if (result.feasible) result.objective = incumbent;
+  return result;
+}
+
+struct LinearProgramResult {
+  bool feasible = false;
+  double objective = 0.0;
+  std::vector<double> solution;
+};
+
+LinearProgramResult solve_linear_program(
+    const std::vector<std::vector<double>>& constraints,
+    const std::vector<double>& bounds, const std::vector<double>& costs) {
+  std::vector<double> maximize(costs.size());
+  for (std::size_t i = 0; i < costs.size(); ++i) maximize[i] = -costs[i];
+  Simplex program(constraints, bounds, maximize);
+  LinearProgramResult result;
+  double maximum = 0.0;
+  result.feasible =
+      program.solve(result.solution, maximum) == Simplex::Status::OPTIMAL;
+  if (result.feasible) result.objective = -maximum;
   return result;
 }
 
@@ -1328,18 +1352,15 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
     inequalities.push_back(std::move(negative));
     bounds.push_back(-delta);
   }
-  const auto program = solve_integer_program(inequalities, bounds, costs,
-                                             options.realizability_limit);
-  result.exhausted = program.exhausted;
+  const auto program = solve_linear_program(inequalities, bounds, costs);
   if (!program.feasible) {
     result.feasible = false;
-    result.error = program.exhausted ? "marking equation node limit reached"
-                                     : "marking equation is infeasible";
+    result.error = "marking equation is infeasible";
     return result;
   }
   result.feasible = true;
   result.objective = program.objective;
-  result.lower_bound = program.root_lower_bound;
+  result.lower_bound = program.objective;
   result.transition_counts = program.solution;
   result.residual.resize(net.place_count());
   for (std::size_t p = 0; p < net.place_count(); ++p) {
@@ -1349,17 +1370,25 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
   }
   for (std::size_t t = 0; t < result.transition_counts.size(); ++t)
     if (result.transition_counts[t] > kEps) result.activated_transitions.push_back(t);
-  result.recovery_attempted = true;
-  bool recovery_exhausted = false;
-  result.firing_sequence = recover_sequence(net, markings.initial, markings.final,
-                                            result.transition_counts,
-                                            options.realizability_limit,
-                                            recovery_exhausted);
-  result.exhausted = result.exhausted || recovery_exhausted;
-  if (result.firing_sequence.empty()) {
-    result.reaches_final = markings.initial == markings.final &&
-        std::all_of(result.transition_counts.begin(), result.transition_counts.end(), [](double x) { return x <= kEps; });
-  } else result.reaches_final = true;
+  const bool integral = std::all_of(
+      result.transition_counts.begin(), result.transition_counts.end(),
+      [](double value) { return std::abs(value - std::round(value)) <= 1e-7; });
+  result.recovery_attempted = integral;
+  if (integral) {
+    bool recovery_exhausted = false;
+    result.firing_sequence = recover_sequence(
+        net, markings.initial, markings.final, result.transition_counts,
+        options.realizability_limit, recovery_exhausted);
+    result.exhausted = recovery_exhausted;
+    if (result.firing_sequence.empty()) {
+      result.reaches_final = markings.initial == markings.final &&
+          std::all_of(result.transition_counts.begin(),
+                      result.transition_counts.end(),
+                      [](double value) { return value <= kEps; });
+    } else {
+      result.reaches_final = true;
+    }
+  }
   return result;
 }
 
