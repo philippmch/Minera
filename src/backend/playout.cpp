@@ -797,6 +797,15 @@ EventLog extensive_playout_impl(const PetriNet& net,
     }
   }
 
+  if (include_elements && !queue.empty()) {
+    visited_result->trace_limit_reached =
+        log.traces.size() >= options.max_traces;
+    visited_result->state_limit_reached =
+        visited.size() >= options.max_states;
+    visited_result->truncated = visited_result->trace_limit_reached ||
+                                visited_result->state_limit_reached;
+  }
+
   return log;
 }
 

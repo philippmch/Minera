@@ -3584,18 +3584,27 @@ export type PlayoutVisitedElement =
 export interface BasicPlayoutVisitedResult {
   family: "PETRI_PLAYOUT_VISITED";
   variant: "BASIC_PLAYOUT";
+  truncated: boolean;
+  trace_limit_reached: boolean;
+  state_limit_reached: boolean;
   traces: PlayoutVisitedElement[][];
 }
 
 export interface StochasticPlayoutVisitedResult {
   family: "PETRI_PLAYOUT_VISITED";
   variant: "STOCHASTIC_PLAYOUT";
+  truncated: boolean;
+  trace_limit_reached: boolean;
+  state_limit_reached: boolean;
   traces: PlayoutVisitedElement[][];
 }
 
 export interface ExtensivePlayoutVisitedResult {
   family: "PETRI_PLAYOUT_VISITED";
   variant: "EXTENSIVE_PLAYOUT";
+  truncated: boolean;
+  trace_limit_reached: boolean;
+  state_limit_reached: boolean;
   traces: PlayoutVisitedElement[][];
 }
 
@@ -3624,7 +3633,10 @@ function isPlayoutVisitedResult(
   if (!value || typeof value !== "object") return false;
   const result = value as Partial<BasicPlayoutVisitedResult | StochasticPlayoutVisitedResult>;
   if (result.family !== "PETRI_PLAYOUT_VISITED" ||
-      result.variant !== variant || !Array.isArray(result.traces)) {
+      result.variant !== variant || typeof result.truncated !== "boolean" ||
+      typeof result.trace_limit_reached !== "boolean" ||
+      typeof result.state_limit_reached !== "boolean" ||
+      !Array.isArray(result.traces)) {
     return false;
   }
   return result.traces.every((trace) => {

@@ -3967,7 +3967,12 @@ std::string serialize_playout_visited_json_variant(
   std::ostringstream out;
   out << "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":";
   write_json_string(out, variant);
-  out << ",\"traces\":[";
+  out << ",\"truncated\":" << (result.truncated ? "true" : "false")
+      << ",\"trace_limit_reached\":"
+      << (result.trace_limit_reached ? "true" : "false")
+      << ",\"state_limit_reached\":"
+      << (result.state_limit_reached ? "true" : "false")
+      << ",\"traces\":[";
   for (std::size_t i = 0; i < result.traces.size(); ++i) {
     if (i) out << ',';
     out << '[';
