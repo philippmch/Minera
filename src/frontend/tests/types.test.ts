@@ -36,7 +36,7 @@ describe("Windows events result guard", () => {
 describe("isProcessTreePlayoutSetResult", () => {
   const valid = {
     family: "PROCESS_TREE_PLAYOUT", variant: "EXTENSIVE",
-    return_set_strings: true, traces: [[], ["A", "B"]],
+    return_set_strings: true, truncated: false, traces: [[], ["A", "B"]],
   };
   it("accepts sorted activity words", () => {
     expect(isProcessTreePlayoutSetResult(valid)).toBe(true);
@@ -44,6 +44,7 @@ describe("isProcessTreePlayoutSetResult", () => {
   it("rejects malformed words and variants", () => {
     expect(isProcessTreePlayoutSetResult({ ...valid, traces: [["A", 2]] })).toBe(false);
     expect(isProcessTreePlayoutSetResult({ ...valid, variant: "TOPBOTTOM" })).toBe(false);
+    expect(isProcessTreePlayoutSetResult({ ...valid, truncated: "false" })).toBe(false);
     expect(isProcessTreePlayoutSetResult({ ...valid, traces: [["A"], ["A"]] })).toBe(false);
     expect(isProcessTreePlayoutSetResult({ ...valid, traces: [["A", "B"], ["A"]] })).toBe(false);
   });

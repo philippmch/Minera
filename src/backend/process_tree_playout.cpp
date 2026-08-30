@@ -469,22 +469,7 @@ ProcessTreePlayoutResult process_tree_playout_result(
     EnumerationBudget budget{budget_limit};
     Words words = enumerate(tree.root(), tree, options.max_length,
                             options.max_loop_occurrences, budget);
-    if (budget.exhausted) {
-      // A safety budget may cut off a composition after its intermediate
-      // candidates have been consumed. Never return a silently partial word
-      // (or an empty language) in that case: retain one deterministic valid
-      // execution instead and let the caller's trace cap apply normally.
-      words.clear();
-      if (const auto fallback = first_word(tree.root(), tree);
-          fallback && fallback->size() >= options.min_length &&
-          fallback->size() <= options.max_length) {
-        words.push_back(*fallback);
-      } else {
-        throw std::runtime_error(
-            "process-tree extensive playout generation budget exhausted "
-            "before a trace within the requested length bounds");
-      }
-    }
+    const bool truncated = budget.exhausted;
     std::set<Word> unique(words.begin(), words.end());
     words.assign(unique.begin(), unique.end());
     std::stable_sort(words.begin(), words.end(), [](const Word& a, const Word& b) {
@@ -497,6 +482,7 @@ ProcessTreePlayoutResult process_tree_playout_result(
     ProcessTreePlayoutResult result;
     result.log = words_to_log(words, options);
     if (options.return_set_strings) result.trace_strings = std::move(words);
+    result.truncated = truncated;
     return result;
   }
   Words words;

@@ -103,7 +103,10 @@ Process-tree simulation evidence: `BASIC_PLAYOUT`, `EXTENSIVE`, and
 `TOPBOTTOM` are available through strict request parsing, the CLI
 (`--playout-miner process_tree`), local-server `/api/playout`, cached-tree XES,
 and frontend controls. Omitted process-tree playout settings select
-`TOPBOTTOM`; `BASIC_PLAYOUT` and `EXTENSIVE` remain explicit selections. This
+`TOPBOTTOM`; `BASIC_PLAYOUT` and `EXTENSIVE` remain explicit selections. The
+bounded extensive result reports `truncated` through native and JSON/frontend
+contracts whenever its safety budget cuts off language enumeration, so a
+partial language cannot be mistaken for a complete one. This
 closes only the process-tree variants; the broader simulation row remains
 partial because other simulation families are pending.
 

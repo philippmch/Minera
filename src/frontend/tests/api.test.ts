@@ -532,7 +532,7 @@ describe("basic Petri playout API", () => {
   it("fetches the extensive process-tree activity-word set", async () => {
     const payload = {
       family: "PROCESS_TREE_PLAYOUT", variant: "EXTENSIVE",
-      return_set_strings: true, traces: [["C"], ["A", "B"]],
+      return_set_strings: true, truncated: false, traces: [["C"], ["A", "B"]],
     };
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {
       expect(path).toContain("/api/playout?miner=process_tree");

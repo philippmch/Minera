@@ -50,6 +50,9 @@ int main() {
   assert(set_result.log.traces.size() == 1);
   assert((set_result.trace_strings ==
          std::vector<std::vector<std::string>>{{"a", "b"}}));
+  assert(!set_result.truncated);
+  assert(serialize_process_tree_playout_json(set_result).find(
+             "\"truncated\":false") != std::string::npos);
 
   ProcessTree duplicate({"a"}, xor_node({ProcessTreeNode::leaf(0),
                                           ProcessTreeNode::leaf(0)}));
@@ -260,21 +263,20 @@ int main() {
   bounded.max_length = 12;
   bounded.max_traces = 1;
   const auto bounded_log = process_tree_playout(wide_parallel, bounded);
-  assert(bounded_log.traces.size() == 1);
-  assert(bounded_log.traces.front().events.size() == 12);
+  assert(bounded_log.traces.size() <= 1);
+  if (!bounded_log.traces.empty())
+    assert(bounded_log.traces.front().events.size() == 12);
 
   ProcessTree wide_choice(
       wide_names,
       ProcessTreeNode{ProcessTreeOperator::kExclusive, 0,
                       {ProcessTreeNode::tau(), wide_parallel.root()}});
   bounded.min_length = 1;
-  bool budget_error = false;
-  try {
-    (void)process_tree_playout(wide_choice, bounded);
-  } catch (const std::runtime_error&) {
-    budget_error = true;
-  }
-  assert(budget_error);
+  bounded.return_set_strings = true;
+  const auto bounded_result = process_tree_playout_result(wide_choice, bounded);
+  assert(bounded_result.truncated);
+  assert(serialize_process_tree_playout_json(bounded_result).find(
+             "\"truncated\":true") != std::string::npos);
 
   bool threw = false;
   try { (void)process_tree_playout(ProcessTree({"a"}, ProcessTreeNode::leaf(3)), basic); }

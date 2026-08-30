@@ -4,7 +4,8 @@
     "commit": "0715c31f3f1d85924107d6aa5329806db69df899"
   },
   "artifact_required_packages": [
-    "algo.simulation.tree_generator"
+    "algo.simulation.tree_generator",
+    "algo.simulation.playout.process_tree"
   ],
   "packages": [
     {
@@ -663,8 +664,22 @@
         "EXTENSIVE",
         "TOPBOTTOM"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_playout.hpp",
+        "src/backend/process_tree_playout.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_process_tree_playout.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.simulation.tree_generator",
