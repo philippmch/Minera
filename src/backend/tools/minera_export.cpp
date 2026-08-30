@@ -25,6 +25,7 @@
 #include "minera/attribute_statistics.hpp"
 #include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
+#include "minera/browser_history.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/case_arrival.hpp"
@@ -666,6 +667,8 @@ int usage(const char* program) {
                "  --drift-activity-attribute <name> Event activity selector\n"
                "  --drift-timestamp-attribute <name> Event timestamp selector\n"
                "  --drift-case-id-attribute <name> Case identifier selector\n"
+               "  --browser-history <id>   Import chrome_history or firefox_history SQLite\n"
+               "  --browser-history-max-events <n> Positive import bound\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1427,6 +1430,8 @@ int main(int argc, char** argv) {
   minera::CorrelationMinerOptions correlation_options;
   bool concept_drift_requested = false;
   std::map<std::string, std::string> concept_drift_fields;
+  bool browser_history_requested = false;
+  std::map<std::string, std::string> browser_history_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2527,6 +2532,20 @@ int main(int argc, char** argv) {
       continue;
     }
     if (arg == "--concept-drift") { concept_drift_requested = true; continue; }
+    if (arg == "--browser-history") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      browser_history_fields.insert_or_assign("browser_history_variant", value);
+      browser_history_requested = true;
+      continue;
+    }
+    if (arg == "--browser-history-max-events") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      browser_history_fields.insert_or_assign("browser_history_max_events", value);
+      browser_history_requested = true;
+      continue;
+    }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4829,10 +4848,27 @@ int main(int argc, char** argv) {
       };
       dfg_playout_options = minera::parse_dfg_playout_params(lookup, present);
     }
+    minera::EventLog log;
+    if (browser_history_requested) {
+      browser_history_fields.insert_or_assign("browser_history_path",
+                                               input.string());
+      const auto lookup = [&](std::string_view name) {
+        const auto it = browser_history_fields.find(std::string(name));
+        return it == browser_history_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return browser_history_fields.contains(std::string(name));
+      };
+      const auto browser_options =
+          minera::parse_browser_history_params(lookup, present);
+      log = minera::import_browser_history(browser_options);
+      std::cout << minera::browser_history_json(log, browser_options.variant)
+                << '\n';
+      return 0;
+    }
     // A .xes file is read as XES; everything else is treated as CSV.
-    auto log = is_xes_path(input)
-                   ? minera::import_xes_event_log(input, xes_options)
-                   : minera::import_csv_event_log(input, options);
+    log = is_xes_path(input) ? minera::import_xes_event_log(input, xes_options)
+                             : minera::import_csv_event_log(input, options);
     if (log_conversion_requested) {
       const auto lookup = [&](std::string_view name) {
         const auto it = log_conversion_fields.find(std::string(name));

@@ -31,6 +31,8 @@ import {
   type EmbeddingVariant,
   type EmbeddingProvider,
   type EmbeddingApiResult,
+  type BrowserHistoryVariant,
+  type BrowserHistoryResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -83,6 +85,7 @@ import {
   isLogConversionResult,
   isLogUtilityResult,
   isEmbeddingApiResult,
+  isBrowserHistoryResult,
   isLabelSplittingResult,
   isTrieResult,
   isIntervalTreeResult,
@@ -4638,6 +4641,44 @@ export interface EmbeddingOptions {
   embedding_keep_cases?: boolean;
   embedding_target?: string;
   embedding_top_k?: number;
+}
+
+export interface BrowserHistoryOptions {
+  browser_history_variant: BrowserHistoryVariant;
+  browser_history_path: string;
+  browser_history_max_events?: number;
+}
+export function browserHistoryQuery(options: BrowserHistoryOptions): string {
+  if (options.browser_history_path.trim().length === 0)
+    throw new Error("browser_history_path must not be empty");
+  if (options.browser_history_variant !== "chrome_history" &&
+      options.browser_history_variant !== "firefox_history")
+    throw new Error("browser_history_variant is not supported");
+  if (options.browser_history_max_events !== undefined &&
+      (!Number.isSafeInteger(options.browser_history_max_events) ||
+       options.browser_history_max_events <= 0 ||
+       options.browser_history_max_events > 10_000_000))
+    throw new Error("browser_history_max_events must be in [1,10000000]");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b)))
+    if (value !== undefined) query.set(key, String(value));
+  return query.toString();
+}
+export async function requestBrowserHistory(
+  options: BrowserHistoryOptions,
+): Promise<BrowserHistoryResult> {
+  const response = await fetch(`/api/browser-history?${browserHistoryQuery(options)}`,
+                               { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isBrowserHistoryResult(payload))
+    throw new Error("the Minera backend returned invalid browser history");
+  return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {
   if (options.embedding_provider !== undefined &&

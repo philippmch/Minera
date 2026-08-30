@@ -70,6 +70,7 @@
 #include "minera/attribute_distribution.hpp"
 #include "minera/attribute_kde.hpp"
 #include "minera/boundary_activities.hpp"
+#include "minera/browser_history.hpp"
 #include "minera/case_arrival.hpp"
 #include "minera/case_statistics.hpp"
 #include "minera/variant_statistics.hpp"
@@ -160,6 +161,7 @@ using RandomTreeParams = RandomTreeOptions;
 using LogToFeaturesParams = LogToFeaturesOptions;
 using EmbeddingParams = EmbeddingOptions;
 using LabelSplittingParams = LabelSplittingOptions;
+using BrowserHistoryParams = BrowserHistoryOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -504,6 +506,11 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(
     const FieldLookup& field);
 [[nodiscard]] ConceptDriftParams parse_concept_drift_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+[[nodiscard]] BrowserHistoryParams parse_browser_history_params(
+    const FieldLookup& field);
+[[nodiscard]] BrowserHistoryParams parse_browser_history_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] LogToTargetParams parse_log_to_target_params(

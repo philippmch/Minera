@@ -646,6 +646,29 @@ void concept_drift_params_contract() {
   assert(threw);
 }
 
+void browser_history_params_contract() {
+  const auto chrome = minera::parse_browser_history_params(fields({
+      {"browser_history_variant", "chrome_history"},
+      {"browser_history_path", "history.db"},
+      {"browser_history_max_events", "42"}}));
+  assert(chrome.variant == minera::BrowserHistoryVariant::kChrome);
+  assert(chrome.history_path == "history.db" && chrome.max_events == 42);
+  const auto firefox = minera::parse_browser_history_params(fields({
+      {"browser_history_variant", "firefox"},
+      {"browser_history_path", "profiles"}}));
+  assert(firefox.variant == minera::BrowserHistoryVariant::kFirefox);
+  bool threw = false;
+  try { (void)minera::parse_browser_history_params(fields({})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  threw = false;
+  try { (void)minera::parse_browser_history_params(fields({
+      {"browser_history_variant", "other"},
+      {"browser_history_path", "x"}})); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 void log_to_target_params_contract() {
   const auto p = minera::parse_log_to_target_params(fields({
       {"target_variant", "remaining_time"},
@@ -3675,6 +3698,7 @@ int main() {
   parse_evaluation_params_rejects_invalid_and_explicit_empty_values();
   native_json_contracts();
   concept_drift_params_contract();
+  browser_history_params_contract();
   log_to_target_params_contract();
   trie_params_contract();
   interval_tree_params_contract();
