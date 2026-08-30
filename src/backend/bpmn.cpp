@@ -382,7 +382,7 @@ enum class BpmnNodeKind {
   parallel,     // parallel gateways: all in, all out
   inclusive,    // block-structured inclusive split/join pair
   subprocess,   // an embedded scope with its own start and end events
-  boundary,     // interrupting event attached to an atomic activity
+  boundary,     // event attached to an activity
 };
 
 constexpr std::size_t kNoIndex = std::numeric_limits<std::size_t>::max();
@@ -393,6 +393,7 @@ struct BpmnNode {
   BpmnNodeKind kind = BpmnNodeKind::task;
   std::size_t child_scope = 0;  // scope index, kind == subprocess only
   std::string attached_to;
+  bool interrupting = true;
   std::vector<std::size_t> in_flows;   // indices into the scope's flows
   std::vector<std::size_t> out_flows;
   // Inclusive gateways are compiled as one block: the split owns the
@@ -697,9 +698,6 @@ class BpmnNetBuilder {
               add_activity_node(node, place, activity);
             break;
           }
-          if (boundaries.contains(node.id))
-            throw std::runtime_error(
-                "BPMN boundary events on expanded subprocesses are not supported");
           const auto in = merge_entry(node, place);
           const auto outs = out_places(node, place);
           std::size_t local_exit;
@@ -709,7 +707,55 @@ class BpmnNetBuilder {
             local_exit = net_.add_place();
             silent({local_exit}, outs);
           }
-          convert(child, in, local_exit);
+          const auto attached = boundaries.find(node.id);
+          if (attached == boundaries.end()) {
+            convert(child, in, local_exit);
+            break;
+          }
+
+          // Keep a token for the lifetime of this subprocess instance. Normal
+          // completion consumes it; an interrupting boundary transition
+          // consumes it and resets every place created for the child scope.
+          // The child exit is private so a cancelled instance cannot later
+          // leak a stale completion token into the parent flow.
+          const auto active = net_.add_place();
+          const auto child_entry = net_.add_place();
+          const auto child_exit = net_.add_place();
+          std::vector<std::size_t> armed;
+          for (const auto* boundary : attached->second)
+            if (!boundary->interrupting) armed.push_back(net_.add_place());
+          auto entry_outputs = armed;
+          entry_outputs.push_back(active);
+          entry_outputs.push_back(child_entry);
+          silent({in}, std::move(entry_outputs));
+          const auto first_child_place = net_.place_count();
+          convert(child, child_entry, child_exit);
+          const auto after_child_place = net_.place_count();
+          silent({active, child_exit}, {local_exit});
+          std::size_t next_armed = 0;
+          for (const auto* boundary : attached->second) {
+            if (!boundary->in_flows.empty())
+              throw std::runtime_error("BPMN boundary event has an incoming flow");
+            const auto boundary_activity = boundary->name.empty()
+                                               ? std::optional<std::size_t>{}
+                                               : std::optional<std::size_t>{
+                                                     activity_id(boundary->name)};
+            if (boundary->interrupting) {
+              const auto interrupt = net_.add_transition(
+                  boundary_activity, {active}, out_places(*boundary, place));
+              net_.add_reset_arc(interrupt, child_entry);
+              net_.add_reset_arc(interrupt, child_exit);
+              for (std::size_t child_place = first_child_place;
+                   child_place < after_child_place; ++child_place)
+                net_.add_reset_arc(interrupt, child_place);
+            } else {
+              // Attach the one-shot trigger to the subprocess lifetime token
+              // without consuming it: both tokens are replaced on firing.
+              net_.add_transition(boundary_activity,
+                                  {active, armed[next_armed++]},
+                                  append(out_places(*boundary, place), active));
+            }
+          }
           break;
         }
         case BpmnNodeKind::boundary:
@@ -759,16 +805,38 @@ class BpmnNetBuilder {
     if (node.in_flows.empty())
       throw std::runtime_error("BPMN boundary attachment has no incoming flow");
     const auto active = net_.add_place();
-    silent({merge_entry(node, place)}, {active});
+    std::vector<std::size_t> armed;
+    for (const auto* boundary : boundaries)
+      if (!boundary->interrupting) armed.push_back(net_.add_place());
+    auto entry_outputs = armed;
+    entry_outputs.push_back(active);
+    silent({merge_entry(node, place)}, std::move(entry_outputs));
     auto normal_outputs = node.out_flows.empty()
                               ? std::vector<std::size_t>{net_.add_place()}
                               : out_places(node, place);
     net_.add_transition(activity, {active}, std::move(normal_outputs));
+    std::size_t next_armed = 0;
     for (const auto* boundary : boundaries) {
       if (!boundary->in_flows.empty())
         throw std::runtime_error("BPMN boundary event has an incoming flow");
-      silent({active}, out_places(*boundary, place));
+      const auto boundary_activity = boundary->name.empty()
+                                         ? std::optional<std::size_t>{}
+                                         : std::optional<std::size_t>{
+                                               activity_id(boundary->name)};
+      if (boundary->interrupting) {
+        net_.add_transition(boundary_activity, {active},
+                            out_places(*boundary, place));
+      } else {
+        net_.add_transition(boundary_activity, {active, armed[next_armed++]},
+                            append(out_places(*boundary, place), active));
+      }
     }
+  }
+
+  static std::vector<std::size_t> append(std::vector<std::size_t> values,
+                                         std::size_t value) {
+    values.push_back(value);
+    return values;
   }
 
   // The single place a node consumes from: its one incoming flow, or — since
@@ -987,12 +1055,13 @@ PetriNet parse_bpmn(std::string_view xml) {
       const auto* attached = detail::attribute(token.attributes, "attachedToRef");
       if (!attached)
         throw std::runtime_error("BPMN boundary event is missing attachedToRef");
-      const auto* cancel = detail::attribute(token.attributes, "cancelActivity");
-      if (cancel && *cancel == "false")
-        throw std::runtime_error(
-            "BPMN non-interrupting boundary events are not supported");
       add_node(scope, BpmnNodeKind::boundary, token);
       scope.nodes.back().attached_to = *attached;
+      const auto* cancel = detail::attribute(token.attributes, "cancelActivity");
+      if (cancel && *cancel != "true" && *cancel != "false")
+        throw std::runtime_error(
+            "BPMN boundary event cancelActivity must be true or false");
+      scope.nodes.back().interrupting = !cancel || *cancel == "true";
     } else if (name == "adHocSubProcess") {
       throw std::runtime_error("BPMN ad-hoc subprocesses are not supported");
     }
