@@ -2977,6 +2977,148 @@ void parse_monte_carlo_params_rejects_bad_values() {
   }
 }
 
+void parse_monte_carlo_params_maps_extended_contract() {
+  const auto parsed = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_simulations", "12"},
+      {"monte_carlo_activity_key", "  activity_name  "},
+      {"monte_carlo_timestamp_key", " observed_at "},
+      {"monte_carlo_initial_marking", "0, 1, 2"},
+      {"monte_carlo_final_marking", "3, 4, 5"},
+      {"monte_carlo_case_arrival_ratio", "1.25"},
+      {"monte_carlo_diagnostic_interval", "7"},
+      {"monte_carlo_small_scale_factor", "0.5"},
+      {"monte_carlo_max_thread_execution_time", "2.25"},
+      {"monte_carlo_token_replay_variant", " backwards "},
+      {"monte_carlo_provided_stochastic_map",
+       "2:immediate:normal:1:0.5:0:3:-2,0:timed:lognormal:2:0.1:1:0.75:4"}}));
+  assert(parsed.activity_key == "activity_name");
+  assert(parsed.timestamp_key == "observed_at");
+  assert((parsed.initial_marking ==
+          std::vector<std::uint32_t>{0, 1, 2}));
+  assert((parsed.final_marking == std::vector<std::uint32_t>{3, 4, 5}));
+  assert(parsed.case_arrival_ratio.has_value() &&
+         *parsed.case_arrival_ratio == 1.25);
+  assert(!parsed.case_arrival_seconds.has_value());
+  assert(parsed.diagnostic_interval == 7 &&
+         parsed.small_scale_factor == 0.5 &&
+         parsed.max_thread_execution_time == 2.25);
+  assert(parsed.token_replay_variant == minera::TokenReplayVariant::kBackwards);
+  assert(parsed.stochastic_map.has_value());
+  assert(parsed.stochastic_map->transitions.size() == 2);
+  assert(parsed.stochastic_map->transitions[0].transition == 2);
+  assert(parsed.stochastic_map->transitions[0].timing ==
+         minera::StochasticMapTiming::kImmediate);
+  assert(parsed.stochastic_map->transitions[0].distribution ==
+         minera::StochasticMapDistribution::kNormal);
+  assert(parsed.stochastic_map->transitions[0].parameter == 1.0);
+  assert(parsed.stochastic_map->transitions[0].secondary_parameter == 0.5);
+  assert(parsed.stochastic_map->transitions[0].tertiary_parameter == 0.0);
+  assert(parsed.stochastic_map->transitions[0].activation_weight == 3.0);
+  assert(parsed.stochastic_map->transitions[0].priority == -2);
+  assert(parsed.stochastic_map->transitions[1].transition == 0);
+  assert(parsed.stochastic_map->transitions[1].timing ==
+         minera::StochasticMapTiming::kTimed);
+  assert(parsed.stochastic_map->transitions[1].distribution ==
+         minera::StochasticMapDistribution::kLogNormal);
+  assert(parsed.stochastic_map->transitions[1].tertiary_parameter == 1.0);
+
+  const auto empty_map = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_provided_stochastic_map", " empty "}}));
+  assert(empty_map.stochastic_map.has_value() &&
+         empty_map.stochastic_map->transitions.empty());
+
+  const auto legacy = minera::parse_monte_carlo_params(fields({
+      {"monte_carlo_case_arrival_seconds", "2.5"},
+      {"monte_carlo_token_replay_variant", "token_replay"}}));
+  assert(legacy.case_arrival_seconds.has_value() &&
+         *legacy.case_arrival_seconds == 2.5);
+  assert(!legacy.case_arrival_ratio.has_value());
+  assert(legacy.token_replay_variant == minera::TokenReplayVariant::kForward);
+}
+
+void parse_monte_carlo_params_rejects_extended_bad_values() {
+  for (const auto& item : {
+           std::pair{"monte_carlo_case_arrival_ratio", "-1"},
+           std::pair{"monte_carlo_diagnostic_interval", "0"},
+           std::pair{"monte_carlo_small_scale_factor", "0"},
+           std::pair{"monte_carlo_small_scale_factor", "NaN"},
+           std::pair{"monte_carlo_max_thread_execution_time", "-1"},
+           std::pair{"monte_carlo_activity_key", "  "},
+           std::pair{"monte_carlo_timestamp_key", "\t"},
+           std::pair{"monte_carlo_initial_marking", "0,,1"},
+           std::pair{"monte_carlo_final_marking", "4294967296"},
+           std::pair{"monte_carlo_token_replay_variant", "reverse"},
+           std::pair{"monte_carlo_provided_stochastic_map", " "},
+           std::pair{"monte_carlo_provided_stochastic_map", "0:timed"},
+           std::pair{"monte_carlo_provided_stochastic_map",
+                     "0:timed:exponential:1:nan:0:1:0"},
+           std::pair{"monte_carlo_provided_stochastic_map",
+                     "0:timed:exponential:1:0:0:1:0,0:timed:exponential:1:0:0:1:0"},
+           std::pair{"monte_carlo_provided_stochastic_map",
+                     "0:timed:unsupported:1:0:0:1:0"},
+           std::pair{"monte_carlo_provided_stochastic_map",
+                     "0:timed:exponential:1:0:0:1:not-an-int"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_monte_carlo_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  bool conflict = false;
+  try {
+    (void)minera::parse_monte_carlo_params(fields({
+        {"monte_carlo_case_arrival_ratio", "1"},
+        {"monte_carlo_case_arrival_seconds", "2"}}));
+  } catch (const std::invalid_argument&) {
+    conflict = true;
+  }
+  assert(conflict);
+}
+
+void parse_monte_carlo_params_bounds_supplied_maps_before_accumulation() {
+  const auto records =
+      "0:timed:deterministic:1:0:0:1:0,"
+      "1:timed:deterministic:1:0:0:1:0,"
+      "2:timed:deterministic:1:0:0:1:0";
+  const auto values = fields({
+      {"monte_carlo_provided_stochastic_map", records}});
+
+  const auto within_limit = minera::parse_monte_carlo_params(
+      values, {}, 3);
+  assert(within_limit.stochastic_map.has_value());
+  assert(within_limit.stochastic_map->transitions.size() == 3);
+
+  bool threw = false;
+  try {
+    (void)minera::parse_monte_carlo_params(values, {}, 2);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  threw = false;
+  try {
+    (void)minera::parse_monte_carlo_params(values, {}, 0);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+
+  // The explicit empty marker remains valid even when the selected net has
+  // no transitions and therefore supplies a zero record limit.
+  const auto empty = minera::parse_monte_carlo_params(
+      fields({{"monte_carlo_provided_stochastic_map", "empty"}}), {}, 0);
+  assert(empty.stochastic_map.has_value());
+  assert(empty.stochastic_map->transitions.empty());
+
+  // The ordinary overload uses the conservative request-level hard limit.
+  assert(minera::kMonteCarloRequestMapMaxRecords >= 3);
+  const auto default_limit = minera::parse_monte_carlo_params(values);
+  assert(default_limit.stochastic_map->transitions.size() == 3);
+}
+
 void log_to_features_params_contract() {
   const auto parsed = minera::parse_log_to_features_params(fields({
       {"features_variant", "temporal"},
@@ -3472,6 +3614,9 @@ int main() {
   parse_stochastic_playout_params_rejects_bad_values();
   parse_monte_carlo_params_maps_controls();
   parse_monte_carlo_params_rejects_bad_values();
+  parse_monte_carlo_params_maps_extended_contract();
+  parse_monte_carlo_params_rejects_extended_bad_values();
+  parse_monte_carlo_params_bounds_supplied_maps_before_accumulation();
   parse_mine_params_ignores_blank_fields();
   parse_mine_params_maps_transition_system_options();
   parse_mine_params_rejects_invalid_transition_fields();

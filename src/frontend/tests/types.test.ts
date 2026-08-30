@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "../src/types";
-import { isGeneticMatrixConversionResult } from "../src/types";
+import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 
 describe("isProcessTreePlayoutSetResult", () => {
   const valid = {
@@ -755,12 +755,45 @@ describe("isMonteCarloResult", () => {
   const valid = {
     family: "MONTE_CARLO", variant: "PETRI_SEMAPH_FIFO",
     log: { trace_count: 1, event_count: 2 },
-    diagnostics: { simulated_cases: 1, completed_cases: 1, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 2, median_case_execution_seconds: 2, case_execution_seconds: [2] },
+    diagnostics: { simulated_cases: 1, completed_cases: 1, deadlocked_cases: 0, step_limited_cases: 0, case_arrival_seconds: 1, total_cases_seconds: 2, median_case_execution_seconds: 2, case_execution_seconds: [2], case_arrival_ratio: 1, total_cases_time: 2, median_cases_ex_time: 2, cases_ex_time: [2] },
+    output_places_interval_trees: [{ place_index: 0, intervals: [{ start: 1, end: 2 }] }],
+    output_transitions_interval_trees: [{ transition_index: 0, intervals: [] }],
   };
   it("accepts bounded diagnostics", () => expect(isMonteCarloResult(valid)).toBe(true));
   it("rejects negative and malformed counts", () => {
     expect(isMonteCarloResult({ ...valid, log: { trace_count: -1, event_count: 2 } })).toBe(false);
     expect(isMonteCarloResult({ ...valid, diagnostics: { ...valid.diagnostics, case_execution_seconds: ["bad"] } })).toBe(false);
+    expect(isMonteCarloResult({ ...valid, output_places_interval_trees: [{ place_index: 0, intervals: [{ start: 2, end: 1 }] }] })).toBe(false);
+    expect(isMonteCarloResult({ ...valid, output_transitions_interval_trees: [{ transition_index: 1, intervals: [] }] })).toBe(false);
+  });
+});
+
+describe("isStochasticMapResult", () => {
+  const valid = {
+    family: "STOCHASTIC_MAP", source: "log",
+    map: { family: "STOCHASTIC_MAP", transitions: [{
+      transition: 0, timing: "immediate", distribution: "immediate",
+      parameter: 0, secondary_parameter: 0, tertiary_parameter: 0,
+      activation_weight: 1, priority: -2147483648,
+    }] },
+    reachability: {
+      family: "STOCHASTIC_PETRI", variant: "TANGIBLE_CTMC", exhausted: false,
+      diagnostic: "", states: [[1]], edges: [], generator: [[0]],
+    },
+  };
+  it("accepts signed 32-bit priority boundaries", () => {
+    expect(isStochasticMapResult(valid)).toBe(true);
+    expect(isStochasticMapResult({ ...valid,
+      map: { ...valid.map, transitions: [{ ...valid.map.transitions[0], priority: 2147483647 }] },
+    })).toBe(true);
+  });
+  it("rejects priorities outside backend integer bounds", () => {
+    expect(isStochasticMapResult({ ...valid,
+      map: { ...valid.map, transitions: [{ ...valid.map.transitions[0], priority: -2147483649 }] },
+    })).toBe(false);
+    expect(isStochasticMapResult({ ...valid,
+      map: { ...valid.map, transitions: [{ ...valid.map.transitions[0], priority: 2147483648 }] },
+    })).toBe(false);
   });
 });
 

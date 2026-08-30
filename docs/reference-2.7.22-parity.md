@@ -150,17 +150,25 @@ legacy sampler select `BASIC` explicitly.
 Monte Carlo simulation evidence: the native `monte_carlo` core implements the
 `PETRI_SEMAPH_FIFO` virtual-time scheduler over workflow nets, seeded transition
 selection, deterministic, exponential, constant-zero, immediate, normal, uniform,
-lognormal, and gamma service times, bounded case/step
+lognormal, and gamma service times, bounded case/step and live-allocation
 budgets, shared output-place resource pools, completion/deadlock diagnostics,
-and deterministic EventLog output. Source-log fitting can force normal,
-uniform, or exponential service-time distributions while retaining deterministic
-fallbacks for degenerate samples; explicit duration vectors take precedence.
-`monte_carlo_*` request fields are strictly
+and deterministic EventLog output. Arbitrary multi-token initial/final markings
+use componentwise final coverage. Sparse supplied stochastic maps support every distribution and
+define missing transitions as uniform, immediate choices; explicit weight and
+duration vectors retain precedence. Source-log fitting honors custom activity
+and timestamp selectors, selectable forward/backwards token replay, forced
+normal/uniform/exponential distributions, and deterministic degenerate
+fallbacks. Omitted arrival cadence is inferred from sorted case-start times,
+while an explicit ratio overrides inference. Generated XES retains typed aliases
+for custom selectors. Documented diagnostic interval, scale-factor, and legacy
+thread-limit controls are accepted and validated without introducing sleeping or
+threads into the virtual scheduler. `monte_carlo_*` request fields are strictly
 validated, the export CLI can select `--playout-miner monte_carlo`, the local
 server exposes both `/api/playout?mode=monte_carlo` (XES) and `/api/monte-carlo`
-(JSON), and the frontend offers typed query/result guards and controls. Fitted
-activation weights and timestamp-derived service durations are applied
-when the source log overload is used.
+(JSON), and the frontend offers typed query/result guards, interval-tree
+validation, markings, selectors, replay, arrival, and compatibility controls.
+Dedicated POST adapters keep supplied stochastic maps out of request-size-limited
+URLs while the legacy GET routes remain available.
 
 Object-centric Petri-net simulation evidence: the bounded native adapter
 enumerates per-object-type workflow-net traces, combines object choices into

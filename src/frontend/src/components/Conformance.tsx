@@ -43,7 +43,7 @@ import {
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
+import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, fetchMonteCarloPlayout, fetchMonteCarloResult, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -624,17 +624,36 @@ function StochasticPetriPlayoutPanel({ dataset, miners }: { dataset: string; min
 
 function MonteCarloPlayoutPanel({ dataset, miners }: { dataset: string; miners: Array<{ id: string; label: string }> }) {
   const [options, setOptions] = useState<MonteCarloOptions>({ simulations: 100, max_steps: 1000, stop_at_final: true });
+  const [initialMarking, setInitialMarking] = useState("");
+  const [finalMarking, setFinalMarking] = useState("");
   const [miner, setMiner] = useState(miners[0]?.id ?? "inductive");
   const [result, setResult] = useState<{ completed_cases: number; deadlocked_cases: number; median_case_execution_seconds: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const parseMarking = (value: string, label: string): number[] | undefined => {
+    if (!value.trim()) return undefined;
+    const tokens = value.split(",").map((token) => token.trim());
+    if (tokens.some((token) => !/^\d+$/.test(token))) {
+      throw new Error(`${label} must contain comma-separated token counts`);
+    }
+    const marking = tokens.map(Number);
+    if (marking.some((count) => !Number.isSafeInteger(count) || count > 0xffffffff)) {
+      throw new Error(`${label} token counts must fit uint32`);
+    }
+    return marking;
+  };
   const run = async () => {
     setBusy(true); setError(null); setResult(null);
     try {
       const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
+      const runOptions: MonteCarloOptions = {
+        ...options,
+        initial_marking: parseMarking(initialMarking, "Initial marking"),
+        final_marking: parseMarking(finalMarking, "Final marking"),
+      };
       const [summary, xes] = await Promise.all([
-        fetchMonteCarloResult(selectedMiner, options),
-        fetchPlayout(selectedMiner, options),
+        fetchMonteCarloResult(selectedMiner, runOptions),
+        fetchMonteCarloPlayout(selectedMiner, runOptions),
       ]);
       setResult({
         completed_cases: summary.diagnostics.completed_cases,
@@ -658,8 +677,16 @@ function MonteCarloPlayoutPanel({ dataset, miners }: { dataset: string; miners: 
         <label>Simulations<input type="number" min={1} value={options.simulations ?? ""} onChange={e => number("simulations", e.target.value)} /></label>
         <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
         <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
-        <label>Case arrival (s)<input type="number" min={0} step={0.1} value={options.case_arrival_seconds ?? ""} onChange={e => number("case_arrival_seconds", e.target.value)} /></label>
+        <label>Arrival override (s)<input type="number" min={0} step={0.1} placeholder="infer from log" value={options.case_arrival_ratio ?? ""} onChange={e => number("case_arrival_ratio", e.target.value)} /></label>
         <label>Default duration (s)<input type="number" min={0} step={0.1} value={options.default_duration_seconds ?? ""} onChange={e => number("default_duration_seconds", e.target.value)} /></label>
+        <label>Activity key<input value={options.activity_key ?? ""} placeholder="concept:name" onChange={e => setOptions({ ...options, activity_key: e.target.value || undefined })} /></label>
+        <label>Timestamp key<input value={options.timestamp_key ?? ""} placeholder="time:timestamp" onChange={e => setOptions({ ...options, timestamp_key: e.target.value || undefined })} /></label>
+        <label>Initial marking<input value={initialMarking} placeholder="default source token" onChange={e => setInitialMarking(e.target.value)} /></label>
+        <label>Final marking<input value={finalMarking} placeholder="default sink token" onChange={e => setFinalMarking(e.target.value)} /></label>
+        <label>Replay strategy<select value={options.token_replay_variant ?? "forward"} onChange={e => setOptions({ ...options, token_replay_variant: e.target.value as "forward" | "backwards" })}><option value="forward">forward</option><option value="backwards">backwards</option></select></label>
+        <label>Diagnostic interval<input type="number" min={1} value={options.diagnostic_interval ?? ""} placeholder="32" onChange={e => number("diagnostic_interval", e.target.value)} /></label>
+        <label>Scale factor<input type="number" min={0} step={1} value={options.small_scale_factor ?? ""} placeholder="864000" onChange={e => number("small_scale_factor", e.target.value)} /></label>
+        <label>Execution limit (s)<input type="number" min={0} step={0.1} value={options.max_thread_execution_time ?? ""} placeholder="60" onChange={e => number("max_thread_execution_time", e.target.value)} /></label>
         <label><input type="checkbox" checked={Boolean(options.stop_at_final)} onChange={e => setOptions({ ...options, stop_at_final: e.target.checked })} /> Stop at final marking</label>
         <label><input type="checkbox" checked={options.enable_diagnostics !== false} onChange={e => setOptions({ ...options, enable_diagnostics: e.target.checked })} /> Collect diagnostics</label>
       </div>

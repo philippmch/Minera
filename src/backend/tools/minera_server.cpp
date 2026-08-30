@@ -230,10 +230,81 @@ constexpr std::size_t kServerLogConversionMaxGraphNodes = 200'000;
 constexpr std::size_t kServerLogConversionMaxGraphEdges = 400'000;
 constexpr std::size_t kServerLogConversionMaxVariants = 100'000;
 constexpr std::size_t kServerLogConversionMaxRows = 1'000'000;
+constexpr std::size_t kServerMonteCarloMaxSimulations = 10'000;
+constexpr std::size_t kServerMonteCarloMaxSteps = 10'000;
+constexpr std::size_t kServerMonteCarloMaxResourceCapacity = 1'000;
+constexpr std::size_t kServerMonteCarloMaxResourceSlots = 1'000'000;
+constexpr std::size_t kServerMonteCarloMaxInitialTokens = 1'000'000;
+constexpr std::size_t kServerMonteCarloMaxInitialAssignments = 1'000'000;
+constexpr std::size_t kServerMonteCarloMaxSimulationSteps = 1'000'000;
+
+void validate_monte_carlo_server_limits(
+    const minera::MonteCarloOptions& options, const minera::PetriNet& net) {
+  if (options.simulations > kServerMonteCarloMaxSimulations ||
+      options.max_steps > kServerMonteCarloMaxSteps ||
+      options.default_resources_per_place == 0 ||
+      options.default_resources_per_place > kServerMonteCarloMaxResourceCapacity) {
+    throw std::invalid_argument(
+        "Monte Carlo bounds exceed the server safety limits");
+  }
+  if (options.simulations != 0 && options.max_steps != 0 &&
+      options.simulations >
+          kServerMonteCarloMaxSimulationSteps / options.max_steps) {
+    throw std::invalid_argument(
+        "Monte Carlo simulation budget exceeds the server safety limit");
+  }
+
+  for (const auto& [place, capacity] : options.resources_per_place) {
+    if (place >= net.place_count()) {
+      throw std::invalid_argument(
+          "Monte Carlo resource place index is invalid");
+    }
+    if (capacity == 0 || capacity > kServerMonteCarloMaxResourceCapacity) {
+      throw std::invalid_argument(
+          "Monte Carlo resource capacity exceeds the server safety limit");
+    }
+  }
+  std::size_t total_resources = 0;
+  for (std::size_t place = 0; place < net.place_count(); ++place) {
+    const auto override_capacity = options.resources_per_place.find(place);
+    const auto capacity = override_capacity == options.resources_per_place.end()
+                              ? options.default_resources_per_place
+                              : override_capacity->second;
+    if (total_resources > kServerMonteCarloMaxResourceSlots - capacity) {
+      throw std::invalid_argument(
+          "Monte Carlo total resource capacity exceeds the server safety limit");
+    }
+    total_resources += capacity;
+  }
+
+  if (!options.initial_marking.empty() &&
+      options.initial_marking.size() != net.place_count()) {
+    throw std::invalid_argument(
+        "Monte Carlo initial marking must match the place count");
+  }
+  std::size_t initial_tokens = options.initial_marking.empty() ? 1 : 0;
+  for (const auto tokens : options.initial_marking) {
+    if (tokens > kServerMonteCarloMaxInitialTokens ||
+        initial_tokens > kServerMonteCarloMaxInitialTokens - tokens) {
+      throw std::invalid_argument(
+          "Monte Carlo initial marking exceeds the server safety limit");
+    }
+    initial_tokens += tokens;
+  }
+  if (initial_tokens != 0 &&
+      options.simulations >
+          kServerMonteCarloMaxInitialAssignments / initial_tokens) {
+    throw std::invalid_argument(
+        "Monte Carlo initial assignment budget exceeds the server safety limit");
+  }
+}
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
       "miner", "mode", "monte_carlo_simulations",
+      "monte_carlo_activity_key", "monte_carlo_timestamp_key",
+      "monte_carlo_initial_marking", "monte_carlo_final_marking",
+      "monte_carlo_case_arrival_ratio",
       "monte_carlo_case_arrival_seconds", "monte_carlo_max_steps",
       "monte_carlo_seed", "monte_carlo_start",
       "monte_carlo_default_duration_seconds",
@@ -243,6 +314,10 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request) {
       "monte_carlo_resources_per_place",
       "monte_carlo_default_resources_per_place",
       "monte_carlo_enable_diagnostics", "monte_carlo_stop_at_final",
+      "monte_carlo_diagnostic_interval", "monte_carlo_small_scale_factor",
+      "monte_carlo_max_thread_execution_time",
+      "monte_carlo_token_replay_variant",
+      "monte_carlo_provided_stochastic_map",
       "process_tree_variant"};
   for (const auto& [key, value] : request.params) {
     (void)value;
@@ -5074,20 +5149,14 @@ void handle_monte_carlo_json(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_monte_carlo_params(lookup, present);
-    if (options.simulations > 10000 || options.max_steps > 10000 ||
-        options.default_resources_per_place > 1000) {
-      reject("Monte Carlo bounds exceed the server safety limits");
-      return;
-    }
-    constexpr std::size_t kMaxSimulationSteps = 1'000'000;
-    if (options.simulations != 0 && options.max_steps != 0 &&
-        options.simulations > kMaxSimulationSteps / options.max_steps) {
-      reject("Monte Carlo simulation budget exceeds the server safety limit");
-      return;
-    }
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, selected_miner, converted);
+    const auto map_record_limit = std::min(
+        selected.transitions().size(),
+        minera::kMonteCarloRequestMapMaxRecords);
+    const auto options = minera::parse_monte_carlo_params(
+        lookup, present, map_record_limit);
+    validate_monte_carlo_server_limits(options, selected);
     const auto result =
         minera::monte_carlo(session->log, selected, options);
     response.set_content(minera::monte_carlo_json(result), "application/json");
@@ -5414,24 +5483,16 @@ void handle_playout(const httplib::Request& request,
       const auto present = [&](std::string_view name) {
         return request.has_param(std::string(name));
       };
-      const auto options = minera::parse_monte_carlo_params(lookup, present);
-      if (options.simulations > 10000 || options.max_steps > 10000 ||
-          options.default_resources_per_place > 1000) {
-        reject("Monte Carlo bounds exceed the server safety limits");
-        return;
-      }
-      constexpr std::size_t kMaxSimulationSteps = 1'000'000;
-      if (options.simulations != 0 && options.max_steps != 0 &&
-          options.simulations > kMaxSimulationSteps / options.max_steps) {
-        reject("Monte Carlo simulation budget exceeds the server safety limit");
-        return;
-      }
+      const auto& selected = select_cached_or_process_tree_net(
+          request, *session, selected_miner, converted);
+      const auto map_record_limit = std::min(
+          selected.transitions().size(),
+          minera::kMonteCarloRequestMapMaxRecords);
+      const auto options = minera::parse_monte_carlo_params(
+          lookup, present, map_record_limit);
+      validate_monte_carlo_server_limits(options, selected);
       const auto result =
-          minera::monte_carlo(
-              session->log,
-              select_cached_or_process_tree_net(request, *session,
-                                                selected_miner, converted),
-              options);
+          minera::monte_carlo(session->log, selected, options);
       response.set_content(
           minera::to_xes(result.log, selected_miner + " Monte Carlo playout"),
           "application/xml");
@@ -6536,6 +6597,7 @@ int main(int argc, char** argv) {
   server.Options("/api/data-petri-net", preflight);
   server.Options("/api/check-model", preflight);
   server.Options("/api/process-tree-petri", preflight);
+  server.Options("/api/playout", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
   server.Options("/api/dfg-precision", preflight);
@@ -6639,9 +6701,11 @@ int main(int argc, char** argv) {
   server.Post("/api/streaming-temporal", handle_streaming_temporal);
   server.Post("/api/streaming-tbr", handle_streaming_tbr);
   server.Get("/api/playout", handle_playout);
+  server.Post("/api/playout", handle_playout);
   server.Get("/api/stochastic-petri", handle_stochastic_petri);
   server.Get("/api/stochastic-map", handle_stochastic_map);
   server.Get("/api/monte-carlo", handle_monte_carlo_json);
+  server.Post("/api/monte-carlo", handle_monte_carlo_json);
 
   server.Get("/api/version", [](const httplib::Request&, httplib::Response& response) {
     std::ostringstream out;
