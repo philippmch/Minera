@@ -33,6 +33,7 @@
 #include "minera/case_statistics.hpp"
 #include "minera/cycle_time.hpp"
 #include "minera/petri_net.hpp"
+#include "minera/pnml.hpp"
 #include "minera/stochastic_petri.hpp"
 #include "minera/playout.hpp"
 #include "minera/powl.hpp"
@@ -289,6 +290,7 @@ void write_analysis_json(std::ostream& out,
     const PetriUsageComparison& result);
 [[nodiscard]] std::string petri_net_reduction_json(
     const PetriNetReductionResult& result);
+[[nodiscard]] std::string pnml_document_json(const PnmlDocument& document);
 [[nodiscard]] std::string serialize_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_playout_visited_json(

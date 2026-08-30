@@ -716,6 +716,10 @@ int usage(const char* program) {
                "  --interval-query-start <f> Range diagnostic lower bound\n"
                "  --interval-query-end <f> Range diagnostic upper bound\n"
                "  --reduce-petri-net <file> Reduce a PNML model and emit JSON\n"
+               "  --inspect-pnml <file>      Parse a PNML model and emit JSON\n"
+               "  --pnml-infer-initial-marking <bool>\n"
+               "  --pnml-infer-final-marking <bool>\n"
+               "  --pnml-import-stochastic-map <bool>\n"
                "  --petri-reduction-initial-marking <m> Comma-separated marking\n"
                "  --petri-reduction-final-marking <m> Comma-separated marking\n"
                "  --petri-reduction-parallel-place-fusion <bool>\n"
@@ -1260,6 +1264,8 @@ int main(int argc, char** argv) {
   std::filesystem::path pnml_to_ptml_input;
   std::filesystem::path petri_reduction_input;
   std::map<std::string, std::string> petri_reduction_fields;
+  std::filesystem::path pnml_inspection_input;
+  std::map<std::string, std::string> pnml_inspection_fields;
   std::filesystem::path bpmn_to_ptml_input;
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
@@ -1644,6 +1650,20 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       petri_reduction_input = value;
+      continue;
+    }
+    if (arg == "--inspect-pnml") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      pnml_inspection_input = value;
+      continue;
+    }
+    if (arg == "--pnml-infer-initial-marking" ||
+        arg == "--pnml-infer-final-marking" ||
+        arg == "--pnml-import-stochastic-map") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      pnml_inspection_fields.insert_or_assign(std::string(arg), value);
       continue;
     }
     if (arg == "--petri-reduction-initial-marking" ||
@@ -4673,8 +4693,18 @@ int main(int argc, char** argv) {
                  "--reduce-petri-net\n";
     return 2;
   }
+  if (!pnml_inspection_fields.empty() && pnml_inspection_input.empty()) {
+    std::cerr << "error: --pnml-* import options require --inspect-pnml\n";
+    return 2;
+  }
+  if (!pnml_inspection_input.empty() &&
+      (!input.empty() || random_tree_requested || reverse_tree_inputs != 0 ||
+       !petri_reduction_input.empty())) {
+    std::cerr << "error: PNML inspection cannot be combined with another input mode\n";
+    return 2;
+  }
   if (input.empty() && !random_tree_requested && reverse_tree_inputs == 0 &&
-      petri_reduction_input.empty()) {
+      petri_reduction_input.empty() && pnml_inspection_input.empty()) {
     return usage(argv[0]);
   }
   if (process_tree_variant !=
@@ -4744,12 +4774,34 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) {
         return petri_reduction_fields.contains(std::string(name));
       };
-      const auto options =
-          minera::parse_petri_net_reduction_params(lookup, present);
-      const auto result =
-          minera::reduce_petri_net(minera::import_pnml(petri_reduction_input),
-                                   options);
+      auto options = minera::parse_petri_net_reduction_params(lookup, present);
+      auto document = minera::import_pnml_document(petri_reduction_input);
+      if (!present("petri_reduction_initial_marking"))
+        options.initial_marking = document.initial_marking;
+      if (!present("petri_reduction_final_marking"))
+        options.final_marking = document.final_marking;
+      const auto result = minera::reduce_petri_net(document.net, options);
       std::cout << minera::petri_net_reduction_json(result) << '\n';
+      return 0;
+    }
+    if (!pnml_inspection_input.empty()) {
+      const auto boolean = [&](const char* key, bool fallback) {
+        const auto it = pnml_inspection_fields.find(key);
+        if (it == pnml_inspection_fields.end()) return fallback;
+        if (it->second == "true" || it->second == "1") return true;
+        if (it->second == "false" || it->second == "0") return false;
+        throw std::invalid_argument(std::string(key) + ": expected true or false");
+      };
+      minera::PnmlImportOptions options;
+      options.infer_initial_marking =
+          boolean("--pnml-infer-initial-marking", true);
+      options.infer_final_marking =
+          boolean("--pnml-infer-final-marking", true);
+      options.import_stochastic_map =
+          boolean("--pnml-import-stochastic-map", false);
+      std::cout << minera::pnml_document_json(
+                       minera::import_pnml_document(pnml_inspection_input, options))
+                << '\n';
       return 0;
     }
     if (random_tree_requested) {

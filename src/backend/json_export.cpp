@@ -3903,6 +3903,57 @@ std::string petri_net_reduction_json(const PetriNetReductionResult& result) {
   return out.str();
 }
 
+std::string pnml_document_json(const PnmlDocument& document) {
+  std::ostringstream out;
+  out << "{\"family\":\"PNML_DOCUMENT\",\"variant\":\"pnml\""
+      << ",\"place_count\":" << document.net.place_count()
+      << ",\"transition_count\":" << document.net.transitions().size()
+      << ",\"source\":" << document.net.source()
+      << ",\"sink\":" << document.net.sink()
+      << ",\"initial_marking\":[";
+  for (std::size_t i = 0; i < document.initial_marking.size(); ++i) {
+    if (i) out << ',';
+    out << document.initial_marking[i];
+  }
+  out << "],\"final_marking\":[";
+  for (std::size_t i = 0; i < document.final_marking.size(); ++i) {
+    if (i) out << ',';
+    out << document.final_marking[i];
+  }
+  out << "],\"transitions\":[";
+  for (std::size_t i = 0; i < document.net.transitions().size(); ++i) {
+    if (i) out << ',';
+    const auto& transition = document.net.transitions()[i];
+    out << "{\"activity\":";
+    if (transition.activity) {
+      write_json_string(out, document.net.activities()[*transition.activity]);
+    } else {
+      out << "null";
+    }
+    const auto places = [&](const char* name,
+                            const std::vector<std::size_t>& values) {
+      out << ",\"" << name << "\":[";
+      for (std::size_t j = 0; j < values.size(); ++j) {
+        if (j) out << ',';
+        out << values[j];
+      }
+      out << ']';
+    };
+    places("inputs", transition.inputs);
+    places("outputs", transition.outputs);
+    places("reset_inputs", transition.reset_inputs);
+    places("inhibitor_inputs", transition.inhibitor_inputs);
+    out << '}';
+  }
+  out << "],\"stochastic_map\":";
+  if (document.stochastic_map)
+    out << serialize_stochastic_map_json(*document.stochastic_map);
+  else
+    out << "null";
+  out << '}';
+  return out.str();
+}
+
 namespace {
 
 std::string serialize_playout_visited_json_variant(

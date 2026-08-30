@@ -3794,12 +3794,15 @@ void handle_reduce_petri_net(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options =
-        minera::parse_petri_net_reduction_params(lookup, present);
-    const auto net = minera::parse_pnml(model_xml);
+    auto options = minera::parse_petri_net_reduction_params(lookup, present);
+    auto document = minera::parse_pnml_document(model_xml);
+    if (!present("petri_reduction_initial_marking"))
+      options.initial_marking = document.initial_marking;
+    if (!present("petri_reduction_final_marking"))
+      options.final_marking = document.final_marking;
     response.set_content(
         minera::petri_net_reduction_json(
-            minera::reduce_petri_net(net, options)),
+            minera::reduce_petri_net(document.net, options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

@@ -2,13 +2,28 @@
 
 #include <filesystem>
 #include <ostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "minera/petri_net.hpp"
+#include "minera/stochastic_map.hpp"
 
 namespace minera {
+
+struct PnmlDocument {
+  PetriNet net;
+  std::vector<std::int64_t> initial_marking;
+  std::vector<std::int64_t> final_marking;
+  std::optional<StochasticMap> stochastic_map;
+};
+
+struct PnmlImportOptions {
+  bool infer_initial_marking = true;
+  bool infer_final_marking = true;
+  bool import_stochastic_map = false;
+};
 
 // Serializes a workflow net as PNML (the Petri Net Markup Language, ISO/IEC
 // 15909-2) — the standard interchange format read by ProM and other
@@ -24,12 +39,22 @@ void write_pnml(std::ostream& out, const PetriNet& net,
                 const std::vector<std::int64_t>& initial_marking,
                 const std::vector<std::int64_t>& final_marking,
                 std::string_view name = "net");
+void write_pnml(std::ostream& out, const PetriNet& net,
+                const std::vector<std::int64_t>& initial_marking,
+                const std::vector<std::int64_t>& final_marking,
+                const StochasticMap& stochastic_map,
+                std::string_view name = "net");
 
 [[nodiscard]] std::string to_pnml(const PetriNet& net,
                                   std::string_view name = "net");
 [[nodiscard]] std::string to_pnml(
     const PetriNet& net, const std::vector<std::int64_t>& initial_marking,
     const std::vector<std::int64_t>& final_marking,
+    std::string_view name = "net");
+[[nodiscard]] std::string to_pnml(
+    const PetriNet& net, const std::vector<std::int64_t>& initial_marking,
+    const std::vector<std::int64_t>& final_marking,
+    const StochasticMap& stochastic_map,
     std::string_view name = "net");
 
 // Parses a PNML workflow net, so a model discovered or drawn elsewhere can be
@@ -45,7 +70,17 @@ void write_pnml(std::ostream& out, const PetriNet& net,
 // shape throw std::runtime_error.
 [[nodiscard]] PetriNet parse_pnml(std::string_view xml);
 
+// Parses the first PNML net together with its complete nonnegative initial and
+// final markings. When a marking is omitted, the unique structural source or
+// sink receives one token. Unlike parse_pnml, this accepts markings spanning
+// multiple places and token counts greater than one.
+[[nodiscard]] PnmlDocument parse_pnml_document(
+    std::string_view xml, const PnmlImportOptions& options = {});
+
 // Reads and parses a PNML file.
 [[nodiscard]] PetriNet import_pnml(const std::filesystem::path& path);
+[[nodiscard]] PnmlDocument import_pnml_document(
+    const std::filesystem::path& path,
+    const PnmlImportOptions& options = {});
 
 }  // namespace minera
