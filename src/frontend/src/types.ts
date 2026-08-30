@@ -325,7 +325,9 @@ export function isNetworkAnalysisResult(value: unknown): value is NetworkAnalysi
   if (v.family !== "NETWORK_ANALYSIS" || v.variant !== "dataframe" || !Array.isArray(v.edges) || !v.diagnostics) return false;
   if (!v.edges.every((e) => !!e && typeof e.source === "string" && typeof e.target === "string" && typeof e.activity === "string" && Number.isInteger(e.count) && e.count >= 0 && Array.isArray(e.performance) && e.performance.every((x) => typeof x === "number" && Number.isFinite(x)))) return false;
   const d = v.diagnostics as Partial<NetworkAnalysisDiagnostics>;
-  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && typeof d.message === "string";
+  const performanceCount = v.edges.reduce((sum, edge) => sum + edge.performance.length, 0);
+  const linkCount = v.edges.reduce((sum, edge) => sum + edge.count, 0);
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && ["trace_count", "event_count", "link_count", "row_count", "performance_value_count"].every((k) => { const n = d[k as keyof NetworkAnalysisDiagnostics]; return typeof n === "number" && Number.isInteger(n) && n >= 0; }) && d.row_count === v.edges.length && d.link_count === linkCount && d.performance_value_count === performanceCount && typeof d.message === "string";
 }
 export function isOrganizationalSnaResult(value: unknown): value is OrganizationalSnaResult {
   if (!value || typeof value !== "object") return false;
@@ -344,6 +346,9 @@ export function isOrganizationalSnaResult(value: unknown): value is Organization
   const d = c.diagnostics as Partial<OrganizationalSnaDiagnostics>;
   return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" &&
     [d.trace_count, d.event_count, d.resource_count, d.edge_count].every((x) => Number.isInteger(x) && (x as number) >= 0) &&
+    d.resource_count === c.resources.length && d.edge_count === c.edges.length &&
+    new Set(c.resources).size === c.resources.length &&
+    c.directed === (["handover", "subcontracting", "handover_pandas", "subcontracting_pandas"] as unknown[]).includes(c.variant) &&
     typeof d.message === "string";
 }
 export const isOrganizationalSna = isOrganizationalSnaResult;
@@ -360,7 +365,9 @@ export function isRoleDiscoveryResult(value: unknown): value is RoleDiscoveryRes
   if (c.family !== "ROLE_DISCOVERY" || (c.variant !== "log" && c.variant !== "pandas") || !Array.isArray(c.roles) || !c.diagnostics || typeof c.diagnostics !== "object") return false;
   if (!c.roles.every((r) => !!r && typeof r === "object" && Array.isArray(r.activities) && r.activities.every((a) => typeof a === "string") && Array.isArray(r.resources) && r.resources.every((x) => !!x && typeof x === "object" && typeof x.name === "string" && Number.isInteger(x.count) && (x.count as number) > 0))) return false;
   const d = c.diagnostics as Partial<RoleDiscoveryDiagnostics>;
-  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count, d.event_count, d.activity_count, d.resource_count, d.role_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+  const activities = new Set(c.roles.flatMap((role) => role.activities));
+  const resources = new Set(c.roles.flatMap((role) => role.resources.map((resource) => resource.name)));
+  return typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count, d.event_count, d.activity_count, d.resource_count, d.role_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && d.role_count === c.roles.length && d.activity_count === activities.size && d.resource_count === resources.size && typeof d.message === "string";
 }
 export const isRoleDiscovery = isRoleDiscoveryResult;
 
@@ -398,7 +405,10 @@ export function isKnowledgeInjectionResult(value: unknown): value is KnowledgeIn
 export function isResourceProfilesResult(value: unknown): value is ResourceProfilesResult {
   if (!value || typeof value !== "object") return false; const c = value as Partial<ResourceProfilesResult>; const d = c.diagnostics;
   const metrics = new Set<ResourceProfilesMetric>(["distinct_activities", "activity_frequency", "activity_completions", "case_completions", "fraction_case_completions", "average_workload", "multitasking", "average_duration_activity", "average_case_duration", "interaction_two_resources", "social_position"]);
-  return c.family === "RESOURCE_PROFILES" && typeof c.metric === "string" && metrics.has(c.metric as ResourceProfilesMetric) && Array.isArray(c.rows) && c.rows.every((r) => !!r && typeof r.resource === "string" && typeof r.activity === "string" && typeof r.resource2 === "string" && typeof r.value === "number" && Number.isFinite(r.value) && Number.isInteger(r.count) && r.count >= 0) && !!d && typeof d.computed === "boolean" && typeof d.output_truncated === "boolean" && [d.trace_count,d.event_count,d.resource_count].every((n) => Number.isInteger(n) && (n as number) >= 0) && typeof d.message === "string";
+  if (c.family !== "RESOURCE_PROFILES" || typeof c.metric !== "string" || !metrics.has(c.metric as ResourceProfilesMetric) || !Array.isArray(c.rows) || !c.rows.every((r) => !!r && typeof r.resource === "string" && r.resource.length > 0 && typeof r.activity === "string" && typeof r.resource2 === "string" && typeof r.value === "number" && Number.isFinite(r.value) && Number.isInteger(r.count) && r.count >= 0) || !d || typeof d.computed !== "boolean" || typeof d.output_truncated !== "boolean" || ![d.trace_count,d.event_count,d.resource_count].every((n) => Number.isInteger(n) && (n as number) >= 0) || typeof d.message !== "string") return false;
+  const keys = c.rows.map((row) => `${row.resource}\0${row.activity}\0${row.resource2}`);
+  const resources = new Set(c.rows.flatMap((row) => row.resource2 ? [row.resource, row.resource2] : [row.resource]));
+  return new Set(keys).size === keys.length && d.resource_count >= resources.size;
 }
 
 export interface LocalDiagnosticsOptions { local_diagnostics_group_attribute?: string; local_diagnostics_resource_attribute?: string; local_diagnostics_activity_attribute?: string; local_diagnostics_groups?: string; local_diagnostics_max_groups?: number; local_diagnostics_max_resources?: number; local_diagnostics_max_rows?: number; }

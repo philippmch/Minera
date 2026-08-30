@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <iomanip>
 #include <numeric>
 #include <set>
@@ -174,6 +175,44 @@ LocalDiagnosticsResult apply_from_clustering_or_roles(
 }
 
 std::string local_diagnostics_json(const LocalDiagnosticsResult& r) {
+  const auto finite_ratios = [](const auto& values) {
+    for (const auto& [outer, inner] : values) {
+      (void)outer;
+      for (const auto& [key, value] : inner) {
+        (void)key;
+        if (!std::isfinite(value) || value < 0.0 || value > 1.0) return false;
+      }
+    }
+    return true;
+  };
+  if (!finite_ratios(r.group_relative_focus) ||
+      !finite_ratios(r.group_relative_stake) ||
+      !finite_ratios(r.group_coverage))
+    throw std::invalid_argument("local diagnostics ratio is invalid");
+  std::set<std::string> groups;
+  std::set<std::string> resources;
+  for (const auto& [group, values] : r.group_relative_focus) {
+    (void)values; groups.insert(group);
+  }
+  for (const auto& [group, values] : r.group_relative_stake) {
+    (void)values; groups.insert(group);
+  }
+  for (const auto& [group, values] : r.group_coverage) {
+    groups.insert(group);
+    for (const auto& [resource, value] : values) {
+      (void)value; resources.insert(resource);
+    }
+  }
+  for (const auto& [group, by_resource] : r.group_member_contribution) {
+    groups.insert(group);
+    for (const auto& [resource, activities] : by_resource) {
+      (void)activities; resources.insert(resource);
+    }
+  }
+  if (r.diagnostics.group_count != groups.size() ||
+      r.diagnostics.resource_count < resources.size() ||
+      r.diagnostics.skipped_events > r.diagnostics.event_count)
+    throw std::invalid_argument("local diagnostics counts are inconsistent");
   std::ostringstream out;
   out << "{\"family\":\"LOCAL_DIAGNOSTICS\",\"group_relative_focus\":";
   emit_double_map(out, r.group_relative_focus);

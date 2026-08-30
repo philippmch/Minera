@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -143,8 +144,13 @@ int main() {
   const auto json = resource_profiles_json(distinct);
   assert(json.find("RESOURCE_PROFILES") != std::string::npos);
   assert(json.find("distinct_activities") != std::string::npos);
+  auto malformed_result = distinct;
+  malformed_result.rows[0].value = std::numeric_limits<double>::infinity();
+  try { (void)resource_profiles_json(malformed_result); assert(false); }
+  catch (const std::invalid_argument&) {}
   ResourceProfilesResult escaped;
   escaped.diagnostics.message = "line\n\\ok";
+  escaped.diagnostics.resource_count = 1;
   escaped.rows.push_back({"a\"b", "x\ny", "", 1.0, 1});
   const auto escaped_json = resource_profiles_json(escaped);
   assert(escaped_json.find("a\\\"b") != std::string::npos);

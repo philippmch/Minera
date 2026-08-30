@@ -8,6 +8,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 
 #include "minera/timestamp.hpp"
@@ -395,6 +396,17 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
 }
 
 std::string resource_profiles_json(const ResourceProfilesResult& result) {
+  std::set<std::tuple<std::string, std::string, std::string>> keys;
+  std::set<std::string> resources;
+  for (const auto& row : result.rows) {
+    if (row.resource.empty() || !std::isfinite(row.value) ||
+        !keys.emplace(row.resource, row.activity, row.resource2).second)
+      throw std::invalid_argument("resource profile row is invalid");
+    resources.insert(row.resource);
+    if (!row.resource2.empty()) resources.insert(row.resource2);
+  }
+  if (result.diagnostics.resource_count < resources.size())
+    throw std::invalid_argument("resource profile diagnostics are inconsistent");
   std::ostringstream out; out << "{\"family\":\"RESOURCE_PROFILES\",\"metric\":\"" << resource_profile_metric_name(result.metric) << "\",\"rows\":[";
   const auto quote = [&out](const std::string& s) { out << '"'; for (unsigned char c : s) { if (c == '\\' || c == '"') out << '\\'; if (c < 0x20) { out << "\\u00" << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(c) << std::dec << std::setfill(' '); } else out << c; } out << '"'; };
   for(std::size_t i=0;i<result.rows.size();++i){const auto&r=result.rows[i]; if(i)out<<','; out<<"{\"resource\":"; quote(r.resource); out<<",\"activity\":"; quote(r.activity); out<<",\"resource2\":"; quote(r.resource2); out<<",\"value\":"<<std::setprecision(17)<<r.value<<",\"count\":"<<r.count<<"}";} out<<"],\"diagnostics\":{\"computed\":"<<(result.diagnostics.computed?"true":"false")<<",\"output_truncated\":"<<(result.diagnostics.output_truncated?"true":"false")<<",\"trace_count\":"<<result.diagnostics.trace_count<<",\"event_count\":"<<result.diagnostics.event_count<<",\"resource_count\":"<<result.diagnostics.resource_count<<",\"message\":"; quote(result.diagnostics.message); out << "}}"; return out.str();

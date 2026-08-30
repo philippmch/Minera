@@ -4989,17 +4989,34 @@ std::string variant_statistics_json(const VariantStatisticsResult& result) {
 }
 
 std::string organizational_sna_json(const OrganizationalSnaResult& result) {
-  const char* variant = "handover";
+  const char* variant = nullptr;
   switch (result.variant) {
     case OrganizationalSnaVariant::kWorkingTogether: variant = "working_together"; break;
     case OrganizationalSnaVariant::kSubcontracting: variant = "subcontracting"; break;
     case OrganizationalSnaVariant::kJointActivities: variant = "jointactivities"; break;
-    case OrganizationalSnaVariant::kHandover: break;
+    case OrganizationalSnaVariant::kHandover: variant = "handover"; break;
     case OrganizationalSnaVariant::kHandoverPandas: variant = "handover_pandas"; break;
     case OrganizationalSnaVariant::kWorkingTogetherPandas: variant = "working_together_pandas"; break;
     case OrganizationalSnaVariant::kSubcontractingPandas: variant = "subcontracting_pandas"; break;
     case OrganizationalSnaVariant::kJointActivitiesPandas: variant = "jointactivities_pandas"; break;
   }
+  if (variant == nullptr)
+    throw std::invalid_argument("organizational SNA result has an unknown variant");
+  const bool directed = result.variant == OrganizationalSnaVariant::kHandover ||
+      result.variant == OrganizationalSnaVariant::kHandoverPandas ||
+      result.variant == OrganizationalSnaVariant::kSubcontracting ||
+      result.variant == OrganizationalSnaVariant::kSubcontractingPandas;
+  if (result.directed != directed ||
+      result.diagnostics.resource_count != result.resources.size() ||
+      result.diagnostics.edge_count != result.edges.size())
+    throw std::invalid_argument("organizational SNA result is inconsistent");
+  if (std::set<std::string>(result.resources.begin(), result.resources.end()).size() !=
+      result.resources.size())
+    throw std::invalid_argument("organizational SNA resources must be unique");
+  for (const auto& edge : result.edges)
+    if (edge.source >= result.resources.size() || edge.target >= result.resources.size() ||
+        !std::isfinite(edge.weight))
+      throw std::invalid_argument("organizational SNA edge is invalid");
   std::ostringstream out;
   out << "{\"family\":\"ORGANIZATIONAL_SNA\",\"variant\":";
   write_json_string(out, variant);
@@ -5033,6 +5050,20 @@ std::string organizational_sna_json(const OrganizationalSnaResult& result) {
 std::string network_analysis_json(const NetworkAnalysisResult& result) {
   if (result.variant != NetworkAnalysisVariant::kDataframe)
     throw std::invalid_argument("network analysis result has an unknown variant");
+  std::size_t performance_values = 0;
+  std::uint64_t links = 0;
+  for (const auto& edge : result.edges) {
+    if (edge.source.empty() || edge.target.empty() || edge.activity.empty() || edge.count == 0 ||
+        std::any_of(edge.performance.begin(), edge.performance.end(),
+                    [](double value) { return !std::isfinite(value); }))
+      throw std::invalid_argument("network analysis edge is invalid");
+    links += edge.count;
+    performance_values += edge.performance.size();
+  }
+  if (result.diagnostics.row_count != result.edges.size() ||
+      result.diagnostics.link_count != links ||
+      result.diagnostics.performance_value_count != performance_values)
+    throw std::invalid_argument("network analysis diagnostics are inconsistent");
   std::ostringstream out;
   out << "{\"family\":\"NETWORK_ANALYSIS\",\"variant\":\"dataframe\",\"edges\":[";
   for (std::size_t i = 0; i < result.edges.size(); ++i) {
@@ -5067,6 +5098,24 @@ std::string role_discovery_json(const RoleDiscoveryResult& result) {
   }
   if (variant == nullptr)
     throw std::invalid_argument("role discovery result has an unknown variant");
+  std::set<std::string> activities;
+  std::set<std::string> resources;
+  for (const auto& role : result.roles) {
+    if (role.activities.empty() || role.resources.empty())
+      throw std::invalid_argument("role discovery contains an empty role");
+    for (const auto& activity : role.activities)
+      if (activity.empty() || !activities.insert(activity).second)
+        throw std::invalid_argument("role discovery activities are invalid");
+    for (const auto& resource : role.resources) {
+      if (resource.name.empty() || resource.count == 0)
+        throw std::invalid_argument("role discovery resource is invalid");
+      resources.insert(resource.name);
+    }
+  }
+  if (result.diagnostics.role_count != result.roles.size() ||
+      result.diagnostics.activity_count != activities.size() ||
+      result.diagnostics.resource_count != resources.size())
+    throw std::invalid_argument("role discovery diagnostics are inconsistent");
   std::ostringstream out;
   out << "{\"family\":\"ROLE_DISCOVERY\",\"variant\":\""
       << variant << "\",\"roles\":[";

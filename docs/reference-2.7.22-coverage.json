@@ -8,6 +8,12 @@
     "algo.analysis.marking_equation",
     "algo.analysis.woflan",
     "algo.analysis.workflow_net",
+    "algo.organizational_mining.local_diagnostics",
+    "algo.organizational_mining.network_analysis",
+    "algo.organizational_mining.resource_profiles",
+    "algo.organizational_mining.roles",
+    "algo.organizational_mining.roles.common",
+    "algo.organizational_mining.sna",
     "algo.simulation.tree_generator",
     "algo.simulation.playout.process_tree",
     "algo.simulation.playout.dfg",
@@ -610,24 +616,27 @@
       "variants": [
         "default"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/local_diagnostics.hpp", "src/backend/local_diagnostics.cpp", "src/backend/request_params.cpp", "src/backend/tools/minera_export.cpp", "src/backend/tools/minera_server.cpp", "src/backend/tests/test_local_diagnostics.cpp", "src/frontend/src/api.ts", "src/frontend/src/types.ts", "src/frontend/tests/api.test.ts", "src/frontend/tests/types.test.ts"]
     },
     {
       "package": "algo.organizational_mining.network_analysis",
       "variants": [
         "DATAFRAME"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/network_analysis.hpp", "src/backend/network_analysis.cpp", "src/backend/json_export.cpp", "src/backend/request_params.cpp", "src/backend/tools/minera_export.cpp", "src/backend/tools/minera_server.cpp", "src/backend/tests/test_network_analysis.cpp", "src/frontend/src/api.ts", "src/frontend/src/types.ts", "src/frontend/tests/api.test.ts", "src/frontend/tests/types.test.ts"]
     },
     {
       "package": "algo.organizational_mining.resource_profiles",
       "variants": [
         "default"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/resource_profiles.hpp", "src/backend/resource_profiles.cpp", "src/backend/request_params.cpp", "src/backend/tools/minera_export.cpp", "src/backend/tools/minera_server.cpp", "src/backend/tests/test_resource_profiles.cpp", "src/frontend/src/api.ts", "src/frontend/src/types.ts", "src/frontend/tests/api.test.ts", "src/frontend/tests/types.test.ts"]
     },
     {
       "package": "algo.organizational_mining.roles",
@@ -635,16 +644,18 @@
         "LOG",
         "PANDAS"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/role_discovery.hpp", "src/backend/role_discovery.cpp", "src/backend/json_export.cpp", "src/backend/request_params.cpp", "src/backend/tools/minera_export.cpp", "src/backend/tools/minera_server.cpp", "src/backend/tests/test_role_discovery.cpp", "src/frontend/src/api.ts", "src/frontend/src/types.ts", "src/frontend/tests/api.test.ts", "src/frontend/tests/types.test.ts"]
     },
     {
       "package": "algo.organizational_mining.roles.common",
       "variants": [
         "default"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/role_discovery.hpp", "src/backend/role_discovery.cpp", "src/backend/tests/test_role_discovery.cpp"]
     },
     {
       "package": "algo.organizational_mining.sna",
@@ -658,8 +669,9 @@
         "SUBCONTRACTING_PANDAS",
         "JOINTACTIVITIES_PANDAS"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": ["include/minera/organizational_mining.hpp", "src/backend/organizational_mining.cpp", "src/backend/json_export.cpp", "src/backend/request_params.cpp", "src/backend/tools/minera_export.cpp", "src/backend/tools/minera_server.cpp", "src/backend/tests/test_organizational_mining.cpp", "src/frontend/src/api.ts", "src/frontend/src/types.ts", "src/frontend/tests/api.test.ts", "src/frontend/tests/types.test.ts"]
     },
     {
       "package": "algo.querying.llm.injection",
