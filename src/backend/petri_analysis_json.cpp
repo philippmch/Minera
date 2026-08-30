@@ -182,6 +182,42 @@ std::string workflow(const WorkflowNetResult& result) {
   return out.str();
 }
 
+void validate_workflow_result(const WorkflowNetResult& result) {
+  const auto sorted_unique = [](const auto& values) {
+    return std::is_sorted(values.begin(), values.end()) &&
+           std::adjacent_find(values.begin(), values.end()) == values.end();
+  };
+  if (!sorted_unique(result.source_candidates) ||
+      !sorted_unique(result.sink_candidates) ||
+      !sorted_unique(result.offending_places) ||
+      !sorted_unique(result.offending_transitions) ||
+      !sorted_unique(result.unreachable_places) ||
+      !sorted_unique(result.unreachable_transitions))
+    throw std::invalid_argument(
+        "workflow-net diagnostics must be sorted and unique");
+  if (result.valid &&
+      (result.source_candidates.size() != 1 ||
+       result.sink_candidates.size() != 1 || !result.offending_places.empty() ||
+       !result.offending_transitions.empty() ||
+       !result.unreachable_places.empty() ||
+       !result.unreachable_transitions.empty() || !result.reason.empty()))
+    throw std::invalid_argument("valid workflow-net result is inconsistent");
+  if (!result.valid && result.reason.empty())
+    throw std::invalid_argument("invalid workflow-net result requires a reason");
+}
+
+void validate_soundness_result(const SoundnessResult& result) {
+  validate_workflow_result(result.workflow);
+  if (result.status == SoundnessStatus::SOUND &&
+      (!result.computed || result.exhausted || !result.workflow.valid ||
+       !result.bounded || !result.final_reachable ||
+       !result.option_to_complete || !result.proper_completion ||
+       !result.dead_tasks.empty()))
+    throw std::invalid_argument("sound result is internally inconsistent");
+  if (result.returned_asap && !result.computed)
+    throw std::invalid_argument("early soundness result must be computed");
+}
+
 }  // namespace
 
 std::string petri_analysis_json(const MarkingEquationResult& result) {
@@ -228,11 +264,13 @@ std::string petri_analysis_json(const ExtendedMarkingEquationResult& result) {
 }
 
 std::string petri_analysis_json(const WorkflowNetResult& result) {
+  validate_workflow_result(result);
   return "{\"family\":\"workflow_net\",\"result\":" +
          workflow(result) + '}';
 }
 
 std::string petri_analysis_json(const SoundnessResult& result) {
+  validate_soundness_result(result);
   std::ostringstream out;
   const char* family = result.variant == SoundnessVariant::kWoflan
                            ? "woflan"
