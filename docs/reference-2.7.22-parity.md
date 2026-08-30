@@ -1169,6 +1169,14 @@ orders, subset rejection, silent branches emitted by tree export, nested
 structure, malformed mixed-arity gateways, final-marking reachability, and
 alignment fitness after a BPMN round trip.
 
+Interrupting boundary events attached to tasks, call activities, and collapsed
+subprocesses are translated as alternatives to normal activity completion.
+Multiple attached events compete for the same active token, so normal and
+interruption paths are mutually exclusive. Non-interrupting boundary events and
+events attached to expanded subprocesses are rejected explicitly rather than
+approximated. Regressions cover atomic and collapsed activities, multiple
+boundary alternatives, invalid references, and unsupported forms.
+
 ## POWL parity evidence
 
 The POWL review is pinned to commit
