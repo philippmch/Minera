@@ -1797,6 +1797,8 @@ export type OcelInteractionGraphSource = "event_cooccurrence" | "event_and_o2o";
 export interface OcelFeatureResult {
   family: "OCEL_FEATURES";
   variant: OcelFeatureVariant;
+  row_count: number;
+  feature_count: number;
   row_ids: string[];
   row_types?: string[];
   feature_names: string[];
@@ -1805,6 +1807,8 @@ export interface OcelFeatureResult {
 export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_FEATURES" ||
       !["EVENTS", "OBJECTS", "EVENTS_OBJECTS"].includes(String(value.variant)) ||
+      !isNonNegativeSafeInteger(value.row_count) ||
+      !isNonNegativeSafeInteger(value.feature_count) ||
       !Array.isArray(value.row_ids) || !value.row_ids.every((id) => typeof id === "string") ||
       !Array.isArray(value.feature_names) ||
       !value.feature_names.every((name) => typeof name === "string") ||
@@ -1812,6 +1816,11 @@ export function isOcelFeatureResult(value: unknown): value is OcelFeatureResult 
   const rowIds = value.row_ids;
   const featureNames = value.feature_names;
   const values = value.values;
+  if (value.row_count !== rowIds.length ||
+      value.feature_count !== featureNames.length ||
+      new Set(rowIds).size !== rowIds.length || rowIds.some((id) => id.length === 0) ||
+      new Set(featureNames).size !== featureNames.length ||
+      featureNames.some((name) => name.length === 0)) return false;
   if (value.row_types !== undefined &&
       (!Array.isArray(value.row_types) ||
        !value.row_types.every((type) => typeof type === "string") ||

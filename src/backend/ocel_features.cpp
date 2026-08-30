@@ -41,13 +41,13 @@ struct Lifecycle {
   std::optional<double> end;
 };
 
-const char* variant_name(OcelFeatureVariant variant) noexcept {
+const char* variant_name(OcelFeatureVariant variant) {
   switch (variant) {
     case OcelFeatureVariant::kEvents: return "EVENTS";
     case OcelFeatureVariant::kObjects: return "OBJECTS";
     case OcelFeatureVariant::kEventsObjects: return "EVENTS_OBJECTS";
   }
-  return "EVENTS";
+  throw std::invalid_argument("OCEL feature variant is invalid");
 }
 
 void json_string(std::ostringstream& out, std::string_view value) {
@@ -969,7 +969,7 @@ void add_prefix_columns(
 
 }  // namespace
 
-const char* ocel_feature_variant_name(OcelFeatureVariant variant) noexcept {
+const char* ocel_feature_variant_name(OcelFeatureVariant variant) {
   return variant_name(variant);
 }
 
@@ -1199,15 +1199,31 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
 }
 
 std::string serialize_ocel_features_json(const OcelFeatureTable& table) {
+  (void)variant_name(table.variant);
   if (table.row_ids.size() != table.values.size() ||
       (!table.row_types.empty() && table.row_types.size() != table.row_ids.size()))
     throw std::invalid_argument("OCEL feature table row metadata is inconsistent");
-  for (const auto& row : table.values)
+  std::set<std::string> row_ids;
+  for (const auto& row_id : table.row_ids)
+    if (row_id.empty() || !row_ids.insert(row_id).second)
+      throw std::invalid_argument("OCEL feature table row ids must be unique and non-empty");
+  std::set<std::string> feature_names;
+  for (const auto& feature_name : table.feature_names)
+    if (feature_name.empty() || !feature_names.insert(feature_name).second)
+      throw std::invalid_argument(
+          "OCEL feature table names must be unique and non-empty");
+  for (const auto& row : table.values) {
     if (row.size() != table.feature_names.size())
       throw std::invalid_argument("OCEL feature table columns are inconsistent");
+    if (std::any_of(row.begin(), row.end(),
+                    [](double value) { return !std::isfinite(value); }))
+      throw std::invalid_argument("OCEL feature table values must be finite");
+  }
   std::ostringstream out;
   out << "{\"family\":\"OCEL_FEATURES\",\"variant\":\""
-      << variant_name(table.variant) << "\",\"row_ids\":[";
+      << variant_name(table.variant) << "\",\"row_count\":"
+      << table.row_ids.size() << ",\"feature_count\":"
+      << table.feature_names.size() << ",\"row_ids\":[";
   for (std::size_t i = 0; i < table.row_ids.size(); ++i) {
     if (i) out << ',';
     json_string(out, table.row_ids[i]);

@@ -2354,7 +2354,7 @@ describe("OCEL API", () => {
     vi.stubGlobal("fetch", vi.fn(async (_path: string, init: RequestInit) => {
       expect(init.body).toBeInstanceOf(FormData);
       return { ok: true, json: async () => ({
-        family: "OCEL_FEATURES", variant: "EVENTS", row_ids: ["e1"],
+        family: "OCEL_FEATURES", variant: "EVENTS", row_count: 1, feature_count: 1, row_ids: ["e1"],
         feature_names: ["@@event_num_rel_objs"], values: [[1]],
       }) };
     }));

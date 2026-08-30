@@ -431,12 +431,16 @@ describe("isOcelExchangeResult", () => {
 describe("isOcelFeatureResult", () => {
   const valid = {
     family: "OCEL_FEATURES", variant: "OBJECTS", row_ids: ["o1"],
+    row_count: 1, feature_count: 1,
     row_types: ["order"], feature_names: ["@@object_lifecycle_length"], values: [[2]],
   };
   it("accepts rectangular numeric feature tables", () => expect(isOcelFeatureResult(valid)).toBe(true));
   it("rejects ragged and non-finite tables", () => {
     expect(isOcelFeatureResult({ ...valid, values: [[]] })).toBe(false);
     expect(isOcelFeatureResult({ ...valid, values: [[Number.NaN]] })).toBe(false);
+    expect(isOcelFeatureResult({ ...valid, row_count: 2 })).toBe(false);
+    expect(isOcelFeatureResult({ ...valid, feature_count: 2 })).toBe(false);
+    expect(isOcelFeatureResult({ ...valid, row_ids: [""] })).toBe(false);
   });
 });
 
