@@ -3337,6 +3337,69 @@ void timestamp_interleavings_params_contract() {
   }
 }
 
+void log_conversion_params_contract() {
+  const auto parsed = minera::parse_log_conversion_params(fields({
+      {"log_conversion_variant", "TO_NX"},
+      {"log_conversion_include_case_attributes", "false"},
+      {"log_conversion_case_attribute_prefix", "case_"},
+      {"log_conversion_case_id_key", "case:id"},
+      {"log_conversion_graph_case_id_attribute", "case_id"},
+      {"log_conversion_include_df", "0"},
+      {"log_conversion_return_variants", "1"},
+      {"log_conversion_max_variants_to_return", "56"},
+      {"log_conversion_max_graph_nodes", "12"},
+      {"log_conversion_max_graph_edges", "34"},
+      {"log_conversion_case_attributes_as_nodes", "region,customer\\,id"},
+      {"log_conversion_event_attributes_as_nodes", "resource\\\\name"}}));
+  assert(parsed.variant == minera::LogConversionVariant::kToAttributedGraph);
+  assert(!parsed.include_case_attributes);
+  assert(parsed.case_attribute_prefix == "case_");
+  assert(parsed.case_id_key == "case:id");
+  assert(parsed.graph_case_id_attribute == "case_id");
+  assert(!parsed.include_directly_follows);
+  assert(parsed.return_variants);
+  assert(parsed.max_variants_to_return &&
+         *parsed.max_variants_to_return == 56);
+  assert(parsed.max_graph_nodes == 12 && parsed.max_graph_edges == 34);
+  assert((parsed.case_attributes_as_nodes ==
+          std::vector<std::string>{"region", "customer,id"}));
+  assert((parsed.event_attributes_as_nodes ==
+          std::vector<std::string>{"resource\\name"}));
+
+  // A presence callback preserves the distinction between an omitted field
+  // and a meaningful explicitly empty prefix.
+  const std::map<std::string, std::string> values = {
+      {"log_conversion_case_attribute_prefix", ""}};
+  const auto lookup = fields(values);
+  const minera::FieldPresence present = [](std::string_view name) {
+    return name == "log_conversion_case_attribute_prefix";
+  };
+  assert(minera::parse_log_conversion_params(lookup, present)
+             .case_attribute_prefix.empty());
+  const auto unlimited = minera::parse_log_conversion_params(fields({
+      {"log_conversion_max_variants_to_return", "0"}}));
+  assert(unlimited.max_variants_to_return &&
+         *unlimited.max_variants_to_return == 0);
+
+  for (const auto& item : {
+           std::pair{"log_conversion_variant", "bad"},
+           std::pair{"log_conversion_include_df", "yes"},
+           std::pair{"log_conversion_max_graph_nodes", "0"},
+           std::pair{"log_conversion_max_graph_edges", "NaN"},
+           std::pair{"log_conversion_max_variants_to_return", "-1"},
+           std::pair{"log_conversion_case_id_key", "   "},
+           std::pair{"log_conversion_case_attributes_as_nodes", "a,,b"},
+           std::pair{"log_conversion_event_attributes_as_nodes", "a\\q"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_log_conversion_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -3451,5 +3514,6 @@ int main() {
   attribute_kde_params_contract();
   boundary_activities_params_contract();
   variant_statistics_params_contract();
+  log_conversion_params_contract();
   return 0;
 }

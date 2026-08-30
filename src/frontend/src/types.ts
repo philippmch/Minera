@@ -665,6 +665,119 @@ export function isLogToFeaturesResult(value: unknown): value is LogToFeaturesRes
   return Array.isArray(c.temporal_rows) && c.temporal_rows.every((r) => !!r && typeof r === "object" && typeof (r as LogToFeaturesTemporalRow).timestamp === "number" && Number.isFinite((r as LogToFeaturesTemporalRow).timestamp) && rows((r as LogToFeaturesTemporalRow).values));
 }
 
+export type LogConversionVariant =
+  | "TO_EVENT_LOG"
+  | "TO_EVENT_STREAM"
+  | "TO_DATA_FRAME"
+  | "TO_NX"
+  | "DF_TO_EVENT_LOG_1V"
+  | "DF_TO_EVENT_LOG_NV";
+export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id";
+export interface LogConversionAttribute { key: string; value: string; kind: LogConversionAttributeKind; }
+export interface LogConversionEvent {
+  case_id: string;
+  activity: string;
+  timestamp: string;
+  resource: string;
+  lifecycle: string;
+  input_order: number;
+  attributes: LogConversionAttribute[];
+}
+export interface LogConversionTrace { case_id: string; attributes: LogConversionAttribute[]; events: LogConversionEvent[]; }
+export interface LogConversionLog { attributes: LogConversionAttribute[]; traces: LogConversionTrace[]; }
+export interface LogConversionStreamRecord { fields: LogConversionAttribute[]; }
+export interface LogConversionStream { attributes: LogConversionAttribute[]; events: LogConversionStreamRecord[]; }
+export interface LogConversionTableCell { value: string; kind: LogConversionAttributeKind; }
+export interface LogConversionTable { columns: string[]; rows: (LogConversionTableCell | null)[][]; }
+export type LogConversionGraphNodeType = "CASE" | "EVENT" | "ATTRIBUTE_NODE";
+export type LogConversionGraphEdgeType = "BELONGS_TO" | "DF" | "ATTRIBUTE_EDGE";
+export interface LogConversionGraphNode {
+  id: string;
+  type: LogConversionGraphNodeType;
+  attributes: LogConversionAttribute[];
+}
+export interface LogConversionGraphEdge {
+  source: number;
+  target: number;
+  type: LogConversionGraphEdgeType;
+  name?: string;
+}
+export interface LogConversionGraph { nodes: LogConversionGraphNode[]; edges: LogConversionGraphEdge[]; }
+export interface LogConversionVariantProjection { activities: string[]; count: number; trace_indexes: number[]; }
+interface LogConversionResultBase {
+  family: "LOG_CONVERSION";
+  variant: LogConversionVariant;
+  variants?: LogConversionVariantProjection[];
+}
+export type LogConversionResult =
+  | (LogConversionResultBase & { variant: "TO_EVENT_LOG" | "DF_TO_EVENT_LOG_1V" | "DF_TO_EVENT_LOG_NV"; log: LogConversionLog })
+  | (LogConversionResultBase & { variant: "TO_EVENT_STREAM"; stream: LogConversionStream })
+  | (LogConversionResultBase & { variant: "TO_DATA_FRAME"; table: LogConversionTable })
+  | (LogConversionResultBase & { variant: "TO_NX"; graph: LogConversionGraph });
+
+function isLogConversionAttribute(value: unknown): value is LogConversionAttribute {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LogConversionAttribute>;
+  return typeof candidate.key === "string" && typeof candidate.value === "string"
+    && (["string", "date", "int", "float", "boolean", "id"] as const)
+      .includes(candidate.kind as LogConversionAttributeKind);
+}
+function isLogConversionLog(value: unknown): value is LogConversionLog {
+  if (!value || typeof value !== "object") return false;
+  const log = value as Partial<LogConversionLog>;
+  return Array.isArray(log.attributes) && log.attributes.every(isLogConversionAttribute)
+    && Array.isArray(log.traces) && log.traces.every((trace) => !!trace && typeof trace === "object"
+      && typeof trace.case_id === "string"
+      && Array.isArray(trace.attributes) && trace.attributes.every(isLogConversionAttribute)
+      && Array.isArray(trace.events) && trace.events.every((event) => !!event && typeof event === "object"
+        && typeof event.case_id === "string" && typeof event.activity === "string"
+        && typeof event.timestamp === "string" && typeof event.resource === "string"
+        && typeof event.lifecycle === "string" && Number.isSafeInteger(event.input_order) && event.input_order >= 0
+        && Array.isArray(event.attributes) && event.attributes.every(isLogConversionAttribute)));
+}
+function isLogConversionVariants(value: unknown): value is LogConversionVariantProjection[] {
+  return Array.isArray(value) && value.every((variant) => !!variant && typeof variant === "object"
+    && Array.isArray(variant.activities) && variant.activities.every((activity: unknown) => typeof activity === "string")
+    && Number.isSafeInteger(variant.count) && variant.count >= 0
+    && Array.isArray(variant.trace_indexes)
+    && variant.trace_indexes.every((index: unknown) => Number.isSafeInteger(index) && (index as number) >= 0));
+}
+export function isLogConversionResult(value: unknown): value is LogConversionResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LogConversionResult> & Record<string, unknown>;
+  if (candidate.family !== "LOG_CONVERSION"
+      || !(["TO_EVENT_LOG", "TO_EVENT_STREAM", "TO_DATA_FRAME", "TO_NX", "DF_TO_EVENT_LOG_1V", "DF_TO_EVENT_LOG_NV"] as const)
+        .includes(candidate.variant as LogConversionVariant)
+      || (candidate.variants !== undefined && !isLogConversionVariants(candidate.variants))) return false;
+  if (candidate.variant === "TO_EVENT_LOG" || candidate.variant === "DF_TO_EVENT_LOG_1V" || candidate.variant === "DF_TO_EVENT_LOG_NV")
+    return isLogConversionLog(candidate.log);
+  if (candidate.variant === "TO_EVENT_STREAM") {
+    const stream = candidate.stream as Partial<LogConversionStream> | undefined;
+    return !!stream && Array.isArray(stream.attributes) && stream.attributes.every(isLogConversionAttribute)
+      && Array.isArray(stream.events) && stream.events.every((event) => !!event && typeof event === "object"
+        && Array.isArray(event.fields) && event.fields.every(isLogConversionAttribute));
+  }
+  if (candidate.variant === "TO_DATA_FRAME") {
+    const table = candidate.table as Partial<LogConversionTable> | undefined;
+    return !!table && Array.isArray(table.columns) && table.columns.every((column) => typeof column === "string")
+      && Array.isArray(table.rows) && table.rows.every((row) => Array.isArray(row) && row.length === table.columns!.length
+        && row.every((cell) => cell === null || (!!cell && typeof cell === "object"
+          && typeof cell.value === "string"
+          && (["string", "date", "int", "float", "boolean", "id"] as const)
+            .includes(cell.kind as LogConversionAttributeKind))));
+  }
+  const graph = candidate.graph as Partial<LogConversionGraph> | undefined;
+  if (!graph || !Array.isArray(graph.nodes) || !graph.nodes.every((node) => !!node && typeof node === "object"
+      && typeof node.id === "string" && (["CASE", "EVENT", "ATTRIBUTE_NODE"] as const).includes(node.type as LogConversionGraphNodeType)
+      && Array.isArray(node.attributes) && node.attributes.every(isLogConversionAttribute))
+      || !Array.isArray(graph.edges)) return false;
+  return graph.edges.every((edge) => !!edge && typeof edge === "object"
+    && Number.isSafeInteger(edge.source) && edge.source >= 0 && edge.source < graph.nodes!.length
+    && Number.isSafeInteger(edge.target) && edge.target >= 0 && edge.target < graph.nodes!.length
+    && (["BELONGS_TO", "DF", "ATTRIBUTE_EDGE"] as const).includes(edge.type as LogConversionGraphEdgeType)
+    && (edge.name === undefined || typeof edge.name === "string"));
+}
+
 export type LogUtilityVariant = "SPLIT_TRAIN_TEST" | "FIXED_PREFIXES" | "ALL_PREFIXES" | "UNTIL_ACTIVITY" | "TO_ACTIVITIES" | "FEATURE_SELECTION";
 export interface LogUtilityAttribute { key: string; value: string; kind: string; }
 export interface LogUtilityEvent {
