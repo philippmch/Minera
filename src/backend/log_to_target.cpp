@@ -67,6 +67,8 @@ LogToTargetResult log_to_target(const EventLog& log,
 
   LogToTargetResult result;
   result.variant = options.variant;
+  result.trace_count = log.traces.size();
+  result.padded = options.enable_padding;
   if (options.variant == LogToTargetVariant::NEXT_ACTIVITY) {
     if (!options.activities.empty()) {
       result.classes = options.activities;
@@ -82,6 +84,9 @@ LogToTargetResult log_to_target(const EventLog& log,
           result.classes.end());
     }
   }
+  result.target_width = options.variant == LogToTargetVariant::NEXT_ACTIVITY
+                            ? result.classes.size()
+                            : 1;
   if (log.traces.empty()) return result;
 
   std::unordered_map<std::string, std::size_t> class_index;

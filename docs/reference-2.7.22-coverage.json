@@ -8,7 +8,8 @@
     "algo.simulation.playout.process_tree",
     "algo.simulation.playout.dfg",
     "algo.simulation.playout.declare",
-    "algo.simulation.playout.petri_net"
+    "algo.simulation.playout.petri_net",
+    "algo.transformation.log_to_target"
   ],
   "packages": [
     {
@@ -773,8 +774,21 @@
         "NEXT_TIME",
         "REMAINING_TIME"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_target.hpp",
+        "src/backend/log_to_target.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_log_to_target.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts"
+      ]
     },
     {
       "package": "algo.transformation.log_to_trie",

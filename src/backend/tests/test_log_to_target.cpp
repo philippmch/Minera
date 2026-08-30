@@ -30,6 +30,8 @@ void next_activity() {
   const auto result = minera::log_to_target(sample());
   assert((result.classes == std::vector<std::string>{"A", "B", "C"}));
   assert(result.rows.size() == 2);
+  assert(result.trace_count == 2 && result.target_width == 3);
+  assert(!result.padded);
   assert(result.rows[0].size() == 3);
   assert(result.rows[0][0][0] == 1.0 && result.rows[0][0][1] == 0.0);
   assert(result.rows[0][1][2] == 1.0);
@@ -58,6 +60,7 @@ void options_and_errors() {
   const auto result = minera::log_to_target(sample(), options);
   assert((result.classes == std::vector<std::string>{"C", "A"}));
   assert(result.rows[0].size() == 4 && result.rows[1].size() == 4);
+  assert(result.padded && result.trace_count == 2 && result.target_width == 2);
 
   bool threw = false;
   try {
@@ -136,9 +139,22 @@ void json_shape() {
   const auto json = minera::log_to_target_json(result);
   assert(json.find("\"family\":\"LOG_TO_TARGET\"") != std::string::npos);
   assert(json.find("\"variant\":\"next_activity\"") != std::string::npos);
+  assert(json.find("\"trace_count\":2") != std::string::npos);
+  assert(json.find("\"target_width\":3") != std::string::npos);
+  assert(json.find("\"padded\":false") != std::string::npos);
   assert(json.find("\"classes\":[\"A\",\"B\",\"C\"]") !=
          std::string::npos);
   assert(json.find("\"rows\":[") != std::string::npos);
+
+  auto invalid = result;
+  invalid.variant = static_cast<minera::LogToTargetVariant>(99);
+  bool threw = false;
+  try {
+    (void)minera::log_to_target_json(invalid);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 }  // namespace

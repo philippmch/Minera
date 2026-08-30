@@ -4206,12 +4206,15 @@ std::string log_to_target_json(const LogToTargetResult& result) {
       case LogToTargetVariant::NEXT_TIME: return "next_time";
       case LogToTargetVariant::REMAINING_TIME: return "remaining_time";
     }
-    return "next_activity";
+    throw std::invalid_argument("log-to-target result has an unknown variant");
   };
   std::ostringstream out;
   out << "{\"family\":\"LOG_TO_TARGET\",\"variant\":";
   write_json_string(out, variant_name());
-  out << ",\"classes\":[";
+  out << ",\"trace_count\":" << result.trace_count
+      << ",\"target_width\":" << result.target_width
+      << ",\"padded\":" << (result.padded ? "true" : "false")
+      << ",\"classes\":[";
   for (std::size_t i = 0; i < result.classes.size(); ++i) {
     if (i) out << ',';
     write_json_string(out, result.classes[i]);
