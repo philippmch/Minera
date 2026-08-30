@@ -1,0 +1,763 @@
+{
+  "target": {
+    "tag": "2.7.22",
+    "commit": "0715c31f3f1d85924107d6aa5329806db69df899"
+  },
+  "packages": [
+    {
+      "package": "algo.analysis.extended_marking_equation",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.analysis.marking_equation",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.analysis.woflan",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.analysis.workflow_net",
+      "variants": [
+        "PETRI_NET"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.anonymization.pripel",
+      "variants": [
+        "PRIPEL"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.anonymization.trace_variant_query",
+      "variants": [
+        "LAPLACE",
+        "SACOFA"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.clustering.profiles",
+      "variants": [
+        "SKLEARN_PROFILES"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.clustering.trace_attribute_driven",
+      "variants": [
+        "VARIANT_DMM_LEVEN",
+        "VARIANT_AVG_LEVEN",
+        "VARIANT_DMM_VEC",
+        "VARIANT_AVG_VEC",
+        "DFG"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.concept_drift",
+      "variants": [
+        "BOSE"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.alignments.decomposed",
+      "variants": [
+        "RECOMPOS_MAXIMAL"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.alignments.dfg",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.alignments.edit_distance",
+      "variants": [
+        "EDIT_DISTANCE"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.alignments.petri_net",
+      "variants": [
+        "VERSION_STATE_EQUATION_A_STAR",
+        "VERSION_DIJKSTRA_NO_HEURISTICS",
+        "VERSION_DIJKSTRA_LESS_MEMORY",
+        "VERSION_DISCOUNTED_A_STAR"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.alignments.process_tree",
+      "variants": [
+        "APPROXIMATED_ORIGINAL",
+        "SEARCH_GRAPH_PT",
+        "DYNAMIC_PROGRAMMING",
+        "MILP"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.antialignments",
+      "variants": [
+        "VERSION_DISCOUNTED_A_STAR"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.declare",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.footprints",
+      "variants": [
+        "LOG_MODEL",
+        "LOG_EXTENSIVE",
+        "TRACE_EXTENSIVE"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.log_skeleton",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.multialignments",
+      "variants": [
+        "VERSION_DISCOUNTED_A_STAR"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.ocel.etot",
+      "variants": [
+        "GRAPH_COMPARISON"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.ocel.ocdfg",
+      "variants": [
+        "GRAPH_COMPARISON"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.ocel.otg",
+      "variants": [
+        "GRAPH_COMPARISON"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.temporal_profile",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.conformance.tokenreplay",
+      "variants": [
+        "TOKEN_REPLAY",
+        "BACKWARDS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.connectors",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.decision_mining",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.alpha",
+      "variants": [
+        "ALPHA_VERSION_CLASSIC",
+        "ALPHA_VERSION_PLUS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.batches",
+      "variants": [
+        "LOG",
+        "PANDAS",
+        "POLARS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.causal",
+      "variants": [
+        "CAUSAL_ALPHA",
+        "CAUSAL_HEURISTIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.correlation_mining",
+      "variants": [
+        "CLASSIC_SPLIT",
+        "CLASSIC",
+        "TRACE_BASED"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.declare",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.dfg",
+      "variants": [
+        "NATIVE",
+        "FREQUENCY",
+        "PERFORMANCE",
+        "FREQUENCY_GREEDY",
+        "PERFORMANCE_GREEDY",
+        "FREQ_TRIPLES",
+        "CASE_ATTRIBUTES",
+        "CLEAN"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.footprints",
+      "variants": [
+        "ENTIRE_EVENT_LOG",
+        "ENTIRE_DATAFRAME",
+        "TRACE_BY_TRACE",
+        "PETRI_REACH_GRAPH",
+        "PROCESS_TREE",
+        "POWL",
+        "DFG",
+        "POLARS_LAZYFRAMES"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.genetic",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.heuristics",
+      "variants": [
+        "CLASSIC",
+        "PLUSPLUS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ilp",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.inductive",
+      "variants": [
+        "IM"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.log_skeleton",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.minimum_self_distance",
+      "variants": [
+        "LOG",
+        "PANDAS",
+        "POLARS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.etot",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.interleavings",
+      "variants": [
+        "TIMESTAMP_INTERLEAVINGS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.link_analysis",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.ocdfg",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.ocpn",
+      "variants": [
+        "WO_ANNOTATION",
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.otg",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.ocel.saw_nets",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.performance_spectrum",
+      "variants": [
+        "DATAFRAME",
+        "LOG",
+        "DATAFRAME_DISCONNECTED",
+        "LOG_DISCONNECTED"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.powl",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.temporal_profile",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.discovery.transition_system",
+      "variants": [
+        "VIEW_BASED"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.earth_mover_distance",
+      "variants": [
+        "PYEMD"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.generalization",
+      "variants": [
+        "GENERALIZATION_TOKEN"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.precision",
+      "variants": [
+        "ETCONFORMANCE_TOKEN",
+        "ALIGN_ETCONFORMANCE",
+        "AUTOMATON_AFTER_ALIGN"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.precision.dfg",
+      "variants": [
+        "default"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.replay_fitness",
+      "variants": [
+        "ALIGNMENT_BASED",
+        "TOKEN_BASED"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.evaluation.simplicity",
+      "variants": [
+        "SIMPLICITY_ARC_DEGREE",
+        "EXTENDED_CARDOSO",
+        "EXTENDED_CYCLOMATIC"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.label_splitting",
+      "variants": [
+        "CONTEXTUAL"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.merging.case_relations",
+      "variants": [
+        "PANDAS"
+      ],
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.local_diagnostics",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.network_analysis",
+      "variants": [
+        "DATAFRAME"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.resource_profiles",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.roles",
+      "variants": [
+        "LOG",
+        "PANDAS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.roles.common",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.organizational_mining.sna",
+      "variants": [
+        "HANDOVER_LOG",
+        "WORKING_TOGETHER_LOG",
+        "SUBCONTRACTING_LOG",
+        "JOINTACTIVITIES_LOG",
+        "HANDOVER_PANDAS",
+        "WORKING_TOGETHER_PANDAS",
+        "SUBCONTRACTING_PANDAS",
+        "JOINTACTIVITIES_PANDAS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.querying.llm.injection",
+      "variants": [
+        "default"
+      ],
+      "status": "missing",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.querying.llm.injection.db_knowledge",
+      "variants": [
+        "default"
+      ],
+      "status": "missing",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.querying.llm.injection.pm_knowledge",
+      "variants": [
+        "default"
+      ],
+      "status": "missing",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.montecarlo",
+      "variants": [
+        "PETRI_SEMAPH_FIFO"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.declare",
+      "variants": [
+        "CLASSIC"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.dfg",
+      "variants": [
+        "CLASSIC",
+        "PERFORMANCE"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.oc_causal_net",
+      "variants": [
+        "EXTENSIVE"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.ocpn",
+      "variants": [
+        "EXTENSIVE"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.petri_net",
+      "variants": [
+        "BASIC_PLAYOUT",
+        "STOCHASTIC_PLAYOUT",
+        "EXTENSIVE"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.playout.process_tree",
+      "variants": [
+        "BASIC_PLAYOUT",
+        "EXTENSIVE",
+        "TOPBOTTOM"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.simulation.tree_generator",
+      "variants": [
+        "BASIC",
+        "PTANDLOGGENERATOR"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.log_to_features",
+      "variants": [
+        "EVENT_BASED",
+        "TRACE_BASED",
+        "TEMPORAL"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.log_to_interval_tree",
+      "variants": [
+        "OPEN_PATHS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.log_to_target",
+      "variants": [
+        "NEXT_ACTIVITY",
+        "NEXT_TIME",
+        "REMAINING_TIME"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.log_to_trie",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.ocel.description",
+      "variants": [
+        "VARIANT1",
+        "VARIANT2"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.ocel.features.events",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.ocel.features.events_objects",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.ocel.features.objects",
+      "variants": [
+        "default"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.ocel.split_ocel",
+      "variants": [
+        "CONNECTED_COMPONENTS",
+        "ANCESTORS_DESCENDANTS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    },
+    {
+      "package": "algo.transformation.to_embeddings",
+      "variants": [
+        "CASES_TRANSFORMERS",
+        "EVENTS_TRANSFORMERS"
+      ],
+      "status": "partial",
+      "evidence": "docs/reference-2.7.22-parity.md"
+    }
+  ]
+}

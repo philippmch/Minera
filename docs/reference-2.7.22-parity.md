@@ -16,6 +16,19 @@ Run the reproducible catalogue audit against an exact checkout:
 node scripts/audit-reference-catalog.mjs C:\path\to\reference-2.7.22
 ```
 
+The checked-in package/selector mapping is
+`docs/reference-2.7.22-coverage.json`. Verify that it still covers the exact
+pinned catalogue with:
+
+```powershell
+node scripts/verify-reference-parity.mjs C:\path\to\reference-2.7.22
+```
+
+The verifier rejects target drift, missing or stale packages, selector-list
+drift, invalid statuses, and missing evidence files. A successful mapping is a
+coverage precondition, not proof that packages marked partial or missing are
+complete.
+
 At the pinned tag the source catalogue contains 18 algorithm domains, 86
 `algorithm.py` packages, 182 implementation files under `variants` trees, 779
 Python files under `algo`, 348 under `objects`, 156 under `statistics`,
