@@ -109,6 +109,7 @@
 #include "minera/windows_event_log.hpp"
 #include "minera/repository_history.hpp"
 #include "minera/workflow_history.hpp"
+#include "minera/enterprise_history.hpp"
 #include "repository_history_runtime.hpp"
 #include "embedding_runtime.hpp"
 
@@ -681,6 +682,8 @@ int usage(const char* program) {
                "  --repository-max-pages|issues|events <n> Positive safety bounds\n"
                "  --workflow-history       Import a normalized workflow-history CSV\n"
                "  --workflow-max-events <n> Positive import bound\n"
+               "  --enterprise-history <order_to_cash|accounting> Import normalized enterprise CSV\n"
+               "  --enterprise-max-events <n> Positive import bound\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1451,6 +1454,8 @@ int main(int argc, char** argv) {
   std::string repository_auth_token_env;
   bool workflow_history_requested = false;
   std::map<std::string, std::string> workflow_history_fields;
+  bool enterprise_history_requested = false;
+  std::map<std::string, std::string> enterprise_history_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2605,6 +2610,16 @@ int main(int argc, char** argv) {
       const auto* value = next(); if (!value) return usage(argv[0]);
       workflow_history_fields["workflow_max_events"] = value;
       workflow_history_requested = true; continue;
+    }
+    if (arg == "--enterprise-history") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      enterprise_history_fields["enterprise_variant"] = value;
+      enterprise_history_requested = true; continue;
+    }
+    if (arg == "--enterprise-max-events") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      enterprise_history_fields["enterprise_max_events"] = value;
+      enterprise_history_requested = true; continue;
     }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
@@ -4980,6 +4995,20 @@ int main(int argc, char** argv) {
       const auto options = minera::parse_workflow_history_params(lookup);
       std::cout << minera::workflow_history_json(
                        minera::import_workflow_history_csv(csv, options))
+                << '\n';
+      return 0;
+    }
+    if (enterprise_history_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = enterprise_history_fields.find(std::string(name));
+        return it == enterprise_history_fields.end() ? std::string{} : it->second;
+      };
+      std::ifstream stream(input, std::ios::binary);
+      if (!stream) throw std::invalid_argument("enterprise history input does not exist");
+      const std::string csv((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+      const auto options = minera::parse_enterprise_history_params(lookup);
+      std::cout << minera::enterprise_history_json(
+                       minera::import_enterprise_history_csv(csv, options), options.variant)
                 << '\n';
       return 0;
     }

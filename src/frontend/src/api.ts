@@ -38,6 +38,8 @@ import {
   isRepositoryHistoryResult,
   type WorkflowHistoryResult,
   isWorkflowHistoryResult,
+  type EnterpriseHistoryResult,
+  isEnterpriseHistoryResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -4781,6 +4783,25 @@ export async function requestWorkflowHistory(
   const payload: unknown = await response.json();
   if (!isWorkflowHistoryResult(payload))
     throw new Error("the Minera backend returned invalid workflow history");
+  return payload;
+}
+export async function requestEnterpriseHistory(
+  csv: string, variant: "order_to_cash" | "accounting", maxEvents?: number,
+): Promise<EnterpriseHistoryResult> {
+  if (maxEvents !== undefined && (!Number.isSafeInteger(maxEvents) || maxEvents <= 0 || maxEvents > 10_000_000))
+    throw new Error("enterprise_max_events must be in [1,10000000]");
+  const query = new URLSearchParams({ enterprise_variant: variant });
+  if (maxEvents !== undefined) query.set("enterprise_max_events", String(maxEvents));
+  const response = await fetch(`/api/enterprise-history?${query}`, {
+    method: "POST", headers: { "Content-Type": "text/csv" }, body: csv,
+  });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isEnterpriseHistoryResult(payload)) throw new Error("the Minera backend returned invalid enterprise history");
   return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {
