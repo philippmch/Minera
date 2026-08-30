@@ -107,6 +107,8 @@
 #include "minera/xes_export.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/windows_event_log.hpp"
+#include "minera/repository_history.hpp"
+#include "repository_history_runtime.hpp"
 #include "embedding_runtime.hpp"
 
 namespace {
@@ -672,6 +674,10 @@ int usage(const char* program) {
                "  --browser-history-max-events <n> Positive import bound\n"
                "  --windows-events         Import an explicitly exported event XML file\n"
                "  --windows-events-max-events <n> Positive import bound\n"
+               "  --repository-history <owner/name> Import paginated issue history\n"
+               "  --repository-api-base-url <url> Override the repository API origin\n"
+               "  --repository-auth-token-env <name> Read bearer token from an environment variable\n"
+               "  --repository-max-pages|issues|events <n> Positive safety bounds\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1437,6 +1443,9 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> browser_history_fields;
   bool windows_events_requested = false;
   std::map<std::string, std::string> windows_events_fields;
+  bool repository_history_requested = false;
+  std::map<std::string, std::string> repository_history_fields;
+  std::string repository_auth_token_env;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2561,6 +2570,30 @@ int main(int argc, char** argv) {
       windows_events_fields.insert_or_assign("windows_events_max_events", value);
       windows_events_requested = true;
       continue;
+    }
+    if (arg == "--repository-history") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string selection(value);
+      const auto separator = selection.find('/');
+      if (separator == std::string::npos || separator == 0 || separator + 1 == selection.size())
+        return usage(argv[0]);
+      repository_history_fields["repository_owner"] = selection.substr(0, separator);
+      repository_history_fields["repository_name"] = selection.substr(separator + 1);
+      repository_history_requested = true;
+      continue;
+    }
+    if (arg == "--repository-auth-token-env") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      repository_auth_token_env = value; repository_history_requested = true; continue;
+    }
+    if (arg.rfind("--repository-", 0) == 0) {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {"repository_api_base_url", "repository_max_pages", "repository_max_issues", "repository_max_events"};
+      if (!names.contains(key)) return usage(argv[0]);
+      repository_history_fields.insert_or_assign(std::move(key), value);
+      repository_history_requested = true; continue;
     }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
@@ -4895,6 +4928,32 @@ int main(int argc, char** argv) {
           minera::parse_windows_event_log_params(lookup, present);
       std::cout << minera::windows_event_log_json(
                        minera::import_windows_event_log(event_options))
+                << '\n';
+      return 0;
+    }
+    if (repository_history_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = repository_history_fields.find(std::string(name));
+        return it == repository_history_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return repository_history_fields.contains(std::string(name));
+      };
+      auto repository_options =
+          minera::parse_repository_history_params(lookup, present);
+      if (!repository_auth_token_env.empty()) {
+        const auto* token = std::getenv(repository_auth_token_env.c_str());
+        if (!token)
+          throw std::invalid_argument("repository auth token environment variable is not set");
+        repository_options.auth_token = token;
+      }
+      repository_options.transport =
+          minera::tools::repository_history_http_transport();
+      const auto repository_log =
+          minera::import_repository_history(repository_options);
+      std::cout << minera::repository_history_json(
+                       repository_log, repository_options.owner,
+                       repository_options.repository)
                 << '\n';
       return 0;
     }

@@ -138,6 +138,7 @@ add_library(minera_core
   src/backend/ptml.cpp
   src/backend/request_params.cpp
   src/backend/rework.cpp
+  src/backend/repository_history.cpp
   src/backend/resource_analysis.cpp
   src/backend/resource_profiles.cpp
   src/backend/role_discovery.cpp
@@ -944,6 +945,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_windows_event_log_tests PRIVATE cxx_std_20)
   target_compile_options(minera_windows_event_log_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_windows_event_log_tests COMMAND minera_windows_event_log_tests)
+
+  add_executable(minera_repository_history_tests
+    src/backend/tests/test_repository_history.cpp
+  )
+  target_link_libraries(minera_repository_history_tests PRIVATE minera::core)
+  target_compile_features(minera_repository_history_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_repository_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_repository_history_tests COMMAND minera_repository_history_tests)
 
   add_executable(minera_alignment_variants_tests
     src/backend/tests/test_alignment_variants.cpp

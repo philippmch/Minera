@@ -3601,6 +3601,40 @@ WindowsEventLogParams parse_windows_event_log_params(
   return params;
 }
 
+RepositoryHistoryOptions parse_repository_history_params(
+    const FieldLookup& field) {
+  return parse_repository_history_params(field, {});
+}
+
+RepositoryHistoryOptions parse_repository_history_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  RepositoryHistoryOptions params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  params.owner = require("repository_owner");
+  params.repository = require("repository_name");
+  if (supplied("repository_api_base_url"))
+    params.api_base_url = require("repository_api_base_url");
+  const auto limit = [&](std::string_view name, std::size_t& target,
+                         std::size_t maximum) {
+    if (!supplied(name)) return;
+    target = parse_positive_size(require(name), name);
+    if (target > maximum)
+      throw std::invalid_argument(std::string(name) + " exceeds its limit");
+  };
+  limit("repository_max_pages", params.max_pages, 10'000);
+  limit("repository_max_issues", params.max_issues, 1'000'000);
+  limit("repository_max_events", params.max_events, 10'000'000);
+  return params;
+}
+
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {
   ConceptDriftParams params;
