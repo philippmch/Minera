@@ -109,7 +109,7 @@ EventLog filter_adjacent_path(const EventLog& event_log,
                               const AdjacentPathFilterOptions& options) {
   validate_options(options);
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     const bool matches = trace_matches(trace, options);

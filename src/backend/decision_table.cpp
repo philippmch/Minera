@@ -108,7 +108,8 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
     std::map<std::string, std::string> trace_context;
     if (options.include_trace_attributes) {
       for (const auto& attribute : trace.attributes)
-        trace_context[attribute.key] = attribute.value;
+        if (!attribute.is_null)
+          trace_context[attribute.key] = attribute.value;
     }
     std::vector<std::optional<std::map<std::string, std::string>>> context_slots(
         options.lookback);
@@ -128,6 +129,7 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
                      "resource") != options.attributes.end()))
         snapshot["resource"] = event.resource;
       for (const auto& attribute : event.attributes) {
+        if (attribute.is_null) continue;
         if (options.attributes.empty() ||
             std::find(options.attributes.begin(), options.attributes.end(),
                       attribute.key) != options.attributes.end())

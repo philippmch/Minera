@@ -24,9 +24,14 @@ Event event(std::string case_id, std::string activity, std::string timestamp,
 EventLog source_log() {
   EventLog log;
   log.attributes.push_back({"source", "fixture", AttributeKind::kString});
+  log.metadata.extensions.push_back(
+      {"Fixture", "fx", "https://example.invalid/fixture"});
+  log.metadata.properties.push_back(
+      {"case_id_key", "case:concept:name", AttributeKind::kString});
   Trace first;
   first.case_id = "c1";
   first.attributes.push_back({"segment", "one", AttributeKind::kString});
+  first.properties.push_back({"owner", "team-a", AttributeKind::kString});
   first.events = {event("c1", "A", "1", 0), event("c1", "B", "2", 1),
                  event("c1", "C", "3", 2)};
   Trace second;
@@ -45,6 +50,7 @@ void split_is_seeded_and_preserves_metadata() {
   assert(left.training.traces[0].case_id == right.training.traces[0].case_id);
   assert(left.training.attributes.size() == 1);
   assert(left.training.attributes[0].key == "source");
+  assert(left.training.metadata == log.metadata);
   const auto original = std::find_if(
       log.traces.begin(), log.traces.end(), [&](const auto& trace) {
         return trace.case_id == left.training.traces[0].case_id;
@@ -52,6 +58,7 @@ void split_is_seeded_and_preserves_metadata() {
   assert(original != log.traces.end());
   assert(left.training.traces[0].attributes.size() ==
          original->attributes.size());
+  assert(left.training.traces[0].properties == original->properties);
   bool rejected = false;
   try {
     (void)split_log_train_test(log, 1.1, 0);
@@ -67,6 +74,8 @@ void fixed_and_all_prefixes_match_contract() {
   assert(fixed.traces.size() == 2);
   assert(fixed.traces[0].events.size() == 2);
   assert(fixed.traces[1].events.size() == 2);
+  assert(fixed.metadata == log.metadata);
+  assert(fixed.traces[0].properties == log.traces[0].properties);
   const auto all = get_log_with_prefixes(log);
   assert(all.log.traces.size() == 10);  // two entries around each event
   assert(all.change_indexes.size() == 2);
@@ -75,6 +84,10 @@ void fixed_and_all_prefixes_match_contract() {
   const auto json = log_prefix_json(all.log, LogUtilityVariant::kAllPrefixes,
                                     all.change_indexes);
   assert(json.find("\"family\":\"LOG_UTIL\"") != std::string::npos);
+  assert(json.find("\"metadata\":{\"extensions\":[{\"name\":\"Fixture\"") !=
+         std::string::npos);
+  assert(json.find("\"properties\":[{\"key\":\"owner\"") !=
+         std::string::npos);
   assert(json.find("\"change_indexes\":[[5,5,5],[9,9]]") != std::string::npos);
 }
 

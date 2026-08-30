@@ -4884,6 +4884,29 @@ LogConversionOptions parse_log_conversion_params(const FieldLookup& field,
   if (supplied("log_conversion_case_id_key")) {
     options.case_id_key = require_name("log_conversion_case_id_key");
   }
+  if (supplied("log_conversion_stream_postprocessing")) {
+    options.remove_null_fields = parse_boolean(
+        require("log_conversion_stream_postprocessing"),
+        "log_conversion_stream_postprocessing");
+  }
+  if (supplied("log_conversion_max_rows_to_materialize")) {
+    options.max_rows_to_materialize = parse_nonnegative_size(
+        require("log_conversion_max_rows_to_materialize"),
+        "log_conversion_max_rows_to_materialize");
+  }
+  if (supplied("log_conversion_deep_copy")) {
+    options.deep_copy = parse_boolean(require("log_conversion_deep_copy"),
+                                      "log_conversion_deep_copy");
+  }
+  if (supplied("log_conversion_compress")) {
+    options.compress = parse_boolean(require("log_conversion_compress"),
+                                     "log_conversion_compress");
+  }
+  if (supplied("log_conversion_lazy_output")) {
+    options.lazy_output = parse_boolean(
+        require("log_conversion_lazy_output"),
+        "log_conversion_lazy_output");
+  }
   if (supplied("log_conversion_graph_case_id_attribute")) {
     options.graph_case_id_attribute =
         require_name("log_conversion_graph_case_id_attribute");

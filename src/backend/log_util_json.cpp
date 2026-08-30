@@ -54,14 +54,52 @@ void write_attributes(std::ostream& out,
     write_json_string(out, attribute.value);
     out << ",\"kind\":";
     write_json_string(out, attribute_kind_name(attribute.kind));
+    if (attribute.is_null) out << ",\"null\":true";
     out << '}';
   }
   out << ']';
 }
 
+void write_metadata(std::ostream& out, const EventDataMetadata& metadata) {
+  out << "{\"extensions\":[";
+  for (std::size_t i = 0; i < metadata.extensions.size(); ++i) {
+    if (i) out << ',';
+    const auto& extension = metadata.extensions[i];
+    out << "{\"name\":";
+    write_json_string(out, extension.name);
+    out << ",\"prefix\":";
+    write_json_string(out, extension.prefix);
+    out << ",\"uri\":";
+    write_json_string(out, extension.uri);
+    out << '}';
+  }
+  out << "],\"classifiers\":[";
+  for (std::size_t i = 0; i < metadata.classifiers.size(); ++i) {
+    if (i) out << ',';
+    const auto& classifier = metadata.classifiers[i];
+    out << "{\"name\":";
+    write_json_string(out, classifier.name);
+    out << ",\"keys\":[";
+    for (std::size_t j = 0; j < classifier.keys.size(); ++j) {
+      if (j) out << ',';
+      write_json_string(out, classifier.keys[j]);
+    }
+    out << "]}";
+  }
+  out << "],\"trace_globals\":";
+  write_attributes(out, metadata.trace_globals);
+  out << ",\"event_globals\":";
+  write_attributes(out, metadata.event_globals);
+  out << ",\"properties\":";
+  write_attributes(out, metadata.properties);
+  out << '}';
+}
+
 void write_event_log(std::ostream& out, const EventLog& log) {
   out << "{\"attributes\":";
   write_attributes(out, log.attributes);
+  out << ",\"metadata\":";
+  write_metadata(out, log.metadata);
   out << ",\"traces\":[";
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
     if (i != 0) out << ',';
@@ -70,6 +108,8 @@ void write_event_log(std::ostream& out, const EventLog& log) {
     write_json_string(out, trace.case_id);
     out << ",\"attributes\":";
     write_attributes(out, trace.attributes);
+    out << ",\"properties\":";
+    write_attributes(out, trace.properties);
     out << ",\"events\":[";
     for (std::size_t j = 0; j < trace.events.size(); ++j) {
       if (j != 0) out << ',';

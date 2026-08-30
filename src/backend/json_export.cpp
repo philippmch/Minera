@@ -1305,7 +1305,10 @@ void write_attribute_object(std::ostream& out,
   for (std::size_t i = 0; i < attributes.size(); ++i) {
     write_json_string(out, attributes[i].key);
     out << ": ";
-    write_json_string(out, attributes[i].value);
+    if (attributes[i].is_null)
+      out << "null";
+    else
+      write_json_string(out, attributes[i].value);
     out << (i + 1 < attributes.size() ? ", " : "");
   }
   out << '}';
@@ -1363,6 +1366,7 @@ void write_event_attribute_stats(std::ostream& out, const EventLog& log) {
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
       for (const auto& attribute : event.attributes) {
+        if (attribute.is_null) continue;
         auto& stats = keys[attribute.key];
         ++stats.carriers;
         ++stats.value_counts[attribute.value];
@@ -1378,6 +1382,7 @@ void write_case_attribute_stats(std::ostream& out, const EventLog& log) {
   std::map<std::string, AttributeKeyStats> keys;  // ordered, stable export
   for (const auto& trace : log.traces) {
     for (const auto& attribute : trace.attributes) {
+      if (attribute.is_null) continue;
       auto& stats = keys[attribute.key];
       ++stats.carriers;
       ++stats.value_counts[attribute.value];
@@ -3599,6 +3604,42 @@ void write_attribute_kinds(std::ostream& out,
   out << '}';
 }
 
+void write_projected_metadata(std::ostream& out,
+                              const EventDataMetadata& metadata) {
+  out << "{\"extensions\":[";
+  for (std::size_t i = 0; i < metadata.extensions.size(); ++i) {
+    if (i) out << ',';
+    const auto& extension = metadata.extensions[i];
+    out << "{\"name\":";
+    write_json_string(out, extension.name);
+    out << ",\"prefix\":";
+    write_json_string(out, extension.prefix);
+    out << ",\"uri\":";
+    write_json_string(out, extension.uri);
+    out << '}';
+  }
+  out << "],\"classifiers\":[";
+  for (std::size_t i = 0; i < metadata.classifiers.size(); ++i) {
+    if (i) out << ',';
+    const auto& classifier = metadata.classifiers[i];
+    out << "{\"name\":";
+    write_json_string(out, classifier.name);
+    out << ",\"keys\":[";
+    for (std::size_t j = 0; j < classifier.keys.size(); ++j) {
+      if (j) out << ',';
+      write_json_string(out, classifier.keys[j]);
+    }
+    out << "]}";
+  }
+  out << "],\"trace_globals\":";
+  write_attribute_object(out, metadata.trace_globals);
+  out << ",\"event_globals\":";
+  write_attribute_object(out, metadata.event_globals);
+  out << ",\"properties\":";
+  write_attribute_object(out, metadata.properties);
+  out << '}';
+}
+
 void write_projected_log(std::ostream& out, const EventLog& log) {
   out << "{";
   if (!log.attributes.empty()) {
@@ -3608,6 +3649,9 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
     write_attribute_kinds(out, log.attributes);
     out << ',';
   }
+  out << "\"metadata\":";
+  write_projected_metadata(out, log.metadata);
+  out << ',';
   out << "\"traces\":[";
   for (std::size_t i=0;i<log.traces.size();++i) {
     if (i) out << ',';
@@ -3618,6 +3662,12 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
       write_attribute_object(out, t.attributes);
       out<<",\"attribute_kinds\":";
       write_attribute_kinds(out, t.attributes);
+    }
+    if(!t.properties.empty()) {
+      out<<",\"properties\":";
+      write_attribute_object(out, t.properties);
+      out<<",\"property_kinds\":";
+      write_attribute_kinds(out, t.properties);
     }
     out << ",\"events\":[";
     for (std::size_t j=0;j<t.events.size();++j) {

@@ -204,7 +204,7 @@ ActivityNames trace_activities(const ProcessTree& tree, const Trace& trace,
     } else {
       const EventAttribute* selected = nullptr;
       for (const auto& attribute : event.attributes) {
-        if (attribute.key == options.activity_key) {
+        if (!attribute.is_null && attribute.key == options.activity_key) {
           selected = &attribute;
           break;
         }

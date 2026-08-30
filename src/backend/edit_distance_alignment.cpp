@@ -195,6 +195,7 @@ void set_attr(std::vector<EventAttribute>& attrs, std::string key,
   }
   if (first != attrs.end()) {
     first->value = std::move(value);
+    first->is_null = false;
     first->kind = kind;
   } else {
     attrs.push_back({std::move(key), std::move(value), kind});
@@ -292,7 +293,7 @@ EventLog project_log_on_alignments(
         "edit-distance projection requires one alignment per source trace");
   }
   EventLog projected;
-  projected.attributes = source.attributes;
+  copy_event_log_context(source, projected);
   erase_attr(projected.attributes, "@@aligned_variant");
   erase_attr(projected.attributes, "@@aligned_variants");
   bool uniform_target = true;
@@ -317,6 +318,7 @@ EventLog project_log_on_alignments(
     Trace projected_trace;
     projected_trace.case_id = original.case_id;
     projected_trace.attributes = original.attributes;
+    projected_trace.properties = original.properties;
     set_attr(projected_trace.attributes, "@@original_trace",
              join_variant(alignment.source_variant));
     set_attr(projected_trace.attributes, "@@aligned_variant",

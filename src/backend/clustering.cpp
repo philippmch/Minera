@@ -416,14 +416,14 @@ namespace {
 const EventAttribute* profile_event_attribute(const Event& event,
                                               const std::string& key) {
   for (const auto& attribute : event.attributes)
-    if (attribute.key == key) return &attribute;
+    if (!attribute.is_null && attribute.key == key) return &attribute;
   return nullptr;
 }
 
 const EventAttribute* profile_trace_attribute(const Trace& trace,
                                               const std::string& key) {
   for (const auto& attribute : trace.attributes)
-    if (attribute.key == key) return &attribute;
+    if (!attribute.is_null && attribute.key == key) return &attribute;
   return nullptr;
 }
 
@@ -468,11 +468,13 @@ ProfileRows profile_rows(const EventLog& log,
   std::map<std::string, AttributeKind> trace_kinds, event_kinds;
   for (const auto& trace : log.traces) {
     for (const auto& attribute : trace.attributes) {
+      if (attribute.is_null) continue;
       trace_keys.insert(attribute.key);
       trace_kinds.emplace(attribute.key, attribute.kind);
     }
     for (const auto& event : trace.events) {
       for (const auto& attribute : event.attributes) {
+        if (attribute.is_null) continue;
         event_keys.insert(attribute.key);
         event_kinds.emplace(attribute.key, attribute.kind);
       }

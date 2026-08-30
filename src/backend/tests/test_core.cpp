@@ -5814,7 +5814,8 @@ void pripel_json_is_standalone_and_escapes_diagnostics() {
   assert(json.find("\"family\":\"PRIPEL\"") != std::string::npos);
   assert(json.find("ok \\\"quoted\\\"") != std::string::npos);
   assert(json.find("\"secure_random\":false") != std::string::npos);
-  assert(json.find("\"log\":{\"traces\":[]}") != std::string::npos);
+  assert(json.find("\"log\":{") != std::string::npos);
+  assert(json.find("\"traces\":[]") != std::string::npos);
 }
 
 int main() {

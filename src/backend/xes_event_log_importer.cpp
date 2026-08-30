@@ -20,10 +20,19 @@
 namespace minera {
 namespace {
 
+// XML names may be namespace-qualified.  The XES vocabulary is identified by
+// its local name, while the attribute values remain untouched.
+std::string_view local_name(std::string_view name) {
+  const auto separator = name.rfind(':');
+  return separator == std::string_view::npos ? name
+                                             : name.substr(separator + 1);
+}
+
 // The XES attribute element names and the kind each maps to. Anything else
 // under an <event> (e.g. <list>, <container>, or an extension element) is not
 // a scalar attribute and is skipped.
 std::optional<AttributeKind> attribute_kind_of(std::string_view element) {
+  element = local_name(element);
   if (element == "string") return AttributeKind::kString;
   if (element == "date") return AttributeKind::kDate;
   if (element == "int") return AttributeKind::kInt;
@@ -46,6 +55,64 @@ int selector_match_rank(std::string_view key, std::string_view selector) {
   if (selector == "lifecycle" || selector == "lifecycle:transition")
     return key == "lifecycle" || key == "lifecycle:transition" ? 1 : 0;
   return 0;
+}
+
+// Classifier keys are conventionally whitespace-separated, with single
+// quotes around keys that contain whitespace.  Accept both quote styles and
+// a backslash escape so classifier declarations survive a complete round
+// trip even when a key itself contains a quote.
+std::vector<std::string> tokenize_classifier_keys(std::string_view text) {
+  std::vector<std::string> keys;
+  std::size_t position = 0;
+  while (position < text.size()) {
+    while (position < text.size() &&
+           std::isspace(static_cast<unsigned char>(text[position]))) {
+      ++position;
+    }
+    if (position == text.size()) break;
+
+    std::string key;
+    const char quote = text[position] == '\'' || text[position] == '"'
+                           ? text[position]
+                           : '\0';
+    if (quote != '\0') ++position;
+    bool closed = quote == '\0';
+    while (position < text.size()) {
+      const char current = text[position++];
+      if (current == '\\' && position < text.size()) {
+        // Escapes are useful for quoted keys and harmless for an unquoted
+        // key; retain the escaped character without its quoting backslash.
+        key.push_back(text[position++]);
+        continue;
+      }
+      if (quote != '\0' && current == quote) {
+        closed = true;
+        break;
+      }
+      if (quote == '\0' &&
+          std::isspace(static_cast<unsigned char>(current))) {
+        break;
+      }
+      key.push_back(current);
+    }
+    // An unterminated quote is kept as a best-effort token.  This mirrors the
+    // permissive handling of other unknown XES metadata while never dropping
+    // a classifier key from the imported document.
+    (void)closed;
+    keys.push_back(std::move(key));
+  }
+  return keys;
+}
+
+std::optional<EventAttribute> scalar_attribute(
+    std::string_view element,
+    const std::vector<std::pair<std::string, std::string>>& attributes) {
+  const auto kind = attribute_kind_of(element);
+  if (!kind) return std::nullopt;
+  const auto* key = detail::attribute(attributes, "key");
+  const auto* value = detail::attribute(attributes, "value");
+  if (!key || !value) return std::nullopt;
+  return EventAttribute{*key, *value, *kind};
 }
 
 bool first_class_activity_selector(std::string_view selector) {
@@ -191,9 +258,12 @@ EventLog import_xes_event_log(
   Trace current_trace;
   std::string case_id;
   bool in_trace = false;
+  bool case_attribute_present = false;
+  std::vector<EventAttribute>* active_global = nullptr;
 
   Event current_event;
   bool in_event = false;
+  bool activity_attribute_present = false;
   int activity_match_rank = 0;
   int timestamp_match_rank = 0;
   int resource_match_rank = 0;
@@ -203,7 +273,7 @@ EventLog import_xes_event_log(
   bool saw_timestamp = false;
 
   const auto finish_event = [&]() {
-    if (current_event.activity.empty()) {
+    if (!activity_attribute_present) {
       throw std::runtime_error(
           "XES event is missing its activity attribute ('" +
           options.activity_attribute + "')");
@@ -220,6 +290,7 @@ EventLog import_xes_event_log(
     current_trace.events.push_back(std::move(current_event));
     current_event = Event{};
     in_event = false;
+    activity_attribute_present = false;
     activity_match_rank = 0;
     timestamp_match_rank = 0;
     resource_match_rank = 0;
@@ -227,7 +298,7 @@ EventLog import_xes_event_log(
   };
 
   const auto finish_trace = [&]() {
-    if (case_id.empty()) {
+    if (!case_attribute_present) {
       throw std::runtime_error(
           "XES trace is missing its case attribute ('" +
           options.case_attribute + "')");
@@ -239,6 +310,7 @@ EventLog import_xes_event_log(
     log.traces.push_back(std::move(current_trace));
     current_trace = Trace{};
     case_id.clear();
+    case_attribute_present = false;
     in_trace = false;
   };
 
@@ -249,16 +321,52 @@ EventLog import_xes_event_log(
     }
 
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
-      const std::string parent = stack.empty() ? std::string{} : stack.back();
+      const std::string parent =
+          stack.empty() ? std::string{} : std::string(local_name(stack.back()));
+      const std::string element = std::string(local_name(token.name));
 
-      if (token.name == "trace" && parent == "log") {
+      if (element == "trace" && parent == "log") {
         if (log.traces.size() >= options.max_traces) break;
         if (in_trace) {
           throw std::runtime_error("XES input nests a <trace> inside a <trace>");
         }
         in_trace = true;
-      } else if (token.name == "event" && in_trace && parent == "trace") {
+      } else if (element == "event" && in_trace && parent == "trace") {
         in_event = true;
+      } else if (!in_trace && parent == "log" && element == "extension") {
+        // Keep declarations in document order.  Missing optional values are
+        // represented as empty strings so a permissive read does not discard
+        // a declaration from an otherwise usable log.
+        LogExtension extension;
+        if (const auto* value = detail::attribute(token.attributes, "name"))
+          extension.name = *value;
+        if (const auto* value = detail::attribute(token.attributes, "prefix"))
+          extension.prefix = *value;
+        if (const auto* value = detail::attribute(token.attributes, "uri"))
+          extension.uri = *value;
+        log.metadata.extensions.push_back(std::move(extension));
+      } else if (!in_trace && parent == "log" && element == "classifier") {
+        LogClassifier classifier;
+        if (const auto* value = detail::attribute(token.attributes, "name"))
+          classifier.name = *value;
+        if (const auto* value = detail::attribute(token.attributes, "keys"))
+          classifier.keys = tokenize_classifier_keys(*value);
+        log.metadata.classifiers.push_back(std::move(classifier));
+      } else if (!in_trace && parent == "log" && element == "global") {
+        active_global = nullptr;
+        if (const auto* scope = detail::attribute(token.attributes, "scope")) {
+          if (*scope == "trace") {
+            active_global = &log.metadata.trace_globals;
+          } else if (*scope == "event") {
+            active_global = &log.metadata.event_globals;
+          }
+        }
+      } else if (active_global && parent == "global") {
+        if (const auto attribute = scalar_attribute(element,
+                                                     token.attributes);
+            attribute && keeps_attribute(attribute->key)) {
+          active_global->push_back(*attribute);
+        }
       } else if (in_event && parent == "event") {
         if (const auto* key = detail::attribute(token.attributes, "key")) {
           if (const auto* value = detail::attribute(token.attributes, "value")) {
@@ -269,6 +377,7 @@ EventLog import_xes_event_log(
               if (activity_rank > activity_match_rank) {
                 current_event.activity = *value;
                 activity_match_rank = activity_rank;
+                activity_attribute_present = true;
               }
               recognized = true;
             }
@@ -301,7 +410,7 @@ EventLog import_xes_event_log(
               recognized = true;
             }
             if (!recognized && keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(token.name)) {
+              if (const auto kind = attribute_kind_of(element)) {
                 // Any other scalar attribute is kept generically, with its XES
                 // type so an export can round-trip it faithfully.
                 current_event.attributes.push_back(
@@ -315,8 +424,9 @@ EventLog import_xes_event_log(
           if (const auto* value = detail::attribute(token.attributes, "value")) {
             if (*key == options.case_attribute) {
               case_id = *value;
+              case_attribute_present = true;
             } else if (keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(token.name)) {
+              if (const auto kind = attribute_kind_of(element)) {
                 // Any other scalar trace attribute is a case attribute, kept
                 // with its scalar type like the generic event attributes.
                 current_trace.attributes.push_back(
@@ -332,7 +442,7 @@ EventLog import_xes_event_log(
             // retain every other scalar log attribute, including derived
             // projection metadata such as @@aligned_dfg.
             if (*key != "concept:name" && keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(token.name)) {
+              if (const auto kind = attribute_kind_of(element)) {
                 log.attributes.push_back(EventAttribute{*key, *value, *kind});
               }
             }
@@ -342,10 +452,12 @@ EventLog import_xes_event_log(
 
       if (token.self_closing) {
         // A self-closing trace/event still opens and closes here.
-        if (token.name == "event" && in_event && parent == "trace") {
+        if (element == "event" && in_event && parent == "trace") {
           finish_event();
-        } else if (token.name == "trace" && in_trace && parent == "log") {
+        } else if (element == "trace" && in_trace && parent == "log") {
           finish_trace();
+        } else if (element == "global") {
+          active_global = nullptr;
         }
       } else {
         stack.push_back(token.name);
@@ -355,15 +467,19 @@ EventLog import_xes_event_log(
 
     // EndElement: unwind the stack to the matching open element. Tolerates
     // minor mismatches by popping until the name is found.
-    while (!stack.empty() && stack.back() != token.name) {
+    while (!stack.empty() && local_name(stack.back()) != local_name(token.name)) {
       stack.pop_back();
     }
     if (!stack.empty()) {
       stack.pop_back();
     }
-    if (token.name == "event" && in_event) {
+    const auto element = local_name(token.name);
+    if (element == "global") {
+      active_global = nullptr;
+    }
+    if (element == "event" && in_event) {
       finish_event();
-    } else if (token.name == "trace" && in_trace) {
+    } else if (element == "trace" && in_trace) {
       finish_trace();
     }
   }
@@ -373,6 +489,27 @@ EventLog import_xes_event_log(
         "XES log has no timestamps (attribute '" +
         options.timestamp_attribute + "')");
   }
+
+  // Keep the selectors used to interpret this document alongside the native
+  // data.  These properties are deterministic and intentionally distinct from
+  // scalar log attributes; they allow a table/stream adapter to reproduce the
+  // same interpretation without introducing another side-channel.  Do not
+  // append a key twice if this function is extended with another selector.
+  const auto append_property = [&](std::string_view key,
+                                   std::string_view value) {
+    const auto duplicate = std::any_of(
+        log.metadata.properties.begin(), log.metadata.properties.end(),
+        [&](const auto& property) { return property.key == key; });
+    if (!duplicate) {
+      log.metadata.properties.push_back(
+          {std::string(key), std::string(value), AttributeKind::kString});
+    }
+  };
+  append_property("case_attribute", options.case_attribute);
+  append_property("activity_attribute", options.activity_attribute);
+  append_property("timestamp_attribute", options.timestamp_attribute);
+  append_property("resource_attribute", options.resource_attribute);
+  append_property("lifecycle_attribute", options.lifecycle_attribute);
 
   if (options.timestamp_sort) sort_log_by_timestamp(log, options.reverse_sort);
 

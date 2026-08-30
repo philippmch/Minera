@@ -229,6 +229,7 @@ constexpr std::size_t kServerAttributeKdeMaxSamples = 100'000;
 constexpr std::size_t kServerLogConversionMaxGraphNodes = 200'000;
 constexpr std::size_t kServerLogConversionMaxGraphEdges = 400'000;
 constexpr std::size_t kServerLogConversionMaxVariants = 100'000;
+constexpr std::size_t kServerLogConversionMaxRows = 1'000'000;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -2706,7 +2707,7 @@ void handle_genetic_matrix_conversion(const httplib::Request& request,
   handle_genetic_request(request, response, true);
 }
 
-// Cached-session adapter for the six classic EventLog conversion views.
+// Cached-session adapter for native event-data conversion views.
 void handle_log_conversion(const httplib::Request& request,
                            httplib::Response& response) {
   try {
@@ -2727,6 +2728,11 @@ void handle_log_conversion(const httplib::Request& request,
         "log_conversion_include_case_attributes",
         "log_conversion_case_attribute_prefix",
         "log_conversion_case_id_key",
+        "log_conversion_stream_postprocessing",
+        "log_conversion_max_rows_to_materialize",
+        "log_conversion_deep_copy",
+        "log_conversion_compress",
+        "log_conversion_lazy_output",
         "log_conversion_graph_case_id_attribute",
         "log_conversion_include_df",
         "log_conversion_case_attributes_as_nodes",
@@ -2759,6 +2765,13 @@ void handle_log_conversion(const httplib::Request& request,
       return request.has_param(key) || request.has_file(key);
     };
     auto options = minera::parse_log_conversion_params(lookup, present);
+    if (!options.max_rows_to_materialize) {
+      options.max_rows_to_materialize = kServerLogConversionMaxRows;
+    } else if (*options.max_rows_to_materialize >
+               kServerLogConversionMaxRows) {
+      throw std::invalid_argument(
+          "log_conversion_max_rows_to_materialize exceeds the server safety cap");
+    }
     if (options.max_graph_nodes > kServerLogConversionMaxGraphNodes) {
       if (present("log_conversion_max_graph_nodes"))
         throw std::invalid_argument(

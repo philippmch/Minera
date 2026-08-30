@@ -389,7 +389,7 @@ EventLog filter_embeddings_top_k(const EventLog& log,
   std::unordered_set<std::string> selected_cases;
 
   EventLog filtered;
-  filtered.attributes = log.attributes;
+  copy_event_log_context(log, filtered);
   std::size_t ordinal = 0;
   for (const auto& trace : log.traces) {
     if (options.variant == EmbeddingVariant::CASES_TRANSFORMERS) {

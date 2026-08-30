@@ -45,7 +45,7 @@ EventLog split_activity(const EventLog& event_log,
                                                 options.activities.end());
 
   EventLog result;
-  result.attributes = event_log.attributes;
+  copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
 
   for (const auto& trace : event_log.traces) {
@@ -59,6 +59,7 @@ EventLog split_activity(const EventLog& event_log,
         piece.case_id = trace.case_id + options.subcase_separator +
                         std::to_string(pieces.size());
         piece.attributes = trace.attributes;
+        piece.properties = trace.properties;
         pieces.push_back(std::move(piece));
       }
       return pieces[index];

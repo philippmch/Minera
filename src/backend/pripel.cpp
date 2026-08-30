@@ -266,7 +266,7 @@ PripelResult anonymize_pripel(const EventLog& source,
         have_time = true;
       }
       for (const auto& attr : event.attributes) {
-        if (blocked(attr.key, deny)) continue;
+        if (attr.is_null || blocked(attr.key, deny)) continue;
         if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat) {
           try {
             const double value = std::stod(attr.value);
@@ -383,6 +383,10 @@ PripelResult anonymize_pripel(const EventLog& source,
       std::vector<EventAttribute> attrs;
       for (auto attr : out.attributes) {
         if (blocked(attr.key, deny)) continue;
+        if (attr.is_null) {
+          attrs.push_back(std::move(attr));
+          continue;
+        }
         if (attr.kind == AttributeKind::kInt || attr.kind == AttributeKind::kFloat)
           attr.value = next_numeric(attr.key, attr.value, (emitted + 1) * 1009 + ei + 101);
         else attr.value = randomized(

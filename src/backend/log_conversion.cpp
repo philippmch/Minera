@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <map>
 #include <set>
 #include <sstream>
@@ -15,6 +16,23 @@ constexpr std::string_view kActivityKey = "concept:name";
 constexpr std::string_view kTimestampKey = "time:timestamp";
 constexpr std::string_view kResourceKey = "org:resource";
 constexpr std::string_view kLifecycleKey = "lifecycle:transition";
+
+struct StandardExtension {
+  std::string_view prefix;
+  std::string_view name;
+  std::string_view uri;
+};
+
+constexpr StandardExtension kStandardExtensions[] = {
+    {"concept", "Concept", "http://www.xes-standard.org/concept.xesext"},
+    {"time", "Time", "http://www.xes-standard.org/time.xesext"},
+    {"org", "Organizational", "http://www.xes-standard.org/org.xesext"},
+    {"lifecycle", "Lifecycle",
+     "http://www.xes-standard.org/lifecycle.xesext"},
+    {"cost", "Cost", "http://www.xes-standard.org/cost.xesext"},
+    {"identity", "Identity",
+     "http://www.xes-standard.org/identity.xesext"},
+};
 
 void upsert(std::vector<EventAttribute>& attributes, EventAttribute value) {
   const auto found = std::find_if(
@@ -69,7 +87,10 @@ std::optional<EventAttribute> selected_trace_attribute(
       key == "case:concept:name")
     return EventAttribute{std::string(key), trace.case_id,
                           AttributeKind::kString};
-  if (const auto* value = find_attribute(trace.attributes, key)) return *value;
+  if (const auto* value = find_attribute(trace.attributes, key)) {
+    if (value->is_null) return std::nullopt;
+    return *value;
+  }
   return std::nullopt;
 }
 
@@ -96,7 +117,10 @@ std::optional<EventAttribute> selected_event_attribute(
                : std::optional<EventAttribute>{{std::string(key),
                                                  event.lifecycle,
                                                  AttributeKind::kString}};
-  if (const auto* value = find_attribute(event.attributes, key)) return *value;
+  if (const auto* value = find_attribute(event.attributes, key)) {
+    if (value->is_null) return std::nullopt;
+    return *value;
+  }
   return std::nullopt;
 }
 
@@ -118,15 +142,66 @@ void validate_options(const LogConversionOptions& options) {
   }
 }
 
+void enforce_event_log_row_cap(const EventLog& log,
+                               const LogConversionOptions& options) {
+  // EventLog-to-table conversion has one output row per input event. Check
+  // the complete count before flattening so eager and lazy outputs fail with
+  // the same deterministic result and never partially materialize a table.
+  if (options.max_rows_to_materialize &&
+      log.event_count() > *options.max_rows_to_materialize)
+    throw std::length_error("log conversion: row materialization cap exceeded");
+}
+
+void infer_standard_extensions(const LogConversionTable& table,
+                               EventDataMetadata& metadata) {
+  for (const auto& column : table.columns) {
+    const auto separator = column.find(':');
+    if (separator == std::string::npos || separator == 0) continue;
+    const auto prefix = std::string_view(column).substr(0, separator);
+    const auto found = std::find_if(
+        std::begin(kStandardExtensions), std::end(kStandardExtensions),
+        [&](const auto& extension) { return extension.prefix == prefix; });
+    if (found == std::end(kStandardExtensions)) continue;
+    const auto already_declared = std::any_of(
+        metadata.extensions.begin(), metadata.extensions.end(),
+        [&](const auto& extension) { return extension.prefix == prefix; });
+    if (already_declared) continue;
+    metadata.extensions.push_back(
+        {std::string(found->name), std::string(found->prefix),
+         std::string(found->uri)});
+  }
+}
+
+bool is_case_attribute_field(const EventAttribute& field,
+                             const LogConversionOptions& options) {
+  if (!options.include_case_attributes) return false;
+  // An empty prefix is an explicit request to treat every non-glue field as
+  // trace data.  This mirrors the flattening contract instead of relying on
+  // string::starts_with("") for accidental matching.
+  if (options.case_attribute_prefix.empty())
+    return field.key != options.case_id_key;
+  return field.key.starts_with(options.case_attribute_prefix);
+}
+
 Event record_to_event(const LogConversionRecord& record,
                       std::string case_id,
                       const LogConversionOptions& options) {
   Event event;
   event.case_id = std::move(case_id);
   for (const auto& field : record.fields) {
-    if ((options.include_case_attributes &&
-         field.key.starts_with(options.case_attribute_prefix)) ||
-        (!options.include_case_attributes && field.key == options.case_id_key))
+    if (field.key == options.case_id_key ||
+        is_case_attribute_field(field, options))
+      continue;
+    // A present null is not a textual value for a standard field.  Keep null
+    // generic attributes below, but leave the first-class member empty.
+    if (field.is_null && (field.key == kActivityKey ||
+                          field.key == "activity" ||
+                          field.key == kTimestampKey ||
+                          field.key == "timestamp" ||
+                          field.key == kResourceKey ||
+                          field.key == "resource" ||
+                          field.key == kLifecycleKey ||
+                          field.key == "lifecycle"))
       continue;
     if (field.key == kActivityKey || field.key == "activity")
       event.activity = field.value;
@@ -239,9 +314,41 @@ void write_attributes(std::ostream& output,
     output << "{\"key\":\"" << json_escape(attributes[i].key)
            << "\",\"value\":\"" << json_escape(attributes[i].value)
            << "\",\"kind\":\"" << kind_name(attributes[i].kind)
-           << "\"}";
+           << "\"";
+    if (attributes[i].is_null) output << ",\"null\":true";
+    output << "}";
   }
   output << ']';
+}
+
+void write_metadata(std::ostream& output, const EventDataMetadata& metadata) {
+  output << "{\"extensions\":[";
+  for (std::size_t i = 0; i < metadata.extensions.size(); ++i) {
+    if (i != 0) output << ',';
+    const auto& extension = metadata.extensions[i];
+    output << "{\"name\":\"" << json_escape(extension.name)
+           << "\",\"prefix\":\"" << json_escape(extension.prefix)
+           << "\",\"uri\":\"" << json_escape(extension.uri) << "\"}";
+  }
+  output << "],\"classifiers\":[";
+  for (std::size_t i = 0; i < metadata.classifiers.size(); ++i) {
+    if (i != 0) output << ',';
+    const auto& classifier = metadata.classifiers[i];
+    output << "{\"name\":\"" << json_escape(classifier.name)
+           << "\",\"keys\":[";
+    for (std::size_t j = 0; j < classifier.keys.size(); ++j) {
+      if (j != 0) output << ',';
+      output << '"' << json_escape(classifier.keys[j]) << '"';
+    }
+    output << "]}";
+  }
+  output << "],\"trace_globals\":";
+  write_attributes(output, metadata.trace_globals);
+  output << ",\"event_globals\":";
+  write_attributes(output, metadata.event_globals);
+  output << ",\"properties\":";
+  write_attributes(output, metadata.properties);
+  output << '}';
 }
 
 void write_event_log(std::ostream& output, const EventLog& log) {
@@ -255,6 +362,8 @@ void write_event_log(std::ostream& output, const EventLog& log) {
     output << "{\"case_id\":\"" << json_escape(trace.case_id)
            << "\",\"attributes\":";
     write_attributes(output, trace.attributes);
+    output << ",\"properties\":";
+    write_attributes(output, trace.properties);
     output << ",\"events\":[";
     for (std::size_t event_index = 0; event_index < trace.events.size();
          ++event_index) {
@@ -272,7 +381,9 @@ void write_event_log(std::ostream& output, const EventLog& log) {
     }
     output << "]}";
   }
-  output << "]}";
+  output << "],\"metadata\":";
+  write_metadata(output, log.metadata);
+  output << "}";
 }
 
 std::string_view node_type_name(LogGraphNodeType type) {
@@ -294,10 +405,6 @@ std::string_view edge_type_name(LogGraphEdgeType type) {
 }
 
 }  // namespace
-
-const EventAttribute* LogConversionRecord::field(std::string_view key) const {
-  return find_attribute(fields, key);
-}
 
 LogConversionVariant parse_log_conversion_variant(std::string_view value) {
   std::string normalized(value);
@@ -343,6 +450,7 @@ ConvertedEventStream event_log_to_event_stream(
   validate_options(options);
   ConvertedEventStream stream;
   stream.attributes = log.attributes;
+  stream.metadata = log.metadata;
   stream.events.reserve(log.event_count());
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
@@ -353,13 +461,24 @@ ConvertedEventStream event_log_to_event_stream(
       if (options.include_case_attributes) {
         for (const auto& attribute : trace_fields(trace)) {
           auto injected = attribute;
-          injected.key = options.case_attribute_prefix + injected.key;
+          // The configured glue key is authoritative for the case id.  Other
+          // trace attributes use the configured prefix.
+          if (injected.key == kActivityKey)
+            injected.key = options.case_id_key;
+          else
+            injected.key = options.case_attribute_prefix + injected.key;
           upsert(record.fields, std::move(injected));
         }
       } else {
         upsert(record.fields,
                {options.case_id_key, std::to_string(trace_index),
                 AttributeKind::kString});
+      }
+      if (options.remove_null_fields) {
+        record.fields.erase(
+            std::remove_if(record.fields.begin(), record.fields.end(),
+                           [](const auto& field) { return field.is_null; }),
+            record.fields.end());
       }
       stream.events.push_back(std::move(record));
     }
@@ -372,12 +491,13 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
   validate_options(options);
   EventLog log;
   log.attributes = stream.attributes;
+  log.metadata = stream.metadata;
   std::map<std::pair<AttributeKind, std::string>, std::size_t> trace_indexes;
   for (const auto& record : stream.events) {
     const auto* glue = record.field(options.case_id_key);
-    if (!glue)
+    if (!glue || glue->is_null)
       throw std::invalid_argument(
-          "log conversion: event stream record has no case id");
+          "log conversion: event stream record has no non-null case id");
     auto [found, inserted] = trace_indexes.emplace(
         std::pair{glue->kind, glue->value}, log.traces.size());
     if (inserted) {
@@ -385,13 +505,18 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
       trace.case_id = glue->value;
       if (options.include_case_attributes) {
         for (const auto& field : record.fields) {
-          if (!field.key.starts_with(options.case_attribute_prefix)) continue;
+          if (!is_case_attribute_field(field, options)) continue;
           auto attribute = field;
-          attribute.key.erase(0, options.case_attribute_prefix.size());
-          if (attribute.key == kActivityKey)
-            trace.case_id = attribute.value;
-          else
-            upsert(trace.attributes, std::move(attribute));
+          if (!options.case_attribute_prefix.empty())
+            attribute.key.erase(0, options.case_attribute_prefix.size());
+          if (attribute.key == kActivityKey &&
+              !options.case_attribute_prefix.empty()) {
+            if (!attribute.is_null) trace.case_id = attribute.value;
+            // A null canonical case label is an absent label, not an empty
+            // replacement for the non-null glue value.
+            continue;
+          }
+          upsert(trace.attributes, std::move(attribute));
         }
       }
       log.traces.push_back(std::move(trace));
@@ -404,12 +529,20 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
   return log;
 }
 
+LogConversionTable event_stream_to_table(const ConvertedEventStream& stream) {
+  return event_stream_to_table(stream, LogConversionOptions{});
+}
+
 LogConversionTable event_stream_to_table(
-    const ConvertedEventStream& stream) {
+    const ConvertedEventStream& stream, const LogConversionOptions& options) {
+  validate_options(options);
   LogConversionTable table;
+  table.attributes = stream.attributes;
+  table.metadata = stream.metadata;
   std::map<std::string, std::size_t> column_indexes;
   for (const auto& record : stream.events) {
     for (const auto& field : record.fields) {
+      if (options.remove_null_fields && field.is_null) continue;
       if (!column_indexes.contains(field.key)) {
         column_indexes.emplace(field.key, table.columns.size());
         table.columns.push_back(field.key);
@@ -419,11 +552,183 @@ LogConversionTable event_stream_to_table(
   table.rows.reserve(stream.events.size());
   for (const auto& record : stream.events) {
     std::vector<std::optional<EventAttribute>> row(table.columns.size());
-    for (const auto& field : record.fields)
-      row[column_indexes.at(field.key)] = field;
+    for (const auto& field : record.fields) {
+      if (!options.remove_null_fields || !field.is_null)
+        row[column_indexes.at(field.key)] = field;
+    }
     table.rows.push_back(std::move(row));
   }
+  table.validate();
   return table;
+}
+
+ConvertedEventStream event_table_to_event_stream(
+    const LogConversionTable& table, const LogConversionOptions& options) {
+  validate_options(options);
+  table.validate();
+  ConvertedEventStream stream;
+  stream.attributes = table.attributes;
+  stream.metadata = table.metadata;
+  infer_standard_extensions(table, stream.metadata);
+  stream.events.reserve(table.rows.size());
+  for (const auto& row : table.rows) {
+    LogConversionRecord record;
+    record.fields.reserve(table.columns.size());
+    for (std::size_t index = 0; index < table.columns.size(); ++index) {
+      if (!row[index]) continue;
+      if (options.remove_null_fields && row[index]->is_null) continue;
+      auto field = *row[index];
+      field.key = table.columns[index];
+      record.fields.push_back(std::move(field));
+    }
+    stream.events.push_back(std::move(record));
+  }
+  return stream;
+}
+
+LogConversionTable remove_null_cells(LogConversionTable table) {
+  table.validate();
+  for (auto& row : table.rows) {
+    for (auto& cell : row) {
+      if (cell && cell->is_null) cell.reset();
+    }
+  }
+  return table;
+}
+
+EventLog event_table_to_event_log(const LogConversionTable& table,
+                                  const LogConversionOptions& options) {
+  return event_stream_to_event_log(event_table_to_event_stream(table, options),
+                                   options);
+}
+
+LogConversionTable event_log_to_table(const EventLog& log,
+                                      const LogConversionOptions& options) {
+  validate_options(options);
+  enforce_event_log_row_cap(log, options);
+  return event_stream_to_table(event_log_to_event_stream(log, options),
+                               options);
+}
+
+LazyEventTable event_log_to_lazy_table(const EventLog& log,
+                                       const LogConversionOptions& options) {
+  return LazyEventTable::from_table(event_log_to_table(log, options));
+}
+
+LogConversionTable lazy_event_table_to_table(
+    const LazyEventTable& table, const LogConversionOptions& options) {
+  validate_options(options);
+  auto materialized = table.materialize(options.max_rows_to_materialize);
+  if (!options.remove_null_fields) return materialized;
+  return remove_null_cells(std::move(materialized));
+}
+
+ConvertedEventStream lazy_event_table_to_event_stream(
+    const LazyEventTable& table, const LogConversionOptions& options) {
+  return event_table_to_event_stream(lazy_event_table_to_table(table, options),
+                                     options);
+}
+
+EventLog lazy_event_table_to_event_log(const LazyEventTable& table,
+                                       const LogConversionOptions& options) {
+  return event_stream_to_event_log(
+      lazy_event_table_to_event_stream(table, options), options);
+}
+
+ConvertedEventStream event_data_to_event_stream(
+    const EventDataView& data, const LogConversionOptions& options) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return event_log_to_event_stream(*data.log(), options);
+    case EventDataKind::kEventStream: {
+      auto stream = *data.stream();
+      if (options.remove_null_fields) {
+        for (auto& record : stream.events)
+          record.fields.erase(
+              std::remove_if(record.fields.begin(), record.fields.end(),
+                             [](const auto& field) { return field.is_null; }),
+              record.fields.end());
+      }
+      return stream;
+    }
+    case EventDataKind::kEventTable:
+      return event_table_to_event_stream(*data.table(), options);
+    case EventDataKind::kLazyEventTable:
+      return lazy_event_table_to_event_stream(*data.lazy_table(), options);
+  }
+  throw std::invalid_argument("event data: invalid input kind");
+}
+
+LogConversionTable event_data_to_table(const EventDataView& data,
+                                       const LogConversionOptions& options) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return event_log_to_table(*data.log(), options);
+    case EventDataKind::kEventStream:
+      return event_stream_to_table(*data.stream(), options);
+    case EventDataKind::kEventTable:
+      data.table()->validate();
+      if (!options.remove_null_fields) return *data.table();
+      return remove_null_cells(*data.table());
+    case EventDataKind::kLazyEventTable:
+      return lazy_event_table_to_table(*data.lazy_table(), options);
+  }
+  throw std::invalid_argument("event data: invalid input kind");
+}
+
+EventLog event_data_to_event_log(const EventDataView& data,
+                                 const LogConversionOptions& options) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return *data.log();
+    case EventDataKind::kEventStream:
+      return event_stream_to_event_log(*data.stream(), options);
+    case EventDataKind::kEventTable:
+      return event_table_to_event_log(*data.table(), options);
+    case EventDataKind::kLazyEventTable:
+      return lazy_event_table_to_event_log(*data.lazy_table(), options);
+  }
+  throw std::invalid_argument("event data: invalid input kind");
+}
+
+LazyEventTable event_data_to_lazy_table(const EventDataView& data,
+                                        const LogConversionOptions& options) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      return event_log_to_lazy_table(*data.log(), options);
+    case EventDataKind::kEventStream:
+      return LazyEventTable::from_table(
+          event_stream_to_table(*data.stream(), options));
+    case EventDataKind::kEventTable:
+      data.table()->validate();
+      if (!options.remove_null_fields)
+        return LazyEventTable::from_table(*data.table());
+      return LazyEventTable::from_table(remove_null_cells(*data.table()));
+    case EventDataKind::kLazyEventTable:
+      {
+        const auto source = *data.lazy_table();
+        if (!options.remove_null_fields &&
+            !options.max_rows_to_materialize)
+          return source;
+        const auto max_rows = options.max_rows_to_materialize;
+        return LazyEventTable(
+            source.columns(),
+            [source, max_rows, remove_null_fields = options.remove_null_fields](
+                const LazyEventTable::RowConsumer& consumer) {
+              source.scan([&](const LazyEventTable::Row& input) {
+                auto row = input;
+                if (remove_null_fields) {
+                  for (auto& cell : row) {
+                    if (cell && cell->is_null) cell.reset();
+                  }
+                }
+                if (consumer) consumer(row);
+              }, max_rows);
+            },
+            source.attributes(), source.metadata(), source.row_count());
+      }
+  }
+  throw std::invalid_argument("event data: invalid input kind");
 }
 
 AttributedLogGraph event_log_to_attributed_graph(
@@ -527,8 +832,9 @@ LogConversionResult convert_event_log(const EventLog& log,
       result.stream = event_log_to_event_stream(log, options);
       break;
     case LogConversionVariant::kToDataFrame: {
-      const auto stream = event_log_to_event_stream(log, options);
-      result.table = event_stream_to_table(stream);
+      result.table = event_log_to_table(log, options);
+      if (options.lazy_output)
+        result.lazy_table = LazyEventTable::from_table(result.table);
       break;
     }
     case LogConversionVariant::kToAttributedGraph:
@@ -555,6 +861,8 @@ std::string log_conversion_json(const LogConversionResult& result) {
   } else if (result.variant == LogConversionVariant::kToEventStream) {
     output << ",\"stream\":{\"attributes\":";
     write_attributes(output, result.stream.attributes);
+    output << ",\"metadata\":";
+    write_metadata(output, result.stream.metadata);
     output << ",\"events\":[";
     for (std::size_t i = 0; i < result.stream.events.size(); ++i) {
       if (i != 0) output << ',';
@@ -569,7 +877,11 @@ std::string log_conversion_json(const LogConversionResult& result) {
       if (i != 0) output << ',';
       output << '\"' << json_escape(result.table.columns[i]) << '\"';
     }
-    output << "],\"rows\":[";
+    output << "],\"attributes\":";
+    write_attributes(output, result.table.attributes);
+    output << ",\"metadata\":";
+    write_metadata(output, result.table.metadata);
+    output << ",\"rows\":[";
     for (std::size_t row = 0; row < result.table.rows.size(); ++row) {
       if (row != 0) output << ',';
       output << '[';
@@ -582,11 +894,15 @@ std::string log_conversion_json(const LogConversionResult& result) {
         }
         const auto& cell = *result.table.rows[row][column];
         output << "{\"value\":\"" << json_escape(cell.value)
-               << "\",\"kind\":\"" << kind_name(cell.kind) << "\"}";
+               << "\",\"kind\":\"" << kind_name(cell.kind) << "\"";
+        if (cell.is_null) output << ",\"null\":true";
+        output << "}";
       }
       output << ']';
     }
-    output << "]}";
+    output << ']';
+    if (result.lazy_table) output << ",\"lazy\":true";
+    output << "}";
   } else {
     output << ",\"graph\":{\"nodes\":[";
     for (std::size_t i = 0; i < result.graph.nodes.size(); ++i) {

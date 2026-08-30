@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-#include "minera/event_log.hpp"
+#include "minera/event_data.hpp"
 
 namespace minera {
 
@@ -31,6 +31,18 @@ struct LogConversionOptions {
   bool include_case_attributes = true;
   std::string case_attribute_prefix = "case:";
   std::string case_id_key = "case:concept:name";
+  // Null cells are retained in stream/table output.  Set this flag for the
+  // optional post-processing pass that drops present-null event fields.
+  bool remove_null_fields = false;
+  // A lazy source may be materialized only up to this many rows.  Exceeding
+  // the limit raises std::length_error instead of silently truncating input.
+  std::optional<std::size_t> max_rows_to_materialize;
+  // These options are accepted for adapters whose implementation can expose
+  // identity or compression details.  Native value objects have no observable
+  // aliasing/compression state, so they do not change conversion results.
+  bool deep_copy = true;
+  bool compress = false;
+  bool lazy_output = false;
   std::string graph_case_id_attribute = "concept:name";
   bool include_directly_follows = true;
   std::vector<std::string> case_attributes_as_nodes;
@@ -41,23 +53,11 @@ struct LogConversionOptions {
   std::size_t max_graph_edges = 2000000;
 };
 
-// One ordered, typed record in a flattened stream. Standard event fields and
-// injected case fields use the same representation as generic attributes.
-struct LogConversionRecord {
-  std::vector<EventAttribute> fields;
-
-  [[nodiscard]] const EventAttribute* field(std::string_view key) const;
-};
-
-struct ConvertedEventStream {
-  std::vector<EventAttribute> attributes;
-  std::vector<LogConversionRecord> events;
-};
-
-struct LogConversionTable {
-  std::vector<std::string> columns;
-  std::vector<std::vector<std::optional<EventAttribute>>> rows;
-};
+// Compatibility names retained for clients of the original conversion API.
+// Both now denote the native value-semantic event-data objects.
+using LogConversionRecord = EventRecord;
+using ConvertedEventStream = EventStream;
+using LogConversionTable = EventTable;
 
 enum class LogGraphNodeType { kCase, kEvent, kAttribute };
 enum class LogGraphEdgeType { kBelongsTo, kDirectlyFollows, kAttribute };
@@ -93,6 +93,7 @@ struct LogConversionResult {
   LogConversionTable table;
   AttributedLogGraph graph;
   std::vector<LogVariantProjection> variants;
+  std::optional<LazyEventTable> lazy_table;
 };
 
 [[nodiscard]] LogConversionVariant parse_log_conversion_variant(
@@ -107,6 +108,36 @@ struct LogConversionResult {
     const LogConversionOptions& options = {});
 [[nodiscard]] LogConversionTable event_stream_to_table(
     const ConvertedEventStream& stream);
+[[nodiscard]] LogConversionTable event_stream_to_table(
+    const ConvertedEventStream& stream,
+    const LogConversionOptions& options);
+[[nodiscard]] ConvertedEventStream event_table_to_event_stream(
+    const LogConversionTable& table,
+    const LogConversionOptions& options = {});
+[[nodiscard]] EventLog event_table_to_event_log(
+    const LogConversionTable& table,
+    const LogConversionOptions& options = {});
+[[nodiscard]] LogConversionTable event_log_to_table(
+    const EventLog& log, const LogConversionOptions& options = {});
+[[nodiscard]] LazyEventTable event_log_to_lazy_table(
+    const EventLog& log, const LogConversionOptions& options = {});
+[[nodiscard]] LogConversionTable lazy_event_table_to_table(
+    const LazyEventTable& table,
+    const LogConversionOptions& options = {});
+[[nodiscard]] ConvertedEventStream lazy_event_table_to_event_stream(
+    const LazyEventTable& table,
+    const LogConversionOptions& options = {});
+[[nodiscard]] EventLog lazy_event_table_to_event_log(
+    const LazyEventTable& table,
+    const LogConversionOptions& options = {});
+[[nodiscard]] ConvertedEventStream event_data_to_event_stream(
+    const EventDataView& data, const LogConversionOptions& options = {});
+[[nodiscard]] LogConversionTable event_data_to_table(
+    const EventDataView& data, const LogConversionOptions& options = {});
+[[nodiscard]] EventLog event_data_to_event_log(
+    const EventDataView& data, const LogConversionOptions& options = {});
+[[nodiscard]] LazyEventTable event_data_to_lazy_table(
+    const EventDataView& data, const LogConversionOptions& options = {});
 [[nodiscard]] AttributedLogGraph event_log_to_attributed_graph(
     const EventLog& log, const LogConversionOptions& options = {});
 

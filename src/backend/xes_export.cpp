@@ -7,6 +7,8 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #include "minera/timestamp.hpp"
 
@@ -54,6 +56,9 @@ std::string_view element_name(AttributeKind kind) {
 // to a string attribute rather than emitting an invalid xs:dateTime.
 void write_typed_attribute(std::ostream& out, std::string_view indent,
                            const EventAttribute& attribute) {
+  // XES scalar elements have no null representation.  Empty strings are
+  // valid values and are intentionally emitted; only explicit nulls vanish.
+  if (attribute.is_null) return;
   if (attribute.kind == AttributeKind::kDate) {
     if (const auto instant = parse_timestamp(attribute.value)) {
       out << indent << "<date key=\"";
@@ -68,6 +73,93 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
   write_xml_escaped(out, attribute.key);
   out << "\" value=\"";
   write_xml_escaped(out, attribute.value);
+  out << "\"/>\n";
+}
+
+void write_extension(std::ostream& out, const LogExtension& extension) {
+  out << "  <extension name=\"";
+  write_xml_escaped(out, extension.name);
+  out << "\" prefix=\"";
+  write_xml_escaped(out, extension.prefix);
+  out << "\" uri=\"";
+  write_xml_escaped(out, extension.uri);
+  out << "\"/>\n";
+}
+
+bool extension_matches(const LogExtension& stored,
+                       const LogExtension& generated) {
+  // Generated attributes keep their canonical key prefixes, so only a stored
+  // declaration for that exact prefix can make the generated declaration
+  // redundant. A matching display name or URI with a different prefix does
+  // not declare the keys emitted below.
+  return !stored.prefix.empty() && stored.prefix == generated.prefix;
+}
+
+bool has_classifier_name(const std::vector<LogClassifier>& classifiers,
+                         std::string_view name) {
+  return std::any_of(classifiers.begin(), classifiers.end(),
+                     [&](const auto& classifier) {
+                       return classifier.name == name;
+                     });
+}
+
+bool is_event_projection_key(std::string_view key) {
+  return key == "concept:name" || key == "time:timestamp" ||
+         key == "org:resource" || key == "lifecycle:transition";
+}
+
+void write_global(std::ostream& out, std::string_view scope,
+                  const std::vector<EventAttribute>& attributes) {
+  out << "  <global scope=\"";
+  write_xml_escaped(out, scope);
+  out << "\">\n";
+  bool has_concept_name = false;
+  for (const auto& attribute : attributes) {
+    has_concept_name = has_concept_name ||
+                       (attribute.key == "concept:name" &&
+                        !attribute.is_null);
+    write_typed_attribute(out, "    ", attribute);
+  }
+  if (!has_concept_name) {
+    write_string_attribute(out, "    ", "concept:name", "");
+  }
+  out << "  </global>\n";
+}
+
+bool classifier_key_needs_quotes(std::string_view key) {
+  if (key.empty()) return true;
+  for (const char character : key) {
+    if (std::isspace(static_cast<unsigned char>(character)) ||
+        character == '\'' || character == '"' || character == '\\') {
+      return true;
+    }
+  }
+  return key.front() == '\'' || key.front() == '"';
+}
+
+std::string serialize_classifier_keys(const std::vector<std::string>& keys) {
+  std::string serialized;
+  for (const auto& key : keys) {
+    if (!serialized.empty()) serialized.push_back(' ');
+    if (!classifier_key_needs_quotes(key)) {
+      serialized += key;
+      continue;
+    }
+    serialized.push_back('\'');
+    for (const char character : key) {
+      if (character == '\'' || character == '\\') serialized.push_back('\\');
+      serialized.push_back(character);
+    }
+    serialized.push_back('\'');
+  }
+  return serialized;
+}
+
+void write_classifier(std::ostream& out, const LogClassifier& classifier) {
+  out << "  <classifier name=\"";
+  write_xml_escaped(out, classifier.name);
+  out << "\" keys=\"";
+  write_xml_escaped(out, serialize_classifier_keys(classifier.keys));
   out << "\"/>\n";
 }
 
@@ -107,25 +199,54 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   out << "<log xes.version=\"1.0\" xes.features=\"\" "
          "xmlns=\"http://www.xes-standard.org/\">\n";
-  out << "  <extension name=\"Concept\" prefix=\"concept\" "
-         "uri=\"http://www.xes-standard.org/concept.xesext\"/>\n";
-  out << "  <extension name=\"Time\" prefix=\"time\" "
-         "uri=\"http://www.xes-standard.org/time.xesext\"/>\n";
+  const std::vector<LogExtension> generated_extensions = {
+      {"Concept", "concept", "http://www.xes-standard.org/concept.xesext"},
+      {"Time", "time", "http://www.xes-standard.org/time.xesext"},
+  };
+  for (const auto& extension : log.metadata.extensions) {
+    write_extension(out, extension);
+  }
+  for (const auto& extension : generated_extensions) {
+    const auto found = std::any_of(
+        log.metadata.extensions.begin(), log.metadata.extensions.end(),
+        [&](const auto& stored) { return extension_matches(stored, extension); });
+    if (!found) write_extension(out, extension);
+  }
   if (any_resource) {
-    out << "  <extension name=\"Organizational\" prefix=\"org\" "
-           "uri=\"http://www.xes-standard.org/org.xesext\"/>\n";
+    const LogExtension extension{
+        "Organizational", "org", "http://www.xes-standard.org/org.xesext"};
+    const auto found = std::any_of(
+        log.metadata.extensions.begin(), log.metadata.extensions.end(),
+        [&](const auto& stored) { return extension_matches(stored, extension); });
+    if (!found) write_extension(out, extension);
   }
   if (any_lifecycle) {
-    out << "  <extension name=\"Lifecycle\" prefix=\"lifecycle\" "
-           "uri=\"http://www.xes-standard.org/lifecycle.xesext\"/>\n";
+    const LogExtension extension{
+        "Lifecycle", "lifecycle",
+        "http://www.xes-standard.org/lifecycle.xesext"};
+    const auto found = std::any_of(
+        log.metadata.extensions.begin(), log.metadata.extensions.end(),
+        [&](const auto& stored) { return extension_matches(stored, extension); });
+    if (!found) write_extension(out, extension);
   }
-  out << "  <global scope=\"trace\">\n"
-         "    <string key=\"concept:name\" value=\"\"/>\n"
-         "  </global>\n";
-  out << "  <global scope=\"event\">\n"
-         "    <string key=\"concept:name\" value=\"\"/>\n"
-         "  </global>\n";
-  out << "  <classifier name=\"Activity\" keys=\"concept:name\"/>\n";
+
+  if (log.metadata.trace_globals.empty()) {
+    write_global(out, "trace", {});
+  } else {
+    write_global(out, "trace", log.metadata.trace_globals);
+  }
+  if (log.metadata.event_globals.empty()) {
+    write_global(out, "event", {});
+  } else {
+    write_global(out, "event", log.metadata.event_globals);
+  }
+
+  for (const auto& classifier : log.metadata.classifiers) {
+    write_classifier(out, classifier);
+  }
+  if (!has_classifier_name(log.metadata.classifiers, "Activity")) {
+    write_classifier(out, {"Activity", {"concept:name"}});
+  }
   write_string_attribute(out, "  ", "concept:name", name);
   for (const auto& attribute : log.attributes) {
     // Avoid two log-name attributes when a caller constructed one manually;
@@ -139,7 +260,10 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
     out << "  <trace>\n";
     write_string_attribute(out, "    ", "concept:name", trace.case_id);
     for (const auto& attribute : trace.attributes) {
-      write_typed_attribute(out, "    ", attribute);
+      // The first-class case id is always emitted above.  A manually supplied
+      // canonical trace attribute must not create a duplicate XES key.
+      if (attribute.key != "concept:name")
+        write_typed_attribute(out, "    ", attribute);
     }
     for (const auto& event : trace.events) {
       out << "    <event>\n";
@@ -164,7 +288,10 @@ void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
                                event.lifecycle);
       }
       for (const auto& attribute : event.attributes) {
-        write_typed_attribute(out, "      ", attribute);
+        // First-class projections above are authoritative for canonical XES
+        // keys; generic aliases remain available for custom consumers.
+        if (!is_event_projection_key(attribute.key))
+          write_typed_attribute(out, "      ", attribute);
       }
       out << "    </event>\n";
     }

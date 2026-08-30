@@ -310,7 +310,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
             ? std::numeric_limits<std::size_t>::max()
             : start + options.sub_log_size);
     EventLog raw;
-    raw.attributes = log.attributes;
+    copy_event_log_context(log, raw);
     raw.traces.insert(raw.traces.end(), log.traces.begin() + start,
                       log.traces.begin() + end);
     result.sublogs.push_back(raw);
@@ -319,7 +319,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
                                        options.activity_attribute));
     // Keep this field cumulative from the beginning, as requested by the API.
     EventLog cumulative_copy;
-    cumulative_copy.attributes = log.attributes;
+    copy_event_log_context(log, cumulative_copy);
     cumulative_copy.traces.insert(cumulative_copy.traces.end(), log.traces.begin(),
                                    log.traces.begin() + end);
     result.cumulative_sublogs.push_back(std::move(cumulative_copy));
@@ -392,7 +392,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
     }
 
     EventLog segment;
-    segment.attributes = log.attributes;
+    copy_event_log_context(log, segment);
     result.returned_sublogs.reserve(result.change_points.size() + 1);
     for (std::size_t i = 0; i < result.sublogs.size(); ++i) {
       const auto& raw = result.sublogs[i];
@@ -401,7 +401,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
       if (drift_boundaries[i + 1] || i + 1 == result.sublogs.size()) {
         result.returned_sublogs.push_back(std::move(segment));
         segment = EventLog{};
-        segment.attributes = log.attributes;
+        copy_event_log_context(log, segment);
       }
     }
   }
