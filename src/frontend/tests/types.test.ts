@@ -178,6 +178,7 @@ describe("isDfgPlayoutVariantsResult", () => {
   const valid = {
     family: "DFG_PLAYOUT", variant: "CLASSIC", return_variants: true,
     complete: true, interrupted: false,
+    completed_traces: 0, truncated_traces: 0,
     variants: [{ activities: ["A", "B"], occurrences: 3 }],
   };
   it("accepts deterministic sequence/count envelopes", () => {
@@ -187,6 +188,7 @@ describe("isDfgPlayoutVariantsResult", () => {
     expect(isDfgPlayoutVariantsResult({ ...valid, variants: [{ activities: [], occurrences: 1 }] })).toBe(false);
     expect(isDfgPlayoutVariantsResult({ ...valid, variants: [{ activities: ["A"], occurrences: -1 }] })).toBe(false);
     expect(isDfgPlayoutVariantsResult({ ...valid, interrupted: "false" })).toBe(false);
+    expect(isDfgPlayoutVariantsResult({ ...valid, truncated_traces: -1 })).toBe(false);
   });
 });
 
