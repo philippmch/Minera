@@ -31,6 +31,34 @@ try {
   if (result.status === 0 || !result.stderr.includes("variants differ")) {
     throw new Error(`variant drift was not rejected: ${result.stderr}`);
   }
+
+  const artifactManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const complete = artifactManifest.packages.find((entry) => entry.status === "complete");
+  complete.artifacts = ["src/backend/does-not-exist.cpp"];
+  const missingArtifact = resolve(directory, "missing-artifact.json");
+  writeFileSync(missingArtifact, JSON.stringify(artifactManifest), "utf8");
+  const artifactResult = spawnSync(
+    process.execPath,
+    [verifier, checkout, "--manifest", missingArtifact],
+    { encoding: "utf8" },
+  );
+  if (artifactResult.status === 0 || !artifactResult.stderr.includes("artifact does not exist")) {
+    throw new Error(`missing artifact was not rejected: ${artifactResult.stderr}`);
+  }
+
+  const requiredManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const requiredPackage = requiredManifest.artifact_required_packages[0];
+  delete requiredManifest.packages.find((entry) => entry.package === requiredPackage).artifacts;
+  const absentArtifacts = resolve(directory, "absent-artifacts.json");
+  writeFileSync(absentArtifacts, JSON.stringify(requiredManifest), "utf8");
+  const absentResult = spawnSync(
+    process.execPath,
+    [verifier, checkout, "--manifest", absentArtifacts],
+    { encoding: "utf8" },
+  );
+  if (absentResult.status === 0 || !absentResult.stderr.includes("requires an artifact list")) {
+    throw new Error(`required artifact list was not enforced: ${absentResult.stderr}`);
+  }
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

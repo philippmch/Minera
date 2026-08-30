@@ -3,6 +3,9 @@
     "tag": "2.7.22",
     "commit": "0715c31f3f1d85924107d6aa5329806db69df899"
   },
+  "artifact_required_packages": [
+    "algo.simulation.tree_generator"
+  ],
   "packages": [
     {
       "package": "algo.analysis.extended_marking_equation",
@@ -669,8 +672,22 @@
         "BASIC",
         "PTANDLOGGENERATOR"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/random_tree.hpp",
+        "src/backend/random_tree.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_random_tree.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/app-logic.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.transformation.log_to_features",
