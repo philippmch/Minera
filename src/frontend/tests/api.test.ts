@@ -8,6 +8,26 @@ import { requestWindowsEvents, windowsEventsQuery } from "../src/api";
 import { requestWorkflowHistory } from "../src/api";
 import { requestEnterpriseHistory } from "../src/api";
 import { requestCommunicationHistory } from "../src/api";
+import { knowledgeInjectionQuery, requestKnowledgeInjection } from "../src/api";
+
+describe("knowledge injection API", () => {
+  it("serializes bounded provider-neutral prompt options", () => {
+    expect(knowledgeInjectionQuery({
+      knowledge_variant: "database", knowledge_query: "count cases",
+      knowledge_database_schema: "events(case_id)", knowledge_max_input_bytes: 100,
+    })).toBe("knowledge_variant=database&knowledge_query=count+cases&knowledge_database_schema=events%28case_id%29&knowledge_max_input_bytes=100");
+    expect(() => knowledgeInjectionQuery({ knowledge_max_prompt_bytes: 0 })).toThrow(/positive integer/);
+  });
+  it("validates prompt-construction results", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({
+      family: "KNOWLEDGE_INJECTION", variant: "description", computed: true,
+      prompt: "Description\\nmodel", input_bytes: 5, error: "",
+    }) })));
+    await expect(requestKnowledgeInjection({ knowledge_description: "model" }))
+      .resolves.toMatchObject({ family: "KNOWLEDGE_INJECTION", computed: true });
+    vi.unstubAllGlobals();
+  });
+});
 
 describe("browser history API", () => {
   it("serializes explicit local connector options", () => {

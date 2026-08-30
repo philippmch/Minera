@@ -3663,6 +3663,28 @@ void log_conversion_params_contract() {
 
 }  // namespace
 
+void knowledge_injection_params_contract() {
+  const auto options = minera::parse_knowledge_injection_params(fields({
+      {"knowledge_variant", "database"},
+      {"knowledge_description", "description"},
+      {"knowledge_query", "query"},
+      {"knowledge_database_schema", "events(id)"},
+      {"knowledge_max_input_bytes", "100"},
+      {"knowledge_max_prompt_bytes", "200"}}),
+      [](std::string_view) { return true; });
+  assert(options.variant == minera::KnowledgeInjectionVariant::kDatabase);
+  assert(options.description == "description" && options.query == "query");
+  assert(options.database_schema == "events(id)");
+  assert(options.max_input_bytes == 100 && options.max_prompt_bytes == 200);
+  bool threw = false;
+  try {
+    (void)minera::parse_knowledge_injection_params(
+        fields({{"knowledge_max_input_bytes", "0"}}),
+        [](std::string_view name) { return name == "knowledge_max_input_bytes"; });
+  } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
 int main() {
   ends_with_ci_is_case_insensitive();
   looks_like_xes_uses_extension_then_content_sniff();
@@ -3752,6 +3774,7 @@ int main() {
   workflow_history_params_contract();
   enterprise_history_params_contract();
   communication_history_params_contract();
+  knowledge_injection_params_contract();
   windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();

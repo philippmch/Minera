@@ -82,6 +82,7 @@ add_library(minera_core
   src/backend/live_stream.cpp
   src/backend/link_analysis.cpp
   src/backend/json_export.cpp
+  src/backend/knowledge_injection.cpp
   src/backend/log_filter.cpp
   src/backend/log_conversion.cpp
   src/backend/path_filter.cpp
@@ -1196,4 +1197,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_overlap_json_tests PRIVATE cxx_std_20)
   target_compile_options(minera_overlap_json_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_overlap_json_tests COMMAND minera_overlap_json_tests)
+
+  add_executable(minera_knowledge_injection_tests
+    src/backend/tests/test_knowledge_injection.cpp
+  )
+  target_link_libraries(minera_knowledge_injection_tests PRIVATE minera::core)
+  target_compile_features(minera_knowledge_injection_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_knowledge_injection_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_knowledge_injection_tests
+           COMMAND minera_knowledge_injection_tests)
 endif()

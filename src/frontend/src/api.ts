@@ -6181,3 +6181,34 @@ export async function requestOcelConformance(
   if (!isOcelConformanceResult(payload)) throw new Error("the Minera backend returned an invalid OCEL conformance result");
   return payload;
 }
+
+export function knowledgeInjectionQuery(options: import("./types").KnowledgeInjectionOptions = {}): string {
+  const query = new URLSearchParams();
+  const variant = options.knowledge_variant;
+  if (variant !== undefined && !["description", "process_mining", "database"].includes(variant))
+    throw new Error("knowledge_variant is not supported");
+  const positive = (name: string, value: number | undefined) => {
+    if (value === undefined) return;
+    if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+    query.set(name, String(value));
+  };
+  if (variant !== undefined) query.set("knowledge_variant", variant);
+  if (options.knowledge_description !== undefined) query.set("knowledge_description", options.knowledge_description);
+  if (options.knowledge_query !== undefined) query.set("knowledge_query", options.knowledge_query);
+  if (options.knowledge_database_schema !== undefined) query.set("knowledge_database_schema", options.knowledge_database_schema);
+  positive("knowledge_max_input_bytes", options.knowledge_max_input_bytes);
+  positive("knowledge_max_prompt_bytes", options.knowledge_max_prompt_bytes);
+  return query.toString();
+}
+
+export async function requestKnowledgeInjection(
+  options: import("./types").KnowledgeInjectionOptions = {},
+): Promise<import("./types").KnowledgeInjectionResult> {
+  const query = knowledgeInjectionQuery(options);
+  const response = await fetch(`/api/knowledge-injection${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) throw new Error(`the Minera backend answered with status ${response.status}`);
+  const payload: unknown = await response.json();
+  const { isKnowledgeInjectionResult } = await import("./types");
+  if (!isKnowledgeInjectionResult(payload)) throw new Error("the Minera backend returned an invalid knowledge injection result");
+  return payload;
+}

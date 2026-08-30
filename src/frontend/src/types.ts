@@ -368,6 +368,33 @@ export type ResourceProfilesMetric = "distinct_activities" | "activity_frequency
 export interface ResourceProfilesRow { resource: string; activity: string; resource2: string; value: number; count: number; }
 export interface ResourceProfilesResult { family: "RESOURCE_PROFILES"; metric: ResourceProfilesMetric; rows: ResourceProfilesRow[]; diagnostics: { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; resource_count: number; message: string }; }
 export interface ResourceProfilesOptions { resource_profiles_metric?: ResourceProfilesMetric; resource_profiles_activity_attribute?: string; resource_profiles_resource_attribute?: string; resource_profiles_timestamp_attribute?: string; resource_profiles_start_timestamp_attribute?: string; resource_profiles_case_id_attribute?: string; resource_profiles_t1?: string; resource_profiles_t2?: string; resource_profiles_resource?: string; resource_profiles_activity?: string; resource_profiles_resource2?: string; resource_profiles_max_resources?: number; resource_profiles_max_rows?: number; }
+
+export type KnowledgeInjectionVariant = "description" | "process_mining" | "database";
+export interface KnowledgeInjectionOptions {
+  knowledge_variant?: KnowledgeInjectionVariant;
+  knowledge_description?: string;
+  knowledge_query?: string;
+  knowledge_database_schema?: string;
+  knowledge_max_input_bytes?: number;
+  knowledge_max_prompt_bytes?: number;
+}
+export interface KnowledgeInjectionResult {
+  family: "KNOWLEDGE_INJECTION";
+  variant: KnowledgeInjectionVariant;
+  computed: boolean;
+  prompt: string;
+  input_bytes: number;
+  error: string;
+}
+export function isKnowledgeInjectionResult(value: unknown): value is KnowledgeInjectionResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<KnowledgeInjectionResult>;
+  return result.family === "KNOWLEDGE_INJECTION" &&
+    (result.variant === "description" || result.variant === "process_mining" || result.variant === "database") &&
+    typeof result.computed === "boolean" && typeof result.prompt === "string" &&
+    Number.isSafeInteger(result.input_bytes) && (result.input_bytes as number) >= 0 &&
+    typeof result.error === "string";
+}
 export function isResourceProfilesResult(value: unknown): value is ResourceProfilesResult {
   if (!value || typeof value !== "object") return false; const c = value as Partial<ResourceProfilesResult>; const d = c.diagnostics;
   const metrics = new Set<ResourceProfilesMetric>(["distinct_activities", "activity_frequency", "activity_completions", "case_completions", "fraction_case_completions", "average_workload", "multitasking", "average_duration_activity", "average_case_duration", "interaction_two_resources", "social_position"]);
