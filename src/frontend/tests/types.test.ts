@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, type MineraExport } from "../src/types";
+import { isGeneticMatrixConversionResult } from "../src/types";
 
 describe("isProcessTreePlayoutSetResult", () => {
   const valid = {
@@ -778,6 +779,7 @@ describe("isILPMinerResult", () => {
 describe("isGeneticMinerResult", () => {
   const valid = {
     family: "GENETIC",
+    matrix: { activities: ["A"], input_map: [[]], output_map: [[]] },
     net: { place_count: 2, source: 0, sink: 1, activities: ["A"], transitions: [{ activity: 0, inputs: [0], outputs: [1] }] },
     markings: { initial: [1, 0], final: [0, 1] },
     diagnostics: { computed: true, exhausted: false, generations_completed: 2, candidates_evaluated: 8, population_size: 4, activity_count: 1, best_fitness: 1, seed: 7, message: "done" },
@@ -786,6 +788,25 @@ describe("isGeneticMinerResult", () => {
   it("rejects invalid activity and marking references", () => {
     expect(isGeneticMinerResult({ ...valid, net: { ...valid.net, transitions: [{ activity: 2, inputs: [0], outputs: [1] }] } })).toBe(false);
     expect(isGeneticMinerResult({ ...valid, markings: { initial: [1], final: [0, 1] } })).toBe(false);
+  });
+});
+
+describe("isGeneticMatrixConversionResult", () => {
+  const valid = {
+    family: "GENETIC_MATRIX_CONVERSION",
+    variant: "TO_PETRI_NET",
+    matrix: { activities: ["A", "B"], input_map: [[], [[0]]], output_map: [[[1]], []] },
+    net: { place_count: 3, source: 0, sink: 1, activities: ["A", "B"], transitions: [
+      { activity: 0, inputs: [0], outputs: [2] },
+      { activity: 1, inputs: [2], outputs: [1] },
+    ] },
+    markings: { initial: [1, 0, 0], final: [0, 1, 0] },
+  };
+  it("accepts a normalized matrix and converted workflow net", () =>
+    expect(isGeneticMatrixConversionResult(valid)).toBe(true));
+  it("rejects invalid matrix references and mismatched activity tables", () => {
+    expect(isGeneticMatrixConversionResult({ ...valid, matrix: { ...valid.matrix, input_map: [[], [[2]]] } })).toBe(false);
+    expect(isGeneticMatrixConversionResult({ ...valid, net: { ...valid.net, activities: ["B", "A"] } })).toBe(false);
   });
 });
 

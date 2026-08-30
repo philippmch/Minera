@@ -4384,8 +4384,36 @@ std::string ilp_miner_json(const ILPMinerResult& result) {
 std::string genetic_miner_json(const GeneticMinerResult& result) {
   const auto& net = result.net;
   std::ostringstream out;
-  out << "{\"family\":\"GENETIC\",\"net\":{\"place_count\":"
-      << net.place_count() << ",\"source\":" << net.source()
+  const auto write_matrix_map = [&](const GeneticMatrixMap& map) {
+    out << '[';
+    for (std::size_t activity = 0; activity < map.size(); ++activity) {
+      if (activity) out << ',';
+      out << '[';
+      for (std::size_t group = 0; group < map[activity].size(); ++group) {
+        if (group) out << ',';
+        out << '[';
+        for (std::size_t member = 0; member < map[activity][group].size();
+             ++member) {
+          if (member) out << ',';
+          out << map[activity][group][member];
+        }
+        out << ']';
+      }
+      out << ']';
+    }
+    out << ']';
+  };
+  out << "{\"family\":\"GENETIC\",\"matrix\":{\"activities\":[";
+  for (std::size_t i = 0; i < result.matrix.activities.size(); ++i) {
+    if (i) out << ',';
+    write_json_string(out, result.matrix.activities[i]);
+  }
+  out << "],\"input_map\":";
+  write_matrix_map(result.matrix.input_map);
+  out << ",\"output_map\":";
+  write_matrix_map(result.matrix.output_map);
+  out << "},\"net\":{\"place_count\":" << net.place_count()
+      << ",\"source\":" << net.source()
       << ",\"sink\":" << net.sink() << ",\"activities\":[";
   for (std::size_t i = 0; i < net.activities().size(); ++i) {
     if (i) out << ',';

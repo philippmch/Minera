@@ -633,6 +633,16 @@ PetriNet to_petri_net(const Individual& individual,
   return net;
 }
 
+GeneticCausalMatrix to_causal_matrix(
+    const Individual& individual,
+    const std::vector<std::string>& names) {
+  GeneticCausalMatrix matrix;
+  matrix.activities = names;
+  matrix.input_map = individual.input;
+  matrix.output_map = individual.output;
+  return matrix;
+}
+
 double fitness(const EventLog& log, const PetriNet& net) {
   const auto conformance = check_conformance(log, net);
   if (conformance.trace_count == 0) return 0.0;
@@ -814,11 +824,10 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
     ++result.diagnostics.generations_completed;
   }
 
-  result.net = to_petri_net(best, log.names);
-  result.markings.initial.assign(result.net.place_count(), 0);
-  result.markings.final.assign(result.net.place_count(), 0);
-  result.markings.initial[result.net.source()] = 1;
-  result.markings.final[result.net.sink()] = 1;
+  result.matrix = to_causal_matrix(best, log.names);
+  const auto conversion = convert_genetic_matrix_to_petri_net(result.matrix);
+  result.net = conversion.net;
+  result.markings = conversion.markings;
   result.diagnostics.best_fitness = best_fitness;
   result.diagnostics.computed = true;
   result.diagnostics.message = result.diagnostics.exhausted

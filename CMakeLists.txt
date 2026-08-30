@@ -63,6 +63,7 @@ add_library(minera_core
   src/backend/event_ordering.cpp
   src/backend/eventually_follows.cpp
   src/backend/footprints.cpp
+  src/backend/genetic_matrix_conversion.cpp
   src/backend/genetic_miner.cpp
   src/backend/gzip_codec.cpp
   src/backend/footprints_models.cpp
@@ -517,6 +518,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_genetic_miner_tests PRIVATE cxx_std_20)
   target_compile_options(minera_genetic_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_genetic_miner_tests COMMAND minera_genetic_miner_tests)
+
+  add_executable(minera_genetic_matrix_conversion_tests
+    src/backend/tests/test_genetic_matrix_conversion.cpp
+  )
+  target_link_libraries(minera_genetic_matrix_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_genetic_matrix_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_genetic_matrix_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_genetic_matrix_conversion_tests COMMAND minera_genetic_matrix_conversion_tests)
 
   add_executable(minera_role_discovery_tests
     src/backend/tests/test_role_discovery.cpp

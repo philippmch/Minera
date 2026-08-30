@@ -48,6 +48,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/ilp_miner.hpp"
 #include "minera/genetic_miner.hpp"
+#include "minera/genetic_matrix_conversion.hpp"
 #include "minera/trace_variant_query.hpp"
 #include "minera/pripel.hpp"
 #include "minera/organizational_mining.hpp"
@@ -440,6 +441,8 @@ int usage(const char* program) {
                "  --ilp-noise-threshold <f> ILP threshold in [0,1]\n"
                "  --ilp-max-nodes <n>       Positive ILP search bound\n"
                "  --genetic-mine            Emit standalone classic genetic JSON\n"
+               "  --genetic-matrix-convert  Convert the discovered causal matrix\n"
+               "  --genetic-conversion-variant <id> to_petri_net\n"
                "  --genetic-activity-key <name> Event attribute used as activity\n"
                "  --genetic-timestamp-key <name> Event timestamp attribute\n"
                "  --genetic-case-id-key <name> Case id or event/trace attribute\n"
@@ -1414,6 +1417,7 @@ int main(int argc, char** argv) {
   bool ilp_mine_requested = false;
   std::map<std::string, std::string> ilp_fields;
   bool genetic_mine_requested = false;
+  bool genetic_matrix_conversion_requested = false;
   std::map<std::string, std::string> genetic_fields;
   bool organizational_sna_requested = false;
   std::map<std::string, std::string> organizational_sna_fields;
@@ -2248,6 +2252,11 @@ int main(int argc, char** argv) {
       genetic_mine_requested = true;
       continue;
     }
+    if (arg == "--genetic-matrix-convert") {
+      genetic_mine_requested = true;
+      genetic_matrix_conversion_requested = true;
+      continue;
+    }
     if (arg.rfind("--genetic-", 0) == 0) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -2259,7 +2268,7 @@ int main(int argc, char** argv) {
           "genetic_generations", "genetic_elitism_rate",
           "genetic_crossover_rate", "genetic_mutation_rate",
           "genetic_elitism_min_sample", "genetic_max_activities",
-          "genetic_max_states"};
+          "genetic_max_states", "genetic_conversion_variant"};
       if (!genetic_option_names.contains(key)) return usage(argv[0]);
       genetic_fields.insert_or_assign(std::move(key), value);
       genetic_mine_requested = true;
@@ -5089,9 +5098,22 @@ int main(int argc, char** argv) {
       const auto present = [&](std::string_view name) {
         return genetic_fields.contains(std::string(name));
       };
+      if (!genetic_matrix_conversion_requested &&
+          genetic_fields.contains("genetic_conversion_variant"))
+        throw std::invalid_argument(
+            "--genetic-conversion-variant requires --genetic-matrix-convert");
       const auto options = minera::parse_genetic_miner_params(lookup, present);
-      const auto body = minera::genetic_miner_json(
-          minera::mine_genetic(log, options));
+      const auto mined = minera::mine_genetic(log, options);
+      const auto body = [&] {
+        if (!genetic_matrix_conversion_requested)
+          return minera::genetic_miner_json(mined);
+        const auto variant = genetic_fields.contains("genetic_conversion_variant")
+                                 ? minera::parse_genetic_matrix_conversion_variant(
+                                       genetic_fields.at("genetic_conversion_variant"))
+                                 : minera::GeneticMatrixConversionVariant::kToPetriNet;
+        return minera::genetic_matrix_conversion_json(
+            minera::convert_genetic_matrix(mined.matrix, variant));
+      }();
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

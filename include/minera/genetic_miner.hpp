@@ -5,6 +5,7 @@
 #include <string>
 
 #include "minera/event_log.hpp"
+#include "minera/genetic_matrix_conversion.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/petri_net.hpp"
 
@@ -43,6 +44,7 @@ struct GeneticMinerDiagnostics {
 };
 
 struct GeneticMinerResult {
+  GeneticCausalMatrix matrix;
   PetriNet net;
   WorkflowMarkings markings;
   GeneticMinerDiagnostics diagnostics;

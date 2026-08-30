@@ -2628,8 +2628,9 @@ void handle_ilp_mine(const httplib::Request& request,
 // Hidden cached-session adapter for bounded classic genetic discovery. The
 // source log is the latest /api/mine session and all evolutionary limits are
 // checked again at the server boundary.
-void handle_genetic_mine(const httplib::Request& request,
-                         httplib::Response& response) {
+void handle_genetic_request(const httplib::Request& request,
+                            httplib::Response& response,
+                            bool convert_matrix) {
   try {
     std::shared_ptr<const MinedSession> session;
     {
@@ -2648,11 +2649,14 @@ void handle_genetic_mine(const httplib::Request& request,
         "genetic_generations", "genetic_elitism_rate",
         "genetic_crossover_rate", "genetic_mutation_rate",
         "genetic_elitism_min_sample", "genetic_max_activities",
-        "genetic_max_states"};
+        "genetic_max_states", "genetic_conversion_variant"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
         throw std::invalid_argument("unknown genetic parameter: " + key);
+      if (!convert_matrix && key == "genetic_conversion_variant")
+        throw std::invalid_argument(
+            "genetic_conversion_variant requires the conversion endpoint");
     }
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
@@ -2669,12 +2673,33 @@ void handle_genetic_mine(const httplib::Request& request,
       throw std::invalid_argument("genetic safety bound exceeded");
     }
     const auto result = minera::mine_genetic(session->log, options);
-    response.set_content(minera::genetic_miner_json(result),
-                         "application/json");
+    if (convert_matrix) {
+      const auto variant = request.has_param("genetic_conversion_variant")
+          ? minera::parse_genetic_matrix_conversion_variant(
+                request.get_param_value("genetic_conversion_variant"))
+          : minera::GeneticMatrixConversionVariant::kToPetriNet;
+      response.set_content(minera::genetic_matrix_conversion_json(
+                               minera::convert_genetic_matrix(result.matrix,
+                                                              variant)),
+                           "application/json");
+    } else {
+      response.set_content(minera::genetic_miner_json(result),
+                           "application/json");
+    }
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
   }
+}
+
+void handle_genetic_mine(const httplib::Request& request,
+                         httplib::Response& response) {
+  handle_genetic_request(request, response, false);
+}
+
+void handle_genetic_matrix_conversion(const httplib::Request& request,
+                                      httplib::Response& response) {
+  handle_genetic_request(request, response, true);
 }
 
 // Hidden cached-session adapter for bounded organizational SNA metrics.
@@ -6352,6 +6377,7 @@ int main(int argc, char** argv) {
   server.Options("/api/mine-ilp", preflight);
   server.Options("/api/genetic-mine", preflight);
   server.Options("/api/mine-genetic", preflight);
+  server.Options("/api/genetic-matrix-convert", preflight);
   server.Options("/api/organizational-sna", preflight);
   server.Options("/api/sna", preflight);
   server.Options("/api/network-analysis", preflight);
@@ -6439,6 +6465,7 @@ int main(int argc, char** argv) {
   server.Post("/api/mine-ilp", handle_ilp_mine);
   server.Post("/api/genetic-mine", handle_genetic_mine);
   server.Post("/api/mine-genetic", handle_genetic_mine);
+  server.Post("/api/genetic-matrix-convert", handle_genetic_matrix_conversion);
   server.Post("/api/organizational-sna", handle_organizational_sna);
   server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/network-analysis", handle_network_analysis);
