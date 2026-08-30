@@ -332,6 +332,21 @@ int main() {
          std::string::npos);
   assert(similarity_json.find("\"dimensions\":32") != std::string::npos);
 
+  auto invalid_serialized = cases;
+  invalid_serialized.items[0].values.pop_back();
+  bool serialized_rejected = false;
+  try { (void)serialize_embeddings_json(invalid_serialized); }
+  catch (const std::invalid_argument&) { serialized_rejected = true; }
+  assert(serialized_rejected);
+  auto invalid_matches = matches;
+  invalid_matches[0].score = std::numeric_limits<double>::quiet_NaN();
+  serialized_rejected = false;
+  try {
+    (void)serialize_embedding_similarity_json(
+        "Approve Ship", cases, invalid_matches, 1);
+  } catch (const std::invalid_argument&) { serialized_rejected = true; }
+  assert(serialized_rejected);
+
   bool threw = false;
   try {
     options.dimensions = 0;

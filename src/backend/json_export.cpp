@@ -4245,8 +4245,40 @@ std::string log_to_features_json(const LogToFeaturesResult& result) {
       case LogToFeaturesVariant::TRACE_BASED: return "trace_based";
       case LogToFeaturesVariant::TEMPORAL: return "temporal";
     }
-    return "event_based";
+    throw std::invalid_argument("log_to_features: unknown result variant");
   };
+  std::set<std::string> unique_features;
+  for (const auto& name : result.feature_names)
+    if (name.empty() || !unique_features.insert(name).second)
+      throw std::invalid_argument("log_to_features: invalid result feature schema");
+  const auto valid_row = [&](const std::vector<double>& row) {
+    return row.size() == result.feature_names.size() &&
+           std::all_of(row.begin(), row.end(), [](double value) {
+             return std::isfinite(value);
+           });
+  };
+  if (result.variant == LogToFeaturesVariant::EVENT_BASED) {
+    if (!result.trace_rows.empty() || !result.temporal_rows.empty())
+      throw std::invalid_argument("log_to_features: mixed result row families");
+    for (const auto& trace : result.event_rows)
+      for (const auto& row : trace)
+        if (!valid_row(row))
+          throw std::invalid_argument("log_to_features: invalid event result row");
+  } else if (result.variant == LogToFeaturesVariant::TRACE_BASED) {
+    if (!result.event_rows.empty() || !result.temporal_rows.empty() ||
+        (!result.case_ids.empty() && result.case_ids.size() != result.trace_rows.size()))
+      throw std::invalid_argument("log_to_features: inconsistent trace result");
+    for (const auto& row : result.trace_rows)
+      if (!valid_row(row))
+        throw std::invalid_argument("log_to_features: invalid trace result row");
+  } else if (result.variant == LogToFeaturesVariant::TEMPORAL) {
+    if (!result.event_rows.empty() || !result.trace_rows.empty() ||
+        !result.case_ids.empty())
+      throw std::invalid_argument("log_to_features: mixed temporal result");
+    for (const auto& row : result.temporal_rows)
+      if (!std::isfinite(row.timestamp) || !valid_row(row.values))
+        throw std::invalid_argument("log_to_features: invalid temporal result row");
+  }
   std::ostringstream out;
   out << "{\"family\":\"LOG_TO_FEATURES\",\"variant\":";
   write_json_string(out, variant_name());

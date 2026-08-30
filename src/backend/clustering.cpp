@@ -391,6 +391,25 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
 }
 
 std::string trace_attribute_clustering_json(const TraceAttributeClusteringResult& r) {
+  std::set<std::string> leaves;
+  std::size_t node_count = 0;
+  std::function<void(const TraceAttributeClusteringNode&)> validate = [&](const auto& node) {
+    ++node_count;
+    if (node.name.empty() || !std::isfinite(node.distance) || node.distance < 0.0)
+      throw std::invalid_argument("clustering: malformed result node");
+    if (node.leaf) {
+      if (!node.children.empty() || node.size == 0 || !leaves.insert(node.name).second)
+        throw std::invalid_argument("clustering: malformed result leaf");
+    } else if (node.children.empty()) {
+      throw std::invalid_argument("clustering: internal result node has no children");
+    }
+    for (const auto& child : node.children) validate(child);
+  };
+  validate(r.tree);
+  if (leaves != std::set<std::string>(r.leaf_names.begin(), r.leaf_names.end()) ||
+      r.diagnostics.group_count != r.leaf_names.size() ||
+      r.diagnostics.node_count != node_count)
+    throw std::invalid_argument("clustering: inconsistent result diagnostics");
   std::function<void(std::ostringstream&, const TraceAttributeClusteringNode&)> emit = [&](auto& o, const auto& n){ o << "{\"name\":" << json_quote(n.name) << ",\"distance\":" << std::setprecision(17) << n.distance << ",\"size\":" << n.size << ",\"leaf\":" << (n.leaf?"true":"false") << ",\"children\":["; for(std::size_t i=0;i<n.children.size();++i){if(i)o<<',';emit(o,n.children[i]);} o << "]}"; };
   std::ostringstream out;
   out << "{\"family\":\"TRACE_ATTRIBUTE_CLUSTERING\",\"tree\":";
@@ -828,11 +847,32 @@ ProfileClusteringResult discover_profile_clustering(
 }
 
 std::string profile_clustering_json(const ProfileClusteringResult& result) {
+  if (result.variant != ProfileClusteringVariant::kSklearnProfiles)
+    throw std::invalid_argument("profile clustering: unsupported result variant");
+  const auto rows = result.labels.size();
+  const auto dimensions = result.feature_names.size();
+  if (!std::isfinite(result.inertia) || result.inertia < 0.0 ||
+      result.centroids.size() != result.clusters.size() ||
+      result.diagnostics.trace_count != rows ||
+      result.diagnostics.feature_count != dimensions ||
+      result.diagnostics.cluster_count != result.clusters.size())
+    throw std::invalid_argument("profile clustering: inconsistent result diagnostics");
+  std::vector<bool> seen(rows, false);
+  for (std::size_t cluster = 0; cluster < result.clusters.size(); ++cluster) {
+    if (result.centroids[cluster].size() != dimensions ||
+        !std::all_of(result.centroids[cluster].begin(), result.centroids[cluster].end(),
+                     [](double value) { return std::isfinite(value); }))
+      throw std::invalid_argument("profile clustering: malformed centroid");
+    for (const auto row : result.clusters[cluster]) {
+      if (row >= rows || seen[row] || result.labels[row] != static_cast<int>(cluster))
+        throw std::invalid_argument("profile clustering: invalid cluster partition");
+      seen[row] = true;
+    }
+  }
+  if (!std::all_of(seen.begin(), seen.end(), [](bool value) { return value; }))
+    throw std::invalid_argument("profile clustering: incomplete cluster partition");
   std::ostringstream out;
-  const std::string variant =
-      result.variant == ProfileClusteringVariant::kSklearnProfiles
-          ? "sklearn_profiles"
-          : "unknown";
+  const std::string variant = "sklearn_profiles";
   out << "{\"family\":\"PROFILE_CLUSTERING\",\"variant\":";
   out << json_quote(variant) << ",\"labels\":[";
   for (std::size_t i = 0; i < result.labels.size(); ++i) {
