@@ -2080,26 +2080,38 @@ export interface OcelDescriptionResult {
   family: "OCEL_DESCRIPTION";
   variant: OcelDescriptionVariant;
   includes_timestamps: boolean;
+  event_count: number;
+  object_count: number;
   text?: string;
   events?: string[][];
+  event_object_counts?: number[];
   objects?: Array<Array<string | number>>;
 }
 export function isOcelDescriptionResult(value: unknown): value is OcelDescriptionResult {
   if (!isOcelRecord(value) || value.family !== "OCEL_DESCRIPTION" ||
       (value.variant !== "VARIANT1" && value.variant !== "VARIANT2") ||
-      typeof value.includes_timestamps !== "boolean") return false;
+      typeof value.includes_timestamps !== "boolean" ||
+      !Number.isInteger(value.event_count) || (value.event_count as number) < 0 ||
+      !Number.isInteger(value.object_count) || (value.object_count as number) < 0) return false;
   if (value.variant === "VARIANT1") return typeof value.text === "string";
   if (!Array.isArray(value.events) || !value.events.every((event) =>
       Array.isArray(event) && event.length >= 1 &&
       event.every((item) => typeof item === "string"))) return false;
-  if (!Array.isArray(value.objects)) return false;
+  if (!Array.isArray(value.event_object_counts) ||
+      value.event_object_counts.length !== value.events.length ||
+      !value.event_object_counts.every((count, index) => Number.isInteger(count) && count >= 0 &&
+        (value.events as string[][])[index].length === 1 + count + (value.includes_timestamps ? 1 : 0)) ||
+      value.event_count !== value.events.length || !Array.isArray(value.objects) ||
+      value.object_count !== value.objects.length) return false;
   return value.objects.every((object) => {
     if (!Array.isArray(object) || (value.includes_timestamps
-        ? object.length !== 5 : object.length !== 2)) return false;
+        ? object.length !== 6 : object.length !== 2)) return false;
     return typeof object[0] === "string" && typeof object[1] === "string" &&
       (!value.includes_timestamps ||
-        (typeof object[2] === "string" && typeof object[3] === "string" &&
-         typeof object[4] === "number" && Number.isFinite(object[4])));
+        (typeof object[2] === "boolean" && typeof object[3] === "string" &&
+         typeof object[4] === "string" && typeof object[5] === "number" &&
+         Number.isFinite(object[5]) && object[5] >= 0 &&
+         (object[2] || (object[3] === "" && object[4] === "" && object[5] === 0))));
   });
 }
 

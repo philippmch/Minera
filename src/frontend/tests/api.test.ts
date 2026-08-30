@@ -2385,6 +2385,7 @@ describe("OCEL API", () => {
   it("posts an OCEL description request and validates tuple output", async () => {
     const payload = {
       family: "OCEL_DESCRIPTION", variant: "VARIANT2", includes_timestamps: false,
+      event_count: 1, object_count: 1, event_object_counts: [1],
       events: [["Create", "o1"]], objects: [["o1", "order"]],
     };
     vi.stubGlobal("fetch", vi.fn(async (path: string, init: RequestInit) => {
