@@ -106,6 +106,7 @@
 #include "minera/transition_system.hpp"
 #include "minera/xes_export.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/windows_event_log.hpp"
 #include "embedding_runtime.hpp"
 
 namespace {
@@ -669,6 +670,8 @@ int usage(const char* program) {
                "  --drift-case-id-attribute <name> Case identifier selector\n"
                "  --browser-history <id>   Import chrome_history or firefox_history SQLite\n"
                "  --browser-history-max-events <n> Positive import bound\n"
+               "  --windows-events         Import an explicitly exported event XML file\n"
+               "  --windows-events-max-events <n> Positive import bound\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1432,6 +1435,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> concept_drift_fields;
   bool browser_history_requested = false;
   std::map<std::string, std::string> browser_history_fields;
+  bool windows_events_requested = false;
+  std::map<std::string, std::string> windows_events_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2544,6 +2549,17 @@ int main(int argc, char** argv) {
       if (!value) return usage(argv[0]);
       browser_history_fields.insert_or_assign("browser_history_max_events", value);
       browser_history_requested = true;
+      continue;
+    }
+    if (arg == "--windows-events") {
+      windows_events_requested = true;
+      continue;
+    }
+    if (arg == "--windows-events-max-events") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      windows_events_fields.insert_or_assign("windows_events_max_events", value);
+      windows_events_requested = true;
       continue;
     }
     if (arg.rfind("--drift-", 0) == 0) {
@@ -4863,6 +4879,22 @@ int main(int argc, char** argv) {
           minera::parse_browser_history_params(lookup, present);
       log = minera::import_browser_history(browser_options);
       std::cout << minera::browser_history_json(log, browser_options.variant)
+                << '\n';
+      return 0;
+    }
+    if (windows_events_requested) {
+      windows_events_fields.insert_or_assign("windows_events_path", input.string());
+      const auto lookup = [&](std::string_view name) {
+        const auto it = windows_events_fields.find(std::string(name));
+        return it == windows_events_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return windows_events_fields.contains(std::string(name));
+      };
+      const auto event_options =
+          minera::parse_windows_event_log_params(lookup, present);
+      std::cout << minera::windows_event_log_json(
+                       minera::import_windows_event_log(event_options))
                 << '\n';
       return 0;
     }

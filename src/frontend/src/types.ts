@@ -885,6 +885,46 @@ export interface BrowserHistoryResult {
   event_count: number;
   traces: BrowserHistoryTrace[];
 }
+
+export interface WindowsEventRecord {
+  activity: string;
+  timestamp: string;
+  resource: string;
+  attributes: Record<string, string>;
+}
+export interface WindowsEventTrace {
+  case_id: string;
+  events: WindowsEventRecord[];
+}
+export interface WindowsEventsResult {
+  type: "WINDOWS_EVENTS";
+  variant: "windows_events";
+  trace_count: number;
+  event_count: number;
+  traces: WindowsEventTrace[];
+}
+export function isWindowsEventsResult(value: unknown): value is WindowsEventsResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<WindowsEventsResult>;
+  if (result.type !== "WINDOWS_EVENTS" || result.variant !== "windows_events" ||
+      !Number.isSafeInteger(result.trace_count) || (result.trace_count as number) < 0 ||
+      !Number.isSafeInteger(result.event_count) || (result.event_count as number) < 0 ||
+      !Array.isArray(result.traces) || result.traces.length !== result.trace_count) return false;
+  let events = 0;
+  for (const trace of result.traces) {
+    if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" ||
+        !Array.isArray(trace.events)) return false;
+    events += trace.events.length;
+    for (const event of trace.events) {
+      if (!event || typeof event !== "object" || typeof event.activity !== "string" ||
+          typeof event.timestamp !== "string" || typeof event.resource !== "string" ||
+          !event.attributes || typeof event.attributes !== "object" ||
+          Array.isArray(event.attributes) ||
+          !Object.values(event.attributes).every((item) => typeof item === "string")) return false;
+    }
+  }
+  return events === result.event_count;
+}
 export function isBrowserHistoryResult(value: unknown): value is BrowserHistoryResult {
   if (!value || typeof value !== "object") return false;
   const result = value as Partial<BrowserHistoryResult>;

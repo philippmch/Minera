@@ -3572,6 +3572,35 @@ BrowserHistoryParams parse_browser_history_params(
   return params;
 }
 
+WindowsEventLogParams parse_windows_event_log_params(const FieldLookup& field) {
+  return parse_windows_event_log_params(field, {});
+}
+
+WindowsEventLogParams parse_windows_event_log_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  WindowsEventLogParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (!supplied("windows_events_path"))
+    throw std::invalid_argument("windows_events_path: expected a value");
+  params.path = require("windows_events_path");
+  if (supplied("windows_events_max_events")) {
+    params.max_events = parse_positive_size(
+        require("windows_events_max_events"), "windows_events_max_events");
+    if (params.max_events > 10'000'000)
+      throw std::invalid_argument(
+          "windows_events_max_events must be in [1, 10000000]");
+  }
+  return params;
+}
+
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {
   ConceptDriftParams params;

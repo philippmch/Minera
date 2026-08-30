@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
 import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 import { isBrowserHistoryResult } from "../src/types";
+import { isWindowsEventsResult } from "../src/types";
 
 describe("browser history result guard", () => {
   const valid = { type: "BROWSER_HISTORY", variant: "chrome_history",
@@ -15,6 +16,20 @@ describe("browser history result guard", () => {
   it("rejects bad variants and inconsistent counts", () => {
     expect(isBrowserHistoryResult({ ...valid, variant: "other" })).toBe(false);
     expect(isBrowserHistoryResult({ ...valid, event_count: 2 })).toBe(false);
+  });
+});
+
+describe("Windows events result guard", () => {
+  const valid = { type: "WINDOWS_EVENTS", variant: "windows_events",
+    trace_count: 1, event_count: 1, traces: [{ case_id: "HOST", events: [{
+      activity: "Kernel 1", timestamp: "2024-01-01T00:00:00Z", resource: "SYSTEM",
+      attributes: { channel: "System" },
+    }] }] };
+  it("accepts consistent exported records", () => {
+    expect(isWindowsEventsResult(valid)).toBe(true);
+  });
+  it("rejects malformed record counts", () => {
+    expect(isWindowsEventsResult({ ...valid, event_count: 0 })).toBe(false);
   });
 });
 

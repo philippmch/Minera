@@ -587,7 +587,7 @@ export CLI, the cached local server route, and typed frontend controls.
 | Privacy | anonymization algorithms and privacy-preserving query variants | **Partial** — PRIPEL-style release and Laplace/SaCoFa trace-variant queries have native and adapter surfaces, with explicit deterministic or OS-backed secure-random modes; broader privacy contracts remain |
 | ML | train/test splits, prefixes, feature tables, prediction targets, OCEL features | **Partial** — deterministic seeded train/test trace splits, fixed and all-prefix projections, until-activity targets, activity-targeted sublogs, automatic event/case feature selection, and typed process-cube tables now have native, standalone CLI, cached-log server, and typed frontend adapters; model training and columnar dataframe integrations remain |
 | LLM/querying | abstractions, provider calls, clustering/hypotheses, natural-language log query/filter, database knowledge injection | **Missing / Integration** |
-| Connectors | Outlook, Windows events, browsers, GitHub, Camunda, SAP O2C/accounting | **Partial** — explicit-path Chrome and Firefox SQLite history ingestion is available through native, JSON, CLI, local-server, and typed frontend adapters; remaining remote/platform connectors are integration work |
+| Connectors | Outlook, Windows events, browsers, GitHub, Camunda, SAP O2C/accounting | **Partial** — explicit-path Chrome and Firefox SQLite history ingestion plus exported Windows-event XML ingestion are available through native, JSON, CLI, local-server, and typed frontend adapters; remaining remote/platform connectors are integration work |
 
 Overlap evidence: `OverlapOptions` validates finite non-negative epsilon,
 supports configurable activity/timestamp attributes, and supports inclusive or strict endpoint semantics. When `overlap=true`, the
@@ -2394,3 +2394,13 @@ the same explicit-path contract and `BROWSER_HISTORY` JSON envelope. Synthetic
 SQLite fixtures cover both schemas, timestamp epochs, URL normalization,
 transition labels, referrers, directory and single-file input, and invalid
 bounds without accessing installed browser data.
+
+Exported Windows event XML uses computer names as cases, provider plus event id
+as activities, creation time as timestamps, and security identifiers as
+resources. System metadata, rendered messages, and named or unnamed event-data
+fields remain event attributes. Namespaced documents, entity decoding,
+deterministic computer/timestamp ordering, strict timestamps, and bounded
+result sizes share the native, CLI (`--windows-events`), local
+`POST /api/windows-events`, and typed frontend contracts. The connector reads
+only an explicitly supplied XML file; it does not query the live event service,
+request elevation, start a management process, or create subscriptions.

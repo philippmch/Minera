@@ -33,6 +33,7 @@ import {
   type EmbeddingApiResult,
   type BrowserHistoryVariant,
   type BrowserHistoryResult,
+  type WindowsEventsResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -86,6 +87,7 @@ import {
   isLogUtilityResult,
   isEmbeddingApiResult,
   isBrowserHistoryResult,
+  isWindowsEventsResult,
   isLabelSplittingResult,
   isTrieResult,
   isIntervalTreeResult,
@@ -4678,6 +4680,40 @@ export async function requestBrowserHistory(
   const payload: unknown = await response.json();
   if (!isBrowserHistoryResult(payload))
     throw new Error("the Minera backend returned invalid browser history");
+  return payload;
+}
+
+export interface WindowsEventsOptions {
+  windows_events_path: string;
+  windows_events_max_events?: number;
+}
+export function windowsEventsQuery(options: WindowsEventsOptions): string {
+  if (options.windows_events_path.trim().length === 0)
+    throw new Error("windows_events_path must not be empty");
+  if (options.windows_events_max_events !== undefined &&
+      (!Number.isSafeInteger(options.windows_events_max_events) ||
+       options.windows_events_max_events <= 0 ||
+       options.windows_events_max_events > 10_000_000))
+    throw new Error("windows_events_max_events must be in [1,10000000]");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b)))
+    if (value !== undefined) query.set(key, String(value));
+  return query.toString();
+}
+export async function requestWindowsEvents(
+  options: WindowsEventsOptions,
+): Promise<WindowsEventsResult> {
+  const response = await fetch(`/api/windows-events?${windowsEventsQuery(options)}`,
+                               { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isWindowsEventsResult(payload))
+    throw new Error("the Minera backend returned invalid Windows events");
   return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {

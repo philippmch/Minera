@@ -14,6 +14,7 @@
 #include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/windows_event_log.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -162,6 +163,7 @@ using LogToFeaturesParams = LogToFeaturesOptions;
 using EmbeddingParams = EmbeddingOptions;
 using LabelSplittingParams = LabelSplittingOptions;
 using BrowserHistoryParams = BrowserHistoryOptions;
+using WindowsEventLogParams = WindowsEventLogOptions;
 
 enum class EvaluationFamily {
   kReplayFitness,
@@ -511,6 +513,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] BrowserHistoryParams parse_browser_history_params(
     const FieldLookup& field);
 [[nodiscard]] BrowserHistoryParams parse_browser_history_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] WindowsEventLogParams parse_windows_event_log_params(
+    const FieldLookup& field);
+[[nodiscard]] WindowsEventLogParams parse_windows_event_log_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] LogToTargetParams parse_log_to_target_params(
