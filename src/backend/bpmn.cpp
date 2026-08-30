@@ -382,6 +382,7 @@ enum class BpmnNodeKind {
   parallel,     // parallel gateways: all in, all out
   inclusive,    // block-structured inclusive split/join pair
   subprocess,   // an embedded scope with its own start and end events
+  boundary,     // interrupting event attached to an atomic activity
 };
 
 constexpr std::size_t kNoIndex = std::numeric_limits<std::size_t>::max();
@@ -391,6 +392,7 @@ struct BpmnNode {
   std::string name;
   BpmnNodeKind kind = BpmnNodeKind::task;
   std::size_t child_scope = 0;  // scope index, kind == subprocess only
+  std::string attached_to;
   std::vector<std::size_t> in_flows;   // indices into the scope's flows
   std::vector<std::size_t> out_flows;
   // Inclusive gateways are compiled as one block: the split owns the
@@ -588,6 +590,22 @@ class BpmnNetBuilder {
     std::vector<std::size_t> place(scope.flows.size());
     for (auto& p : place) p = net_.add_place();
 
+    std::unordered_map<std::string, std::vector<const BpmnNode*>> boundaries;
+    for (const auto& candidate : scope.nodes) {
+      if (candidate.kind == BpmnNodeKind::boundary)
+        boundaries[candidate.attached_to].push_back(&candidate);
+    }
+    for (const auto& [attached, _] : boundaries) {
+      const auto found = scope.node_index.find(attached);
+      if (found == scope.node_index.end())
+        throw std::runtime_error("BPMN boundary event references unknown node '" +
+                                 attached + "'");
+      const auto kind = scope.nodes[found->second].kind;
+      if (kind != BpmnNodeKind::task && kind != BpmnNodeKind::subprocess)
+        throw std::runtime_error(
+            "BPMN boundary event must attach to an activity or subprocess");
+    }
+
     for (const auto& node : scope.nodes) {
       switch (node.kind) {
         case BpmnNodeKind::start:
@@ -619,7 +637,11 @@ class BpmnNetBuilder {
           if (node.kind == BpmnNodeKind::task && !node.name.empty()) {
             activity = activity_id(node.name);
           }
-          add_activity_node(node, place, activity);
+          const auto attached = boundaries.find(node.id);
+          if (node.kind == BpmnNodeKind::task && attached != boundaries.end())
+            add_atomic_with_boundaries(node, attached->second, place, activity);
+          else
+            add_activity_node(node, place, activity);
           break;
         }
         case BpmnNodeKind::exclusive: {
@@ -667,9 +689,17 @@ class BpmnNetBuilder {
             // Collapsed subprocess: an atomic step, like a task.
             std::optional<std::size_t> activity;
             if (!node.name.empty()) activity = activity_id(node.name);
-            add_activity_node(node, place, activity);
+            const auto attached = boundaries.find(node.id);
+            if (attached != boundaries.end())
+              add_atomic_with_boundaries(node, attached->second, place,
+                                         activity);
+            else
+              add_activity_node(node, place, activity);
             break;
           }
+          if (boundaries.contains(node.id))
+            throw std::runtime_error(
+                "BPMN boundary events on expanded subprocesses are not supported");
           const auto in = merge_entry(node, place);
           const auto outs = out_places(node, place);
           std::size_t local_exit;
@@ -682,6 +712,8 @@ class BpmnNetBuilder {
           convert(child, in, local_exit);
           break;
         }
+        case BpmnNodeKind::boundary:
+          break;
       }
     }
   }
@@ -718,6 +750,25 @@ class BpmnNetBuilder {
                     ? std::vector<std::size_t>{net_.add_place()}
                     : out_places(node, place);
     net_.add_transition(activity, {in}, std::move(outs));
+  }
+
+  void add_atomic_with_boundaries(
+      const BpmnNode& node, const std::vector<const BpmnNode*>& boundaries,
+      const std::vector<std::size_t>& place,
+      std::optional<std::size_t> activity) {
+    if (node.in_flows.empty())
+      throw std::runtime_error("BPMN boundary attachment has no incoming flow");
+    const auto active = net_.add_place();
+    silent({merge_entry(node, place)}, {active});
+    auto normal_outputs = node.out_flows.empty()
+                              ? std::vector<std::size_t>{net_.add_place()}
+                              : out_places(node, place);
+    net_.add_transition(activity, {active}, std::move(normal_outputs));
+    for (const auto* boundary : boundaries) {
+      if (!boundary->in_flows.empty())
+        throw std::runtime_error("BPMN boundary event has an incoming flow");
+      silent({active}, out_places(*boundary, place));
+    }
   }
 
   // The single place a node consumes from: its one incoming flow, or — since
@@ -933,9 +984,15 @@ PetriNet parse_bpmn(std::string_view xml) {
           "BPMN complex gateways are not supported; their token semantics "
           "do not fit a workflow net");
     } else if (name == "boundaryEvent") {
-      throw std::runtime_error(
-          "BPMN boundary events are not supported; interrupting semantics "
-          "do not fit a workflow net");
+      const auto* attached = detail::attribute(token.attributes, "attachedToRef");
+      if (!attached)
+        throw std::runtime_error("BPMN boundary event is missing attachedToRef");
+      const auto* cancel = detail::attribute(token.attributes, "cancelActivity");
+      if (cancel && *cancel == "false")
+        throw std::runtime_error(
+            "BPMN non-interrupting boundary events are not supported");
+      add_node(scope, BpmnNodeKind::boundary, token);
+      scope.nodes.back().attached_to = *attached;
     } else if (name == "adHocSubProcess") {
       throw std::runtime_error("BPMN ad-hoc subprocesses are not supported");
     }

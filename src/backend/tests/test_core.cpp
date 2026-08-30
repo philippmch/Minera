@@ -1605,6 +1605,90 @@ void parse_bpmn_reads_subprocesses() {
   assert(minera::check_alignment(log, net).fitness == 1.0);
 }
 
+void parse_bpmn_reads_interrupting_boundary_events() {
+  const auto net = minera::parse_bpmn(R"(<definitions><process id="p">
+    <startEvent id="start"/><task id="work" name="work"/>
+    <boundaryEvent id="timeout" attachedToRef="work"><timerEventDefinition/></boundaryEvent>
+    <task id="recover" name="recover"/><endEvent id="done"/><endEvent id="failed"/>
+    <sequenceFlow id="f1" sourceRef="start" targetRef="work"/>
+    <sequenceFlow id="f2" sourceRef="work" targetRef="done"/>
+    <sequenceFlow id="f3" sourceRef="timeout" targetRef="recover"/>
+    <sequenceFlow id="f4" sourceRef="recover" targetRef="failed"/>
+  </process></definitions>)");
+  minera::EventLog log;
+  for (const auto& activities :
+       std::vector<std::vector<std::string>>{{"work"}, {"recover"},
+                                             {"work", "recover"}}) {
+    minera::Trace trace;
+    trace.case_id = "case_" + std::to_string(log.traces.size());
+    for (const auto& activity : activities)
+      trace.events.push_back({trace.case_id, activity});
+    log.traces.push_back(std::move(trace));
+  }
+  const auto result = minera::check_conformance(log, net);
+  assert(result.trace_count == 3);
+  assert(result.fitting_traces == 2);
+
+  // A collapsed subprocess is atomic too. Multiple attached events are
+  // mutually exclusive alternatives to normal completion.
+  const auto collapsed = minera::parse_bpmn(R"(<definitions><process id="p">
+    <startEvent id="start"/><subProcess id="work" name="work"/>
+    <boundaryEvent id="timeout" attachedToRef="work"/>
+    <boundaryEvent id="cancel" attachedToRef="work"/>
+    <task id="recover" name="recover"/><task id="cancelled" name="cancelled"/>
+    <endEvent id="done"/><endEvent id="failed"/><endEvent id="aborted"/>
+    <sequenceFlow id="f1" sourceRef="start" targetRef="work"/>
+    <sequenceFlow id="f2" sourceRef="work" targetRef="done"/>
+    <sequenceFlow id="f3" sourceRef="timeout" targetRef="recover"/>
+    <sequenceFlow id="f4" sourceRef="recover" targetRef="failed"/>
+    <sequenceFlow id="f5" sourceRef="cancel" targetRef="cancelled"/>
+    <sequenceFlow id="f6" sourceRef="cancelled" targetRef="aborted"/>
+  </process></definitions>)");
+  assert(minera::check_conformance(
+             log_from_variants({{"work"}, {"recover"}, {"cancelled"}}),
+             collapsed)
+             .fitness == 1.0);
+  assert(minera::check_conformance(
+             log_from_variants({{"work", "recover"},
+                                {"recover", "cancelled"}}),
+             collapsed)
+             .fitness < 1.0);
+
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><task id="a" name="A"/>
+      <boundaryEvent id="b" attachedToRef="a" cancelActivity="false"/>
+      <endEvent id="e"/><sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <sequenceFlow id="f2" sourceRef="a" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="b" targetRef="e"/>
+    </process></definitions>)");
+  }));
+
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><task id="a" name="A"/>
+      <boundaryEvent id="b" attachedToRef="missing"/>
+      <endEvent id="e"/><sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <sequenceFlow id="f2" sourceRef="a" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="b" targetRef="e"/>
+    </process></definitions>)");
+  }));
+
+  assert(throws([] {
+    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><subProcess id="sub">
+        <startEvent id="ss"/><task id="a" name="A"/><endEvent id="se"/>
+        <sequenceFlow id="g1" sourceRef="ss" targetRef="a"/>
+        <sequenceFlow id="g2" sourceRef="a" targetRef="se"/>
+      </subProcess>
+      <boundaryEvent id="b" attachedToRef="sub"/><endEvent id="e"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="sub"/>
+      <sequenceFlow id="f2" sourceRef="sub" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="b" targetRef="e"/>
+    </process></definitions>)");
+  }));
+}
+
 void parse_bpmn_supports_inclusive_gateway_blocks() {
   // A structured inclusive split/join admits every non-empty branch subset,
   // including either serial interleaving when both branches are selected.
@@ -5890,6 +5974,7 @@ int main() {
   parse_bpmn_reads_a_foreign_model();
   parse_bpmn_keeps_disconnected_tasks();
   parse_bpmn_reads_subprocesses();
+  parse_bpmn_reads_interrupting_boundary_events();
   parse_bpmn_supports_inclusive_gateway_blocks();
   parse_bpmn_rejects_unsupported_models();
   decorate_model_counts_firings_and_waits();
