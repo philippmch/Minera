@@ -342,6 +342,7 @@ describe("basic Petri playout API", () => {
   it("serializes and validates basic POWL visited playout", async () => {
     const payload = {
       family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+      truncated: false, trace_limit_reached: false, state_limit_reached: false,
       traces: [[
         { kind: "marking", marking: [1, 0] },
         { kind: "transition", transition: 0, activity: "finish" },
@@ -368,6 +369,7 @@ describe("basic Petri playout API", () => {
   it("serializes and validates extensive POWL visited playout", async () => {
     const payload = {
       family: "PETRI_PLAYOUT_VISITED", variant: "EXTENSIVE_PLAYOUT",
+      truncated: false, trace_limit_reached: false, state_limit_reached: false,
       traces: [[
         { kind: "marking", marking: [1, 0] },
         { kind: "transition", transition: 0, activity: null },
@@ -488,6 +490,7 @@ describe("basic Petri playout API", () => {
   it("decodes structured visited markings and transitions", async () => {
     const payload = {
       family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+      truncated: false, trace_limit_reached: false, state_limit_reached: false,
       traces: [[
         { kind: "marking", marking: [1, 0] },
         { kind: "transition", transition: 0, activity: "finish" },
@@ -507,6 +510,7 @@ describe("basic Petri playout API", () => {
   it("decodes stochastic visited markings and preserves stochastic controls", async () => {
     const payload = {
       family: "PETRI_PLAYOUT_VISITED", variant: "STOCHASTIC_PLAYOUT",
+      truncated: false, trace_limit_reached: false, state_limit_reached: false,
       traces: [[
         { kind: "marking", marking: [1, 0] },
         { kind: "transition", transition: 0, activity: null },
@@ -528,6 +532,7 @@ describe("basic Petri playout API", () => {
   it("requests extensive Petri visited elements with strict mode controls", async () => {
     const payload = {
       family: "PETRI_PLAYOUT_VISITED", variant: "EXTENSIVE_PLAYOUT",
+      truncated: true, trace_limit_reached: true, state_limit_reached: false,
       traces: [[
         { kind: "marking", marking: [1, 0] },
         { kind: "transition", transition: 0, activity: null },

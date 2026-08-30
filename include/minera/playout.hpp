@@ -109,6 +109,12 @@ using PlayoutVisitedTrace = std::vector<PlayoutVisitedElement>;
 
 struct PlayoutVisitedResult {
   std::vector<PlayoutVisitedTrace> traces;
+  // Set when a bounded exhaustive search stopped before its queue was empty.
+  // Sampled variants leave these diagnostics false because their requested
+  // trace and firing limits define the result rather than truncating a search.
+  bool truncated = false;
+  bool trace_limit_reached = false;
+  bool state_limit_reached = false;
 };
 
 // Returns the alternating marking/transition visitation sequence for each

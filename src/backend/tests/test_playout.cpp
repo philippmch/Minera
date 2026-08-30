@@ -265,7 +265,7 @@ void visited_playout_records_markings_and_transitions() {
   assert(visited[4].kind == minera::PlayoutVisitedElementKind::MARKING);
   assert(visited[4].marking == std::vector<std::uint32_t>({0, 0, 1}));
   assert(minera::serialize_playout_visited_json(net, result) ==
-         "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"traces\":[[{\"kind\":\"marking\",\"marking\":[1,0,0]},"
+         "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"truncated\":false,\"trace_limit_reached\":false,\"state_limit_reached\":false,\"traces\":[[{\"kind\":\"marking\",\"marking\":[1,0,0]},"
          "{\"kind\":\"transition\",\"transition\":0,\"activity\":null},"
          "{\"kind\":\"marking\",\"marking\":[0,1,0]},"
          "{\"kind\":\"transition\",\"transition\":1,\"activity\":\"a\"},"
@@ -389,6 +389,9 @@ void extensive_visited_preserves_silent_steps_and_occurrence_bound() {
   options.return_elements = true;
   const auto result = minera::extensive_playout_visited(net, options);
   assert(result.traces.size() == 1);
+  assert(!result.truncated);
+  assert(!result.trace_limit_reached);
+  assert(!result.state_limit_reached);
   const auto& trace = result.traces.front();
   assert(trace.size() == 5);
   assert(trace[0].kind == minera::PlayoutVisitedElementKind::MARKING);
@@ -401,6 +404,8 @@ void extensive_visited_preserves_silent_steps_and_occurrence_bound() {
   assert(minera::serialize_extensive_playout_visited_json(net, result)
              .find("\"variant\":\"EXTENSIVE_PLAYOUT\"") !=
          std::string::npos);
+  assert(minera::serialize_extensive_playout_visited_json(net, result)
+             .find("\"truncated\":false") != std::string::npos);
 
   minera::PetriNet loop;
   const auto loop_source = loop.add_place();
@@ -410,6 +415,15 @@ void extensive_visited_preserves_silent_steps_and_occurrence_bound() {
   loop.set_activities({"loop", "finish"});
   loop.add_transition(0, {loop_source}, {loop_source});
   loop.add_transition(1, {loop_source}, {loop_sink});
+  options.max_traces = 1;
+  options.max_length = 2;
+  options.max_marking_occ.reset();
+  const auto trace_limited = minera::extensive_playout_visited(loop, options);
+  assert(trace_limited.traces.size() == 1);
+  assert(trace_limited.truncated);
+  assert(trace_limited.trace_limit_reached);
+  assert(!trace_limited.state_limit_reached);
+
   options.max_traces = 2;
   options.max_length = 1;
   options.max_marking_occ.reset();

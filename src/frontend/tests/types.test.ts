@@ -53,6 +53,7 @@ describe("isProcessTreePlayoutSetResult", () => {
 describe("isBasicPlayoutVisitedResult", () => {
   const valid = {
     family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+    truncated: false, trace_limit_reached: false, state_limit_reached: false,
     traces: [[
       { kind: "marking", marking: [1, 0] },
       { kind: "transition", transition: 0, activity: null },
@@ -63,6 +64,7 @@ describe("isBasicPlayoutVisitedResult", () => {
     expect(isBasicPlayoutVisitedResult(valid)).toBe(true);
   });
   it("rejects malformed elements", () => {
+    expect(isBasicPlayoutVisitedResult({ ...valid, truncated: "false" })).toBe(false);
     expect(isBasicPlayoutVisitedResult({ ...valid, traces: [[
       { kind: "transition", transition: -1, activity: null },
     ]] })).toBe(false);
