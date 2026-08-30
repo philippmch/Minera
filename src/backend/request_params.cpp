@@ -3672,6 +3672,20 @@ EnterpriseHistoryOptions parse_enterprise_history_params(
   }
   return params;
 }
+CommunicationHistoryOptions parse_communication_history_params(const FieldLookup& field) { return parse_communication_history_params(field, {}); }
+CommunicationHistoryOptions parse_communication_history_params(const FieldLookup& field, const FieldPresence& present) {
+  CommunicationHistoryOptions params;
+  const auto supplied = [&](std::string_view name) { return present ? present(name) : !field(name).empty(); };
+  const auto variant = field("communication_variant");
+  if (variant == "mailbox") params.variant = CommunicationHistoryVariant::kMailbox;
+  else if (variant == "calendar") params.variant = CommunicationHistoryVariant::kCalendar;
+  else throw std::invalid_argument("communication_variant: expected mailbox or calendar");
+  if (supplied("communication_include_reminders")) params.include_reminders = parse_boolean(field("communication_include_reminders"), "communication_include_reminders");
+  if (supplied("communication_current_time")) params.current_time = field("communication_current_time");
+  if (supplied("communication_max_items")) { params.max_items = parse_positive_size(field("communication_max_items"), "communication_max_items"); if (params.max_items > 1'000'000) throw std::invalid_argument("communication_max_items exceeds 1000000"); }
+  if (supplied("communication_max_events")) { params.max_events = parse_positive_size(field("communication_max_events"), "communication_max_events"); if (params.max_events > 10'000'000) throw std::invalid_argument("communication_max_events exceeds 10000000"); }
+  return params;
+}
 
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {

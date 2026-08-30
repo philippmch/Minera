@@ -7,6 +7,7 @@ import { browserHistoryQuery, requestBrowserHistory } from "../src/api";
 import { requestWindowsEvents, windowsEventsQuery } from "../src/api";
 import { requestWorkflowHistory } from "../src/api";
 import { requestEnterpriseHistory } from "../src/api";
+import { requestCommunicationHistory } from "../src/api";
 
 describe("browser history API", () => {
   it("serializes explicit local connector options", () => {
@@ -62,6 +63,12 @@ describe("enterprise history API", () => {
     }));
     await expect(requestEnterpriseHistory("header\n", "accounting", 25)).resolves.toMatchObject({ variant: "accounting" });
     vi.unstubAllGlobals();
+  });
+});
+describe("communication history API", () => {
+  it("posts explicit calendar export controls", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => { expect(path).toBe("/api/communication-history?communication_include_reminders=false&communication_max_events=20&communication_variant=calendar"); return { ok: true, json: async () => ({ type: "COMMUNICATION_HISTORY", variant: "calendar", trace_count: 0, event_count: 0, traces: [] }) }; }));
+    await expect(requestCommunicationHistory("header\n", { communication_variant: "calendar", communication_include_reminders: false, communication_max_events: 20 })).resolves.toMatchObject({ variant: "calendar" }); vi.unstubAllGlobals();
   });
 });
 import { geneticMatrixConversionQuery, requestGeneticMatrixConversion } from "../src/api";

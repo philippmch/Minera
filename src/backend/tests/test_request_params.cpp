@@ -702,6 +702,10 @@ void enterprise_history_params_contract() {
   catch (const std::invalid_argument&) { rejected = true; }
   assert(rejected);
 }
+void communication_history_params_contract() {
+  const auto parsed = minera::parse_communication_history_params(fields({{"communication_variant", "calendar"}, {"communication_include_reminders", "false"}, {"communication_current_time", "2024-01-01T00:00:00Z"}, {"communication_max_items", "2"}, {"communication_max_events", "8"}}));
+  assert(parsed.variant == minera::CommunicationHistoryVariant::kCalendar && !parsed.include_reminders && parsed.max_items == 2 && parsed.max_events == 8);
+}
 
 void windows_event_log_params_contract() {
   const auto parsed = minera::parse_windows_event_log_params(fields({
@@ -3747,6 +3751,7 @@ int main() {
   repository_history_params_contract();
   workflow_history_params_contract();
   enterprise_history_params_contract();
+  communication_history_params_contract();
   windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();

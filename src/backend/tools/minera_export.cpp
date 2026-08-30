@@ -110,6 +110,7 @@
 #include "minera/repository_history.hpp"
 #include "minera/workflow_history.hpp"
 #include "minera/enterprise_history.hpp"
+#include "minera/communication_history.hpp"
 #include "repository_history_runtime.hpp"
 #include "embedding_runtime.hpp"
 
@@ -684,6 +685,8 @@ int usage(const char* program) {
                "  --workflow-max-events <n> Positive import bound\n"
                "  --enterprise-history <order_to_cash|accounting> Import normalized enterprise CSV\n"
                "  --enterprise-max-events <n> Positive import bound\n"
+               "  --communication-history <mailbox|calendar> Import an explicit communication CSV\n"
+               "  --communication-* <value> Reminder, current-time, and safety controls\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1456,6 +1459,8 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> workflow_history_fields;
   bool enterprise_history_requested = false;
   std::map<std::string, std::string> enterprise_history_fields;
+  bool communication_history_requested = false;
+  std::map<std::string, std::string> communication_history_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2621,6 +2626,8 @@ int main(int argc, char** argv) {
       enterprise_history_fields["enterprise_max_events"] = value;
       enterprise_history_requested = true; continue;
     }
+    if (arg == "--communication-history") { const auto* value = next(); if (!value) return usage(argv[0]); communication_history_fields["communication_variant"] = value; communication_history_requested = true; continue; }
+    if (arg.rfind("--communication-", 0) == 0) { const auto* value = next(); if (!value) return usage(argv[0]); std::string key(arg.substr(2)); std::replace(key.begin(), key.end(), '-', '_'); static const std::set<std::string> names = {"communication_include_reminders", "communication_current_time", "communication_max_items", "communication_max_events"}; if (!names.contains(key)) return usage(argv[0]); communication_history_fields[std::move(key)] = value; communication_history_requested = true; continue; }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5011,6 +5018,13 @@ int main(int argc, char** argv) {
                        minera::import_enterprise_history_csv(csv, options), options.variant)
                 << '\n';
       return 0;
+    }
+    if (communication_history_requested) {
+      const auto lookup = [&](std::string_view name) { const auto it = communication_history_fields.find(std::string(name)); return it == communication_history_fields.end() ? std::string{} : it->second; };
+      std::ifstream stream(input, std::ios::binary); if (!stream) throw std::invalid_argument("communication history input does not exist");
+      const std::string csv((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+      const auto options = minera::parse_communication_history_params(lookup);
+      std::cout << minera::communication_history_json(minera::import_communication_history_csv(csv, options), options.variant) << '\n'; return 0;
     }
     // A .xes file is read as XES; everything else is treated as CSV.
     log = is_xes_path(input) ? minera::import_xes_event_log(input, xes_options)

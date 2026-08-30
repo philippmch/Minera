@@ -37,6 +37,7 @@ add_library(minera_core
   src/backend/case_statistics.cpp
   src/backend/oc_causal_net.cpp
   src/backend/conformance.cpp
+  src/backend/communication_history.cpp
   src/backend/concept_drift.cpp
   src/backend/cycle_time.cpp
   src/backend/correlation_miner.cpp
@@ -971,6 +972,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_enterprise_history_tests PRIVATE cxx_std_20)
   target_compile_options(minera_enterprise_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_enterprise_history_tests COMMAND minera_enterprise_history_tests)
+
+  add_executable(minera_communication_history_tests
+    src/backend/tests/test_communication_history.cpp
+  )
+  target_link_libraries(minera_communication_history_tests PRIVATE minera::core)
+  target_compile_features(minera_communication_history_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_communication_history_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_communication_history_tests COMMAND minera_communication_history_tests)
 
   add_executable(minera_alignment_variants_tests
     src/backend/tests/test_alignment_variants.cpp
