@@ -2342,7 +2342,9 @@ std::string serialize_ocel_description_json(
   out << "{\"family\":\"OCEL_DESCRIPTION\",\"variant\":\""
       << ocel_description_variant_name(variant)
       << "\",\"includes_timestamps\":"
-      << (options.include_timestamps ? "true" : "false");
+      << (options.include_timestamps ? "true" : "false")
+      << ",\"event_count\":" << log.events.size()
+      << ",\"object_count\":" << log.objects.size();
   if (variant == OcelDescriptionVariant::kVariant1) {
     out << ",\"text\":";
     write_string(out, describe_ocel_text(log, options));
@@ -2366,6 +2368,11 @@ std::string serialize_ocel_description_json(
     }
     out << ']';
   }
+  out << "],\"event_object_counts\":[";
+  for (std::size_t index = 0; index < description.events.size(); ++index) {
+    if (index != 0) out << ',';
+    out << description.events[index].related_objects.size();
+  }
   out << "],\"objects\":[";
   for (std::size_t index = 0; index < description.objects.size(); ++index) {
     if (index != 0) out << ',';
@@ -2375,6 +2382,7 @@ std::string serialize_ocel_description_json(
     out << ',';
     write_string(out, object.type);
     if (description.includes_timestamps) {
+      out << ',' << (object.has_lifecycle ? "true" : "false");
       out << ',';
       write_string(out, object.lifecycle_start);
       out << ',';

@@ -629,11 +629,15 @@ int main() {
   assert(variant1.find("\"variant\":\"VARIANT1\"") !=
          std::string::npos);
   assert(variant1.find("\"text\":") != std::string::npos);
+  assert(variant1.find("\"event_count\":2") != std::string::npos &&
+         variant1.find("\"object_count\":2") != std::string::npos);
   const auto variant2 = minera::serialize_ocel_description_json(
       log, minera::OcelDescriptionVariant::kVariant2);
   assert(variant2.find("\"variant\":\"VARIANT2\"") !=
          std::string::npos);
   assert(variant2.find("\"events\":[[\"Create\",\"o1\",") !=
+         std::string::npos);
+  assert(variant2.find("\"event_object_counts\":[1,2]") !=
          std::string::npos);
   assert(variant2.find("\"objects\":[[") != std::string::npos);
 

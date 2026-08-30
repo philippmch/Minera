@@ -619,24 +619,26 @@ describe("isOcelDescriptionResult", () => {
   it("accepts textual and tuple envelopes", () => {
     expect(isOcelDescriptionResult({
       family: "OCEL_DESCRIPTION", variant: "VARIANT1",
-      includes_timestamps: true, text: "events:",
+      includes_timestamps: true, event_count: 1, object_count: 1, text: "events:",
     })).toBe(true);
     expect(isOcelDescriptionResult({
       family: "OCEL_DESCRIPTION", variant: "VARIANT2",
-      includes_timestamps: true,
+      includes_timestamps: true, event_count: 1, object_count: 1,
       events: [["Create", "o1", "2024-01-01T00:00:00Z"]],
-      objects: [["o1", "order", "2024-01-01T00:00:00Z",
+      event_object_counts: [1],
+      objects: [["o1", "order", true, "2024-01-01T00:00:00Z",
         "2024-01-02T00:00:00Z", 86400]],
     })).toBe(true);
   });
   it("rejects malformed tuple fields", () => {
     expect(isOcelDescriptionResult({
       family: "OCEL_DESCRIPTION", variant: "VARIANT2",
-      includes_timestamps: true, events: [["Create"]], objects: [["o1", "order"]],
+      includes_timestamps: true, event_count: 1, object_count: 1,
+      events: [["Create"]], event_object_counts: [0], objects: [["o1", "order"]],
     })).toBe(false);
     expect(isOcelDescriptionResult({
       family: "OCEL_DESCRIPTION", variant: "VARIANT1",
-      includes_timestamps: true, text: 2,
+      includes_timestamps: true, event_count: 0, object_count: 0, text: 2,
     })).toBe(false);
   });
 });
