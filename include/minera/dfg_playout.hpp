@@ -60,6 +60,8 @@ struct DfgPlayoutResult {
   DfgVariantCounts counts;
   bool complete = false;
   bool interrupted = false;
+  std::size_t completed_traces = 0;
+  std::size_t truncated_traces = 0;
 };
 
 // Generates a DFG playout and, for classic playout, the deterministic variant

@@ -5,7 +5,8 @@
   },
   "artifact_required_packages": [
     "algo.simulation.tree_generator",
-    "algo.simulation.playout.process_tree"
+    "algo.simulation.playout.process_tree",
+    "algo.simulation.playout.dfg"
   ],
   "packages": [
     {
@@ -628,8 +629,22 @@
         "CLASSIC",
         "PERFORMANCE"
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_playout.hpp",
+        "src/backend/dfg_playout.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_dfg_playout.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.simulation.playout.oc_causal_net",

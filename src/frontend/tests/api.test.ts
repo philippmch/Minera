@@ -259,6 +259,7 @@ describe("DFG playout API", () => {
     const payload = {
       family: "DFG_PLAYOUT", variant: "CLASSIC", return_variants: true,
       complete: true, interrupted: false,
+      completed_traces: 0, truncated_traces: 0,
       variants: [{ activities: ["A", "B"], occurrences: 2 }],
     };
     vi.stubGlobal("fetch", vi.fn(async (path: string) => {

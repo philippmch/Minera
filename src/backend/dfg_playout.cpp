@@ -344,13 +344,22 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
   return result;
 }
 
-EventLog performance_playout(const DfgFrequency& frequency,
+DfgPlayoutResult performance_playout(const DfgFrequency& frequency,
                              const DfgActivityCounts& starts,
                              const DfgActivityCounts& ends,
                              const DfgPlayoutOptions& options,
                              const DfgPerformance* performance) {
-  EventLog log;
-  if (options.traces == 0 || options.max_events_per_trace == 0) return log;
+  DfgPlayoutResult result;
+  result.variant = DfgPlayoutVariant::kPerformance;
+  if (options.traces == 0) {
+    result.complete = true;
+    return result;
+  }
+  if (options.max_events_per_trace == 0) {
+    result.truncated_traces = options.traces;
+    result.interrupted = true;
+    return result;
+  }
   std::mt19937_64 rng(options.seed);
   // Prefix the boundary labels so they cannot alias real activity names.
   // The labels still define the two synthetic nodes, matching the public
@@ -387,7 +396,8 @@ EventLog performance_playout(const DfgFrequency& frequency,
     add_case_id_attribute(trace, options);
     double instant = base + static_cast<double>(trace_index) * options.case_arrival_rate;
     std::string current = start_node;
-    for (std::size_t step = 0; step < options.max_events_per_trace; ++step) {
+    bool reached_end = false;
+    while (trace.events.size() < options.max_events_per_trace) {
       const auto it = out.find(current);
       std::vector<std::string> names;
       std::vector<double> weights;
@@ -405,14 +415,34 @@ EventLog performance_playout(const DfgFrequency& frequency,
                               ? 0.0
                               : performance_mean(performance, {current, next});
       if (mean > 0.0) instant += std::exponential_distribution<double>(1.0 / mean)(rng);
-      if (next == end_node || next.empty()) break;
+      if (next == end_node || next.empty()) {
+        reached_end = true;
+        break;
+      }
       current = next;
       trace.events.push_back(make_event(trace.case_id, current, instant,
                                         trace.events.size(), options));
     }
-    log.traces.push_back(std::move(trace));
+    // Reaching the visible-event cap can still leave only the invisible end
+    // boundary enabled. Consume that termination without charging another
+    // visible event against the caller's bound.
+    if (!reached_end && trace.events.size() == options.max_events_per_trace) {
+      const auto it = out.find(current);
+      if (it != out.end()) {
+        reached_end = std::any_of(
+            it->second.begin(), it->second.end(),
+            [&](const auto& choice) { return choice.first == end_node; });
+      }
+    }
+    result.log.traces.push_back(std::move(trace));
+    if (reached_end)
+      ++result.completed_traces;
+    else
+      ++result.truncated_traces;
   }
-  return log;
+  result.complete = result.truncated_traces == 0;
+  result.interrupted = !result.complete;
+  return result;
 }
 
 }  // namespace
@@ -430,12 +460,8 @@ DfgPlayoutResult dfg_playout_result(
         "performance DFG playout requires performance statistics");
   }
   if (options.variant == DfgPlayoutVariant::kPerformance) {
-    DfgPlayoutResult result;
-    result.variant = DfgPlayoutVariant::kPerformance;
-    result.log = performance_playout(frequency, start_activities,
-                                     end_activities, options, performance);
-    result.complete = true;
-    return result;
+    return performance_playout(frequency, start_activities, end_activities,
+                               options, performance);
   }
   return classic_playout(frequency, start_activities, end_activities, options);
 }

@@ -3756,6 +3756,8 @@ std::string dfg_playout_json(const DfgPlayoutResult& result) {
       << (result.complete ? "true" : "false")
       << ",\"interrupted\":"
       << (result.interrupted ? "true" : "false")
+      << ",\"completed_traces\":" << result.completed_traces
+      << ",\"truncated_traces\":" << result.truncated_traces
       << ",\"variants\":[";
   std::size_t index = 0;
   for (const auto& [activities, occurrences] : result.counts) {

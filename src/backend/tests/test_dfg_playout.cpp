@@ -246,6 +246,27 @@ void performance_result_keeps_legacy_log_without_variant_counts() {
   assert(result.variant == minera::DfgPlayoutVariant::kPerformance);
   assert(result.counts.empty());
   assert(result.log.traces.size() == 2);
+  assert(result.complete && !result.interrupted);
+  assert(result.completed_traces == 2 && result.truncated_traces == 0);
+}
+
+void performance_result_reports_cutoff_and_deadlock() {
+  DfgFrequency loop{{{"A", "A"}, 1}};
+  DfgActivityCounts starts{{"A", 1}};
+  DfgActivityCounts ends;
+  minera::DfgPerformance performance;
+  minera::DfgPerformanceStatistics stats;
+  stats.summary.mean = 0.0;
+  stats.value = 0.0;
+  performance[{"A", "A"}] = stats;
+  minera::DfgPlayoutOptions options;
+  options.variant = minera::DfgPlayoutVariant::kPerformance;
+  options.traces = 3;
+  options.max_events_per_trace = 2;
+  const auto result = minera::dfg_playout_result(
+      loop, starts, ends, options, &performance);
+  assert(!result.complete && result.interrupted);
+  assert(result.completed_traces == 0 && result.truncated_traces == 3);
 }
 
 void classic_completion_flag_controls_early_stop() {
@@ -369,6 +390,7 @@ int main() {
   classic_result_honors_minimum_variant_occurrences();
   classic_result_complete_only_suppresses_partial_counts();
   performance_result_keeps_legacy_log_without_variant_counts();
+  performance_result_reports_cutoff_and_deadlock();
   classic_completion_flag_controls_early_stop();
   custom_attribute_keys_are_emitted_for_both_variants();
   performance_boundary_labels_are_collision_safe();

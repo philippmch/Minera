@@ -3997,6 +3997,8 @@ export interface DfgPlayoutVariantsResult {
   return_variants: true;
   complete: boolean;
   interrupted: boolean;
+  completed_traces: number;
+  truncated_traces: number;
   variants: DfgPlayoutVariantEntry[];
 }
 
@@ -4010,6 +4012,8 @@ export function isDfgPlayoutVariantsResult(
       result.return_variants !== true ||
       typeof result.complete !== "boolean" ||
       typeof result.interrupted !== "boolean" ||
+      !Number.isSafeInteger(result.completed_traces) || result.completed_traces! < 0 ||
+      !Number.isSafeInteger(result.truncated_traces) || result.truncated_traces! < 0 ||
       !Array.isArray(result.variants)) return false;
   return result.variants.every((entry) => {
     if (!entry || typeof entry !== "object") return false;
