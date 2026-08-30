@@ -95,18 +95,19 @@ function CaseRow({
 function XesButton({ dataset }: { dataset: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [variant, setVariant] = useState<"line_by_line" | "etree">("line_by_line");
+  const [compress, setCompress] = useState(false);
 
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchXes()
-      .then((xml) => {
-        const blob = new Blob([xml], { type: "application/xml" });
+    fetchXes({ variant, compress })
+      .then((blob) => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "log";
         anchor.href = url;
-        anchor.download = `${base}.xes`;
+        anchor.download = `${base}.xes${compress ? ".gz" : ""}`;
         anchor.click();
         URL.revokeObjectURL(url);
       })
@@ -116,6 +117,11 @@ function XesButton({ dataset }: { dataset: string }) {
 
   return (
     <span className="pnml-export">
+      <select aria-label="XES export variant" value={variant} onChange={(event) => setVariant(event.target.value as "line_by_line" | "etree")}>
+        <option value="line_by_line">Line by line</option>
+        <option value="etree">Element tree</option>
+      </select>
+      <label><input type="checkbox" checked={compress} onChange={(event) => setCompress(event.target.checked)} /> gzip</label>
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : "Download log as XES"}
       </button>

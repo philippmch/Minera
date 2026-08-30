@@ -37,6 +37,8 @@ void ends_with_ci_is_case_insensitive() {
 void looks_like_xes_uses_extension_then_content_sniff() {
   // Extension wins outright.
   assert(minera::looks_like_xes("trace.xes", "anything"));
+  assert(minera::looks_like_xes("trace.XES.GZ", "anything"));
+  assert(minera::looks_like_xes("trace.bin", "\x1f\x8bpayload"));
   // A CSV name with XML content is still recognized by sniffing the preamble.
   assert(minera::looks_like_xes("trace.csv", "<?xml version=\"1.0\"?><log/>"));
   assert(minera::looks_like_xes("noext", "<log></log>"));
@@ -894,6 +896,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"xes_reverse_sort", "true"},
       {"xes_max_traces", "7"},
       {"xes_attributes_to_read", "cost, region"},
+      {"xes_max_decompressed_bytes", "1048576"},
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
@@ -929,6 +932,7 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.xes.require_timestamp && params.xes.timestamp_sort &&
          params.xes.reverse_sort);
   assert(params.xes.max_traces == 7);
+  assert(params.xes.max_decompressed_bytes == 1048576);
   assert((params.xes.attributes_to_read ==
           std::vector<std::string>{"cost", "region"}));
   assert(params.inductive.noise_threshold == 0.25);
@@ -1168,7 +1172,9 @@ void parse_mine_params_rejects_invalid_xes_options() {
            std::pair{"xes_reverse_sort", "ascending"},
            std::pair{"xes_require_timestamp", "on"},
            std::pair{"xes_max_traces", "-1"},
-           std::pair{"xes_max_traces", "2x"}}) {
+           std::pair{"xes_max_traces", "2x"},
+           std::pair{"xes_max_decompressed_bytes", "0"},
+           std::pair{"xes_max_decompressed_bytes", "2x"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));

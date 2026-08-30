@@ -10,7 +10,7 @@ namespace {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " INPUT.csv|INPUT.xes [--trace] [--thread-pool N]\n";
+            << " INPUT.csv|INPUT.xes[.gz] [--trace] [--thread-pool N]\n";
   return 2;
 }
 
@@ -29,15 +29,18 @@ std::size_t parse_size(std::string_view text) {
 }
 
 bool ends_with_xes(std::string_view path) {
-  if (path.size() < 4) return false;
-  const auto offset = path.size() - 4;
-  for (std::size_t i = 0; i < 4; ++i) {
-    char a = path[offset + i];
-    char b = ".xes"[i];
-    if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
-    if (a != b) return false;
-  }
-  return true;
+  const auto has_suffix = [path](std::string_view suffix) {
+    if (path.size() < suffix.size()) return false;
+    const auto offset = path.size() - suffix.size();
+    for (std::size_t i = 0; i < suffix.size(); ++i) {
+      char actual = path[offset + i];
+      if (actual >= 'A' && actual <= 'Z')
+        actual = static_cast<char>(actual - 'A' + 'a');
+      if (actual != suffix[i]) return false;
+    }
+    return true;
+  };
+  return has_suffix(".xes") || has_suffix(".xes.gz");
 }
 
 }  // namespace

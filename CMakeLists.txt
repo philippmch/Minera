@@ -64,6 +64,7 @@ add_library(minera_core
   src/backend/eventually_follows.cpp
   src/backend/footprints.cpp
   src/backend/genetic_miner.cpp
+  src/backend/gzip_codec.cpp
   src/backend/footprints_models.cpp
   src/backend/heuristic_miner.cpp
   src/backend/organizational_mining.cpp
@@ -302,6 +303,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_core_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_core_tests COMMAND minera_core_tests)
+
+  add_executable(minera_xes_io_tests
+    src/backend/tests/test_xes_io.cpp
+  )
+  target_link_libraries(minera_xes_io_tests PRIVATE minera::core)
+  target_compile_features(minera_xes_io_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_xes_io_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_xes_io_tests COMMAND minera_xes_io_tests)
 
   add_executable(minera_ocel_tests
     src/backend/tests/test_ocel.cpp

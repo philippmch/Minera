@@ -63,6 +63,8 @@ struct XesImportOptions {
   // Empty means all scalar attributes. First-class selectors are always read
   // so the resulting EventLog remains structurally valid.
   std::vector<std::string> attributes_to_read;
+  // Bounds transparent gzip expansion before XML parsing.
+  std::size_t max_decompressed_bytes = 512ULL * 1024ULL * 1024ULL;
 };
 
 [[nodiscard]] EventLog import_xes_event_log(

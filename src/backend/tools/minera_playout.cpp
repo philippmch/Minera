@@ -284,9 +284,15 @@ int main(int argc, char** argv) {
 
   try {
     if (dfg) {
-      std::ifstream input_file(input);
+      std::ifstream input_file(input, std::ios::binary);
       if (!input_file) throw std::runtime_error("cannot open input log");
-      const auto source = input.extension() == ".xes"
+      auto lower_path = input.string();
+      std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(),
+                     [](unsigned char value) {
+                       return static_cast<char>(std::tolower(value));
+                     });
+      const auto source = (lower_path.ends_with(".xes") ||
+                           lower_path.ends_with(".xes.gz"))
                               ? minera::import_xes_event_log(input_file)
                               : minera::import_csv_event_log(input_file);
       const auto frequency = minera::discover_frequency_dfg(source);

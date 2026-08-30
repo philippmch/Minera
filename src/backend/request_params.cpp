@@ -328,7 +328,12 @@ bool ends_with_ci(std::string_view value, std::string_view suffix) {
 }
 
 bool looks_like_xes(std::string_view filename, std::string_view content) {
-  if (ends_with_ci(filename, ".xes")) return true;
+  if (ends_with_ci(filename, ".xes") || ends_with_ci(filename, ".xes.gz"))
+    return true;
+  if (content.size() >= 2 &&
+      static_cast<unsigned char>(content[0]) == 0x1f &&
+      static_cast<unsigned char>(content[1]) == 0x8b)
+    return true;
   std::size_t i = 0;
   if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
       static_cast<unsigned char>(content[1]) == 0xBB &&
@@ -1112,6 +1117,10 @@ MineParams parse_mine_params(const FieldLookup& field,
   }
   if (supplied("xes_attributes_to_read")) {
     params.xes.attributes_to_read = split_csv(field("xes_attributes_to_read"));
+  }
+  if (supplied("xes_max_decompressed_bytes")) {
+    params.xes.max_decompressed_bytes = parse_positive_size(
+        field("xes_max_decompressed_bytes"), "xes_max_decompressed_bytes");
   }
 
   // Optional log-preprocessing filters, applied before discovery.

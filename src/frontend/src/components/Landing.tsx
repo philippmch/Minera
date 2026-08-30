@@ -22,7 +22,7 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
         <label className={mining ? "landing-drop mining" : "landing-drop"}>
           <input
             type="file"
-            accept=".csv,.tsv,.xes,.json,text/csv,application/xml"
+            accept=".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip"
             disabled={mining}
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -34,7 +34,7 @@ export function Landing({ onOpenFile, onLoadSample, error, mining }: LandingProp
             {mining ? "Mining event log…" : "Drop your event log here"}
           </span>
           <span className="landing-drop-sub">
-            or click to browse — .csv (case_id, activity, timestamp) or .xes
+            or click to browse — .csv (case_id, activity, timestamp), .xes, or .xes.gz
           </span>
         </label>
 

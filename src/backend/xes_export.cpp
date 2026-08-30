@@ -1,6 +1,12 @@
 #include "minera/xes_export.hpp"
 
+#include "gzip_codec.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 #include "minera/timestamp.hpp"
 
@@ -66,6 +72,26 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
 }
 
 }  // namespace
+
+XesExportVariant parse_xes_export_variant(std::string_view value) {
+  std::string normalized(value);
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                 [](unsigned char c) {
+                   return static_cast<char>(std::tolower(c));
+                 });
+  if (normalized == "line_by_line") return XesExportVariant::kLineByLine;
+  if (normalized == "etree") return XesExportVariant::kElementTree;
+  throw std::invalid_argument(
+      "XES export variant must be line_by_line or etree");
+}
+
+std::string_view xes_export_variant_name(XesExportVariant variant) {
+  switch (variant) {
+    case XesExportVariant::kLineByLine: return "line_by_line";
+    case XesExportVariant::kElementTree: return "etree";
+  }
+  throw std::invalid_argument("XES export: unsupported variant");
+}
 
 void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
   bool any_resource = false;
@@ -151,6 +177,43 @@ std::string to_xes(const EventLog& log, std::string_view name) {
   std::ostringstream out;
   write_xes(out, log, name);
   return out.str();
+}
+
+std::string serialize_xes(const EventLog& log,
+                          const XesExportOptions& options) {
+  (void)xes_export_variant_name(options.variant);
+  const auto xml = to_xes(log, options.name);
+  return options.compress.value_or(false) ? detail::gzip_compress(xml) : xml;
+}
+
+std::filesystem::path export_xes_event_log(
+    const std::filesystem::path& path, const EventLog& log,
+    const XesExportOptions& options) {
+  (void)xes_export_variant_name(options.variant);
+  const auto lower_path = [&] {
+    auto value = path.string();
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) {
+                     return static_cast<char>(std::tolower(c));
+                   });
+    return value;
+  }();
+  const bool suffix_compressed = lower_path.ends_with(".gz");
+  const bool compressed = options.compress.value_or(suffix_compressed);
+  std::filesystem::path output_path = path;
+  if (compressed && !suffix_compressed) output_path += ".gz";
+  XesExportOptions effective = options;
+  effective.compress = compressed;
+  const auto bytes = serialize_xes(log, effective);
+  std::ofstream output(output_path, std::ios::binary);
+  if (!output)
+    throw std::runtime_error("Unable to open XES output: " +
+                             output_path.string());
+  output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+  if (!output)
+    throw std::runtime_error("Unable to write XES output: " +
+                             output_path.string());
+  return output_path;
 }
 
 }  // namespace minera
