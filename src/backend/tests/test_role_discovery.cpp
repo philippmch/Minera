@@ -47,6 +47,10 @@ int main() {
   assert(json.find("\"family\":\"ROLE_DISCOVERY\"") != std::string::npos);
   assert(json.find("\"variant\":\"log\"") != std::string::npos);
   assert(json.find("\"role_count\":3") != std::string::npos);
+  auto malformed_result = ordered;
+  ++malformed_result.diagnostics.role_count;
+  try { (void)role_discovery_json(malformed_result); assert(false); }
+  catch (const std::invalid_argument&) {}
 
   EventLog custom{{Trace{"custom", {
       Event{"custom", "ignored", "", "ignored", 0,

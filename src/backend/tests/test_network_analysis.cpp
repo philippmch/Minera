@@ -76,6 +76,10 @@ int main() {
   const auto json = network_analysis_json(p);
   assert(json.find("NETWORK_ANALYSIS") != std::string::npos);
   assert(json.find("\"variant\":\"dataframe\"") != std::string::npos);
+  auto malformed_result = p;
+  ++malformed_result.diagnostics.row_count;
+  try { (void)network_analysis_json(malformed_result); assert(false); }
+  catch (const std::invalid_argument&) {}
   const auto parsed = parse_network_analysis_params(
       [](std::string_view n) {
         if (n == "network_analysis_variant") return std::string("dataframe");

@@ -42,6 +42,10 @@ int main() {
 
   const auto json = local_diagnostics_json(result);
   assert(json.find("LOCAL_DIAGNOSTICS") != std::string::npos);
+  auto malformed_result = result;
+  malformed_result.group_relative_focus["g1"]["A"] = 2.0;
+  try { (void)local_diagnostics_json(malformed_result); assert(false); }
+  catch (const std::invalid_argument&) {}
 
   const auto parsed = parse_local_diagnostics_params([](std::string_view n) {
     if (n == "local_diagnostics_groups") return std::string("g1:r1,r2;g2:r3");

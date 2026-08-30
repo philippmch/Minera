@@ -1,4 +1,5 @@
 #include "minera/organizational_mining.hpp"
+#include "minera/json_export.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -164,5 +165,9 @@ int main() {
     unsupported_case_selector = true;
   }
   assert(unsupported_case_selector);
+  auto malformed_result = handover;
+  ++malformed_result.diagnostics.edge_count;
+  try { (void)minera::organizational_sna_json(malformed_result); assert(false); }
+  catch (const std::invalid_argument&) {}
   return 0;
 }
