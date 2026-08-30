@@ -61,12 +61,16 @@ void write_bpmn(std::ostream& out,
 // replays. A task no sequence flow reaches — how an activity that is
 // disconnected in the source model comes out of a BPMN export — stays a
 // disconnected (dead) transition rather than an error, so conformance can
-// report it honestly. Complex, mixed-arity inclusive, ambiguous inclusive,
-// Interrupting boundary events on tasks and collapsed subprocesses compete
-// with normal completion for the activity token. Non-interrupting boundary
-// events and boundary events on expanded subprocesses are rejected, as are
-// malformed models (dangling flow references, missing start or end events,
-// gateways without incoming or outgoing flows) — all via std::runtime_error.
+// report it honestly. Complex, mixed-arity inclusive, and ambiguous inclusive
+// gateways are rejected. Interrupting boundary events on tasks and collapsed
+// subprocesses compete
+// with normal completion for the activity token; named boundary events remain
+// observable, while unnamed events route silently. A non-interrupting event
+// forks a one-shot boundary path while leaving the activity enabled. Expanded
+// subprocess interruption resets the private child-scope marking before
+// routing the boundary path. Malformed models
+// (dangling flow references, missing start or end events, gateways without
+// incoming or outgoing flows) fail via std::runtime_error.
 [[nodiscard]] PetriNet parse_bpmn(std::string_view xml);
 
 // Reads and parses a BPMN file.

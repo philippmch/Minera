@@ -1169,13 +1169,19 @@ orders, subset rejection, silent branches emitted by tree export, nested
 structure, malformed mixed-arity gateways, final-marking reachability, and
 alignment fitness after a BPMN round trip.
 
-Interrupting boundary events attached to tasks, call activities, and collapsed
-subprocesses are translated as alternatives to normal activity completion.
-Multiple attached events compete for the same active token, so normal and
-interruption paths are mutually exclusive. Non-interrupting boundary events and
-events attached to expanded subprocesses are rejected explicitly rather than
-approximated. Regressions cover atomic and collapsed activities, multiple
-boundary alternatives, invalid references, and unsupported forms.
+Interrupting boundary events attached to tasks, call activities, and both
+collapsed and expanded subprocesses are translated as alternatives to normal
+activity completion. Expanded scopes carry a private lifetime token; an
+interrupting path consumes it and reset-clears every child-scope place, while
+normal completion requires the same token. Multiple attached events therefore
+compete with one another and with normal completion. Non-interrupting boundary
+events use a one-shot trigger token, fork their boundary path, and preserve the
+activity or subprocess lifetime token so normal completion can still occur.
+Named boundary events remain observable transitions; unnamed boundary events
+route silently. Regressions cover
+atomic, collapsed, and partially executed expanded activities, multiple
+boundary alternatives, invalid references, stale-completion prevention, and
+one-shot non-interrupting paths.
 
 ## POWL parity evidence
 

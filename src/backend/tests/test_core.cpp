@@ -1608,7 +1608,7 @@ void parse_bpmn_reads_subprocesses() {
 void parse_bpmn_reads_interrupting_boundary_events() {
   const auto net = minera::parse_bpmn(R"(<definitions><process id="p">
     <startEvent id="start"/><task id="work" name="work"/>
-    <boundaryEvent id="timeout" attachedToRef="work"><timerEventDefinition/></boundaryEvent>
+    <boundaryEvent id="timeout" name="timeout" attachedToRef="work"><timerEventDefinition/></boundaryEvent>
     <task id="recover" name="recover"/><endEvent id="done"/><endEvent id="failed"/>
     <sequenceFlow id="f1" sourceRef="start" targetRef="work"/>
     <sequenceFlow id="f2" sourceRef="work" targetRef="done"/>
@@ -1617,8 +1617,9 @@ void parse_bpmn_reads_interrupting_boundary_events() {
   </process></definitions>)");
   minera::EventLog log;
   for (const auto& activities :
-       std::vector<std::vector<std::string>>{{"work"}, {"recover"},
-                                             {"work", "recover"}}) {
+       std::vector<std::vector<std::string>>{{"work"},
+                                             {"timeout", "recover"},
+                                             {"work", "timeout", "recover"}}) {
     minera::Trace trace;
     trace.case_id = "case_" + std::to_string(log.traces.size());
     for (const auto& activity : activities)
@@ -1654,15 +1655,25 @@ void parse_bpmn_reads_interrupting_boundary_events() {
              collapsed)
              .fitness < 1.0);
 
-  assert(throws([] {
-    (void)minera::parse_bpmn(R"(<definitions><process id="p">
+  const auto non_interrupting = minera::parse_bpmn(R"(<definitions><process id="p">
       <startEvent id="s"/><task id="a" name="A"/>
-      <boundaryEvent id="b" attachedToRef="a" cancelActivity="false"/>
-      <endEvent id="e"/><sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <boundaryEvent id="b" name="alert" attachedToRef="a" cancelActivity="false"/>
+      <task id="handle" name="handle"/><endEvent id="e"/><endEvent id="be"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
       <sequenceFlow id="f2" sourceRef="a" targetRef="e"/>
-      <sequenceFlow id="f3" sourceRef="b" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="b" targetRef="handle"/>
+      <sequenceFlow id="f4" sourceRef="handle" targetRef="be"/>
     </process></definitions>)");
-  }));
+  assert(minera::check_alignment(
+             log_from_variants({{"A"}, {"alert", "handle", "A"},
+                                {"alert", "A", "handle"},
+                                {"A", "alert", "handle"}}),
+             non_interrupting)
+             .fitness == 1.0);
+  assert(minera::check_conformance(
+             log_from_variants({{"alert", "alert", "handle", "handle", "A"}}),
+             non_interrupting)
+             .fitting_traces == 0);
 
   assert(throws([] {
     (void)minera::parse_bpmn(R"(<definitions><process id="p">
@@ -1676,17 +1687,89 @@ void parse_bpmn_reads_interrupting_boundary_events() {
 
   assert(throws([] {
     (void)minera::parse_bpmn(R"(<definitions><process id="p">
-      <startEvent id="s"/><subProcess id="sub">
-        <startEvent id="ss"/><task id="a" name="A"/><endEvent id="se"/>
-        <sequenceFlow id="g1" sourceRef="ss" targetRef="a"/>
-        <sequenceFlow id="g2" sourceRef="a" targetRef="se"/>
-      </subProcess>
-      <boundaryEvent id="b" attachedToRef="sub"/><endEvent id="e"/>
-      <sequenceFlow id="f1" sourceRef="s" targetRef="sub"/>
-      <sequenceFlow id="f2" sourceRef="sub" targetRef="e"/>
+      <startEvent id="s"/><task id="a" name="A"/>
+      <boundaryEvent id="b" attachedToRef="a" cancelActivity="sometimes"/>
+      <endEvent id="e"/><sequenceFlow id="f1" sourceRef="s" targetRef="a"/>
+      <sequenceFlow id="f2" sourceRef="a" targetRef="e"/>
       <sequenceFlow id="f3" sourceRef="b" targetRef="e"/>
     </process></definitions>)");
   }));
+
+  const auto expanded = minera::parse_bpmn(R"(<definitions><process id="p">
+      <startEvent id="s"/><subProcess id="sub">
+        <startEvent id="ss"/><task id="a" name="A"/><task id="b" name="B"/>
+        <endEvent id="se"/>
+        <sequenceFlow id="g1" sourceRef="ss" targetRef="a"/>
+        <sequenceFlow id="g2" sourceRef="a" targetRef="b"/>
+        <sequenceFlow id="g3" sourceRef="b" targetRef="se"/>
+      </subProcess>
+      <boundaryEvent id="interrupt" attachedToRef="sub"/>
+      <task id="recover" name="recover"/><endEvent id="e"/><endEvent id="failed"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="sub"/>
+      <sequenceFlow id="f2" sourceRef="sub" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="interrupt" targetRef="recover"/>
+      <sequenceFlow id="f4" sourceRef="recover" targetRef="failed"/>
+    </process></definitions>)");
+  assert(expanded.has_extended_arcs());
+  assert(minera::check_alignment(
+             log_from_variants({{"A", "B"}, {"recover"}, {"A", "recover"}}),
+             expanded)
+             .fitness == 1.0);
+  assert(minera::check_alignment(
+             log_from_variants({{"A", "recover", "B"},
+                                {"A", "B", "recover"}}),
+             expanded)
+             .fitness < 1.0);
+
+  const auto expanded_non_interrupting = minera::parse_bpmn(
+      R"(<definitions><process id="p"><startEvent id="s"/><subProcess id="sub">
+        <startEvent id="ss"/><task id="a" name="A"/><task id="b" name="B"/>
+        <endEvent id="se"/><sequenceFlow id="g1" sourceRef="ss" targetRef="a"/>
+        <sequenceFlow id="g2" sourceRef="a" targetRef="b"/>
+        <sequenceFlow id="g3" sourceRef="b" targetRef="se"/>
+      </subProcess><boundaryEvent id="notice" name="notice" attachedToRef="sub"
+        cancelActivity="false"/><task id="handle" name="handle"/>
+      <endEvent id="e"/><endEvent id="ne"/>
+      <sequenceFlow id="f1" sourceRef="s" targetRef="sub"/>
+      <sequenceFlow id="f2" sourceRef="sub" targetRef="e"/>
+      <sequenceFlow id="f3" sourceRef="notice" targetRef="handle"/>
+      <sequenceFlow id="f4" sourceRef="handle" targetRef="ne"/>
+    </process></definitions>)");
+  assert(minera::check_alignment(
+             log_from_variants({{"A", "B"},
+                                {"A", "notice", "handle", "B"},
+                                {"notice", "A", "B", "handle"}}),
+             expanded_non_interrupting)
+             .fitness == 1.0);
+  assert(minera::check_conformance(
+             log_from_variants({{"notice", "notice", "A", "B", "handle"}}),
+             expanded_non_interrupting)
+             .fitting_traces == 0);
+
+  const auto nested = minera::parse_bpmn(R"(<definitions><process id="p">
+    <startEvent id="s"/><subProcess id="outer">
+      <startEvent id="os"/><subProcess id="inner">
+        <startEvent id="is"/><task id="a" name="A"/><task id="b" name="B"/>
+        <endEvent id="ie"/><sequenceFlow id="i1" sourceRef="is" targetRef="a"/>
+        <sequenceFlow id="i2" sourceRef="a" targetRef="b"/>
+        <sequenceFlow id="i3" sourceRef="b" targetRef="ie"/>
+      </subProcess><endEvent id="oe"/>
+      <sequenceFlow id="o1" sourceRef="os" targetRef="inner"/>
+      <sequenceFlow id="o2" sourceRef="inner" targetRef="oe"/>
+    </subProcess>
+    <boundaryEvent id="interrupt" attachedToRef="outer"/>
+    <task id="recover" name="recover"/><endEvent id="e"/><endEvent id="failed"/>
+    <sequenceFlow id="f1" sourceRef="s" targetRef="outer"/>
+    <sequenceFlow id="f2" sourceRef="outer" targetRef="e"/>
+    <sequenceFlow id="f3" sourceRef="interrupt" targetRef="recover"/>
+    <sequenceFlow id="f4" sourceRef="recover" targetRef="failed"/>
+  </process></definitions>)");
+  assert(minera::check_alignment(
+             log_from_variants({{"A", "recover"}, {"A", "B"}}), nested)
+             .fitness == 1.0);
+  assert(minera::check_alignment(
+             log_from_variants({{"A", "recover", "B"}}), nested)
+             .fitness < 1.0);
 }
 
 void parse_bpmn_supports_inclusive_gateway_blocks() {
