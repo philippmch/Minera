@@ -444,7 +444,7 @@ class Simplex {
   }
 
   bool run(int phase) {
-    const std::size_t objective = m_ + static_cast<std::size_t>(phase);
+    const std::size_t objective = phase == 1 ? m_ + 1 : m_;
     while (true) {
       std::size_t col = 0;
       for (std::size_t j = 1; j <= n_; ++j) {
@@ -1321,9 +1321,12 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
   for (std::size_t p = 0; p < net.place_count(); ++p) {
     const double delta = static_cast<double>(markings.final[p]) -
                          static_cast<double>(markings.initial[p]);
-    inequalities.push_back(matrix[p]); bounds.push_back(delta);
-    auto negative = matrix[p]; for (auto& x : negative) x = -x;
-    inequalities.push_back(std::move(negative)); bounds.push_back(-delta);
+    inequalities.push_back(matrix[p]);
+    bounds.push_back(delta);
+    auto negative = matrix[p];
+    for (auto& x : negative) x = -x;
+    inequalities.push_back(std::move(negative));
+    bounds.push_back(-delta);
   }
   const auto program = solve_integer_program(inequalities, bounds, costs,
                                              options.realizability_limit);
@@ -1352,7 +1355,7 @@ MarkingEquationResult solve_marking_equation(const PetriNet& net,
                                             result.transition_counts,
                                             options.realizability_limit,
                                             recovery_exhausted);
-  result.exhausted = recovery_exhausted;
+  result.exhausted = result.exhausted || recovery_exhausted;
   if (result.firing_sequence.empty()) {
     result.reaches_final = markings.initial == markings.final &&
         std::all_of(result.transition_counts.begin(), result.transition_counts.end(), [](double x) { return x <= kEps; });
