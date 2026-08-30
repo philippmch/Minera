@@ -108,6 +108,7 @@
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/windows_event_log.hpp"
 #include "minera/repository_history.hpp"
+#include "minera/workflow_history.hpp"
 #include "repository_history_runtime.hpp"
 #include "embedding_runtime.hpp"
 
@@ -678,6 +679,8 @@ int usage(const char* program) {
                "  --repository-api-base-url <url> Override the repository API origin\n"
                "  --repository-auth-token-env <name> Read bearer token from an environment variable\n"
                "  --repository-max-pages|issues|events <n> Positive safety bounds\n"
+               "  --workflow-history       Import a normalized workflow-history CSV\n"
+               "  --workflow-max-events <n> Positive import bound\n"
                "  --transform-target       Emit standalone target JSON\n"
                "  --target-variant <id>    next_activity (default), next_time,\n"
                "                            or remaining_time\n"
@@ -1446,6 +1449,8 @@ int main(int argc, char** argv) {
   bool repository_history_requested = false;
   std::map<std::string, std::string> repository_history_fields;
   std::string repository_auth_token_env;
+  bool workflow_history_requested = false;
+  std::map<std::string, std::string> workflow_history_fields;
   bool target_requested = false;
   std::map<std::string, std::string> target_fields;
   bool features_requested = false;
@@ -2594,6 +2599,12 @@ int main(int argc, char** argv) {
       if (!names.contains(key)) return usage(argv[0]);
       repository_history_fields.insert_or_assign(std::move(key), value);
       repository_history_requested = true; continue;
+    }
+    if (arg == "--workflow-history") { workflow_history_requested = true; continue; }
+    if (arg == "--workflow-max-events") {
+      const auto* value = next(); if (!value) return usage(argv[0]);
+      workflow_history_fields["workflow_max_events"] = value;
+      workflow_history_requested = true; continue;
     }
     if (arg.rfind("--drift-", 0) == 0) {
       const auto* value = next();
@@ -4954,6 +4965,21 @@ int main(int argc, char** argv) {
       std::cout << minera::repository_history_json(
                        repository_log, repository_options.owner,
                        repository_options.repository)
+                << '\n';
+      return 0;
+    }
+    if (workflow_history_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = workflow_history_fields.find(std::string(name));
+        return it == workflow_history_fields.end() ? std::string{} : it->second;
+      };
+      std::ifstream stream(input, std::ios::binary);
+      if (!stream) throw std::invalid_argument("workflow history input does not exist");
+      const std::string csv((std::istreambuf_iterator<char>(stream)),
+                            std::istreambuf_iterator<char>());
+      const auto options = minera::parse_workflow_history_params(lookup);
+      std::cout << minera::workflow_history_json(
+                       minera::import_workflow_history_csv(csv, options))
                 << '\n';
       return 0;
     }

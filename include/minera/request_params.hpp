@@ -16,6 +16,7 @@
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/windows_event_log.hpp"
 #include "minera/repository_history.hpp"
+#include "minera/workflow_history.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -522,6 +523,10 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] RepositoryHistoryOptions parse_repository_history_params(
     const FieldLookup& field);
 [[nodiscard]] RepositoryHistoryOptions parse_repository_history_params(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] WorkflowHistoryOptions parse_workflow_history_params(
+    const FieldLookup& field);
+[[nodiscard]] WorkflowHistoryOptions parse_workflow_history_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] LogToTargetParams parse_log_to_target_params(

@@ -3635,6 +3635,23 @@ RepositoryHistoryOptions parse_repository_history_params(
   return params;
 }
 
+WorkflowHistoryOptions parse_workflow_history_params(const FieldLookup& field) {
+  return parse_workflow_history_params(field, {});
+}
+WorkflowHistoryOptions parse_workflow_history_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  WorkflowHistoryOptions params;
+  const bool supplied = present ? present("workflow_max_events")
+                                : !field("workflow_max_events").empty();
+  if (supplied) {
+    params.max_events = parse_positive_size(field("workflow_max_events"),
+                                            "workflow_max_events");
+    if (params.max_events > 10'000'000)
+      throw std::invalid_argument("workflow_max_events must be in [1,10000000]");
+  }
+  return params;
+}
+
 ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
                                              const FieldPresence& present) {
   ConceptDriftParams params;

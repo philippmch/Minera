@@ -5,6 +5,7 @@ import { isStochasticMapResult } from "../src/types";
 import { fetchXes } from "../src/api";
 import { browserHistoryQuery, requestBrowserHistory } from "../src/api";
 import { requestWindowsEvents, windowsEventsQuery } from "../src/api";
+import { requestWorkflowHistory } from "../src/api";
 
 describe("browser history API", () => {
   it("serializes explicit local connector options", () => {
@@ -36,6 +37,19 @@ describe("Windows events API", () => {
     }) })));
     await expect(requestWindowsEvents({ windows_events_path: "events.xml" }))
       .resolves.toMatchObject({ type: "WINDOWS_EVENTS" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("workflow history API", () => {
+  it("posts normalized CSV with a bounded event count", async () => {
+    const csv = "process_id,case_id,activity,timestamp,resource\norder,c1,create,2024-01-01T00:00:00Z,alice\n";
+    vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
+      expect(path).toBe("/api/workflow-history?workflow_max_events=50");
+      expect(init?.body).toBe(csv);
+      return { ok: true, json: async () => ({ type: "WORKFLOW_HISTORY", variant: "activity_instances", trace_count: 0, event_count: 0, traces: [] }) };
+    }));
+    await expect(requestWorkflowHistory(csv, 50)).resolves.toMatchObject({ type: "WORKFLOW_HISTORY" });
     vi.unstubAllGlobals();
   });
 });
