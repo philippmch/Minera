@@ -4843,4 +4843,123 @@ VariantStatisticsOptions parse_variant_statistics_params(
   return options;
 }
 
+LogConversionOptions parse_log_conversion_params(const FieldLookup& field) {
+  return parse_log_conversion_params(field, FieldPresence{});
+}
+
+LogConversionOptions parse_log_conversion_params(const FieldLookup& field,
+                                                 const FieldPresence& present) {
+  LogConversionOptions options;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  const auto require_name = [&](std::string_view name) {
+    const auto value = trim_text(require(name));
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty name");
+    return value;
+  };
+
+  if (supplied("log_conversion_variant")) {
+    options.variant = parse_log_conversion_variant(
+        require("log_conversion_variant"));
+  }
+  if (supplied("log_conversion_include_case_attributes")) {
+    options.include_case_attributes = parse_boolean(
+        require("log_conversion_include_case_attributes"),
+        "log_conversion_include_case_attributes");
+  }
+  if (supplied("log_conversion_case_attribute_prefix")) {
+    // An explicitly empty prefix is meaningful: it makes every flattened
+    // field a case field, matching the core conversion contract.
+    options.case_attribute_prefix = field("log_conversion_case_attribute_prefix");
+  }
+  if (supplied("log_conversion_case_id_key")) {
+    options.case_id_key = require_name("log_conversion_case_id_key");
+  }
+  if (supplied("log_conversion_graph_case_id_attribute")) {
+    options.graph_case_id_attribute =
+        require_name("log_conversion_graph_case_id_attribute");
+  }
+  if (supplied("log_conversion_include_df")) {
+    options.include_directly_follows = parse_boolean(
+        require("log_conversion_include_df"), "log_conversion_include_df");
+  }
+  if (supplied("log_conversion_return_variants")) {
+    options.return_variants = parse_boolean(
+        require("log_conversion_return_variants"),
+        "log_conversion_return_variants");
+  }
+  if (supplied("log_conversion_max_variants_to_return")) {
+    options.max_variants_to_return = parse_nonnegative_size(
+        require("log_conversion_max_variants_to_return"),
+        "log_conversion_max_variants_to_return");
+  }
+  if (supplied("log_conversion_max_graph_nodes")) {
+    options.max_graph_nodes = parse_positive_size(
+        require("log_conversion_max_graph_nodes"),
+        "log_conversion_max_graph_nodes");
+  }
+  if (supplied("log_conversion_max_graph_edges")) {
+    options.max_graph_edges = parse_positive_size(
+        require("log_conversion_max_graph_edges"),
+        "log_conversion_max_graph_edges");
+  }
+
+  // Attribute-node selectors use the same escaped comma grammar as the
+  // existing target adapters. Unlike the permissive legacy helper, this
+  // conversion parser rejects empty list members so malformed requests are
+  // never silently changed.
+  const auto parse_attribute_list = [&](std::string_view name) {
+    const auto value = require(name);
+    std::vector<std::string> result;
+    std::string current;
+    bool escaped = false;
+    const auto flush = [&]() {
+      const auto token = trim_text(current);
+      if (token.empty())
+        throw std::invalid_argument(std::string(name) +
+                                    ": values must not be empty");
+      result.push_back(token);
+      current.clear();
+    };
+    for (const char character : value) {
+      if (escaped) {
+        if (character != ',' && character != '\\')
+          throw std::invalid_argument(
+              std::string(name) +
+              ": invalid escape (use \\, or \\\\)");
+        current.push_back(character);
+        escaped = false;
+      } else if (character == '\\') {
+        escaped = true;
+      } else if (character == ',') {
+        flush();
+      } else {
+        current.push_back(character);
+      }
+    }
+    if (escaped)
+      throw std::invalid_argument(std::string(name) + ": dangling escape");
+    flush();
+    return result;
+  };
+  if (supplied("log_conversion_case_attributes_as_nodes")) {
+    options.case_attributes_as_nodes =
+        parse_attribute_list("log_conversion_case_attributes_as_nodes");
+  }
+  if (supplied("log_conversion_event_attributes_as_nodes")) {
+    options.event_attributes_as_nodes =
+        parse_attribute_list("log_conversion_event_attributes_as_nodes");
+  }
+  return options;
+}
+
 }  // namespace minera

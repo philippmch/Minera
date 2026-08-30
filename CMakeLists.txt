@@ -79,6 +79,7 @@ add_library(minera_core
   src/backend/link_analysis.cpp
   src/backend/json_export.cpp
   src/backend/log_filter.cpp
+  src/backend/log_conversion.cpp
   src/backend/path_filter.cpp
   src/backend/passed_time.cpp
   src/backend/segment_filter.cpp
@@ -803,6 +804,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_log_util_tests PRIVATE cxx_std_20)
   target_compile_options(minera_log_util_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_log_util_tests COMMAND minera_log_util_tests)
+
+  add_executable(minera_log_conversion_tests
+    src/backend/tests/test_log_conversion.cpp
+  )
+  target_link_libraries(minera_log_conversion_tests PRIVATE minera::core)
+  target_compile_features(minera_log_conversion_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_log_conversion_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_log_conversion_tests COMMAND minera_log_conversion_tests)
 
   add_executable(minera_label_splitting_tests
     src/backend/tests/test_label_splitting.cpp

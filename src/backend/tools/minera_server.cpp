@@ -70,6 +70,7 @@
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
@@ -225,6 +226,9 @@ constexpr std::size_t kServerProfileMaxTraces = 100'000;
 constexpr std::size_t kServerProfileMaxFeatures = 10'000;
 constexpr std::size_t kServerAttributeKdeMaxGraphPoints = 10'000;
 constexpr std::size_t kServerAttributeKdeMaxSamples = 100'000;
+constexpr std::size_t kServerLogConversionMaxGraphNodes = 200'000;
+constexpr std::size_t kServerLogConversionMaxGraphEdges = 400'000;
+constexpr std::size_t kServerLogConversionMaxVariants = 100'000;
 
 void reject_unknown_monte_carlo_params(const httplib::Request& request) {
   static const std::set<std::string> allowed = {
@@ -2700,6 +2704,88 @@ void handle_genetic_mine(const httplib::Request& request,
 void handle_genetic_matrix_conversion(const httplib::Request& request,
                                       httplib::Response& response) {
   handle_genetic_request(request, response, true);
+}
+
+// Cached-session adapter for the six classic EventLog conversion views.
+void handle_log_conversion(const httplib::Request& request,
+                           httplib::Response& response) {
+  try {
+    std::shared_ptr<const MinedSession> session;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      session = g_session;
+    }
+    if (!session) {
+      response.status = 409;
+      response.set_content(error_json("no cached log; run /api/mine first"),
+                           "application/json");
+      return;
+    }
+
+    static const std::set<std::string> allowed = {
+        "log_conversion_variant",
+        "log_conversion_include_case_attributes",
+        "log_conversion_case_attribute_prefix",
+        "log_conversion_case_id_key",
+        "log_conversion_graph_case_id_attribute",
+        "log_conversion_include_df",
+        "log_conversion_case_attributes_as_nodes",
+        "log_conversion_event_attributes_as_nodes",
+        "log_conversion_return_variants",
+        "log_conversion_max_variants_to_return",
+        "log_conversion_max_graph_nodes",
+        "log_conversion_max_graph_edges"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown log conversion parameter: " +
+                                    key);
+    }
+    for (const auto& [key, value] : request.files) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown log conversion parameter: " +
+                                    key);
+    }
+
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      if (request.has_param(key)) return request.get_param_value(key);
+      if (request.has_file(key)) return request.get_file_value(key).content;
+      return std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) || request.has_file(key);
+    };
+    auto options = minera::parse_log_conversion_params(lookup, present);
+    if (options.max_graph_nodes > kServerLogConversionMaxGraphNodes) {
+      if (present("log_conversion_max_graph_nodes"))
+        throw std::invalid_argument(
+            "log_conversion_max_graph_nodes exceeds the server safety cap");
+      options.max_graph_nodes = kServerLogConversionMaxGraphNodes;
+    }
+    if (options.max_graph_edges > kServerLogConversionMaxGraphEdges) {
+      if (present("log_conversion_max_graph_edges"))
+        throw std::invalid_argument(
+            "log_conversion_max_graph_edges exceeds the server safety cap");
+      options.max_graph_edges = kServerLogConversionMaxGraphEdges;
+    }
+    if (!options.max_variants_to_return ||
+        *options.max_variants_to_return == 0) {
+      options.max_variants_to_return = kServerLogConversionMaxVariants;
+    } else if (*options.max_variants_to_return >
+               kServerLogConversionMaxVariants) {
+      throw std::invalid_argument(
+          "log_conversion_max_variants_to_return exceeds the server safety cap");
+    }
+    const auto result = minera::convert_event_log(session->log, options);
+    response.set_content(minera::log_conversion_json(result),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 // Hidden cached-session adapter for bounded organizational SNA metrics.
@@ -6378,6 +6464,7 @@ int main(int argc, char** argv) {
   server.Options("/api/genetic-mine", preflight);
   server.Options("/api/mine-genetic", preflight);
   server.Options("/api/genetic-matrix-convert", preflight);
+  server.Options("/api/log-convert", preflight);
   server.Options("/api/organizational-sna", preflight);
   server.Options("/api/sna", preflight);
   server.Options("/api/network-analysis", preflight);
@@ -6466,6 +6553,7 @@ int main(int argc, char** argv) {
   server.Post("/api/genetic-mine", handle_genetic_mine);
   server.Post("/api/mine-genetic", handle_genetic_mine);
   server.Post("/api/genetic-matrix-convert", handle_genetic_matrix_conversion);
+  server.Post("/api/log-convert", handle_log_conversion);
   server.Post("/api/organizational-sna", handle_organizational_sna);
   server.Post("/api/sna", handle_organizational_sna);
   server.Post("/api/network-analysis", handle_network_analysis);

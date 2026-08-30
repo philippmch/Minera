@@ -26,6 +26,7 @@ import {
   type ConceptDriftResult,
   type LogToTargetResult,
   type LogToFeaturesResult,
+  type LogConversionResult,
   type LogUtilityResult,
   type EmbeddingVariant,
   type EmbeddingProvider,
@@ -78,6 +79,7 @@ import {
   isLogToTargetResult,
   isConceptDriftResult,
   isLogToFeaturesResult,
+  isLogConversionResult,
   isLogUtilityResult,
   isEmbeddingApiResult,
   isLabelSplittingResult,
@@ -4324,6 +4326,76 @@ export async function requestLogToFeatures(options: LogToFeaturesOptions = {}): 
   }
   const payload: unknown = await response.json();
   if (!isLogToFeaturesResult(payload)) throw new Error("the Minera backend returned an invalid feature extraction");
+  return payload;
+}
+
+export type LogConversionSelector =
+  | "to_event_log"
+  | "to_event_stream"
+  | "to_data_frame"
+  | "to_nx"
+  | "df_to_event_log_1v"
+  | "df_to_event_log_nv";
+export interface LogConversionOptions {
+  log_conversion_variant?: LogConversionSelector;
+  log_conversion_include_case_attributes?: boolean;
+  log_conversion_case_attribute_prefix?: string;
+  log_conversion_case_id_key?: string;
+  log_conversion_graph_case_id_attribute?: string;
+  log_conversion_include_df?: boolean;
+  log_conversion_case_attributes_as_nodes?: string[];
+  log_conversion_event_attributes_as_nodes?: string[];
+  log_conversion_return_variants?: boolean;
+  log_conversion_max_variants_to_return?: number;
+  log_conversion_max_graph_nodes?: number;
+  log_conversion_max_graph_edges?: number;
+}
+export function logConversionQuery(options: LogConversionOptions = {}): string {
+  const variants: readonly LogConversionSelector[] = [
+    "to_event_log", "to_event_stream", "to_data_frame", "to_nx",
+    "df_to_event_log_1v", "df_to_event_log_nv",
+  ];
+  if (options.log_conversion_variant !== undefined && !variants.includes(options.log_conversion_variant))
+    throw new Error("log_conversion_variant is not supported");
+  for (const [key, value] of [
+    ["log_conversion_case_id_key", options.log_conversion_case_id_key],
+    ["log_conversion_graph_case_id_attribute", options.log_conversion_graph_case_id_attribute],
+  ] as const) if (value !== undefined && value.trim().length === 0) throw new Error(`${key} must not be empty`);
+  for (const [key, values] of [
+    ["log_conversion_case_attributes_as_nodes", options.log_conversion_case_attributes_as_nodes],
+    ["log_conversion_event_attributes_as_nodes", options.log_conversion_event_attributes_as_nodes],
+  ] as const) {
+    if (values !== undefined && (values.length === 0 || values.some((value) => value.trim().length === 0)))
+      throw new Error(`${key} must contain non-empty attribute names`);
+  }
+  for (const [key, value, maximum] of [
+    ["log_conversion_max_graph_nodes", options.log_conversion_max_graph_nodes, 200_000],
+    ["log_conversion_max_graph_edges", options.log_conversion_max_graph_edges, 400_000],
+  ] as const) if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0 || value > maximum))
+    throw new Error(`${key} must be a positive integer within the safety limit`);
+  if (options.log_conversion_max_variants_to_return !== undefined
+      && (!Number.isSafeInteger(options.log_conversion_max_variants_to_return)
+        || options.log_conversion_max_variants_to_return < 0
+        || options.log_conversion_max_variants_to_return > 100_000))
+    throw new Error("log_conversion_max_variants_to_return must be a non-negative integer within the safety limit");
+  const encode = (value: string) => value.replaceAll("\\", "\\\\").replaceAll(",", "\\,");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([left], [right]) => left.localeCompare(right))) {
+    if (value === undefined) continue;
+    query.set(key, Array.isArray(value) ? value.map(encode).join(",") : String(value));
+  }
+  return query.toString();
+}
+export async function requestLogConversion(options: LogConversionOptions = {}): Promise<LogConversionResult> {
+  const query = logConversionQuery(options);
+  const response = await fetch(`/api/log-convert${query ? `?${query}` : ""}`, { method: "POST" });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload) throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isLogConversionResult(payload)) throw new Error("the Minera backend returned an invalid log conversion");
   return payload;
 }
 

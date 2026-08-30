@@ -77,6 +77,7 @@
 #include "minera/service_time.hpp"
 #include "minera/rework.hpp"
 #include "minera/minimum_self_distance.hpp"
+#include "minera/log_conversion.hpp"
 
 // Pure request-parsing helpers shared by the local server
 // (src/backend/tools/minera_server)
@@ -544,6 +545,14 @@ parse_timestamp_interleavings_params(const FieldLookup& field);
 [[nodiscard]] LabelSplittingParams parse_label_splitting_params(
     const FieldLookup& field);
 [[nodiscard]] LabelSplittingParams parse_label_splitting_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+// Strict request/CLI adapter for EventLog conversion selectors. Wire fields
+// use the `log_conversion_` prefix and preserve explicit empty values where
+// the conversion contract permits them (for example, an empty case prefix).
+[[nodiscard]] LogConversionOptions parse_log_conversion_params(
+    const FieldLookup& field);
+[[nodiscard]] LogConversionOptions parse_log_conversion_params(
     const FieldLookup& field, const FieldPresence& present);
 
 }  // namespace minera

@@ -59,6 +59,7 @@
 #include "minera/role_discovery.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_filter.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_target.hpp"
@@ -428,6 +429,12 @@ int usage(const char* program) {
                "  --xes-max-decompressed-bytes <n> Gzip expansion safety bound\n"
                "  --xes-export-variant <id> line_by_line or etree\n"
                "  --xes-compress <bool>     Override .gz output detection\n"
+               "  --log-convert <id>       Event-log conversion selector\n"
+               "                            to_event_log, to_event_stream,\n"
+               "                            to_data_frame, to_nx, df_to_event_log_1v,\n"
+               "                            or df_to_event_log_nv\n"
+               "  --log-conversion-* <v>   Conversion attributes, flags, and bounds\n"
+               "  --log-conversion-max-variants-to-return <n> Variant output cap\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
                "  --inductive-variant <id>  log (default), imf (infrequent),\n"
@@ -1234,6 +1241,8 @@ int main(int argc, char** argv) {
   std::filesystem::path xes_output;
   std::filesystem::path dfg_output;
   std::filesystem::path playout_output;
+  bool log_conversion_requested = false;
+  std::map<std::string, std::string> log_conversion_fields;
   std::string pnml_miner = "inductive";
   std::string bpmn_miner = "inductive";
   minera::ProcessTreePetriNetVariant process_tree_variant =
@@ -2228,6 +2237,33 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       dfg_output = value;
+      continue;
+    }
+    if (arg == "--log-convert") {
+      const auto* value = next();
+      if (!value || *value == '\0') return usage(argv[0]);
+      log_conversion_fields.insert_or_assign("log_conversion_variant", value);
+      log_conversion_requested = true;
+      continue;
+    }
+    if (arg.rfind("--log-conversion-", 0) == 0) {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      static const std::set<std::string> names = {
+          "log_conversion_variant", "log_conversion_include_case_attributes",
+          "log_conversion_case_attribute_prefix", "log_conversion_case_id_key",
+          "log_conversion_graph_case_id_attribute", "log_conversion_include_df",
+          "log_conversion_case_attributes_as_nodes",
+          "log_conversion_event_attributes_as_nodes",
+          "log_conversion_return_variants",
+          "log_conversion_max_variants_to_return",
+          "log_conversion_max_graph_nodes",
+          "log_conversion_max_graph_edges"};
+      if (!names.contains(key)) return usage(argv[0]);
+      log_conversion_fields.insert_or_assign(std::move(key), value);
+      log_conversion_requested = true;
       continue;
     }
     if (arg == "--ilp-mine") {
@@ -4656,6 +4692,30 @@ int main(int argc, char** argv) {
     auto log = is_xes_path(input)
                    ? minera::import_xes_event_log(input, xes_options)
                    : minera::import_csv_event_log(input, options);
+    if (log_conversion_requested) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = log_conversion_fields.find(std::string(name));
+        return it == log_conversion_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return log_conversion_fields.contains(std::string(name));
+      };
+      const auto conversion_options =
+          minera::parse_log_conversion_params(lookup, present);
+      const auto body = minera::log_conversion_json(
+          minera::convert_event_log(log, conversion_options));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
     if (timestamp_interleavings_requested) {
       const auto right = is_xes_path(timestamp_interleavings_right_path)
                              ? minera::import_xes_event_log(
