@@ -1,5 +1,6 @@
 #include "minera/xes_event_log_importer.hpp"
 
+#include "gzip_codec.hpp"
 #include "xml_pull_parser.hpp"
 
 #include <algorithm>
@@ -166,6 +167,11 @@ EventLog import_xes_event_log(
 
   std::string xml((std::istreambuf_iterator<char>(input)),
                   std::istreambuf_iterator<char>());
+  if (detail::is_gzip_data(xml)) {
+    xml = detail::gzip_decompress(xml, options.max_decompressed_bytes);
+  } else if (xml.size() > options.max_decompressed_bytes) {
+    throw std::runtime_error("XES input exceeds the configured size limit");
+  }
 
   // Strip a leading UTF-8 byte-order mark so the first '<' is found cleanly.
   if (xml.size() >= 3 && static_cast<unsigned char>(xml[0]) == 0xEF &&

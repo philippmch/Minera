@@ -132,6 +132,11 @@ std::vector<std::string> split_csv(std::string_view value) {
   return parts;
 }
 
+bool is_xes_path(const std::filesystem::path& path) {
+  const auto value = path.string();
+  return ends_with_ci(value, ".xes") || ends_with_ci(value, ".xes.gz");
+}
+
 std::string trim_text(std::string_view value) {
   const auto first = value.find_first_not_of(" \t\r\n");
   if (first == std::string_view::npos) return {};
@@ -419,6 +424,9 @@ int usage(const char* program) {
                "  --xes-resource-attribute <key> Event resource selector\n"
                "  --xes-lifecycle-attribute <key> Event lifecycle selector\n"
                "  --xes-require-timestamp <bool> Reject logs without timestamps\n"
+               "  --xes-max-decompressed-bytes <n> Gzip expansion safety bound\n"
+               "  --xes-export-variant <id> line_by_line or etree\n"
+               "  --xes-compress <bool>     Override .gz output detection\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
                "  --inductive-variant <id>  log (default), imf (infrequent),\n"
@@ -1324,6 +1332,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> variant_statistics_fields;
   minera::CsvImportOptions options;
   minera::XesImportOptions xes_options;
+  minera::XesExportOptions xes_export_options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
   std::map<std::string, std::string> segment_fields;
@@ -3115,7 +3124,9 @@ int main(int argc, char** argv) {
         arg == "--xes-timestamp-attribute" ||
         arg == "--xes-resource-attribute" ||
         arg == "--xes-lifecycle-attribute" ||
-        arg == "--xes-require-timestamp") {
+        arg == "--xes-require-timestamp" ||
+        arg == "--xes-max-decompressed-bytes" ||
+        arg == "--xes-export-variant" || arg == "--xes-compress") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
@@ -3140,6 +3151,12 @@ int main(int argc, char** argv) {
           xes_options.lifecycle_attribute = value;
         if (arg == "--xes-require-timestamp")
           xes_options.require_timestamp = parse_boolean(value, arg);
+        if (arg == "--xes-max-decompressed-bytes")
+          xes_options.max_decompressed_bytes = parse_positive_size(value, arg);
+        if (arg == "--xes-export-variant")
+          xes_export_options.variant = minera::parse_xes_export_variant(value);
+        if (arg == "--xes-compress")
+          xes_export_options.compress = parse_boolean(value, arg);
         if ((arg == "--xes-case-attribute" ||
              arg == "--xes-activity-attribute" ||
              arg == "--xes-timestamp-attribute" ||
@@ -4627,12 +4644,11 @@ int main(int argc, char** argv) {
       dfg_playout_options = minera::parse_dfg_playout_params(lookup, present);
     }
     // A .xes file is read as XES; everything else is treated as CSV.
-    auto log = ends_with_ci(input.string(), ".xes")
+    auto log = is_xes_path(input)
                    ? minera::import_xes_event_log(input, xes_options)
                    : minera::import_csv_event_log(input, options);
     if (timestamp_interleavings_requested) {
-      const auto right = ends_with_ci(
-                             timestamp_interleavings_right_path.string(), ".xes")
+      const auto right = is_xes_path(timestamp_interleavings_right_path)
                              ? minera::import_xes_event_log(
                                    timestamp_interleavings_right_path)
                              : minera::import_csv_event_log(
@@ -4673,7 +4689,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (merge_requested) {
-      const auto incoming = ends_with_ci(merge_incoming_path.string(), ".xes")
+      const auto incoming = is_xes_path(merge_incoming_path)
                                 ? minera::import_xes_event_log(merge_incoming_path)
                                 : minera::import_csv_event_log(merge_incoming_path,
                                                                options);
@@ -5215,7 +5231,7 @@ int main(int argc, char** argv) {
     if (pripel_requested) {
       if (pripel_query_path.empty())
         throw std::invalid_argument("--pripel requires a query log path");
-      const auto query = ends_with_ci(pripel_query_path.string(), ".xes")
+      const auto query = is_xes_path(pripel_query_path)
                              ? minera::import_xes_event_log(pripel_query_path)
                              : minera::import_csv_event_log(pripel_query_path, options);
       const auto lookup = [&](std::string_view name) {
@@ -5370,7 +5386,7 @@ int main(int argc, char** argv) {
     std::optional<std::vector<minera::EditDistanceAlignment>> edit_result;
     std::optional<minera::EventLog> edit_projected_log;
     if (!edit_reference.empty()) {
-      const auto reference = minera::ends_with_ci(edit_reference.string(), ".xes")
+      const auto reference = is_xes_path(edit_reference)
           ? minera::import_xes_event_log(edit_reference)
           : minera::import_csv_event_log(edit_reference, options);
       edit_result = minera::align_edit_distance(log, reference, edit_options);
@@ -5378,7 +5394,7 @@ int main(int argc, char** argv) {
     }
     std::optional<minera::EmdResult> emd_result;
     if (!emd_reference.empty()) {
-      const auto reference = minera::ends_with_ci(emd_reference.string(), ".xes")
+      const auto reference = is_xes_path(emd_reference)
           ? minera::import_xes_event_log(emd_reference)
           : minera::import_csv_event_log(emd_reference, options);
       emd_result = minera::evaluate_emd(
@@ -5585,7 +5601,7 @@ int main(int argc, char** argv) {
     }
     if (!compare_petri_reference.empty()) {
       if (!ends_with_ci(compare_petri_reference.string(), ".csv") &&
-          !ends_with_ci(compare_petri_reference.string(), ".xes")) {
+          !is_xes_path(compare_petri_reference)) {
         std::cerr << "error: --compare-petri-reference expects a .csv or .xes file\n";
         return 2;
       }
@@ -5599,7 +5615,7 @@ int main(int argc, char** argv) {
       }
       const auto selector = compare_petri_activity_attribute;
       const auto reference = [&]() {
-        if (ends_with_ci(compare_petri_reference.string(), ".xes")) {
+        if (is_xes_path(compare_petri_reference)) {
           minera::XesImportOptions reference_options;
           if (!selector.empty() && selector != "concept:name")
             reference_options.activity_attribute = selector;
@@ -6029,13 +6045,9 @@ int main(int argc, char** argv) {
     // Optionally emit the (filtered) event log as standard XES, making the
     // CLI double as a CSV-to-XES converter.
     if (!xes_output.empty()) {
-      std::ofstream xes_file(xes_output);
-      if (!xes_file) {
-        std::cerr << "error: cannot open XES output file " << xes_output
-                  << '\n';
-        return 1;
-      }
-      minera::write_xes(xes_file, log, dataset);
+      xes_export_options.name = dataset;
+      (void)minera::export_xes_event_log(xes_output, log,
+                                         xes_export_options);
     }
 
     if (!dfg_output.empty()) {

@@ -5704,7 +5704,7 @@ void handle_playout(const httplib::Request& request,
 
 // Exports the most recently mined event log — after any server-side filtering
 // applied at mine time — as standard XES.
-void handle_xes(const httplib::Request&, httplib::Response& response) {
+void handle_xes(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
@@ -5717,8 +5717,27 @@ void handle_xes(const httplib::Request&, httplib::Response& response) {
     return;
   }
 
-  response.set_content(minera::to_xes(session->log, session->dataset),
-                       "application/xml");
+  try {
+    minera::XesExportOptions options;
+    options.name = session->dataset;
+    if (request.has_param("xes_export_variant")) {
+      options.variant = minera::parse_xes_export_variant(
+          request.get_param_value("xes_export_variant"));
+    }
+    if (request.has_param("xes_compress")) {
+      const auto value = request.get_param_value("xes_compress");
+      if (value == "true" || value == "1") options.compress = true;
+      else if (value == "false" || value == "0") options.compress = false;
+      else throw std::invalid_argument(
+          "xes_compress: expected true, false, 1, or 0");
+    }
+    const bool compressed = options.compress.value_or(false);
+    response.set_content(minera::serialize_xes(session->log, options),
+                         compressed ? "application/gzip" : "application/xml");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
 }
 
 void handle_dfg(const httplib::Request& request, httplib::Response& response) {

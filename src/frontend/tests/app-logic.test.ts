@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, type FilterOptions } from "../src/api";
+import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, xesExportQuery, type FilterOptions } from "../src/api";
 import {
   delimiterForFile,
   evaluationModelIds,
@@ -27,6 +27,7 @@ describe("native alignment adapters", () => {
       xesReverseSort: true,
       xesMaxTraces: 7,
       xesAttributesToRead: ["cost", " region "],
+      xesMaxDecompressedBytes: 1048576,
     })).toEqual([
       ["xes_variant", "iterparse_20"],
       ["xes_case_attribute", "case:id"],
@@ -39,9 +40,21 @@ describe("native alignment adapters", () => {
       ["xes_reverse_sort", "true"],
       ["xes_max_traces", "7"],
       ["xes_attributes_to_read", "cost,region"],
+      ["xes_max_decompressed_bytes", "1048576"],
     ]);
     expect(() => mineFormEntries({ xesMaxTraces: -1 })).toThrow(/non-negative/);
     expect(() => mineFormEntries({ xesActivityAttribute: " " })).toThrow(/empty/);
+    expect(() => mineFormEntries({ xesMaxDecompressedBytes: 0 })).toThrow(/positive/);
+  });
+
+  it("serializes both XES exporter selectors and gzip control", () => {
+    expect(xesExportQuery()).toBe("");
+    expect(xesExportQuery({ variant: "line_by_line", compress: false }))
+      .toBe("xes_export_variant=line_by_line&xes_compress=false");
+    expect(xesExportQuery({ variant: "etree", compress: true }))
+      .toBe("xes_export_variant=etree&xes_compress=true");
+    expect(() => xesExportQuery({ variant: "unknown" as "etree" }))
+      .toThrow(/not supported/);
   });
 
   it("serializes opt-in overlap controls and marks them active", () => {

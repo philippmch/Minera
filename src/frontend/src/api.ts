@@ -239,6 +239,7 @@ export interface CsvOptions {
   xesReverseSort?: boolean;
   xesMaxTraces?: number;
   xesAttributesToRead?: string[];
+  xesMaxDecompressedBytes?: number;
 }
 
 /** How the backend's time-range filter reads a trace. */
@@ -576,6 +577,12 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     if (attributes.some((key) => !key))
       throw new Error("xesAttributesToRead must contain non-empty keys");
     add("xes_attributes_to_read", attributes.join(","));
+  }
+  if (options.xesMaxDecompressedBytes !== undefined) {
+    if (!Number.isSafeInteger(options.xesMaxDecompressedBytes) ||
+        options.xesMaxDecompressedBytes <= 0)
+      throw new Error("xesMaxDecompressedBytes must be a positive safe integer");
+    add("xes_max_decompressed_bytes", String(options.xesMaxDecompressedBytes));
   }
 
   if (options.topVariants) add("top_variants", String(options.topVariants));
@@ -2661,10 +2668,28 @@ export async function fetchPtml(miner?: string): Promise<string> {
  * mine time — as standard XES. Like PNML, this is served from the backend's
  * cached session, so it only works for a log mined this session.
  */
-export async function fetchXes(): Promise<string> {
+export interface XesExportOptions {
+  variant?: "line_by_line" | "etree";
+  compress?: boolean;
+}
+
+export function xesExportQuery(options: XesExportOptions = {}): string {
+  if (options.variant !== undefined &&
+      !["line_by_line", "etree"].includes(options.variant))
+    throw new Error("XES export variant is not supported");
+  const query = new URLSearchParams();
+  if (options.variant !== undefined)
+    query.set("xes_export_variant", options.variant);
+  if (options.compress !== undefined)
+    query.set("xes_compress", String(options.compress));
+  return query.toString();
+}
+
+export async function fetchXes(options: XesExportOptions = {}): Promise<Blob> {
   let response: Response;
   try {
-    response = await fetch("/api/xes");
+    const query = xesExportQuery(options);
+    response = await fetch(`/api/xes${query ? `?${query}` : ""}`);
   } catch {
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
@@ -2677,7 +2702,7 @@ export async function fetchXes(): Promise<string> {
     }
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
-  return response.text();
+  return response.blob();
 }
 
 /** Requests the encoded decision tables for one cached model. */

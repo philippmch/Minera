@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -78,7 +80,7 @@ double parse_percentage(std::string_view text) {
 
 int usage(const char* program) {
   std::cerr << "Usage: " << program
-            << " INPUT.csv|INPUT.xes (--train-percentage P | --prefix-length N |"
+            << " INPUT.csv|INPUT.xes[.gz] (--train-percentage P | --prefix-length N |"
                " --all-prefixes | --until-activity ACTIVITY | --to-activities A,B |"
                " --feature-selection) [--seed N] [--activity-key NAME]"
                " [--timestamp-key NAME] [--feature-min-different N]"
@@ -94,9 +96,12 @@ minera::EventLog import_log(const std::string& path) {
   content << input.rdbuf();
   const auto text = content.str();
   std::istringstream stream(text);
-  if (path.size() >= 4 &&
-      (path.substr(path.size() - 4) == ".xes" ||
-       path.substr(path.size() - 4) == ".XES"))
+  auto lower = path;
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+                 [](unsigned char value) {
+                   return static_cast<char>(std::tolower(value));
+                 });
+  if (lower.ends_with(".xes") || lower.ends_with(".xes.gz"))
     return minera::import_xes_event_log(stream);
   return minera::import_csv_event_log(stream);
 }
