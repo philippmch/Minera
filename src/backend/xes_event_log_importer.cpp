@@ -10,8 +10,11 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
@@ -51,11 +54,116 @@ bool first_class_activity_selector(std::string_view selector) {
          selector == "lifecycle" || selector == "lifecycle:transition";
 }
 
+void validate_variant(XesImportVariant variant) {
+  switch (variant) {
+    case XesImportVariant::kIterparse:
+    case XesImportVariant::kLineByLine:
+    case XesImportVariant::kIterparseMemoryCompressed:
+    case XesImportVariant::kIterparse20:
+    case XesImportVariant::kChunkRegex:
+    case XesImportVariant::kRustXes:
+      return;
+  }
+  throw std::invalid_argument("XES import: unsupported parser variant");
+}
+
+double required_timestamp(const Event& event) {
+  if (event.timestamp.empty()) {
+    throw std::runtime_error(
+        "XES timestamp sorting requires a timestamp on every event");
+  }
+  const auto parsed = parse_timestamp(event.timestamp);
+  if (!parsed) {
+    throw std::runtime_error(
+        "XES timestamp sorting encountered an invalid timestamp");
+  }
+  return *parsed;
+}
+
+void sort_log_by_timestamp(EventLog& log, bool reverse) {
+  std::vector<std::pair<double, Trace>> timed_traces;
+  timed_traces.reserve(log.traces.size());
+  for (auto& trace : log.traces) {
+    if (trace.events.empty()) continue;
+    std::vector<std::pair<double, Event>> timed_events;
+    timed_events.reserve(trace.events.size());
+    for (auto& event : trace.events) {
+      const auto timestamp = required_timestamp(event);
+      timed_events.emplace_back(timestamp, std::move(event));
+    }
+    std::stable_sort(timed_events.begin(), timed_events.end(),
+                     [reverse](const auto& lhs, const auto& rhs) {
+                       return reverse ? lhs.first > rhs.first
+                                      : lhs.first < rhs.first;
+                     });
+    trace.events.clear();
+    trace.events.reserve(timed_events.size());
+    for (auto& entry : timed_events)
+      trace.events.push_back(std::move(entry.second));
+    timed_traces.emplace_back(timed_events.front().first, std::move(trace));
+  }
+  std::stable_sort(timed_traces.begin(), timed_traces.end(),
+                   [reverse](const auto& lhs, const auto& rhs) {
+                     return reverse ? lhs.first > rhs.first
+                                    : lhs.first < rhs.first;
+                   });
+  log.traces.clear();
+  log.traces.reserve(timed_traces.size());
+  for (auto& entry : timed_traces)
+    log.traces.push_back(std::move(entry.second));
+}
+
 }  // namespace
+
+XesImportVariant parse_xes_import_variant(std::string_view value) {
+  std::string normalized(value);
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                 [](unsigned char c) {
+                   return static_cast<char>(std::tolower(c));
+                 });
+  if (normalized == "iterparse" || normalized == "lxml")
+    return XesImportVariant::kIterparse;
+  if (normalized == "line_by_line" || normalized == "nonstandard")
+    return XesImportVariant::kLineByLine;
+  if (normalized == "iterparse_mem_compressed")
+    return XesImportVariant::kIterparseMemoryCompressed;
+  if (normalized == "iterparse_20") return XesImportVariant::kIterparse20;
+  if (normalized == "chunk_regex") return XesImportVariant::kChunkRegex;
+  if (normalized == "rustxes" || normalized == "r4pm")
+    return XesImportVariant::kRustXes;
+  throw std::invalid_argument(
+      "XES import variant must be iterparse, line_by_line, "
+      "iterparse_mem_compressed, iterparse_20, chunk_regex, or rustxes");
+}
+
+std::string_view xes_import_variant_name(XesImportVariant variant) {
+  switch (variant) {
+    case XesImportVariant::kIterparse: return "iterparse";
+    case XesImportVariant::kLineByLine: return "line_by_line";
+    case XesImportVariant::kIterparseMemoryCompressed:
+      return "iterparse_mem_compressed";
+    case XesImportVariant::kIterparse20: return "iterparse_20";
+    case XesImportVariant::kChunkRegex: return "chunk_regex";
+    case XesImportVariant::kRustXes: return "rustxes";
+  }
+  throw std::invalid_argument("XES import: unsupported parser variant");
+}
 
 EventLog import_xes_event_log(
     std::istream& input,
     const XesImportOptions& options) {
+  validate_variant(options.variant);
+  if (options.case_attribute.empty() || options.activity_attribute.empty() ||
+      options.timestamp_attribute.empty() || options.resource_attribute.empty() ||
+      options.lifecycle_attribute.empty()) {
+    throw std::invalid_argument("XES import selectors must not be empty");
+  }
+  std::unordered_set<std::string> attributes_to_read(
+      options.attributes_to_read.begin(), options.attributes_to_read.end());
+  const auto keeps_attribute = [&](std::string_view key) {
+    return attributes_to_read.empty() || attributes_to_read.contains(std::string(key));
+  };
+
   std::string xml((std::istreambuf_iterator<char>(input)),
                   std::istreambuf_iterator<char>());
 
@@ -138,6 +246,7 @@ EventLog import_xes_event_log(
       const std::string parent = stack.empty() ? std::string{} : stack.back();
 
       if (token.name == "trace" && parent == "log") {
+        if (log.traces.size() >= options.max_traces) break;
         if (in_trace) {
           throw std::runtime_error("XES input nests a <trace> inside a <trace>");
         }
@@ -185,7 +294,7 @@ EventLog import_xes_event_log(
               }
               recognized = true;
             }
-            if (!recognized) {
+            if (!recognized && keeps_attribute(*key)) {
               if (const auto kind = attribute_kind_of(token.name)) {
                 // Any other scalar attribute is kept generically, with its XES
                 // type so an export can round-trip it faithfully.
@@ -200,12 +309,13 @@ EventLog import_xes_event_log(
           if (const auto* value = detail::attribute(token.attributes, "value")) {
             if (*key == options.case_attribute) {
               case_id = *value;
-            } else if (const auto kind = attribute_kind_of(token.name)) {
-              // Any other scalar trace attribute is a case attribute (e.g.
-              // BPI 2012's AMOUNT_REQ), kept with its XES type like the
-              // generic event attributes.
-              current_trace.attributes.push_back(
-                  EventAttribute{*key, *value, *kind});
+            } else if (keeps_attribute(*key)) {
+              if (const auto kind = attribute_kind_of(token.name)) {
+                // Any other scalar trace attribute is a case attribute, kept
+                // with its scalar type like the generic event attributes.
+                current_trace.attributes.push_back(
+                    EventAttribute{*key, *value, *kind});
+              }
             }
           }
         }
@@ -215,7 +325,7 @@ EventLog import_xes_event_log(
             // The log name is supplied separately by Minera's XES exporter;
             // retain every other scalar log attribute, including derived
             // projection metadata such as @@aligned_dfg.
-            if (*key != "concept:name") {
+            if (*key != "concept:name" && keeps_attribute(*key)) {
               if (const auto kind = attribute_kind_of(token.name)) {
                 log.attributes.push_back(EventAttribute{*key, *value, *kind});
               }
@@ -258,13 +368,7 @@ EventLog import_xes_event_log(
         options.timestamp_attribute + "')");
   }
 
-  // Mirror the CSV importer: when timestamps are present, order events within
-  // each trace by timestamp, keeping document order for equal timestamps.
-  if (saw_timestamp) {
-    for (auto& trace : log.traces) {
-      order_events_by_time(trace.events);
-    }
-  }
+  if (options.timestamp_sort) sort_log_by_timestamp(log, options.reverse_sort);
 
   return log;
 }

@@ -3783,27 +3783,86 @@ void xes_importer_reads_traces_and_events() {
   assert(graph.edge_count("A", "B") == 1);
 }
 
-void xes_importer_sorts_events_by_timestamp() {
-  // Events out of order in the document are reordered by their timestamp.
-  const auto log = import_xes(
+void xes_importer_variants_ordering_limits_and_projection() {
+  const std::string xml =
       "<log>\n"
       "  <trace>\n"
       "    <string key=\"concept:name\" value=\"c\"/>\n"
+      "    <string key=\"region\" value=\"west\"/>\n"
       "    <event>\n"
       "      <string key=\"concept:name\" value=\"B\"/>\n"
       "      <date key=\"time:timestamp\" value=\"2026-01-01T00:02:00\"/>\n"
+      "      <int key=\"cost\" value=\"2\"/>\n"
       "    </event>\n"
       "    <event>\n"
       "      <string key=\"concept:name\" value=\"A\"/>\n"
       "      <date key=\"time:timestamp\" value=\"2026-01-01T00:01:00\"/>\n"
+      "      <string key=\"ignored\" value=\"x\"/>\n"
       "    </event>\n"
       "  </trace>\n"
-      "</log>\n");
+      "  <trace>\n"
+      "    <string key=\"concept:name\" value=\"d\"/>\n"
+      "    <event><string key=\"concept:name\" value=\"C\"/>"
+      "<date key=\"time:timestamp\" value=\"2025-12-31T23:59:00Z\"/></event>\n"
+      "  </trace>\n"
+      "</log>\n";
 
-  assert(log.traces.size() == 1);
-  assert(log.traces[0].events.size() == 2);
-  assert(log.traces[0].events[0].activity == "A");
-  assert(log.traces[0].events[1].activity == "B");
+  // XML order is authoritative unless timestamp sorting is explicitly enabled.
+  const auto document_order = import_xes(xml);
+  assert(document_order.traces.size() == 2);
+  assert(document_order.traces[0].events[0].activity == "B");
+  assert(document_order.traces[0].events[1].activity == "A");
+
+  minera::XesImportOptions sorted_options;
+  sorted_options.timestamp_sort = true;
+  std::istringstream sorted_input(xml);
+  const auto sorted = minera::import_xes_event_log(sorted_input, sorted_options);
+  assert(sorted.traces[0].case_id == "d");
+  assert(sorted.traces[1].case_id == "c");
+  assert(sorted.traces[1].events[0].activity == "A");
+  assert(sorted.traces[1].events[1].activity == "B");
+
+  sorted_options.reverse_sort = true;
+  std::istringstream reversed_input(xml);
+  const auto reversed =
+      minera::import_xes_event_log(reversed_input, sorted_options);
+  assert(reversed.traces[0].case_id == "c");
+  assert(reversed.traces[0].events[0].activity == "B");
+
+  minera::XesImportOptions projected_options;
+  projected_options.max_traces = 1;
+  projected_options.attributes_to_read = {"cost"};
+  std::istringstream projected_input(xml);
+  const auto projected =
+      minera::import_xes_event_log(projected_input, projected_options);
+  assert(projected.trace_count() == 1);
+  assert(projected.traces[0].attribute("region") == nullptr);
+  assert(*projected.traces[0].events[0].attribute("cost") == "2");
+  assert(projected.traces[0].events[1].attribute("ignored") == nullptr);
+
+  const std::vector<minera::XesImportVariant> variants = {
+      minera::XesImportVariant::ITERPARSE,
+      minera::XesImportVariant::LINE_BY_LINE,
+      minera::XesImportVariant::ITERPARSE_MEM_COMPRESSED,
+      minera::XesImportVariant::ITERPARSE_20,
+      minera::XesImportVariant::CHUNK_REGEX,
+      minera::XesImportVariant::RUSTXES};
+  for (const auto variant : variants) {
+    minera::XesImportOptions variant_options;
+    variant_options.variant = variant;
+    std::istringstream variant_input(xml);
+    assert(minera::import_xes_event_log(variant_input, variant_options)
+               .trace_count() == 2);
+    assert(minera::parse_xes_import_variant(
+               minera::xes_import_variant_name(variant)) == variant);
+  }
+  assert(minera::parse_xes_import_variant("lxml") ==
+         minera::XesImportVariant::kIterparse);
+  assert(minera::parse_xes_import_variant("nonstandard") ==
+         minera::XesImportVariant::kLineByLine);
+  assert(minera::parse_xes_import_variant("r4pm") ==
+         minera::XesImportVariant::kRustXes);
+  assert(throws([] { (void)minera::parse_xes_import_variant("unknown"); }));
 }
 
 void xes_importer_decodes_entities_and_ignores_nesting() {
@@ -5925,7 +5984,7 @@ int main() {
   json_export_carries_case_attributes();
   xes_importer_reads_traces_and_events();
   xes_importer_reads_a_file_from_disk();
-  xes_importer_sorts_events_by_timestamp();
+  xes_importer_variants_ordering_limits_and_projection();
   xes_importer_decodes_entities_and_ignores_nesting();
   xes_importer_rejects_malformed_logs();
   heuristic_miner_keeps_a_clean_sequence();

@@ -14,6 +14,36 @@ import {
 import { isDfgAlignmentResult, isEditDistanceResult, isProcessTreeAlignmentResult, isDecomposedAlignmentResult, isPetriAntiAlignmentResult, isPetriMultiAlignmentResult, isProcessTreeReductionResult, isPetriAnalysisResult, isPetriUsageComparison, isLogToTargetResult, isTrieResult, isIntervalTreeResult, isCaseRelationsResult, isRandomTreeResult, isModelEvaluation, type EdgeStat, type MineraExport, type Trace } from "../src/types";
 
 describe("native alignment adapters", () => {
+  it("serializes the complete XES import contract", () => {
+    expect(mineFormEntries({
+      xesVariant: "iterparse_20",
+      xesCaseAttribute: "case:id",
+      xesActivityAttribute: "event:name",
+      xesTimestampAttribute: "completed_at",
+      xesResourceAttribute: "performer",
+      xesLifecycleAttribute: "phase",
+      xesRequireTimestamp: true,
+      xesTimestampSort: true,
+      xesReverseSort: true,
+      xesMaxTraces: 7,
+      xesAttributesToRead: ["cost", " region "],
+    })).toEqual([
+      ["xes_variant", "iterparse_20"],
+      ["xes_case_attribute", "case:id"],
+      ["xes_activity_attribute", "event:name"],
+      ["xes_timestamp_attribute", "completed_at"],
+      ["xes_resource_attribute", "performer"],
+      ["xes_lifecycle_attribute", "phase"],
+      ["xes_require_timestamp", "true"],
+      ["xes_timestamp_sort", "true"],
+      ["xes_reverse_sort", "true"],
+      ["xes_max_traces", "7"],
+      ["xes_attributes_to_read", "cost,region"],
+    ]);
+    expect(() => mineFormEntries({ xesMaxTraces: -1 })).toThrow(/non-negative/);
+    expect(() => mineFormEntries({ xesActivityAttribute: " " })).toThrow(/empty/);
+  });
+
   it("serializes opt-in overlap controls and marks them active", () => {
     expect(mineFormEntries({
       overlap: true,

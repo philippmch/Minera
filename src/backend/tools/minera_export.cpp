@@ -406,6 +406,19 @@ int usage(const char* program) {
                "  --timestamp-column <name> Timestamp column (default: timestamp)\n"
                "  --resource-column <name>  Resource column (default: resource)\n"
                "  --delimiter <char>        Field delimiter (default: ,)\n"
+               "  --xes-import-variant <id> iterparse, line_by_line,\n"
+               "                            iterparse_mem_compressed, iterparse_20,\n"
+               "                            chunk_regex, or rustxes\n"
+               "  --xes-timestamp-sort <bool> Sort events and traces by timestamp\n"
+               "  --xes-reverse-sort <bool> Reverse requested timestamp ordering\n"
+               "  --xes-max-traces <n>      Import at most n traces\n"
+               "  --xes-attributes-to-read <keys> Optional scalar key projection\n"
+               "  --xes-case-attribute <key> Trace case-id selector\n"
+               "  --xes-activity-attribute <key> Event activity selector\n"
+               "  --xes-timestamp-attribute <key> Event timestamp selector\n"
+               "  --xes-resource-attribute <key> Event resource selector\n"
+               "  --xes-lifecycle-attribute <key> Event lifecycle selector\n"
+               "  --xes-require-timestamp <bool> Reject logs without timestamps\n"
                "  --noise-threshold <f>     Inductive Miner – infrequent filter\n"
                "                            in [0,1] (default: 0 = classic)\n"
                "  --inductive-variant <id>  log (default), imf (infrequent),\n"
@@ -1310,6 +1323,7 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> boundary_activities_fields;
   std::map<std::string, std::string> variant_statistics_fields;
   minera::CsvImportOptions options;
+  minera::XesImportOptions xes_options;
   minera::LogFilterOptions filter;
   std::map<std::string, std::string> ltl_fields;
   std::map<std::string, std::string> segment_fields;
@@ -3094,6 +3108,52 @@ int main(int argc, char** argv) {
       continue;
     }
 
+    if (arg == "--xes-import-variant" || arg == "--xes-timestamp-sort" ||
+        arg == "--xes-reverse-sort" || arg == "--xes-max-traces" ||
+        arg == "--xes-attributes-to-read" || arg == "--xes-case-attribute" ||
+        arg == "--xes-activity-attribute" ||
+        arg == "--xes-timestamp-attribute" ||
+        arg == "--xes-resource-attribute" ||
+        arg == "--xes-lifecycle-attribute" ||
+        arg == "--xes-require-timestamp") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      try {
+        if (arg == "--xes-import-variant")
+          xes_options.variant = minera::parse_xes_import_variant(value);
+        if (arg == "--xes-timestamp-sort")
+          xes_options.timestamp_sort = parse_boolean(value, arg);
+        if (arg == "--xes-reverse-sort")
+          xes_options.reverse_sort = parse_boolean(value, arg);
+        if (arg == "--xes-max-traces")
+          xes_options.max_traces = parse_nonnegative_size(value, arg);
+        if (arg == "--xes-attributes-to-read")
+          xes_options.attributes_to_read = split_csv(value);
+        if (arg == "--xes-case-attribute") xes_options.case_attribute = value;
+        if (arg == "--xes-activity-attribute")
+          xes_options.activity_attribute = value;
+        if (arg == "--xes-timestamp-attribute")
+          xes_options.timestamp_attribute = value;
+        if (arg == "--xes-resource-attribute")
+          xes_options.resource_attribute = value;
+        if (arg == "--xes-lifecycle-attribute")
+          xes_options.lifecycle_attribute = value;
+        if (arg == "--xes-require-timestamp")
+          xes_options.require_timestamp = parse_boolean(value, arg);
+        if ((arg == "--xes-case-attribute" ||
+             arg == "--xes-activity-attribute" ||
+             arg == "--xes-timestamp-attribute" ||
+             arg == "--xes-resource-attribute" ||
+             arg == "--xes-lifecycle-attribute") && value[0] == '\0') {
+          return usage(argv[0]);
+        }
+      } catch (const std::exception& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return 2;
+      }
+      continue;
+    }
+
     if (arg == "-o") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4568,7 +4628,7 @@ int main(int argc, char** argv) {
     }
     // A .xes file is read as XES; everything else is treated as CSV.
     auto log = ends_with_ci(input.string(), ".xes")
-                   ? minera::import_xes_event_log(input)
+                   ? minera::import_xes_event_log(input, xes_options)
                    : minera::import_csv_event_log(input, options);
     if (timestamp_interleavings_requested) {
       const auto right = ends_with_ci(

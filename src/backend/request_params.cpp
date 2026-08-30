@@ -1077,6 +1077,42 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("delimiter"); !value.empty()) {
     params.csv.delimiter = value.front();
   }
+  if (supplied("xes_variant")) {
+    params.xes.variant = parse_xes_import_variant(field("xes_variant"));
+  }
+  const auto parse_xes_selector = [&](std::string_view name,
+                                      std::string& destination) {
+    if (!supplied(name)) return;
+    const auto value = field(name);
+    if (value.empty()) {
+      throw std::invalid_argument(std::string(name) + ": must not be empty");
+    }
+    destination = value;
+  };
+  parse_xes_selector("xes_case_attribute", params.xes.case_attribute);
+  parse_xes_selector("xes_activity_attribute", params.xes.activity_attribute);
+  parse_xes_selector("xes_timestamp_attribute", params.xes.timestamp_attribute);
+  parse_xes_selector("xes_resource_attribute", params.xes.resource_attribute);
+  parse_xes_selector("xes_lifecycle_attribute", params.xes.lifecycle_attribute);
+  if (supplied("xes_require_timestamp")) {
+    params.xes.require_timestamp = parse_boolean(
+        field("xes_require_timestamp"), "xes_require_timestamp");
+  }
+  if (supplied("xes_timestamp_sort")) {
+    params.xes.timestamp_sort =
+        parse_boolean(field("xes_timestamp_sort"), "xes_timestamp_sort");
+  }
+  if (supplied("xes_reverse_sort")) {
+    params.xes.reverse_sort =
+        parse_boolean(field("xes_reverse_sort"), "xes_reverse_sort");
+  }
+  if (supplied("xes_max_traces")) {
+    params.xes.max_traces =
+        parse_nonnegative_size(field("xes_max_traces"), "xes_max_traces");
+  }
+  if (supplied("xes_attributes_to_read")) {
+    params.xes.attributes_to_read = split_csv(field("xes_attributes_to_read"));
+  }
 
   // Optional log-preprocessing filters, applied before discovery.
   if (const auto value = field("time_from"); !value.empty()) {

@@ -227,6 +227,18 @@ export interface CsvOptions {
   activityColumn?: string;
   timestampColumn?: string;
   delimiter?: string;
+  xesVariant?: "iterparse" | "line_by_line" | "iterparse_mem_compressed" |
+    "iterparse_20" | "chunk_regex" | "rustxes";
+  xesCaseAttribute?: string;
+  xesActivityAttribute?: string;
+  xesTimestampAttribute?: string;
+  xesResourceAttribute?: string;
+  xesLifecycleAttribute?: string;
+  xesRequireTimestamp?: boolean;
+  xesTimestampSort?: boolean;
+  xesReverseSort?: boolean;
+  xesMaxTraces?: number;
+  xesAttributesToRead?: string[];
 }
 
 /** How the backend's time-range filter reads a trace. */
@@ -531,6 +543,40 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.activityColumn) add("activity_column", options.activityColumn);
   if (options.timestampColumn) add("timestamp_column", options.timestampColumn);
   if (options.delimiter) add("delimiter", options.delimiter);
+  if (options.xesVariant) {
+    const variants = ["iterparse", "line_by_line", "iterparse_mem_compressed",
+      "iterparse_20", "chunk_regex", "rustxes"];
+    if (!variants.includes(options.xesVariant))
+      throw new Error("xesVariant is not supported");
+    add("xes_variant", options.xesVariant);
+  }
+  const addXesSelector = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${name} must not be empty`);
+    add(name, normalized);
+  };
+  addXesSelector("xes_case_attribute", options.xesCaseAttribute);
+  addXesSelector("xes_activity_attribute", options.xesActivityAttribute);
+  addXesSelector("xes_timestamp_attribute", options.xesTimestampAttribute);
+  addXesSelector("xes_resource_attribute", options.xesResourceAttribute);
+  addXesSelector("xes_lifecycle_attribute", options.xesLifecycleAttribute);
+  if (options.xesRequireTimestamp !== undefined)
+    add("xes_require_timestamp", String(options.xesRequireTimestamp));
+  if (options.xesTimestampSort !== undefined)
+    add("xes_timestamp_sort", String(options.xesTimestampSort));
+  if (options.xesReverseSort !== undefined)
+    add("xes_reverse_sort", String(options.xesReverseSort));
+  if (options.xesMaxTraces !== undefined) {
+    validateNonnegativeInteger("xesMaxTraces", options.xesMaxTraces);
+    add("xes_max_traces", String(options.xesMaxTraces));
+  }
+  if (options.xesAttributesToRead !== undefined) {
+    const attributes = options.xesAttributesToRead.map((key) => key.trim());
+    if (attributes.some((key) => !key))
+      throw new Error("xesAttributesToRead must contain non-empty keys");
+    add("xes_attributes_to_read", attributes.join(","));
+  }
 
   if (options.topVariants) add("top_variants", String(options.topVariants));
   if (options.minVariantFrequency)
