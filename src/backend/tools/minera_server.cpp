@@ -138,6 +138,8 @@
 #include "minera/version.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/windows_event_log.hpp"
+#include "minera/repository_history.hpp"
+#include "repository_history_runtime.hpp"
 #include "minera/xes_export.hpp"
 
 namespace {
@@ -3909,6 +3911,43 @@ void handle_windows_events(const httplib::Request& request,
   }
 }
 
+void handle_repository_history(const httplib::Request& request,
+                               httplib::Response& response) {
+  try {
+    static const std::set<std::string> allowed = {
+        "repository_owner", "repository_name", "repository_api_base_url",
+        "repository_max_pages", "repository_max_issues", "repository_max_events"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown repository history parameter: " + key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    auto options = minera::parse_repository_history_params(lookup, present);
+    const auto authorization = request.get_header_value("Authorization");
+    if (!authorization.empty()) {
+      constexpr std::string_view prefix = "Bearer ";
+      if (authorization.rfind(prefix, 0) != 0 || authorization.size() == prefix.size())
+        throw std::invalid_argument("Authorization must contain a non-empty bearer token");
+      options.auth_token = authorization.substr(prefix.size());
+    }
+    options.transport = minera::tools::repository_history_http_transport();
+    response.set_content(minera::repository_history_json(
+                             minera::import_repository_history(options),
+                             options.owner, options.repository),
+                         "application/json");
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_log_to_target(const httplib::Request& request,
                           httplib::Response& response) {
   try {
@@ -6762,6 +6801,7 @@ int main(int argc, char** argv) {
   server.Post("/api/concept-drift", handle_concept_drift);
   server.Post("/api/browser-history", handle_browser_history);
   server.Post("/api/windows-events", handle_windows_events);
+  server.Post("/api/repository-history", handle_repository_history);
   server.Post("/api/transform-target", handle_log_to_target);
   server.Post("/api/log-to-features", handle_log_to_features);
   server.Post("/api/features", handle_log_to_features);

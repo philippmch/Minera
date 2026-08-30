@@ -34,6 +34,8 @@ import {
   type BrowserHistoryVariant,
   type BrowserHistoryResult,
   type WindowsEventsResult,
+  type RepositoryHistoryResult,
+  isRepositoryHistoryResult,
   type LabelSplittingResult,
   type TrieResult,
   type IntervalTreeResult,
@@ -4714,6 +4716,49 @@ export async function requestWindowsEvents(
   const payload: unknown = await response.json();
   if (!isWindowsEventsResult(payload))
     throw new Error("the Minera backend returned invalid Windows events");
+  return payload;
+}
+export interface RepositoryHistoryOptions {
+  repository_owner: string;
+  repository_name: string;
+  repository_api_base_url?: string;
+  repository_max_pages?: number;
+  repository_max_issues?: number;
+  repository_max_events?: number;
+}
+export function repositoryHistoryQuery(options: RepositoryHistoryOptions): string {
+  if (!options.repository_owner.trim() || !options.repository_name.trim())
+    throw new Error("repository owner and name must not be empty");
+  const bounds: Array<[keyof RepositoryHistoryOptions, number]> = [
+    ["repository_max_pages", 10_000], ["repository_max_issues", 1_000_000],
+    ["repository_max_events", 10_000_000],
+  ];
+  for (const [key, maximum] of bounds) {
+    const value = options[key];
+    if (value !== undefined && (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0 || value > maximum))
+      throw new Error(`${key} must be an integer in [1,${maximum}]`);
+  }
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(options).sort(([a], [b]) => a.localeCompare(b)))
+    if (value !== undefined) query.set(key, String(value));
+  return query.toString();
+}
+export async function requestRepositoryHistory(
+  options: RepositoryHistoryOptions, bearerToken?: string,
+): Promise<RepositoryHistoryResult> {
+  const headers: Record<string, string> = {};
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
+  const response = await fetch(`/api/repository-history?${repositoryHistoryQuery(options)}`,
+                               { method: "POST", headers });
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    if (payload && typeof payload === "object" && "error" in payload)
+      throw new Error(String((payload as { error: unknown }).error));
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isRepositoryHistoryResult(payload))
+    throw new Error("the Minera backend returned invalid repository history");
   return payload;
 }
 export function embeddingsQuery(options: EmbeddingOptions = {}): string {

@@ -903,6 +903,46 @@ export interface WindowsEventsResult {
   event_count: number;
   traces: WindowsEventTrace[];
 }
+export interface RepositoryHistoryEvent {
+  activity: string;
+  timestamp: string;
+  resource: string;
+}
+export interface RepositoryHistoryTrace {
+  case_id: string;
+  attributes: Record<string, string>;
+  events: RepositoryHistoryEvent[];
+}
+export interface RepositoryHistoryResult {
+  type: "REPOSITORY_HISTORY";
+  variant: "issues";
+  owner: string;
+  repository: string;
+  trace_count: number;
+  event_count: number;
+  traces: RepositoryHistoryTrace[];
+}
+export function isRepositoryHistoryResult(value: unknown): value is RepositoryHistoryResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<RepositoryHistoryResult>;
+  if (result.type !== "REPOSITORY_HISTORY" || result.variant !== "issues" ||
+      typeof result.owner !== "string" || typeof result.repository !== "string" ||
+      !Number.isSafeInteger(result.trace_count) || (result.trace_count as number) < 0 ||
+      !Number.isSafeInteger(result.event_count) || (result.event_count as number) < 0 ||
+      !Array.isArray(result.traces) || result.traces.length !== result.trace_count) return false;
+  let count = 0;
+  for (const trace of result.traces) {
+    if (!trace || typeof trace !== "object" || typeof trace.case_id !== "string" ||
+        !trace.attributes || typeof trace.attributes !== "object" || Array.isArray(trace.attributes) ||
+        !Object.values(trace.attributes).every((item) => typeof item === "string") ||
+        !Array.isArray(trace.events)) return false;
+    count += trace.events.length;
+    if (!trace.events.every((event) => !!event && typeof event === "object" &&
+        typeof event.activity === "string" && typeof event.timestamp === "string" &&
+        typeof event.resource === "string")) return false;
+  }
+  return count === result.event_count;
+}
 export function isWindowsEventsResult(value: unknown): value is WindowsEventsResult {
   if (!value || typeof value !== "object") return false;
   const result = value as Partial<WindowsEventsResult>;

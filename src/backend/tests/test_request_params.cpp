@@ -669,6 +669,21 @@ void browser_history_params_contract() {
   assert(threw);
 }
 
+void repository_history_params_contract() {
+  const auto parsed = minera::parse_repository_history_params(fields({
+      {"repository_owner", "acme"}, {"repository_name", "engine"},
+      {"repository_api_base_url", "https://api.example.test"},
+      {"repository_max_pages", "12"}, {"repository_max_issues", "34"},
+      {"repository_max_events", "56"}}));
+  assert(parsed.owner == "acme" && parsed.repository == "engine");
+  assert(parsed.api_base_url == "https://api.example.test");
+  assert(parsed.max_pages == 12 && parsed.max_issues == 34 && parsed.max_events == 56);
+  bool rejected = false;
+  try { (void)minera::parse_repository_history_params(fields({})); }
+  catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 void windows_event_log_params_contract() {
   const auto parsed = minera::parse_windows_event_log_params(fields({
       {"windows_events_path", "events.xml"},
@@ -3710,6 +3725,7 @@ int main() {
   native_json_contracts();
   concept_drift_params_contract();
   browser_history_params_contract();
+  repository_history_params_contract();
   windows_event_log_params_contract();
   log_to_target_params_contract();
   trie_params_contract();
