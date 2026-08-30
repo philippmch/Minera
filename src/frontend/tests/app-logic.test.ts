@@ -167,10 +167,12 @@ describe("native alignment adapters", () => {
       .toBe("interval_query_point=1.5&interval_query_start=1&interval_query_end=2");
     expect(() => intervalTreeQuery({ interval_query_start: 2 })).toThrow(/both/);
     expect(() => intervalTreeQuery({ interval_query_start: 3, interval_query_end: 2 })).toThrow(/exceed/);
-    const valid = { family: "LOG_TO_INTERVAL_TREE", intervals: [{ start: 1, end: 2, case_id: "c", source_activity: "A", target_activity: "B", trace_index: 0, source_event_index: 0, target_event_index: 1 }], point_query: 1.5, point_matches: [0], range_query: [1, 2] as [number, number], range_matches: [0] };
+    const valid = { family: "LOG_TO_INTERVAL_TREE", interval_count: 1, intervals: [{ start: 1, end: 2, case_id: "c", source_activity: "A", target_activity: "B", trace_index: 0, source_event_index: 0, target_event_index: 1 }], point_query: 1.5, point_matches: [0], range_query: [1, 2] as [number, number], range_matches: [0] };
     expect(isIntervalTreeResult(valid)).toBe(true);
     expect(isIntervalTreeResult({ ...valid, intervals: [{ ...valid.intervals[0], end: Number.NaN }] })).toBe(false);
     expect(isIntervalTreeResult({ ...valid, point_matches: [-1] })).toBe(false);
+    expect(isIntervalTreeResult({ ...valid, point_matches: [1] })).toBe(false);
+    expect(isIntervalTreeResult({ ...valid, interval_count: 2 })).toBe(false);
     expect(isIntervalTreeResult({ ...valid, range_query: [2, 1] as [number, number] })).toBe(false);
     expect(isIntervalTreeResult({ ...valid, point_query: undefined, point_matches: [0] })).toBe(false);
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => valid }));

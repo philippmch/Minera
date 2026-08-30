@@ -1241,6 +1241,7 @@ export interface OpenPathInterval {
 }
 export interface IntervalTreeResult {
   family: "LOG_TO_INTERVAL_TREE";
+  interval_count: number;
   intervals: OpenPathInterval[];
   point_query?: number;
   point_matches?: number[];
@@ -1250,18 +1251,21 @@ export interface IntervalTreeResult {
 export function isIntervalTreeResult(value: unknown): value is IntervalTreeResult {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<IntervalTreeResult>;
-  if (candidate.family !== "LOG_TO_INTERVAL_TREE" || !Array.isArray(candidate.intervals)
+  if (candidate.family !== "LOG_TO_INTERVAL_TREE"
+    || !Number.isInteger(candidate.interval_count) || candidate.interval_count! < 0
+    || !Array.isArray(candidate.intervals) || candidate.interval_count !== candidate.intervals.length
     || !candidate.intervals.every((interval) => !!interval && typeof interval === "object"
       && Number.isFinite((interval as OpenPathInterval).start)
       && Number.isFinite((interval as OpenPathInterval).end)
+      && (interval as OpenPathInterval).start <= (interval as OpenPathInterval).end
       && typeof (interval as OpenPathInterval).case_id === "string"
       && typeof (interval as OpenPathInterval).source_activity === "string"
       && typeof (interval as OpenPathInterval).target_activity === "string"
-      && Number.isInteger((interval as OpenPathInterval).trace_index)
-      && Number.isInteger((interval as OpenPathInterval).source_event_index)
-      && Number.isInteger((interval as OpenPathInterval).target_event_index))) return false;
+      && Number.isInteger((interval as OpenPathInterval).trace_index) && (interval as OpenPathInterval).trace_index >= 0
+      && Number.isInteger((interval as OpenPathInterval).source_event_index) && (interval as OpenPathInterval).source_event_index >= 0
+      && Number.isInteger((interval as OpenPathInterval).target_event_index) && (interval as OpenPathInterval).target_event_index > (interval as OpenPathInterval).source_event_index)) return false;
   const validMatches = (matches: unknown): matches is number[] =>
-    Array.isArray(matches) && matches.every((item) => Number.isInteger(item) && item >= 0);
+    Array.isArray(matches) && matches.every((item) => Number.isInteger(item) && item >= 0 && item < candidate.intervals!.length);
   if (candidate.point_query !== undefined) {
     if (!Number.isFinite(candidate.point_query) || !validMatches(candidate.point_matches)) return false;
   } else if (candidate.point_matches !== undefined) return false;
