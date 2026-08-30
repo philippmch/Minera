@@ -1168,7 +1168,7 @@ export function isTimestampInterleavingsResult(value: unknown): value is Timesta
 }
 
 export interface RandomTreeNode {
-  operator: "activity" | "tau" | "sequence" | "exclusive" | "inclusive_or" | "parallel" | "loop";
+  operator: "activity" | "tau" | "sequence" | "exclusive" | "inclusive_or" | "parallel" | "interleaving" | "loop";
   activity?: string;
   children: RandomTreeNode[];
 }
@@ -1183,7 +1183,7 @@ function isRandomTreeNode(value: unknown, activities: string[], root = false,
                           basicRoot = false): value is RandomTreeNode {
   if (!value || typeof value !== "object") return false;
   const node = value as Partial<RandomTreeNode>;
-  if (!["activity", "tau", "sequence", "exclusive", "inclusive_or", "parallel", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
+  if (!["activity", "tau", "sequence", "exclusive", "inclusive_or", "parallel", "interleaving", "loop"].includes(String(node.operator)) || !Array.isArray(node.children)) return false;
   if (node.operator === "activity") return node.children.length === 0 && typeof node.activity === "string" && activities.includes(node.activity);
   if (node.activity !== undefined) return false;
   if (node.operator === "tau") return node.children.length === 0;
@@ -1938,6 +1938,7 @@ export type ProcessTreeOperator =
   | "exclusive"
   | "inclusive_or"
   | "parallel"
+  | "interleaving"
   | "loop"
   | "activity"
   | "tau";
@@ -2997,7 +2998,7 @@ export function isPetriAntiAlignmentResult(value: unknown): value is PetriAntiAl
 export function isPetriMultiAlignmentResult(value: unknown): value is PetriMultiAlignmentResult { return isPetriAdvancedResult(value, "petri_multi_alignment"); }
 
 function isProcessTreeNode(value: unknown): value is ProcessTreeNode {
-  if (!isRecord(value) || !["sequence", "exclusive", "inclusive_or", "parallel", "loop", "activity", "tau"].includes(value.operator as string)) return false;
+  if (!isRecord(value) || !["sequence", "exclusive", "inclusive_or", "parallel", "interleaving", "loop", "activity", "tau"].includes(value.operator as string)) return false;
   if (value.operator === "activity" && !nonNegativeInt(value.activity)) return false;
   if (value.activity !== undefined && !nonNegativeInt(value.activity)) return false;
   if (value.children !== undefined && (!Array.isArray(value.children) || !value.children.every(isProcessTreeNode))) return false;
@@ -3027,6 +3028,7 @@ export type FootprintsConformanceVariant = (typeof FOOTPRINTS_CONFORMANCE_VARIAN
 export interface AggregateFootprint {
   sequence: FootprintRelation[];
   parallel: FootprintRelation[];
+  atomic_interleaving?: FootprintRelation[];
   dfg?: EdgeStat[];
   start_activities?: number[];
   end_activities?: number[];

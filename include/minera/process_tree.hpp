@@ -17,6 +17,7 @@ enum class ProcessTreeOperator {
   kExclusive,  // exactly one child executed
   kInclusiveChoice,  // one or more children executed concurrently
   kParallel,   // children executed concurrently (any interleaving)
+  kInterleaving,  // every child executes atomically, in any child order
   kLoop,       // child[0] is the body; child[1..] are redo paths
 };
 

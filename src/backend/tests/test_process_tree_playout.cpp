@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/bpmn.hpp"
 #include "minera/json_export.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/ptml.hpp"
@@ -85,6 +86,41 @@ int main() {
                       {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
   log = process_tree_playout(parallel, ex);
   assert(log.traces.size() == 2);
+
+  ProcessTree interleaving(
+      {"a", "b", "c", "d"},
+      ProcessTreeNode{ProcessTreeOperator::kInterleaving, 0,
+                      {seq({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}),
+                       seq({ProcessTreeNode::leaf(2), ProcessTreeNode::leaf(3)})}});
+  ex.max_length = 4;
+  ex.min_length = 4;
+  ex.max_traces = 10;
+  const auto interleaving_log = process_tree_playout(interleaving, ex);
+  assert(interleaving_log.traces.size() == 2);
+  assert((labels(interleaving_log.traces[0]) ==
+          std::vector<std::string>{"a", "b", "c", "d"}));
+  assert((labels(interleaving_log.traces[1]) ==
+          std::vector<std::string>{"c", "d", "a", "b"}));
+  const auto interleaving_net = to_petri_net(interleaving);
+  assert(check_conformance(interleaving_log, interleaving_net).fitness == 1.0);
+  EventLog mixed;
+  Trace mixed_trace;
+  mixed_trace.case_id = "mixed";
+  for (const auto& activity : {"a", "c", "b", "d"})
+    mixed_trace.events.push_back({mixed_trace.case_id, activity});
+  mixed.traces.push_back(std::move(mixed_trace));
+  assert(check_conformance(mixed, interleaving_net).fitting_traces == 0);
+  const auto interleaving_ptml = to_ptml(interleaving);
+  assert(interleaving_ptml.find("<interleaving ") != std::string::npos);
+  const auto interleaving_round_trip = parse_ptml(interleaving_ptml);
+  assert(interleaving_round_trip.root().op == ProcessTreeOperator::kInterleaving);
+  assert(check_conformance(interleaving_log,
+                           to_petri_net(interleaving_round_trip)).fitness == 1.0);
+  const auto interleaving_json = random_tree_json(interleaving);
+  assert(interleaving_json.find("\"interleaving\"") != std::string::npos);
+  const auto interleaving_bpmn = parse_bpmn(to_bpmn(interleaving));
+  assert(check_conformance(interleaving_log, interleaving_bpmn).fitness == 1.0);
+  assert(check_conformance(mixed, interleaving_bpmn).fitting_traces == 0);
 
   ProcessTree inclusive(
       {"a", "b"}, or_node({ProcessTreeNode::leaf(0),

@@ -93,6 +93,20 @@ describe("inclusive process-tree JSON", () => {
   });
 });
 
+describe("interleaving process-tree JSON", () => {
+  it("accepts first-class interleaving nodes", () => {
+    expect(isRandomTreeResult({
+      family: "RANDOM_TREE", variant: "PTANDLOGGENERATOR", activities: ["A", "B"],
+      tree: {
+        operator: "interleaving", children: [
+          { operator: "activity", activity: "A", children: [] },
+          { operator: "activity", activity: "B", children: [] },
+        ],
+      },
+    })).toBe(true);
+  });
+});
+
 describe("isConceptDriftResult", () => {
   const valid = {
     family: "CONCEPT_DRIFT", variant: "bose", activity_attribute: "event:type",

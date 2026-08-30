@@ -11,6 +11,7 @@ using PairSet = std::set<FootprintPair>;
 PairSet configurations(const Footprint& fp) {
   PairSet out = fp.sequence;
   out.insert(fp.parallel.begin(), fp.parallel.end());
+  out.insert(fp.atomic_interleaving.begin(), fp.atomic_interleaving.end());
   return out;
 }
 
@@ -202,6 +203,10 @@ FootprintViolations check_footprints_log_model(
     for (const auto& pair : log.parallel) {
       if (model.parallel.find(pair) == model.parallel.end()) violations.insert(pair);
     }
+    for (const auto& pair : log.atomic_interleaving) {
+      if (model.atomic_interleaving.find(pair) == model.atomic_interleaving.end())
+        violations.insert(pair);
+    }
   } else {
     const auto log_cfg = configurations(log);
     const auto model_cfg = configurations(model);
@@ -255,11 +260,14 @@ double fp_fitness(const Footprint& log, const Footprint&, const FootprintsExtens
   }
   const double nseq = static_cast<double>(log.sequence.size());
   const double npar = static_cast<double>(log.parallel.size());
+  const double ninter =
+      static_cast<double>(log.atomic_interleaving.size());
   const double nstart = static_cast<double>(log.start_activities.size());
   const double nend = static_cast<double>(log.end_activities.size());
-  const double denominator = nseq + npar + nstart + nend;
+  const double nrelations = nseq + npar + ninter;
+  const double denominator = nrelations + nstart + nend;
   if (denominator == 0.0) return 1.0;
-  return ((1.0 - static_cast<double>(sum_dev) / sum_dfg) * (nseq + npar) +
+  return ((1.0 - static_cast<double>(sum_dev) / sum_dfg) * nrelations +
           nstart + nend - static_cast<double>(conformance.start_activities.size()) -
           static_cast<double>(conformance.end_activities.size())) / denominator;
 }

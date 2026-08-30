@@ -17,6 +17,8 @@ namespace minera {
 // gateway pair, and a loop becomes a gateway cycle. A silent (tau) step emits
 // no task — it collapses into a direct sequence flow. Only the semantic process
 // interchange); importers lay the graph out on their own.
+// Trees containing atomic interleaving are first converted to their exact
+// workflow net so BPMN export does not weaken them into event-level parallelism.
 void write_bpmn(std::ostream& out,
                 const ProcessTree& tree,
                 std::string_view name = "process");

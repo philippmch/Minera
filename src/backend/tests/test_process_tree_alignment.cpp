@@ -13,6 +13,7 @@ ProcessTree seq(std::vector<std::string> a) { std::vector<ProcessTreeNode> c; fo
 ProcessTree loop2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kLoop,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
 ProcessTree parallel2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
 ProcessTree inclusive2() { return ProcessTree({"a","b"}, ProcessTreeNode{ProcessTreeOperator::kInclusiveChoice,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}}); }
+ProcessTree interleaving2() { return ProcessTree({"a","b","c"}, ProcessTreeNode{ProcessTreeOperator::kInterleaving,0,{ProcessTreeNode{ProcessTreeOperator::kSequence,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}},ProcessTreeNode::leaf(2)}}); }
 ProcessTree nested() { return ProcessTree({"a","b","c","d"}, ProcessTreeNode{ProcessTreeOperator::kSequence,0,{
   ProcessTreeNode{ProcessTreeOperator::kExclusive,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}},
   ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(2),ProcessTreeNode::leaf(3)}}}}); }
@@ -23,6 +24,12 @@ int main() {
     auto r=align_process_tree(log_of({"a","b"}),seq({"a","b"}),ProcessTreeAlignmentOptions{v}); assert(r.computed&&r.traces.size()==1&&r.total_cost==0&&r.fitness==1.0);
     auto l0=align_process_tree(log_of({"a","a"}),loop2(),ProcessTreeAlignmentOptions{v}); assert(l0.total_cost>0);
     auto l1=align_process_tree(log_of({"a","b","a"}),loop2(),ProcessTreeAlignmentOptions{v}); assert(l1.total_cost==0);
+  }
+  for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT, ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING, ProcessTreeAlignmentVariant::MILP, ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {
+    ProcessTreeAlignmentOptions o; o.variant=v;
+    assert(align_process_tree(log_of({"a","b","c"}),interleaving2(),o).total_cost==0);
+    assert(align_process_tree(log_of({"c","a","b"}),interleaving2(),o).total_cost==0);
+    assert(align_process_tree(log_of({"a","c","b"}),interleaving2(),o).total_cost>0);
   }
   auto tau=ProcessTree({"a"},ProcessTreeNode::tau()); auto e=align_process_tree(log_of({}),tau); assert(e.computed&&e.total_cost==0&&e.fitness==0.0);
   for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT, ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING, ProcessTreeAlignmentVariant::MILP, ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {

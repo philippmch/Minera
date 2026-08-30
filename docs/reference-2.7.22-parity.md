@@ -1150,6 +1150,26 @@ POWL/alignment expansion, PTML, BPMN, JSON, and frontend rendering.
 
 ## BPMN inclusive-gateway evidence
 
+## PTML atomic-interleaving evidence
+
+The process-tree model includes a first-class atomic-interleaving operator.
+Every child executes exactly once and each child subtree remains contiguous,
+while the children themselves may occur in any order. PTML reads and writes the
+`interleaving` element without approximating it as event-level parallelism.
+
+The standard Petri conversion uses a compact subset-state construction, so the
+model has one state per completed-child subset instead of enumerating factorial
+permutations. Extensive playout enumerates permutations of complete child words;
+seeded playout shuffles whole children. Alignment and POWL conversion use exact
+permutation expansion with an explicit eight-child safety bound. BPMN export
+automatically uses the exact converted workflow net. JSON and frontend tree
+views preserve the operator, and footprints expose atomic interleaving as a
+separate relation family from sequence and parallel.
+
+Regressions distinguish the two legal block orders from an illegal event-level
+mix, exercise all alignment variants, nested footprint propagation, PTML
+round-trip, reduction, exact POWL language, JSON typing, and frontend rendering.
+
 The BPMN importer recognizes block-structured inclusive split/join pairs by
 graph structure rather than element identifiers. Each split branch must reach a
 distinct incoming flow of one converging join, and every join input must be

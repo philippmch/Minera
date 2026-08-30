@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <queue>
 #include <set>
@@ -19,6 +20,7 @@ namespace minera {
 namespace {
 
 constexpr std::size_t kMaxInclusiveChildren = 12;
+constexpr std::size_t kMaxInterleavingChildren = 8;
 
 PowlNode inclusive_to_powl(const ProcessTreeNode& node,
                            const std::vector<std::string>& activities);
@@ -46,6 +48,25 @@ PowlNode tree_node_to_powl(const ProcessTreeNode& node,
       for (const auto& child : node.children)
         children.push_back(tree_node_to_powl(child, activities));
       return PowlNode::concurrency(std::move(children));
+    }
+    case ProcessTreeOperator::kInterleaving: {
+      if (node.children.empty()) return PowlNode::silent();
+      if (node.children.size() > kMaxInterleavingChildren)
+        throw std::invalid_argument(
+            "process-tree interleaving exceeds the POWL expansion limit of 8 children");
+      std::vector<std::size_t> order(node.children.size());
+      std::iota(order.begin(), order.end(), 0);
+      std::vector<PowlNode> alternatives;
+      do {
+        std::vector<PowlNode> sequence;
+        sequence.reserve(order.size());
+        for (const auto index : order)
+          sequence.push_back(tree_node_to_powl(node.children[index], activities));
+        alternatives.push_back(PowlNode::sequence(std::move(sequence)));
+      } while (std::next_permutation(order.begin(), order.end()));
+      return alternatives.size() == 1
+                 ? std::move(alternatives.front())
+                 : PowlNode::xor_node(std::move(alternatives));
     }
     case ProcessTreeOperator::kExclusive: {
       if (node.children.size() < 2) {

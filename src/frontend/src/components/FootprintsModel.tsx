@@ -67,7 +67,7 @@ function FootprintCard({ data, footprint }: { data: MineraExport; footprint?: Ag
   if (!footprint) return null;
   return <div className="footprints-card">
     <div className="footprints-summary"><span>activities {footprint.activities?.length ?? 0}</span><span>skippable {footprint.skippable === undefined ? "—" : String(footprint.skippable)}</span><span>min length {footprint.min_trace_length ?? "—"}</span><span>max without loops {footprint.max_trace_length_without_loops ?? "—"}</span></div>
-    <div className="footprints-tables"><Table title="Sequence" data={data} values={footprint.sequence} /><Table title="Parallel" data={data} values={footprint.parallel} /></div>
+    <div className="footprints-tables"><Table title="Sequence" data={data} values={footprint.sequence} /><Table title="Parallel" data={data} values={footprint.parallel} /><Table title="Atomic interleaving" data={data} values={footprint.atomic_interleaving} /></div>
     <div className="footprints-summary"><span>starts: {(footprint.start_activities ?? []).map((id) => name(data, id)).join(", ") || "—"}</span><span>ends: {(footprint.end_activities ?? []).map((id) => name(data, id)).join(", ") || "—"}</span><span>always: {(footprint.activities_always_happening ?? []).map((id) => name(data, id)).join(", ") || "—"}</span></div>
   </div>;
 }

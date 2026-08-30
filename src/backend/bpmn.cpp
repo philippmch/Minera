@@ -96,6 +96,9 @@ class BpmnBuilder {
         return emit_gateway(node, "inclusiveGateway");
       case ProcessTreeOperator::kParallel:
         return emit_gateway(node, "parallelGateway");
+      case ProcessTreeOperator::kInterleaving:
+        throw std::invalid_argument(
+            "direct BPMN tree export does not support interleaving; convert the tree to a Petri net first");
       case ProcessTreeOperator::kLoop:
         return emit_loop(node);
     }
@@ -345,6 +348,20 @@ class NetBpmnBuilder {
 void write_bpmn(std::ostream& out,
                 const ProcessTree& tree,
                 std::string_view name) {
+  const auto has_interleaving = [](const ProcessTreeNode& root) {
+    std::vector<const ProcessTreeNode*> pending{&root};
+    while (!pending.empty()) {
+      const auto* node = pending.back();
+      pending.pop_back();
+      if (node->op == ProcessTreeOperator::kInterleaving) return true;
+      for (const auto& child : node->children) pending.push_back(&child);
+    }
+    return false;
+  };
+  if (has_interleaving(tree.root())) {
+    write_bpmn(out, to_petri_net(tree), name);
+    return;
+  }
   BpmnBuilder builder(tree);
   builder.build();
   write_bpmn_document(out, name, builder.nodes(), builder.flows());
