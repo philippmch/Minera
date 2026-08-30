@@ -3501,6 +3501,13 @@ export interface ProcessTreePlayoutOptions {
   return_set_strings?: boolean;
 }
 
+export interface DeclarePlayoutOptions {
+  traces?: number;
+  min_length?: number;
+  max_length?: number;
+  seed?: number;
+}
+
 export interface ProcessTreePlayoutSetResult {
   family: "PROCESS_TREE_PLAYOUT";
   variant: "EXTENSIVE";

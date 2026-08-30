@@ -40,6 +40,7 @@
 #include "minera/process_tree_reduction.hpp"
 #include "minera/petri_net_reduction.hpp"
 #include "minera/process_tree_playout.hpp"
+#include "minera/declare_playout.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/playout.hpp"
 #include "minera/ocel_playout.hpp"
@@ -453,6 +454,12 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
     const FieldLookup& field);
 [[nodiscard]] ProcessTreePlayoutParams parse_process_tree_playout_params(
+    const FieldLookup& field, const FieldPresence& present);
+
+using DeclarePlayoutParams = DeclarePlayoutOptions;
+[[nodiscard]] DeclarePlayoutParams parse_declare_playout_params(
+    const FieldLookup& field);
+[[nodiscard]] DeclarePlayoutParams parse_declare_playout_params(
     const FieldLookup& field, const FieldPresence& present);
 
 [[nodiscard]] ExtensivePlayoutParams parse_extensive_playout_params(

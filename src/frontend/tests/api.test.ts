@@ -92,7 +92,7 @@ describe("communication history API", () => {
   });
 });
 import { geneticMatrixConversionQuery, requestGeneticMatrixConversion } from "../src/api";
-import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFlattenQuery, requestOcelFlatten, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloPlayout, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage, petriNetReductionQuery, reducePetriNet } from "../src/api";
+import { labelSplittingQuery, requestLabelSplitting, logToFeaturesQuery, requestLogToFeatures, logUtilityQuery, requestLogUtility, embeddingsQuery, requestEmbeddings, ilpMinerQuery, requestIlpMine, geneticMinerQuery, requestGeneticMine, traceVariantQuery, requestTraceVariantQuery, pripelQuery, requestPripel, organizationalSnaQuery, requestOrganizationalSna, networkAnalysisQuery, requestNetworkAnalysis, clusteringQuery, requestClustering, profileClusteringQuery, requestProfileClustering, roleDiscoveryQuery, requestRoleDiscovery, resourceProfilesQuery, requestResourceProfiles, localDiagnosticsQuery, ocelDiscoveryQuery, requestOcelDiscovery, requestOcelSqlite, requestOcelSqliteExport, ocelExchangeQuery, requestOcelExchangeImport, requestOcelExchangeExport, ocelFlattenQuery, requestOcelFlatten, ocelFilterQuery, requestOcelFilter, ocelSplitQuery, requestOcelSplit, ocelEnrichmentQuery, requestOcelEnrichment, ocelObjectGraphQuery, requestOcelObjectGraph, ocelEventObjectGraphQuery, requestOcelEventObjectGraph, ocelPlayoutQuery, requestOcelPlayout, ocelFeaturesQuery, requestOcelFeatures, ocelStatisticsQuery, requestOcelStatistics, ocelDescriptionQuery, requestOcelDescription, ocelConformanceQuery, requestOcelConformance, linkAnalysisQuery, requestLinkAnalysis, timestampInterleavingsQuery, requestTimestampInterleavings, monteCarloQuery, fetchMonteCarloPlayout, fetchMonteCarloResult, fetchDfg, fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchStochasticPlayoutVisited, fetchProcessTreePlayoutSet, processTreePlayoutQuery, declarePlayoutQuery, fetchPtml, dfgExportQuery, importDfg, dfgPrecisionQuery, requestDfgPrecision, dfgPetriConversionQuery, convertDfgToPetriNet, requestTriePetriNet, processCubeQuery, requestProcessCube, streamingDfgQuery, requestStreamingDfg, streamingFootprintsQuery, requestStreamingFootprints, streamingTemporalQuery, requestStreamingTemporal, streamingTbrQuery, requestStreamingTbr, requestDataPetriNet, chaoticActivitiesQuery, requestChaoticActivities, passedTimeQuery, requestPassedTime, serviceTimeQuery, requestServiceTime, reworkQuery, requestRework, cycleTimeQuery, requestCycleTime, caseArrivalQuery, requestCaseArrival, caseStatisticsQuery, requestCaseStatistics, attributeStatisticsQuery, requestAttributeStatistics, attributeDistributionQuery, requestAttributeDistribution, attributeKdeQuery, requestAttributeKde, boundaryActivitiesQuery, requestBoundaryActivities, variantStatisticsQuery, requestVariantStatistics, comparePetriUsage, petriNetReductionQuery, reducePetriNet } from "../src/api";
 
 describe("XES export API", () => {
   it("requests the selected exporter as a binary-safe blob", async () => {
@@ -318,6 +318,24 @@ describe("basic Petri playout API", () => {
       traces: 2, initial_marking: [0, 1, 0],
       add_only_if_fm_is_reached: true,
     })).resolves.toBe("<log/>");
+    vi.unstubAllGlobals();
+  });
+
+  it("uses the dedicated Declare playout contract", async () => {
+    expect(declarePlayoutQuery({ traces: 0, min_length: 2, max_length: 8, seed: 7 }))
+      .toBe("traces=0&min_length=2&max_length=8&seed=7");
+    expect(() => declarePlayoutQuery({ min_length: 4, max_length: 2 }))
+      .toThrow(/must not exceed/);
+    expect(() => declarePlayoutQuery({ traces: -1 })).toThrow(/between 0/);
+    vi.stubGlobal("fetch", vi.fn(async (path: string) => {
+      expect(path).toContain("/api/playout?miner=declare");
+      expect(path).toContain("traces=3");
+      expect(path).toContain("min_length=1");
+      expect(path).not.toContain("playout_");
+      return { ok: true, text: async () => "<log/>" };
+    }));
+    await expect(fetchPlayout("declare", { traces: 3, min_length: 1, max_length: 5 }))
+      .resolves.toBe("<log/>");
     vi.unstubAllGlobals();
   });
 

@@ -17,8 +17,10 @@ EventLog declare_playout(const DeclareModel& model, const DeclarePlayoutOptions&
   (void)validator;
   if (options.min_length > options.max_length)
     throw std::invalid_argument("Declare playout min_length must not exceed max_length");
+  if (options.n_traces > 100000 || options.max_length > 10000)
+    throw std::invalid_argument("Declare playout bounds exceed the native safety limit");
   EventLog log;
-  if (options.n_traces <= 0) return log;
+  if (options.n_traces == 0) return log;
   std::mt19937_64 rng(options.seed.value_or(std::random_device{}()));
   std::vector<std::string> activities;
   for (const auto& [_, values] : model.rules) {
@@ -30,18 +32,18 @@ EventLog declare_playout(const DeclareModel& model, const DeclarePlayoutOptions&
   std::sort(activities.begin(), activities.end());
   activities.erase(std::unique(activities.begin(), activities.end()), activities.end());
 
-  for (int trace_index = 0; trace_index < options.n_traces; ++trace_index) {
-    int length = options.min_length;
+  for (std::size_t trace_index = 0; trace_index < options.n_traces; ++trace_index) {
+    std::size_t length = options.min_length;
     if (options.min_length <= options.max_length) {
-      std::uniform_int_distribution<int> length_dist(options.min_length, options.max_length);
+      std::uniform_int_distribution<std::size_t> length_dist(options.min_length, options.max_length);
       length = length_dist(rng);
     }
     Trace trace;
     trace.case_id = std::to_string(trace_index);
-    if (length < 0 || activities.empty()) { log.traces.push_back(std::move(trace)); continue; }
+    if (activities.empty()) { log.traces.push_back(std::move(trace)); continue; }
     std::vector<std::string> prefix;
     prefix.reserve(static_cast<std::size_t>(length));
-    for (int step = 0; step < length; ++step) {
+    for (std::size_t step = 0; step < length; ++step) {
       struct Candidate { std::string activity; };
       std::vector<Candidate> candidates;
       for (const auto& activity : activities) {

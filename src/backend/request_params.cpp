@@ -2557,6 +2557,40 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
   return parse_process_tree_playout_params(field, {});
 }
 
+DeclarePlayoutParams parse_declare_playout_params(const FieldLookup& field) {
+  return parse_declare_playout_params(field, {});
+}
+
+DeclarePlayoutParams parse_declare_playout_params(
+    const FieldLookup& field, const FieldPresence& present) {
+  DeclarePlayoutParams params;
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto require = [&](std::string_view name) {
+    const auto value = field(name);
+    if (value.empty())
+      throw std::invalid_argument(std::string(name) + ": expected a value");
+    return value;
+  };
+  if (supplied("traces"))
+    params.n_traces = parse_nonnegative_size(require("traces"), "traces");
+  if (supplied("min_length"))
+    params.min_length = parse_nonnegative_size(require("min_length"), "min_length");
+  if (supplied("max_length"))
+    params.max_length = parse_nonnegative_size(require("max_length"), "max_length");
+  if (supplied("seed"))
+    params.seed = static_cast<std::uint64_t>(
+        parse_nonnegative_size(require("seed"), "seed"));
+  if (params.n_traces > 100000)
+    throw std::invalid_argument("traces must not exceed 100000");
+  if (params.max_length > 10000)
+    throw std::invalid_argument("max_length must not exceed 10000");
+  if (params.min_length > params.max_length)
+    throw std::invalid_argument("min_length must not exceed max_length");
+  return params;
+}
+
 ProcessTreePlayoutParams parse_process_tree_playout_params(
     const FieldLookup& field, const FieldPresence& present) {
   ProcessTreePlayoutParams params;
