@@ -362,16 +362,37 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
   const [result, setResult] = useState<ConceptDriftResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subLogSize, setSubLogSize] = useState(50);
+  const [windowSize, setWindowSize] = useState(8);
+  const [numPermutations, setNumPermutations] = useState(100);
+  const [threshold, setThreshold] = useState(0.5);
+  const [maxChangePoints, setMaxChangePoints] = useState(5);
+  const [seed, setSeed] = useState(0);
+  const [includeTimestamps, setIncludeTimestamps] = useState(false);
   const [activityAttribute, setActivityAttribute] = useState("concept:name");
   const [timestampAttribute, setTimestampAttribute] = useState("time:timestamp");
   const [caseIdAttribute, setCaseIdAttribute] = useState("case:concept:name");
   const requestId = useRef(0);
+  const invalidSettings = !Number.isSafeInteger(subLogSize) || subLogSize < 1 ||
+    !Number.isSafeInteger(windowSize) || windowSize < 1 ||
+    !Number.isSafeInteger(numPermutations) || numPermutations < 1 || numPermutations > 1_000_000 ||
+    !Number.isFinite(threshold) || threshold < 0 || threshold > 1 ||
+    !Number.isSafeInteger(maxChangePoints) || maxChangePoints < 0 || maxChangePoints > 1_000_000 ||
+    !Number.isSafeInteger(seed) || seed < 0;
   const run = async () => {
     if (!onRequest) return;
     const id = ++requestId.current;
     setBusy(true); setError(null); setResult(null);
     try {
       const next = await onRequest({
+        drift_variant: "bose",
+        drift_sub_log_size: subLogSize,
+        drift_window_size: windowSize,
+        drift_num_permutations: numPermutations,
+        drift_threshold: threshold,
+        drift_max_no_change_points: maxChangePoints,
+        drift_seed: seed,
+        drift_include_timestamps: includeTimestamps,
         drift_activity_attribute: activityAttribute.trim() || "concept:name",
         drift_timestamp_attribute: timestampAttribute.trim() || "time:timestamp",
         drift_case_id_attribute: caseIdAttribute.trim() || "case:concept:name",
@@ -383,7 +404,25 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
       if (id === requestId.current) setBusy(false);
     }
   };
-  return <section className="panel other-align-card"><h3>Concept drift</h3><p>Detect distribution changes across consecutive sub-logs.</p><div className="align-settings-grid"><label>Activity attribute<input value={activityAttribute} onChange={event => setActivityAttribute(event.target.value)} /></label><label>Timestamp attribute<input value={timestampAttribute} onChange={event => setTimestampAttribute(event.target.value)} /></label><label>Case-id attribute<input value={caseIdAttribute} onChange={event => setCaseIdAttribute(event.target.value)} /></label></div><button className="button" disabled={!onRequest || busy || !activityAttribute.trim() || !timestampAttribute.trim() || !caseIdAttribute.trim()} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>{error && <div className="error-banner">{error}</div>}{result && <small>{result.change_points.length} change point(s) across {result.sublogs.length} sub-logs.</small>}</section>;
+  return <section className="panel other-align-card">
+    <h3>Concept drift</h3>
+    <p>Detect distribution changes across consecutive sub-logs.</p>
+    <div className="align-settings-grid">
+      <label>Sub-log size<input type="number" min={1} step={1} value={subLogSize} onChange={event => setSubLogSize(event.target.valueAsNumber)} /></label>
+      <label>Window size<input type="number" min={1} step={1} value={windowSize} onChange={event => setWindowSize(event.target.valueAsNumber)} /></label>
+      <label>Permutations<input type="number" min={1} max={1_000_000} step={1} value={numPermutations} onChange={event => setNumPermutations(event.target.valueAsNumber)} /></label>
+      <label>Threshold<input type="number" min={0} max={1} step="any" value={threshold} onChange={event => setThreshold(event.target.valueAsNumber)} /></label>
+      <label>Maximum change points<input type="number" min={0} max={1_000_000} step={1} value={maxChangePoints} onChange={event => setMaxChangePoints(event.target.valueAsNumber)} /></label>
+      <label>Random seed<input type="number" min={0} step={1} value={seed} onChange={event => setSeed(event.target.valueAsNumber)} /></label>
+      <label>Activity attribute<input value={activityAttribute} onChange={event => setActivityAttribute(event.target.value)} /></label>
+      <label>Timestamp attribute<input value={timestampAttribute} onChange={event => setTimestampAttribute(event.target.value)} /></label>
+      <label>Case-id attribute<input value={caseIdAttribute} onChange={event => setCaseIdAttribute(event.target.value)} /></label>
+      <label><input type="checkbox" checked={includeTimestamps} onChange={event => setIncludeTimestamps(event.target.checked)} /> Include drift timestamps</label>
+    </div>
+    <button className="button" disabled={!onRequest || busy || invalidSettings || !activityAttribute.trim() || !timestampAttribute.trim() || !caseIdAttribute.trim()} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>
+    {error && <div className="error-banner">{error}</div>}
+    {result && <small>{result.change_points.length} change point(s), {result.returned_sublogs.length} segment(s) across {result.sublogs.length} sub-logs.</small>}
+  </section>;
 }
 
 function PetriUsageComparisonPanel() {

@@ -98,6 +98,7 @@ describe("isConceptDriftResult", () => {
     timestamp_attribute: "started_at", case_id_attribute: "case:order",
     activities: ["A"], feature_vectors: [[1, 0, 0]],
     sublogs: [{ trace_count: 1, event_count: 1 }],
+    returned_sublogs: [{ trace_count: 1, event_count: 1 }],
     cumulative_sublogs: [{ trace_count: 1, event_count: 1 }],
     sublog_start_timestamps: [1], change_points: [{ sublog_index: 1, p_value: 0.25 }],
     change_timestamps: [1],
@@ -108,6 +109,7 @@ describe("isConceptDriftResult", () => {
   it("rejects malformed drift diagnostics", () => {
     expect(isConceptDriftResult({ ...valid, change_points: [{ sublog_index: -1, p_value: 0.25 }] })).toBe(false);
     expect(isConceptDriftResult({ ...valid, feature_vectors: [[Number.NaN]] })).toBe(false);
+    expect(isConceptDriftResult({ ...valid, returned_sublogs: [{ trace_count: -1, event_count: 1 }] })).toBe(false);
     expect(isConceptDriftResult({ ...valid, activity_attribute: 7 })).toBe(false);
     expect(isConceptDriftResult({ ...valid, variant: "other" })).toBe(false);
   });

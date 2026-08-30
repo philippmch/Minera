@@ -67,7 +67,7 @@ void validate_options(const ConceptDriftOptions& options, std::size_t trace_coun
         (complete + 1.0L) / 2.0L;
     if (remainder != 0) cumulative_trace_copies += static_cast<long double>(trace_count);
     const long double materialized_trace_copies =
-        cumulative_trace_copies + static_cast<long double>(trace_count);
+        cumulative_trace_copies + 2.0L * static_cast<long double>(trace_count);
     const long double cumulative_event_copies =
         static_cast<long double>(event_count) *
         static_cast<long double>(sublog_count);
@@ -378,6 +378,30 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
       for (const auto& point : candidates) {
         result.change_timestamps.push_back(
             result.sublog_start_timestamps.at(point.sublog_index));
+      }
+    }
+  }
+
+  if (!result.sublogs.empty()) {
+    std::vector<bool> drift_boundaries(result.sublogs.size() + 1, false);
+    for (const auto& point : result.change_points) {
+      if (point.sublog_index > 0 &&
+          point.sublog_index < drift_boundaries.size()) {
+        drift_boundaries[point.sublog_index] = true;
+      }
+    }
+
+    EventLog segment;
+    segment.attributes = log.attributes;
+    result.returned_sublogs.reserve(result.change_points.size() + 1);
+    for (std::size_t i = 0; i < result.sublogs.size(); ++i) {
+      const auto& raw = result.sublogs[i];
+      segment.traces.insert(segment.traces.end(), raw.traces.begin(),
+                            raw.traces.end());
+      if (drift_boundaries[i + 1] || i + 1 == result.sublogs.size()) {
+        result.returned_sublogs.push_back(std::move(segment));
+        segment = EventLog{};
+        segment.attributes = log.attributes;
       }
     }
   }

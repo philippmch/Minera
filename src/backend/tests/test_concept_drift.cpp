@@ -36,6 +36,9 @@ int main() {
   minera::EventLog log;
   log.traces = {trace({"a", "b"}, "c1"), trace({"a", "b"}, "c2"),
                 trace({"a", "c"}, "c3"), trace({"a", "c"}, "c4")};
+  log.attributes.push_back({"fixture", "concept-drift"});
+  log.traces[0].attributes.push_back({"case:group", "before"});
+  log.traces[0].events[0].attributes.push_back({"event:detail", "kept"});
 
   const auto activities = minera::extract_concept_drift_activities(log);
   assert((activities == std::vector<std::string>{"a", "b", "c"}));
@@ -93,12 +96,41 @@ int main() {
   const auto result = minera::detect_concept_drift(log, options);
   assert(result.variant == minera::ConceptDriftVariant::kBose);
   assert(result.sublogs.size() == 2);
+  assert(result.returned_sublogs.size() == 1);
+  assert(result.returned_sublogs[0].traces.size() == 4);
   assert(result.cumulative_sublogs.size() == 2);
   assert(result.cumulative_sublogs[0].traces.size() == 2);
   assert(result.cumulative_sublogs[1].traces.size() == 4);
   assert(result.sublog_start_timestamps.size() == 2);
   assert(std::isfinite(result.sublog_start_timestamps[0]));
   assert(result.change_points.empty());  // strict p < threshold; p is 1 here
+  const auto result_json = minera::concept_drift_json(result);
+  assert(result_json.find("\"returned_sublogs\":[{\"trace_count\":4,\"event_count\":8}]") !=
+         std::string::npos);
+
+  minera::ConceptDriftOptions boundary_options = options;
+  boundary_options.sub_log_size = 1;
+  boundary_options.window_size = 2;
+  boundary_options.num_permutations = 100;
+  boundary_options.threshold = 1.0;
+  boundary_options.seed = 42;
+  const auto boundary_result =
+      minera::detect_concept_drift(log, boundary_options);
+  assert(boundary_result.change_points.size() == 1);
+  assert(boundary_result.change_points[0].sublog_index == 2);
+  assert(boundary_result.returned_sublogs.size() == 2);
+  assert(boundary_result.returned_sublogs[0].traces.size() == 2);
+  assert(boundary_result.returned_sublogs[1].traces.size() == 2);
+  assert(boundary_result.returned_sublogs[0].traces[0].case_id == "c1");
+  assert(boundary_result.returned_sublogs[0].traces[1].case_id == "c2");
+  assert(boundary_result.returned_sublogs[1].traces[0].case_id == "c3");
+  assert(boundary_result.returned_sublogs[1].traces[1].case_id == "c4");
+  assert(*boundary_result.returned_sublogs[0].attribute("fixture") ==
+         "concept-drift");
+  assert(*boundary_result.returned_sublogs[0].traces[0].attribute("case:group") ==
+         "before");
+  assert(*boundary_result.returned_sublogs[0].traces[0].events[0].attribute(
+             "event:detail") == "kept");
 
   options.threshold = 0.0;
   assert(minera::detect_concept_drift(log, options).change_points.empty());

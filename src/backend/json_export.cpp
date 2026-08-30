@@ -4018,6 +4018,13 @@ std::string concept_drift_json(const ConceptDriftResult& result) {
     out << "{\"trace_count\":" << result.sublogs[i].trace_count()
         << ",\"event_count\":" << result.sublogs[i].event_count() << '}';
   }
+  out << "],\"returned_sublogs\":[";
+  for (std::size_t i = 0; i < result.returned_sublogs.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"trace_count\":" << result.returned_sublogs[i].trace_count()
+        << ",\"event_count\":" << result.returned_sublogs[i].event_count()
+        << '}';
+  }
   out << "],\"cumulative_sublogs\":[";
   for (std::size_t i = 0; i < result.cumulative_sublogs.size(); ++i) {
     if (i) out << ',';

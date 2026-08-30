@@ -60,7 +60,7 @@ are reconciled.
 | Anonymization | PRIPEL; trace-variant query Laplace and SaCoFa | **Partial** — bounded PRIPEL-style release plus both trace-variant query variants are exposed through native, JSON, CLI, local-server, and frontend adapters; deterministic seeded mode and opt-in OS-backed secure randomness are available, while differential edge-contract review remains |
 | Clustering | `SKLEARN_PROFILES` profile clustering; trace-attribute-driven activity/successor/log-slice/similarity distances | **Partial** — the explicit `SKLEARN_PROFILES` selector and deterministic seeded profile clustering have bounded native/JSON/CLI/server/frontend adapters with activity/succession and explicit trace/event attribute representations; trace-attribute groups with DMM/average Levenshtein, vector, and DFG distances retain first-seen group/variant ordering, independently match DMM activity and succession components, omit missing grouping attributes, and preserve linkage child order across the same adapters; broader differential review remains |
 | Comparison | Petri-net element-usage comparison | **Complete** — native deterministic place/transition/arc usage deltas are available through JSON, CLI, local server, and frontend adapters, including explicit initial/final markings, every ordinary/reset/inhibitor arc, a selectable event activity attribute, element labels, and signed-direction colors |
-| Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Partial** — the explicit `BOSE` selector, seeded permutation windows, timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters are available; differential edge-contract review and alternate data-frame adapters remain |
+| Concept drift | BOSE relation-type feature extraction and permutation-window drift detection | **Complete** — the explicit `BOSE` selector covers relation-count features, seeded permutation windows, ranked/capped drift boundaries, boundary-partitioned result logs, optional timestamp diagnostics, strict options, and JSON/CLI/server/frontend adapters |
 | Conformance: Petri alignments | state-equation A*, Dijkstra no heuristics, Dijkstra less memory, discounted A*, generator Dijkstra no heuristics, generator Dijkstra less memory | **Complete (core)** — all six variants are explicitly selectable; the backward-compatible default remains the legacy unit-cost state-equation A* behavior, with named event activity fields available at replay time |
 | Conformance: other alignments | decomposed recomposition, DFG classic, edit distance, process-tree search graph/dynamic programming/MILP/approximated original | **Complete** — `RECOMPOS_MAXIMAL`, DFG classic, edit distance (`EDIT_DISTANCE`), and all four process-tree variants are native selectable APIs with JSON, CLI, server, and frontend adapters |
 | Conformance: replay | forward token replay and backwards token replay | **Complete (core)** — forward replay remains the default; the backwards variation, reverse silent routing, weak firing, duplicate-label behavior, immediate-stop option, and named event activity selector are selectable |
@@ -877,13 +877,18 @@ endpoints, both extended arc kinds, and every replay-control branch.
 The native concept-drift surface explicitly selects the `BOSE` variant and extracts deterministic relation-type count
 vectors from ordered trace sub-logs and evaluates adjacent windows with a
 seeded permutation test. It supports configurable sub-log/window sizes,
-permutation counts, p-value threshold, result cap, and optional case-start
-timestamps. Activity, timestamp, and case-id selectors accept the standard
-keys or generic event/trace attributes, and the selected keys are echoed in
-the JSON response. Strict variant/request parsing, standalone JSON, CLI, cached-session
-server, frontend request/response validation, and focused native/request tests
-are included. The current row remains partial pending differential edge-contract
-fixtures and the reference implementation's dataframe/lazyframe adapters.
+permutation counts, p-value threshold, result cap, reproducible seed, and
+optional case-start timestamps. Candidate boundaries are ranked by p-value and
+sub-log index before the configured cap is applied. The public result then
+partitions the original traces chronologically at those selected boundaries;
+the final remainder is always emitted, while raw and cumulative sub-logs remain
+available as diagnostics. Trace, event, and log metadata are preserved in the
+partitioned logs. Activity, timestamp, and case-id selectors accept the standard
+keys or generic event/trace attributes, and the selected keys are echoed in the
+JSON response. CSV and XES import paths provide the tabular and event-log input
+adapters. Strict variant/request parsing, standalone JSON, CLI, cached-session
+server, complete frontend controls and response validation, and positive/no-drift
+native regression fixtures are included.
 
 ## Trace-variant query anonymization evidence
 
@@ -2214,8 +2219,10 @@ selected `bose` variant from the CLI
 (`--concept-drift`, `--drift-*`) and cached-log server endpoint
 `POST /api/concept-drift`. Strict controls cover sub-log/window sizes,
 permutation count, threshold, change-point cap, seed, and optional timestamps;
-the result includes activity features, raw and cumulative sub-log summaries,
-change points, and timestamp arrays.
+the result includes activity features, raw, boundary-partitioned, and cumulative
+sub-log summaries, change points, and timestamp arrays. The frontend form
+exposes the complete control set and reports both raw sub-log and returned
+segment counts.
 
 ## Organizational role discovery parity
 
