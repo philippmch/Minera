@@ -13,6 +13,7 @@
 #include "minera/correlation_miner.hpp"
 #include "minera/declare.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 #include "minera/dfg_variants.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
@@ -104,6 +105,7 @@ namespace minera {
 // The discovery options parsed from a mine request's form fields.
 struct MineParams {
   CsvImportOptions csv;
+  XesImportOptions xes;
   LogFilterOptions filter;
   InductiveMinerOptions inductive;
   AlphaMinerOptions alpha;

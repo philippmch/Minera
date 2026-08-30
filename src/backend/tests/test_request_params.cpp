@@ -883,6 +883,17 @@ void parse_mine_params_maps_csv_and_inductive_options() {
       {"resource_column", "Who"},
       {"lifecycle_column", "Phase"},
       {"delimiter", ";"},
+      {"xes_variant", "iterparse_mem_compressed"},
+      {"xes_case_attribute", "case:id"},
+      {"xes_activity_attribute", "event:name"},
+      {"xes_timestamp_attribute", "completed_at"},
+      {"xes_resource_attribute", "performer"},
+      {"xes_lifecycle_attribute", "phase"},
+      {"xes_require_timestamp", "true"},
+      {"xes_timestamp_sort", "true"},
+      {"xes_reverse_sort", "true"},
+      {"xes_max_traces", "7"},
+      {"xes_attributes_to_read", "cost, region"},
       {"noise_threshold", "0.25"},
       {"alpha_variant", "classic"},
       {"inductive_variant", "dfg"},
@@ -908,6 +919,18 @@ void parse_mine_params_maps_csv_and_inductive_options() {
   assert(params.csv.resource_column == "Who");
   assert(params.csv.lifecycle_column == "Phase");
   assert(params.csv.delimiter == ';');  // only the first char is taken
+  assert(params.xes.variant ==
+         minera::XesImportVariant::kIterparseMemoryCompressed);
+  assert(params.xes.case_attribute == "case:id");
+  assert(params.xes.activity_attribute == "event:name");
+  assert(params.xes.timestamp_attribute == "completed_at");
+  assert(params.xes.resource_attribute == "performer");
+  assert(params.xes.lifecycle_attribute == "phase");
+  assert(params.xes.require_timestamp && params.xes.timestamp_sort &&
+         params.xes.reverse_sort);
+  assert(params.xes.max_traces == 7);
+  assert((params.xes.attributes_to_read ==
+          std::vector<std::string>{"cost", "region"}));
   assert(params.inductive.noise_threshold == 0.25);
   assert(params.inductive.variant == minera::InductiveMinerVariant::kDfg);
   assert(!params.alpha.short_loops);
@@ -1136,6 +1159,40 @@ void parse_mine_params_maps_filters() {
   assert(params.filter.variant_max_coverage == 0.8);
   assert(params.filter.variant_percentage == 0.6);
   assert(params.filter.any());
+}
+
+void parse_mine_params_rejects_invalid_xes_options() {
+  for (const auto& item : {
+           std::pair{"xes_variant", "unknown"},
+           std::pair{"xes_timestamp_sort", "yes"},
+           std::pair{"xes_reverse_sort", "ascending"},
+           std::pair{"xes_require_timestamp", "on"},
+           std::pair{"xes_max_traces", "-1"},
+           std::pair{"xes_max_traces", "2x"}}) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> empty = {
+      {"xes_activity_attribute", ""}};
+  const auto lookup = [&empty](std::string_view name) {
+    const auto it = empty.find(std::string(name));
+    return it == empty.end() ? std::string{} : it->second;
+  };
+  const auto present = [&empty](std::string_view name) {
+    return empty.contains(std::string(name));
+  };
+  bool threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void parse_mine_params_rejects_variant_and_endpoint_filter_errors() {
@@ -3289,6 +3346,7 @@ int main() {
   parse_mine_params_preserves_explicit_empty_correlation_timestamp();
   parse_mine_params_rejects_invalid_correlation_options();
   parse_mine_params_maps_csv_and_inductive_options();
+  parse_mine_params_rejects_invalid_xes_options();
   parse_mine_params_maps_filters();
   parse_mine_params_rejects_variant_and_endpoint_filter_errors();
   parse_mine_params_rejects_invalid_attribute_occurrence_thresholds();

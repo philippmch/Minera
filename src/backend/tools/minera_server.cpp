@@ -510,7 +510,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     std::istringstream input(csv);
     auto log = looks_like_xes(dataset, csv)
-                   ? minera::import_xes_event_log(input)
+                   ? minera::import_xes_event_log(input, params.xes)
                    : minera::import_csv_event_log(input, params.csv);
     if (params.filter.any()) {
       log = minera::filter_event_log(log, params.filter);
