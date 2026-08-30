@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 #include "minera/timestamp.hpp"
@@ -174,6 +175,29 @@ int main() {
   const auto events_json = minera::serialize_ocel_features_json(events);
   assert(events_json.find("\"family\":\"OCEL_FEATURES\"") != std::string::npos);
   assert(events_json.find("\"variant\":\"EVENTS\"") != std::string::npos);
+  assert(events_json.find("\"row_count\":3") != std::string::npos);
+  assert(events_json.find("\"feature_count\":") != std::string::npos);
+
+  const auto rejects_table = [](minera::OcelFeatureTable table) {
+    try {
+      (void)minera::serialize_ocel_features_json(table);
+      return false;
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+  };
+  auto malformed_table = events;
+  malformed_table.variant = static_cast<minera::OcelFeatureVariant>(99);
+  assert(rejects_table(malformed_table));
+  malformed_table = events;
+  malformed_table.row_ids[1] = malformed_table.row_ids[0];
+  assert(rejects_table(malformed_table));
+  malformed_table = events;
+  malformed_table.feature_names[1] = malformed_table.feature_names[0];
+  assert(rejects_table(malformed_table));
+  malformed_table = events;
+  malformed_table.values[0][0] = std::numeric_limits<double>::infinity();
+  assert(rejects_table(malformed_table));
 
   const auto objects = minera::extract_ocel_features(
       log, minera::OcelFeatureVariant::kObjects, options);

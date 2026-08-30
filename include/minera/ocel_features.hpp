@@ -124,6 +124,6 @@ struct OcelFeatureTable {
     const OcelFeatureTable& table);
 
 [[nodiscard]] const char* ocel_feature_variant_name(
-    OcelFeatureVariant variant) noexcept;
+    OcelFeatureVariant variant);
 
 }  // namespace minera
