@@ -4,41 +4,83 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace minera {
 namespace {
 
+bool matches_selected_key(std::string_view key, std::string_view source_key,
+                          const std::optional<EventAttribute>& selected) {
+  return (!source_key.empty() && key == source_key) ||
+         (selected && key == selected->key);
+}
+
 const std::string* event_value(const Event& event, const std::string& key) {
   if (key.empty() || key == "activity" || key == "concept:name")
     return &event.activity;
-  if (key == "resource") return event.resource.empty() ? nullptr : &event.resource;
+  if (matches_selected_key(key, event.activity_source_key,
+                           event.activity_attribute)) {
+    return event.has_activity() ? &event.activity : nullptr;
+  }
+  if (key == "resource" || key == "org:resource")
+    return event.resource.empty() ? nullptr : &event.resource;
+  if (matches_selected_key(key, event.resource_source_key,
+                           event.resource_attribute)) {
+    return event.has_resource() ? &event.resource : nullptr;
+  }
   if (key == "lifecycle" || key == "lifecycle:transition")
     return event.lifecycle.empty() ? nullptr : &event.lifecycle;
+  if (matches_selected_key(key, event.lifecycle_source_key,
+                           event.lifecycle_attribute)) {
+    return event.has_lifecycle() ? &event.lifecycle : nullptr;
+  }
   if (key == "timestamp" || key == "time:timestamp")
     return event.timestamp.empty() ? nullptr : &event.timestamp;
+  if (matches_selected_key(key, event.timestamp_source_key,
+                           event.timestamp_attribute)) {
+    return event.has_timestamp() ? &event.timestamp : nullptr;
+  }
   return event.attribute(key);
 }
 
 void set_event_value(Event& event, const std::string& key,
                      const std::string& value) {
-  if (key.empty() || key == "activity" || key == "concept:name") {
-    event.activity = value;
+  const bool activity_projection =
+      key.empty() || key == "activity" || key == "concept:name" ||
+      matches_selected_key(key, event.activity_source_key,
+                           event.activity_attribute);
+  if (activity_projection) {
+    const Event source = event;
+    set_event_activity_context(source, value, event);
     return;
   }
-  if (key == "resource") {
+  if (key == "resource" || key == "org:resource") {
     event.resource = value;
+    event.resource_state = FirstClassAttributeState::kPresent;
+    if (event.resource_source_key.empty())
+      event.resource_source_key = key == "org:resource" ? key : "resource";
     return;
   }
   if (key == "lifecycle" || key == "lifecycle:transition") {
     event.lifecycle = value;
+    event.lifecycle_state = FirstClassAttributeState::kPresent;
+    if (event.lifecycle_source_key.empty())
+      event.lifecycle_source_key = key;
     return;
   }
   for (auto& attribute : event.attributes) {
     if (attribute.key == key) {
       attribute.value = value;
       attribute.is_null = false;
+      attribute.container = AttributeContainerKind::kScalar;
+      attribute.children.clear();
+      if (attribute.kind != AttributeKind::kString &&
+          attribute.kind != AttributeKind::kId) {
+        attribute.kind = AttributeKind::kString;
+      }
+      attribute.typed_value = std::monostate{};
       return;
     }
   }
@@ -61,9 +103,7 @@ EventLog group_consecutive_activities(
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     Trace output;
-    output.case_id = trace.case_id;
-    output.attributes = trace.attributes;
-    output.properties = trace.properties;
+    copy_trace_context(trace, output);
     if (trace.events.empty()) {
       result.traces.push_back(std::move(output));
       continue;
@@ -104,9 +144,7 @@ EventLog group_same_timestamp_events(
   result.traces.reserve(event_log.traces.size());
   for (const auto& trace : event_log.traces) {
     Trace output;
-    output.case_id = trace.case_id;
-    output.attributes = trace.attributes;
-    output.properties = trace.properties;
+    copy_trace_context(trace, output);
     std::map<std::string, std::vector<const Event*>> groups;
     std::vector<std::string> order;
     for (const auto& event : trace.events) {

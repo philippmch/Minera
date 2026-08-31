@@ -123,6 +123,10 @@ struct MineParams {
   PowlDiscoveryOptions powl;
   TransitionSystemOptions transition_system;
   TokenReplayOptions token_replay;
+  // Whether the token-replay activity field was explicitly supplied. This
+  // lets model-specific selectors provide defaults without masking a caller's
+  // more specific replay choice.
+  bool token_replay_activity_attribute_supplied = false;
   LogSkeletonOptions log_skeleton;
   DeclareDiscoveryOptions declare_options;
   FootprintsOptions footprints;

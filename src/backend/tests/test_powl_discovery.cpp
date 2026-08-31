@@ -1,9 +1,12 @@
 #include "minera/powl_discovery.hpp"
 
+#include "minera/csv_event_log_importer.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
 using namespace minera;
@@ -46,6 +49,151 @@ int main() {
   assert(optional.kind() == PowlNodeKind::kXor);
   assert(optional.children()[0].kind() == PowlNodeKind::kSilent);
   assert(optional.children()[1].label() == "A");
+
+  // A non-canonical activity selector reads the exact event attribute and
+  // rejects both missing and explicit-null values deterministically.
+  EventLog keyed_log;
+  Trace keyed_trace;
+  Event keyed_a{"case-1", "canonical-A"};
+  keyed_a.attributes.push_back(EventAttribute{"phase", "A"});
+  Event keyed_b{"case-1", "canonical-B"};
+  keyed_b.attributes.push_back(EventAttribute{"phase", "B"});
+  keyed_trace.events = {std::move(keyed_a), std::move(keyed_b)};
+  keyed_log.traces.push_back(std::move(keyed_trace));
+  PowlDiscoveryOptions keyed_options;
+  keyed_options.activity_key = "phase";
+  const auto keyed_model = discover_powl(keyed_log, keyed_options);
+  assert(keyed_model.serialize().find("T(\"A\")") != std::string::npos);
+  assert(keyed_model.serialize().find("T(\"B\")") != std::string::npos);
+  assert(keyed_model.serialize().find("canonical-A") == std::string::npos);
+  assert(keyed_model.serialize().find("canonical-B") == std::string::npos);
+  auto missing_activity = keyed_log;
+  missing_activity.traces[0].events[1].attributes.clear();
+  bool missing_threw = false;
+  try {
+    (void)discover_powl(missing_activity, keyed_options);
+  } catch (const std::invalid_argument& error) {
+    missing_threw = std::string(error.what()).find("phase") != std::string::npos;
+  }
+  assert(missing_threw);
+  auto null_activity = keyed_log;
+  null_activity.traces[0].events[1].attributes[0].is_null = true;
+  bool null_threw = false;
+  try {
+    (void)discover_powl(null_activity, keyed_options);
+  } catch (const std::invalid_argument& error) {
+    null_threw = std::string(error.what()).find("phase") != std::string::npos;
+  }
+  assert(null_threw);
+
+  // Native logs may arrive as one flattened trace.  Custom selectors must
+  // regroup by the selected case field and stably order each case by its
+  // selected timestamp while projecting the selected activity label.
+  EventLog flattened;
+  Trace flattened_trace;
+  const auto append_flattened_event = [&](const char* case_key,
+                                          const char* phase,
+                                          const char* when) {
+    Event event{"legacy-case", "canonical"};
+    event.attributes.push_back(EventAttribute{"batch", case_key});
+    event.attributes.push_back(EventAttribute{"phase", phase});
+    event.attributes.push_back(EventAttribute{"when", when});
+    flattened_trace.events.push_back(std::move(event));
+  };
+  append_flattened_event("case-b", "B-late", "2024-01-01T00:00:03Z");
+  append_flattened_event("case-a", "A-late", "2024-01-01T00:00:02Z");
+  append_flattened_event("case-b", "B-early", "2024-01-01T00:00:00Z");
+  append_flattened_event("case-a", "A-early", "2024-01-01T00:00:01Z");
+  flattened.traces.push_back(std::move(flattened_trace));
+  PowlDiscoveryOptions alternate_selectors = keyed_options;
+  alternate_selectors.activity_key = "phase";
+  alternate_selectors.timestamp_key = "when";
+  alternate_selectors.case_id_key = "batch";
+  const auto normalized =
+      normalize_powl_event_log(flattened, alternate_selectors);
+  assert(normalized.traces.size() == 2);
+  assert(normalized.traces[0].case_id == "case-a");
+  assert(normalized.traces[1].case_id == "case-b");
+  assert(normalized.traces[0].events.size() == 2);
+  assert(normalized.traces[1].events.size() == 2);
+  assert(normalized.traces[0].events[0].activity == "A-early");
+  assert(normalized.traces[0].events[1].activity == "A-late");
+  assert(normalized.traces[1].events[0].activity == "B-early");
+  assert(normalized.traces[1].events[1].activity == "B-late");
+  for (const auto& trace : normalized.traces)
+    for (const auto& event : trace.events) {
+      assert(event.case_id == trace.case_id);
+      assert(event.attribute("phase") != nullptr);
+      assert(event.attribute("when") != nullptr);
+    }
+  const auto canonical_projection = normalize_powl_event_log(flattened);
+  assert(canonical_projection.traces.size() == 1);
+  assert(canonical_projection.traces[0].events[0].activity == "canonical");
+  assert(canonical_projection.traces[0].events[1].activity == "canonical");
+  auto missing_case = flattened;
+  missing_case.traces[0].events[0].attributes.erase(
+      missing_case.traces[0].events[0].attributes.begin());
+  bool missing_case_threw = false;
+  try {
+    (void)normalize_powl_event_log(missing_case, alternate_selectors);
+  } catch (const std::invalid_argument& error) {
+    missing_case_threw = std::string(error.what()).find("batch") !=
+                         std::string::npos;
+  }
+  assert(missing_case_threw);
+  auto invalid_timestamp = flattened;
+  invalid_timestamp.traces[0].events[0].attributes[2].value = "not-a-time";
+  bool invalid_timestamp_threw = false;
+  try {
+    (void)normalize_powl_event_log(invalid_timestamp, alternate_selectors);
+  } catch (const std::invalid_argument& error) {
+    invalid_timestamp_threw = std::string(error.what()).find("when") !=
+                              std::string::npos;
+  }
+  assert(invalid_timestamp_threw);
+
+  // CSV first-class projections retain the exact headers that supplied them.
+  // POWL selectors therefore work even though selected columns are not copied
+  // into the generic attribute bag.
+  CsvImportOptions csv_options;
+  csv_options.case_id_column = "order_ref";
+  csv_options.activity_column = "step_name";
+  csv_options.timestamp_column = "occurred_at";
+  csv_options.resource_column = "worker";
+  csv_options.lifecycle_column = "phase_state";
+  csv_options.require_timestamp_column = true;
+  std::istringstream csv(
+      "order_ref,step_name,occurred_at,worker,phase_state,amount\n"
+      "case-b,B-late,2024-01-01T00:00:03Z,r2,complete,20\n"
+      "case-a,A-late,2024-01-01T00:00:02Z,r1,complete,10\n"
+      "case-b,B-early,2024-01-01T00:00:00Z,r2,start,20\n"
+      "case-a,A-early,2024-01-01T00:00:01Z,r1,start,10\n");
+  const auto csv_log = import_csv_event_log(csv, csv_options);
+  const auto& csv_event = csv_log.traces.front().events.front();
+  assert(csv_event.case_id_source_key == "order_ref");
+  assert(csv_event.activity_source_key == "step_name");
+  assert(csv_event.timestamp_source_key == "occurred_at");
+  assert(csv_event.resource_source_key == "worker");
+  assert(csv_event.lifecycle_source_key == "phase_state");
+  assert(csv_event.attribute("step_name") == nullptr);
+  assert(csv_event.attribute("occurred_at") == nullptr);
+  assert(csv_event.attribute("worker") == nullptr);
+  assert(csv_event.attribute("phase_state") == nullptr);
+  PowlDiscoveryOptions csv_powl_options;
+  csv_powl_options.variant = PowlDiscoveryVariant::kTree;
+  csv_powl_options.activity_key = "step_name";
+  csv_powl_options.timestamp_key = "occurred_at";
+  csv_powl_options.case_id_key = "order_ref";
+  const auto normalized_csv =
+      normalize_powl_event_log(csv_log, csv_powl_options);
+  assert(normalized_csv.traces.size() == 2);
+  assert(normalized_csv.traces[0].case_id == "case-a");
+  assert(normalized_csv.traces[0].events[0].activity == "A-early");
+  assert(normalized_csv.traces[1].case_id == "case-b");
+  assert(normalized_csv.traces[1].events[0].activity == "B-early");
+  const auto csv_powl = discover_powl(csv_log, csv_powl_options).serialize();
+  assert(csv_powl.find("A-early") != std::string::npos);
+  assert(csv_powl.find("B-early") != std::string::npos);
 
   PowlDiscoveryOptions tree;
   tree.variant = PowlDiscoveryVariant::kTree;
@@ -398,21 +546,41 @@ int main() {
       discover_powl(filtering_log, filtered).serialize();
   assert(dynamic_default_threshold.find("T(\"C\")") != std::string::npos);
 
-  // Decreasing-factor retention is strict: a variant exactly equal to the
-  // threshold boundary is not retained.
+  // Decreasing-factor filtering is exercised on a cyclic no-cut fixture, so
+  // filtering is reached before any structured fall-through can retain the
+  // low-frequency activities.  Ranking is frequency-only and stable: the
+  // equal-frequency variants remain in input order, the boundary value is
+  // rejected by strict `>`, and scanning stops at that first rejection.
   EventLog equality_log;
-  append_trace(equality_log, {"B", "A", "A"}, 100);
-  append_trace(equality_log, {"A", "A", "B"}, 50);
-  append_trace(equality_log, {"A", "A", "C"}, 50);
+  append_trace(equality_log, {"A", "B", "C"}, 100);
+  append_trace(equality_log, {"B", "C", "X", "A"}, 50);
+  append_trace(equality_log, {"C", "A", "Y", "B"}, 50);
   auto strict_filter = tree;
   strict_filter.filtering_threshold = 0.5;
   const auto strict_boundary = discover_powl(equality_log, strict_filter).serialize();
-  assert(strict_boundary.find("T(\"C\")") != std::string::npos);
+  assert(strict_boundary.find("T(\"X\")") == std::string::npos);
+  assert(strict_boundary.find("T(\"Y\")") == std::string::npos);
+  // When ranking changes insertion order but retains every variant, filtering
+  // must recognize semantic equality and continue to fall-through discovery
+  // instead of recursively rediscovering the same multiset.
+  EventLog all_retained_reordered;
+  append_trace(all_retained_reordered, {"B", "C", "X", "A"}, 50);
+  append_trace(all_retained_reordered, {"A", "B", "C"}, 100);
+  append_trace(all_retained_reordered, {"C", "A", "Y", "B"}, 50);
+  auto retain_all = tree;
+  retain_all.filtering_threshold = 0.1;
+  const auto retained =
+      discover_powl(all_retained_reordered, retain_all).serialize();
+  assert(retained.find("T(\"X\")") != std::string::npos);
+  assert(retained.find("T(\"Y\")") != std::string::npos);
   throws([&] { auto o = filtered; o.filtering_threshold = 1.0; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_threshold = -0.1; discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.filtering_type = static_cast<PowlFilteringType>(99); discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.variant = static_cast<PowlDiscoveryVariant>(99); discover_powl(log({{"A"}}), o); });
   throws([&] { auto o = filtered; o.order_frequency_ratio = std::numeric_limits<double>::quiet_NaN(); discover_powl(log({{"A"}}), o); });
+  throws([&] { auto o = filtered; o.activity_key = " "; discover_powl(log({{"A"}}), o); });
+  throws([&] { auto o = filtered; o.timestamp_key = "\t"; discover_powl(log({{"A"}}), o); });
+  throws([&] { auto o = filtered; o.case_id_key = ""; discover_powl(log({{"A"}}), o); });
 
   const auto ordered_a = discover_powl(log({{"B", "A"}, {"A", "B"}}), tree).serialize();
   const auto ordered_b = discover_powl(log({{"A", "B"}, {"B", "A"}}), tree).serialize();

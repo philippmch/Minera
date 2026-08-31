@@ -103,9 +103,7 @@ LogPrefixResult get_log_with_prefixes(const EventLog& log) {
   result.change_indexes.reserve(log.traces.size());
   for (const auto& source : log.traces) {
     Trace cumulative;
-    cumulative.case_id = source.case_id;
-    cumulative.attributes = source.attributes;
-    cumulative.properties = source.properties;
+    copy_trace_context(source, cumulative);
     std::vector<std::size_t> changes;
     changes.reserve(source.events.size());
     for (const auto& event : source.events) {

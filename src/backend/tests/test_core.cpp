@@ -43,6 +43,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <cmath>
 #include <exception>
 #include <filesystem>
@@ -4116,8 +4117,7 @@ void xes_importer_captures_generic_event_attributes() {
 
 void xes_export_round_trips_generic_attributes() {
   // Attributes survive an export/import cycle with their XES types, so an
-  // <int> stays an <int>; a date that no longer parses degrades to a string
-  // instead of emitting an invalid xs:dateTime.
+  // <int> stays an <int>; explicitly typed invalid dates are rejected.
   minera::EventLog log;
   log.attributes.push_back(
       {"@@aligned_variant", "a,b", minera::AttributeKind::kString});
@@ -4131,8 +4131,6 @@ void xes_export_round_trips_generic_attributes() {
       {"channel <&>", "web \"x\"", minera::AttributeKind::kString});
   event.attributes.push_back(
       {"due", "2026-03-01T10:00:00Z", minera::AttributeKind::kDate});
-  event.attributes.push_back(
-      {"odd-date", "someday", minera::AttributeKind::kDate});
   trace.events.push_back(event);
   log.traces.push_back(trace);
 
@@ -4142,21 +4140,27 @@ void xes_export_round_trips_generic_attributes() {
   assert(xes.find("<int key=\"amount\" value=\"100\"/>") != std::string::npos);
   assert(xes.find("<date key=\"due\" value=\"2026-03-01T10:00:00.000Z\"/>") !=
          std::string::npos);
-  assert(xes.find("<string key=\"odd-date\" value=\"someday\"/>") !=
-         std::string::npos);
+
+  auto invalid = log;
+  invalid.traces.front().events.front().attributes.push_back(
+      {"odd-date", "someday", minera::AttributeKind::kDate});
+  bool invalid_date_threw = false;
+  try {
+    (void)minera::to_xes(invalid);
+  } catch (const std::invalid_argument&) {
+    invalid_date_threw = true;
+  }
+  assert(invalid_date_threw);
 
   std::istringstream input(xes);
   const auto reread = minera::import_xes_event_log(input);
   assert(*reread.attribute("@@aligned_variant") == "a,b");
   const auto& back = reread.traces.front().events.front();
-  assert(back.attributes.size() == 4);
+  assert(back.attributes.size() == 3);
   assert(back.attributes[0].kind == minera::AttributeKind::kInt);
   assert(back.attributes[0].value == "100");
   assert(*back.attribute("channel <&>") == "web \"x\"");
   assert(back.attributes[2].kind == minera::AttributeKind::kDate);
-  // The unparseable date came back as the string it was written as.
-  assert(back.attributes[3].kind == minera::AttributeKind::kString);
-  assert(back.attributes[3].value == "someday");
 }
 
 // A three-event trace with a channel attribute on two events: web on a,
@@ -4251,12 +4255,26 @@ void filter_attribute_values_require_a_key() {
 }
 
 void json_export_carries_event_attributes() {
-  const auto log = attribute_filter_log();
+  auto log = attribute_filter_log();
+  minera::EventAttribute payload{"payload", "",
+                                 minera::AttributeKind::kString};
+  payload.container = minera::AttributeContainerKind::kContainer;
+  minera::EventAttribute nested{"score", "7", minera::AttributeKind::kInt};
+  nested.typed_value = std::int64_t{7};
+  payload.children.push_back(std::move(nested));
+  log.traces[0].events[0].attributes.push_back(std::move(payload));
+  minera::EventAttribute non_finite{"ratio", "NaN",
+                                    minera::AttributeKind::kFloat};
+  non_finite.typed_value = std::numeric_limits<double>::quiet_NaN();
+  log.traces[0].events[0].attributes.push_back(std::move(non_finite));
+  log.traces[0].case_id_source_key = "business.case";
+  log.traces[0].events[0].activity_source_key = "business.activity";
+  log.metadata.globals.push_back({"custom", {{"ordered", "yes"}}});
   const auto graph = minera::discover_directly_follows_graph(log);
   const auto json = minera::analysis_json("test", log, graph);
 
   // Per-event attributes ride along in the traces block.
-  assert(json.find("\"attributes\": {\"channel\": \"web\"}") !=
+  assert(json.find("\"attributes\": {\"channel\": \"web\"") !=
          std::string::npos);
   // The summary lists the key with its event count and value frequencies.
   assert(json.find("\"event_attributes\": [") != std::string::npos);
@@ -4264,6 +4282,20 @@ void json_export_carries_event_attributes() {
                    "\"distinct_values\": 2, \"values\": [") !=
          std::string::npos);
   assert(json.find("{\"value\": \"phone\", \"count\": 1}") !=
+         std::string::npos);
+  assert(json.find("\"log_metadata\":") != std::string::npos);
+  assert(json.find("\"globals\":[{\"scope\":\"custom\"") !=
+         std::string::npos);
+  assert(json.find("\"attribute_details\": [") != std::string::npos);
+  assert(json.find("\"container\":\"container\"") !=
+         std::string::npos);
+  assert(json.find("\"typed_value\":7") != std::string::npos);
+  assert(json.find("\"typed_value\":\"NaN\"") != std::string::npos);
+  assert(json.find("\"case_id_source_key\": \"business.case\"") !=
+         std::string::npos);
+  assert(json.find("\"activity_source_key\": \"business.activity\"") !=
+         std::string::npos);
+  assert(json.find("\"activity_state\": \"present\"") !=
          std::string::npos);
 
   // A log without generic attributes omits the field entirely.
@@ -4313,7 +4345,9 @@ void xes_export_round_trips_lifecycle() {
   trace.events.push_back(minera::Event{"c1", "a", "", "", 1, {}, "complete"});
   log.traces.push_back(trace);
 
-  const auto xes = minera::to_xes(log);
+  minera::XesExportOptions options;
+  options.infer_metadata = true;
+  const auto xes = minera::serialize_xes(log, options);
   assert(xes.find("lifecycle.xesext") != std::string::npos);
   assert(xes.find("<string key=\"lifecycle:transition\" value=\"start\"/>") !=
          std::string::npos);
@@ -4324,7 +4358,8 @@ void xes_export_round_trips_lifecycle() {
   assert(reread.traces.front().events[1].lifecycle == "complete");
 
   // An atomic log declares no Lifecycle extension.
-  const auto atomic = minera::to_xes(log_from_variants({{"a"}}));
+  const auto atomic =
+      minera::serialize_xes(log_from_variants({{"a"}}), options);
   assert(atomic.find("lifecycle.xesext") == std::string::npos);
 }
 
@@ -4828,6 +4863,61 @@ void filter_case_attribute_values_require_a_key() {
   }));
 }
 
+void filter_preserves_typed_first_class_projection_context() {
+  const std::string xml =
+      "<log><trace><int key=\"case.number\" value=\"42\"/>"
+      "<event><string key=\"concept:name\" value=\"A\"/>"
+      "<date key=\"when.value\" value=\"2026-01-01T00:00:00Z\"/>"
+      "</event><event><string key=\"concept:name\" value=\"B\"/>"
+      "<date key=\"when.value\" value=\"2026-01-01T00:01:00Z\"/>"
+      "</event></trace></log>";
+  minera::XesImportOptions import_options;
+  import_options.case_attribute = "case.number";
+  import_options.timestamp_attribute = "when.value";
+  std::istringstream input(xml);
+  const auto imported = minera::import_xes_event_log(input, import_options);
+  assert(imported.traces.size() == 1);
+  assert(imported.traces.front().case_id_state ==
+         minera::FirstClassAttributeState::kPresent);
+  assert(imported.traces.front().case_id_source_key == "case.number");
+  assert(imported.traces.front().case_id_attribute &&
+         imported.traces.front().case_id_attribute->kind ==
+             minera::AttributeKind::kInt);
+
+  minera::LogFilterOptions options;
+  options.keep_activities = {"A"};
+  const auto filtered = minera::filter_event_log(imported, options);
+  const auto& trace = filtered.traces.front();
+  assert(trace.case_id == "42");
+  assert(trace.case_id_state == minera::FirstClassAttributeState::kPresent);
+  assert(trace.case_id_source_key == "case.number");
+  assert(trace.case_id_attribute &&
+         trace.case_id_attribute->kind == minera::AttributeKind::kInt &&
+         std::get<std::int64_t>(trace.case_id_attribute->typed_value) == 42);
+  assert(trace.events.size() == 1);
+  const auto& event = trace.events.front();
+  assert(event.timestamp == "2026-01-01T00:00:00.000Z");
+  assert(event.timestamp_state == minera::FirstClassAttributeState::kPresent);
+  assert(event.timestamp_source_key == "when.value");
+  assert(event.timestamp_attribute &&
+         event.timestamp_attribute->kind == minera::AttributeKind::kDate);
+
+  const auto exported = minera::to_xes(filtered);
+  assert(exported.find("<int key=\"case.number\" value=\"42\"/>") !=
+         std::string::npos);
+  assert(exported.find(
+             "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
+         std::string::npos);
+  std::istringstream round_input(exported);
+  const auto round = minera::import_xes_event_log(round_input, import_options);
+  assert(round.traces.front().case_id_attribute &&
+         round.traces.front().case_id_attribute->kind ==
+             minera::AttributeKind::kInt);
+  assert(round.traces.front().events.front().timestamp_attribute &&
+         round.traces.front().events.front().timestamp_attribute->kind ==
+             minera::AttributeKind::kDate);
+}
+
 void json_export_carries_case_attributes() {
   const auto log = case_attribute_filter_log();
   const auto graph = minera::discover_directly_follows_graph(log);
@@ -4851,20 +4941,25 @@ void json_export_carries_case_attributes() {
   assert(plain_json.find("case_attributes") == std::string::npos);
 }
 
-void xes_importer_rejects_malformed_logs() {
-  // Trace without a case attribute.
-  assert(throws([] {
-    (void)import_xes("<log><trace><event>"
-                     "<string key=\"concept:name\" value=\"A\"/>"
-                     "</event></trace></log>");
-  }));
-  // Event without an activity attribute.
-  assert(throws([] {
-    (void)import_xes("<log><trace>"
-                     "<string key=\"concept:name\" value=\"c\"/>"
-                     "<event><string key=\"org:resource\" value=\"x\"/></event>"
-                     "</trace></log>");
-  }));
+void xes_importer_preserves_missing_fields_and_rejects_malformed_xml() {
+  // Missing first-class fields remain distinguishable from present empty
+  // strings. They do not make an otherwise valid XES document malformed.
+  const auto missing_case = import_xes(
+      "<log><trace><event>"
+      "<string key=\"concept:name\" value=\"A\"/>"
+      "</event></trace></log>");
+  assert(missing_case.traces[0].case_id_state ==
+         minera::FirstClassAttributeState::kMissing);
+  assert(missing_case.traces[0].events[0].activity == "A");
+
+  const auto missing_activity = import_xes(
+      "<log><trace>"
+      "<string key=\"concept:name\" value=\"c\"/>"
+      "<event><string key=\"org:resource\" value=\"x\"/></event>"
+      "</trace></log>");
+  assert(missing_activity.traces[0].case_id == "c");
+  assert(missing_activity.traces[0].events[0].activity_state ==
+         minera::FirstClassAttributeState::kMissing);
   // Unterminated tag.
   assert(throws([] { (void)import_xes("<log><trace"); }));
   // An empty stream yields an empty log rather than throwing.
@@ -6150,12 +6245,13 @@ int main() {
   xes_export_round_trips_case_attributes();
   filter_case_attribute_selects_cases();
   filter_case_attribute_values_require_a_key();
+  filter_preserves_typed_first_class_projection_context();
   json_export_carries_case_attributes();
   xes_importer_reads_traces_and_events();
   xes_importer_reads_a_file_from_disk();
   xes_importer_variants_ordering_limits_and_projection();
   xes_importer_decodes_entities_and_ignores_nesting();
-  xes_importer_rejects_malformed_logs();
+  xes_importer_preserves_missing_fields_and_rejects_malformed_xml();
   heuristic_miner_keeps_a_clean_sequence();
   heuristic_miner_filters_noisy_reverse_edges();
   heuristic_miner_detects_self_loops();

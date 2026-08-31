@@ -49,10 +49,12 @@ describe("native alignment adapters", () => {
 
   it("serializes both XES exporter selectors and gzip control", () => {
     expect(xesExportQuery()).toBe("");
-    expect(xesExportQuery({ variant: "line_by_line", compress: false }))
-      .toBe("xes_export_variant=line_by_line&xes_compress=false");
-    expect(xesExportQuery({ variant: "etree", compress: true }))
-      .toBe("xes_export_variant=etree&xes_compress=true");
+    expect(xesExportQuery({ variant: "line_by_line", compress: false,
+      inferMetadata: false }))
+      .toBe("xes_export_variant=line_by_line&xes_compress=false&xes_infer_metadata=false");
+    expect(xesExportQuery({ variant: "etree", compress: true,
+      inferMetadata: true }))
+      .toBe("xes_export_variant=etree&xes_compress=true&xes_infer_metadata=true");
     expect(() => xesExportQuery({ variant: "unknown" as "etree" }))
       .toThrow(/not supported/);
   });
@@ -576,6 +578,9 @@ describe("alignmentQuery", () => {
   it("omits unset controls so the legacy request remains compatible", () => {
     expect(alignmentQuery({})).toBe("");
     expect(new URLSearchParams(alignmentQuery({
+      activity_attribute: "concept:name",
+    })).get("alignment_activity_attribute")).toBe("concept:name");
+    expect(new URLSearchParams(alignmentQuery({
       process_tree_variant: "transition_bordered",
     })).get("process_tree_variant")).toBe("transition_bordered");
   });
@@ -841,6 +846,9 @@ describe("hasActiveMinerOptions", () => {
     expect(hasActiveMinerOptions({ powlFilteringThreshold: 0.2 })).toBe(true);
     expect(hasActiveMinerOptions({ powlOrderFrequencyRatio: 0.8 })).toBe(true);
     expect(hasActiveMinerOptions({ powlBruteForceActivityLimit: 3 })).toBe(true);
+    expect(hasActiveMinerOptions({ powlActivityKey: "phase" })).toBe(true);
+    expect(hasActiveMinerOptions({ powlTimestampKey: "finished_at" })).toBe(true);
+    expect(hasActiveMinerOptions({ powlCaseIdKey: "case_ref" })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayVariant: "backwards" })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayStopImmediatelyUnfit: true })).toBe(true);
     expect(hasActiveMinerOptions({ tokenReplayActivityAttribute: "phase" })).toBe(true);
@@ -973,12 +981,18 @@ describe("mineFormEntries", () => {
       powlFilteringThreshold: 0.2,
       powlOrderFrequencyRatio: 0.8,
       powlBruteForceActivityLimit: 4,
+      powlActivityKey: " phase ",
+      powlTimestampKey: " finished_at ",
+      powlCaseIdKey: " case_ref ",
     })).toEqual([
       ["powl_variant", "dynamic_clustering_plain"],
       ["powl_filtering_type", "dynamic"],
       ["powl_filtering_threshold", "0.2"],
       ["powl_order_frequency_ratio", "0.8"],
       ["powl_brute_force_activity_limit", "4"],
+      ["powl_activity_key", "phase"],
+      ["powl_timestamp_key", "finished_at"],
+      ["powl_case_id_key", "case_ref"],
     ]);
     expect(mineFormEntries({
       powlVariant: "maximal",
@@ -986,6 +1000,9 @@ describe("mineFormEntries", () => {
       powlFilteringThreshold: 0,
       powlOrderFrequencyRatio: 1,
       powlBruteForceActivityLimit: 0,
+      powlActivityKey: "concept:name",
+      powlTimestampKey: "time:timestamp",
+      powlCaseIdKey: "case:concept:name",
     })).toEqual([]);
     expect(() => mineFormEntries({ powlFilteringThreshold: Number.NaN }))
       .toThrow(/powlFilteringThreshold/);
@@ -995,6 +1012,12 @@ describe("mineFormEntries", () => {
       .toThrow(/0.5 < value <= 1/);
     expect(() => mineFormEntries({ powlBruteForceActivityLimit: 1.5 }))
       .toThrow(/non-negative integer/);
+    expect(() => mineFormEntries({ powlActivityKey: "  " }))
+      .toThrow("powl_activity_key must not be empty");
+    expect(() => mineFormEntries({ powlTimestampKey: "" }))
+      .toThrow("powl_timestamp_key must not be empty");
+    expect(() => mineFormEntries({ powlCaseIdKey: "\t" }))
+      .toThrow("powl_case_id_key must not be empty");
   });
 
   it("maps non-default token-replay settings", () => {
@@ -1011,6 +1034,11 @@ describe("mineFormEntries", () => {
       tokenReplayVariant: "forward",
       tokenReplayStopImmediatelyUnfit: false,
     })).toEqual([]);
+    expect(mineFormEntries({
+      tokenReplayActivityAttribute: "concept:name",
+    })).toEqual([
+      ["token_replay_activity_attribute", "concept:name"],
+    ]);
   });
 
   it("maps non-default log-skeleton settings and leaves defaults implicit", () => {

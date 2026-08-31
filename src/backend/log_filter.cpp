@@ -89,9 +89,7 @@ Trace project_events(const Trace& trace,
                      const std::unordered_set<std::string>& remove_lifecycles,
                      const AttributeMatcher* attribute) {
   Trace result;
-  result.case_id = trace.case_id;
-  result.attributes = trace.attributes;
-  result.properties = trace.properties;
+  copy_trace_context(trace, result);
   for (const auto& event : trace.events) {
     if (!keep_activities.empty() &&
         keep_activities.find(event.activity) == keep_activities.end()) {
@@ -186,11 +184,11 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
   // A lone segment keeps the original case id; several get a #k suffix so each
   // subtrace remains a distinct case. All inherit the case's attributes.
   for (std::size_t i = 0; i < segments.size(); ++i) {
-    segments[i].case_id = segments.size() == 1
-                              ? trace.case_id
-                              : trace.case_id + "#" + std::to_string(i + 1);
-    segments[i].attributes = trace.attributes;
-    segments[i].properties = trace.properties;
+    copy_trace_context(trace, segments[i]);
+    if (segments.size() != 1) {
+      set_trace_case_id(segments[i],
+                        trace.case_id + "#" + std::to_string(i + 1));
+    }
   }
   return segments;
 }
@@ -478,9 +476,7 @@ Trace project_frequency_attributes(
     std::string_view threshold_key,
     const std::unordered_set<std::string>* threshold_allowed) {
   Trace result;
-  result.case_id = trace.case_id;
-  result.attributes = trace.attributes;
-  result.properties = trace.properties;
+  copy_trace_context(trace, result);
   for (const auto& event : trace.events) {
     if (top_allowed != nullptr) {
       const auto* value = frequency_attribute_value(event, top_key);
@@ -583,9 +579,7 @@ std::optional<Trace> cut_trace(const Trace& trace,
                                  : trace.events.size();
   if (begin >= end) return std::nullopt;
   Trace result;
-  result.case_id = trace.case_id;
-  result.attributes = trace.attributes;
-  result.properties = trace.properties;
+  copy_trace_context(trace, result);
   result.events.insert(result.events.end(), trace.events.begin() + begin,
                        trace.events.begin() + end);
   return result;
@@ -782,9 +776,7 @@ EventLog filter_numeric_attribute(
       continue;
     }
     Trace projected;
-    projected.case_id = trace.case_id;
-    projected.attributes = trace.attributes;
-    projected.properties = trace.properties;
+    copy_trace_context(trace, projected);
     for (const auto& event : trace.events) {
       if (numeric_attribute_event_survives(event, options))
         projected.events.push_back(event);
@@ -1083,9 +1075,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
     if (by_time) {
       switch (options.time_mode) {
         case TimeFilterMode::events: {
-          timed.case_id = trace.case_id;
-          timed.attributes = trace.attributes;
-          timed.properties = trace.properties;
+          copy_trace_context(trace, timed);
           for (const auto& event : trace.events) {
             const auto instant = parse_timestamp(event.timestamp);
             if (instant && *instant >= time_from && *instant <= time_to) {
@@ -1124,8 +1114,7 @@ EventLog filter_event_log(const EventLog& log, const LogFilterOptions& options) 
       if (numeric.mode == AttributeFilterMode::traces) {
         if (!numeric_trace_matches(*source, numeric)) continue;
       } else {
-        numeric_projected.case_id = source->case_id;
-        numeric_projected.attributes = source->attributes;
+        copy_trace_context(*source, numeric_projected);
         for (const auto& event : source->events) {
           if (numeric_attribute_event_survives(event, numeric))
             numeric_projected.events.push_back(event);

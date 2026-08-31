@@ -1625,6 +1625,21 @@ void write_replay_fitness(std::ostream& out, const ReplayFitnessResult& result,
   out << '}';
 }
 
+// The compatibility object above is intentionally compact, but cannot retain
+// duplicate keys or nested/typed XES data. The detailed representation is
+// additive so existing consumers keep working while lossless consumers can
+// use the ordered recursive array.
+const char* first_class_state_name(FirstClassAttributeState state);
+FirstClassAttributeState effective_first_class_state(
+    FirstClassAttributeState state, std::string_view value);
+void write_attribute_details(std::ostream& out,
+                             const std::vector<EventAttribute>& attributes);
+void write_optional_attribute_detail(
+    std::ostream& out, std::string_view field,
+    const std::optional<EventAttribute>& attribute);
+void write_projected_metadata(std::ostream& out,
+                              const EventDataMetadata& metadata);
+
 void write_precision(std::ostream& out, const PrecisionResult& result,
                      const DirectlyFollowsGraph* graph) {
   out << "{\"variant\": ";
@@ -3162,14 +3177,39 @@ void write_analysis_json(std::ostream& out,
   out << "  \"trace_count\": " << log.trace_count() << ",\n";
   out << "  \"event_count\": " << log.event_count() << ",\n";
 
+  out << "  \"log_attributes\": ";
+  write_attribute_object(out, log.attributes);
+  out << ",\n  \"log_attribute_details\": ";
+  write_attribute_details(out, log.attributes);
+  out << ",\n  \"log_metadata\": ";
+  write_projected_metadata(out, log.metadata);
+  out << ",\n";
+
   out << "  \"traces\": [\n";
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
     const auto& trace = log.traces[i];
     out << "    {\"case_id\": ";
     write_json_string(out, trace.case_id);
+    out << ", \"case_id_state\": ";
+    write_json_string(
+        out, first_class_state_name(
+                 effective_first_class_state(trace.case_id_state,
+                                             trace.case_id)));
+    out << ", \"case_id_source_key\": ";
+    write_json_string(out, trace.case_id_source_key);
+    write_optional_attribute_detail(out, "case_id_attribute",
+                                    trace.case_id_attribute);
     if (!trace.attributes.empty()) {
       out << ", \"attributes\": ";
       write_attribute_object(out, trace.attributes);
+      out << ", \"attribute_details\": ";
+      write_attribute_details(out, trace.attributes);
+    }
+    if (!trace.properties.empty()) {
+      out << ", \"properties\": ";
+      write_attribute_object(out, trace.properties);
+      out << ", \"property_details\": ";
+      write_attribute_details(out, trace.properties);
     }
     out << ", \"events\": [";
     for (std::size_t j = 0; j < trace.events.size(); ++j) {
@@ -3177,17 +3217,66 @@ void write_analysis_json(std::ostream& out,
       out << "{\"activity\": " << *graph.activity_id(event.activity)
           << ", \"timestamp\": ";
       write_json_string(out, event.timestamp);
-      if (!event.resource.empty()) {
+      out << ", \"input_order\": " << event.input_order;
+      out << ", \"case_id_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.case_id_state,
+                                               event.case_id)));
+      out << ", \"case_id_source_key\": ";
+      write_json_string(out, event.case_id_source_key);
+      out << ", \"activity_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.activity_state,
+                                               event.activity)));
+      out << ", \"activity_source_key\": ";
+      write_json_string(out, event.activity_source_key);
+      write_optional_attribute_detail(out, "activity_attribute",
+                                      event.activity_attribute);
+      out << ", \"timestamp_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.timestamp_state,
+                                               event.timestamp)));
+      out << ", \"timestamp_source_key\": ";
+      write_json_string(out, event.timestamp_source_key);
+      write_optional_attribute_detail(out, "timestamp_attribute",
+                                      event.timestamp_attribute);
+      if (effective_first_class_state(event.resource_state, event.resource) !=
+          FirstClassAttributeState::kMissing) {
         out << ", \"resource\": ";
         write_json_string(out, event.resource);
       }
-      if (!event.lifecycle.empty()) {
+      out << ", \"resource_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.resource_state,
+                                               event.resource)));
+      out << ", \"resource_source_key\": ";
+      write_json_string(out, event.resource_source_key);
+      write_optional_attribute_detail(out, "resource_attribute",
+                                      event.resource_attribute);
+      if (effective_first_class_state(event.lifecycle_state,
+                                      event.lifecycle) !=
+          FirstClassAttributeState::kMissing) {
         out << ", \"lifecycle\": ";
         write_json_string(out, event.lifecycle);
       }
+      out << ", \"lifecycle_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.lifecycle_state,
+                                               event.lifecycle)));
+      out << ", \"lifecycle_source_key\": ";
+      write_json_string(out, event.lifecycle_source_key);
+      write_optional_attribute_detail(out, "lifecycle_attribute",
+                                      event.lifecycle_attribute);
       if (!event.attributes.empty()) {
         out << ", \"attributes\": ";
         write_attribute_object(out, event.attributes);
+        out << ", \"attribute_details\": ";
+        write_attribute_details(out, event.attributes);
       }
       out << '}' << (j + 1 < trace.events.size() ? ", " : "");
     }
@@ -3596,6 +3685,96 @@ const char* attribute_kind_name(AttributeKind kind) {
   throw std::invalid_argument("projected log contains an invalid attribute kind");
 }
 
+const char* attribute_container_name(AttributeContainerKind container) {
+  switch (container) {
+    case AttributeContainerKind::kScalar: return "scalar";
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kContainer: return "container";
+  }
+  throw std::invalid_argument(
+      "projected log contains an invalid attribute container");
+}
+
+const char* first_class_state_name(FirstClassAttributeState state) {
+  switch (state) {
+    case FirstClassAttributeState::kMissing: return "missing";
+    case FirstClassAttributeState::kPresent: return "present";
+    case FirstClassAttributeState::kNull: return "null";
+  }
+  throw std::invalid_argument(
+      "projected log contains an invalid first-class attribute state");
+}
+
+FirstClassAttributeState effective_first_class_state(
+    FirstClassAttributeState state, std::string_view value) {
+  return state == FirstClassAttributeState::kMissing && !value.empty()
+             ? FirstClassAttributeState::kPresent
+             : state;
+}
+
+void write_typed_attribute_value(std::ostream& out,
+                                 const NativeAttributeValue& value) {
+  if (const auto* integer = std::get_if<std::int64_t>(&value)) {
+    out << *integer;
+  } else if (const auto* number = std::get_if<double>(&value)) {
+    if (std::isfinite(*number))
+      out << std::setprecision(17) << *number;
+    else if (std::isnan(*number))
+      write_json_string(out, "NaN");
+    else
+      write_json_string(out, *number < 0 ? "-INF" : "INF");
+  } else if (const auto* boolean = std::get_if<bool>(&value)) {
+    out << (*boolean ? "true" : "false");
+  } else if (const auto* date = std::get_if<NativeDate>(&value)) {
+    write_json_string(out, date->value);
+  } else {
+    out << "null";
+  }
+}
+
+void write_attribute_details(std::ostream& out,
+                             const std::vector<EventAttribute>& attributes);
+
+void write_attribute_detail(std::ostream& out,
+                            const EventAttribute& attribute) {
+  out << "{\"key\":";
+  write_json_string(out, attribute.key);
+  out << ",\"value\":";
+  write_json_string(out, attribute.value);
+  out << ",\"kind\":";
+  write_json_string(out, attribute_kind_name(attribute.kind));
+  out << ",\"container\":";
+  write_json_string(out, attribute_container_name(attribute.container));
+  out << ",\"null\":" << (attribute.is_null ? "true" : "false");
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    out << ",\"typed_value\":";
+    write_typed_attribute_value(out, attribute.typed_value);
+  }
+  if (!attribute.children.empty()) {
+    out << ",\"children\":";
+    write_attribute_details(out, attribute.children);
+  }
+  out << '}';
+}
+
+void write_attribute_details(std::ostream& out,
+                             const std::vector<EventAttribute>& attributes) {
+  out << '[';
+  for (std::size_t i = 0; i < attributes.size(); ++i) {
+    if (i) out << ',';
+    write_attribute_detail(out, attributes[i]);
+  }
+  out << ']';
+}
+
+void write_optional_attribute_detail(
+    std::ostream& out, std::string_view field,
+    const std::optional<EventAttribute>& attribute) {
+  if (!attribute) return;
+  out << ", \"" << field << "\": ";
+  write_attribute_detail(out, *attribute);
+}
+
 void write_attribute_kinds(std::ostream& out,
                            const std::vector<EventAttribute>& attributes) {
   out << '{';
@@ -3637,10 +3816,26 @@ void write_projected_metadata(std::ostream& out,
   }
   out << "],\"trace_globals\":";
   write_attribute_object(out, metadata.trace_globals);
+  out << ",\"trace_global_details\":";
+  write_attribute_details(out, metadata.trace_globals);
   out << ",\"event_globals\":";
   write_attribute_object(out, metadata.event_globals);
+  out << ",\"event_global_details\":";
+  write_attribute_details(out, metadata.event_globals);
   out << ",\"properties\":";
   write_attribute_object(out, metadata.properties);
+  out << ",\"property_details\":";
+  write_attribute_details(out, metadata.properties);
+  out << ",\"globals\":[";
+  for (std::size_t i = 0; i < metadata.globals.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"scope\":";
+    write_json_string(out, metadata.globals[i].scope);
+    out << ",\"attributes\":";
+    write_attribute_details(out, metadata.globals[i].attributes);
+    out << '}';
+  }
+  out << ']';
   out << '}';
 }
 
@@ -3651,6 +3846,8 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
     write_attribute_object(out, log.attributes);
     out << ",\"attribute_kinds\":";
     write_attribute_kinds(out, log.attributes);
+    out << ",\"attribute_details\":";
+    write_attribute_details(out, log.attributes);
     out << ',';
   }
   out << "\"metadata\":";
@@ -3661,17 +3858,29 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
     if (i) out << ',';
     const auto& t=log.traces[i];
     out << "{\"case_id\":"; write_json_string(out,t.case_id);
+    out << ",\"case_id_state\":";
+    write_json_string(
+        out, first_class_state_name(
+                 effective_first_class_state(t.case_id_state, t.case_id)));
+    out << ",\"case_id_source_key\":";
+    write_json_string(out, t.case_id_source_key);
+    write_optional_attribute_detail(out, "case_id_attribute",
+                                    t.case_id_attribute);
     if(!t.attributes.empty()) {
       out<<",\"attributes\":";
       write_attribute_object(out, t.attributes);
       out<<",\"attribute_kinds\":";
       write_attribute_kinds(out, t.attributes);
+      out<<",\"attribute_details\":";
+      write_attribute_details(out, t.attributes);
     }
     if(!t.properties.empty()) {
       out<<",\"properties\":";
       write_attribute_object(out, t.properties);
       out<<",\"property_kinds\":";
       write_attribute_kinds(out, t.properties);
+      out<<",\"property_details\":";
+      write_attribute_details(out, t.properties);
     }
     out << ",\"events\":[";
     for (std::size_t j=0;j<t.events.size();++j) {
@@ -3682,11 +3891,51 @@ void write_projected_log(std::ostream& out, const EventLog& log) {
       out << ",\"resource\":"; write_json_string(out,e.resource);
       out << ",\"lifecycle\":"; write_json_string(out,e.lifecycle);
       out << ",\"input_order\":" << e.input_order;
+      out << ",\"case_id_state\":";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(e.case_id_state, e.case_id)));
+      out << ",\"case_id_source_key\":";
+      write_json_string(out, e.case_id_source_key);
+      out << ",\"activity_state\":";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(e.activity_state, e.activity)));
+      out << ",\"activity_source_key\":";
+      write_json_string(out, e.activity_source_key);
+      write_optional_attribute_detail(out, "activity_attribute",
+                                      e.activity_attribute);
+      out << ",\"timestamp_state\":";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(e.timestamp_state, e.timestamp)));
+      out << ",\"timestamp_source_key\":";
+      write_json_string(out, e.timestamp_source_key);
+      write_optional_attribute_detail(out, "timestamp_attribute",
+                                      e.timestamp_attribute);
+      out << ",\"resource_state\":";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(e.resource_state, e.resource)));
+      out << ",\"resource_source_key\":";
+      write_json_string(out, e.resource_source_key);
+      write_optional_attribute_detail(out, "resource_attribute",
+                                      e.resource_attribute);
+      out << ",\"lifecycle_state\":";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(e.lifecycle_state, e.lifecycle)));
+      out << ",\"lifecycle_source_key\":";
+      write_json_string(out, e.lifecycle_source_key);
+      write_optional_attribute_detail(out, "lifecycle_attribute",
+                                      e.lifecycle_attribute);
       if(!e.attributes.empty()) {
         out<<",\"attributes\":";
         write_attribute_object(out, e.attributes);
         out<<",\"attribute_kinds\":";
         write_attribute_kinds(out, e.attributes);
+        out<<",\"attribute_details\":";
+        write_attribute_details(out, e.attributes);
       }
       out<<'}';
     }

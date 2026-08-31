@@ -220,6 +220,9 @@ EventLog import_csv_event_log(
     auto [it, inserted] = trace_ids.emplace(case_id, log.traces.size());
     if (inserted) {
       log.traces.push_back(Trace{case_id, {}, {}});
+      auto& inserted_trace = log.traces.back();
+      inserted_trace.case_id_state = FirstClassAttributeState::kPresent;
+      inserted_trace.case_id_source_key = header[case_index];
     }
 
     auto& trace = log.traces[it->second];
@@ -234,16 +237,28 @@ EventLog import_csv_event_log(
     }
 
     Event event{case_id, activity, timestamp, resource, input_order++};
+    event.case_id_state = FirstClassAttributeState::kPresent;
+    event.activity_state = FirstClassAttributeState::kPresent;
+    event.case_id_source_key = header[case_index];
+    event.activity_source_key = header[activity_index];
+    if (timestamp_index) {
+      event.timestamp_state = event.timestamp.empty()
+                                  ? FirstClassAttributeState::kMissing
+                                  : FirstClassAttributeState::kPresent;
+      event.timestamp_source_key = header[*timestamp_index];
+    }
+    if (resource_index) {
+      event.resource_state = event.resource.empty()
+                                 ? FirstClassAttributeState::kMissing
+                                 : FirstClassAttributeState::kPresent;
+      event.resource_source_key = header[*resource_index];
+    }
     if (lifecycle_index) {
       event.lifecycle = field_at(fields, *lifecycle_index, line_number);
-    }
-    // Preserve a non-default activity column in the generic bag as well. This
-    // lets downstream consumers use the same selector on logs imported with a
-    // custom canonical activity column.
-    if (options.activity_column != "activity" &&
-        options.activity_column != "concept:name") {
-      event.attributes.push_back(EventAttribute{
-          options.activity_column, event.activity, AttributeKind::kString});
+      event.lifecycle_state = event.lifecycle.empty()
+                                  ? FirstClassAttributeState::kMissing
+                                  : FirstClassAttributeState::kPresent;
+      event.lifecycle_source_key = header[*lifecycle_index];
     }
     for (const auto index : attribute_indices) {
       // A blank cell means the event simply has no such attribute; a short row

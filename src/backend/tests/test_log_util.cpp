@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 
 using namespace minera;
 
@@ -89,6 +91,34 @@ void fixed_and_all_prefixes_match_contract() {
   assert(json.find("\"properties\":[{\"key\":\"owner\"") !=
          std::string::npos);
   assert(json.find("\"change_indexes\":[[5,5,5],[9,9]]") != std::string::npos);
+}
+
+void derived_prefix_logs_preserve_typed_case_context() {
+  EventLog log;
+  Trace trace;
+  trace.case_id = "42";
+  trace.case_id_state = FirstClassAttributeState::kPresent;
+  trace.case_id_source_key = "case.number";
+  EventAttribute selected{"case.number", "42", AttributeKind::kInt};
+  selected.typed_value = std::int64_t{42};
+  trace.case_id_attribute = selected;
+  trace.events = {event("42", "A", "1", 0), event("42", "B", "2", 1)};
+  log.traces.push_back(std::move(trace));
+
+  const auto fixed = get_log_prefixes(log, 1);
+  assert(fixed.traces.front().case_id_source_key == "case.number");
+  assert(fixed.traces.front().case_id_attribute &&
+         fixed.traces.front().case_id_attribute->kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(fixed.traces.front().case_id_attribute->typed_value) ==
+             42);
+  const auto all = get_log_with_prefixes(log);
+  assert(all.log.traces.size() == 4);
+  for (const auto& prefix : all.log.traces) {
+    assert(prefix.case_id == "42");
+    assert(prefix.case_id_source_key == "case.number");
+    assert(prefix.case_id_attribute &&
+           prefix.case_id_attribute->kind == AttributeKind::kInt);
+  }
 }
 
 void until_activity_returns_prefix_and_duration() {
@@ -197,6 +227,7 @@ void feature_selection_keeps_useful_typed_attributes() {
 int main() {
   split_is_seeded_and_preserves_metadata();
   fixed_and_all_prefixes_match_contract();
+  derived_prefix_logs_preserve_typed_case_context();
   until_activity_returns_prefix_and_duration();
   activity_targets_exclude_competing_targets();
   feature_selection_keeps_useful_typed_attributes();

@@ -4,6 +4,7 @@
 #include "minera/powl.hpp"
 
 #include <cstddef>
+#include <string>
 
 namespace minera {
 
@@ -39,7 +40,24 @@ struct PowlDiscoveryOptions {
   // Zero means unlimited. A positive value fails before brute-force
   // partition enumeration when the local alphabet is larger than this cap.
   std::size_t brute_force_activity_limit = 0;
+  // Event field used to form POWL activity labels. The native activity field
+  // is selected by the canonical concept:name spelling; other names resolve
+  // through first-class fields or Event::attribute and must be present on
+  // every event.
+  std::string activity_key = "concept:name";
+  // Timestamp and case selectors are applied while adapting EventLog inputs.
+  // A custom timestamp orders events stably; a custom case field regroups
+  // flattened event rows into traces.
+  std::string timestamp_key = "time:timestamp";
+  std::string case_id_key = "case:concept:name";
 };
+
+// Applies the selectors used by POWL to a native event log. Custom case
+// selectors regroup event rows, custom timestamp selectors stably order each
+// case, and custom activity selectors replace the visible activity label.
+// Canonical defaults retain the existing EventLog trace and event order.
+[[nodiscard]] EventLog normalize_powl_event_log(
+    const EventLog& event_log, const PowlDiscoveryOptions& options = {});
 
 [[nodiscard]] PowlNode discover_powl(
     const EventLog& event_log, const PowlDiscoveryOptions& options = {});

@@ -716,30 +716,98 @@ export type LogConversionVariant =
   | "DF_TO_EVENT_LOG_1V"
   | "DF_TO_EVENT_LOG_NV";
 export type LogConversionAttributeKind = "string" | "date" | "int" | "float" | "boolean" | "id";
-export interface LogConversionAttribute { key: string; value: string; kind: LogConversionAttributeKind; null?: true; }
+export type LogConversionContainer = "scalar" | "list" | "container";
+export type LogConversionFirstClassRole =
+  | "none" | "case_id" | "activity" | "timestamp" | "resource" | "lifecycle";
+export type LogConversionFirstClassState = "missing" | "present" | "null";
+// Native non-finite floats are represented by their XES lexical spellings in
+// JSON because JSON itself has no NaN or infinity values.
+export type LogConversionTypedValue = number | string | boolean | null;
+export interface LogConversionAttribute {
+  key: string;
+  value: string;
+  kind: LogConversionAttributeKind;
+  container?: LogConversionContainer;
+  null?: boolean;
+  typed_value?: LogConversionTypedValue;
+  children?: LogConversionAttribute[];
+  first_class_role?: LogConversionFirstClassRole;
+  first_class_state?: LogConversionFirstClassState;
+  first_class_source_key?: string;
+}
+export interface LogConversionAttributeDetail extends LogConversionAttribute {
+  container: LogConversionContainer;
+  null: boolean;
+}
 export interface LogConversionExtension { name: string; prefix: string; uri: string; }
 export interface LogConversionClassifier { name: string; keys: string[]; }
+export interface LogConversionGlobal {
+  scope: string;
+  attributes: LogConversionAttribute[] | LogConversionAttributeDetail[];
+}
 export interface LogConversionMetadata {
   extensions: LogConversionExtension[];
   classifiers: LogConversionClassifier[];
   trace_globals: LogConversionAttribute[];
   event_globals: LogConversionAttribute[];
   properties: LogConversionAttribute[];
+  globals?: LogConversionGlobal[];
+  trace_global_details?: LogConversionAttributeDetail[];
+  event_global_details?: LogConversionAttributeDetail[];
+  property_details?: LogConversionAttributeDetail[];
 }
 export interface LogConversionEvent {
   case_id: string;
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
   activity: string;
+  /** Full source attribute selected for the activity projection, when present. */
+  activity_attribute?: LogConversionAttributeDetail;
+  activity_state?: LogConversionFirstClassState;
+  activity_source_key?: string;
   timestamp: string;
+  /** Full source attribute selected for the timestamp projection, when present. */
+  timestamp_attribute?: LogConversionAttributeDetail;
+  timestamp_state?: LogConversionFirstClassState;
+  timestamp_source_key?: string;
   resource: string;
+  /** Full source attribute selected for the resource projection, when present. */
+  resource_attribute?: LogConversionAttributeDetail;
+  resource_state?: LogConversionFirstClassState;
+  resource_source_key?: string;
   lifecycle: string;
+  /** Full source attribute selected for the lifecycle projection, when present. */
+  lifecycle_attribute?: LogConversionAttributeDetail;
+  lifecycle_state?: LogConversionFirstClassState;
+  lifecycle_source_key?: string;
   input_order: number;
   attributes: LogConversionAttribute[];
 }
-export interface LogConversionTrace { case_id: string; attributes: LogConversionAttribute[]; properties?: LogConversionAttribute[]; events: LogConversionEvent[]; }
+export interface LogConversionTrace {
+  case_id: string;
+  /** Full source attribute selected for the case-id projection, when present. */
+  case_id_attribute?: LogConversionAttributeDetail;
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
+  attributes: LogConversionAttribute[];
+  properties?: LogConversionAttribute[];
+  events: LogConversionEvent[];
+}
 export interface LogConversionLog { attributes: LogConversionAttribute[]; metadata?: LogConversionMetadata; traces: LogConversionTrace[]; }
 export interface LogConversionStreamRecord { fields: LogConversionAttribute[]; }
 export interface LogConversionStream { attributes: LogConversionAttribute[]; metadata?: LogConversionMetadata; events: LogConversionStreamRecord[]; }
-export interface LogConversionTableCell { value: string; kind: LogConversionAttributeKind; null?: true; }
+export interface LogConversionTableCell {
+  key?: string;
+  value: string;
+  kind: LogConversionAttributeKind;
+  container?: LogConversionContainer;
+  null?: boolean;
+  typed_value?: LogConversionTypedValue;
+  children?: LogConversionAttribute[];
+  first_class_role?: LogConversionFirstClassRole;
+  first_class_state?: LogConversionFirstClassState;
+  first_class_source_key?: string;
+}
 export interface LogConversionTable {
   columns: string[];
   rows: (LogConversionTableCell | null)[][];
@@ -776,10 +844,37 @@ export type LogConversionResult =
 function isLogConversionAttribute(value: unknown): value is LogConversionAttribute {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<LogConversionAttribute>;
-  return typeof candidate.key === "string" && typeof candidate.value === "string"
-    && (candidate.null === undefined || candidate.null === true)
-    && (["string", "date", "int", "float", "boolean", "id"] as const)
-      .includes(candidate.kind as LogConversionAttributeKind);
+  if (typeof candidate.key !== "string" || typeof candidate.value !== "string" ||
+      !("kind" in candidate) ||
+      !(["string", "date", "int", "float", "boolean", "id"] as const)
+        .includes(candidate.kind as LogConversionAttributeKind) ||
+      (candidate.container !== undefined &&
+       !(["scalar", "list", "container"] as const)
+         .includes(candidate.container as LogConversionContainer)) ||
+      (candidate.null !== undefined && typeof candidate.null !== "boolean") ||
+      (candidate.typed_value !== undefined && candidate.typed_value !== null &&
+       typeof candidate.typed_value !== "number" &&
+       typeof candidate.typed_value !== "string" &&
+       typeof candidate.typed_value !== "boolean") ||
+      (typeof candidate.typed_value === "number" &&
+       !Number.isFinite(candidate.typed_value)) ||
+      (candidate.first_class_role !== undefined &&
+       !(["none", "case_id", "activity", "timestamp", "resource", "lifecycle"] as const)
+         .includes(candidate.first_class_role as LogConversionFirstClassRole)) ||
+      (candidate.first_class_state !== undefined &&
+       !(["missing", "present", "null"] as const)
+         .includes(candidate.first_class_state as LogConversionFirstClassState)) ||
+      (candidate.first_class_source_key !== undefined &&
+       typeof candidate.first_class_source_key !== "string")) return false;
+  return candidate.children === undefined ||
+    (Array.isArray(candidate.children) &&
+     candidate.children.every(isLogConversionAttribute));
+}
+function isLogConversionAttributeDetail(value: unknown): value is LogConversionAttributeDetail {
+  if (!isLogConversionAttribute(value)) return false;
+  const detail = value as LogConversionAttributeDetail;
+  return detail.container !== undefined && typeof detail.null === "boolean" &&
+    (detail.children === undefined || detail.children.every(isLogConversionAttributeDetail));
 }
 function isLogConversionMetadata(value: unknown): value is LogConversionMetadata {
   if (!value || typeof value !== "object") return false;
@@ -792,7 +887,20 @@ function isLogConversionMetadata(value: unknown): value is LogConversionMetadata
       && Array.isArray(classifier.keys) && classifier.keys.every((key) => typeof key === "string"))
     && Array.isArray(metadata.trace_globals) && metadata.trace_globals.every(isLogConversionAttribute)
     && Array.isArray(metadata.event_globals) && metadata.event_globals.every(isLogConversionAttribute)
-    && Array.isArray(metadata.properties) && metadata.properties.every(isLogConversionAttribute);
+    && Array.isArray(metadata.properties) && metadata.properties.every(isLogConversionAttribute)
+    && (metadata.globals === undefined ||
+      (Array.isArray(metadata.globals) && metadata.globals.every((global) =>
+        !!global && typeof global === "object" && typeof global.scope === "string" &&
+        Array.isArray(global.attributes) && global.attributes.every(isLogConversionAttribute))))
+    && (metadata.trace_global_details === undefined ||
+      (Array.isArray(metadata.trace_global_details) &&
+       metadata.trace_global_details.every(isLogConversionAttributeDetail)))
+    && (metadata.event_global_details === undefined ||
+      (Array.isArray(metadata.event_global_details) &&
+       metadata.event_global_details.every(isLogConversionAttributeDetail)))
+    && (metadata.property_details === undefined ||
+      (Array.isArray(metadata.property_details) &&
+       metadata.property_details.every(isLogConversionAttributeDetail)));
 }
 function isLogConversionLog(value: unknown): value is LogConversionLog {
   if (!value || typeof value !== "object") return false;
@@ -801,12 +909,38 @@ function isLogConversionLog(value: unknown): value is LogConversionLog {
     && (log.metadata === undefined || isLogConversionMetadata(log.metadata))
     && Array.isArray(log.traces) && log.traces.every((trace) => !!trace && typeof trace === "object"
       && typeof trace.case_id === "string"
+      && (trace.case_id_attribute === undefined || isLogConversionAttributeDetail(trace.case_id_attribute))
+      && (trace.case_id_state === undefined ||
+          (["missing", "present", "null"] as const).includes(trace.case_id_state as LogConversionFirstClassState))
+      && (trace.case_id_source_key === undefined || typeof trace.case_id_source_key === "string")
       && Array.isArray(trace.attributes) && trace.attributes.every(isLogConversionAttribute)
       && (trace.properties === undefined || (Array.isArray(trace.properties) && trace.properties.every(isLogConversionAttribute)))
       && Array.isArray(trace.events) && trace.events.every((event) => !!event && typeof event === "object"
-        && typeof event.case_id === "string" && typeof event.activity === "string"
-        && typeof event.timestamp === "string" && typeof event.resource === "string"
-        && typeof event.lifecycle === "string" && Number.isSafeInteger(event.input_order) && event.input_order >= 0
+        && typeof event.case_id === "string"
+        && (event.case_id_state === undefined ||
+            (["missing", "present", "null"] as const).includes(event.case_id_state as LogConversionFirstClassState))
+        && (event.case_id_source_key === undefined || typeof event.case_id_source_key === "string")
+         && typeof event.activity === "string"
+         && (event.activity_attribute === undefined || isLogConversionAttributeDetail(event.activity_attribute))
+        && (event.activity_state === undefined ||
+            (["missing", "present", "null"] as const).includes(event.activity_state as LogConversionFirstClassState))
+        && (event.activity_source_key === undefined || typeof event.activity_source_key === "string")
+         && typeof event.timestamp === "string"
+         && (event.timestamp_attribute === undefined || isLogConversionAttributeDetail(event.timestamp_attribute))
+         && typeof event.resource === "string"
+         && (event.resource_attribute === undefined || isLogConversionAttributeDetail(event.resource_attribute))
+        && (event.timestamp_state === undefined ||
+            (["missing", "present", "null"] as const).includes(event.timestamp_state as LogConversionFirstClassState))
+        && (event.timestamp_source_key === undefined || typeof event.timestamp_source_key === "string")
+        && (event.resource_state === undefined ||
+            (["missing", "present", "null"] as const).includes(event.resource_state as LogConversionFirstClassState))
+        && (event.resource_source_key === undefined || typeof event.resource_source_key === "string")
+         && typeof event.lifecycle === "string"
+         && (event.lifecycle_attribute === undefined || isLogConversionAttributeDetail(event.lifecycle_attribute))
+         && Number.isSafeInteger(event.input_order) && event.input_order >= 0
+        && (event.lifecycle_state === undefined ||
+            (["missing", "present", "null"] as const).includes(event.lifecycle_state as LogConversionFirstClassState))
+        && (event.lifecycle_source_key === undefined || typeof event.lifecycle_source_key === "string")
         && Array.isArray(event.attributes) && event.attributes.every(isLogConversionAttribute)));
 }
 function isLogConversionVariants(value: unknown): value is LogConversionVariantProjection[] {
@@ -830,7 +964,7 @@ export function isLogConversionResult(value: unknown): value is LogConversionRes
     return !!stream && Array.isArray(stream.attributes) && stream.attributes.every(isLogConversionAttribute)
       && (stream.metadata === undefined || isLogConversionMetadata(stream.metadata))
       && Array.isArray(stream.events) && stream.events.every((event) => !!event && typeof event === "object"
-        && Array.isArray(event.fields) && event.fields.every(isLogConversionAttribute));
+          && Array.isArray(event.fields) && event.fields.every(isLogConversionAttribute));
   }
   if (candidate.variant === "TO_DATA_FRAME") {
     const table = candidate.table as Partial<LogConversionTable> | undefined;
@@ -839,11 +973,7 @@ export function isLogConversionResult(value: unknown): value is LogConversionRes
       && (table.metadata === undefined || isLogConversionMetadata(table.metadata))
       && (table.lazy === undefined || typeof table.lazy === "boolean")
       && Array.isArray(table.rows) && table.rows.every((row) => Array.isArray(row) && row.length === table.columns!.length
-        && row.every((cell) => cell === null || (!!cell && typeof cell === "object"
-          && typeof cell.value === "string"
-          && (cell.null === undefined || cell.null === true)
-          && (["string", "date", "int", "float", "boolean", "id"] as const)
-            .includes(cell.kind as LogConversionAttributeKind))));
+        && row.every((cell) => cell === null || isLogConversionTableCell(cell)));
   }
   const graph = candidate.graph as Partial<LogConversionGraph> | undefined;
   if (!graph || !Array.isArray(graph.nodes) || !graph.nodes.every((node) => !!node && typeof node === "object"
@@ -858,12 +988,45 @@ export function isLogConversionResult(value: unknown): value is LogConversionRes
 }
 
 export type LogUtilityVariant = "SPLIT_TRAIN_TEST" | "FIXED_PREFIXES" | "ALL_PREFIXES" | "UNTIL_ACTIVITY" | "TO_ACTIVITIES" | "FEATURE_SELECTION";
-export interface LogUtilityAttribute { key: string; value: string; kind: string; null?: true; }
+export interface LogUtilityAttribute {
+  key: string;
+  value: string;
+  kind: string;
+  container?: LogConversionContainer;
+  null?: boolean;
+  typed_value?: LogConversionTypedValue;
+  children?: LogUtilityAttribute[];
+  first_class_role?: LogConversionFirstClassRole;
+  first_class_state?: LogConversionFirstClassState;
+  first_class_source_key?: string;
+}
 export interface LogUtilityEvent {
   case_id: string; activity: string; timestamp: string; resource: string;
   lifecycle: string; input_order: number; attributes: LogUtilityAttribute[];
+  activity_attribute?: LogConversionAttributeDetail;
+  timestamp_attribute?: LogConversionAttributeDetail;
+  resource_attribute?: LogConversionAttributeDetail;
+  lifecycle_attribute?: LogConversionAttributeDetail;
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
+  activity_state?: LogConversionFirstClassState;
+  activity_source_key?: string;
+  timestamp_state?: LogConversionFirstClassState;
+  timestamp_source_key?: string;
+  resource_state?: LogConversionFirstClassState;
+  resource_source_key?: string;
+  lifecycle_state?: LogConversionFirstClassState;
+  lifecycle_source_key?: string;
 }
-export interface LogUtilityTrace { case_id: string; attributes: LogUtilityAttribute[]; properties?: LogUtilityAttribute[]; events: LogUtilityEvent[]; }
+export interface LogUtilityTrace {
+  case_id: string;
+  case_id_attribute?: LogConversionAttributeDetail;
+  attributes: LogUtilityAttribute[];
+  properties?: LogUtilityAttribute[];
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
+  events: LogUtilityEvent[];
+}
 export interface LogUtilityLog { attributes: LogUtilityAttribute[]; metadata?: LogConversionMetadata; traces: LogUtilityTrace[]; }
 export interface LogUtilityResult {
   family: "LOG_UTIL";
@@ -878,10 +1041,31 @@ export interface LogUtilityResult {
   event_attributes?: string[];
   case_attributes?: string[];
 }
+
+function isLogConversionTableCell(value: unknown): value is LogConversionTableCell {
+  if (!value || typeof value !== "object") return false;
+  // Current table serialization carries the complete attribute (including
+  // key and recursive metadata). Accept the historical compact cell form as
+  // well so older cached responses remain consumable.
+  if (isLogConversionAttribute(value)) return true;
+  const cell = value as Partial<LogConversionTableCell>;
+  return typeof cell.value === "string" &&
+    (["string", "date", "int", "float", "boolean", "id"] as const)
+      .includes(cell.kind as LogConversionAttributeKind) &&
+    (cell.null === undefined || typeof cell.null === "boolean") &&
+    (cell.container === undefined ||
+      (["scalar", "list", "container"] as const)
+        .includes(cell.container as LogConversionContainer)) &&
+    (cell.typed_value === undefined || cell.typed_value === null ||
+      typeof cell.typed_value === "string" ||
+      typeof cell.typed_value === "boolean" ||
+      (typeof cell.typed_value === "number" && Number.isFinite(cell.typed_value))) &&
+    (cell.children === undefined ||
+      (Array.isArray(cell.children) && cell.children.every(isLogConversionAttribute)));
+}
+
 function isLogUtilityAttribute(value: unknown): value is LogUtilityAttribute {
-  return !!value && typeof value === "object" && typeof (value as LogUtilityAttribute).key === "string" &&
-    typeof (value as LogUtilityAttribute).value === "string" && typeof (value as LogUtilityAttribute).kind === "string" &&
-    ((value as LogUtilityAttribute).null === undefined || (value as LogUtilityAttribute).null === true);
+  return isLogConversionAttribute(value) && typeof (value as LogUtilityAttribute).kind === "string";
 }
 function isLogUtilityLog(value: unknown): value is LogUtilityLog {
   if (!value || typeof value !== "object") return false;
@@ -889,11 +1073,19 @@ function isLogUtilityLog(value: unknown): value is LogUtilityLog {
   if (!Array.isArray(log.attributes) || !log.attributes.every(isLogUtilityAttribute) ||
       (log.metadata !== undefined && !isLogConversionMetadata(log.metadata)) || !Array.isArray(log.traces)) return false;
   return log.traces.every((trace) => !!trace && typeof trace === "object" && typeof trace.case_id === "string" &&
+    (trace.case_id_attribute === undefined || isLogConversionAttributeDetail(trace.case_id_attribute)) &&
     Array.isArray(trace.attributes) && trace.attributes.every(isLogUtilityAttribute) && Array.isArray(trace.events) &&
     (trace.properties === undefined || (Array.isArray(trace.properties) && trace.properties.every(isLogUtilityAttribute))) &&
     trace.events.every((event) => !!event && typeof event === "object" && typeof event.case_id === "string" &&
-      typeof event.activity === "string" && typeof event.timestamp === "string" && typeof event.resource === "string" &&
-      typeof event.lifecycle === "string" && Number.isSafeInteger(event.input_order) && event.input_order >= 0 &&
+      typeof event.activity === "string" &&
+      (event.activity_attribute === undefined || isLogConversionAttributeDetail(event.activity_attribute)) &&
+      typeof event.timestamp === "string" &&
+      (event.timestamp_attribute === undefined || isLogConversionAttributeDetail(event.timestamp_attribute)) &&
+      typeof event.resource === "string" &&
+      (event.resource_attribute === undefined || isLogConversionAttributeDetail(event.resource_attribute)) &&
+      typeof event.lifecycle === "string" &&
+      (event.lifecycle_attribute === undefined || isLogConversionAttributeDetail(event.lifecycle_attribute)) &&
+      Number.isSafeInteger(event.input_order) && event.input_order >= 0 &&
       Array.isArray(event.attributes) && event.attributes.every(isLogUtilityAttribute)));
 }
 export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
@@ -5028,8 +5220,28 @@ export interface TraceEvent {
   resource?: string;
   /** Lifecycle transition ("start", "complete", …); present when recorded. */
   lifecycle?: string;
+  /** Full source attribute selected for the activity projection, when present. */
+  activity_attribute?: MineraAttributeDetail;
+  /** Full source attribute selected for the timestamp projection, when present. */
+  timestamp_attribute?: MineraAttributeDetail;
+  /** Full source attribute selected for the resource projection, when present. */
+  resource_attribute?: MineraAttributeDetail;
+  /** Full source attribute selected for the lifecycle projection, when present. */
+  lifecycle_attribute?: MineraAttributeDetail;
   /** Generic event attributes (extra CSV columns, non-standard XES keys). */
-  attributes?: Record<string, string>;
+  attributes?: Record<string, string | null>;
+  /** Ordered recursive attribute payload, when typed export details exist. */
+  attribute_details?: LogConversionAttributeDetail[];
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
+  activity_state?: LogConversionFirstClassState;
+  activity_source_key?: string;
+  timestamp_state?: LogConversionFirstClassState;
+  timestamp_source_key?: string;
+  resource_state?: LogConversionFirstClassState;
+  resource_source_key?: string;
+  lifecycle_state?: LogConversionFirstClassState;
+  lifecycle_source_key?: string;
 }
 
 /** One observed value of a generic event attribute. */
@@ -5058,11 +5270,39 @@ export interface CaseAttributeStat {
   values: AttributeValueStat[];
 }
 
+/** Recursive typed attribute details emitted with a mined-log export. */
+export interface MineraAttributeDetail extends LogConversionAttributeDetail {}
+
+export interface MineraLogGlobal {
+  scope: string;
+  attributes: MineraAttributeDetail[];
+}
+
+/** Full log-level metadata projection, including ordered global declarations. */
+export interface MineraLogMetadata {
+  extensions: LogConversionExtension[];
+  classifiers: LogConversionClassifier[];
+  trace_globals?: Record<string, string | null>;
+  trace_global_details?: MineraAttributeDetail[];
+  event_globals?: Record<string, string | null>;
+  event_global_details?: MineraAttributeDetail[];
+  properties?: Record<string, string | null>;
+  property_details?: MineraAttributeDetail[];
+  globals?: MineraLogGlobal[];
+}
+
 export interface Trace {
   case_id: string;
+  /** Full source attribute selected for the case-id projection, when present. */
+  case_id_attribute?: MineraAttributeDetail;
   events: TraceEvent[];
   /** Case attributes (XES trace attributes, `case:` CSV columns). */
-  attributes?: Record<string, string>;
+  attributes?: Record<string, string | null>;
+  attribute_details?: LogConversionAttributeDetail[];
+  properties?: Record<string, string | null>;
+  property_details?: LogConversionAttributeDetail[];
+  case_id_state?: LogConversionFirstClassState;
+  case_id_source_key?: string;
 }
 
 /**
@@ -5237,6 +5477,12 @@ export interface MineraExport {
   event_count: number;
   /** Raw event log; absent in exports from older minera_export versions. */
   traces?: Trace[];
+  /** Compatibility log-level attributes, when generic attributes exist. */
+  log_attributes?: Record<string, string | null>;
+  /** Ordered recursive log-level attribute details. */
+  log_attribute_details?: MineraAttributeDetail[];
+  /** Full log metadata projection, including ordered global declarations. */
+  log_metadata?: MineraLogMetadata;
   activities: ActivityStat[];
   edges: EdgeStat[];
   variants: VariantStat[];
@@ -5329,6 +5575,87 @@ export interface MineraExport {
   decision_tables?: DecisionTablesResult;
 }
 
+function isFirstClassState(value: unknown): value is LogConversionFirstClassState {
+  return value === "missing" || value === "present" || value === "null";
+}
+
+function isNullableStringRecord(value: unknown): value is Record<string, string | null> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) &&
+    Object.values(value).every((entry) => typeof entry === "string" || entry === null);
+}
+
+function isMineraAttributeDetail(value: unknown): value is MineraAttributeDetail {
+  return isLogConversionAttributeDetail(value);
+}
+
+function isMineraMetadata(value: unknown): value is MineraLogMetadata {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const metadata = value as Partial<MineraLogMetadata>;
+  if (!Array.isArray(metadata.extensions) ||
+      !metadata.extensions.every((extension) => !!extension &&
+        typeof extension.name === "string" && typeof extension.prefix === "string" &&
+        typeof extension.uri === "string") ||
+      !Array.isArray(metadata.classifiers) ||
+      !metadata.classifiers.every((classifier) => !!classifier &&
+        typeof classifier.name === "string" && Array.isArray(classifier.keys) &&
+        classifier.keys.every((key) => typeof key === "string"))) return false;
+  const maps = [metadata.trace_globals, metadata.event_globals, metadata.properties];
+  if (!maps.every((map) => map === undefined || isNullableStringRecord(map))) return false;
+  const details = [metadata.trace_global_details, metadata.event_global_details,
+                   metadata.property_details];
+  if (!details.every((list) => list === undefined ||
+      (Array.isArray(list) && list.every(isMineraAttributeDetail)))) return false;
+  return metadata.globals === undefined ||
+    (Array.isArray(metadata.globals) && metadata.globals.every((global) =>
+      !!global && typeof global.scope === "string" && Array.isArray(global.attributes) &&
+      global.attributes.every(isMineraAttributeDetail)));
+}
+
+function isMineraTraceEvent(value: unknown): value is TraceEvent {
+  if (!value || typeof value !== "object" ||
+      !Number.isSafeInteger((value as TraceEvent).activity) ||
+      (value as TraceEvent).activity < 0 ||
+      typeof (value as TraceEvent).timestamp !== "string") return false;
+  const event = value as TraceEvent;
+  if (event.resource !== undefined && typeof event.resource !== "string") return false;
+  if (event.lifecycle !== undefined && typeof event.lifecycle !== "string") return false;
+  if (event.activity_attribute !== undefined &&
+      !isMineraAttributeDetail(event.activity_attribute)) return false;
+  if (event.timestamp_attribute !== undefined &&
+      !isMineraAttributeDetail(event.timestamp_attribute)) return false;
+  if (event.resource_attribute !== undefined &&
+      !isMineraAttributeDetail(event.resource_attribute)) return false;
+  if (event.lifecycle_attribute !== undefined &&
+      !isMineraAttributeDetail(event.lifecycle_attribute)) return false;
+  const states = [event.case_id_state, event.activity_state, event.timestamp_state,
+                  event.resource_state, event.lifecycle_state];
+  if (!states.every((state) => state === undefined || isFirstClassState(state))) return false;
+  const sources = [event.case_id_source_key, event.activity_source_key,
+                   event.timestamp_source_key, event.resource_source_key,
+                   event.lifecycle_source_key];
+  if (!sources.every((source) => source === undefined || typeof source === "string")) return false;
+  return (event.attributes === undefined || isNullableStringRecord(event.attributes)) &&
+    (event.attribute_details === undefined ||
+      (Array.isArray(event.attribute_details) && event.attribute_details.every(isMineraAttributeDetail)));
+}
+
+function isMineraTrace(value: unknown): value is Trace {
+  if (!value || typeof value !== "object" || typeof (value as Trace).case_id !== "string" ||
+      !Array.isArray((value as Trace).events) ||
+      !(value as Trace).events.every(isMineraTraceEvent)) return false;
+  const trace = value as Trace;
+  if (trace.case_id_attribute !== undefined &&
+      !isMineraAttributeDetail(trace.case_id_attribute)) return false;
+  if (trace.attributes !== undefined && !isNullableStringRecord(trace.attributes)) return false;
+  if (trace.properties !== undefined && !isNullableStringRecord(trace.properties)) return false;
+  if (trace.attribute_details !== undefined &&
+      (!Array.isArray(trace.attribute_details) || !trace.attribute_details.every(isMineraAttributeDetail))) return false;
+  if (trace.property_details !== undefined &&
+      (!Array.isArray(trace.property_details) || !trace.property_details.every(isMineraAttributeDetail))) return false;
+  return (trace.case_id_state === undefined || isFirstClassState(trace.case_id_state)) &&
+    (trace.case_id_source_key === undefined || typeof trace.case_id_source_key === "string");
+}
+
 export function isMineraExport(value: unknown): value is MineraExport {
   if (typeof value !== "object" || value === null) return false;
   const data = value as MineraExport;
@@ -5364,7 +5691,14 @@ export function isMineraExport(value: unknown): value is MineraExport {
         typeof batch.start === "number" && Number.isFinite(batch.start) &&
         typeof batch.complete === "number" && Number.isFinite(batch.complete) &&
         Array.isArray(batch.events));
-    }));
+      }));
+  if (data.traces !== undefined &&
+      (!Array.isArray(data.traces) || !data.traces.every(isMineraTrace))) return false;
+  if (data.log_attributes !== undefined && !isNullableStringRecord(data.log_attributes)) return false;
+  if (data.log_attribute_details !== undefined &&
+      (!Array.isArray(data.log_attribute_details) ||
+       !data.log_attribute_details.every(isMineraAttributeDetail))) return false;
+  if (data.log_metadata !== undefined && !isMineraMetadata(data.log_metadata)) return false;
   return Array.isArray(data.activities) &&
     Array.isArray(data.edges) &&
     Array.isArray(data.variants) &&

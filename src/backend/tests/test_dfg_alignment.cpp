@@ -1,7 +1,9 @@
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
+#include <utility>
 
 #include "minera/dfg_alignment.hpp"
 
@@ -45,6 +47,51 @@ int main() {
   assert(pc.traces[0].events[0].lifecycle == "complete");
   auto agc = project_alignments_on_dfg(colliding, d, s, e);
   assert(agc.activities["a"].lm == 1);
+
+  // Model moves inherit custom first-class selectors from the source event,
+  // while an incompatible typed activity value is represented as a string.
+  EventLog custom_log;
+  Trace custom_trace;
+  custom_trace.case_id = "42";
+  custom_trace.case_id_state = FirstClassAttributeState::kPresent;
+  custom_trace.case_id_source_key = "case.number";
+  EventAttribute custom_case{"case.number", "42", AttributeKind::kInt};
+  custom_case.typed_value = std::int64_t{42};
+  custom_trace.case_id_attribute = custom_case;
+  Event custom_event;
+  custom_event.case_id = "42";
+  custom_event.case_id_state = FirstClassAttributeState::kPresent;
+  custom_event.case_id_source_key = "case.number";
+  custom_event.activity = "7";
+  custom_event.activity_state = FirstClassAttributeState::kPresent;
+  custom_event.activity_source_key = "activity.code";
+  EventAttribute custom_activity{"activity.code", "7", AttributeKind::kInt};
+  custom_activity.typed_value = std::int64_t{7};
+  custom_event.activity_attribute = custom_activity;
+  custom_event.timestamp = "2026-01-01T00:00:00Z";
+  custom_event.timestamp_state = FirstClassAttributeState::kPresent;
+  custom_event.timestamp_source_key = "when.value";
+  EventAttribute custom_timestamp{
+      "when.value", custom_event.timestamp, AttributeKind::kDate};
+  custom_timestamp.typed_value =
+      NativeDate{"2026-01-01T00:00:00.000Z"};
+  custom_event.timestamp_attribute = custom_timestamp;
+  custom_trace.events.push_back(std::move(custom_event));
+  custom_log.traces.push_back(std::move(custom_trace));
+  const auto custom_projection = project_log_on_dfg(custom_log, d, s, e);
+  assert(custom_projection.traces.front().case_id_attribute &&
+         custom_projection.traces.front().case_id_attribute->kind ==
+             AttributeKind::kInt);
+  assert(custom_projection.traces.front().events.size() == 2);
+  const auto& model_event = custom_projection.traces.front().events.front();
+  assert(model_event.activity == "a" &&
+         model_event.activity_source_key == "activity.code" &&
+         model_event.activity_attribute &&
+         model_event.activity_attribute->kind == AttributeKind::kString &&
+         model_event.activity_attribute->value == "a");
+  assert(model_event.timestamp_source_key == "when.value" &&
+         model_event.timestamp_attribute &&
+         model_event.timestamp_attribute->kind == AttributeKind::kDate);
 
   DfgAlignmentOptions bounded; bounded.max_visited_states = 1; bool limit = false;
   try { (void)align_trace_on_dfg(std::vector<std::string>{"a", "b"}, d, s, e, bounded); } catch (const std::runtime_error&) { limit = true; }

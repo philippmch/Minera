@@ -1,9 +1,15 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
+#include "minera/json_export.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/log_util_json.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
 
@@ -67,9 +73,10 @@ void empty_prefix_and_trace_properties_follow_flattening_contract() {
   const auto restored = minera::event_stream_to_event_log(stream, options);
   assert(restored.traces.size() == 1);
   assert(restored.traces[0].properties.empty());
-  assert(restored.traces[0].events[0].activity.empty());
+  assert(restored.traces[0].events[0].activity == "A");
   assert(restored.traces[0].events[0].attributes.empty());
-  assert(restored.traces[0].attribute("concept:name") != nullptr);
+  assert(restored.traces[0].attribute("concept:name") == nullptr);
+  assert(restored.traces[0].attribute("cost") != nullptr);
 }
 
 void stream_grouping_is_first_seen_and_first_event_wins() {
@@ -153,6 +160,155 @@ void custom_case_glue_and_prefix_round_trip() {
   assert(restored.traces[0].events[0].activity == "A");
 }
 
+void source_keys_and_missing_case_ids_survive_flat_adapters() {
+  minera::EventLog source;
+
+  minera::Trace custom;
+  custom.case_id = "business-1";
+  custom.case_id_state = minera::FirstClassAttributeState::kPresent;
+  custom.case_id_source_key = "business.case";
+  custom.attributes.push_back({"concept:name", "alias-must-not-win"});
+  minera::Event custom_event;
+  custom_event.activity = "Review";
+  custom_event.activity_state = minera::FirstClassAttributeState::kPresent;
+  custom_event.activity_source_key = "business.activity";
+  custom_event.timestamp = "2026-01-01T00:00:00Z";
+  custom_event.timestamp_state = minera::FirstClassAttributeState::kPresent;
+  custom_event.timestamp_source_key = "business.when";
+  custom_event.resource = "alice";
+  custom_event.resource_state = minera::FirstClassAttributeState::kPresent;
+  custom_event.resource_source_key = "business.owner";
+  custom_event.lifecycle = "start";
+  custom_event.lifecycle_state = minera::FirstClassAttributeState::kPresent;
+  custom_event.lifecycle_source_key = "business.lifecycle";
+  custom.events.push_back(std::move(custom_event));
+  source.traces.push_back(std::move(custom));
+
+  minera::Trace alternate;
+  alternate.case_id = "business-2";
+  alternate.case_id_state = minera::FirstClassAttributeState::kPresent;
+  alternate.case_id_source_key = "order.case";
+  minera::Event alternate_event;
+  alternate_event.activity = "Approve";
+  alternate_event.activity_state = minera::FirstClassAttributeState::kPresent;
+  alternate_event.activity_source_key = "order.activity";
+  alternate_event.timestamp = "2026-01-02T00:00:00Z";
+  alternate_event.timestamp_state = minera::FirstClassAttributeState::kPresent;
+  alternate_event.timestamp_source_key = "order.when";
+  alternate_event.resource = "bob";
+  alternate_event.resource_state = minera::FirstClassAttributeState::kPresent;
+  alternate_event.resource_source_key = "order.owner";
+  alternate_event.lifecycle = "complete";
+  alternate_event.lifecycle_state = minera::FirstClassAttributeState::kPresent;
+  alternate_event.lifecycle_source_key = "order.lifecycle";
+  alternate_event.attributes.push_back(
+      {"concept:name", "canonical-alias-must-not-win"});
+  alternate.events.push_back(std::move(alternate_event));
+  source.traces.push_back(std::move(alternate));
+
+  minera::Trace missing;
+  minera::Event missing_event;
+  missing_event.activity = "Unassigned";
+  missing_event.activity_state = minera::FirstClassAttributeState::kPresent;
+  missing.events.push_back(std::move(missing_event));
+  source.traces.push_back(std::move(missing));
+
+  const auto stream = minera::event_log_to_event_stream(source);
+  assert(stream.metadata == source.metadata);
+  const auto* business_activity =
+      stream.events[0].field("business.activity");
+  assert(business_activity != nullptr);
+  assert(business_activity->first_class_role ==
+         minera::FirstClassAttributeRole::kActivity);
+  assert(business_activity->first_class_source_key == "business.activity");
+  assert(stream.events[0].field("business.owner") != nullptr);
+  assert(stream.events[0].field("business.lifecycle") != nullptr);
+  const auto* order_activity = stream.events[1].field("order.activity");
+  assert(order_activity != nullptr);
+  assert(order_activity->first_class_role ==
+         minera::FirstClassAttributeRole::kActivity);
+  assert(order_activity->first_class_source_key == "order.activity");
+  for (const auto& record : stream.events)
+    for (const auto& field : record.fields)
+      assert(!field.key.starts_with("@@"));
+  assert(stream.events[0].field("business.case") == nullptr);
+  const auto* case_glue = stream.events[0].field("case:concept:name");
+  assert(case_glue != nullptr && case_glue->value == "business-1");
+  assert(case_glue->first_class_role ==
+         minera::FirstClassAttributeRole::kCaseId);
+  assert(case_glue->first_class_source_key == "business.case");
+
+  const auto restored = minera::event_stream_to_event_log(stream);
+  assert(restored.traces.size() == 3);
+  assert(restored.traces[0].case_id == "business-1");
+  assert(restored.traces[0].case_id_source_key == "business.case");
+  assert(restored.traces[0].events[0].activity == "Review");
+  assert(restored.traces[0].events[0].activity_source_key ==
+         "business.activity");
+  assert(restored.traces[0].events[0].timestamp_source_key == "business.when");
+  assert(restored.traces[0].events[0].resource == "alice");
+  assert(restored.traces[0].events[0].resource_source_key == "business.owner");
+  assert(restored.traces[0].events[0].lifecycle == "start");
+  assert(restored.traces[0].events[0].lifecycle_source_key ==
+         "business.lifecycle");
+  assert(restored.traces[1].case_id == "business-2");
+  assert(restored.traces[1].case_id_source_key == "order.case");
+  assert(restored.traces[1].events[0].activity == "Approve");
+  assert(restored.traces[1].events[0].activity_source_key == "order.activity");
+  assert(restored.traces[1].events[0].timestamp_source_key == "order.when");
+  assert(restored.traces[1].events[0].resource_source_key == "order.owner");
+  assert(restored.traces[1].events[0].lifecycle_source_key == "order.lifecycle");
+  assert(restored.traces[2].case_id.empty());
+  assert(restored.traces[2].case_id_state ==
+         minera::FirstClassAttributeState::kMissing);
+
+  const auto table = minera::event_stream_to_table(stream);
+  assert(std::none_of(table.columns.begin(), table.columns.end(),
+                      [](const auto& column) {
+                        return column.starts_with("@@");
+                      }));
+  const auto table_round = minera::event_table_to_event_log(table);
+  assert(table_round.traces.size() == 3);
+  assert(table_round.traces[0].case_id_source_key == "business.case");
+  assert(table_round.traces[0].events[0].activity_source_key ==
+         "business.activity");
+  assert(table_round.traces[0].events[0].resource_source_key ==
+         "business.owner");
+  assert(table_round.traces[1].case_id_source_key == "order.case");
+  assert(table_round.traces[1].events[0].activity_source_key ==
+         "order.activity");
+  assert(table_round.traces[1].events[0].timestamp_source_key == "order.when");
+  assert(table_round.traces[1].events[0].resource_source_key == "order.owner");
+  assert(table_round.traces[1].events[0].lifecycle_source_key ==
+         "order.lifecycle");
+  assert(table_round.traces[2].case_id_state ==
+         minera::FirstClassAttributeState::kMissing);
+}
+
+void table_json_keeps_recursive_cell_shape() {
+  minera::EventLog source;
+  minera::Trace trace;
+  trace.case_id = "case";
+  minera::Event event;
+  event.activity = "A";
+  minera::EventAttribute list{"payload", "", minera::AttributeKind::kString};
+  list.container = minera::AttributeContainerKind::kList;
+  minera::EventAttribute child{"count", "42", minera::AttributeKind::kInt};
+  child.typed_value = std::int64_t{42};
+  list.children.push_back(std::move(child));
+  event.attributes.push_back(std::move(list));
+  trace.events.push_back(std::move(event));
+  source.traces.push_back(std::move(trace));
+
+  minera::LogConversionOptions options;
+  options.variant = minera::LogConversionVariant::kToDataFrame;
+  const auto json = minera::log_conversion_json(
+      minera::convert_event_log(source, options));
+  assert(json.find("\"container\":\"list\"") != std::string::npos);
+  assert(json.find("\"typed_value\":42") != std::string::npos);
+  assert(json.find("\"children\":[") != std::string::npos);
+}
+
 void null_prefixed_case_label_does_not_erase_glue() {
   minera::ConvertedEventStream stream;
   minera::LogConversionRecord record;
@@ -168,6 +324,156 @@ void null_prefixed_case_label_does_not_erase_glue() {
   assert(log.traces.size() == 1);
   assert(log.traces[0].case_id == "c1");
   assert(log.traces[0].attribute("concept:name") == nullptr);
+}
+
+void empty_prefix_preserves_untagged_canonical_event_fields() {
+  minera::ConvertedEventStream stream;
+  minera::LogConversionRecord record;
+  record.fields = {
+      {"case:concept:name", "c1"},
+      {"concept:name", "A"},
+      {"time:timestamp", "2026-01-01T00:00:00Z",
+       minera::AttributeKind::kDate},
+      {"org:resource", "alice"},
+      {"lifecycle:transition", "complete"},
+  };
+  stream.events.push_back(std::move(record));
+  minera::LogConversionOptions options;
+  options.case_attribute_prefix.clear();
+  const auto log = minera::event_stream_to_event_log(stream, options);
+  assert(log.traces.size() == 1);
+  assert(log.traces[0].case_id == "c1");
+  assert(log.traces[0].case_id_source_key == "concept:name");
+  assert(log.traces[0].attributes.empty());
+  assert(log.traces[0].events.size() == 1);
+  const auto& event = log.traces[0].events[0];
+  assert(event.activity == "A");
+  assert(event.timestamp == "2026-01-01T00:00:00Z");
+  assert(event.resource == "alice");
+  assert(event.lifecycle == "complete");
+  assert(event.attributes.empty());
+}
+
+void role_fields_and_legacy_states_are_serialized_explicitly() {
+  minera::EventLog source;
+  minera::Trace trace;
+  trace.case_id = "legacy-case";
+  minera::Event event;
+  event.case_id = trace.case_id;
+  event.activity = "A";
+  event.timestamp = "2026-01-01T00:00:00Z";
+  trace.events.push_back(std::move(event));
+  source.traces.push_back(std::move(trace));
+
+  minera::LogConversionOptions options;
+  options.variant = minera::LogConversionVariant::kToEventStream;
+  const auto stream_json = minera::log_conversion_json(
+      minera::convert_event_log(source, options));
+  assert(stream_json.find("\"first_class_role\":\"activity\"") !=
+         std::string::npos);
+  assert(stream_json.find("\"first_class_role\":\"case_id\"") !=
+         std::string::npos);
+  assert(stream_json.find("\"first_class_state\":\"present\"") !=
+         std::string::npos);
+
+  options.variant = minera::LogConversionVariant::kToEventLog;
+  const auto log_json = minera::log_conversion_json(
+      minera::convert_event_log(source, options));
+  assert(log_json.find("\"case_id_state\":\"present\"") !=
+         std::string::npos);
+  assert(log_json.find("\"activity_state\":\"present\"") !=
+         std::string::npos);
+  const auto util_json = minera::log_prefix_json(source,
+      minera::LogUtilityVariant::kFixedPrefixes);
+  assert(util_json.find("\"case_id_state\":\"present\"") !=
+         std::string::npos);
+  assert(util_json.find("\"activity_state\":\"present\"") !=
+         std::string::npos);
+}
+
+void selected_typed_attributes_survive_all_event_log_json_paths() {
+  const std::string xml =
+      "<log><trace><int key=\"case.number\" value=\"42\"><string "
+      "key=\"case-meta\" value=\"kept\"/></int><event><int "
+      "key=\"activity.code\" value=\"7\"><string key=\"activity-meta\" "
+      "value=\"nested\"/></int><date key=\"when.value\" "
+      "value=\"2026-01-01T00:00:00Z\"><int key=\"precision\" "
+      "value=\"3\"/></date><string key=\"owner\" value=\"alice\"/>"
+      "<string key=\"phase\" value=\"complete\"/></event></trace></log>";
+  minera::XesImportOptions import_options;
+  import_options.case_attribute = "case.number";
+  import_options.activity_attribute = "activity.code";
+  import_options.timestamp_attribute = "when.value";
+  import_options.resource_attribute = "owner";
+  import_options.lifecycle_attribute = "phase";
+  std::istringstream input(xml);
+  const auto log = minera::import_xes_event_log(input, import_options);
+  assert(log.traces.size() == 1 && log.traces[0].case_id_attribute);
+  assert(log.traces[0].case_id_attribute->kind == minera::AttributeKind::kInt);
+  assert(std::get<std::int64_t>(log.traces[0].case_id_attribute->typed_value) ==
+         42);
+  assert(log.traces[0].case_id_attribute->children.size() == 1);
+
+  const auto& event = log.traces[0].events[0];
+  assert(event.activity_attribute && event.timestamp_attribute &&
+         event.resource_attribute && event.lifecycle_attribute);
+  assert(event.activity_attribute->kind == minera::AttributeKind::kInt);
+  assert(std::get<std::int64_t>(event.activity_attribute->typed_value) == 7);
+  assert(event.activity_attribute->children.size() == 1);
+  assert(event.timestamp_attribute->kind == minera::AttributeKind::kDate);
+  assert(event.timestamp_attribute->children.size() == 1);
+
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto analysis_json = minera::analysis_json("typed", log, graph);
+  assert(analysis_json.find(
+             "\"case_id_attribute\": {\"key\":\"case.number\",\"value\":\"42\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":42,\"children\":[") !=
+         std::string::npos);
+  assert(analysis_json.find(
+             "\"activity_attribute\": {\"key\":\"activity.code\",\"value\":\"7\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":7,\"children\":[") !=
+         std::string::npos);
+  assert(analysis_json.find(
+             "\"timestamp_attribute\": {\"key\":\"when.value\",\"value\":\"2026-01-01T00:00:00.000Z\",\"kind\":\"date\",\"container\":\"scalar\",\"null\":false,\"typed_value\":\"2026-01-01T00:00:00.000Z\",\"children\":[") !=
+         std::string::npos);
+  assert(analysis_json.find(
+             "\"resource_attribute\": {\"key\":\"owner\",\"value\":\"alice\",\"kind\":\"string\",\"container\":\"scalar\",\"null\":false") !=
+         std::string::npos);
+  assert(analysis_json.find(
+             "\"lifecycle_attribute\": {\"key\":\"phase\",\"value\":\"complete\",\"kind\":\"string\",\"container\":\"scalar\",\"null\":false") !=
+         std::string::npos);
+
+  minera::LogConversionOptions conversion_options;
+  conversion_options.variant = minera::LogConversionVariant::kToEventLog;
+  const auto conversion_json = minera::log_conversion_json(
+      minera::convert_event_log(log, conversion_options));
+  assert(conversion_json.find(
+             "\"case_id_attribute\":{\"key\":\"case.number\",\"value\":\"42\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":42,\"children\":[") !=
+         std::string::npos);
+  assert(conversion_json.find(
+             "\"activity_attribute\":{\"key\":\"activity.code\",\"value\":\"7\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":7,\"children\":[") !=
+         std::string::npos);
+  assert(conversion_json.find(
+             "\"timestamp_attribute\":{\"key\":\"when.value\",\"value\":\"2026-01-01T00:00:00.000Z\",\"kind\":\"date\",\"container\":\"scalar\",\"null\":false,\"typed_value\":\"2026-01-01T00:00:00.000Z\",\"children\":[") !=
+         std::string::npos);
+  assert(conversion_json.find("\"resource_attribute\":{\"key\":\"owner\"") !=
+         std::string::npos);
+  assert(conversion_json.find("\"lifecycle_attribute\":{\"key\":\"phase\"") !=
+         std::string::npos);
+
+  const auto utility_json = minera::log_prefix_json(
+      log, minera::LogUtilityVariant::kFixedPrefixes);
+  assert(utility_json.find(
+             "\"case_id_attribute\":{\"key\":\"case.number\",\"value\":\"42\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":42,\"children\":[") !=
+         std::string::npos);
+  assert(utility_json.find(
+             "\"activity_attribute\":{\"key\":\"activity.code\",\"value\":\"7\",\"kind\":\"int\",\"container\":\"scalar\",\"null\":false,\"typed_value\":7,\"children\":[") !=
+         std::string::npos);
+  assert(utility_json.find(
+             "\"timestamp_attribute\":{\"key\":\"when.value\",\"value\":\"2026-01-01T00:00:00.000Z\",\"kind\":\"date\",\"container\":\"scalar\",\"null\":false,\"typed_value\":\"2026-01-01T00:00:00.000Z\",\"children\":[") !=
+         std::string::npos);
+  assert(utility_json.find("\"resource_attribute\":{\"key\":\"owner\"") !=
+         std::string::npos);
+  assert(utility_json.find("\"lifecycle_attribute\":{\"key\":\"phase\"") !=
+         std::string::npos);
 }
 
 void table_projection_is_rectangular_and_typed() {
@@ -519,7 +825,12 @@ int main() {
   stream_grouping_is_first_seen_and_first_event_wins();
   stream_without_case_attributes_uses_stable_trace_indexes();
   custom_case_glue_and_prefix_round_trip();
+  source_keys_and_missing_case_ids_survive_flat_adapters();
+  table_json_keeps_recursive_cell_shape();
   null_prefixed_case_label_does_not_erase_glue();
+  empty_prefix_preserves_untagged_canonical_event_fields();
+  role_fields_and_legacy_states_are_serialized_explicitly();
+  selected_typed_attributes_survive_all_event_log_json_paths();
   table_projection_is_rectangular_and_typed();
   lazy_output_and_metadata_json_are_explicit();
   dataframe_row_cap_counts_events_and_is_deterministic();

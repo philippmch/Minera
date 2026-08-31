@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <cmath>
+#include <iomanip>
 #include <iterator>
 #include <map>
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 
 namespace minera {
@@ -32,6 +36,17 @@ constexpr StandardExtension kStandardExtensions[] = {
     {"cost", "Cost", "http://www.xes-standard.org/cost.xesext"},
     {"identity", "Identity",
      "http://www.xes-standard.org/identity.xesext"},
+    {"artifactlifecycle", "Artifact Lifecycle",
+     "http://www.xes-standard.org/artifactlifecycle.xesext"},
+    {"micro", "Micro", "http://www.xes-standard.org/micro.xesext"},
+    {"semantic", "Semantic",
+     "http://www.xes-standard.org/semantic.xesext"},
+    {"swcomm", "Software Communication",
+     "http://www.xes-standard.org/swcomm.xesext"},
+    {"swevent", "Software Event",
+     "http://www.xes-standard.org/swevent.xesext"},
+    {"swtelemetry", "Software Telemetry",
+     "http://www.xes-standard.org/swtelemetry.xesext"},
 };
 
 void upsert(std::vector<EventAttribute>& attributes, EventAttribute value) {
@@ -45,30 +60,99 @@ void upsert(std::vector<EventAttribute>& attributes, EventAttribute value) {
     *found = std::move(value);
 }
 
-void add_if_present(std::vector<EventAttribute>& attributes,
-                    std::string_view key, const std::string& value,
-                    AttributeKind kind = AttributeKind::kString) {
-  if (!value.empty())
-    upsert(attributes, {std::string(key), value, kind});
+bool first_class_present(FirstClassAttributeState state,
+                         std::string_view value) {
+  return state != FirstClassAttributeState::kMissing || !value.empty();
+}
+
+FirstClassAttributeState effective_first_class_state(
+    FirstClassAttributeState state, std::string_view value) {
+  return state == FirstClassAttributeState::kMissing && !value.empty()
+             ? FirstClassAttributeState::kPresent
+             : state;
+}
+
+void add_projection(std::vector<EventAttribute>& attributes,
+                     std::string_view source_key,
+                     std::string_view canonical_key,
+                     const std::string& value, AttributeKind kind,
+                     FirstClassAttributeState state,
+                     FirstClassAttributeRole role,
+                     const EventAttribute* metadata = nullptr) {
+  if (!first_class_present(state, value)) return;
+  const auto resolved_key =
+      source_key.empty() ? std::string(canonical_key) : std::string(source_key);
+  EventAttribute projection{resolved_key, value, kind,
+                            state == FirstClassAttributeState::kNull};
+  const auto effective_state = effective_first_class_state(state, value);
+  if (metadata && metadata->value == value &&
+      metadata->is_null == projection.is_null) {
+    // Keep the selected parent type and complete nested payload. The string
+    // projection remains authoritative if a caller edited the Event field
+    // after import; stale native values are never copied in that case.
+    projection.kind = metadata->kind;
+    projection.typed_value = metadata->typed_value;
+    projection.container = metadata->container;
+    projection.children = metadata->children;
+  }
+  projection.first_class_role = role;
+  projection.first_class_state = effective_state;
+  projection.first_class_source_key = resolved_key;
+  upsert(attributes, std::move(projection));
+}
+
+void append_or_merge_attribute(std::vector<EventAttribute>& fields,
+                               const EventAttribute& attribute) {
+  const auto found = std::find_if(
+      fields.begin(), fields.end(), [&](const auto& field) {
+        return field.key == attribute.key;
+      });
+  if (found == fields.end()) {
+    fields.push_back(attribute);
+    return;
+  }
+  if (found->first_class_role == FirstClassAttributeRole::kNone ||
+      attribute.children.empty())
+    return;
+  // A selected scalar can still carry nested/meta attributes. Preserve those
+  // children on the projected cell without creating a duplicate column.
+  found->children = attribute.children;
 }
 
 std::vector<EventAttribute> event_fields(const Event& event) {
   std::vector<EventAttribute> fields;
   fields.reserve(event.attributes.size() + 4);
-  add_if_present(fields, kActivityKey, event.activity);
-  add_if_present(fields, kTimestampKey, event.timestamp, AttributeKind::kDate);
-  add_if_present(fields, kResourceKey, event.resource);
-  add_if_present(fields, kLifecycleKey, event.lifecycle);
-  for (const auto& attribute : event.attributes) upsert(fields, attribute);
+  add_projection(fields, event.activity_source_key, kActivityKey,
+                 event.activity, AttributeKind::kString, event.activity_state,
+                 FirstClassAttributeRole::kActivity,
+                 event.activity_attribute ? &*event.activity_attribute : nullptr);
+  add_projection(fields, event.timestamp_source_key, kTimestampKey,
+                 event.timestamp, AttributeKind::kDate, event.timestamp_state,
+                 FirstClassAttributeRole::kTimestamp,
+                 event.timestamp_attribute ? &*event.timestamp_attribute : nullptr);
+  add_projection(fields, event.resource_source_key, kResourceKey,
+                 event.resource, AttributeKind::kString, event.resource_state,
+                 FirstClassAttributeRole::kResource,
+                 event.resource_attribute ? &*event.resource_attribute : nullptr);
+  add_projection(fields, event.lifecycle_source_key, kLifecycleKey,
+                 event.lifecycle, AttributeKind::kString,
+                 event.lifecycle_state,
+                 FirstClassAttributeRole::kLifecycle,
+                 event.lifecycle_attribute ? &*event.lifecycle_attribute : nullptr);
+  for (const auto& attribute : event.attributes)
+    append_or_merge_attribute(fields, attribute);
   return fields;
 }
 
 std::vector<EventAttribute> trace_fields(const Trace& trace) {
   std::vector<EventAttribute> fields;
   fields.reserve(trace.attributes.size() + 1);
-  upsert(fields, {std::string(kActivityKey), trace.case_id,
-                  AttributeKind::kString});
-  for (const auto& attribute : trace.attributes) upsert(fields, attribute);
+  add_projection(fields, trace.case_id_source_key, kActivityKey, trace.case_id,
+                 AttributeKind::kString, trace.case_id_state,
+                 FirstClassAttributeRole::kCaseId,
+                 trace.case_id_attribute ? &*trace.case_id_attribute : nullptr);
+  for (const auto& attribute : trace.attributes)
+    append_or_merge_attribute(fields, attribute);
   return fields;
 }
 
@@ -84,9 +168,30 @@ const EventAttribute* find_attribute(
 std::optional<EventAttribute> selected_trace_attribute(
     const Trace& trace, std::string_view key) {
   if (key == "concept:name" || key == "case_id" ||
-      key == "case:concept:name")
-    return EventAttribute{std::string(key), trace.case_id,
-                          AttributeKind::kString};
+      key == "case:concept:name") {
+    if (!first_class_present(trace.case_id_state, trace.case_id))
+      return std::nullopt;
+    auto selected = trace.case_id_attribute.value_or(EventAttribute{
+        std::string(key), trace.case_id, AttributeKind::kString,
+        trace.case_id_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (!trace.case_id_source_key.empty() &&
+      key == trace.case_id_source_key &&
+      first_class_present(trace.case_id_state, trace.case_id)) {
+    auto selected = trace.case_id_attribute.value_or(EventAttribute{
+        std::string(key), trace.case_id, AttributeKind::kString,
+        trace.case_id_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
   if (const auto* value = find_attribute(trace.attributes, key)) {
     if (value->is_null) return std::nullopt;
     return *value;
@@ -96,27 +201,100 @@ std::optional<EventAttribute> selected_trace_attribute(
 
 std::optional<EventAttribute> selected_event_attribute(
     const Event& event, std::string_view key) {
-  if (key == "concept:name" || key == "activity")
-    return EventAttribute{std::string(key), event.activity,
-                          AttributeKind::kString};
-  if (key == "time:timestamp" || key == "timestamp")
-    return event.timestamp.empty()
-               ? std::nullopt
-               : std::optional<EventAttribute>{{std::string(key),
-                                                 event.timestamp,
-                                                 AttributeKind::kDate}};
-  if (key == "org:resource" || key == "resource")
-    return event.resource.empty()
-               ? std::nullopt
-               : std::optional<EventAttribute>{{std::string(key),
-                                                 event.resource,
-                                                 AttributeKind::kString}};
-  if (key == "lifecycle:transition" || key == "lifecycle")
-    return event.lifecycle.empty()
-               ? std::nullopt
-               : std::optional<EventAttribute>{{std::string(key),
-                                                 event.lifecycle,
-                                                 AttributeKind::kString}};
+  if (key == "concept:name" || key == "activity") {
+    if (!first_class_present(event.activity_state, event.activity))
+      return std::nullopt;
+    auto selected = event.activity_attribute.value_or(EventAttribute{
+        std::string(key), event.activity, AttributeKind::kString,
+        event.activity_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (key == "time:timestamp" || key == "timestamp") {
+    if (!first_class_present(event.timestamp_state, event.timestamp))
+      return std::nullopt;
+    auto selected = event.timestamp_attribute.value_or(EventAttribute{
+        std::string(key), event.timestamp, AttributeKind::kDate,
+        event.timestamp_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (key == "org:resource" || key == "resource") {
+    if (!first_class_present(event.resource_state, event.resource))
+      return std::nullopt;
+    auto selected = event.resource_attribute.value_or(EventAttribute{
+        std::string(key), event.resource, AttributeKind::kString,
+        event.resource_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (key == "lifecycle:transition" || key == "lifecycle") {
+    if (!first_class_present(event.lifecycle_state, event.lifecycle))
+      return std::nullopt;
+    auto selected = event.lifecycle_attribute.value_or(EventAttribute{
+        std::string(key), event.lifecycle, AttributeKind::kString,
+        event.lifecycle_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (!event.activity_source_key.empty() && key == event.activity_source_key &&
+      first_class_present(event.activity_state, event.activity)) {
+    auto selected = event.activity_attribute.value_or(EventAttribute{
+        std::string(key), event.activity, AttributeKind::kString,
+        event.activity_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (!event.timestamp_source_key.empty() &&
+      key == event.timestamp_source_key &&
+      first_class_present(event.timestamp_state, event.timestamp)) {
+    auto selected = event.timestamp_attribute.value_or(EventAttribute{
+        std::string(key), event.timestamp, AttributeKind::kDate,
+        event.timestamp_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (!event.resource_source_key.empty() && key == event.resource_source_key &&
+      first_class_present(event.resource_state, event.resource)) {
+    auto selected = event.resource_attribute.value_or(EventAttribute{
+        std::string(key), event.resource, AttributeKind::kString,
+        event.resource_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
+  if (!event.lifecycle_source_key.empty() &&
+      key == event.lifecycle_source_key &&
+      first_class_present(event.lifecycle_state, event.lifecycle)) {
+    auto selected = event.lifecycle_attribute.value_or(EventAttribute{
+        std::string(key), event.lifecycle, AttributeKind::kString,
+        event.lifecycle_state == FirstClassAttributeState::kNull});
+    selected.key = std::string(key);
+    selected.first_class_role = FirstClassAttributeRole::kNone;
+    selected.first_class_state = FirstClassAttributeState::kMissing;
+    selected.first_class_source_key.clear();
+    return selected;
+  }
   if (const auto* value = find_attribute(event.attributes, key)) {
     if (value->is_null) return std::nullopt;
     return *value;
@@ -178,41 +356,159 @@ bool is_case_attribute_field(const EventAttribute& field,
   // An empty prefix is an explicit request to treat every non-glue field as
   // trace data.  This mirrors the flattening contract instead of relying on
   // string::starts_with("") for accidental matching.
-  if (options.case_attribute_prefix.empty())
+  if (options.case_attribute_prefix.empty()) {
+    // Empty prefixes are used by external stream/table callers to request
+    // unprefixed trace attributes. Canonical event columns still describe
+    // the event and must never be swallowed as trace data.
+    if (field.key == kActivityKey || field.key == "activity" ||
+        field.key == kTimestampKey || field.key == "timestamp" ||
+        field.key == kResourceKey || field.key == "resource" ||
+        field.key == kLifecycleKey || field.key == "lifecycle")
+      return false;
     return field.key != options.case_id_key;
+  }
   return field.key.starts_with(options.case_attribute_prefix);
 }
 
 Event record_to_event(const LogConversionRecord& record,
                       std::string case_id,
-                      const LogConversionOptions& options) {
+                      FirstClassAttributeState case_state,
+                      const LogConversionOptions& options,
+                      std::string_view activity_source_key,
+                      std::string_view timestamp_source_key,
+                      std::string_view resource_source_key,
+                      std::string_view lifecycle_source_key) {
   Event event;
   event.case_id = std::move(case_id);
+  event.case_id_state = case_state;
+  std::string selected_activity_key;
+  std::string selected_timestamp_key;
+  std::string selected_resource_key;
+  std::string selected_lifecycle_key;
+  const auto assign_first_class = [&](const EventAttribute& field,
+                                      std::string& target,
+                                      FirstClassAttributeState& state,
+                                      std::string& source_key,
+                                      std::string& selected_key,
+                                      std::optional<EventAttribute>& metadata) {
+    target = field.value;
+    state = field.first_class_role == FirstClassAttributeRole::kNone
+                ? (field.is_null ? FirstClassAttributeState::kNull
+                                 : FirstClassAttributeState::kPresent)
+                : field.first_class_state;
+    source_key = field.first_class_source_key.empty()
+                     ? field.key
+                     : field.first_class_source_key;
+    selected_key = field.key;
+    metadata = field;
+    metadata->key = source_key;
+    metadata->first_class_role = FirstClassAttributeRole::kNone;
+    metadata->first_class_state = FirstClassAttributeState::kMissing;
+    metadata->first_class_source_key.clear();
+    if (!field.children.empty()) {
+      auto preserved = field;
+      preserved.key = source_key;
+      preserved.first_class_role = FirstClassAttributeRole::kNone;
+      preserved.first_class_state = FirstClassAttributeState::kMissing;
+      preserved.first_class_source_key.clear();
+      upsert(event.attributes, std::move(preserved));
+    }
+  };
+
   for (const auto& field : record.fields) {
+    switch (field.first_class_role) {
+      case FirstClassAttributeRole::kActivity:
+        assign_first_class(field, event.activity, event.activity_state,
+                           event.activity_source_key, selected_activity_key,
+                           event.activity_attribute);
+        break;
+      case FirstClassAttributeRole::kTimestamp:
+        assign_first_class(field, event.timestamp, event.timestamp_state,
+                           event.timestamp_source_key, selected_timestamp_key,
+                           event.timestamp_attribute);
+        break;
+      case FirstClassAttributeRole::kResource:
+        assign_first_class(field, event.resource, event.resource_state,
+                           event.resource_source_key, selected_resource_key,
+                           event.resource_attribute);
+        break;
+      case FirstClassAttributeRole::kLifecycle:
+        assign_first_class(field, event.lifecycle, event.lifecycle_state,
+                           event.lifecycle_source_key, selected_lifecycle_key,
+                           event.lifecycle_attribute);
+        break;
+      case FirstClassAttributeRole::kNone:
+      case FirstClassAttributeRole::kCaseId: break;
+    }
+  }
+
+  const auto select_exact = [&](std::string_view key, std::string& target,
+                                FirstClassAttributeState& state,
+                                std::string& source_key,
+                                std::string& selected_key,
+                                std::optional<EventAttribute>& metadata) {
+    if (key.empty() || !selected_key.empty()) return;
+    const auto found = std::find_if(
+        record.fields.begin(), record.fields.end(), [&](const auto& field) {
+          return field.first_class_role == FirstClassAttributeRole::kNone &&
+                 field.key == key;
+        });
+    if (found != record.fields.end())
+      assign_first_class(*found, target, state, source_key, selected_key,
+                         metadata);
+  };
+  select_exact(activity_source_key, event.activity, event.activity_state,
+               event.activity_source_key, selected_activity_key,
+               event.activity_attribute);
+  select_exact(timestamp_source_key, event.timestamp, event.timestamp_state,
+               event.timestamp_source_key, selected_timestamp_key,
+               event.timestamp_attribute);
+  select_exact(resource_source_key, event.resource, event.resource_state,
+               event.resource_source_key, selected_resource_key,
+               event.resource_attribute);
+  select_exact(lifecycle_source_key, event.lifecycle, event.lifecycle_state,
+               event.lifecycle_source_key, selected_lifecycle_key,
+               event.lifecycle_attribute);
+
+  for (const auto& field : record.fields) {
+    if (field.first_class_role != FirstClassAttributeRole::kNone) continue;
     if (field.key == options.case_id_key ||
         is_case_attribute_field(field, options))
       continue;
-    // A present null is not a textual value for a standard field.  Keep null
-    // generic attributes below, but leave the first-class member empty.
-    if (field.is_null && (field.key == kActivityKey ||
-                          field.key == "activity" ||
-                          field.key == kTimestampKey ||
-                          field.key == "timestamp" ||
-                          field.key == kResourceKey ||
-                          field.key == "resource" ||
-                          field.key == kLifecycleKey ||
-                          field.key == "lifecycle"))
+    if (field.key == selected_activity_key ||
+        field.key == selected_timestamp_key ||
+        field.key == selected_resource_key ||
+        field.key == selected_lifecycle_key)
       continue;
-    if (field.key == kActivityKey || field.key == "activity")
-      event.activity = field.value;
-    else if (field.key == kTimestampKey || field.key == "timestamp")
-      event.timestamp = field.value;
-    else if (field.key == kResourceKey || field.key == "resource")
-      event.resource = field.value;
-    else if (field.key == kLifecycleKey || field.key == "lifecycle")
-      event.lifecycle = field.value;
-    else
-      upsert(event.attributes, field);
+    if ((field.key == kActivityKey || field.key == "activity") &&
+        selected_activity_key.empty()) {
+      assign_first_class(field, event.activity, event.activity_state,
+                         event.activity_source_key, selected_activity_key,
+                         event.activity_attribute);
+      continue;
+    }
+    if ((field.key == kTimestampKey || field.key == "timestamp") &&
+        selected_timestamp_key.empty()) {
+      assign_first_class(field, event.timestamp, event.timestamp_state,
+                         event.timestamp_source_key, selected_timestamp_key,
+                         event.timestamp_attribute);
+      continue;
+    }
+    if ((field.key == kResourceKey || field.key == "resource") &&
+        selected_resource_key.empty()) {
+      assign_first_class(field, event.resource, event.resource_state,
+                         event.resource_source_key, selected_resource_key,
+                         event.resource_attribute);
+      continue;
+    }
+    if ((field.key == kLifecycleKey || field.key == "lifecycle") &&
+        selected_lifecycle_key.empty()) {
+      assign_first_class(field, event.lifecycle, event.lifecycle_state,
+                         event.lifecycle_source_key, selected_lifecycle_key,
+                         event.lifecycle_attribute);
+      continue;
+    }
+    upsert(event.attributes, field);
   }
   return event;
 }
@@ -306,19 +602,148 @@ std::string_view kind_name(AttributeKind kind) {
   throw std::invalid_argument("log conversion: invalid attribute kind");
 }
 
+std::string_view container_name(AttributeContainerKind kind) {
+  switch (kind) {
+    case AttributeContainerKind::kScalar: return "scalar";
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kContainer: return "container";
+  }
+  throw std::invalid_argument("log conversion: invalid attribute container kind");
+}
+
+std::string_view first_class_state_name(FirstClassAttributeState state) {
+  switch (state) {
+    case FirstClassAttributeState::kMissing: return "missing";
+    case FirstClassAttributeState::kPresent: return "present";
+    case FirstClassAttributeState::kNull: return "null";
+  }
+  throw std::invalid_argument("log conversion: invalid first-class state");
+}
+
+std::string_view first_class_role_name(FirstClassAttributeRole role) {
+  switch (role) {
+    case FirstClassAttributeRole::kNone: return "none";
+    case FirstClassAttributeRole::kCaseId: return "case_id";
+    case FirstClassAttributeRole::kActivity: return "activity";
+    case FirstClassAttributeRole::kTimestamp: return "timestamp";
+    case FirstClassAttributeRole::kResource: return "resource";
+    case FirstClassAttributeRole::kLifecycle: return "lifecycle";
+  }
+  throw std::invalid_argument("log conversion: invalid first-class role");
+}
+
+void write_attributes(std::ostream& output,
+                      const std::vector<EventAttribute>& attributes);
+void write_attribute_details(std::ostream& output,
+                             const std::vector<EventAttribute>& attributes);
+
+void write_attribute(std::ostream& output, const EventAttribute& attribute) {
+  output << "{\"key\":\"" << json_escape(attribute.key)
+         << "\",\"value\":\"" << json_escape(attribute.value)
+         << "\",\"kind\":\"" << kind_name(attribute.kind)
+         << "\",\"container\":\"" << container_name(attribute.container)
+         << "\"";
+  if (attribute.is_null) output << ",\"null\":true";
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    output << ",\"typed_value\":";
+    if (const auto* integer_value =
+            std::get_if<std::int64_t>(&attribute.typed_value))
+      output << *integer_value;
+    else if (const auto* float_value =
+                 std::get_if<double>(&attribute.typed_value)) {
+      if (std::isfinite(*float_value))
+        output << std::setprecision(17) << *float_value;
+      else if (std::isnan(*float_value))
+        output << "\"NaN\"";
+      else
+        output << '"' << (*float_value < 0 ? "-INF" : "INF") << '"';
+    } else if (const auto* boolean_value =
+                   std::get_if<bool>(&attribute.typed_value))
+      output << (*boolean_value ? "true" : "false");
+    else if (const auto* date_value =
+                  std::get_if<NativeDate>(&attribute.typed_value))
+      output << '"' << json_escape(date_value->value) << '"';
+  }
+  if (!attribute.children.empty()) {
+    output << ",\"children\":";
+    write_attributes(output, attribute.children);
+  }
+  if (attribute.first_class_role != FirstClassAttributeRole::kNone) {
+    output << ",\"first_class_role\":\""
+           << first_class_role_name(attribute.first_class_role)
+           << "\",\"first_class_state\":\""
+           << first_class_state_name(attribute.first_class_state)
+           << "\",\"first_class_source_key\":\""
+           << json_escape(attribute.first_class_source_key) << '"';
+  }
+  output << "}";
+}
+
 void write_attributes(std::ostream& output,
                       const std::vector<EventAttribute>& attributes) {
   output << '[';
   for (std::size_t i = 0; i < attributes.size(); ++i) {
     if (i != 0) output << ',';
-    output << "{\"key\":\"" << json_escape(attributes[i].key)
-           << "\",\"value\":\"" << json_escape(attributes[i].value)
-           << "\",\"kind\":\"" << kind_name(attributes[i].kind)
-           << "\"";
-    if (attributes[i].is_null) output << ",\"null\":true";
-    output << "}";
+    write_attribute(output, attributes[i]);
   }
   output << ']';
+}
+
+// Selected first-class fields retain their source attribute separately from
+// the convenient string projection. Emit that attribute as a complete,
+// recursive detail object so typed values and nested children survive every
+// EventLog-shaped JSON boundary.
+void write_attribute_detail(std::ostream& output,
+                            const EventAttribute& attribute) {
+  output << "{\"key\":\"" << json_escape(attribute.key)
+         << "\",\"value\":\"" << json_escape(attribute.value)
+         << "\",\"kind\":\"" << kind_name(attribute.kind)
+         << "\",\"container\":\"" << container_name(attribute.container)
+         << "\",\"null\":" << (attribute.is_null ? "true" : "false");
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    output << ",\"typed_value\":";
+    if (const auto* integer_value =
+            std::get_if<std::int64_t>(&attribute.typed_value))
+      output << *integer_value;
+    else if (const auto* float_value =
+                 std::get_if<double>(&attribute.typed_value)) {
+      if (std::isfinite(*float_value))
+        output << std::setprecision(17) << *float_value;
+      else if (std::isnan(*float_value))
+        output << "\"NaN\"";
+      else
+        output << '"' << (*float_value < 0 ? "-INF" : "INF") << '"';
+    } else if (const auto* boolean_value =
+                   std::get_if<bool>(&attribute.typed_value))
+      output << (*boolean_value ? "true" : "false");
+    else if (const auto* date_value =
+                 std::get_if<NativeDate>(&attribute.typed_value))
+      output << '"' << json_escape(date_value->value) << '"';
+  }
+  if (!attribute.children.empty()) {
+    output << ",\"children\":";
+    write_attribute_details(output, attribute.children);
+  }
+  output << '}';
+}
+
+void write_attribute_details(
+    std::ostream& output,
+    const std::vector<EventAttribute>& attributes) {
+  output << '[';
+  for (std::size_t i = 0; i < attributes.size(); ++i) {
+    if (i != 0) output << ',';
+    write_attribute_detail(output, attributes[i]);
+  }
+  output << ']';
+}
+
+void write_optional_attribute_detail(
+    std::ostream& output, std::string_view field,
+    const std::optional<EventAttribute>& attribute) {
+  if (!attribute) return;
+  output << ",\"" << field << "\":";
+  write_attribute_detail(output, *attribute);
 }
 
 void write_metadata(std::ostream& output, const EventDataMetadata& metadata) {
@@ -348,6 +773,15 @@ void write_metadata(std::ostream& output, const EventDataMetadata& metadata) {
   write_attributes(output, metadata.event_globals);
   output << ",\"properties\":";
   write_attributes(output, metadata.properties);
+  output << ",\"globals\":[";
+  for (std::size_t i = 0; i < metadata.globals.size(); ++i) {
+    if (i) output << ',';
+    output << "{\"scope\":\"" << json_escape(metadata.globals[i].scope)
+           << "\",\"attributes\":";
+    write_attributes(output, metadata.globals[i].attributes);
+    output << '}';
+  }
+  output << ']';
   output << '}';
 }
 
@@ -360,7 +794,15 @@ void write_event_log(std::ostream& output, const EventLog& log) {
     if (trace_index != 0) output << ',';
     const auto& trace = log.traces[trace_index];
     output << "{\"case_id\":\"" << json_escape(trace.case_id)
-           << "\",\"attributes\":";
+           << "\",\"case_id_state\":\""
+           << first_class_state_name(effective_first_class_state(
+                  trace.case_id_state, trace.case_id))
+           << "\",\"case_id_source_key\":\""
+           << json_escape(trace.case_id_source_key)
+           << '"';
+    write_optional_attribute_detail(output, "case_id_attribute",
+                                    trace.case_id_attribute);
+    output << ",\"attributes\":";
     write_attributes(output, trace.attributes);
     output << ",\"properties\":";
     write_attributes(output, trace.properties);
@@ -370,11 +812,48 @@ void write_event_log(std::ostream& output, const EventLog& log) {
       if (event_index != 0) output << ',';
       const auto& event = trace.events[event_index];
       output << "{\"case_id\":\"" << json_escape(event.case_id)
+             << "\",\"case_id_state\":\""
+             << first_class_state_name(effective_first_class_state(
+                    event.case_id_state, event.case_id))
+             << "\",\"case_id_source_key\":\""
+             << json_escape(event.case_id_source_key)
              << "\",\"activity\":\"" << json_escape(event.activity)
-             << "\",\"timestamp\":\"" << json_escape(event.timestamp)
-             << "\",\"resource\":\"" << json_escape(event.resource)
-             << "\",\"lifecycle\":\"" << json_escape(event.lifecycle)
-             << "\",\"input_order\":" << event.input_order
+             << "\",\"activity_state\":\""
+             << first_class_state_name(effective_first_class_state(
+                    event.activity_state, event.activity))
+              << "\",\"activity_source_key\":\""
+              << json_escape(event.activity_source_key)
+              << '"';
+       write_optional_attribute_detail(output, "activity_attribute",
+                                       event.activity_attribute);
+       output << ",\"timestamp\":\"" << json_escape(event.timestamp)
+             << "\",\"timestamp_state\":\""
+             << first_class_state_name(effective_first_class_state(
+                    event.timestamp_state, event.timestamp))
+              << "\",\"timestamp_source_key\":\""
+              << json_escape(event.timestamp_source_key)
+              << '"';
+       write_optional_attribute_detail(output, "timestamp_attribute",
+                                       event.timestamp_attribute);
+       output << ",\"resource\":\"" << json_escape(event.resource)
+             << "\",\"resource_state\":\""
+             << first_class_state_name(effective_first_class_state(
+                    event.resource_state, event.resource))
+              << "\",\"resource_source_key\":\""
+              << json_escape(event.resource_source_key)
+              << '"';
+       write_optional_attribute_detail(output, "resource_attribute",
+                                       event.resource_attribute);
+       output << ",\"lifecycle\":\"" << json_escape(event.lifecycle)
+             << "\",\"lifecycle_state\":\""
+             << first_class_state_name(effective_first_class_state(
+                    event.lifecycle_state, event.lifecycle))
+              << "\",\"lifecycle_source_key\":\""
+              << json_escape(event.lifecycle_source_key)
+              << '"';
+       write_optional_attribute_detail(output, "lifecycle_attribute",
+                                       event.lifecycle_attribute);
+       output << ",\"input_order\":" << event.input_order
              << ",\"attributes\":";
       write_attributes(output, event.attributes);
       output << '}';
@@ -455,29 +934,66 @@ ConvertedEventStream event_log_to_event_stream(
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
+    const auto effective_case_state =
+        trace.case_id_state == FirstClassAttributeState::kMissing &&
+                !trace.case_id.empty()
+            ? FirstClassAttributeState::kPresent
+            : trace.case_id_state;
     for (const auto& event : trace.events) {
       LogConversionRecord record;
       record.fields = event_fields(event);
+      const auto case_source_key =
+          trace.case_id_source_key.empty()
+              ? std::string(kActivityKey)
+              : trace.case_id_source_key;
+      std::optional<EventAttribute> case_projection;
       if (options.include_case_attributes) {
         for (const auto& attribute : trace_fields(trace)) {
           auto injected = attribute;
           // The configured glue key is authoritative for the case id.  Other
           // trace attributes use the configured prefix.
-          if (injected.key == kActivityKey)
+          if (injected.first_class_role == FirstClassAttributeRole::kCaseId) {
             injected.key = options.case_id_key;
-          else
+            case_projection = std::move(injected);
+          } else {
             injected.key = options.case_attribute_prefix + injected.key;
-          upsert(record.fields, std::move(injected));
+            upsert(record.fields, std::move(injected));
+          }
+        }
+        if (!case_projection) {
+          // A flat representation needs a grouping value even when the
+          // original trace had no case id.  Use a per-trace surrogate, mark it
+          // as missing, and restore the absent state on the reverse adapter.
+          const auto glue_value =
+              effective_case_state == FirstClassAttributeState::kMissing ||
+                      effective_case_state == FirstClassAttributeState::kNull
+                  ? std::to_string(trace_index)
+                  : trace.case_id;
+          case_projection = EventAttribute{
+              options.case_id_key, glue_value, AttributeKind::kString,
+              effective_case_state == FirstClassAttributeState::kNull ||
+                  effective_case_state == FirstClassAttributeState::kMissing};
         }
       } else {
-        upsert(record.fields,
-               {options.case_id_key, std::to_string(trace_index),
-                AttributeKind::kString});
+        case_projection = EventAttribute{
+            options.case_id_key, std::to_string(trace_index),
+            AttributeKind::kString,
+            effective_case_state != FirstClassAttributeState::kPresent};
       }
+      case_projection->first_class_role = FirstClassAttributeRole::kCaseId;
+      case_projection->first_class_state = effective_case_state;
+      case_projection->first_class_source_key = case_source_key;
+      // Insert the grouping cell last so a prefixed trace alias can never
+      // overwrite the authoritative case glue field.
+      upsert(record.fields, std::move(*case_projection));
       if (options.remove_null_fields) {
         record.fields.erase(
             std::remove_if(record.fields.begin(), record.fields.end(),
-                           [](const auto& field) { return field.is_null; }),
+                           [&](const auto& field) {
+                              return field.is_null &&
+                                     field.first_class_role !=
+                                         FirstClassAttributeRole::kCaseId;
+                            }),
             record.fields.end());
       }
       stream.events.push_back(std::move(record));
@@ -492,19 +1008,67 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
   EventLog log;
   log.attributes = stream.attributes;
   log.metadata = stream.metadata;
-  std::map<std::pair<AttributeKind, std::string>, std::size_t> trace_indexes;
+  const auto role_field = [](const LogConversionRecord& record,
+                             FirstClassAttributeRole role) {
+    const auto found = std::find_if(
+        record.fields.begin(), record.fields.end(), [&](const auto& field) {
+          return field.first_class_role == role;
+        });
+    return found == record.fields.end() ? nullptr : &*found;
+  };
+  std::map<std::tuple<AttributeKind, std::string, bool, int,
+                      std::string>,
+           std::size_t>
+      trace_indexes;
   for (const auto& record : stream.events) {
-    const auto* glue = record.field(options.case_id_key);
-    if (!glue || glue->is_null)
+    const auto* glue = role_field(record, FirstClassAttributeRole::kCaseId);
+    if (!glue) glue = record.field(options.case_id_key);
+    if (!glue)
       throw std::invalid_argument(
-          "log conversion: event stream record has no non-null case id");
+          "log conversion: event stream record has no case id field");
+    const auto case_state =
+        glue->first_class_role == FirstClassAttributeRole::kCaseId
+            ? glue->first_class_state
+            : (glue->is_null ? FirstClassAttributeState::kNull
+                             : FirstClassAttributeState::kPresent);
+    const auto row_case_source_key =
+        glue->first_class_source_key.empty()
+            ? (glue->key == options.case_id_key &&
+                       glue->key == "case:concept:name"
+                   ? std::string(kActivityKey)
+                   : glue->key)
+            : glue->first_class_source_key;
     auto [found, inserted] = trace_indexes.emplace(
-        std::pair{glue->kind, glue->value}, log.traces.size());
+        std::tuple{glue->kind, glue->value, glue->is_null,
+                   static_cast<int>(case_state),
+                   row_case_source_key},
+        log.traces.size());
     if (inserted) {
       Trace trace;
-      trace.case_id = glue->value;
+      trace.case_id = case_state == FirstClassAttributeState::kPresent
+                          ? glue->value
+                          : std::string{};
+      trace.case_id_state = case_state;
+      trace.case_id_source_key = row_case_source_key;
+      auto selected_case = *glue;
+      selected_case.key = row_case_source_key;
+      selected_case.first_class_role = FirstClassAttributeRole::kNone;
+      selected_case.first_class_state = FirstClassAttributeState::kMissing;
+      selected_case.first_class_source_key.clear();
+      trace.case_id_attribute = std::move(selected_case);
+      if (!glue->children.empty()) {
+        auto selected_attribute = *glue;
+        selected_attribute.key = row_case_source_key;
+        selected_attribute.first_class_role = FirstClassAttributeRole::kNone;
+        selected_attribute.first_class_state =
+            FirstClassAttributeState::kMissing;
+        selected_attribute.first_class_source_key.clear();
+        upsert(trace.attributes, std::move(selected_attribute));
+      }
       if (options.include_case_attributes) {
         for (const auto& field : record.fields) {
+          if (field.first_class_role != FirstClassAttributeRole::kNone)
+            continue;
           if (!is_case_attribute_field(field, options)) continue;
           auto attribute = field;
           if (!options.case_attribute_prefix.empty())
@@ -522,7 +1086,12 @@ EventLog event_stream_to_event_log(const ConvertedEventStream& stream,
       log.traces.push_back(std::move(trace));
     }
     auto& trace = log.traces[found->second];
-    auto event = record_to_event(record, trace.case_id, options);
+    auto event = record_to_event(record, trace.case_id, trace.case_id_state,
+                                 options, kActivityKey, kTimestampKey,
+                                 kResourceKey, kLifecycleKey);
+    event.case_id = trace.case_id;
+    event.case_id_state = trace.case_id_state;
+    event.case_id_source_key = trace.case_id_source_key;
     event.input_order = trace.events.size();
     trace.events.push_back(std::move(event));
   }
@@ -542,7 +1111,9 @@ LogConversionTable event_stream_to_table(
   std::map<std::string, std::size_t> column_indexes;
   for (const auto& record : stream.events) {
     for (const auto& field : record.fields) {
-      if (options.remove_null_fields && field.is_null) continue;
+      if (options.remove_null_fields && field.is_null &&
+          field.key != options.case_id_key)
+        continue;
       if (!column_indexes.contains(field.key)) {
         column_indexes.emplace(field.key, table.columns.size());
         table.columns.push_back(field.key);
@@ -553,7 +1124,8 @@ LogConversionTable event_stream_to_table(
   for (const auto& record : stream.events) {
     std::vector<std::optional<EventAttribute>> row(table.columns.size());
     for (const auto& field : record.fields) {
-      if (!options.remove_null_fields || !field.is_null)
+      if (!options.remove_null_fields || !field.is_null ||
+          field.key == options.case_id_key)
         row[column_indexes.at(field.key)] = field;
     }
     table.rows.push_back(std::move(row));
@@ -576,7 +1148,9 @@ ConvertedEventStream event_table_to_event_stream(
     record.fields.reserve(table.columns.size());
     for (std::size_t index = 0; index < table.columns.size(); ++index) {
       if (!row[index]) continue;
-      if (options.remove_null_fields && row[index]->is_null) continue;
+      if (options.remove_null_fields && row[index]->is_null &&
+          table.columns[index] != options.case_id_key)
+        continue;
       auto field = *row[index];
       field.key = table.columns[index];
       record.fields.push_back(std::move(field));
@@ -586,11 +1160,12 @@ ConvertedEventStream event_table_to_event_stream(
   return stream;
 }
 
-LogConversionTable remove_null_cells(LogConversionTable table) {
+LogConversionTable remove_null_cells(LogConversionTable table,
+                                    std::string_view case_id_key = {}) {
   table.validate();
   for (auto& row : table.rows) {
     for (auto& cell : row) {
-      if (cell && cell->is_null) cell.reset();
+      if (cell && cell->is_null && cell->key != case_id_key) cell.reset();
     }
   }
   return table;
@@ -620,7 +1195,7 @@ LogConversionTable lazy_event_table_to_table(
   validate_options(options);
   auto materialized = table.materialize(options.max_rows_to_materialize);
   if (!options.remove_null_fields) return materialized;
-  return remove_null_cells(std::move(materialized));
+  return remove_null_cells(std::move(materialized), options.case_id_key);
 }
 
 ConvertedEventStream lazy_event_table_to_event_stream(
@@ -646,7 +1221,10 @@ ConvertedEventStream event_data_to_event_stream(
         for (auto& record : stream.events)
           record.fields.erase(
               std::remove_if(record.fields.begin(), record.fields.end(),
-                             [](const auto& field) { return field.is_null; }),
+                             [&](const auto& field) {
+                               return field.is_null &&
+                                      field.key != options.case_id_key;
+                             }),
               record.fields.end());
       }
       return stream;
@@ -669,7 +1247,7 @@ LogConversionTable event_data_to_table(const EventDataView& data,
     case EventDataKind::kEventTable:
       data.table()->validate();
       if (!options.remove_null_fields) return *data.table();
-      return remove_null_cells(*data.table());
+      return remove_null_cells(*data.table(), options.case_id_key);
     case EventDataKind::kLazyEventTable:
       return lazy_event_table_to_table(*data.lazy_table(), options);
   }
@@ -703,7 +1281,8 @@ LazyEventTable event_data_to_lazy_table(const EventDataView& data,
       data.table()->validate();
       if (!options.remove_null_fields)
         return LazyEventTable::from_table(*data.table());
-      return LazyEventTable::from_table(remove_null_cells(*data.table()));
+      return LazyEventTable::from_table(
+          remove_null_cells(*data.table(), options.case_id_key));
     case EventDataKind::kLazyEventTable:
       {
         const auto source = *data.lazy_table();
@@ -893,10 +1472,7 @@ std::string log_conversion_json(const LogConversionResult& result) {
           continue;
         }
         const auto& cell = *result.table.rows[row][column];
-        output << "{\"value\":\"" << json_escape(cell.value)
-               << "\",\"kind\":\"" << kind_name(cell.kind) << "\"";
-        if (cell.is_null) output << ",\"null\":true";
-        output << "}";
+        write_attribute(output, cell);
       }
       output << ']';
     }

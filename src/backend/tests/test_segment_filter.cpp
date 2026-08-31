@@ -1,8 +1,10 @@
 #include "minera/segment_filter.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace {
@@ -23,9 +25,55 @@ std::vector<std::string> names(const minera::Trace& trace) {
   return result;
 }
 
+void between_updates_derived_case_ids_without_stale_typed_payloads() {
+  minera::EventLog log;
+  auto source = trace("42", {"a", "x", "a", "y", "a", "b"});
+  source.case_id_state = minera::FirstClassAttributeState::kPresent;
+  source.case_id_source_key = "case.number";
+  minera::EventAttribute selected{"case.number", "42",
+                                 minera::AttributeKind::kInt};
+  selected.typed_value = std::int64_t{42};
+  source.case_id_attribute = selected;
+  log.traces.push_back(std::move(source));
+
+  minera::BetweenFilterOptions options;
+  options.start_activities = {"a"};
+  options.end_activities = {"b"};
+  options.subcase_separator = "~";
+  const auto result = minera::filter_between(log, options);
+  assert(result.traces.size() == 1);
+  const auto& segment = result.traces.front();
+  assert(segment.case_id == "42");
+  assert(segment.case_id_source_key == "case.number");
+  assert(segment.case_id_attribute &&
+         segment.case_id_attribute->value == "42" &&
+         segment.case_id_attribute->kind == minera::AttributeKind::kInt &&
+         std::get<std::int64_t>(segment.case_id_attribute->typed_value) == 42);
+
+  options.end_activities = {"a"};
+  const auto split = minera::filter_between(log, options);
+  assert(split.traces.size() == 2);
+  for (std::size_t i = 0; i < split.traces.size(); ++i) {
+    const auto& derived = split.traces[i];
+    assert(derived.case_id == "42~" + std::to_string(i + 1));
+    assert(derived.case_id_state ==
+           minera::FirstClassAttributeState::kPresent);
+    assert(derived.case_id_source_key == "case.number");
+    assert(!derived.events.empty() &&
+           derived.events.front().case_id == derived.case_id &&
+           derived.events.front().case_id_source_key == "case.number");
+    assert(derived.case_id_attribute &&
+           derived.case_id_attribute->value == derived.case_id &&
+           derived.case_id_attribute->kind == minera::AttributeKind::kString &&
+           std::holds_alternative<std::monostate>(
+               derived.case_id_attribute->typed_value));
+  }
+}
+
 }  // namespace
 
 int main() {
+  between_updates_derived_case_ids_without_stale_typed_payloads();
   minera::EventLog log;
   log.attributes.push_back({"source", "unit", minera::AttributeKind::kString});
   auto first = trace("case", {"a", "b", "a", "c", "b"});
