@@ -65,6 +65,7 @@ import {
   type OcelPlayoutResult,
   type OcelFeatureResult,
   type OcelInteractionGraphSource,
+  type OcelObjectNeighborGraph,
   type OcelStatisticsResult,
   type OcelDescriptionResult,
   type ProcessCubeTable,
@@ -5864,6 +5865,7 @@ export interface OcelFeatureOptions {
   variant?: "events" | "objects" | "events_objects";
   feature_name_style?: "native" | "compatibility";
   interaction_graph_source?: OcelInteractionGraphSource;
+  object_neighbor_graph?: OcelObjectNeighborGraph;
   max_features?: number;
   include_activity_features?: boolean;
   include_timestamp_features?: boolean;
@@ -5936,12 +5938,24 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
   if (options.interaction_graph_source !== undefined &&
       options.variant !== "objects" && !relatedObjectEventContext)
     throw new Error("interaction_graph_source applies only to objects");
+  if (options.object_neighbor_graph !== undefined &&
+      options.object_neighbor_graph !== "interaction" &&
+      options.object_neighbor_graph !== "cobirth" &&
+      options.object_neighbor_graph !== "codeath")
+    throw new Error("object_neighbor_graph must be interaction, cobirth, or codeath");
+  if (options.object_neighbor_graph !== undefined &&
+      options.include_obj_con_in_graph_features !== true)
+    throw new Error("object_neighbor_graph requires include_obj_con_in_graph_features=true");
+  if (options.object_neighbor_graph !== undefined &&
+      options.variant !== "objects" && !relatedObjectEventContext)
+    throw new Error("object_neighbor_graph applies only to objects");
   if (objectGraphControl && options.variant !== "objects" &&
       !relatedObjectEventContext)
     throw new Error("object graph features apply only to objects");
   const objectOnlyFeatureControl = options.include_related_events_features !== undefined ||
     options.include_related_activities_features !== undefined ||
     options.include_obj_con_in_graph_features !== undefined ||
+    options.include_lifecycle_features !== undefined ||
     options.include_lifecycle_length_features !== undefined ||
     options.include_lifecycle_unique_activity_features !== undefined ||
     options.include_lifecycle_duration_features !== undefined ||
@@ -5976,6 +5990,8 @@ export function ocelFeaturesQuery(options: OcelFeatureOptions = {}): string {
     query.set("feature_name_style", options.feature_name_style);
   if (options.interaction_graph_source !== undefined)
     query.set("interaction_graph_source", options.interaction_graph_source);
+  if (options.object_neighbor_graph !== undefined)
+    query.set("object_neighbor_graph", options.object_neighbor_graph);
   const addInteger = (name: string, value: number | undefined) => {
     if (value !== undefined && Number.isInteger(value) && value > 0)
       query.set(name, String(value));

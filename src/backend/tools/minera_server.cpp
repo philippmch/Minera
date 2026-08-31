@@ -2103,7 +2103,8 @@ void handle_ocel_features(const httplib::Request& request,
                           httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "feature_name_style", "interaction_graph_source", "max_features", "include_activity_features",
+        "variant", "feature_name_style", "interaction_graph_source",
+        "object_neighbor_graph", "max_features", "include_activity_features",
         "include_timestamp_features", "include_relation_features",
         "include_event_num_rel_objs_features",
         "include_event_num_rel_objs_type_features",
@@ -2184,6 +2185,22 @@ void handle_ocel_features(const httplib::Request& request,
             "interaction_graph_source expects event_cooccurrence or event_and_o2o");
       }
     }
+    if (request.has_param("object_neighbor_graph")) {
+      const auto graph = request.get_param_value("object_neighbor_graph");
+      if (graph == "interaction") {
+        options.object_neighbor_graph =
+            minera::OcelObjectNeighborGraph::kInteraction;
+      } else if (graph == "cobirth") {
+        options.object_neighbor_graph =
+            minera::OcelObjectNeighborGraph::kCobirth;
+      } else if (graph == "codeath") {
+        options.object_neighbor_graph =
+            minera::OcelObjectNeighborGraph::kCodeath;
+      } else {
+        throw std::invalid_argument(
+            "object_neighbor_graph expects interaction, cobirth, or codeath");
+      }
+    }
     options.max_features =
         ocel_query_size(request, "max_features", options.max_features);
     if (options.max_features == 0 || options.max_features > 10000)
@@ -2241,23 +2258,24 @@ void handle_ocel_features(const httplib::Request& request,
     if (request.has_param("include_codeath_features"))
       options.include_codeath_features = ocel_query_bool(
           request, "include_codeath_features", false);
-    options.include_lifecycle_features = ocel_query_bool(
-        request, "include_lifecycle_features", options.include_lifecycle_features);
-    options.include_lifecycle_length_features = ocel_query_bool(
-        request, "include_lifecycle_length_features",
-        options.include_lifecycle_length_features);
-    options.include_lifecycle_unique_activity_features = ocel_query_bool(
-        request, "include_lifecycle_unique_activity_features",
-        options.include_lifecycle_unique_activity_features);
-    options.include_lifecycle_duration_features = ocel_query_bool(
-        request, "include_lifecycle_duration_features",
-        options.include_lifecycle_duration_features);
-    options.include_lifecycle_activity_features = ocel_query_bool(
-        request, "include_lifecycle_activity_features",
-        options.include_lifecycle_activity_features);
-    options.include_lifecycle_path_features = ocel_query_bool(
-        request, "include_lifecycle_path_features",
-        options.include_lifecycle_path_features);
+    if (request.has_param("include_lifecycle_features"))
+      options.include_lifecycle_features = ocel_query_bool(
+          request, "include_lifecycle_features", true);
+    if (request.has_param("include_lifecycle_length_features"))
+      options.include_lifecycle_length_features = ocel_query_bool(
+          request, "include_lifecycle_length_features", true);
+    if (request.has_param("include_lifecycle_unique_activity_features"))
+      options.include_lifecycle_unique_activity_features = ocel_query_bool(
+          request, "include_lifecycle_unique_activity_features", true);
+    if (request.has_param("include_lifecycle_duration_features"))
+      options.include_lifecycle_duration_features = ocel_query_bool(
+          request, "include_lifecycle_duration_features", true);
+    if (request.has_param("include_lifecycle_activity_features"))
+      options.include_lifecycle_activity_features = ocel_query_bool(
+          request, "include_lifecycle_activity_features", true);
+    if (request.has_param("include_lifecycle_path_features"))
+      options.include_lifecycle_path_features = ocel_query_bool(
+          request, "include_lifecycle_path_features", false);
     if (request.has_param("include_lifecycle_wip_features"))
       options.include_lifecycle_wip_features = ocel_query_bool(
           request, "include_lifecycle_wip_features", false);
@@ -2275,15 +2293,15 @@ void handle_ocel_features(const httplib::Request& request,
         options.include_obj_con_in_graph_features);
     options.include_prefix_features = ocel_query_bool(
         request, "include_prefix_features", options.include_prefix_features);
-    options.include_prefix_length_features = ocel_query_bool(
-        request, "include_prefix_length_features",
-        options.include_prefix_length_features);
-    options.include_prefix_timediff_features = ocel_query_bool(
-        request, "include_prefix_timediff_features",
-        options.include_prefix_timediff_features);
-    options.include_prefix_one_hot_features = ocel_query_bool(
-        request, "include_prefix_one_hot_features",
-        options.include_prefix_one_hot_features);
+    if (request.has_param("include_prefix_length_features"))
+      options.include_prefix_length_features = ocel_query_bool(
+          request, "include_prefix_length_features", false);
+    if (request.has_param("include_prefix_timediff_features"))
+      options.include_prefix_timediff_features = ocel_query_bool(
+          request, "include_prefix_timediff_features", false);
+    if (request.has_param("include_prefix_one_hot_features"))
+      options.include_prefix_one_hot_features = ocel_query_bool(
+          request, "include_prefix_one_hot_features", false);
     if (request.has_param("include_event_pointwise_features"))
       options.include_event_pointwise_features = ocel_query_bool(
           request, "include_event_pointwise_features", false);
@@ -2294,6 +2312,7 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_related_events_features") ||
         request.has_param("include_related_activities_features") ||
         request.has_param("include_obj_con_in_graph_features") ||
+        request.has_param("include_lifecycle_features") ||
         request.has_param("include_lifecycle_length_features") ||
         request.has_param("include_lifecycle_unique_activity_features") ||
         request.has_param("include_lifecycle_duration_features") ||
@@ -2324,6 +2343,8 @@ void handle_ocel_features(const httplib::Request& request,
         request.has_param("include_codeath_features");
     const auto interaction_graph_source_supplied =
         request.has_param("interaction_graph_source");
+    const auto object_neighbor_graph_supplied =
+        request.has_param("object_neighbor_graph");
     if (all_object_control_supplied &&
         variant != minera::OcelFeatureVariant::kObjects)
       throw std::invalid_argument(
@@ -2337,6 +2358,15 @@ void handle_ocel_features(const httplib::Request& request,
         !related_object_event_context)
       throw std::invalid_argument(
           "object graph feature controls apply only to the objects variant");
+    if (object_neighbor_graph_supplied &&
+        variant != minera::OcelFeatureVariant::kObjects &&
+        !related_object_event_context)
+      throw std::invalid_argument(
+          "neighbor graph selection applies only to the objects variant");
+    if (object_neighbor_graph_supplied &&
+        !options.include_obj_con_in_graph_features)
+      throw std::invalid_argument(
+          "object_neighbor_graph requires include_obj_con_in_graph_features");
     if (interaction_graph_source_supplied &&
         variant != minera::OcelFeatureVariant::kObjects &&
         !related_object_event_context)

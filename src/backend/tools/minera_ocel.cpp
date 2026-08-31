@@ -37,7 +37,9 @@ int main(int argc, char** argv) {
                    "--ocel-csv-delimiter CHAR --ocel-csv-trim-fields BOOL "
                    "--ocel-csv-sort-events-by-timestamp BOOL --ocel-csv-reject-unsupported BOOL "
                    "--ocel-csv-emit-objects BOOL --ocel-csv-allow-lossy BOOL\n";
-      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--flatten-object-type TYPE] [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-no-lifecycle-paths] [--features-lifecycle-wip|--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --real ocel|graph --real-graph-kind etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "usage: minera_ocel INPUT.json|INPUT.csv|INPUT.xml|INPUT.sqlite [--csv] [--csv-objects OBJECTS.csv] [--xml] [--sqlite] [--sqlite-output OUTPUT.sqlite] [--format classic|standard|csv|xml|xml_standard|sqlite] [--flatten-object-type TYPE] [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME] [--ocel-csv-output EVENTS.csv] [--ocel-csv-objects-output OBJECTS.csv] [--ocel-csv-event-id-column NAME] [--ocel-csv-activity-column NAME] [--ocel-csv-timestamp-column NAME] [--ocel-csv-object-type-prefix PREFIX] [--ocel-csv-object-id-column NAME] [--ocel-csv-object-type-column NAME] [--ocel-csv-delimiter CHAR] [--ocel-csv-trim-fields BOOL] [--ocel-csv-sort-events-by-timestamp BOOL] [--ocel-csv-reject-unsupported BOOL] [--ocel-csv-emit-objects BOOL] [--ocel-csv-allow-lossy BOOL] [--filter-object-count TYPE:N ...] [--filter-object-types TYPE1,TYPE2] [--filter-object-ids ID1,ID2] [--filter-object-level N] [--filter-object-negative] [--filter-start-events TYPE] [--filter-end-events TYPE] [--filter-activities-object-type TYPE] [--filter-cc-object ID] [--filter-cc-length MIN:MAX] [--filter-cc-object-type TYPE] [--filter-cc-object-type-negative] [--filter-cc-activity ACTIVITY] [--statistics object_type_activities|objects_ot_count|activity_associations|object_type_activity_associations|edge_associations] [--statistics-prefilter none|start|end] [--statistics-business-hours] [--statistics-business-hour-slots START-END,...] [--describe text|tuples|variant1|variant2] [--no-description-timestamps] [--features events|objects|events_objects] [--features-name-style native|compatibility] [--features-interaction-graph-source event_cooccurrence|event_and_o2o] [--features-object-neighbor-graph interaction|cobirth|codeath] [--features-filter-per-type TYPE] [--features-related-object-counts|--features-no-related-object-counts] [--features-related-object-counts-by-type|--features-no-related-object-counts-by-type] [--features-lifecycle-start|--features-no-lifecycle-start] [--features-lifecycle-end|--features-no-lifecycle-end] [--features-new-interactions|--features-no-new-interactions] [--features-interactions-by-type|--features-no-interactions-by-type] [--features-no-degree-centrality] [--features-all-object-features|--features-no-all-object-features] [--features-general-interaction|--features-no-general-interaction] [--features-general-descendants|--features-no-general-descendants] [--features-general-inheritance|--features-no-general-inheritance] [--features-cobirth|--features-no-cobirth] [--features-codeath|--features-no-codeath] [--features-related-events] [--features-related-activities] [--features-related-objects] [--features-object-neighbor-features] [--features-event-pointwise|--features-no-event-pointwise] [--features-object-pointwise|--features-no-object-pointwise] [--features-no-prefix] [--features-no-prefix-length] [--features-no-prefix-timediff] [--features-no-prefix-activities] [--features-no-lifecycle] [--features-no-lifecycle-length] [--features-no-lifecycle-unique-activities] [--features-no-lifecycle-duration] [--features-no-lifecycle-activities] [--features-lifecycle-paths|--features-no-lifecycle-paths] [--features-lifecycle-wip|--features-no-lifecycle-wip] [--features-max N] [--discover etot|ocdfg|ocpn|otg|saw] [--ocpn-annotation annotated|none] [--ocdfg-activity-attribute NAME] [--ocdfg-object-type-attribute NAME] [--saw-activity-attribute NAME] [--saw-object-type-attribute NAME] [--ocpn-activity-attribute NAME] [--ocpn-object-type-attribute NAME] [--ocpn-diagnostics-with-token-based-replay] [--enrich interaction,descendants,inheritance,cobirth,codeath] [--graph interaction|descendants|inheritance|cobirth|codeath|heterogeneous] [--graph-include-df BOOL] [--graph-include-object-changes BOOL] [--enrich-no-lifecycle] [--split connected_components|ancestors_descendants] [--split-object-type TYPE] [--split-max-objects N] [--split-max-degree-centrality F] [--ocpn-playout --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--oc-causal-net --ocpn-max-bindings N --ocpn-branching-transitions F --ocpn-branching-bindings F --ocpn-branching-activities F --ocpn-seed N --ocpn-max-traces N --ocpn-max-states N --ocpn-objects TYPE:ID1,ID2 --ocpn-initial-marking TYPE:T0,T1 --ocpn-final-marking TYPE:T0,T1 --ocpn-unique-objects --ocpn-event-binding independent|shared_activity|synchronized --ocpn-exists-trace --ocpn-return-sequences --ocpn-return-traces] [--conformance etot|ocdfg|otg --real ocel|graph --real-graph-kind etot|ocdfg|otg --normative OCEL.json|GRAPH.json --otg-theta-interaction F --otg-theta-descendants F --otg-theta-inheritance F --otg-theta-cobirth F --otg-theta-codeath F]\n";
+      std::cerr << "prefix feature controls: --features-prefix-length | --features-no-prefix-length | --features-prefix-timediff | --features-no-prefix-timediff | --features-prefix-activities | --features-no-prefix-activities\n";
+      std::cerr << "lifecycle feature controls: --features-lifecycle-paths | --features-no-lifecycle-paths\n";
       std::cerr << "flatten options: --flatten-object-type TYPE [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME]\n";
       return 2;
     }
@@ -78,6 +80,7 @@ int main(int argc, char** argv) {
     bool all_object_control_used = false;
     bool object_graph_control_used = false;
     bool interaction_graph_source_used = false;
+    bool object_neighbor_graph_control_used = false;
     bool related_object_control_used = false;
     bool event_control_used = false;
     bool pointwise_control_used = false;
@@ -483,6 +486,22 @@ int main(int argc, char** argv) {
               "--features-interaction-graph-source expects event_cooccurrence or event_and_o2o");
         }
         interaction_graph_source_used = true;
+      } else if (option == "--features-object-neighbor-graph") {
+        const auto graph_name = required_value(i, "--features-object-neighbor-graph");
+        if (graph_name == "interaction") {
+          feature_options.object_neighbor_graph =
+              minera::OcelObjectNeighborGraph::kInteraction;
+        } else if (graph_name == "cobirth") {
+          feature_options.object_neighbor_graph =
+              minera::OcelObjectNeighborGraph::kCobirth;
+        } else if (graph_name == "codeath") {
+          feature_options.object_neighbor_graph =
+              minera::OcelObjectNeighborGraph::kCodeath;
+        } else {
+          throw std::invalid_argument(
+              "--features-object-neighbor-graph expects interaction, cobirth, or codeath");
+        }
+        object_neighbor_graph_control_used = true;
       } else if (option == "--features-related-object-counts") {
         feature_options.include_event_num_rel_objs_features = true;
         event_control_used = true;
@@ -570,18 +589,20 @@ int main(int argc, char** argv) {
         pointwise_control_used = true;
       } else if (option == "--features-no-prefix") {
         feature_options.include_prefix_features = false;
-        feature_options.include_prefix_length_features = false;
-        feature_options.include_prefix_timediff_features = false;
-        feature_options.include_prefix_one_hot_features = false;
         prefix_control_used = true;
-      } else if (option == "--features-no-prefix-length") {
-        feature_options.include_prefix_length_features = false;
-        prefix_control_used = true;
-      } else if (option == "--features-no-prefix-timediff") {
-        feature_options.include_prefix_timediff_features = false;
-        prefix_control_used = true;
-      } else if (option == "--features-no-prefix-activities") {
-        feature_options.include_prefix_one_hot_features = false;
+      } else if (option == "--features-prefix-length" ||
+                 option == "--features-no-prefix-length" ||
+                 option == "--features-prefix-timediff" ||
+                 option == "--features-no-prefix-timediff" ||
+                 option == "--features-prefix-activities" ||
+                 option == "--features-no-prefix-activities") {
+        const bool enabled = option.rfind("--features-no-", 0) != 0;
+        if (option.ends_with("prefix-length"))
+          feature_options.include_prefix_length_features = enabled;
+        else if (option.ends_with("prefix-timediff"))
+          feature_options.include_prefix_timediff_features = enabled;
+        else
+          feature_options.include_prefix_one_hot_features = enabled;
         prefix_control_used = true;
       } else if ((option == "--features-numeric-events" ||
                   option == "--features-string-events" ||
@@ -610,6 +631,7 @@ int main(int argc, char** argv) {
         feature_options.include_interaction_features = false;
       } else if (option == "--features-no-lifecycle") {
         feature_options.include_lifecycle_features = false;
+        lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-length") {
         feature_options.include_lifecycle_length_features = false;
         lifecycle_object_control_used = true;
@@ -621,6 +643,9 @@ int main(int argc, char** argv) {
         lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-activities") {
         feature_options.include_lifecycle_activity_features = false;
+        lifecycle_object_control_used = true;
+      } else if (option == "--features-lifecycle-paths") {
+        feature_options.include_lifecycle_path_features = true;
         lifecycle_object_control_used = true;
       } else if (option == "--features-no-lifecycle-paths") {
         feature_options.include_lifecycle_path_features = false;
@@ -995,6 +1020,18 @@ int main(int argc, char** argv) {
         features != "objects" && !related_object_event_context)
       throw std::invalid_argument(
           "interaction graph source applies only to --features objects");
+    if (object_neighbor_graph_control_used && features.empty() &&
+        !related_object_event_context)
+      throw std::invalid_argument(
+          "neighbor graph selection requires --features objects");
+    if (object_neighbor_graph_control_used && !features.empty() &&
+        features != "objects" && !related_object_event_context)
+      throw std::invalid_argument(
+          "neighbor graph selection applies only to --features objects");
+    if (object_neighbor_graph_control_used &&
+        !feature_options.include_obj_con_in_graph_features)
+      throw std::invalid_argument(
+          "--features-object-neighbor-graph requires --features-object-neighbor-features");
     if (degree_centrality_control_used && features.empty() &&
         !related_object_event_context)
       throw std::invalid_argument(

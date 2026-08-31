@@ -64,6 +64,12 @@ function demoEntry(manifest) {
   return entry;
 }
 
+function memberEntry(manifest) {
+  const entry = manifest.packages.find((candidate) => candidate.package === "algo.member");
+  if (!entry) throw new Error("fixture manifest has no algo.member package");
+  return entry;
+}
+
 function binding(catalog, packageName, selector) {
   return catalog.algorithm_packages
     .find((entry) => entry.package === packageName)?.selector_bindings
@@ -203,6 +209,19 @@ function makeProject(directory) {
     "int run_conditional() { return 2; }",
     "int run_member() { return 3; }",
     "int run_distance() { return 4; }",
+    "",
+    "struct MemberOptions {",
+    "  bool enabled = true;",
+    "  // Child controls may be left unset.",
+    "  std::optional<bool> optional_enabled;",
+    "  // Attribute selections are populated by callers.",
+    "  std::vector<std::string> names;",
+    "  enum class Graph { kDefault, kAlternate };",
+    "  Graph graph = Graph::kDefault;",
+    "};",
+    "struct FakeOptions { bool fake_member = true; };",
+    "bool enabled() { return true; }",
+    "void fake_local() { bool local_only = false; (void)local_only; }",
     "// wrong_symbol exists only in a comment.",
     "const char* string_anchor = \"string_only\";",
     "",
@@ -211,7 +230,19 @@ function makeProject(directory) {
     "int run_first(); int run_conditional(); int run_member(); int run_distance();",
     "void first_case() { (void)run_first(); }",
     "void conditional_case() { (void)run_conditional(); }",
-    "void member_case() { (void)run_member(); }",
+    "struct MemberOptions {",
+    "  static inline bool enabled = true;",
+    "  static inline int optional_enabled = 0;",
+    "  static inline int names = 0;",
+    "  static inline int graph = 0;",
+    "};",
+    "void member_case() {",
+    "  (void)run_member();",
+    "  (void)MemberOptions::enabled;",
+    "  (void)MemberOptions::optional_enabled;",
+    "  (void)MemberOptions::names;",
+    "  (void)MemberOptions::graph;",
+    "}",
     "void distance_case() { (void)run_distance(); }",
     "int main() { first_case(); conditional_case(); member_case(); distance_case(); }",
     "",
@@ -370,6 +401,46 @@ try {
   ];
   expectSuccess(args());
   expectSuccess([...args(), "--require-complete"]);
+
+  const memberFields = clone(manifest);
+  memberEntry(memberFields).proofs.MEMBER.implementation = [
+    { path: "src/demo.cpp", symbol: "MemberOptions::enabled" },
+    { path: "src/demo.cpp", symbol: "MemberOptions::optional_enabled" },
+    { path: "src/demo.cpp", symbol: "MemberOptions::names" },
+    { path: "src/demo.cpp", symbol: "MemberOptions::graph" },
+  ];
+  memberEntry(memberFields).proofs.MEMBER.tests = [{
+    path: "tests/test_demo.cpp",
+    executable: "demo_tests",
+    case: "member_case",
+  }];
+  writeJson(join(project, "member-fields.json"), memberFields);
+  expectSuccess(args(join(project, "member-fields.json")));
+  expectSuccess([...args(join(project, "member-fields.json")), "--require-complete"]);
+
+  const missingMember = clone(memberFields);
+  missingMember.packages.find((entry) => entry.package === "algo.member")
+    .proofs.MEMBER.implementation[0].symbol = "MemberOptions::missing";
+  writeJson(join(project, "missing-member.json"), missingMember);
+  expectFailure(args(join(project, "missing-member.json")), "is not a code declaration");
+
+  const fakeOwner = clone(memberFields);
+  fakeOwner.packages.find((entry) => entry.package === "algo.member")
+    .proofs.MEMBER.implementation[0].symbol = "MemberOptions::fake_member";
+  writeJson(join(project, "fake-owner.json"), fakeOwner);
+  expectFailure(args(join(project, "fake-owner.json")), "is not a code declaration");
+
+  const functionWrongOwner = clone(memberFields);
+  functionWrongOwner.packages.find((entry) => entry.package === "algo.member")
+    .proofs.MEMBER.implementation[0].symbol = "MissingOptions::enabled";
+  writeJson(join(project, "function-wrong-owner.json"), functionWrongOwner);
+  expectFailure(args(join(project, "function-wrong-owner.json")), "is not a code declaration");
+
+  const localMention = clone(memberFields);
+  localMention.packages.find((entry) => entry.package === "algo.member")
+    .proofs.MEMBER.implementation[0].symbol = "MemberOptions::local_only";
+  writeJson(join(project, "local-mention.json"), localMention);
+  expectFailure(args(join(project, "local-mention.json")), "is not a code declaration");
 
   const cleanCatalog = JSON.stringify(catalog);
   rmSync(join(reference, "reference_pkg", "algo", "demo", "algorithm.py"));

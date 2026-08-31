@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
-#include <ctime>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -81,9 +81,26 @@ std::optional<double> numeric_value(const OcelValue& value) {
   return std::nullopt;
 }
 
-std::string string_value(const OcelValue& value) {
+std::optional<std::string> string_value(const OcelValue& value) {
   if (const auto* text = std::get_if<std::string>(&value)) return *text;
-  return {};
+  if (const auto* boolean = std::get_if<bool>(&value))
+    return *boolean ? "True" : "False";
+  if (const auto* integer = std::get_if<std::int64_t>(&value))
+    return std::to_string(*integer);
+  if (const auto* real = std::get_if<double>(&value)) {
+    if (!std::isfinite(*real)) return std::nullopt;
+    std::array<char, 64> buffer{};
+    const auto [end, error] = std::to_chars(
+        buffer.data(), buffer.data() + buffer.size(), *real,
+        std::chars_format::general);
+    if (error != std::errc{}) return std::nullopt;
+    std::string text(buffer.data(), end);
+    // Preserve the distinction between a floating-point 2.0 and the integer
+    // value 2 when scalar values are stringified for categorical columns.
+    if (text.find_first_of(".eE") == std::string::npos) text += ".0";
+    return text;
+  }
+  return std::nullopt;
 }
 
 const OcelAttribute* find_attribute(const std::vector<OcelAttribute>& attrs,
@@ -91,6 +108,15 @@ const OcelAttribute* find_attribute(const std::vector<OcelAttribute>& attrs,
   for (const auto& attr : attrs)
     if (attr.key == key) return &attr;
   return nullptr;
+}
+
+std::vector<std::string> ordered_unique(std::vector<std::string> values) {
+  std::set<std::string> seen;
+  std::vector<std::string> result;
+  result.reserve(values.size());
+  for (auto& value : values)
+    if (seen.insert(value).second) result.push_back(std::move(value));
+  return result;
 }
 
 std::vector<std::string> sorted_unique(std::vector<std::string> values) {
@@ -103,14 +129,14 @@ std::vector<std::string> activity_names(const Ocel& log) {
   std::vector<std::string> values;
   values.reserve(log.events.size());
   for (const auto& event : log.events) values.push_back(event.activity);
-  return sorted_unique(std::move(values));
+  return ordered_unique(std::move(values));
 }
 
 std::vector<std::string> object_type_names(const Ocel& log) {
   std::vector<std::string> values;
   values.reserve(log.objects.size());
   for (const auto& object : log.objects) values.push_back(object.type);
-  return sorted_unique(std::move(values));
+  return ordered_unique(std::move(values));
 }
 
 std::set<ObjectPair> interaction_edges(
@@ -136,6 +162,90 @@ std::set<ObjectPair> interaction_edges(
       edges.insert(std::minmax(left->second, right->second));
   }
   return edges;
+}
+
+struct ObjectGraphFamilies {
+  std::set<ObjectPair> interaction;
+  std::set<ObjectPair> descendants;
+  std::set<ObjectPair> inheritance;
+  std::set<ObjectPair> cobirth;
+  std::set<ObjectPair> codeath;
+};
+
+std::vector<std::vector<std::size_t>> unique_event_objects(
+    const std::vector<std::vector<std::size_t>>& event_objects) {
+  auto result = event_objects;
+  for (auto& objects : result) {
+    std::sort(objects.begin(), objects.end());
+    objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
+  }
+  return result;
+}
+
+ObjectGraphFamilies build_object_graph_families(
+    const Ocel& log, const std::vector<std::vector<std::size_t>>& event_objects) {
+  ObjectGraphFamilies graphs;
+  const auto event_objects_unique = unique_event_objects(event_objects);
+  for (const auto& objects : event_objects_unique)
+    for (std::size_t left = 0; left < objects.size(); ++left)
+      for (std::size_t right = left + 1; right < objects.size(); ++right)
+        graphs.interaction.emplace(objects[left], objects[right]);
+
+  std::vector<std::size_t> forward_events(log.events.size());
+  std::iota(forward_events.begin(), forward_events.end(), 0);
+  {
+    std::set<std::size_t> seen;
+    for (const auto event : forward_events) {
+      const auto& objects = event_objects_unique[event];
+      std::vector<std::size_t> unseen;
+      for (const auto object : objects)
+        if (!seen.contains(object)) unseen.push_back(object);
+      for (const auto object : objects) {
+        if (!seen.contains(object)) continue;
+        for (const auto child : unseen) graphs.descendants.emplace(object, child);
+      }
+      for (std::size_t left = 0; left < unseen.size(); ++left)
+        for (std::size_t right = left + 1; right < unseen.size(); ++right)
+          graphs.cobirth.emplace(unseen[left], unseen[right]);
+      seen.insert(unseen.begin(), unseen.end());
+    }
+  }
+  {
+    std::set<std::size_t> seen;
+    for (auto event = forward_events.rbegin(); event != forward_events.rend();
+         ++event) {
+      const auto& objects = event_objects_unique[*event];
+      std::vector<std::size_t> unseen;
+      for (const auto object : objects)
+        if (!seen.contains(object)) unseen.push_back(object);
+      for (std::size_t left = 0; left < unseen.size(); ++left)
+        for (std::size_t right = left + 1; right < unseen.size(); ++right)
+          graphs.codeath.emplace(unseen[left], unseen[right]);
+      seen.insert(unseen.begin(), unseen.end());
+    }
+  }
+
+  std::vector<std::size_t> first(log.objects.size(), log.events.size());
+  std::vector<std::size_t> last(log.objects.size(), log.events.size());
+  for (std::size_t event = 0; event < event_objects_unique.size(); ++event)
+    for (const auto object : event_objects_unique[event]) {
+      first[object] = std::min(first[object], event);
+      last[object] = event;
+    }
+  for (std::size_t event = 0; event < event_objects_unique.size(); ++event) {
+    const auto& objects = event_objects_unique[event];
+    for (const auto source : objects) {
+      if (last[source] != event) continue;
+      for (const auto target : objects)
+        if (source != target && first[target] == event)
+          graphs.inheritance.emplace(source, target);
+    }
+  }
+  std::vector<ObjectPair> reciprocal;
+  for (const auto& edge : graphs.inheritance)
+    if (graphs.inheritance.contains({edge.second, edge.first})) reciprocal.push_back(edge);
+  for (const auto& edge : reciprocal) graphs.inheritance.erase(edge);
+  return graphs;
 }
 
 std::map<std::string, std::vector<std::size_t>> event_relations(
@@ -164,24 +274,58 @@ std::vector<std::optional<double>> event_times(const Ocel& log) {
   return times;
 }
 
-std::array<double, 5> calendar_features(double seconds) {
-  std::tm calendar{};
-  const auto epoch = static_cast<std::time_t>(std::floor(seconds));
-#if defined(_WIN32)
-  if (gmtime_s(&calendar, &epoch) != 0) {
-    return {seconds, 0.0, 0.0, 0.0, 0.0};
+std::optional<int> timestamp_integer(std::string_view text, std::size_t offset,
+                                     std::size_t count) {
+  if (offset + count > text.size() || count == 0) return std::nullopt;
+  int result = 0;
+  for (std::size_t index = 0; index < count; ++index) {
+    const auto value = static_cast<unsigned char>(text[offset + index]);
+    if (value < '0' || value > '9') return std::nullopt;
+    result = result * 10 + static_cast<int>(value - '0');
   }
-#else
-  if (gmtime_r(&epoch, &calendar) == nullptr) {
-    return {seconds, 0.0, 0.0, 0.0, 0.0};
+  return result;
+}
+
+// Return the number of civil days relative to 1970-01-01.  This Gregorian
+// calculation intentionally never consults the process timezone, so calendar
+// features preserve the source timestamp's local offset.
+std::int64_t days_from_civil(int year, unsigned month, unsigned day) {
+  year -= month <= 2;
+  const auto era = (year >= 0 ? year : year - 399) / 400;
+  const auto year_of_era = static_cast<unsigned>(year - era * 400);
+  const auto month_prime = month > 2 ? month - 3 : month + 9;
+  const auto day_of_year = (153 * month_prime + 2) / 5 + day - 1;
+  const auto day_of_era = year_of_era * 365 + year_of_era / 4 -
+                          year_of_era / 100 + day_of_year;
+  return static_cast<std::int64_t>(era) * 146097 +
+         static_cast<std::int64_t>(day_of_era) - 719468;
+}
+
+std::array<double, 5> calendar_features(std::string_view text, double seconds) {
+  const auto year = timestamp_integer(text, 0, 4);
+  const auto month = timestamp_integer(text, 5, 2);
+  const auto day = timestamp_integer(text, 8, 2);
+  if (!year || !month || !day || text.size() < 10 || text[4] != '-' ||
+      text[7] != '-')
+    throw std::invalid_argument("OCEL feature timestamp is invalid");
+
+  int hour = 0;
+  if (text.size() > 10) {
+    if (text.size() < 16 ||
+        (text[10] != 'T' && text[10] != 't' && text[10] != ' ') ||
+        text[13] != ':')
+      throw std::invalid_argument("OCEL feature timestamp is invalid");
+    const auto parsed_hour = timestamp_integer(text, 11, 2);
+    const auto parsed_minute = timestamp_integer(text, 14, 2);
+    if (!parsed_hour || !parsed_minute)
+      throw std::invalid_argument("OCEL feature timestamp is invalid");
+    hour = *parsed_hour;
   }
-#endif
-  // The table uses Monday as weekday zero, while tm_wday uses Sunday zero.
-  const auto weekday = (calendar.tm_wday + 6) % 7;
-  return {seconds, static_cast<double>(weekday),
-          static_cast<double>(calendar.tm_hour),
-          static_cast<double>(calendar.tm_mon + 1),
-          static_cast<double>(calendar.tm_mday)};
+  const auto weekday = days_from_civil(*year, static_cast<unsigned>(*month),
+                                       static_cast<unsigned>(*day));
+  const auto monday_zero = static_cast<int>(((weekday + 3) % 7 + 7) % 7);
+  return {seconds, static_cast<double>(monday_zero), static_cast<double>(hour),
+          static_cast<double>(*month), static_cast<double>(*day)};
 }
 
 class TableBuilder {
@@ -228,6 +372,7 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
                        const std::vector<std::string>& activities,
                        const std::vector<std::string>& object_types,
                        const std::vector<std::vector<std::size_t>>& event_objects,
+                       const std::vector<std::vector<std::size_t>>& object_events,
                        const std::vector<std::optional<double>>& times,
                        const std::vector<std::string>& object_types_by_index) {
   if (options.include_activity_features) {
@@ -246,7 +391,9 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
     for (std::size_t field = 0; field < names.size(); ++field) {
       std::vector<double> values(log.events.size(), 0.0);
       for (std::size_t row = 0; row < log.events.size(); ++row)
-        if (times[row]) values[row] = calendar_features(*times[row])[field];
+        if (times[row])
+          values[row] = calendar_features(log.events[row].timestamp,
+                                          *times[row])[field];
       builder.add(names[field], std::move(values));
     }
   }
@@ -267,9 +414,13 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
     if (include_event_num_rel_objs_type) {
       for (const auto& type : object_types) {
         std::vector<double> values(log.events.size(), 0.0);
-        for (std::size_t row = 0; row < log.events.size(); ++row)
+        for (std::size_t row = 0; row < log.events.size(); ++row) {
+          std::set<std::size_t> seen_objects;
           for (const auto object : event_objects[row])
-            if (object_types_by_index[object] == type) values[row] += 1.0;
+            if (object_types_by_index[object] == type &&
+                seen_objects.insert(object).second)
+              values[row] += 1.0;
+        }
         builder.add("@@event_num_rel_objs_type_" + type, std::move(values));
       }
     }
@@ -300,28 +451,22 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       if (include_event_start_ot) {
         std::vector<double> starts(log.events.size(), 0.0);
         std::map<std::size_t, bool> seen_start;
-        for (std::size_t row = 0; row < log.events.size(); ++row) {
-          for (const auto object : event_objects[row]) {
-            if (object_types_by_index[object] != type) continue;
-            if (!seen_start.contains(object)) {
-              starts[row] = 1.0;
-              seen_start[object] = true;
-            }
-          }
+        for (std::size_t object = 0; object < object_events.size(); ++object) {
+          if (object_types_by_index[object] != type || object_events[object].empty())
+            continue;
+          const auto event = object_events[object].front();
+          if (seen_start.emplace(object, true).second) starts[event] = 1.0;
         }
         builder.add("@@event_start_" + type, std::move(starts));
       }
       if (include_event_end_ot) {
         std::vector<double> ends(log.events.size(), 0.0);
         std::map<std::size_t, bool> seen_end;
-        for (std::size_t row = log.events.size(); row-- > 0;) {
-          for (const auto object : event_objects[row]) {
-            if (object_types_by_index[object] != type) continue;
-            if (!seen_end.contains(object)) {
-              ends[row] = 1.0;
-              seen_end[object] = true;
-            }
-          }
+        for (std::size_t object = 0; object < object_events.size(); ++object) {
+          if (object_types_by_index[object] != type || object_events[object].empty())
+            continue;
+          const auto event = object_events[object].back();
+          if (seen_end.emplace(object, true).second) ends[event] = 1.0;
         }
         builder.add("@@event_end_" + type, std::move(ends));
       }
@@ -350,13 +495,14 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
     std::vector<std::string> values;
     for (const auto& event : log.events)
       if (const auto* attr = find_attribute(event.attributes, key))
-        values.push_back(string_value(attr->value));
+        if (const auto value = string_value(attr->value)) values.push_back(*value);
     const auto categories = sorted_unique(std::move(values));
     for (const auto& category : categories) {
       std::vector<double> column(log.events.size(), 0.0);
       for (std::size_t row = 0; row < log.events.size(); ++row)
         if (const auto* attr = find_attribute(log.events[row].attributes, key))
-          column[row] = string_value(attr->value) == category ? 1.0 : 0.0;
+          if (const auto value = string_value(attr->value))
+            column[row] = *value == category ? 1.0 : 0.0;
       const auto prefix = options.feature_name_style ==
                                   OcelFeatureNameStyle::kCompatibility
                               ? "@@event_attr_value_"
@@ -379,7 +525,10 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
           if (seen_pairs.insert({objects[left], objects[right]}).second)
             new_interactions[row] += 1.0;
     }
-    builder.add("@@event_new_interactions", std::move(new_interactions));
+    builder.add(options.feature_name_style == OcelFeatureNameStyle::kCompatibility
+                    ? "@@ev_new_interactions"
+                    : "@@event_new_interactions",
+                std::move(new_interactions));
   }
 }
 
@@ -410,6 +559,43 @@ std::vector<Lifecycle> make_lifecycles(
   return lifecycles;
 }
 
+OcelFeatureOptions complete_object_preset(const OcelFeatureOptions& options) {
+  auto result = options;
+  // Neighbor and related-object projections aggregate this stable source
+  // schema.  It intentionally contains the complete object feature families
+  // but none of the projections that would recurse or add selected/native
+  // extension columns.
+  result.include_activity_features = false;
+  result.include_attribute_counts = false;
+  result.include_lifecycle_features = true;
+  result.include_lifecycle_length_features = true;
+  result.include_lifecycle_unique_activity_features = true;
+  result.include_lifecycle_duration_features = true;
+  result.include_lifecycle_activity_features = true;
+  result.include_lifecycle_path_features = false;
+  result.include_lifecycle_wip_features = false;
+  // Explicit attribute selectors remain part of the source schema.  The
+  // broad preset contributes the standard lifecycle/graph families; it does
+  // not erase a caller's deliberate numeric or string attribute request.
+  result.include_all_object_features = true;
+  result.include_degree_centrality_features.reset();
+  result.include_interaction_by_type_features.reset();
+  result.include_general_interaction_features.reset();
+  result.include_general_descendants_features.reset();
+  result.include_general_inheritance_features.reset();
+  result.include_cobirth_features.reset();
+  result.include_codeath_features.reset();
+  result.include_interaction_features = false;
+  result.interaction_graph_source = OcelInteractionGraphSource::kEventCooccurrence;
+  result.include_related_events_features = false;
+  result.include_related_activities_features = false;
+  result.include_related_objects_features = false;
+  result.include_obj_con_in_graph_features = false;
+  result.filter_per_type.reset();
+  result.max_features = std::numeric_limits<std::size_t>::max();
+  return result;
+}
+
 void add_object_columns(TableBuilder& builder, const Ocel& log,
                         const OcelFeatureOptions& options,
                         const std::vector<std::string>& activities,
@@ -432,20 +618,20 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       values[row] = static_cast<double>(log.objects[row].attributes.size());
     builder.add("@@object_num_attributes", std::move(values));
   }
-  if (options.include_lifecycle_features) {
-    if (options.include_lifecycle_length_features) {
+  if (options.include_lifecycle_features.value_or(true)) {
+    if (options.include_lifecycle_length_features.value_or(true)) {
       std::vector<double> length(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < log.objects.size(); ++row)
         length[row] = static_cast<double>(lifecycles[row].event_indices.size());
       builder.add("@@object_lifecycle_length", std::move(length));
     }
-    if (options.include_lifecycle_unique_activity_features) {
+    if (options.include_lifecycle_unique_activity_features.value_or(true)) {
       std::vector<double> unique(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < log.objects.size(); ++row)
         unique[row] = static_cast<double>(lifecycles[row].unique_activities.size());
       builder.add("@@object_lifecycle_unq_act", std::move(unique));
     }
-    if (options.include_lifecycle_duration_features) {
+    if (options.include_lifecycle_duration_features.value_or(true)) {
       std::vector<double> duration(log.objects.size(), 0.0),
           start(log.objects.size(), 0.0), end(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < log.objects.size(); ++row) {
@@ -458,7 +644,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       builder.add("@@object_lifecycle_start_timestamp", std::move(start));
       builder.add("@@object_lifecycle_end_timestamp", std::move(end));
     }
-    if (options.include_lifecycle_activity_features) {
+    if (options.include_lifecycle_activity_features.value_or(true)) {
       for (const auto& activity : activities) {
         std::vector<double> values(log.objects.size(), 0.0);
         for (std::size_t row = 0; row < log.objects.size(); ++row)
@@ -467,7 +653,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
         builder.add("@@ocel_lif_activity_" + activity, std::move(values));
       }
     }
-    if (options.include_lifecycle_path_features) {
+    if (options.include_lifecycle_path_features.value_or(false)) {
       std::set<std::pair<std::string, std::string>> paths;
       for (const auto& lifecycle : lifecycles)
         for (const auto& [path, count] : lifecycle.paths) {
@@ -486,6 +672,8 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
     if (options.include_lifecycle_wip_features.value_or(false)) {
       std::vector<double> wip(log.objects.size(), 0.0);
+      for (std::size_t row = 0; row < log.objects.size(); ++row)
+        if (lifecycles[row].event_indices.empty()) wip[row] = 1.0;
       // Sort valid lifecycles by their start/end boundary, then count the
       // contiguous suffix whose start is within the current end boundary.
       // The feature is intentionally directional: an earlier lifecycle can
@@ -529,13 +717,14 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     std::vector<std::string> values;
     for (const auto& object : log.objects)
       if (const auto* attr = find_attribute(object.attributes, key))
-        values.push_back(string_value(attr->value));
+        if (const auto value = string_value(attr->value)) values.push_back(*value);
     const auto categories = sorted_unique(std::move(values));
     for (const auto& category : categories) {
       std::vector<double> column(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < log.objects.size(); ++row)
         if (const auto* attr = find_attribute(log.objects[row].attributes, key))
-          column[row] = string_value(attr->value) == category ? 1.0 : 0.0;
+          if (const auto value = string_value(attr->value))
+            column[row] = *value == category ? 1.0 : 0.0;
       const auto prefix = options.feature_name_style ==
                                   OcelFeatureNameStyle::kCompatibility
                               ? "@@object_attr_value_"
@@ -555,10 +744,29 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   if (include_degree_centrality_features ||
       options.include_interaction_features ||
       include_interaction_by_type_features) {
+    const auto graph_source = options.interaction_graph_source.value_or(
+        OcelInteractionGraphSource::kEventCooccurrence);
     const auto interactions = interaction_edges(
-        log, event_objects, options.interaction_graph_source.value_or(
-                                OcelInteractionGraphSource::kEventAndO2O));
+        log, event_objects, graph_source);
     std::vector<std::set<std::size_t>> neighbors(log.objects.size());
+    std::set<std::size_t> active_objects;
+    for (const auto& objects : event_objects) {
+      std::set<std::size_t> unique(objects.begin(), objects.end());
+      active_objects.insert(unique.begin(), unique.end());
+    }
+    if (graph_source == OcelInteractionGraphSource::kEventAndO2O) {
+      IndexMap object_ids;
+      for (std::size_t row = 0; row < log.objects.size(); ++row)
+        object_ids.emplace(log.objects[row].id, row);
+      for (const auto& relation : log.o2o) {
+        if (const auto source = object_ids.find(relation.source_id);
+            source != object_ids.end())
+          active_objects.insert(source->second);
+        if (const auto target = object_ids.find(relation.target_id);
+            target != object_ids.end())
+          active_objects.insert(target->second);
+      }
+    }
     for (const auto& edge : interactions) {
       neighbors[edge.first].insert(edge.second);
       neighbors[edge.second].insert(edge.first);
@@ -566,11 +774,13 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     if (include_degree_centrality_features) {
       std::vector<double> degree(log.objects.size(), 0.0);
       for (std::size_t row = 0; row < neighbors.size(); ++row)
-        degree[row] = static_cast<double>(neighbors[row].size());
-      const auto denominator = log.objects.size() > 1
-                                   ? static_cast<double>(log.objects.size() - 1)
+        if (active_objects.contains(row))
+          degree[row] = static_cast<double>(neighbors[row].size());
+      const auto denominator = active_objects.size() > 1
+                                   ? static_cast<double>(active_objects.size() - 1)
                                    : 1.0;
-      for (auto& value : degree) value /= denominator;
+      for (std::size_t row = 0; row < degree.size(); ++row)
+        if (active_objects.contains(row)) degree[row] /= denominator;
       builder.add("@@object_degree_centrality", std::move(degree));
     }
     if (include_interaction_by_type_features) {
@@ -607,90 +817,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       include_general_inheritance_features || include_cobirth_features ||
       include_codeath_features;
   if (include_general_graph_features) {
-    using ObjectPair = std::pair<std::size_t, std::size_t>;
-    std::set<ObjectPair> interaction_graph;
-    std::set<ObjectPair> descendants_graph;
-    std::set<ObjectPair> inheritance_graph;
-    std::set<ObjectPair> cobirth_graph;
-    std::set<ObjectPair> codeath_graph;
-
-    // Relations are deduplicated per event before constructing the graph
-    // families, so repeated object-event rows do not inflate any feature.
-    const auto event_objects_unique = [&]() {
-      std::vector<std::vector<std::size_t>> result = event_objects;
-      for (auto& objects : result) {
-        std::sort(objects.begin(), objects.end());
-        objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
-      }
-      return result;
-    }();
-
-    for (const auto& objects : event_objects_unique) {
-      for (std::size_t left = 0; left < objects.size(); ++left) {
-        for (std::size_t right = left + 1; right < objects.size(); ++right)
-          interaction_graph.emplace(objects[left], objects[right]);
-      }
-    }
-
-    std::vector<std::size_t> forward_events(log.events.size());
-    std::iota(forward_events.begin(), forward_events.end(), 0);
-    // Build descendants and cobirth together in the event order.
-    {
-      std::set<std::size_t> seen;
-      for (const auto event : forward_events) {
-        const auto& objects = event_objects_unique[event];
-        std::vector<std::size_t> unseen;
-        for (const auto object : objects)
-          if (!seen.contains(object)) unseen.push_back(object);
-        for (const auto object : objects) {
-          if (!seen.contains(object)) continue;
-          for (const auto child : unseen) descendants_graph.emplace(object, child);
-        }
-        for (std::size_t left = 0; left < unseen.size(); ++left)
-          for (std::size_t right = left + 1; right < unseen.size(); ++right)
-            cobirth_graph.emplace(unseen[left], unseen[right]);
-        seen.insert(unseen.begin(), unseen.end());
-      }
-    }
-    // Codeath is the same first-seen construction with the event order
-    // traversed backwards.
-    {
-      std::set<std::size_t> seen;
-      for (auto event = forward_events.rbegin(); event != forward_events.rend();
-           ++event) {
-        const auto& objects = event_objects_unique[*event];
-        std::vector<std::size_t> unseen;
-        for (const auto object : objects)
-          if (!seen.contains(object)) unseen.push_back(object);
-        for (std::size_t left = 0; left < unseen.size(); ++left)
-          for (std::size_t right = left + 1; right < unseen.size(); ++right)
-            codeath_graph.emplace(unseen[left], unseen[right]);
-        seen.insert(unseen.begin(), unseen.end());
-      }
-    }
-
-    std::vector<std::size_t> first(log.objects.size(), log.events.size());
-    std::vector<std::size_t> last(log.objects.size(), log.events.size());
-    for (std::size_t event = 0; event < event_objects_unique.size(); ++event)
-      for (const auto object : event_objects_unique[event]) {
-        first[object] = std::min(first[object], event);
-        last[object] = event;
-      }
-    for (std::size_t event = 0; event < event_objects_unique.size(); ++event) {
-      const auto& objects = event_objects_unique[event];
-      for (const auto source : objects) {
-        if (last[source] != event) continue;
-        for (const auto target : objects) {
-          if (source != target && first[target] == event)
-            inheritance_graph.emplace(source, target);
-        }
-      }
-    }
-    std::set<ObjectPair> reciprocal_edges;
-    for (const auto& edge : inheritance_graph)
-      if (inheritance_graph.contains({edge.second, edge.first}))
-        reciprocal_edges.insert(edge);
-    for (const auto& edge : reciprocal_edges) inheritance_graph.erase(edge);
+    const auto graphs = build_object_graph_families(log, event_objects);
 
     const auto undirected_degrees = [&](const std::set<ObjectPair>& graph) {
       std::vector<std::set<std::size_t>> neighbors(log.objects.size());
@@ -712,23 +839,23 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     };
     if (include_general_interaction_features)
       builder.add("@@object_general_interaction_graph",
-                  undirected_degrees(interaction_graph));
+                  undirected_degrees(graphs.interaction));
     if (include_general_descendants_features) {
-      add_directed_degrees(descendants_graph, true,
+      add_directed_degrees(graphs.descendants, true,
                            "@@object_general_descendants_graph_ascendants");
-      add_directed_degrees(descendants_graph, false,
+      add_directed_degrees(graphs.descendants, false,
                            "@@object_general_descendants_graph_descendants");
     }
     if (include_general_inheritance_features) {
-      add_directed_degrees(inheritance_graph, true,
+      add_directed_degrees(graphs.inheritance, true,
                            "@@object_general_inheritance_graph_ascendants");
-      add_directed_degrees(inheritance_graph, false,
+      add_directed_degrees(graphs.inheritance, false,
                            "@@object_general_inheritance_graph_descendants");
     }
     if (include_cobirth_features)
-      builder.add("@@object_cobirth", undirected_degrees(cobirth_graph));
+      builder.add("@@object_cobirth", undirected_degrees(graphs.cobirth));
     if (include_codeath_features)
-      builder.add("@@object_codeath", undirected_degrees(codeath_graph));
+      builder.add("@@object_codeath", undirected_degrees(graphs.codeath));
   }
 
   if (options.include_related_events_features ||
@@ -739,7 +866,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     TableBuilder event_builder(log.events.size(),
                                std::numeric_limits<std::size_t>::max());
     add_event_columns(event_builder, log, options, activities, object_types,
-                      event_objects, times, [&]() {
+                      event_objects, object_events, times, [&]() {
                         std::vector<std::string> types;
                         types.reserve(log.objects.size());
                         for (const auto& object : log.objects) types.push_back(object.type);
@@ -785,7 +912,7 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       for (const auto& events : object_events)
         for (const auto event : events)
           related_activities.push_back(log.events[event].activity);
-      related_activities = sorted_unique(std::move(related_activities));
+      related_activities = ordered_unique(std::move(related_activities));
       std::vector<std::vector<std::size_t>> last_by_activity(
           related_activities.size(),
           std::vector<std::size_t>(log.objects.size(), log.events.size()));
@@ -811,22 +938,32 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
   }
 
   if (options.include_obj_con_in_graph_features) {
-    const auto interactions = interaction_edges(
-        log, event_objects, options.interaction_graph_source.value_or(
-                                OcelInteractionGraphSource::kEventAndO2O));
+    std::set<ObjectPair> selected_graph;
+    switch (options.object_neighbor_graph) {
+      case OcelObjectNeighborGraph::kInteraction:
+        selected_graph = interaction_edges(
+            log, event_objects,
+            options.interaction_graph_source.value_or(
+                OcelInteractionGraphSource::kEventCooccurrence));
+        break;
+      case OcelObjectNeighborGraph::kCobirth:
+        selected_graph = build_object_graph_families(log, event_objects).cobirth;
+        break;
+      case OcelObjectNeighborGraph::kCodeath:
+        selected_graph = build_object_graph_families(log, event_objects).codeath;
+        break;
+      default:
+        throw std::invalid_argument("OCEL object_neighbor_graph is invalid");
+    }
     std::vector<std::set<std::size_t>> neighbors(log.objects.size());
-    for (const auto& [left, right] : interactions) {
+    for (const auto& [left, right] : selected_graph) {
       neighbors[left].insert(right);
       neighbors[right].insert(left);
     }
 
-    // Recursively obtain the ordinary object feature set, with all derived
+    // Obtain the complete ordinary object feature set, with all derived
     // relation/neighbor controls disabled to avoid self-referential columns.
-    auto base_options = options;
-    base_options.include_related_events_features = false;
-    base_options.include_related_activities_features = false;
-    base_options.include_obj_con_in_graph_features = false;
-    base_options.max_features = std::numeric_limits<std::size_t>::max();
+    auto base_options = complete_object_preset(options);
     TableBuilder base_builder(log.objects.size(), base_options.max_features);
     add_object_columns(base_builder, log, base_options, activities, object_types,
                        object_events, event_objects, times, lifecycles);
@@ -875,12 +1012,10 @@ void add_related_object_columns(
     const std::vector<Lifecycle>& lifecycles) {
   if (!options.include_related_objects_features) return;
 
-  // Build the same deterministic object schema as the standalone OBJECTS
-  // table. Keep every selected object feature family; only this aggregation
-  // itself is disabled so the source schema cannot recurse.
-  auto base_options = options;
-  base_options.include_related_objects_features = false;
-  base_options.max_features = std::numeric_limits<std::size_t>::max();
+  // Build the complete deterministic object schema used by the standalone
+  // reference-compatible object preset. The aggregation itself is disabled
+  // so the source schema cannot recurse.
+  auto base_options = complete_object_preset(options);
   TableBuilder object_builder(log.objects.size(), base_options.max_features);
   add_object_columns(object_builder, log, base_options, activities, object_types,
                      object_events, event_objects, times, lifecycles);
@@ -925,28 +1060,46 @@ void add_prefix_columns(
     const std::vector<std::string>& activities, const IndexMap& event_index,
     const IndexMap& object_index,
     const std::vector<std::optional<double>>& times) {
-  if (!options.include_prefix_features) return;
+  const bool include_length = options.include_prefix_length_features.value_or(
+      options.include_prefix_features);
+  const bool include_timediff = options.include_prefix_timediff_features.value_or(
+      options.include_prefix_features);
+  const bool include_one_hot = options.include_prefix_one_hot_features.value_or(
+      options.include_prefix_features);
+  if (!include_length && !include_timediff && !include_one_hot) return;
 
   std::vector<std::vector<std::size_t>> seen_events(log.objects.size());
   std::vector<std::vector<std::size_t>> prefixes(log.relations.size());
+  std::map<std::pair<std::size_t, std::size_t>, std::vector<std::size_t>>
+      duplicate_prefixes;
   for (std::size_t row = 0; row < log.relations.size(); ++row) {
     const auto event = event_index.find(log.relations[row].event_id);
     const auto object = object_index.find(log.relations[row].object_id);
     if (event == event_index.end() || object == object_index.end())
       throw std::invalid_argument("OCEL feature prefix relation references an unknown id");
     auto& seen = seen_events[object->second];
+    const auto identity = std::make_pair(event->second, object->second);
+    if (const auto duplicate = duplicate_prefixes.find(identity);
+        duplicate != duplicate_prefixes.end()) {
+      // Duplicate relation rows represent the same event/object identity. A
+      // duplicate keeps the canonical prefix snapshot while the first row is
+      // still the only row that advances the object-local history.
+      prefixes[row] = duplicate->second;
+      continue;
+    }
     prefixes[row] = seen;
+    duplicate_prefixes.emplace(identity, prefixes[row]);
     if (std::find(seen.begin(), seen.end(), event->second) == seen.end())
       seen.push_back(event->second);
   }
 
-  if (options.include_prefix_length_features) {
+  if (include_length) {
     std::vector<double> values(log.relations.size(), 0.0);
     for (std::size_t row = 0; row < values.size(); ++row)
       values[row] = static_cast<double>(prefixes[row].size());
     builder.add("@@ev_obj_pref_length", std::move(values));
   }
-  if (options.include_prefix_timediff_features) {
+  if (include_timediff) {
     std::vector<double> values(log.relations.size(), 0.0);
     for (std::size_t row = 0; row < values.size(); ++row) {
       const auto event = event_index.at(log.relations[row].event_id);
@@ -956,7 +1109,7 @@ void add_prefix_columns(
     }
     builder.add("@@ev_obj_pref_timediff", std::move(values));
   }
-  if (options.include_prefix_one_hot_features) {
+  if (include_one_hot) {
     for (const auto& activity : activities) {
       std::vector<double> values(log.relations.size(), 0.0);
       for (std::size_t row = 0; row < values.size(); ++row)
@@ -1056,18 +1209,19 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   }
   const bool prefix_control_disabled =
       !options.include_prefix_features ||
-      !options.include_prefix_length_features ||
-      !options.include_prefix_timediff_features ||
-      !options.include_prefix_one_hot_features;
+      options.include_prefix_length_features.has_value() ||
+      options.include_prefix_timediff_features.has_value() ||
+      options.include_prefix_one_hot_features.has_value();
   if (variant != OcelFeatureVariant::kEventsObjects && prefix_control_disabled)
     throw std::invalid_argument(
         "OCEL prefix features apply only to the events_objects variant");
   const bool lifecycle_object_control_disabled =
-      !options.include_lifecycle_length_features ||
-      !options.include_lifecycle_unique_activity_features ||
-      !options.include_lifecycle_duration_features ||
-      !options.include_lifecycle_activity_features ||
-      !options.include_lifecycle_path_features ||
+      options.include_lifecycle_features.has_value() ||
+      options.include_lifecycle_length_features.has_value() ||
+      options.include_lifecycle_unique_activity_features.has_value() ||
+      options.include_lifecycle_duration_features.has_value() ||
+      options.include_lifecycle_activity_features.has_value() ||
+      options.include_lifecycle_path_features.has_value() ||
       options.include_lifecycle_wip_features.has_value();
   if (lifecycle_object_control_disabled &&
       variant != OcelFeatureVariant::kObjects && !related_object_event_context) {
@@ -1086,6 +1240,11 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   std::vector<std::vector<std::size_t>> event_objects, object_events;
   event_relations(log, event_index, object_index, event_objects, object_events);
   const auto times = event_times(log);
+  if (options.include_timestamp_features) {
+    for (std::size_t event = 0; event < log.events.size(); ++event)
+      if (!log.events[event].timestamp.empty() && !times[event])
+        throw std::invalid_argument("OCEL feature timestamp is invalid");
+  }
   const auto activities = activity_names(log);
   const auto object_types = object_type_names(log);
   std::vector<std::string> object_types_by_index;
@@ -1096,7 +1255,7 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   if (variant == OcelFeatureVariant::kEvents) {
     TableBuilder builder(log.events.size(), options.max_features);
     add_event_columns(builder, log, options, activities, object_types, event_objects,
-                      times, object_types_by_index);
+                      object_events, times, object_types_by_index);
     add_related_object_columns(builder, log, options, activities, object_types,
                                object_events, event_objects, times, lifecycles);
     std::vector<std::string> ids;
@@ -1158,7 +1317,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     auto events_objects_options = options;
     events_objects_options.include_related_objects_features = false;
     add_event_columns(event_builder, log, events_objects_options, activities,
-                      object_types, event_objects, times, object_types_by_index);
+                      object_types, event_objects, object_events, times,
+                      object_types_by_index);
     std::vector<std::string> event_ids;
     event_ids.reserve(log.events.size());
     for (const auto& event : log.events) event_ids.push_back(event.id);
