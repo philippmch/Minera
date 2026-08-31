@@ -1903,6 +1903,18 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.powl.brute_force_activity_limit =
         parse_nonnegative_size(value, "powl_brute_force_activity_limit");
   }
+  const auto parse_powl_selector = [&](std::string_view name,
+                                       std::string& destination) {
+    if (!supplied(name)) return;
+    destination = trim_text(field(name));
+    if (destination.empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": expected a non-empty name");
+    }
+  };
+  parse_powl_selector("powl_activity_key", params.powl.activity_key);
+  parse_powl_selector("powl_timestamp_key", params.powl.timestamp_key);
+  parse_powl_selector("powl_case_id_key", params.powl.case_id_key);
 
   if (const auto value = field("transition_view"); !value.empty()) {
     if (value == "sequence") params.transition_system.view = TransitionView::kSequence;
@@ -1934,6 +1946,7 @@ MineParams parse_mine_params(const FieldLookup& field,
           value + "'");
   }
   if (supplied("token_replay_activity_attribute")) {
+    params.token_replay_activity_attribute_supplied = true;
     params.token_replay.activity_attribute =
         trim_text(field("token_replay_activity_attribute"));
     if (params.token_replay.activity_attribute.empty()) {

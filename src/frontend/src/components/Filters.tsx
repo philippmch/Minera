@@ -259,6 +259,39 @@ export function caseGroupingValidationMessage(input: {
   return null;
 }
 
+/** POWL numeric bounds and selectors are validated before defaults are elided. */
+export function powlValidationMessage(input: {
+  filteringThreshold: string;
+  orderFrequencyRatio: string;
+  bruteForceActivityLimit: string;
+  activityKey: string;
+  timestampKey: string;
+  caseIdKey: string;
+}): string | null {
+  const thresholdText = input.filteringThreshold.trim();
+  if (thresholdText) {
+    const threshold = Number(thresholdText);
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold >= 1)
+      return "POWL filter threshold must be finite and in [0, 1).";
+  }
+  const ratioText = input.orderFrequencyRatio.trim();
+  if (ratioText) {
+    const ratio = Number(ratioText);
+    if (!Number.isFinite(ratio) || ratio <= 0.5 || ratio > 1)
+      return "POWL order-frequency ratio must be finite and in (0.5, 1].";
+  }
+  const limitText = input.bruteForceActivityLimit.trim();
+  if (limitText) {
+    const limit = Number(limitText);
+    if (!Number.isFinite(limit) || !Number.isInteger(limit) || limit < 0)
+      return "POWL brute-force activity limit must be a non-negative integer.";
+  }
+  if (!input.activityKey.trim()) return "POWL activity field must not be blank.";
+  if (!input.timestampKey.trim()) return "POWL timestamp field must not be blank.";
+  if (!input.caseIdKey.trim()) return "POWL case-id field must not be blank.";
+  return null;
+}
+
 // A compact, collapsible bar for the log filters and the miner settings.
 // Every apply re-mines the original upload with the full spec, so nothing
 // compounds and every setting can always be widened again.
@@ -426,6 +459,9 @@ export function Filters({
   const [powlFilteringThreshold, setPowlFilteringThreshold] = useState("");
   const [powlOrderFrequencyRatio, setPowlOrderFrequencyRatio] = useState("1");
   const [powlBruteForceActivityLimit, setPowlBruteForceActivityLimit] = useState("");
+  const [powlActivityKey, setPowlActivityKey] = useState("concept:name");
+  const [powlTimestampKey, setPowlTimestampKey] = useState("time:timestamp");
+  const [powlCaseIdKey, setPowlCaseIdKey] = useState("case:concept:name");
   const [tokenReplayVariant, setTokenReplayVariant] =
     useState<"forward" | "backwards">("forward");
   const [
@@ -778,6 +814,14 @@ export function Filters({
     timestampGrouping,
     timestampGroupingSeparator,
   });
+  const powlValidationError = powlValidationMessage({
+    filteringThreshold: powlFilteringThreshold,
+    orderFrequencyRatio: powlOrderFrequencyRatio,
+    bruteForceActivityLimit: powlBruteForceActivityLimit,
+    activityKey: powlActivityKey,
+    timestampKey: powlTimestampKey,
+    caseIdKey: powlCaseIdKey,
+  });
 
   const apply = () => {
     if (temporalValidationError || ltlValidationError || segmentValidationError ||
@@ -786,7 +830,7 @@ export function Filters({
         numericAttributeValidationError || topActivitiesValidationError ||
         relativeAttributeValidationError || attributeOccurrenceValidationError ||
         variantCoverageValidationError || repetitionValidationError ||
-        caseGroupingValidationError) return;
+        caseGroupingValidationError || powlValidationError) return;
     const removeList = activities.filter((a) => removed.has(a));
     const removeResourceList = resources.filter((r) => removedResources.has(r));
     const removeLifecycleList = lifecycles.filter((l) =>
@@ -984,14 +1028,24 @@ export function Filters({
       powlFilteringThreshold: toPowlThreshold(powlFilteringThreshold),
       powlOrderFrequencyRatio: toPowlRatio(powlOrderFrequencyRatio),
       powlBruteForceActivityLimit: toPowlActivityLimit(powlBruteForceActivityLimit),
+      powlActivityKey:
+        powlActivityKey.trim() !== "concept:name"
+          ? powlActivityKey.trim() || undefined
+          : undefined,
+      powlTimestampKey:
+        powlTimestampKey.trim() !== "time:timestamp"
+          ? powlTimestampKey.trim() || undefined
+          : undefined,
+      powlCaseIdKey:
+        powlCaseIdKey.trim() !== "case:concept:name"
+          ? powlCaseIdKey.trim() || undefined
+          : undefined,
       tokenReplayVariant:
         tokenReplayVariant !== "forward" ? tokenReplayVariant : undefined,
       tokenReplayStopImmediatelyUnfit:
         tokenReplayStopImmediatelyUnfit || undefined,
       tokenReplayActivityAttribute:
-        tokenReplayActivityAttribute.trim() !== "concept:name"
-          ? tokenReplayActivityAttribute.trim() || undefined
-          : undefined,
+        tokenReplayActivityAttribute.trim() || undefined,
       logSkeletonNoiseThreshold: toLogSkeletonNoise(logSkeletonNoiseThreshold),
       logSkeletonConstraints:
         logSkeletonConstraints.size === logSkeletonFamilies.length
@@ -1186,6 +1240,9 @@ export function Filters({
     setPowlFilteringThreshold("");
     setPowlOrderFrequencyRatio("1");
     setPowlBruteForceActivityLimit("");
+    setPowlActivityKey("concept:name");
+    setPowlTimestampKey("time:timestamp");
+    setPowlCaseIdKey("case:concept:name");
     setTokenReplayVariant("forward");
     setTokenReplayStopImmediatelyUnfit(false);
     setTokenReplayActivityAttribute("concept:name");
@@ -1356,7 +1413,10 @@ export function Filters({
     powlFilteringType !== "decreasing_factor" ||
     powlFilteringThreshold !== "" && powlFilteringThreshold !== "0" ||
     powlOrderFrequencyRatio !== "" && powlOrderFrequencyRatio !== "1" ||
-    powlBruteForceActivityLimit !== "" && powlBruteForceActivityLimit !== "0";
+    powlBruteForceActivityLimit !== "" && powlBruteForceActivityLimit !== "0" ||
+    powlActivityKey.trim() !== "concept:name" ||
+    powlTimestampKey.trim() !== "time:timestamp" ||
+    powlCaseIdKey.trim() !== "case:concept:name";
   const tokenReplayDirty =
     tokenReplayVariant !== "forward" || tokenReplayStopImmediatelyUnfit ||
     tokenReplayActivityAttribute.trim() !== "concept:name";
@@ -1498,6 +1558,32 @@ export function Filters({
             <label className="filters-field">
               <span>POWL brute-force activity limit</span>
               <input type="number" min={0} step={1} placeholder="0 = unlimited" value={powlBruteForceActivityLimit} onChange={(e) => setPowlBruteForceActivityLimit(e.target.value)} />
+            </label>
+          </div>
+          <div className="filters-row">
+            <label className="filters-field">
+              <span>POWL activity field</span>
+              <input
+                value={powlActivityKey}
+                placeholder="concept:name"
+                onChange={(e) => setPowlActivityKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>POWL timestamp field</span>
+              <input
+                value={powlTimestampKey}
+                placeholder="time:timestamp"
+                onChange={(e) => setPowlTimestampKey(e.target.value)}
+              />
+            </label>
+            <label className="filters-field">
+              <span>POWL case-id field</span>
+              <input
+                value={powlCaseIdKey}
+                placeholder="case:concept:name"
+                onChange={(e) => setPowlCaseIdKey(e.target.value)}
+              />
             </label>
           </div>
 
@@ -3315,11 +3401,12 @@ export function Filters({
             pathValidationError || caseDurationValidationError || caseSelectionValidationError ||
             numericAttributeValidationError || topActivitiesValidationError ||
             relativeAttributeValidationError || attributeOccurrenceValidationError ||
-            variantCoverageValidationError) && (
-            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError}</p>
+            variantCoverageValidationError || repetitionValidationError ||
+            caseGroupingValidationError || powlValidationError) && (
+            <p className="filters-validation" role="alert">{temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError}</p>
           )}
           <div className="filters-actions">
-            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError)}>
+            <button className="filters-apply" onClick={apply} disabled={mining || Boolean(temporalValidationError || ltlValidationError || segmentValidationError || pathValidationError || caseDurationValidationError || caseSelectionValidationError || numericAttributeValidationError || topActivitiesValidationError || relativeAttributeValidationError || attributeOccurrenceValidationError || variantCoverageValidationError || repetitionValidationError || caseGroupingValidationError || powlValidationError)}>
               Apply
             </button>
             <button

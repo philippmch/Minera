@@ -173,6 +173,27 @@ void register_activity_selector_values(
   }
 }
 
+void register_powl_labels(minera::DirectlyFollowsGraph& graph,
+                          const minera::PowlNode& node) {
+  if (node.kind() == minera::PowlNodeKind::kTransition) {
+    graph.ensure_activity(node.label());
+  }
+  for (const auto& child : node.children())
+    register_powl_labels(graph, child);
+}
+
+minera::EventLog project_powl_activity(const minera::EventLog& source,
+                                       std::string_view activity_key,
+                                       std::string_view timestamp_key,
+                                       std::string_view case_id_key =
+                                           "case:concept:name") {
+  minera::PowlDiscoveryOptions options;
+  options.activity_key = std::string(activity_key);
+  options.timestamp_key = std::string(timestamp_key);
+  options.case_id_key = std::string(case_id_key);
+  return minera::normalize_powl_event_log(source, options);
+}
+
 // The most recently mined log and its discovered nets, kept so the costly
 // alignment of a model can be computed on demand (POST /api/align) instead of
 // eagerly for every miner on every mine. The app is local and single-user, so
@@ -186,6 +207,9 @@ struct MinedSession {
   minera::DeclareModel declare;  // classic Declare, for on-demand playout
   std::string dataset;       // uploaded file name, echoed into XES exports
   minera::TokenReplayOptions token_replay;
+  std::string powl_activity_key = "concept:name";
+  std::string powl_timestamp_key = "time:timestamp";
+  std::string powl_case_id_key = "case:concept:name";
 };
 
 // A selector is deliberately request-scoped: the cached inductive model and
@@ -650,11 +674,24 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto net = minera::discover_petri_net(log, params.alpha);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
     const auto powl = minera::discover_powl(log, params.powl);
+    register_powl_labels(graph, powl);
+    const auto powl_log = project_powl_activity(
+        log, params.powl.activity_key, params.powl.timestamp_key,
+        params.powl.case_id_key);
+    const auto powl_graph =
+        minera::discover_directly_follows_graph(powl_log);
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
+    const auto& footprints_log = params.footprints.model == "powl"
+                                     ? powl_log
+                                     : log;
+    const auto& footprints_graph = params.footprints.model == "powl"
+                                       ? powl_graph
+                                       : graph;
     const auto footprints =
-        analyze_footprints(log, graph, tree, powl, inductive_net, net,
+        analyze_footprints(footprints_log, footprints_graph, tree, powl,
+                           inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
@@ -709,16 +746,32 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      const bool is_powl = id == "powl";
       auto replay_options = params.token_replay;
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
         replay_options.activity_attribute = params.heuristic.activity_attribute;
       }
+      if (is_powl && !params.token_replay_activity_attribute_supplied) {
+        replay_options.activity_attribute = params.powl.activity_key;
+      }
+      std::optional<minera::EventLog> projected_powl_log;
+      const minera::EventLog* conformance_log = &log;
+      if (is_powl) {
+        projected_powl_log = project_powl_activity(
+            log, replay_options.activity_attribute, params.powl.timestamp_key,
+            params.powl.case_id_key);
+        conformance_log = &*projected_powl_log;
+      }
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
                                       minera::check_conformance(
-                                          log, petri, replay_options),
-                                      minera::check_footprints(log, petri),
+                                           *conformance_log, petri,
+                                           replay_options),
+                                      is_powl
+                                          ? minera::check_footprints(powl_log,
+                                                                      petri)
+                                          : minera::check_footprints(log, petri),
                                       std::nullopt};
     };
     const std::vector<minera::ModelConformance> conformance = {
@@ -732,7 +785,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto heuristic_decoration = minera::decorate_model(
         log, heuristic_net, params.heuristic.activity_attribute,
         params.heuristic.timestamp_attribute);
-    const auto powl_decoration = minera::decorate_model(log, powl_net);
+    const auto powl_decoration = minera::decorate_model(
+        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key);
 
     const std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
@@ -775,6 +829,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->declare = declare;
     session->dataset = dataset;
     session->token_replay = params.token_replay;
+    session->powl_activity_key = params.powl.activity_key;
+    session->powl_timestamp_key = params.powl.timestamp_key;
+    session->powl_case_id_key = params.powl.case_id_key;
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       g_session = std::move(session);
@@ -3791,9 +3848,21 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_alignment_params(lookup, present);
+    auto options = minera::parse_alignment_params(lookup, present);
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* alignment_log = &session->log;
+    if (miner == "powl" &&
+        !request.has_param("alignment_activity_attribute")) {
+      options.activity_attribute = session->powl_activity_key;
+    }
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, options.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      alignment_log = &*projected_powl_log;
+    }
     const auto alignment =
-        minera::check_alignment(session->log, selected, options);
+        minera::check_alignment(*alignment_log, selected, options);
     auto graph = session->graph;
     register_activity_selector_values(graph, session->log,
                                       options.activity_attribute);
@@ -4730,6 +4799,8 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty name when supplied");
     }
+    if (miner == "powl" && comparison_options.activity_attribute.empty())
+      comparison_options.activity_attribute = session->powl_activity_key;
     comparison_options.walk_through_hidden_trans = comparison_bool(
         "walk_through_hidden_trans",
         comparison_options.walk_through_hidden_trans);
@@ -4751,6 +4822,10 @@ void handle_compare_petri(const httplib::Request& request,
     } else {
       std::istringstream input(reference_file.content);
       minera::CsvImportOptions reference_options;
+      if (miner == "powl") {
+        reference_options.case_id_column = session->powl_case_id_key;
+        reference_options.timestamp_column = session->powl_timestamp_key;
+      }
       if (!selector.empty() && selector != "activity")
         reference_options.activity_column = selector;
       reference = minera::import_csv_event_log(input, reference_options);
@@ -4777,8 +4852,19 @@ void handle_compare_petri(const httplib::Request& request,
         parse_playout_marking(request, "initial_marking");
     comparison_options.final_marking =
         parse_playout_marking(request, "final_marking");
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* comparison_log = &session->log;
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, comparison_options.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      comparison_log = &*projected_powl_log;
+      reference = project_powl_activity(
+          reference, comparison_options.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+    }
     const auto comparison = minera::compare_petri_usage(
-        it->second, session->log, reference, comparison_options);
+        it->second, *comparison_log, reference, comparison_options);
     response.set_content(minera::petri_usage_comparison_json(comparison),
                          "application/json");
   } catch (const std::exception& error) {
@@ -4815,21 +4901,29 @@ void handle_evaluate(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const auto params = minera::parse_evaluation_params(lookup, present);
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* evaluation_log = &session->log;
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, session->powl_activity_key,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      evaluation_log = &*projected_powl_log;
+    }
     minera::ModelEvaluation result;
     result.miner = miner;
     switch (params.family) {
       case minera::EvaluationFamily::kReplayFitness:
         result.replay_fitness = minera::evaluate_replay_fitness(
-            session->log, selected, params.replay_fitness_variant);
+            *evaluation_log, selected, params.replay_fitness_variant);
         break;
       case minera::EvaluationFamily::kPrecision:
         result.precision = minera::evaluate_precision(
-            session->log, selected, params.precision_variant,
+            *evaluation_log, selected, params.precision_variant,
             params.precision_options);
         break;
       case minera::EvaluationFamily::kGeneralization:
         result.generalization = minera::evaluate_generalization(
-            session->log, selected, params.generalization_variant);
+            *evaluation_log, selected, params.generalization_variant);
         break;
       case minera::EvaluationFamily::kSimplicity:
         result.simplicity = minera::evaluate_simplicity(
@@ -4837,7 +4931,7 @@ void handle_evaluate(const httplib::Request& request,
         break;
       case minera::EvaluationFamily::kComposite:
         result.composite = minera::evaluate_composite(
-            session->log, selected, params.composite_options);
+            *evaluation_log, selected, params.composite_options);
         break;
     }
     response.set_content(
@@ -4888,7 +4982,15 @@ void handle_petri_analysis(const httplib::Request& request,
         return;
       }
       case minera::PetriAnalysisFamily::kExtendedMarkingEquation: {
-        if (params.trace_index >= session->log.traces.size())
+        std::optional<minera::EventLog> projected_powl_log;
+        const minera::EventLog* analysis_log = &session->log;
+        if (params.miner == "powl") {
+          projected_powl_log = project_powl_activity(
+              session->log, session->powl_activity_key,
+              session->powl_timestamp_key, session->powl_case_id_key);
+          analysis_log = &*projected_powl_log;
+        }
+        if (params.trace_index >= analysis_log->traces.size())
           throw std::invalid_argument(
               "petri_analysis_trace_index: out of range");
         minera::ExtendedMarkingEquationOptions options;
@@ -4903,7 +5005,7 @@ void handle_petri_analysis(const httplib::Request& request,
         options.full_bootstrap_required = params.full_bootstrap_required;
         options.realizability_limit = params.max_states;
         std::vector<std::string> trace;
-        for (const auto& event : session->log.traces[params.trace_index].events)
+        for (const auto& event : analysis_log->traces[params.trace_index].events)
           trace.push_back(event.activity);
         response.set_content(minera::petri_analysis_json(
                                  minera::solve_extended_marking_equation(
@@ -5044,7 +5146,7 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner = request.get_param_value("miner"); const auto it=session->nets.find(miner);
   if (it==session->nets.end()) { response.status=400; response.set_content(error_json("unknown miner: "+miner),"application/json"); return; }
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_decomposed_alignment_params(lookup,present); const auto r=minera::align_decomposed(session->log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_decomposed_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&session->log; if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
   catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -5052,14 +5154,14 @@ void handle_align_petri_anti(const httplib::Request& request, httplib::Response&
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_anti_alignment_params(lookup,present); const auto r=minera::anti_align_petri(it->second,session->log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_anti_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&session->log; if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::anti_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_anti_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_align_petri_multi(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
   const auto miner=request.get_param_value("miner"); const auto it=session->nets.find(miner); if(it==session->nets.end()){response.status=400;response.set_content(error_json("unknown miner: "+miner),"application/json");return;}
-  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_multi_alignment_params(lookup,present); const auto r=minera::multi_align_petri(it->second,session->log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_petri_multi_alignment_params(lookup,present); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&session->log; if(miner=="powl"){projected_powl_log=project_powl_activity(session->log,session->powl_activity_key,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::multi_align_petri(it->second,*alignment_log,o); response.set_content(minera::petri_multi_alignment_json(r),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
@@ -5180,8 +5282,20 @@ void handle_decide(const httplib::Request& request,
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
-    const auto options = decision_mining_options(request);
-    auto decisions = minera::mine_decisions(session->log, selected, options);
+    auto options = decision_mining_options(request);
+    const bool use_default_powl_decision_selector =
+        miner == "powl" && !request.has_param("decision_activity_attribute");
+    if (use_default_powl_decision_selector)
+      options.activity_attribute = session->powl_activity_key;
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* decision_log = &session->log;
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, options.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      decision_log = &*projected_powl_log;
+    }
+    auto decisions = minera::mine_decisions(*decision_log, selected, options);
     decisions.miner = miner;
     response.set_content(minera::decisions_json(decisions),
                          "application/json");
@@ -5381,11 +5495,22 @@ void handle_monte_carlo_json(const httplib::Request& request,
     const auto map_record_limit = std::min(
         selected.transitions().size(),
         minera::kMonteCarloRequestMapMaxRecords);
-    const auto options = minera::parse_monte_carlo_params(
+    auto options = minera::parse_monte_carlo_params(
         lookup, present, map_record_limit);
     validate_monte_carlo_server_limits(options, selected);
-    const auto result =
-        minera::monte_carlo(session->log, selected, options);
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* simulation_log = &session->log;
+    if (selected_miner == "powl") {
+      if (!request.has_param("monte_carlo_activity_key"))
+        options.activity_key = session->powl_activity_key;
+      if (!request.has_param("monte_carlo_timestamp_key"))
+        options.timestamp_key = session->powl_timestamp_key;
+      projected_powl_log = project_powl_activity(
+          session->log, options.activity_key, options.timestamp_key,
+          session->powl_case_id_key);
+      simulation_log = &*projected_powl_log;
+    }
+    const auto result = minera::monte_carlo(*simulation_log, selected, options);
     response.set_content(minera::monte_carlo_json(result), "application/json");
   } catch (const std::exception& error) {
     reject(error.what());
@@ -5414,14 +5539,26 @@ void handle_decision_tables(const httplib::Request& request,
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
         request, *session, miner, converted);
-    const auto mining = decision_mining_options(request, true);
+    auto mining = decision_mining_options(request, true);
+    const bool use_default_powl_decision_selector =
+        miner == "powl" && !request.has_param("decision_activity_attribute");
+    if (use_default_powl_decision_selector)
+      mining.activity_attribute = session->powl_activity_key;
     minera::DecisionTableOptions options;
     options.mining = mining;
     options.include_trace_attributes = mining.include_trace_attributes;
     options.attributes = mining.attributes;
     options.lookback = decision_table_lookback(request);
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* decision_log = &session->log;
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, mining.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      decision_log = &*projected_powl_log;
+    }
     const auto result =
-        minera::mine_decision_tables(session->log, selected, options);
+        minera::mine_decision_tables(*decision_log, selected, options);
     response.set_content(minera::serialize_decision_tables_json(result),
                          "application/json");
   } catch (const std::exception& error) {
@@ -5455,9 +5592,21 @@ void handle_data_petri_net(const httplib::Request& request,
         request, *session, miner, converted);
     minera::DataPetriNetOptions options;
     options.decision_options = decision_mining_options(request, true);
+    const bool use_default_powl_decision_selector =
+        miner == "powl" && !request.has_param("decision_activity_attribute");
+    if (use_default_powl_decision_selector)
+      options.decision_options.activity_attribute = session->powl_activity_key;
     options.decision_table_lookback = decision_table_lookback(request);
+    std::optional<minera::EventLog> projected_powl_log;
+    const minera::EventLog* decision_log = &session->log;
+    if (miner == "powl") {
+      projected_powl_log = project_powl_activity(
+          session->log, options.decision_options.activity_attribute,
+          session->powl_timestamp_key, session->powl_case_id_key);
+      decision_log = &*projected_powl_log;
+    }
     const auto result =
-        minera::mine_data_petri_net(session->log, selected, options);
+        minera::mine_data_petri_net(*decision_log, selected, options);
     response.set_content(minera::serialize_data_petri_net_json(result, miner),
                          "application/json");
   } catch (const std::exception& error) {
@@ -5596,8 +5745,16 @@ void handle_stochastic_map(const httplib::Request& request,
       const auto it = session->nets.find(miner);
       if (it == session->nets.end())
         throw std::invalid_argument("unknown miner: " + miner);
+      std::optional<minera::EventLog> projected_powl_log;
+      const minera::EventLog* fit_log = &session->log;
+      if (miner == "powl") {
+        projected_powl_log = project_powl_activity(
+            session->log, session->powl_activity_key,
+            session->powl_timestamp_key, session->powl_case_id_key);
+        fit_log = &*projected_powl_log;
+      }
       const auto report = minera::fit_stochastic_map_with_report(
-          session->log, it->second, params.fit);
+          *fit_log, it->second, params.fit);
       map = report.map;
       replayed = report.replayed_traces;
       skipped = report.skipped_traces;
@@ -5715,11 +5872,23 @@ void handle_playout(const httplib::Request& request,
       const auto map_record_limit = std::min(
           selected.transitions().size(),
           minera::kMonteCarloRequestMapMaxRecords);
-      const auto options = minera::parse_monte_carlo_params(
+      auto options = minera::parse_monte_carlo_params(
           lookup, present, map_record_limit);
       validate_monte_carlo_server_limits(options, selected);
+      std::optional<minera::EventLog> projected_powl_log;
+      const minera::EventLog* simulation_log = &session->log;
+      if (selected_miner == "powl") {
+        if (!request.has_param("monte_carlo_activity_key"))
+          options.activity_key = session->powl_activity_key;
+        if (!request.has_param("monte_carlo_timestamp_key"))
+          options.timestamp_key = session->powl_timestamp_key;
+        projected_powl_log = project_powl_activity(
+            session->log, options.activity_key, options.timestamp_key,
+            session->powl_case_id_key);
+        simulation_log = &*projected_powl_log;
+      }
       const auto result =
-          minera::monte_carlo(session->log, selected, options);
+          minera::monte_carlo(*simulation_log, selected, options);
       response.set_content(
           minera::to_xes(result.log, selected_miner + " Monte Carlo playout"),
           "application/xml");
@@ -5756,12 +5925,20 @@ void handle_playout(const httplib::Request& request,
                "safety limit");
         return;
       }
+      std::optional<minera::EventLog> projected_powl_log;
+      const minera::EventLog* fit_log = &session->log;
+      if (options.fit_from_log && selected_miner == "powl") {
+        projected_powl_log = project_powl_activity(
+            session->log, session->powl_activity_key,
+            session->powl_timestamp_key, session->powl_case_id_key);
+        fit_log = &*projected_powl_log;
+      }
       if (options.return_visited_elements) {
         const auto& selected = select_cached_or_process_tree_net(
             request, *session, selected_miner, converted);
         const auto visited = options.fit_from_log
                                  ? minera::stochastic_playout_visited(
-                                       selected, session->log, options)
+                                       selected, *fit_log, options)
                                  : minera::stochastic_playout_visited(
                                        selected, options);
         response.set_content(
@@ -5773,7 +5950,7 @@ void handle_playout(const httplib::Request& request,
             request, *session, selected_miner, converted);
         const auto log = options.fit_from_log
                              ? minera::stochastic_playout(selected,
-                                                         session->log, options)
+                                                         *fit_log, options)
                              : minera::stochastic_playout(selected, options);
         response.set_content(
             minera::to_xes(log, selected_miner + " stochastic playout"),
@@ -6126,6 +6303,8 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
       else throw std::invalid_argument(
           "xes_compress: expected true, false, 1, or 0");
     }
+    options.infer_metadata =
+        ocel_query_bool(request, "xes_infer_metadata", false);
     const bool compressed = options.compress.value_or(false);
     response.set_content(minera::serialize_xes(session->log, options),
                          compressed ? "application/gzip" : "application/xml");

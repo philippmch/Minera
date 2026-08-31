@@ -56,9 +56,9 @@ EventLog filter_prefix(const EventLog& event_log,
     }
     if (anchor_index == trace.events.size()) continue;
     const auto count = anchor_index + (options.strict ? 0U : 1U);
-    Trace cut = trace;
+    Trace cut;
+    copy_trace_context(trace, cut);
     cut.events.assign(trace.events.begin(), trace.events.begin() + count);
-    cut.case_id = trace.case_id;
     result.traces.push_back(std::move(cut));
   }
   return result;
@@ -96,9 +96,9 @@ EventLog filter_suffix(const EventLog& event_log,
     }
     if (index == trace.events.size()) continue;
     const auto begin = index + (options.strict ? 0U : 1U);
-    Trace cut = trace;
+    Trace cut;
+    copy_trace_context(trace, cut);
     cut.events.assign(trace.events.begin() + begin, trace.events.end());
-    cut.case_id = trace.case_id;
     result.traces.push_back(std::move(cut));
   }
   return result;
@@ -159,11 +159,11 @@ EventLog filter_between(const EventLog& event_log,
     }
     for (std::size_t i = 0; i < segments.size(); ++i) {
       auto& segment = segments[i];
-      segment.attributes = trace.attributes;
-      segment.properties = trace.properties;
-      segment.case_id = segments.size() == 1
-                            ? trace.case_id
-                            : trace.case_id + separator + std::to_string(i + 1);
+      copy_trace_context(trace, segment);
+      if (segments.size() != 1) {
+        set_trace_case_id(
+            segment, trace.case_id + separator + std::to_string(i + 1));
+      }
       result.traces.push_back(std::move(segment));
     }
   }

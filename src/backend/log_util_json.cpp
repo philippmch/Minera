@@ -1,5 +1,6 @@
 #include "minera/log_util_json.hpp"
 
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -42,6 +43,31 @@ const char* attribute_kind_name(AttributeKind kind) {
   return "string";
 }
 
+const char* attribute_container_name(AttributeContainerKind kind) {
+  switch (kind) {
+    case AttributeContainerKind::kScalar: return "scalar";
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kContainer: return "container";
+  }
+  return "scalar";
+}
+
+const char* first_class_state_name(FirstClassAttributeState state) {
+  switch (state) {
+    case FirstClassAttributeState::kMissing: return "missing";
+    case FirstClassAttributeState::kPresent: return "present";
+    case FirstClassAttributeState::kNull: return "null";
+  }
+  return "missing";
+}
+
+FirstClassAttributeState effective_first_class_state(
+    FirstClassAttributeState state, std::string_view value) {
+  return state == FirstClassAttributeState::kMissing && !value.empty()
+             ? FirstClassAttributeState::kPresent
+             : state;
+}
+
 void write_attributes(std::ostream& out,
                       const std::vector<EventAttribute>& attributes) {
   out << '[';
@@ -54,10 +80,93 @@ void write_attributes(std::ostream& out,
     write_json_string(out, attribute.value);
     out << ",\"kind\":";
     write_json_string(out, attribute_kind_name(attribute.kind));
+    out << ",\"container\":";
+    write_json_string(out, attribute_container_name(attribute.container));
     if (attribute.is_null) out << ",\"null\":true";
+    if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+      out << ",\"typed_value\":";
+      if (const auto* integer_value =
+              std::get_if<std::int64_t>(&attribute.typed_value))
+        out << *integer_value;
+      else if (const auto* float_value =
+                   std::get_if<double>(&attribute.typed_value)) {
+        if (std::isfinite(*float_value))
+          out << std::setprecision(17) << *float_value;
+        else if (std::isnan(*float_value))
+          write_json_string(out, "NaN");
+        else
+          write_json_string(out, *float_value < 0 ? "-INF" : "INF");
+      }
+      else if (const auto* boolean_value =
+                   std::get_if<bool>(&attribute.typed_value))
+        out << (*boolean_value ? "true" : "false");
+      else if (const auto* date_value =
+                   std::get_if<NativeDate>(&attribute.typed_value))
+        write_json_string(out, date_value->value);
+    }
+    if (!attribute.children.empty()) {
+      out << ",\"children\":";
+      write_attributes(out, attribute.children);
+    }
     out << '}';
   }
   out << ']';
+}
+
+// Preserve the selected source attribute alongside the convenient string
+// field. This detail is recursive and keeps the native type, null state, and
+// nested children available to consumers of log-utility results.
+void write_attribute_detail(std::ostream& out,
+                            const EventAttribute& attribute) {
+  out << "{\"key\":";
+  write_json_string(out, attribute.key);
+  out << ",\"value\":";
+  write_json_string(out, attribute.value);
+  out << ",\"kind\":";
+  write_json_string(out, attribute_kind_name(attribute.kind));
+  out << ",\"container\":";
+  write_json_string(out, attribute_container_name(attribute.container));
+  out << ",\"null\":" << (attribute.is_null ? "true" : "false");
+  if (!std::holds_alternative<std::monostate>(attribute.typed_value)) {
+    out << ",\"typed_value\":";
+    if (const auto* integer_value =
+            std::get_if<std::int64_t>(&attribute.typed_value))
+      out << *integer_value;
+    else if (const auto* float_value =
+                 std::get_if<double>(&attribute.typed_value)) {
+      if (std::isfinite(*float_value))
+        out << std::setprecision(17) << *float_value;
+      else if (std::isnan(*float_value))
+        write_json_string(out, "NaN");
+      else
+        write_json_string(out, *float_value < 0 ? "-INF" : "INF");
+    } else if (const auto* boolean_value =
+                   std::get_if<bool>(&attribute.typed_value))
+      out << (*boolean_value ? "true" : "false");
+    else if (const auto* date_value =
+                 std::get_if<NativeDate>(&attribute.typed_value))
+      write_json_string(out, date_value->value);
+  }
+  if (!attribute.children.empty()) {
+    out << ",\"children\":";
+    out << '[';
+    for (std::size_t i = 0; i < attribute.children.size(); ++i) {
+      if (i != 0) out << ',';
+      write_attribute_detail(out, attribute.children[i]);
+    }
+    out << ']';
+  }
+  out << '}';
+}
+
+void write_optional_attribute_detail(
+    std::ostream& out, std::string_view field,
+    const std::optional<EventAttribute>& attribute) {
+  if (!attribute) return;
+  out << ",";
+  write_json_string(out, field);
+  out << ':';
+  write_attribute_detail(out, *attribute);
 }
 
 void write_metadata(std::ostream& out, const EventDataMetadata& metadata) {
@@ -92,6 +201,16 @@ void write_metadata(std::ostream& out, const EventDataMetadata& metadata) {
   write_attributes(out, metadata.event_globals);
   out << ",\"properties\":";
   write_attributes(out, metadata.properties);
+  out << ",\"globals\":[";
+  for (std::size_t i = 0; i < metadata.globals.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"scope\":";
+    write_json_string(out, metadata.globals[i].scope);
+    out << ",\"attributes\":";
+    write_attributes(out, metadata.globals[i].attributes);
+    out << '}';
+  }
+  out << ']';
   out << '}';
 }
 
@@ -106,7 +225,15 @@ void write_event_log(std::ostream& out, const EventLog& log) {
     const auto& trace = log.traces[i];
     out << "{\"case_id\":";
     write_json_string(out, trace.case_id);
-    out << ",\"attributes\":";
+    out << ",\"case_id_state\":";
+    write_json_string(
+        out, first_class_state_name(effective_first_class_state(
+            trace.case_id_state, trace.case_id)));
+     out << ",\"case_id_source_key\":";
+     write_json_string(out, trace.case_id_source_key);
+     write_optional_attribute_detail(out, "case_id_attribute",
+                                     trace.case_id_attribute);
+     out << ",\"attributes\":";
     write_attributes(out, trace.attributes);
     out << ",\"properties\":";
     write_attributes(out, trace.properties);
@@ -116,14 +243,52 @@ void write_event_log(std::ostream& out, const EventLog& log) {
       const auto& event = trace.events[j];
       out << "{\"case_id\":";
       write_json_string(out, event.case_id);
+      out << ",\"case_id_state\":";
+      write_json_string(
+          out, first_class_state_name(effective_first_class_state(
+              event.case_id_state, event.case_id)));
+      out << ",\"case_id_source_key\":";
+      write_json_string(out, event.case_id_source_key);
       out << ",\"activity\":";
       write_json_string(out, event.activity);
+      out << ",\"activity_state\":";
+      write_json_string(
+          out, first_class_state_name(effective_first_class_state(
+              event.activity_state, event.activity)));
+      out << ",\"activity_source_key\":";
+      write_json_string(out, event.activity_source_key);
+      write_optional_attribute_detail(out, "activity_attribute",
+                                      event.activity_attribute);
       out << ",\"timestamp\":";
       write_json_string(out, event.timestamp);
+      out << ",\"timestamp_state\":";
+      write_json_string(
+          out, first_class_state_name(effective_first_class_state(
+              event.timestamp_state, event.timestamp)));
+      out << ",\"timestamp_source_key\":";
+      write_json_string(out, event.timestamp_source_key);
+      write_optional_attribute_detail(out, "timestamp_attribute",
+                                      event.timestamp_attribute);
       out << ",\"resource\":";
       write_json_string(out, event.resource);
+      out << ",\"resource_state\":";
+      write_json_string(
+          out, first_class_state_name(effective_first_class_state(
+              event.resource_state, event.resource)));
+      out << ",\"resource_source_key\":";
+      write_json_string(out, event.resource_source_key);
+      write_optional_attribute_detail(out, "resource_attribute",
+                                      event.resource_attribute);
       out << ",\"lifecycle\":";
       write_json_string(out, event.lifecycle);
+      out << ",\"lifecycle_state\":";
+      write_json_string(
+          out, first_class_state_name(effective_first_class_state(
+              event.lifecycle_state, event.lifecycle)));
+      out << ",\"lifecycle_source_key\":";
+      write_json_string(out, event.lifecycle_source_key);
+      write_optional_attribute_detail(out, "lifecycle_attribute",
+                                      event.lifecycle_attribute);
       out << ",\"input_order\":" << event.input_order
           << ",\"attributes\":";
       write_attributes(out, event.attributes);

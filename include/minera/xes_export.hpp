@@ -27,7 +27,11 @@ struct XesExportOptions {
   // Unset selects compression from a .gz output suffix for file exports and
   // plain XML for in-memory serialization.
   std::optional<bool> compress;
-  std::string name = "log";
+  // Empty selects a stored log-level concept:name.  If no such attribute is
+  // present, the default output has no log name; set infer_metadata to request
+  // the conventional fallback name and standard declarations.
+  std::string name;
+  bool infer_metadata = false;
 };
 
 // Serializes an event log as XES (eXtensible Event Stream, IEEE 1849-2016) —
@@ -38,15 +42,16 @@ struct XesExportOptions {
 // Timestamps that parse as instants are normalized to ISO-8601 UTC and
 // written as <date> attributes; a non-empty timestamp in an unrecognized
 // format is preserved verbatim as a <string> so no data is lost, and an
-// empty one is omitted. Generic event attributes are written under the XES
-// type each was imported with (CSV columns as strings), so extra data
-// round-trips. `name` becomes the log's own `concept:name`.
+// empty one is omitted. Explicit date attributes must contain a valid instant
+// and are rejected otherwise. Generic event attributes are written under the
+// XES type each was imported with (CSV columns as strings), so extra data
+// round-trips. An explicit non-empty `name` overrides a stored log name.
 void write_xes(std::ostream& out,
                const EventLog& log,
-               std::string_view name = "log");
+               std::string_view name = {});
 
 [[nodiscard]] std::string to_xes(const EventLog& log,
-                                 std::string_view name = "log");
+                                 std::string_view name = {});
 
 // Serializes plain XML or gzip bytes according to the explicit option.
 [[nodiscard]] std::string serialize_xes(

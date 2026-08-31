@@ -91,9 +91,15 @@ export function hasActiveMinerOptions(options: MinerOptions): boolean {
       options.transitionIncludeData === true ||
       (options.powlVariant && options.powlVariant !== "maximal") ||
         (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor") ||
-        (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold !== 0) ||
+      (options.powlFilteringThreshold !== undefined && options.powlFilteringThreshold !== 0) ||
         (options.powlOrderFrequencyRatio !== undefined && options.powlOrderFrequencyRatio !== 1) ||
         (options.powlBruteForceActivityLimit !== undefined && options.powlBruteForceActivityLimit !== 0) ||
+        Boolean(options.powlActivityKey?.trim() &&
+          options.powlActivityKey.trim() !== "concept:name") ||
+        Boolean(options.powlTimestampKey?.trim() &&
+          options.powlTimestampKey.trim() !== "time:timestamp") ||
+        Boolean(options.powlCaseIdKey?.trim() &&
+          options.powlCaseIdKey.trim() !== "case:concept:name") ||
       (options.tokenReplayVariant && options.tokenReplayVariant !== "forward") ||
       options.tokenReplayStopImmediatelyUnfit === true ||
       Boolean(options.tokenReplayActivityAttribute?.trim() &&

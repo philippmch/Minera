@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <queue>
 #include <set>
 #include <stdexcept>
@@ -149,11 +150,13 @@ DfgAlignmentLogResult align_log_on_dfg(const EventLog& log,const DfgFrequency& d
 EventLog project_log_on_dfg(const EventLog& log,const DfgFrequency& d,const std::map<std::string,std::uint64_t>& s,const std::map<std::string,std::uint64_t>& e,const DfgAlignmentOptions& o){
   auto ars=align_log_on_dfg(log,d,s,e,o); EventLog out; copy_event_log_context(log, out);
   set_reserved(out.attributes, "@@aligned_dfg", "DFG alignment projection", AttributeKind::kString);
-  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; t.case_id=in.case_id; t.attributes=in.attributes; t.properties=in.properties; std::size_t z=0; std::string ts; if(!in.events.empty())ts=in.events.front().timestamp;
+  for(std::size_t i=0;i<log.traces.size();++i){const auto& in=log.traces[i]; Trace t; copy_trace_context(in, t); const Event* activity_template=nullptr; for(const auto& candidate:in.events) if(!candidate.activity_source_key.empty()||candidate.activity_attribute){activity_template=&candidate;break;} if(activity_template==nullptr&&!in.events.empty())activity_template=&in.events.front(); std::size_t z=0; std::string ts; FirstClassAttributeState ts_state=FirstClassAttributeState::kMissing; std::string ts_source_key; std::optional<EventAttribute> ts_attribute; if(!in.events.empty()){ts=in.events.front().timestamp;ts_state=in.events.front().timestamp_state;ts_source_key=in.events.front().timestamp_source_key;ts_attribute=in.events.front().timestamp_attribute;}
     std::string original; for(std::size_t j=0;j<in.events.size();++j){if(j)original+=",";original+=in.events[j].activity;}
     set_reserved(t.attributes, "@@original_trace", original, AttributeKind::kString);
-    for(const auto& mv:ars.alignments[i].alignment){if(mv.model==kGap){++z;continue;} bool sync=mv.log!=kGap; Event ev; ev.case_id=in.case_id; ev.activity=mv.model; ev.timestamp=sync?in.events[z].timestamp:ts; ev.input_order=t.events.size();
-      if(sync){ev.resource=in.events[z].resource; ev.lifecycle=in.events[z].lifecycle; for(const auto& a:in.events[z].attributes) if(a.key!="@@is_conforming") ev.attributes.push_back(a); ts=ev.timestamp;++z;}
+    for(const auto& mv:ars.alignments[i].alignment){if(mv.model==kGap){++z;continue;} bool sync=mv.log!=kGap; Event ev;
+      if(sync){ev=in.events[z++]; ts=ev.timestamp; ts_state=ev.timestamp_state; ts_source_key=ev.timestamp_source_key; ts_attribute=ev.timestamp_attribute;}
+      else {copy_event_case_context(in, ev); if(activity_template!=nullptr)set_event_activity_context(*activity_template, mv.model, ev); else {ev.activity=mv.model; ev.activity_state=FirstClassAttributeState::kPresent; ev.activity_source_key="concept:name";} ev.timestamp=ts; ev.timestamp_state=ts_state==FirstClassAttributeState::kMissing&&!ts.empty()?FirstClassAttributeState::kPresent:ts_state; ev.timestamp_source_key=ts_source_key; ev.timestamp_attribute=ts_attribute;}
+      ev.activity=mv.model; ev.input_order=t.events.size();
       set_reserved(ev.attributes, "@@is_conforming", sync?"true":"false", AttributeKind::kBoolean);
       t.events.push_back(std::move(ev)); }
     out.traces.push_back(std::move(t)); }

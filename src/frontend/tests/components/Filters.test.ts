@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
+import { attributeOccurrenceValidationMessage, caseGroupingValidationMessage, pathValidationMessage, powlValidationMessage, repetitionValidationMessage, relativeAttributeValidationMessage, segmentValidationMessage, temporalValidationMessage, topActivitiesValidationMessage, variantCoverageValidationMessage } from "../../src/components/Filters";
 
 const valid = {
   spectrumConfigured: true,
@@ -83,6 +83,47 @@ describe("case grouping validation", () => {
     expect(caseGroupingValidationMessage({ timestampGrouping: "first", timestampGroupingSeparator: "" })).toBeNull();
     expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: " & " })).toBeNull();
     expect(caseGroupingValidationMessage({ timestampGrouping: "concat", timestampGroupingSeparator: "" })).toContain("separator");
+  });
+});
+
+describe("POWL option validation", () => {
+  const validPowl = {
+    filteringThreshold: "0",
+    orderFrequencyRatio: "1",
+    bruteForceActivityLimit: "",
+    activityKey: "concept:name",
+    timestampKey: "time:timestamp",
+    caseIdKey: "case:concept:name",
+  };
+
+  it("accepts defaults and valid boundary values", () => {
+    expect(powlValidationMessage(validPowl)).toBeNull();
+    expect(powlValidationMessage({
+      ...validPowl,
+      filteringThreshold: "0.999",
+      orderFrequencyRatio: "0.5001",
+      bruteForceActivityLimit: "0",
+    })).toBeNull();
+  });
+
+  it("rejects invalid numbers instead of silently choosing defaults", () => {
+    expect(powlValidationMessage({ ...validPowl, filteringThreshold: "1" }))
+      .toContain("threshold");
+    expect(powlValidationMessage({ ...validPowl, filteringThreshold: "0.2x" }))
+      .toContain("threshold");
+    expect(powlValidationMessage({ ...validPowl, orderFrequencyRatio: "0.5" }))
+      .toContain("ratio");
+    expect(powlValidationMessage({ ...validPowl, bruteForceActivityLimit: "1.5" }))
+      .toContain("limit");
+  });
+
+  it("rejects each blank selector", () => {
+    expect(powlValidationMessage({ ...validPowl, activityKey: " " }))
+      .toContain("activity");
+    expect(powlValidationMessage({ ...validPowl, timestampKey: "\t" }))
+      .toContain("timestamp");
+    expect(powlValidationMessage({ ...validPowl, caseIdKey: "" }))
+      .toContain("case-id");
   });
 });
 

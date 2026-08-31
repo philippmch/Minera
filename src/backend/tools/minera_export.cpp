@@ -169,6 +169,26 @@ void register_activity_selector_values(
   }
 }
 
+void register_powl_labels(minera::DirectlyFollowsGraph& graph,
+                          const minera::PowlNode& node) {
+  if (node.kind() == minera::PowlNodeKind::kTransition)
+    graph.ensure_activity(node.label());
+  for (const auto& child : node.children())
+    register_powl_labels(graph, child);
+}
+
+minera::EventLog project_powl_activity(const minera::EventLog& source,
+                                       std::string_view activity_key,
+                                       std::string_view timestamp_key,
+                                       std::string_view case_id_key =
+                                           "case:concept:name") {
+  minera::PowlDiscoveryOptions options;
+  options.activity_key = std::string(activity_key);
+  options.timestamp_key = std::string(timestamp_key);
+  options.case_id_key = std::string(case_id_key);
+  return minera::normalize_powl_event_log(source, options);
+}
+
 const minera::PetriNet* select_decision_model(
     std::string_view miner, const minera::PetriNet& inductive,
     const minera::PetriNet& alpha, const minera::PetriNet& heuristic,
@@ -437,6 +457,7 @@ int usage(const char* program) {
                "  --xes-max-decompressed-bytes <n> Gzip expansion safety bound\n"
                "  --xes-export-variant <id> line_by_line or etree\n"
                "  --xes-compress <bool>     Override .gz output detection\n"
+               "  --xes-infer-metadata <bool> Add standard inferred declarations\n"
                "  --log-convert <id>       Event-log conversion selector\n"
                "                            to_event_log, to_event_stream,\n"
                "                            to_data_frame, to_nx, df_to_event_log_1v,\n"
@@ -579,8 +600,14 @@ int usage(const char* program) {
                "  --powl-order-frequency-ratio <f> Dynamic-clustering order\n"
                "                            ratio in (0.5,1] (default: 1)\n"
                "  --powl-brute-force-activity-limit <n> Maximum local alphabet\n"
-               "                            for brute force (0 = unlimited)\n"
-               "  --pnml <path>             Also write a model as PNML to <path>\n"
+                "                            for brute force (0 = unlimited)\n"
+                "  --powl-activity-key <name> Event field used as the POWL activity\n"
+                "                            label (default: concept:name)\n"
+                "  --powl-timestamp-key <name> Timestamp selector retained for\n"
+                "                            tabular parity (default: time:timestamp)\n"
+                "  --powl-case-id-key <name> Case selector retained for tabular\n"
+                "                            parity (default: case:concept:name)\n"
+                "  --pnml <path>             Also write a model as PNML to <path>\n"
                "  --check-pnml <path>       Also check the log against the\n"
                "                            workflow net in this PNML file\n"
                "                            (conformance id: imported)\n"
@@ -1271,6 +1298,117 @@ minera::DfgPlayoutResult generate_dfg_playout(
                                     performance ? &*performance : nullptr);
 }
 
+enum class PowlCliParseStatus {
+  kNotMatched,
+  kParsed,
+  kInvalid,
+  kMissingValue,
+};
+
+PowlCliParseStatus parse_powl_cli_option(
+    std::string_view arg, int argc, char** argv, int& index,
+    minera::PowlDiscoveryOptions& options) {
+  const bool is_selector = arg == "--powl-activity-key" ||
+                           arg == "--powl-timestamp-key" ||
+                           arg == "--powl-case-id-key";
+  const bool matched = arg == "--powl-variant" ||
+                       arg == "--powl-filtering-type" ||
+                       arg == "--powl-filtering-threshold" ||
+                       arg == "--powl-order-frequency-ratio" ||
+                       arg == "--powl-brute-force-activity-limit" ||
+                       is_selector;
+  if (!matched) return PowlCliParseStatus::kNotMatched;
+  if (index + 1 >= argc) return PowlCliParseStatus::kMissingValue;
+  const char* value = argv[++index];
+
+  if (arg == "--powl-variant") {
+    const std::string_view variant = value;
+    if (variant == "tree")
+      options.variant = minera::PowlDiscoveryVariant::kTree;
+    else if (variant == "brute_force")
+      options.variant = minera::PowlDiscoveryVariant::kBruteForce;
+    else if (variant == "maximal")
+      options.variant = minera::PowlDiscoveryVariant::kMaximal;
+    else if (variant == "dynamic_clustering")
+      options.variant = minera::PowlDiscoveryVariant::kDynamicClustering;
+    else if (variant == "dynamic_clustering_plain")
+      options.variant = minera::PowlDiscoveryVariant::kDynamicClusteringPlain;
+    else {
+      std::cerr << "error: --powl-variant expects tree, brute_force, "
+                   "maximal, dynamic_clustering, or dynamic_clustering_plain\n";
+      return PowlCliParseStatus::kInvalid;
+    }
+    return PowlCliParseStatus::kParsed;
+  }
+
+  if (arg == "--powl-filtering-type") {
+    const std::string_view type = value;
+    if (type == "decreasing_factor")
+      options.filtering_type = minera::PowlFilteringType::kDecreasingFactor;
+    else if (type == "dynamic")
+      options.filtering_type = minera::PowlFilteringType::kDynamic;
+    else {
+      std::cerr << "error: --powl-filtering-type expects decreasing_factor or "
+                   "dynamic\n";
+      return PowlCliParseStatus::kInvalid;
+    }
+    return PowlCliParseStatus::kParsed;
+  }
+
+  if (arg == "--powl-filtering-threshold" ||
+      arg == "--powl-order-frequency-ratio") {
+    char* end = nullptr;
+    const double parsed = std::strtod(value, &end);
+    if (end == value || *end != '\0' || !std::isfinite(parsed)) {
+      std::cerr << "error: " << arg << " expects a finite number\n";
+      return PowlCliParseStatus::kInvalid;
+    }
+    if (arg == "--powl-filtering-threshold") {
+      if (parsed < 0.0 || parsed >= 1.0) {
+        std::cerr
+            << "error: --powl-filtering-threshold expects 0 <= f < 1\n";
+        return PowlCliParseStatus::kInvalid;
+      }
+      options.filtering_threshold = parsed;
+    } else {
+      if (parsed <= 0.5 || parsed > 1.0) {
+        std::cerr
+            << "error: --powl-order-frequency-ratio expects 0.5 < f <= 1\n";
+        return PowlCliParseStatus::kInvalid;
+      }
+      options.order_frequency_ratio = parsed;
+    }
+    return PowlCliParseStatus::kParsed;
+  }
+
+  if (arg == "--powl-brute-force-activity-limit") {
+    std::uint64_t parsed = 0;
+    const char* end = value + std::strlen(value);
+    const auto result = std::from_chars(value, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end ||
+        parsed > std::numeric_limits<std::size_t>::max()) {
+      std::cerr << "error: --powl-brute-force-activity-limit expects a "
+                   "non-negative integer\n";
+      return PowlCliParseStatus::kInvalid;
+    }
+    options.brute_force_activity_limit = static_cast<std::size_t>(parsed);
+    return PowlCliParseStatus::kParsed;
+  }
+
+  const auto name = trim_text(value);
+  if (name.empty()) {
+    std::cerr << "error: " << arg << " expects a non-empty name\n";
+    return PowlCliParseStatus::kInvalid;
+  }
+  if (arg == "--powl-activity-key")
+    options.activity_key = name;
+  else if (arg == "--powl-timestamp-key")
+    options.timestamp_key = name;
+  else
+    options.case_id_key = name;
+  return PowlCliParseStatus::kParsed;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1305,6 +1443,7 @@ int main(int argc, char** argv) {
   std::size_t decision_lookback = 1;
   bool decision_lookback_used = false;
   bool decision_option_used = false;
+  bool decision_activity_option_used = false;
   bool no_alignments = false;
   bool align_process_tree = false;
   std::map<std::string, std::string> pt_alignment_fields;
@@ -1338,6 +1477,8 @@ int main(int argc, char** argv) {
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
   bool alignment_option_used = false;
+  bool alignment_activity_option_used = false;
+  bool token_replay_activity_option_used = false;
   bool alignment_max_alignments_used = false;
   bool alignment_exponent_used = false;
   bool alignment_synchronous_dijkstra_used = false;
@@ -1620,6 +1761,12 @@ int main(int argc, char** argv) {
     const auto next = [&]() -> const char* {
       return i + 1 < argc ? argv[++i] : nullptr;
     };
+    const auto powl_parse =
+        parse_powl_cli_option(arg, argc, argv, i, powl_options);
+    if (powl_parse == PowlCliParseStatus::kParsed) continue;
+    if (powl_parse == PowlCliParseStatus::kInvalid) return 2;
+    if (powl_parse == PowlCliParseStatus::kMissingValue)
+      return usage(argv[0]);
     if (arg == "--alignment-activity-attribute" ||
         arg == "--token-replay-activity-attribute") {
       const auto* value = next();
@@ -1633,8 +1780,10 @@ int main(int argc, char** argv) {
       if (arg == "--alignment-activity-attribute") {
         alignment_options.activity_attribute = trimmed;
         alignment_option_used = true;
+        alignment_activity_option_used = true;
       } else {
         token_replay_options.activity_attribute = trimmed;
+        token_replay_activity_option_used = true;
       }
       continue;
     }
@@ -3031,6 +3180,7 @@ int main(int argc, char** argv) {
       }
       decision_options.activity_attribute = trim_text(value);
       decision_option_used = true;
+      decision_activity_option_used = true;
       continue;
     }
 
@@ -3353,7 +3503,8 @@ int main(int argc, char** argv) {
         arg == "--xes-lifecycle-attribute" ||
         arg == "--xes-require-timestamp" ||
         arg == "--xes-max-decompressed-bytes" ||
-        arg == "--xes-export-variant" || arg == "--xes-compress") {
+        arg == "--xes-export-variant" || arg == "--xes-compress" ||
+        arg == "--xes-infer-metadata") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
@@ -3384,6 +3535,8 @@ int main(int argc, char** argv) {
           xes_export_options.variant = minera::parse_xes_export_variant(value);
         if (arg == "--xes-compress")
           xes_export_options.compress = parse_boolean(value, arg);
+        if (arg == "--xes-infer-metadata")
+          xes_export_options.infer_metadata = parse_boolean(value, arg);
         if ((arg == "--xes-case-attribute" ||
              arg == "--xes-activity-attribute" ||
              arg == "--xes-timestamp-attribute" ||
@@ -4007,78 +4160,6 @@ int main(int argc, char** argv) {
       catch (const std::exception& error) { std::cerr << "error: " << error.what() << "\n"; return 2; }
     } else if (arg == "--transition-include-data") {
       transition_options.include_data = true;
-    } else if (arg == "--powl-variant") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      const std::string_view variant = value;
-      if (variant == "tree")
-        powl_options.variant = minera::PowlDiscoveryVariant::kTree;
-      else if (variant == "brute_force")
-        powl_options.variant = minera::PowlDiscoveryVariant::kBruteForce;
-      else if (variant == "maximal")
-        powl_options.variant = minera::PowlDiscoveryVariant::kMaximal;
-      else if (variant == "dynamic_clustering")
-        powl_options.variant =
-            minera::PowlDiscoveryVariant::kDynamicClustering;
-      else if (variant == "dynamic_clustering_plain")
-        powl_options.variant =
-            minera::PowlDiscoveryVariant::kDynamicClusteringPlain;
-      else {
-        std::cerr << "error: --powl-variant expects tree, brute_force, "
-                     "maximal, dynamic_clustering, or "
-                     "dynamic_clustering_plain\n";
-        return 2;
-      }
-    } else if (arg == "--powl-filtering-type") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      const std::string_view type = value;
-      if (type == "decreasing_factor")
-        powl_options.filtering_type =
-            minera::PowlFilteringType::kDecreasingFactor;
-      else if (type == "dynamic")
-        powl_options.filtering_type = minera::PowlFilteringType::kDynamic;
-      else {
-        std::cerr << "error: --powl-filtering-type expects "
-                     "decreasing_factor or dynamic\n";
-        return 2;
-      }
-    } else if (arg == "--powl-filtering-threshold") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      char* end = nullptr;
-      powl_options.filtering_threshold = std::strtod(value, &end);
-      if (end == value || *end != '\0' ||
-          !std::isfinite(powl_options.filtering_threshold) ||
-          powl_options.filtering_threshold < 0.0 ||
-          powl_options.filtering_threshold >= 1.0) {
-        std::cerr << "error: --powl-filtering-threshold expects 0 <= f < 1\n";
-        return 2;
-      }
-    } else if (arg == "--powl-order-frequency-ratio") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      char* end = nullptr;
-      powl_options.order_frequency_ratio = std::strtod(value, &end);
-      if (end == value || *end != '\0' ||
-          !std::isfinite(powl_options.order_frequency_ratio) ||
-          powl_options.order_frequency_ratio <= 0.5 ||
-          powl_options.order_frequency_ratio > 1.0) {
-        std::cerr << "error: --powl-order-frequency-ratio expects "
-                     "0.5 < f <= 1\n";
-        return 2;
-      }
-    } else if (arg == "--powl-brute-force-activity-limit") {
-      const auto* value = next();
-      if (!value) return usage(argv[0]);
-      try {
-        powl_options.brute_force_activity_limit = parse_nonnegative_size(
-            value, "--powl-brute-force-activity-limit");
-      } catch (const std::exception&) {
-        std::cerr << "error: --powl-brute-force-activity-limit expects a "
-                     "non-negative integer\n";
-        return 2;
-      }
     } else if (arg == "--noise-threshold") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -5857,6 +5938,12 @@ int main(int argc, char** argv) {
     const auto heuristics =
         minera::discover_heuristics_net(log, heuristic_options);
     const auto powl = minera::discover_powl(log, powl_options);
+    register_powl_labels(graph, powl);
+    const auto powl_log = project_powl_activity(
+        log, powl_options.activity_key, powl_options.timestamp_key,
+        powl_options.case_id_key);
+    const auto powl_graph =
+        minera::discover_directly_follows_graph(powl_log);
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
@@ -5919,8 +6006,9 @@ int main(int argc, char** argv) {
                     << "' (expected inductive, alpha, heuristic, or powl)\n";
           return 2;
         }
+        const auto& fit_log = stochastic_map_miner == "powl" ? powl_log : log;
         const auto report = minera::fit_stochastic_map_with_report(
-            log, *selected, stochastic_map_params.fit);
+            fit_log, *selected, stochastic_map_params.fit);
         stochastic_map_net = *selected;
         stochastic_map = report.map;
         replayed = report.replayed_traces;
@@ -5958,8 +6046,15 @@ int main(int argc, char** argv) {
       }
       file << stochastic_map_json.str() << '\n';
     }
+    const auto& footprints_log = footprints_options.model == "powl"
+                                     ? powl_log
+                                     : log;
+    const auto& footprints_graph = footprints_options.model == "powl"
+                                       ? powl_graph
+                                       : graph;
     const auto footprints =
-        analyze_footprints(log, graph, tree, powl, inductive_net, net,
+        analyze_footprints(footprints_log, footprints_graph, tree, powl,
+                           inductive_net, net,
                            heuristic_net, powl_net, footprints_options);
     if (!no_alignments && log.traces.size() > 1000) {
       std::cerr << "note: computing optimal alignments for every model; on a "
@@ -5967,20 +6062,43 @@ int main(int argc, char** argv) {
                    "(--no-alignments skips this export section)\n";
     }
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
+      const bool is_powl = id == "powl";
       auto replay_options = token_replay_options;
       if (id == "heuristic" &&
           replay_options.activity_attribute == "concept:name") {
-        replay_options.activity_attribute = heuristic_options.activity_attribute;
+          replay_options.activity_attribute = heuristic_options.activity_attribute;
+      }
+      if (is_powl && !token_replay_activity_option_used)
+        replay_options.activity_attribute = powl_options.activity_key;
+      auto model_alignment_options = alignment_options;
+      if (is_powl && !alignment_activity_option_used)
+        model_alignment_options.activity_attribute = powl_options.activity_key;
+      std::optional<minera::EventLog> replay_powl_log;
+      std::optional<minera::EventLog> alignment_powl_log;
+      const minera::EventLog* conformance_log = &log;
+      const minera::EventLog* alignment_log = &log;
+      if (is_powl) {
+        replay_powl_log = project_powl_activity(
+            log, replay_options.activity_attribute, powl_options.timestamp_key,
+            powl_options.case_id_key);
+        conformance_log = &*replay_powl_log;
+        alignment_powl_log = project_powl_activity(
+            log, model_alignment_options.activity_attribute,
+            powl_options.timestamp_key, powl_options.case_id_key);
+        alignment_log = &*alignment_powl_log;
       }
       return minera::ModelConformance{
           std::move(id), minera::final_marking_reachable(petri),
-          minera::check_conformance(log, petri, replay_options),
-          minera::check_footprints(log, petri),
-          no_alignments ? std::optional<minera::AlignmentResult>{}
-                        : std::optional<minera::AlignmentResult>(
-                              alignment_option_used
-                                  ? minera::check_alignment(log, petri, alignment_options)
-                                  : minera::check_alignment(log, petri))};
+           minera::check_conformance(*conformance_log, petri, replay_options),
+           is_powl ? minera::check_footprints(powl_log, petri)
+                   : minera::check_footprints(log, petri),
+           no_alignments ? std::optional<minera::AlignmentResult>{}
+                         : std::optional<minera::AlignmentResult>(
+                               (is_powl || alignment_option_used)
+                                   ? minera::check_alignment(
+                                         *alignment_log, petri,
+                                         model_alignment_options)
+                                   : minera::check_alignment(log, petri))};
     };
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
@@ -6032,8 +6150,11 @@ int main(int argc, char** argv) {
                   << compare_petri_miner << "'\n";
         return 2;
       }
-      const auto selector = compare_petri_activity_attribute;
-      const auto reference = [&]() {
+      const auto selector = compare_petri_activity_attribute.empty() &&
+                                    compare_petri_miner == "powl"
+                                ? powl_options.activity_key
+                                : compare_petri_activity_attribute;
+      auto reference = [&]() {
         if (is_xes_path(compare_petri_reference)) {
           minera::XesImportOptions reference_options;
           if (!selector.empty() && selector != "concept:name")
@@ -6048,7 +6169,7 @@ int main(int argc, char** argv) {
                                             reference_options);
       }();
       minera::PetriUsageComparisonOptions comparison_options;
-      comparison_options.activity_attribute = compare_petri_activity_attribute;
+      comparison_options.activity_attribute = selector;
       comparison_options.walk_through_hidden_trans =
           compare_petri_walk_through_hidden;
       comparison_options.try_to_reach_final_marking_through_hidden =
@@ -6059,8 +6180,19 @@ int main(int argc, char** argv) {
         comparison_options.initial_marking = compare_petri_initial_marking;
       if (compare_petri_final_marking_used)
         comparison_options.final_marking = compare_petri_final_marking;
+      std::optional<minera::EventLog> normalized_comparison_log;
+      const minera::EventLog* comparison_log = &log;
+      if (compare_petri_miner == "powl") {
+        normalized_comparison_log = project_powl_activity(
+            log, selector, powl_options.timestamp_key,
+            powl_options.case_id_key);
+        comparison_log = &*normalized_comparison_log;
+        reference = project_powl_activity(
+            reference, selector, powl_options.timestamp_key,
+            powl_options.case_id_key);
+      }
       const auto comparison = minera::compare_petri_usage(
-          *model_it->second, log, reference, comparison_options);
+          *model_it->second, *comparison_log, reference, comparison_options);
       const auto body = minera::petri_usage_comparison_json(comparison);
       if (output.empty()) {
         std::cout << body << '\n';
@@ -6097,7 +6229,9 @@ int main(int argc, char** argv) {
           break;
         }
         case minera::PetriAnalysisFamily::kExtendedMarkingEquation: {
-          if (request.trace_index >= log.traces.size()) {
+          const auto& analysis_log =
+              request.miner == "powl" ? powl_log : log;
+          if (request.trace_index >= analysis_log.traces.size()) {
             std::cerr << "error: --petri-analysis-trace-index out of range\n";
             return 2;
           }
@@ -6113,7 +6247,7 @@ int main(int argc, char** argv) {
           options.full_bootstrap_required = request.full_bootstrap_required;
           options.realizability_limit = request.max_states;
           std::vector<std::string> trace;
-          for (const auto& event : log.traces[request.trace_index].events)
+          for (const auto& event : analysis_log.traces[request.trace_index].events)
             trace.push_back(event.activity);
           result_json = minera::petri_analysis_json(
               minera::solve_extended_marking_equation(
@@ -6158,21 +6292,24 @@ int main(int argc, char** argv) {
       evaluation.emplace();
       evaluation->reserve(available_models.size());
       for (const auto& [miner, petri] : available_models) {
+        const auto& evaluation_log = miner == "powl" ? powl_log : log;
         minera::ModelEvaluation result;
         result.miner = miner;
         switch (evaluation_params->family) {
           case minera::EvaluationFamily::kReplayFitness:
             result.replay_fitness = minera::evaluate_replay_fitness(
-                log, *petri, evaluation_params->replay_fitness_variant);
+                evaluation_log, *petri,
+                evaluation_params->replay_fitness_variant);
             break;
           case minera::EvaluationFamily::kPrecision:
             result.precision = minera::evaluate_precision(
-                log, *petri, evaluation_params->precision_variant,
+                evaluation_log, *petri, evaluation_params->precision_variant,
                 evaluation_params->precision_options);
             break;
           case minera::EvaluationFamily::kGeneralization:
             result.generalization = minera::evaluate_generalization(
-                log, *petri, evaluation_params->generalization_variant);
+                evaluation_log, *petri,
+                evaluation_params->generalization_variant);
             break;
           case minera::EvaluationFamily::kSimplicity:
             result.simplicity = minera::evaluate_simplicity(
@@ -6181,7 +6318,7 @@ int main(int argc, char** argv) {
             break;
           case minera::EvaluationFamily::kComposite:
             result.composite = minera::evaluate_composite(
-                log, *petri, evaluation_params->composite_options);
+                evaluation_log, *petri, evaluation_params->composite_options);
             break;
         }
         evaluation->push_back(std::move(result));
@@ -6190,6 +6327,10 @@ int main(int argc, char** argv) {
     const auto dataset = input.filename().string();
 
     // Optionally mine the decision points of one model's net.
+    if ((decisions_miner == "powl" || decision_tables_miner == "powl") &&
+        !decision_activity_option_used) {
+      decision_options.activity_attribute = powl_options.activity_key;
+    }
     std::optional<minera::DecisionMiningResult> decisions;
     if (!decisions_miner.empty()) {
       const auto* selected = select_decision_model(
@@ -6199,7 +6340,16 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
       }
-      decisions = minera::mine_decisions(log, *selected, decision_options);
+      std::optional<minera::EventLog> projected_decision_log;
+      const minera::EventLog* decision_log = &log;
+      if (decisions_miner == "powl") {
+        projected_decision_log = project_powl_activity(
+            log, decision_options.activity_attribute,
+            powl_options.timestamp_key, powl_options.case_id_key);
+        decision_log = &*projected_decision_log;
+      }
+      decisions = minera::mine_decisions(*decision_log, *selected,
+                                         decision_options);
       decisions->miner = decisions_miner;
     }
     const minera::DecisionMiningResult* decisions_ptr =
@@ -6220,8 +6370,16 @@ int main(int argc, char** argv) {
           decision_options.include_trace_attributes;
       table_options.attributes = decision_options.attributes;
       table_options.lookback = decision_lookback;
+      std::optional<minera::EventLog> projected_decision_log;
+      const minera::EventLog* decision_log = &log;
+      if (decision_tables_miner == "powl") {
+        projected_decision_log = project_powl_activity(
+            log, decision_options.activity_attribute,
+            powl_options.timestamp_key, powl_options.case_id_key);
+        decision_log = &*projected_decision_log;
+      }
       decision_tables =
-          minera::mine_decision_tables(log, *selected, table_options);
+          minera::mine_decision_tables(*decision_log, *selected, table_options);
     }
     const auto* decision_tables_ptr =
         decision_tables ? &*decision_tables : nullptr;
@@ -6234,7 +6392,9 @@ int main(int argc, char** argv) {
     const auto heuristic_decoration = minera::decorate_model(
         log, heuristic_net, heuristic_options.activity_attribute,
         heuristic_options.timestamp_attribute);
-    const auto powl_decoration = minera::decorate_model(log, powl_net);
+    const auto powl_decoration = minera::decorate_model(
+        powl_log, powl_net, powl_options.activity_key,
+        powl_options.timestamp_key);
 
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
@@ -6259,9 +6419,19 @@ int main(int argc, char** argv) {
     if (advanced_petri_miner == "alpha") advanced_net = &net;
     else if (advanced_petri_miner == "heuristic") advanced_net = &heuristic_net;
     else if (advanced_petri_miner == "powl") advanced_net = &powl_net;
-    if (align_decomposed) decomposed_result = minera::align_decomposed(log, *advanced_net, decomposed_options);
-    if (align_petri_anti) petri_anti_result = minera::anti_align_petri(*advanced_net, log, petri_anti_options);
-    if (align_petri_multi) petri_multi_result = minera::multi_align_petri(*advanced_net, log, petri_multi_options);
+    const auto& advanced_log = advanced_petri_miner == "powl" ? powl_log : log;
+    if (align_decomposed)
+      decomposed_result =
+          minera::align_decomposed(advanced_log, *advanced_net,
+                                   decomposed_options);
+    if (align_petri_anti)
+      petri_anti_result =
+          minera::anti_align_petri(*advanced_net, advanced_log,
+                                   petri_anti_options);
+    if (align_petri_multi)
+      petri_multi_result =
+          minera::multi_align_petri(*advanced_net, advanced_log,
+                                    petri_multi_options);
     if (reduce_trace_index) {
       if (*reduce_trace_index >= log.traces.size()) { std::cerr << "error: --reduce-process-tree trace index out of range\n"; return 2; }
       minera::ProcessTreeReductionOptions ro; ro.activity_key = reduction_activity_key;
@@ -6279,9 +6449,21 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, heuristic, or powl)\n";
         return 2;
       }
-      const auto body =
-          minera::monte_carlo_json(minera::monte_carlo(log, *selected,
-                                                       monte_carlo_options));
+      auto effective_options = monte_carlo_options;
+      std::optional<minera::EventLog> projected_monte_carlo_log;
+      const minera::EventLog* simulation_log = &log;
+      if (playout_miner == "powl") {
+        if (!monte_carlo_fields.contains("monte_carlo_activity_key"))
+          effective_options.activity_key = powl_options.activity_key;
+        if (!monte_carlo_fields.contains("monte_carlo_timestamp_key"))
+          effective_options.timestamp_key = powl_options.timestamp_key;
+        projected_monte_carlo_log = project_powl_activity(
+            log, effective_options.activity_key,
+            effective_options.timestamp_key, powl_options.case_id_key);
+        simulation_log = &*projected_monte_carlo_log;
+      }
+      const auto body = minera::monte_carlo_json(
+          minera::monte_carlo(*simulation_log, *selected, effective_options));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {
@@ -6480,8 +6662,11 @@ int main(int argc, char** argv) {
       const bool stochastic = stochastic_playout_requested || playout_miner == "stochastic";
       const bool monte_carlo_mode =
           monte_carlo_requested || playout_miner == "monte_carlo";
+      const bool monte_carlo_uses_inductive_default =
+          monte_carlo_mode && playout_miner == "monte_carlo";
       const std::string model_miner =
-          (playout_miner == "stochastic" || monte_carlo_mode)
+          (playout_miner == "stochastic" ||
+           monte_carlo_uses_inductive_default)
               ? "inductive"
               : playout_miner;
       if (model_miner == "inductive")
@@ -6516,6 +6701,14 @@ int main(int argc, char** argv) {
                   << "' (expected inductive, alpha, heuristic, powl, or "
                      "declare, process_tree, or dfg)\n";
         return 1;
+      }
+      std::optional<minera::EventLog> projected_playout_log;
+      const minera::EventLog* fit_log = &log;
+      if (model_miner == "powl" && stochastic) {
+        projected_playout_log = project_powl_activity(
+            log, powl_options.activity_key, powl_options.timestamp_key,
+            powl_options.case_id_key);
+        fit_log = &*projected_playout_log;
       }
       if (selected != nullptr && petri_playout_mode == "extensive") {
         if (basic_playout_fields.contains("traces"))
@@ -6587,7 +6780,8 @@ int main(int argc, char** argv) {
         generated_json = minera::serialize_stochastic_playout_visited_json(
             *selected, stochastic_playout_options.fit_from_log
                              ? minera::stochastic_playout_visited(
-                                   *selected, log, stochastic_playout_options)
+                                   *selected, *fit_log,
+                                   stochastic_playout_options)
                              : minera::stochastic_playout_visited(
                                    *selected, stochastic_playout_options));
       if (generated_json) {
@@ -6598,8 +6792,20 @@ int main(int argc, char** argv) {
           std::cerr << "error: Monte Carlo playout requires a Petri model\n";
           return 2;
         }
-        generated =
-            minera::monte_carlo(log, *selected, monte_carlo_options).log;
+        auto effective_options = monte_carlo_options;
+        if (model_miner == "powl") {
+          if (!monte_carlo_fields.contains("monte_carlo_activity_key"))
+            effective_options.activity_key = powl_options.activity_key;
+          if (!monte_carlo_fields.contains("monte_carlo_timestamp_key"))
+            effective_options.timestamp_key = powl_options.timestamp_key;
+          if (!projected_playout_log) {
+            projected_playout_log = project_powl_activity(
+                log, effective_options.activity_key,
+                effective_options.timestamp_key, powl_options.case_id_key);
+            fit_log = &*projected_playout_log;
+          }
+        }
+        generated = minera::monte_carlo(*fit_log, *selected, effective_options).log;
       } else if (stochastic) {
         if (selected == nullptr) {
           std::cerr << "error: stochastic playout requires a Petri model\n";
@@ -6607,7 +6813,7 @@ int main(int argc, char** argv) {
         }
         generated = stochastic_playout_options.fit_from_log
                         ? minera::stochastic_playout(
-                              *selected, log, stochastic_playout_options)
+                              *selected, *fit_log, stochastic_playout_options)
                         : minera::stochastic_playout(
                               *selected, stochastic_playout_options);
       } else if (!generated) {

@@ -76,23 +76,36 @@ void table_validation_and_null_contract() {
 void table_prefixes_infer_only_known_extensions() {
   minera::EventTable table;
   table.columns = {"concept:name", "time:timestamp", "org:resource",
-                   "lifecycle:transition", "case:id", "custom:value"};
+                   "lifecycle:transition", "artifactlifecycle:transition",
+                   "micro:trace", "semantic:concept", "swcomm:message",
+                   "swevent:type", "swtelemetry:value", "case:id",
+                   "custom:value"};
   table.rows.push_back(
       {cell("concept:name", "A"), cell("time:timestamp", "2026-01-01T00:00:00Z",
                                        minera::AttributeKind::kDate),
        cell("org:resource", "alice"), cell("lifecycle:transition", "complete"),
+       cell("artifactlifecycle:transition", "complete"),
+       cell("micro:trace", "x"), cell("semantic:concept", "y"),
+       cell("swcomm:message", "z"), cell("swevent:type", "event"),
+       cell("swtelemetry:value", "1"),
        cell("case:id", "c1", minera::AttributeKind::kId),
        cell("custom:value", "x")});
   const auto stream = minera::event_table_to_event_stream(table);
-  assert(stream.metadata.extensions.size() == 4);
+  assert(stream.metadata.extensions.size() == 10);
   assert(stream.metadata.extensions[0].prefix == "concept");
   assert(stream.metadata.extensions[1].prefix == "time");
   assert(stream.metadata.extensions[2].prefix == "org");
   assert(stream.metadata.extensions[3].prefix == "lifecycle");
+  assert(stream.metadata.extensions[4].prefix == "artifactlifecycle");
+  assert(stream.metadata.extensions[5].prefix == "micro");
+  assert(stream.metadata.extensions[6].prefix == "semantic");
+  assert(stream.metadata.extensions[7].prefix == "swcomm");
+  assert(stream.metadata.extensions[8].prefix == "swevent");
+  assert(stream.metadata.extensions[9].prefix == "swtelemetry");
 
   table.metadata.extensions.push_back({"declared", "org", "urn:declared"});
   const auto authoritative = minera::event_table_to_event_stream(table);
-  assert(authoritative.metadata.extensions.size() == 4);
+  assert(authoritative.metadata.extensions.size() == 10);
   const auto org = std::find_if(
       authoritative.metadata.extensions.begin(),
       authoritative.metadata.extensions.end(),

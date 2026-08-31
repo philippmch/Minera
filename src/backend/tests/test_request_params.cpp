@@ -81,6 +81,10 @@ void parse_mine_params_defaults_when_empty() {
   assert(!params.filter.any());
   assert(params.inductive.noise_threshold == 0.0);
   assert(!params.alpha.short_loops);  // classic Alpha is the default variant
+  assert(params.powl.activity_key == "concept:name");
+  assert(params.powl.timestamp_key == "time:timestamp");
+  assert(params.powl.case_id_key == "case:concept:name");
+  assert(!params.token_replay_activity_attribute_supplied);
   const auto explicit_plus = minera::parse_mine_params(
       fields({{"alpha_variant", "plus"}}));
   assert(explicit_plus.alpha.short_loops);
@@ -1597,6 +1601,9 @@ void parse_mine_params_maps_powl_options() {
       {"powl_filtering_threshold", "0.25"},
       {"powl_order_frequency_ratio", "0.8"},
       {"powl_brute_force_activity_limit", "12"},
+      {"powl_activity_key", " phase "},
+      {"powl_timestamp_key", " finished_at "},
+      {"powl_case_id_key", " case_ref "},
   }));
   assert(params.powl.variant ==
          minera::PowlDiscoveryVariant::kDynamicClusteringPlain);
@@ -1604,6 +1611,9 @@ void parse_mine_params_maps_powl_options() {
   assert(params.powl.filtering_threshold == 0.25);
   assert(params.powl.order_frequency_ratio == 0.8);
   assert(params.powl.brute_force_activity_limit == 12);
+  assert(params.powl.activity_key == "phase");
+  assert(params.powl.timestamp_key == "finished_at");
+  assert(params.powl.case_id_key == "case_ref");
 }
 
 void parse_mine_params_rejects_invalid_powl_fields() {
@@ -1617,10 +1627,17 @@ void parse_mine_params_rejects_invalid_powl_fields() {
            std::pair{"powl_order_frequency_ratio", "1.1"},
            std::pair{"powl_order_frequency_ratio", "0.9x"},
            std::pair{"powl_brute_force_activity_limit", "-1"},
-           std::pair{"powl_brute_force_activity_limit", "2x"}}) {
+           std::pair{"powl_brute_force_activity_limit", "2x"},
+           std::pair{"powl_activity_key", "   "},
+           std::pair{"powl_timestamp_key", ""},
+           std::pair{"powl_case_id_key", "\t"}}) {
+    const std::map<std::string, std::string> values{{item.first, item.second}};
     bool threw = false;
     try {
-      (void)minera::parse_mine_params(fields({item}));
+      (void)minera::parse_mine_params(
+          fields(values), [&](std::string_view name) {
+            return values.contains(std::string(name));
+          });
     } catch (const std::invalid_argument&) {
       threw = true;
     }
@@ -1651,6 +1668,7 @@ void parse_mine_params_maps_token_replay_options() {
          minera::TokenReplayVariant::kBackwards);
   assert(params.token_replay.stop_immediately_unfit);
   assert(params.token_replay.activity_attribute == "phase");
+  assert(params.token_replay_activity_attribute_supplied);
 }
 
 void parse_mine_params_rejects_invalid_token_replay_fields() {

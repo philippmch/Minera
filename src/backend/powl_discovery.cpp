@@ -11,14 +11,54 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "minera/timestamp.hpp"
 
 namespace minera {
 namespace {
 
 using Sequence = std::vector<std::string>;
-using UVCL = std::map<Sequence, std::uint64_t>;
+
+struct SequenceHash {
+  std::size_t operator()(const Sequence& sequence) const noexcept {
+    std::size_t hash = 1469598103934665603ull;
+    for (const auto& activity : sequence) {
+      for (const unsigned char byte : activity) {
+        hash ^= static_cast<std::size_t>(byte);
+        hash *= 1099511628211ull;
+      }
+      hash ^= 0xffu;
+      hash *= 1099511628211ull;
+    }
+    return hash;
+  }
+};
+
+struct UVCL {
+  using Entry = std::pair<Sequence, std::uint64_t>;
+  std::vector<Entry> entries;
+  std::unordered_map<Sequence, std::size_t, SequenceHash> index;
+
+  [[nodiscard]] bool empty() const noexcept { return entries.empty(); }
+  [[nodiscard]] std::size_t size() const noexcept { return entries.size(); }
+  [[nodiscard]] auto begin() const noexcept { return entries.begin(); }
+  [[nodiscard]] auto end() const noexcept { return entries.end(); }
+
+  friend bool operator==(const UVCL& left, const UVCL& right) noexcept {
+    if (left.entries.size() != right.entries.size()) return false;
+    for (const auto& [sequence, count] : left.entries) {
+      const auto found = right.index.find(sequence);
+      if (found == right.index.end() ||
+          right.entries[found->second].second != count)
+        return false;
+    }
+    return true;
+  }
+};
 
 void add_checked(std::uint64_t& dst, std::uint64_t value) {
   if (std::numeric_limits<std::uint64_t>::max() - dst < value)
@@ -26,13 +66,330 @@ void add_checked(std::uint64_t& dst, std::uint64_t value) {
   dst += value;
 }
 
-UVCL make_uvcl(const EventLog& log) {
+void add_variant(UVCL& log, Sequence sequence, std::uint64_t count) {
+  const auto [found, inserted] =
+      log.index.try_emplace(sequence, log.entries.size());
+  if (inserted) {
+    log.entries.emplace_back(std::move(sequence), count);
+    return;
+  }
+  add_checked(log.entries[found->second].second, count);
+}
+
+void validate_options(const PowlDiscoveryOptions& options);
+
+std::string selected_activity(const Event& event,
+                              const PowlDiscoveryOptions& options);
+
+bool canonical_activity_key(std::string_view key) {
+  return key.empty() || key == "concept:name" || key == "activity";
+}
+
+bool canonical_timestamp_key(std::string_view key) {
+  return key.empty() || key == "time:timestamp" || key == "timestamp";
+}
+
+bool canonical_case_id_key(std::string_view key) {
+  return key.empty() || key == "case:concept:name";
+}
+
+bool equivalent_first_class_key(std::string_view source,
+                                std::string_view selector) {
+  if (source == selector) return true;
+  const auto same_pair = [&](std::string_view short_name,
+                             std::string_view qualified_name) {
+    return (source == short_name && selector == qualified_name) ||
+           (source == qualified_name && selector == short_name);
+  };
+  return same_pair("activity", "concept:name") ||
+         same_pair("resource", "org:resource") ||
+         same_pair("timestamp", "time:timestamp") ||
+         same_pair("lifecycle", "lifecycle:transition");
+}
+
+void set_projected_attribute(Event& event, std::string_view key,
+                             const std::string& value) {
+  for (auto& attribute : event.attributes) {
+    if (attribute.key != key) continue;
+    attribute.value = value;
+    attribute.is_null = false;
+    return;
+  }
+  EventAttribute attribute;
+  attribute.key = std::string(key);
+  attribute.value = value;
+  event.attributes.push_back(std::move(attribute));
+}
+
+std::string selected_timestamp(const Event& event,
+                               const PowlDiscoveryOptions& options) {
+  if (canonical_timestamp_key(options.timestamp_key)) return event.timestamp;
+  if (event.timestamp_source_key == options.timestamp_key) {
+    if (event.timestamp_state == FirstClassAttributeState::kNull ||
+        (event.timestamp_state == FirstClassAttributeState::kMissing &&
+         event.timestamp.empty())) {
+      throw std::invalid_argument(
+          "powl_timestamp_key: event is missing a non-null attribute '" +
+          options.timestamp_key + "'");
+    }
+    return event.timestamp;
+  }
+  if (const auto* value = event.attribute(options.timestamp_key))
+    return *value;
+  throw std::invalid_argument(
+      "powl_timestamp_key: event is missing a non-null attribute '" +
+      options.timestamp_key + "'");
+}
+
+std::string selected_case_id(const Event& event, const Trace& trace,
+                             const PowlDiscoveryOptions& options) {
+  if (options.case_id_key == "case_id") {
+    if (event.case_id.empty())
+      throw std::invalid_argument(
+          "powl_case_id_key: event is missing a non-null attribute '" +
+          options.case_id_key + "'");
+    return event.case_id;
+  }
+  if (event.case_id_source_key == options.case_id_key) {
+    if (event.case_id_state == FirstClassAttributeState::kNull ||
+        (event.case_id_state == FirstClassAttributeState::kMissing &&
+         event.case_id.empty())) {
+      throw std::invalid_argument(
+          "powl_case_id_key: event is missing a non-null attribute '" +
+          options.case_id_key + "'");
+    }
+    if (event.case_id.empty())
+      throw std::invalid_argument(
+          "powl_case_id_key: selected case attribute '" +
+          options.case_id_key + "' is empty");
+    return event.case_id;
+  }
+  if (const auto* value = event.attribute(options.case_id_key)) {
+    if (value->empty())
+      throw std::invalid_argument(
+          "powl_case_id_key: selected case attribute '" +
+          options.case_id_key + "' is empty");
+    return *value;
+  }
+  if (trace.case_id_source_key == options.case_id_key) {
+    if (trace.case_id_state == FirstClassAttributeState::kNull ||
+        (trace.case_id_state == FirstClassAttributeState::kMissing &&
+         trace.case_id.empty())) {
+      throw std::invalid_argument(
+          "powl_case_id_key: trace is missing a non-null attribute '" +
+          options.case_id_key + "'");
+    }
+    if (trace.case_id.empty())
+      throw std::invalid_argument(
+          "powl_case_id_key: selected case attribute '" +
+          options.case_id_key + "' is empty");
+    return trace.case_id;
+  }
+  if (const auto* value = trace.attribute(options.case_id_key)) {
+    if (value->empty())
+      throw std::invalid_argument(
+          "powl_case_id_key: selected case attribute '" +
+          options.case_id_key + "' is empty");
+    return *value;
+  }
+  throw std::invalid_argument(
+      "powl_case_id_key: event is missing a non-null attribute '" +
+      options.case_id_key + "'");
+}
+
+struct PowlEventWithTime {
+  Event event;
+  std::optional<double> timestamp;
+};
+
+void project_powl_event(Event& event, const PowlDiscoveryOptions& options,
+                        std::optional<double>* timestamp) {
+  if (!canonical_activity_key(options.activity_key)) {
+    const auto activity = selected_activity(event, options);
+    event.activity = activity;
+    set_projected_attribute(event, options.activity_key, activity);
+  }
+  if (!canonical_timestamp_key(options.timestamp_key)) {
+    const auto value = selected_timestamp(event, options);
+    const auto parsed = parse_timestamp(value);
+    if (!parsed || !std::isfinite(*parsed))
+      throw std::invalid_argument(
+          "powl_timestamp_key: event has an invalid timestamp attribute '" +
+          options.timestamp_key + "'");
+    event.timestamp = value;
+    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_source_key = options.timestamp_key;
+    set_projected_attribute(event, options.timestamp_key, value);
+    if (timestamp != nullptr) *timestamp = *parsed;
+  }
+}
+
+EventLog normalize_powl_event_log_impl(const EventLog& event_log,
+                                       const PowlDiscoveryOptions& options) {
+  const bool custom_activity = !canonical_activity_key(options.activity_key);
+  const bool custom_timestamp = !canonical_timestamp_key(options.timestamp_key);
+  const bool custom_case_id = !canonical_case_id_key(options.case_id_key);
+  if (!custom_activity && !custom_timestamp && !custom_case_id)
+    return event_log;
+
+  EventLog normalized;
+  copy_event_log_context(event_log, normalized);
+
+  if (!custom_case_id) {
+    normalized.traces = event_log.traces;
+    for (auto& trace : normalized.traces) {
+      std::vector<PowlEventWithTime> projected;
+      projected.reserve(trace.events.size());
+      for (auto& event : trace.events) {
+        PowlEventWithTime item;
+        item.event = std::move(event);
+        project_powl_event(item.event, options, &item.timestamp);
+        projected.push_back(std::move(item));
+      }
+      if (custom_timestamp) {
+        std::stable_sort(
+            projected.begin(), projected.end(),
+            [](const PowlEventWithTime& left, const PowlEventWithTime& right) {
+              return *left.timestamp < *right.timestamp;
+            });
+      }
+      trace.events.clear();
+      trace.events.reserve(projected.size());
+      for (auto& item : projected) trace.events.push_back(std::move(item.event));
+    }
+    return normalized;
+  }
+
+  struct Group {
+    std::string case_id;
+    Trace trace;
+    std::vector<PowlEventWithTime> events;
+    std::size_t first_seen = 0;
+  };
+  std::vector<Group> groups;
+  std::unordered_map<std::string, std::size_t> group_index;
+  std::size_t ordinal = 0;
+  const auto get_group = [&](const std::string& case_id,
+                             const Trace& source_trace) -> Group& {
+    const auto found = group_index.find(case_id);
+    if (found != group_index.end()) return groups[found->second];
+    Group group;
+    group.case_id = case_id;
+    group.trace = source_trace;
+    group.trace.case_id = case_id;
+    group.trace.case_id_state = FirstClassAttributeState::kPresent;
+    group.trace.case_id_source_key = options.case_id_key;
+    group.trace.events.clear();
+    group.first_seen = ordinal;
+    groups.push_back(std::move(group));
+    group_index.emplace(case_id, groups.size() - 1);
+    return groups.back();
+  };
+
+  for (const auto& source_trace : event_log.traces) {
+    if (source_trace.events.empty()) {
+      const auto case_id = selected_case_id(
+          Event{}, source_trace, options);
+      (void)get_group(case_id, source_trace);
+      ++ordinal;
+      continue;
+    }
+    for (const auto& source_event : source_trace.events) {
+      const auto case_id = selected_case_id(source_event, source_trace, options);
+      auto& group = get_group(case_id, source_trace);
+      PowlEventWithTime item;
+      item.event = source_event;
+      ++ordinal;
+      project_powl_event(item.event, options, &item.timestamp);
+      item.event.case_id = case_id;
+      item.event.case_id_state = FirstClassAttributeState::kPresent;
+      item.event.case_id_source_key = options.case_id_key;
+      group.events.push_back(std::move(item));
+    }
+  }
+
+  for (auto& group : groups) {
+    if (!custom_timestamp) continue;
+    std::stable_sort(
+        group.events.begin(), group.events.end(),
+        [](const PowlEventWithTime& left, const PowlEventWithTime& right) {
+          return *left.timestamp < *right.timestamp;
+        });
+  }
+  std::stable_sort(
+      groups.begin(), groups.end(), [](const Group& left, const Group& right) {
+        if (left.case_id != right.case_id) return left.case_id < right.case_id;
+        return left.first_seen < right.first_seen;
+      });
+
+  normalized.traces.reserve(groups.size());
+  for (auto& group : groups) {
+    group.trace.events.clear();
+    group.trace.events.reserve(group.events.size());
+    for (auto& item : group.events) group.trace.events.push_back(std::move(item.event));
+    normalized.traces.push_back(std::move(group.trace));
+  }
+  return normalized;
+}
+
+std::string selected_activity(const Event& event,
+                              const PowlDiscoveryOptions& options) {
+  if (options.activity_key == "concept:name" ||
+      options.activity_key == "activity") {
+    return event.activity;
+  }
+  bool first_class_match = false;
+  const auto first_class_value = [&]() -> const std::string* {
+    const auto select = [&](std::string_view source_key,
+                            FirstClassAttributeState state,
+                            const std::string& value) -> const std::string* {
+      if (!equivalent_first_class_key(source_key, options.activity_key))
+        return nullptr;
+      first_class_match = true;
+      return state == FirstClassAttributeState::kNull ||
+                     (state == FirstClassAttributeState::kMissing &&
+                      value.empty())
+                 ? nullptr
+                 : &value;
+    };
+    if (const auto* value = select(event.activity_source_key,
+                                   event.activity_state, event.activity))
+      return value;
+    if (const auto* value = select(event.timestamp_source_key,
+                                   event.timestamp_state, event.timestamp))
+      return value;
+    if (const auto* value = select(event.resource_source_key,
+                                   event.resource_state, event.resource))
+      return value;
+    if (const auto* value = select(event.lifecycle_source_key,
+                                   event.lifecycle_state, event.lifecycle))
+      return value;
+    if (const auto* value = select(event.case_id_source_key,
+                                   event.case_id_state, event.case_id))
+      return value;
+    return nullptr;
+  }();
+  if (first_class_match) {
+    if (first_class_value != nullptr) return *first_class_value;
+    throw std::invalid_argument(
+        "powl_activity_key: event is missing a non-null attribute '" +
+        options.activity_key + "'");
+  }
+  if (const auto* value = event.attribute(options.activity_key))
+    return *value;
+  throw std::invalid_argument(
+      "powl_activity_key: event is missing a non-null attribute '" +
+      options.activity_key + "'");
+}
+
+UVCL make_uvcl(const EventLog& log, const PowlDiscoveryOptions& options) {
   UVCL out;
   for (const auto& trace : log.traces) {
     Sequence seq;
     seq.reserve(trace.events.size());
-    for (const auto& event : trace.events) seq.push_back(event.activity);
-    add_checked(out[seq], 1);
+    for (const auto& event : trace.events)
+      seq.push_back(selected_activity(event, options));
+    add_variant(out, std::move(seq), 1);
   }
   return out;
 }
@@ -51,14 +408,15 @@ UVCL project(const UVCL& log, const std::set<std::string>& keep) {
   for (const auto& [seq, count] : log) {
     Sequence p;
     for (const auto& a : seq) if (keep.count(a)) p.push_back(a);
-    add_checked(out[p], count);
+    add_variant(out, std::move(p), count);
   }
   return out;
 }
 
 UVCL without_empty(const UVCL& log) {
   UVCL out;
-  for (const auto& [seq, count] : log) if (!seq.empty()) out.emplace(seq, count);
+  for (const auto& [seq, count] : log)
+    if (!seq.empty()) add_variant(out, seq, count);
   return out;
 }
 
@@ -114,9 +472,9 @@ PowlNode flower(const std::vector<std::string>& acts) {
   for (const auto& a : acts) leaves.push_back(PowlNode::transition(a));
   PowlNode redo_node = leaves.size() == 1 ? std::move(leaves.front())
                                          : PowlNode::xor_node(std::move(leaves));
-  // The flower fallback has an empty do part and an unrestricted redo part:
-  // it can start with no activity and then repeat any activity indefinitely.
-  return PowlNode::loop(PowlNode::silent(), std::move(redo_node));
+  // The flower always executes one visible branch before allowing a redo.
+  // This keeps the empty trace out of the fallback language.
+  return PowlNode::loop(std::move(redo_node), PowlNode::silent());
 }
 
 // Discovery may produce nested partial orders while projecting a cut.  The
@@ -290,7 +648,7 @@ std::optional<PowlNode> make_xor(const UVCL& log, State& s) {
       if (std::find(comps[selected].begin(), comps[selected].end(), activity) !=
           comps[selected].end())
         branch.push_back(activity);
-    add_checked(projected[selected][branch], count);
+    add_variant(projected[selected], std::move(branch), count);
   }
   std::vector<PowlNode> children;
   if (s.probe_only) return PowlNode::silent();
@@ -490,7 +848,7 @@ std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
            ++position)
         if (groups[index].count(sequence[position]) != 0)
           child.push_back(sequence[position]);
-      add_checked(projected_logs[index][child], count);
+      add_variant(projected_logs[index], std::move(child), count);
       split_point = new_split_point;
       ignored.insert(groups[index].begin(), groups[index].end());
     }
@@ -746,12 +1104,12 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     Sequence redo_slice;
     const auto flush_do = [&]() {
       if (do_slice.empty()) return;
-      add_checked(do_log[do_slice], count);
+      add_variant(do_log, do_slice, count);
       do_slice.clear();
     };
     const auto flush_redo = [&]() {
       if (redo_slice.empty()) return;
-      add_checked(redo_log[redo_slice], count);
+      add_variant(redo_log, redo_slice, count);
       redo_slice.clear();
     };
     for (const auto& activity : sequence) {
@@ -768,7 +1126,7 @@ std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
     }
     flush_redo();
     // The loop projection retains an empty trailing do slice.
-    add_checked(do_log[do_slice], count);
+    add_variant(do_log, std::move(do_slice), count);
   }
   if (s.probe_only) return PowlNode::silent();
   return PowlNode::loop(recurse(do_log, s), recurse(redo_log, s));
@@ -1257,7 +1615,7 @@ UVCL split_tau_loop(const UVCL& log, bool strict) {
   UVCL projected;
   for (const auto& [sequence, count] : log) {
     if (sequence.empty()) {
-      add_checked(projected[sequence], count);
+      add_variant(projected, sequence, count);
       continue;
     }
     std::size_t begin = 0;
@@ -1266,12 +1624,12 @@ UVCL split_tau_loop(const UVCL& log, bool strict) {
       if (strict && ends.count(sequence[i - 1]) == 0) continue;
       Sequence segment(sequence.begin() + static_cast<std::ptrdiff_t>(begin),
                        sequence.begin() + static_cast<std::ptrdiff_t>(i));
-      add_checked(projected[segment], count);
+      add_variant(projected, segment, count);
       begin = i;
     }
     Sequence segment(sequence.begin() + static_cast<std::ptrdiff_t>(begin),
                      sequence.end());
-    add_checked(projected[segment], count);
+    add_variant(projected, std::move(segment), count);
   }
   return projected;
 }
@@ -1301,25 +1659,26 @@ std::optional<UVCL> filtered_log(const UVCL& log,
       minimum = std::min(minimum, count);
     }
     for (const auto& [sequence, count] : log)
-      if (count != minimum) filtered.emplace(sequence, count);
+      if (count != minimum) add_variant(filtered, sequence, count);
   } else {
     std::vector<std::pair<Sequence, std::uint64_t>> ranked(log.begin(),
                                                            log.end());
     std::stable_sort(
         ranked.begin(), ranked.end(),
         [](const auto& left, const auto& right) {
-          if (left.second != right.second) return left.second > right.second;
-          return left.first < right.first;
+          return left.second > right.second;
         });
     if (!ranked.empty()) {
-      filtered.emplace(ranked.front());
+      add_variant(filtered, ranked.front().first, ranked.front().second);
       auto previous_retained = ranked.front().second;
       for (std::size_t i = 1; i < ranked.size(); ++i) {
         if (static_cast<long double>(ranked[i].second) >
             static_cast<long double>(previous_retained) *
                 options.filtering_threshold) {
-          filtered.emplace(ranked[i]);
+          add_variant(filtered, ranked[i].first, ranked[i].second);
           previous_retained = ranked[i].second;
+        } else {
+          break;
         }
       }
     }
@@ -1340,7 +1699,11 @@ PowlNode discover_rec(const UVCL& raw, State& s) {
     if (seq.empty()) return finish(PowlNode::silent());
     if (seq.size() == 1) return finish(PowlNode::transition(seq.front()));
   }
-  if (log.count(Sequence{})) {
+  const bool has_empty = std::any_of(
+      log.begin(), log.end(), [](const auto& entry) {
+        return entry.first.empty();
+      });
+  if (has_empty) {
     auto nonempty = without_empty(log);
     if (!nonempty.empty()) return finish(PowlNode::xor_node({PowlNode::silent(), recurse(nonempty, s)}));
   }
@@ -1382,6 +1745,15 @@ void validate_options(const PowlDiscoveryOptions& o) {
     throw std::invalid_argument("POWL filtering threshold must satisfy 0 <= t < 1");
   if (!std::isfinite(o.order_frequency_ratio) || o.order_frequency_ratio <= 0.5 || o.order_frequency_ratio > 1.0)
     throw std::invalid_argument("POWL order frequency ratio must satisfy 0.5 < ratio <= 1");
+  const auto nonempty = [](const std::string& value) {
+    return value.find_first_not_of(" \t\r\n") != std::string::npos;
+  };
+  if (!nonempty(o.activity_key))
+    throw std::invalid_argument("powl_activity_key must not be empty");
+  if (!nonempty(o.timestamp_key))
+    throw std::invalid_argument("powl_timestamp_key must not be empty");
+  if (!nonempty(o.case_id_key))
+    throw std::invalid_argument("powl_case_id_key must not be empty");
 }
 
 }  // namespace
@@ -1389,13 +1761,20 @@ void validate_options(const PowlDiscoveryOptions& o) {
 PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& options) {
   validate_options(options);
   State state{options, 0};
-  const auto log = make_uvcl(event_log);
+  const auto normalized = normalize_powl_event_log_impl(event_log, options);
+  const auto log = make_uvcl(normalized, options);
   if (options.variant == PowlDiscoveryVariant::kBruteForce &&
       options.brute_force_activity_limit != 0 &&
       activities(log).size() > options.brute_force_activity_limit) {
     throw std::runtime_error("POWL brute-force activity limit exceeded");
   }
   return simplify_powl(discover_rec(log, state));
+}
+
+EventLog normalize_powl_event_log(const EventLog& event_log,
+                                  const PowlDiscoveryOptions& options) {
+  validate_options(options);
+  return normalize_powl_event_log_impl(event_log, options);
 }
 
 }  // namespace minera

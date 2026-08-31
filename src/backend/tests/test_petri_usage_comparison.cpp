@@ -8,6 +8,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 #include "minera/petri_usage_comparison.hpp"
+#include "minera/powl_discovery.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
 namespace {
@@ -343,7 +344,9 @@ void imported_custom_activity_attributes_are_replayable() {
   const auto csv_log = minera::import_csv_event_log(csv, csv_options);
   assert(csv_log.traces.size() == 1);
   assert(csv_log.traces.front().events.front().activity == "A");
-  assert(csv_log.traces.front().events.front().attribute("business_activity") !=
+  assert(csv_log.traces.front().events.front().activity_source_key ==
+         "business_activity");
+  assert(csv_log.traces.front().events.front().attribute("business_activity") ==
          nullptr);
 
   minera::PetriUsageComparisonOptions options;
@@ -359,7 +362,9 @@ void imported_custom_activity_attributes_are_replayable() {
       "</event></trace></log>");
   const auto xes_log = minera::import_xes_event_log(xes, xes_options);
   assert(xes_log.traces.front().events.front().activity == "A");
-  assert(xes_log.traces.front().events.front().attribute("business_activity") !=
+  assert(xes_log.traces.front().events.front().activity_source_key ==
+         "business_activity");
+  assert(xes_log.traces.front().events.front().attribute("business_activity") ==
          nullptr);
   const auto xes_result = compare_petri_usage(net, xes_log, log_of({}), options);
   assert(xes_result.transitions[0].log1_occurrences == 1);
@@ -406,6 +411,54 @@ void imported_first_class_aliases_work_without_default_activity_columns() {
         compare_petri_usage(net, log, log_of({}), comparison_options);
     assert(result.transitions[0].log1_occurrences == 1);
   }
+}
+
+void imported_powl_reference_uses_all_cached_selectors() {
+  const auto net = simple_net();
+  minera::PowlDiscoveryOptions powl_options;
+  powl_options.activity_key = "step_name";
+  powl_options.timestamp_key = "finished_at";
+  powl_options.case_id_key = "order_ref";
+
+  // This mirrors the server's reference-CSV construction for a cached POWL
+  // model.  The default case_id/timestamp names must not be retained when
+  // the cached model selected custom POWL fields.
+  bool default_options_rejected = false;
+  try {
+    std::istringstream csv(
+        "order_ref,step_name,finished_at\n"
+        "order-1,A,2024-01-01T00:00:00Z\n");
+    (void)minera::import_csv_event_log(csv);
+  } catch (const std::invalid_argument&) {
+    default_options_rejected = true;
+  }
+  assert(default_options_rejected);
+
+  minera::CsvImportOptions reference_options;
+  reference_options.case_id_column = powl_options.case_id_key;
+  reference_options.timestamp_column = powl_options.timestamp_key;
+  reference_options.activity_column = powl_options.activity_key;
+  std::istringstream csv(
+      "order_ref,step_name,finished_at\n"
+      "order-1,A,2024-01-01T00:00:00Z\n");
+  const auto reference =
+      minera::import_csv_event_log(csv, reference_options);
+  const auto normalized =
+      minera::normalize_powl_event_log(reference, powl_options);
+  assert(normalized.traces.size() == 1);
+  assert(normalized.traces.front().case_id == "order-1");
+  assert(normalized.traces.front().events.size() == 1);
+  assert(normalized.traces.front().events.front().activity == "A");
+  assert(normalized.traces.front().events.front().timestamp ==
+         "2024-01-01T00:00:00Z");
+
+  minera::PetriUsageComparisonOptions comparison_options;
+  comparison_options.activity_attribute = powl_options.activity_key;
+  const auto comparison =
+      minera::compare_petri_usage(net, normalized, normalized,
+                                  comparison_options);
+  assert(comparison.transitions.front().log1_occurrences == 1);
+  assert(comparison.transitions.front().log2_occurrences == 1);
 }
 
 void xes_exact_selector_beats_alias_in_any_order() {
@@ -492,6 +545,7 @@ int main() {
   aliases_prefer_first_class_fields_and_reject_blank_selectors();
   imported_custom_activity_attributes_are_replayable();
   imported_first_class_aliases_work_without_default_activity_columns();
+  imported_powl_reference_uses_all_cached_selectors();
   xes_exact_selector_beats_alias_in_any_order();
   invalid_net_indices_are_rejected();
   silent_search_budget_is_reported();

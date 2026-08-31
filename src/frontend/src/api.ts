@@ -472,6 +472,12 @@ export interface MinerOptions {
   powlFilteringThreshold?: number;
   powlOrderFrequencyRatio?: number;
   powlBruteForceActivityLimit?: number;
+  /** Event field used as the POWL activity label. */
+  powlActivityKey?: string;
+  /** Timestamp field retained for POWL tabular parity. */
+  powlTimestampKey?: string;
+  /** Case-id field retained for POWL tabular parity. */
+  powlCaseIdKey?: string;
   /** Reference-compatible token-replay variation used for model conformance. */
   tokenReplayVariant?: "forward" | "backwards";
   tokenReplayStopImmediatelyUnfit?: boolean;
@@ -945,6 +951,16 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
        options.powlBruteForceActivityLimit < 0)) {
     throw new Error("powlBruteForceActivityLimit must be a non-negative integer");
   }
+  const addPowlSelector = (
+    name: string,
+    value: string | undefined,
+    defaultValue: string,
+  ) => {
+    if (value === undefined) return;
+    const normalized = value.trim();
+    if (!normalized) throw new Error(`${name} must not be empty`);
+    if (normalized !== defaultValue) add(name, normalized);
+  };
   if (options.powlVariant && options.powlVariant !== "maximal")
     add("powl_variant", options.powlVariant);
   if (options.powlFilteringType && options.powlFilteringType !== "decreasing_factor")
@@ -955,6 +971,9 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     add("powl_order_frequency_ratio", String(options.powlOrderFrequencyRatio));
   if (options.powlBruteForceActivityLimit !== undefined && Number.isInteger(options.powlBruteForceActivityLimit) && options.powlBruteForceActivityLimit >= 0 && options.powlBruteForceActivityLimit !== 0)
     add("powl_brute_force_activity_limit", String(options.powlBruteForceActivityLimit));
+  addPowlSelector("powl_activity_key", options.powlActivityKey, "concept:name");
+  addPowlSelector("powl_timestamp_key", options.powlTimestampKey, "time:timestamp");
+  addPowlSelector("powl_case_id_key", options.powlCaseIdKey, "case:concept:name");
   if (options.tokenReplayVariant && options.tokenReplayVariant !== "forward")
     add("token_replay_variant", options.tokenReplayVariant);
   if (options.tokenReplayStopImmediatelyUnfit)
@@ -962,7 +981,7 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   if (options.tokenReplayActivityAttribute !== undefined) {
     const value = options.tokenReplayActivityAttribute.trim();
     if (!value) throw new Error("tokenReplayActivityAttribute must not be empty");
-    if (value !== "concept:name") add("token_replay_activity_attribute", value);
+    add("token_replay_activity_attribute", value);
   }
   if (
     options.logSkeletonNoiseThreshold !== undefined &&
@@ -1311,7 +1330,7 @@ export function alignmentQuery(options: AlignmentOptions = {}): string {
   if (options.activity_attribute !== undefined) {
     const value = options.activity_attribute.trim();
     if (!value) throw new Error("activity_attribute must not be empty");
-    if (value !== "concept:name") add("alignment_activity_attribute", value);
+    add("alignment_activity_attribute", value);
   }
   return query.toString();
 }
@@ -2715,6 +2734,7 @@ export async function fetchPtml(miner?: string): Promise<string> {
 export interface XesExportOptions {
   variant?: "line_by_line" | "etree";
   compress?: boolean;
+  inferMetadata?: boolean;
 }
 
 export interface PetriNetReductionOptions {
@@ -2781,6 +2801,8 @@ export function xesExportQuery(options: XesExportOptions = {}): string {
     query.set("xes_export_variant", options.variant);
   if (options.compress !== undefined)
     query.set("xes_compress", String(options.compress));
+  if (options.inferMetadata !== undefined)
+    query.set("xes_infer_metadata", String(options.inferMetadata));
   return query.toString();
 }
 

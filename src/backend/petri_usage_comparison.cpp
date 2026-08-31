@@ -81,6 +81,31 @@ const std::string* selected_activity_value(const Event& event,
       attribute == "concept:name") {
     return &event.activity;
   }
+  const auto selected_first_class = [&](std::string_view source_key,
+                                        FirstClassAttributeState state,
+                                        const std::string& value)
+      -> const std::string* {
+    if (source_key != attribute) return nullptr;
+    if (state == FirstClassAttributeState::kNull ||
+        (state == FirstClassAttributeState::kMissing && value.empty()))
+      return nullptr;
+    return &value;
+  };
+  if (const auto* value = selected_first_class(
+          event.activity_source_key, event.activity_state, event.activity))
+    return value;
+  if (const auto* value = selected_first_class(
+          event.resource_source_key, event.resource_state, event.resource))
+    return value;
+  if (const auto* value = selected_first_class(
+          event.timestamp_source_key, event.timestamp_state, event.timestamp))
+    return value;
+  if (const auto* value = selected_first_class(
+          event.lifecycle_source_key, event.lifecycle_state, event.lifecycle))
+    return value;
+  if (const auto* value = selected_first_class(
+          event.case_id_source_key, event.case_id_state, event.case_id))
+    return value;
   if (attribute == "resource" || attribute == "org:resource") {
     return &event.resource;
   }

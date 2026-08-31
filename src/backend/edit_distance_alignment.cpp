@@ -316,15 +316,33 @@ EventLog project_log_on_alignments(
     const auto& original = source.traces[ti];
     const auto& alignment = alignments[ti];
     Trace projected_trace;
-    projected_trace.case_id = original.case_id;
-    projected_trace.attributes = original.attributes;
-    projected_trace.properties = original.properties;
+    copy_trace_context(original, projected_trace);
     set_attr(projected_trace.attributes, "@@original_trace",
              join_variant(alignment.source_variant));
     set_attr(projected_trace.attributes, "@@aligned_variant",
              join_variant(alignment.target_variant));
+    const Event* activity_template = nullptr;
+    for (const auto& candidate : original.events) {
+      if (!candidate.activity_source_key.empty() ||
+          candidate.activity_attribute) {
+        activity_template = &candidate;
+        break;
+      }
+    }
+    if (activity_template == nullptr && !original.events.empty())
+      activity_template = &original.events.front();
     std::string current_timestamp;
-    if (!original.events.empty()) current_timestamp = original.events.front().timestamp;
+    FirstClassAttributeState current_timestamp_state =
+        FirstClassAttributeState::kMissing;
+    std::string current_timestamp_source_key;
+    std::optional<EventAttribute> current_timestamp_attribute;
+    if (!original.events.empty()) {
+      current_timestamp = original.events.front().timestamp;
+      current_timestamp_state = original.events.front().timestamp_state;
+      current_timestamp_source_key =
+          original.events.front().timestamp_source_key;
+      current_timestamp_attribute = original.events.front().timestamp_attribute;
+    }
     std::size_t source_pos = 0;
     for (const auto& move : alignment.alignment) {
       if (move.type == EditDistanceMoveType::kLog) {
@@ -343,10 +361,27 @@ EventLog project_log_on_alignments(
         }
         event = original.events[source_pos++];
         current_timestamp = event.timestamp;
+        current_timestamp_state = event.timestamp_state;
+        current_timestamp_source_key = event.timestamp_source_key;
+        current_timestamp_attribute = event.timestamp_attribute;
       } else {
-        event.case_id = original.case_id;
-        event.activity = move.model_activity;
+        copy_event_case_context(original, event);
+        if (activity_template != nullptr) {
+          set_event_activity_context(*activity_template, move.model_activity,
+                                     event);
+        } else {
+          event.activity = move.model_activity;
+          event.activity_state = FirstClassAttributeState::kPresent;
+          event.activity_source_key = "concept:name";
+        }
         event.timestamp = current_timestamp;
+        event.timestamp_state =
+            current_timestamp_state == FirstClassAttributeState::kMissing &&
+                    !current_timestamp.empty()
+                ? FirstClassAttributeState::kPresent
+                : current_timestamp_state;
+        event.timestamp_source_key = current_timestamp_source_key;
+        event.timestamp_attribute = current_timestamp_attribute;
       }
       event.activity = move.model_activity;
       event.input_order = projected_trace.events.size();

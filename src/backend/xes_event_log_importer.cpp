@@ -4,9 +4,12 @@
 #include "xml_pull_parser.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -28,9 +31,7 @@ std::string_view local_name(std::string_view name) {
                                              : name.substr(separator + 1);
 }
 
-// The XES attribute element names and the kind each maps to. Anything else
-// under an <event> (e.g. <list>, <container>, or an extension element) is not
-// a scalar attribute and is skipped.
+// The XES attribute element names and the kind each maps to.
 std::optional<AttributeKind> attribute_kind_of(std::string_view element) {
   element = local_name(element);
   if (element == "string") return AttributeKind::kString;
@@ -40,6 +41,179 @@ std::optional<AttributeKind> attribute_kind_of(std::string_view element) {
   if (element == "boolean") return AttributeKind::kBoolean;
   if (element == "id") return AttributeKind::kId;
   return std::nullopt;
+}
+
+bool true_attribute(const std::vector<std::pair<std::string, std::string>>& attrs,
+                   std::string_view name) {
+  const auto* value = detail::attribute(attrs, name);
+  if (!value) return false;
+  std::string normalized = *value;
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                 [](unsigned char c) {
+                   return static_cast<char>(std::tolower(c));
+                 });
+  return normalized == "true" || normalized == "1" || normalized == "yes";
+}
+
+NativeAttributeValue parse_native_value(AttributeKind kind,
+                                        std::string_view value) {
+  switch (kind) {
+    case AttributeKind::kInt: {
+      if (value.empty())
+        throw std::invalid_argument("XES int attribute has an empty value");
+      const char* first = value.data();
+      const char* last = value.data() + value.size();
+      if (*first == '+') ++first;
+      std::int64_t parsed = 0;
+      const auto result = std::from_chars(first, last, parsed, 10);
+      if (result.ec != std::errc{} || result.ptr != last) {
+        throw std::invalid_argument("XES int attribute has an invalid value: " +
+                                    std::string(value));
+      }
+      return parsed;
+    }
+    case AttributeKind::kFloat: {
+      if (value == "INF" || value == "+INF")
+        return std::numeric_limits<double>::infinity();
+      if (value == "-INF")
+        return -std::numeric_limits<double>::infinity();
+      if (value == "NaN") return std::numeric_limits<double>::quiet_NaN();
+      double parsed = 0.0;
+      const char* first = value.data();
+      if (!value.empty() && *first == '+') ++first;
+      const auto result = std::from_chars(
+          first, value.data() + value.size(), parsed,
+          std::chars_format::general);
+      if (result.ec != std::errc{} || result.ptr != value.data() + value.size()) {
+        throw std::invalid_argument(
+            "XES float attribute has an invalid value: " +
+            std::string(value));
+      }
+      return parsed;
+    }
+    case AttributeKind::kBoolean:
+      if (value == "true" || value == "1") return true;
+      if (value == "false" || value == "0") return false;
+      throw std::invalid_argument("XES boolean attribute has an invalid value: " +
+                                  std::string(value));
+    case AttributeKind::kDate: {
+      const auto parsed = parse_timestamp(value);
+      if (!parsed) {
+        throw std::invalid_argument("XES date attribute has an invalid value: " +
+                                    std::string(value));
+      }
+      return NativeDate{format_timestamp(*parsed)};
+    }
+    case AttributeKind::kString:
+    case AttributeKind::kId:
+      return std::monostate{};
+  }
+  return std::monostate{};
+}
+
+void skip_element(detail::XmlPullParser& parser,
+                  const detail::XmlPullParser::Token& start) {
+  constexpr std::size_t kMaxSkippedDepth = 128;
+  if (start.self_closing) return;
+  std::size_t depth = 1;
+  while (depth != 0) {
+    const auto token = parser.next();
+    if (token.kind == detail::XmlPullParser::Kind::EndOfInput) return;
+    if (token.kind == detail::XmlPullParser::Kind::StartElement &&
+        !token.self_closing) {
+      ++depth;
+      if (depth > kMaxSkippedDepth)
+        throw std::invalid_argument("XES attribute nesting exceeds the maximum depth");
+    } else if (token.kind == detail::XmlPullParser::Kind::EndElement) {
+      --depth;
+    }
+  }
+}
+
+std::optional<EventAttribute> parse_attribute_node(
+    detail::XmlPullParser& parser,
+    const detail::XmlPullParser::Token& start,
+    std::size_t depth = 0) {
+  constexpr std::size_t kMaxAttributeDepth = 128;
+  if (depth > kMaxAttributeDepth)
+    throw std::invalid_argument("XES attribute nesting exceeds the maximum depth");
+  const auto element = local_name(start.name);
+  const auto kind = attribute_kind_of(element);
+  const bool list = element == "list";
+  const bool container = element == "container";
+  if (!kind && !list && !container) {
+    skip_element(parser, start);
+    return std::nullopt;
+  }
+
+  const auto* key = detail::attribute(start.attributes, "key");
+  if (!key) {
+    skip_element(parser, start);
+    return std::nullopt;
+  }
+  const bool is_null = true_attribute(start.attributes, "null") ||
+                       true_attribute(start.attributes, "is_null");
+  EventAttribute result;
+  result.key = *key;
+  result.container = list ? AttributeContainerKind::kList
+                          : container ? AttributeContainerKind::kContainer
+                                      : AttributeContainerKind::kScalar;
+  result.kind = kind.value_or(AttributeKind::kString);
+  result.is_null = is_null;
+  if (const auto* value = detail::attribute(start.attributes, "value")) {
+    result.value = *value;
+  } else if (!is_null && kind) {
+    throw std::invalid_argument("XES scalar attribute is missing its value");
+  }
+  if (!is_null && kind) {
+    result.typed_value = parse_native_value(*kind, result.value);
+    if (const auto* date = std::get_if<NativeDate>(&result.typed_value))
+      result.value = date->value;
+  }
+  if (start.self_closing) return result;
+
+  while (true) {
+    const auto token = parser.next();
+    if (token.kind == detail::XmlPullParser::Kind::EndOfInput) {
+      throw std::runtime_error("XES attribute element is not closed");
+    }
+    if (token.kind == detail::XmlPullParser::Kind::EndElement) {
+      if (local_name(token.name) == element) return result;
+      continue;
+    }
+    if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
+    if (!kind) {
+      // The XES list grammar wraps its entries in a <values> element.  Older
+      // producers also emit direct children, so accept both forms while
+      // preserving every recursive typed attribute.
+      if (list && local_name(token.name) == "values") {
+        if (token.self_closing) continue;
+        while (true) {
+          const auto values_token = parser.next();
+          if (values_token.kind == detail::XmlPullParser::Kind::EndOfInput)
+            throw std::runtime_error("XES list <values> element is not closed");
+          if (values_token.kind == detail::XmlPullParser::Kind::EndElement) {
+            if (local_name(values_token.name) == "values") break;
+            continue;
+          }
+          if (values_token.kind != detail::XmlPullParser::Kind::StartElement)
+            continue;
+          if (const auto child =
+                  parse_attribute_node(parser, values_token, depth + 1))
+            result.children.push_back(*child);
+        }
+      } else if (const auto child =
+                     parse_attribute_node(parser, token, depth + 1)) {
+        result.children.push_back(*child);
+      }
+    } else if (const auto child =
+                   parse_attribute_node(parser, token, depth + 1)) {
+      // Scalar attributes are normally self-closing, but the attribute
+      // representation also permits recursive metadata children. Preserve
+      // those children instead of discarding the whole nested subtree.
+      result.children.push_back(*child);
+    }
+  }
 }
 
 int selector_match_rank(std::string_view key, std::string_view selector) {
@@ -54,6 +228,18 @@ int selector_match_rank(std::string_view key, std::string_view selector) {
     return key == "timestamp" || key == "time:timestamp" ? 1 : 0;
   if (selector == "lifecycle" || selector == "lifecycle:transition")
     return key == "lifecycle" || key == "lifecycle:transition" ? 1 : 0;
+  return 0;
+}
+
+int case_selector_match_rank(std::string_view key, std::string_view selector) {
+  if (key == selector) return 2;
+  if (selector == "concept:name" || selector == "case_id" ||
+      selector == "case:concept:name") {
+    return key == "concept:name" || key == "case_id" ||
+                   key == "case:concept:name"
+               ? 1
+               : 0;
+  }
   return 0;
 }
 
@@ -102,24 +288,6 @@ std::vector<std::string> tokenize_classifier_keys(std::string_view text) {
     keys.push_back(std::move(key));
   }
   return keys;
-}
-
-std::optional<EventAttribute> scalar_attribute(
-    std::string_view element,
-    const std::vector<std::pair<std::string, std::string>>& attributes) {
-  const auto kind = attribute_kind_of(element);
-  if (!kind) return std::nullopt;
-  const auto* key = detail::attribute(attributes, "key");
-  const auto* value = detail::attribute(attributes, "value");
-  if (!key || !value) return std::nullopt;
-  return EventAttribute{*key, *value, *kind};
-}
-
-bool first_class_activity_selector(std::string_view selector) {
-  return selector == "activity" || selector == "concept:name" ||
-         selector == "resource" || selector == "org:resource" ||
-         selector == "timestamp" || selector == "time:timestamp" ||
-         selector == "lifecycle" || selector == "lifecycle:transition";
 }
 
 void validate_variant(XesImportVariant variant) {
@@ -228,9 +396,6 @@ EventLog import_xes_event_log(
   }
   std::unordered_set<std::string> attributes_to_read(
       options.attributes_to_read.begin(), options.attributes_to_read.end());
-  const auto keeps_attribute = [&](std::string_view key) {
-    return attributes_to_read.empty() || attributes_to_read.contains(std::string(key));
-  };
 
   std::string xml((std::istreambuf_iterator<char>(input)),
                   std::istreambuf_iterator<char>());
@@ -249,21 +414,15 @@ EventLog import_xes_event_log(
 
   detail::XmlPullParser parser(xml);
   EventLog log;
-
-  // Element nesting, so leaf attributes can be matched to their direct parent
-  // (a <string> under <trace> is a case attribute; under <event>, an event
-  // attribute; deeper nesting is a sub-attribute we ignore).
   std::vector<std::string> stack;
 
   Trace current_trace;
-  std::string case_id;
   bool in_trace = false;
-  bool case_attribute_present = false;
-  std::vector<EventAttribute>* active_global = nullptr;
+  std::size_t case_match_rank = 0;
+  LogGlobal* active_global = nullptr;
 
   Event current_event;
   bool in_event = false;
-  bool activity_attribute_present = false;
   int activity_match_rank = 0;
   int timestamp_match_rank = 0;
   int resource_match_rank = 0;
@@ -272,25 +431,78 @@ EventLog import_xes_event_log(
   std::size_t input_order = 0;
   bool saw_timestamp = false;
 
+  const auto erase_selected = [](std::vector<EventAttribute>& attributes,
+                                 std::string_view key) {
+    if (key.empty()) return;
+    const auto found = std::find_if(
+        attributes.begin(), attributes.end(),
+        [&](const auto& attribute) { return attribute.key == key; });
+    if (found != attributes.end() && found->children.empty())
+      attributes.erase(found);
+  };
+
+  const auto apply_event_attribute = [&](EventAttribute attribute) {
+    const auto key = std::string_view(attribute.key);
+    const auto set_first_class = [&](int rank, int& current_rank,
+                                     std::string& target,
+                                     FirstClassAttributeState& state,
+                                     std::string& source_key,
+                                     std::optional<EventAttribute>& metadata) {
+      if (rank == 0 || rank <= current_rank) return;
+      current_rank = rank;
+      target = attribute.value;
+      state = attribute.is_null ? FirstClassAttributeState::kNull
+                                : FirstClassAttributeState::kPresent;
+      source_key = attribute.key;
+      metadata = attribute;
+    };
+    const auto activity_rank = selector_match_rank(
+        key, options.activity_attribute);
+    const auto timestamp_rank = selector_match_rank(
+        key, options.timestamp_attribute);
+    const auto resource_rank = selector_match_rank(
+        key, options.resource_attribute);
+    const auto lifecycle_rank = selector_match_rank(
+        key, options.lifecycle_attribute);
+    const bool scalar = attribute.container == AttributeContainerKind::kScalar;
+    if (scalar) {
+      set_first_class(activity_rank, activity_match_rank,
+                      current_event.activity, current_event.activity_state,
+                      current_event.activity_source_key,
+                      current_event.activity_attribute);
+      set_first_class(timestamp_rank, timestamp_match_rank,
+                      current_event.timestamp, current_event.timestamp_state,
+                      current_event.timestamp_source_key,
+                      current_event.timestamp_attribute);
+      set_first_class(resource_rank, resource_match_rank,
+                      current_event.resource, current_event.resource_state,
+                      current_event.resource_source_key,
+                      current_event.resource_attribute);
+      set_first_class(lifecycle_rank, lifecycle_match_rank,
+                      current_event.lifecycle, current_event.lifecycle_state,
+                      current_event.lifecycle_source_key,
+                      current_event.lifecycle_attribute);
+      if (timestamp_rank != 0) saw_timestamp = true;
+    }
+    // Keep aliases and conflicting canonical keys.  The selected key is
+    // removed once the complete event has been read, after selector ranking is
+    // known.
+    if (attributes_to_read.empty() || attributes_to_read.contains(attribute.key) ||
+        activity_rank != 0 || timestamp_rank != 0 || resource_rank != 0 ||
+        lifecycle_rank != 0) {
+      current_event.attributes.push_back(std::move(attribute));
+    }
+  };
+
   const auto finish_event = [&]() {
-    if (!activity_attribute_present) {
-      throw std::runtime_error(
-          "XES event is missing its activity attribute ('" +
-          options.activity_attribute + "')");
-    }
-    // Keep a selected non-default activity key available in the generic bag
-    // too, so replay can apply that selector consistently after import.
-    if (!first_class_activity_selector(options.activity_attribute) &&
-        current_event.attribute(options.activity_attribute) == nullptr) {
-      current_event.attributes.push_back(EventAttribute{
-          options.activity_attribute, current_event.activity,
-          AttributeKind::kString});
-    }
+    erase_selected(current_event.attributes, current_event.activity_source_key);
+    erase_selected(current_event.attributes, current_event.timestamp_source_key);
+    erase_selected(current_event.attributes, current_event.resource_source_key);
+    erase_selected(current_event.attributes, current_event.lifecycle_source_key);
     current_event.input_order = input_order++;
     current_trace.events.push_back(std::move(current_event));
     current_event = Event{};
     in_event = false;
-    activity_attribute_present = false;
     activity_match_rank = 0;
     timestamp_match_rank = 0;
     resource_match_rank = 0;
@@ -298,19 +510,15 @@ EventLog import_xes_event_log(
   };
 
   const auto finish_trace = [&]() {
-    if (!case_attribute_present) {
-      throw std::runtime_error(
-          "XES trace is missing its case attribute ('" +
-          options.case_attribute + "')");
-    }
-    current_trace.case_id = case_id;
+    erase_selected(current_trace.attributes, current_trace.case_id_source_key);
     for (auto& event : current_trace.events) {
-      event.case_id = case_id;
+      event.case_id = current_trace.case_id;
+      event.case_id_state = current_trace.case_id_state;
+      event.case_id_source_key = current_trace.case_id_source_key;
     }
     log.traces.push_back(std::move(current_trace));
     current_trace = Trace{};
-    case_id.clear();
-    case_attribute_present = false;
+    case_match_rank = 0;
     in_trace = false;
   };
 
@@ -322,8 +530,9 @@ EventLog import_xes_event_log(
 
     if (token.kind == detail::XmlPullParser::Kind::StartElement) {
       const std::string parent =
-          stack.empty() ? std::string{} : std::string(local_name(stack.back()));
+           stack.empty() ? std::string{} : std::string(local_name(stack.back()));
       const std::string element = std::string(local_name(token.name));
+      bool consumed_by_parser = false;
 
       if (element == "trace" && parent == "log") {
         if (log.traces.size() >= options.max_traces) break;
@@ -353,101 +562,53 @@ EventLog import_xes_event_log(
           classifier.keys = tokenize_classifier_keys(*value);
         log.metadata.classifiers.push_back(std::move(classifier));
       } else if (!in_trace && parent == "log" && element == "global") {
-        active_global = nullptr;
-        if (const auto* scope = detail::attribute(token.attributes, "scope")) {
-          if (*scope == "trace") {
-            active_global = &log.metadata.trace_globals;
-          } else if (*scope == "event") {
-            active_global = &log.metadata.event_globals;
-          }
-        }
+        LogGlobal global;
+        if (const auto* scope = detail::attribute(token.attributes, "scope"))
+          global.scope = *scope;
+        log.metadata.globals.push_back(std::move(global));
+        active_global = &log.metadata.globals.back();
       } else if (active_global && parent == "global") {
-        if (const auto attribute = scalar_attribute(element,
-                                                     token.attributes);
-            attribute && keeps_attribute(attribute->key)) {
-          active_global->push_back(*attribute);
+        consumed_by_parser = true;
+        if (const auto attribute = parse_attribute_node(parser, token)) {
+          if (attributes_to_read.empty() ||
+              attributes_to_read.contains(attribute->key)) {
+            active_global->attributes.push_back(*attribute);
+            if (active_global->scope == "trace")
+              log.metadata.trace_globals.push_back(*attribute);
+            if (active_global->scope == "event")
+              log.metadata.event_globals.push_back(*attribute);
+          }
         }
       } else if (in_event && parent == "event") {
-        if (const auto* key = detail::attribute(token.attributes, "key")) {
-          if (const auto* value = detail::attribute(token.attributes, "value")) {
-            bool recognized = false;
-            const auto activity_rank =
-                selector_match_rank(*key, options.activity_attribute);
-            if (activity_rank != 0) {
-              if (activity_rank > activity_match_rank) {
-                current_event.activity = *value;
-                activity_match_rank = activity_rank;
-                activity_attribute_present = true;
-              }
-              recognized = true;
-            }
-            const auto timestamp_rank =
-                selector_match_rank(*key, options.timestamp_attribute);
-            if (timestamp_rank != 0) {
-              if (timestamp_rank > timestamp_match_rank) {
-                current_event.timestamp = *value;
-                timestamp_match_rank = timestamp_rank;
-              }
-              saw_timestamp = true;
-              recognized = true;
-            }
-            const auto resource_rank =
-                selector_match_rank(*key, options.resource_attribute);
-            if (resource_rank != 0) {
-              if (resource_rank > resource_match_rank) {
-                current_event.resource = *value;
-                resource_match_rank = resource_rank;
-              }
-              recognized = true;
-            }
-            const auto lifecycle_rank =
-                selector_match_rank(*key, options.lifecycle_attribute);
-            if (lifecycle_rank != 0) {
-              if (lifecycle_rank > lifecycle_match_rank) {
-                current_event.lifecycle = *value;
-                lifecycle_match_rank = lifecycle_rank;
-              }
-              recognized = true;
-            }
-            if (!recognized && keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(element)) {
-                // Any other scalar attribute is kept generically, with its XES
-                // type so an export can round-trip it faithfully.
-                current_event.attributes.push_back(
-                    EventAttribute{*key, *value, *kind});
-              }
-            }
-          }
-        }
+        consumed_by_parser = true;
+        if (const auto attribute = parse_attribute_node(parser, token))
+          apply_event_attribute(*attribute);
       } else if (in_trace && !in_event && parent == "trace") {
-        if (const auto* key = detail::attribute(token.attributes, "key")) {
-          if (const auto* value = detail::attribute(token.attributes, "value")) {
-            if (*key == options.case_attribute) {
-              case_id = *value;
-              case_attribute_present = true;
-            } else if (keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(element)) {
-                // Any other scalar trace attribute is a case attribute, kept
-                // with its scalar type like the generic event attributes.
-                current_trace.attributes.push_back(
-                    EventAttribute{*key, *value, *kind});
-              }
-            }
+        consumed_by_parser = true;
+        if (const auto attribute = parse_attribute_node(parser, token)) {
+          const auto rank = attribute->container == AttributeContainerKind::kScalar
+                                ? case_selector_match_rank(
+                                      attribute->key, options.case_attribute)
+                                : 0;
+          if (rank > static_cast<int>(case_match_rank)) {
+            case_match_rank = static_cast<std::size_t>(rank);
+            current_trace.case_id = attribute->value;
+            current_trace.case_id_state =
+                attribute->is_null ? FirstClassAttributeState::kNull
+                                    : FirstClassAttributeState::kPresent;
+            current_trace.case_id_source_key = attribute->key;
+            current_trace.case_id_attribute = *attribute;
           }
+          if (attributes_to_read.empty() ||
+              attributes_to_read.contains(attribute->key) || rank != 0)
+            current_trace.attributes.push_back(*attribute);
         }
       } else if (!in_trace && parent == "log") {
-        if (const auto* key = detail::attribute(token.attributes, "key")) {
-          if (const auto* value = detail::attribute(token.attributes, "value")) {
-            // The log name is supplied separately by Minera's XES exporter;
-            // retain every other scalar log attribute, including derived
-            // projection metadata such as @@aligned_dfg.
-            if (*key != "concept:name" && keeps_attribute(*key)) {
-              if (const auto kind = attribute_kind_of(element)) {
-                log.attributes.push_back(EventAttribute{*key, *value, *kind});
-              }
-            }
-          }
-        }
+        consumed_by_parser = true;
+        if (const auto attribute = parse_attribute_node(parser, token);
+            attribute && (attributes_to_read.empty() ||
+                          attributes_to_read.contains(attribute->key)))
+          log.attributes.push_back(*attribute);
       }
 
       if (token.self_closing) {
@@ -459,7 +620,7 @@ EventLog import_xes_event_log(
         } else if (element == "global") {
           active_global = nullptr;
         }
-      } else {
+      } else if (!consumed_by_parser) {
         stack.push_back(token.name);
       }
       continue;
@@ -490,26 +651,16 @@ EventLog import_xes_event_log(
         options.timestamp_attribute + "')");
   }
 
-  // Keep the selectors used to interpret this document alongside the native
-  // data.  These properties are deterministic and intentionally distinct from
-  // scalar log attributes; they allow a table/stream adapter to reproduce the
-  // same interpretation without introducing another side-channel.  Do not
-  // append a key twice if this function is extended with another selector.
-  const auto append_property = [&](std::string_view key,
-                                   std::string_view value) {
-    const auto duplicate = std::any_of(
-        log.metadata.properties.begin(), log.metadata.properties.end(),
-        [&](const auto& property) { return property.key == key; });
-    if (!duplicate) {
-      log.metadata.properties.push_back(
-          {std::string(key), std::string(value), AttributeKind::kString});
-    }
-  };
-  append_property("case_attribute", options.case_attribute);
-  append_property("activity_attribute", options.activity_attribute);
-  append_property("timestamp_attribute", options.timestamp_attribute);
-  append_property("resource_attribute", options.resource_attribute);
-  append_property("lifecycle_attribute", options.lifecycle_attribute);
+  // Materialize the legacy projections after all arbitrary scopes have been
+  // parsed. Duplicate trace/event scopes retain their document order by
+  // concatenating their attributes in the compatibility vectors.
+
+  log.metadata.compatibility_snapshot_valid = true;
+  log.metadata.compatibility_globals_snapshot = log.metadata.globals;
+  log.metadata.compatibility_trace_globals_snapshot =
+      log.metadata.trace_globals;
+  log.metadata.compatibility_event_globals_snapshot =
+      log.metadata.event_globals;
 
   if (options.timestamp_sort) sort_log_by_timestamp(log, options.reverse_sort);
 

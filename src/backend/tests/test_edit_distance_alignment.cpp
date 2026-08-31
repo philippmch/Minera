@@ -1,10 +1,14 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <variant>
 
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/json_export.hpp"
+#include "minera/xes_export.hpp"
 
 using namespace minera;
 
@@ -70,7 +74,11 @@ int main() {
   const auto empty_trace = align_edit_distance(log_of({{}}), log_of({{"a"}}));
   assert(empty_trace[0].cost == 10000 && empty_trace[0].alignment.size() == 1);
 
-  const auto projected = project_log_on_variant(log_of({{"a", "x"}, {}}), {"a", "b"});
+  auto projection_source = log_of({{"a", "x"}, {}});
+  projection_source.traces[0].events[0].timestamp_source_key =
+      "business.when";
+  const auto projected =
+      project_log_on_variant(projection_source, {"a", "b"});
   assert(projected.traces.size() == 2);
   assert(projected.attribute("@@aligned_variant") != nullptr);
   assert(projected.traces[0].attribute("@@original_trace") != nullptr);
@@ -79,6 +87,8 @@ int main() {
   assert(projected.traces[0].events[1].attribute("@@is_conforming")->compare("false") == 0);
   assert(projected.traces[0].events[0].timestamp == "t0");
   assert(projected.traces[0].events[1].timestamp == "t0");
+  assert(projected.traces[0].events[1].timestamp_source_key ==
+         "business.when");
   assert(projected.traces[0].events[0].input_order == 0 &&
          projected.traces[0].events[1].input_order == 1);
   assert(projected.traces[1].events.size() == 2);  // empty source trace retained
@@ -112,6 +122,34 @@ int main() {
   heterogeneous_source.traces[0].events[0].lifecycle = "complete";
   heterogeneous_source.traces[0].events[0].attributes.push_back(
       {"amount", "7", AttributeKind::kInt});
+  heterogeneous_source.traces[0].events[0].attributes.back().typed_value =
+      std::int64_t{7};
+  EventAttribute nested{"payload", "", AttributeKind::kString};
+  nested.container = AttributeContainerKind::kContainer;
+  nested.children.push_back({"label", "kept"});
+  heterogeneous_source.traces[0].events[0].attributes.push_back(
+      std::move(nested));
+  EventAttribute nan{"nan", "NaN", AttributeKind::kFloat};
+  nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+  heterogeneous_source.traces[0].events[0].attributes.push_back(
+      std::move(nan));
+  EventAttribute positive_infinity{"positive", "INF",
+                                   AttributeKind::kFloat};
+  positive_infinity.typed_value = std::numeric_limits<double>::infinity();
+  heterogeneous_source.traces[0].events[0].attributes.push_back(
+      std::move(positive_infinity));
+  EventAttribute negative_infinity{"negative", "-INF",
+                                   AttributeKind::kFloat};
+  negative_infinity.typed_value = -std::numeric_limits<double>::infinity();
+  heterogeneous_source.traces[0].events[0].attributes.push_back(
+      std::move(negative_infinity));
+  heterogeneous_source.traces[0].case_id_source_key = "business.case";
+  heterogeneous_source.traces[0].events[0].activity_source_key =
+      "business.activity";
+  heterogeneous_source.traces[0].events[0].timestamp_source_key =
+      "business.when";
+  heterogeneous_source.metadata.globals.push_back(
+      {"custom", {{"ordered", "yes"}}});
   const auto heterogeneous_alignments =
       align_edit_distance(heterogeneous_source, heterogeneous_target);
   const auto heterogeneous_projection =
@@ -129,6 +167,28 @@ int main() {
   assert(projected_json.find("\"lifecycle\":\"complete\"") != std::string::npos);
   assert(projected_json.find("\"input_order\":0") != std::string::npos);
   assert(projected_json.find("\"attribute_kinds\":{\"amount\":\"int\"") != std::string::npos);
+  assert(projected_json.find("\"attribute_details\":[") !=
+         std::string::npos);
+  assert(projected_json.find("\"container\":\"container\"") !=
+         std::string::npos);
+  assert(projected_json.find("\"typed_value\":7") != std::string::npos);
+  assert(projected_json.find("\"typed_value\":\"NaN\"") !=
+         std::string::npos);
+  assert(projected_json.find("\"typed_value\":\"INF\"") !=
+         std::string::npos);
+  assert(projected_json.find("\"typed_value\":\"-INF\"") !=
+         std::string::npos);
+  assert(projected_json.find(
+             "\"globals\":[{\"scope\":\"custom\",\"attributes\":[") !=
+         std::string::npos);
+  assert(projected_json.find("\"case_id_source_key\":\"business.case\"") !=
+         std::string::npos);
+  assert(projected_json.find(
+             "\"activity_source_key\":\"business.activity\"") !=
+         std::string::npos);
+  assert(projected_json.find(
+             "\"timestamp_source_key\":\"business.when\"") !=
+         std::string::npos);
 
   EventLog empty_source;
   empty_source.attributes.push_back({"@@aligned_variant", "stale", AttributeKind::kString});
@@ -136,5 +196,71 @@ int main() {
   const auto empty_projection = project_log_on_alignments(empty_source, {});
   assert(empty_projection.attribute("@@aligned_variant") == nullptr);
   assert(empty_projection.attribute("@@aligned_variants") == nullptr);
+
+  // Typed selectors and their presence/source metadata must survive a model
+  // insertion.  The inserted event inherits the timestamp cell that anchors
+  // the projected trace, including its XES type and native value.
+  EventLog typed_source;
+  Trace typed_trace;
+  typed_trace.case_id = "42";
+  typed_trace.case_id_state = FirstClassAttributeState::kPresent;
+  typed_trace.case_id_source_key = "case.number";
+  EventAttribute selected_case{"case.number", "42", AttributeKind::kInt};
+  selected_case.typed_value = std::int64_t{42};
+  typed_trace.case_id_attribute = selected_case;
+  Event typed_event;
+  typed_event.case_id = "42";
+  typed_event.case_id_state = FirstClassAttributeState::kPresent;
+  typed_event.case_id_source_key = "case.number";
+  typed_event.activity = "a";
+  typed_event.activity_state = FirstClassAttributeState::kPresent;
+  typed_event.activity_source_key = "activity.code";
+  EventAttribute selected_activity{"activity.code", "7", AttributeKind::kInt};
+  selected_activity.typed_value = std::int64_t{7};
+  typed_event.activity_attribute = selected_activity;
+  typed_event.timestamp = "2026-01-01T00:00:00Z";
+  typed_event.timestamp_state = FirstClassAttributeState::kPresent;
+  typed_event.timestamp_source_key = "when.value";
+  EventAttribute selected_timestamp{
+      "when.value", typed_event.timestamp, AttributeKind::kDate};
+  selected_timestamp.typed_value =
+      NativeDate{"2026-01-01T00:00:00.000Z"};
+  typed_event.timestamp_attribute = selected_timestamp;
+  typed_trace.events.push_back(std::move(typed_event));
+  typed_source.traces.push_back(std::move(typed_trace));
+
+  const auto typed_projection =
+      project_log_on_variant(typed_source, {"x", "a"});
+  const auto& projected_typed_trace = typed_projection.traces.front();
+  assert(projected_typed_trace.case_id_attribute &&
+         projected_typed_trace.case_id_attribute->kind == AttributeKind::kInt &&
+         std::get<std::int64_t>(
+             projected_typed_trace.case_id_attribute->typed_value) == 42);
+  assert(projected_typed_trace.events.size() == 2);
+  const auto& inserted = projected_typed_trace.events.front();
+  assert(inserted.activity == "x" &&
+         inserted.case_id_state == FirstClassAttributeState::kPresent &&
+         inserted.case_id_source_key == "case.number" &&
+         inserted.activity_source_key == "activity.code" &&
+         inserted.activity_attribute &&
+         inserted.activity_attribute->kind == AttributeKind::kString &&
+         inserted.activity_attribute->value == "x" &&
+         std::holds_alternative<std::monostate>(
+             inserted.activity_attribute->typed_value));
+  assert(inserted.timestamp == "2026-01-01T00:00:00Z" &&
+         inserted.timestamp_state == FirstClassAttributeState::kPresent &&
+         inserted.timestamp_source_key == "when.value" &&
+         inserted.timestamp_attribute &&
+         inserted.timestamp_attribute->kind == AttributeKind::kDate &&
+         std::get<NativeDate>(inserted.timestamp_attribute->typed_value).value ==
+             "2026-01-01T00:00:00.000Z");
+  const auto typed_xes = to_xes(typed_projection);
+  assert(typed_xes.find("<int key=\"case.number\" value=\"42\"/>") !=
+         std::string::npos);
+  assert(typed_xes.find("<string key=\"activity.code\" value=\"x\"/>") !=
+         std::string::npos);
+  assert(typed_xes.find(
+             "<date key=\"when.value\" value=\"2026-01-01T00:00:00.000Z\"/>") !=
+         std::string::npos);
   return 0;
 }

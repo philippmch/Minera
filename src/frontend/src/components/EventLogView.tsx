@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, type Trace, numberFormat } from "../types";
-import { type DfgExportOptions, fetchDfg, fetchXes } from "../api";
+import {
+  type DfgExportOptions,
+  type XesExportOptions,
+  fetchDfg,
+  fetchXes,
+} from "../api";
 
 const PAGE_SIZE = 50;
 
@@ -92,16 +97,25 @@ function CaseRow({
 // standard XES, the interchange format read by process-mining tools. The
 // file is serialized server-side from the cached session, so it matches what
 // Minera actually analyzed.
-function XesButton({ dataset }: { dataset: string }) {
+export function buildXesExportOptions(
+  variant: XesExportOptions["variant"],
+  compress: boolean,
+  inferMetadata: boolean,
+): XesExportOptions {
+  return { variant, compress, inferMetadata };
+}
+
+export function XesButton({ dataset }: { dataset: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [variant, setVariant] = useState<"line_by_line" | "etree">("line_by_line");
   const [compress, setCompress] = useState(false);
+  const [inferMetadata, setInferMetadata] = useState(false);
 
   const download = () => {
     setBusy(true);
     setError(null);
-    fetchXes({ variant, compress })
+    fetchXes(buildXesExportOptions(variant, compress, inferMetadata))
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -122,6 +136,7 @@ function XesButton({ dataset }: { dataset: string }) {
         <option value="etree">Element tree</option>
       </select>
       <label><input type="checkbox" checked={compress} onChange={(event) => setCompress(event.target.checked)} /> gzip</label>
+      <label><input aria-label="Infer XES metadata" type="checkbox" checked={inferMetadata} onChange={(event) => setInferMetadata(event.target.checked)} /> infer metadata</label>
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : "Download log as XES"}
       </button>
