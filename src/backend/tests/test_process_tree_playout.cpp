@@ -32,9 +32,80 @@ std::vector<std::string> labels(const Trace& t) {
   for (const auto& e : t.events) out.push_back(e.activity);
   return out;
 }
+
+void process_tree_basic_variant_contract() {
+  ProcessTree tree(
+      {"a", "b"},
+      ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
+                      {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  ProcessTreePlayoutOptions options;
+  options.traces = 16;
+  options.max_length = 5;
+  options.max_loop_occurrences = 2;
+  options.seed = 17;
+
+  const auto basic = basic_process_tree_playout(tree, options);
+  const auto topbottom = topbottom_process_tree_playout(tree, options);
+  assert(basic.traces.size() == options.traces);
+  assert(topbottom.traces.size() == options.traces);
+  std::vector<std::vector<std::string>> basic_words;
+  std::vector<std::vector<std::string>> topbottom_words;
+  for (const auto& trace : basic.traces) basic_words.push_back(labels(trace));
+  for (const auto& trace : topbottom.traces)
+    topbottom_words.push_back(labels(trace));
+  assert(basic_words != topbottom_words);
+  for (const auto& word : basic_words) {
+    assert(word.size() == 1 || word.size() == 3 || word.size() == 5);
+    for (std::size_t index = 0; index < word.size(); ++index)
+      assert(word[index] == (index % 2 == 0 ? "a" : "b"));
+  }
+}
+
+void process_tree_extensive_variant_contract() {
+  ProcessTree tree(
+      {"a", "b"},
+      xor_node({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}));
+  ProcessTreePlayoutOptions options;
+  options.max_length = 1;
+  options.min_length = 1;
+  options.max_traces = 4;
+
+  const auto log = extensive_process_tree_playout(tree, options);
+  assert(log.traces.size() == 2);
+  assert(labels(log.traces[0]) == std::vector<std::string>{"a"});
+  assert(labels(log.traces[1]) == std::vector<std::string>{"b"});
+}
+
+void process_tree_topbottom_variant_contract() {
+  ProcessTree tree(
+      {"a", "b"},
+      ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
+                      {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  ProcessTreePlayoutOptions options;
+  options.traces = 8;
+  options.max_length = 3;
+  options.max_loop_occurrences = 1;
+  options.seed = 23;
+
+  const auto log = topbottom_process_tree_playout(tree, options);
+  assert(log.traces.size() == 8);
+  for (const auto& trace : log.traces) {
+    assert(!trace.events.empty());
+    assert(trace.events.front().activity == "a");
+    assert(trace.events.size() == 1 || trace.events.size() == 3);
+    if (trace.events.size() == 3) {
+      assert(trace.events[1].activity == "b");
+      assert(trace.events[2].activity == "a");
+    }
+  }
+}
 }  // namespace
 
 int main() {
+  process_tree_basic_variant_contract();
+  process_tree_extensive_variant_contract();
+  process_tree_topbottom_variant_contract();
+
   ProcessTree tree({"a", "b"}, seq({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}));
   ProcessTreePlayoutOptions ex;
   ex.variant = ProcessTreePlayoutVariant::EXTENSIVE;

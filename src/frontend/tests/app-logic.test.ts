@@ -133,7 +133,7 @@ describe("native alignment adapters", () => {
       target_pad_size: 4,
       target_activities: ["Review, senior", "A\\B"],
     })).toBe("target_activity_key=concept%3Aname&target_activities=Review%5C%2C+senior%2CA%5C%5CB&target_enable_padding=true&target_pad_size=4&target_timestamp_key=time%3Atimestamp&target_variant=next_activity");
-    const target = { family: "LOG_TO_TARGET", variant: "next_time", trace_count: 1, target_width: 1, padded: false, classes: [], rows: [[[1], [0]]] };
+    const target = { family: "LOG_TO_TARGET", variant: "next_time", trace_count: 1, target_width: 1, padded: false, classes: ["@@next_time"], rows: [[[1], [0]]] };
     expect(isLogToTargetResult(target)).toBe(true);
     expect(isLogToTargetResult({ ...target, target_width: -1 })).toBe(false);
     expect(isLogToTargetResult({ ...target, rows: [[[{ bad: true }]]] })).toBe(false);
