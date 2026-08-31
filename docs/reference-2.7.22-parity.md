@@ -40,15 +40,18 @@ or artifacts. Each selector has an exact static binding to one or more tracked
 target modules, including imported-member and conditional fallback targets.
 Every one of the 387 non-dispatcher modules has its own machine-readable
 coverage record, owner, classification, selector references, status, and
-evidence path. A row marked complete also carries a per-selector proof tied to
-the exact binding and to artifacts owned by that row. Implementation proof
+evidence path. A complete dispatcher carries per-selector proofs tied to its
+exact bindings; a complete non-dispatcher row carries a distinct module proof.
+Both proof forms name tracked artifacts owned by the row. Implementation proof
 symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
 adapter, integration, or missing are complete. The current manifest records 13
-complete and 73 partial dispatcher rows, while all 387 non-dispatcher module
-records remain partial pending module-specific proof. A release may
+complete and 73 partial dispatcher rows, plus 19 complete and 368 partial
+non-dispatcher module rows. The completed module group covers the implemented
+simulation and core transformation variants with distinct registered tests;
+the remaining rows still require module-specific proof. A release may
 additionally run the strict gate:
 
 ```powershell
@@ -1084,8 +1087,9 @@ open.
 The native target transformation emits one numeric row per event, preserving
 trace and event order. `NEXT_ACTIVITY` produces sorted or caller-supplied
 one-hot classes and a zero row for each trace's final event; `NEXT_TIME`
-produces seconds until the next timestamp; and `REMAINING_TIME` produces
-seconds until the trace's final timestamp. Temporal variants require valid
+produces seconds until the next timestamp under the `@@next_time` target
+column; and `REMAINING_TIME` produces seconds until the trace's final timestamp
+under `@@remaining_time`. Temporal variants require valid
 timestamps (including timezone offsets and fractional seconds), while custom
 activity/timestamp attributes, escaped comma-containing class names, and
 deterministic zero padding are supported.

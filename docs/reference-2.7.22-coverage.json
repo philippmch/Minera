@@ -2597,14 +2597,14 @@
           "implementation": [
             {
               "path": "include/minera/process_tree_playout.hpp",
-              "symbol": "process_tree_playout"
+              "symbol": "basic_process_tree_playout"
             }
           ],
           "tests": [
             {
               "path": "src/backend/tests/test_process_tree_playout.cpp",
               "executable": "minera_process_tree_playout_tests",
-              "case": "main"
+              "case": "process_tree_basic_variant_contract"
             }
           ]
         },
@@ -2622,14 +2622,14 @@
           "implementation": [
             {
               "path": "include/minera/process_tree_playout.hpp",
-              "symbol": "process_tree_playout"
+              "symbol": "extensive_process_tree_playout"
             }
           ],
           "tests": [
             {
               "path": "src/backend/tests/test_process_tree_playout.cpp",
               "executable": "minera_process_tree_playout_tests",
-              "case": "main"
+              "case": "process_tree_extensive_variant_contract"
             }
           ]
         },
@@ -2647,14 +2647,14 @@
           "implementation": [
             {
               "path": "include/minera/process_tree_playout.hpp",
-              "symbol": "process_tree_playout"
+              "symbol": "topbottom_process_tree_playout"
             }
           ],
           "tests": [
             {
               "path": "src/backend/tests/test_process_tree_playout.cpp",
               "executable": "minera_process_tree_playout_tests",
-              "case": "main"
+              "case": "process_tree_topbottom_variant_contract"
             }
           ]
         }
@@ -2927,7 +2927,7 @@
             {
               "path": "src/backend/tests/test_log_to_target.cpp",
               "executable": "minera_log_to_target_tests",
-              "case": "next_activity"
+              "case": "next_activity_contract"
             }
           ]
         },
@@ -2952,7 +2952,7 @@
             {
               "path": "src/backend/tests/test_log_to_target.cpp",
               "executable": "minera_log_to_target_tests",
-              "case": "temporal"
+              "case": "next_time_contract"
             }
           ]
         },
@@ -2977,7 +2977,7 @@
             {
               "path": "src/backend/tests/test_log_to_target.cpp",
               "executable": "minera_log_to_target_tests",
-              "case": "temporal"
+              "case": "remaining_time_contract"
             }
           ]
         }
@@ -3098,14 +3098,14 @@
           "implementation": [
             {
               "path": "include/minera/ocel.hpp",
-              "symbol": "describe_ocel_tuples"
+              "symbol": "describe_ocel_text"
             }
           ],
           "tests": [
             {
               "path": "src/backend/tests/test_ocel.cpp",
               "executable": "minera_ocel_tests",
-              "case": "main"
+              "case": "variant1_text_contract"
             }
           ]
         },
@@ -3123,14 +3123,14 @@
           "implementation": [
             {
               "path": "include/minera/ocel.hpp",
-              "symbol": "describe_ocel_text"
+              "symbol": "describe_ocel_tuples"
             }
           ],
           "tests": [
             {
               "path": "src/backend/tests/test_ocel.cpp",
               "executable": "minera_ocel_tests",
-              "case": "main"
+              "case": "variant2_tuple_contract"
             }
           ]
         }
@@ -6989,8 +6989,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/declare_playout.hpp",
+        "src/backend/declare_playout.cpp",
+        "src/backend/tests/test_declare_variants.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.declare.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/declare_playout.hpp",
+            "symbol": "declare_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_declare_variants.cpp",
+            "executable": "minera_declare_variants_tests",
+            "case": "playout_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.dfg.variants.classic",
@@ -7003,8 +7024,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_playout.hpp",
+        "src/backend/dfg_playout.cpp",
+        "src/backend/tests/test_dfg_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.dfg.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_playout.hpp",
+            "symbol": "DfgPlayoutVariant::kClassic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_playout.cpp",
+            "executable": "minera_dfg_playout_tests",
+            "case": "classic_is_best_first_and_deterministic"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.dfg.variants.performance",
@@ -7017,8 +7059,29 @@
           "selector": "PERFORMANCE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_playout.hpp",
+        "src/backend/dfg_playout.cpp",
+        "src/backend/tests/test_dfg_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.dfg.variants.performance",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_playout.hpp",
+            "symbol": "DfgPlayoutVariant::kPerformance"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_playout.cpp",
+            "executable": "minera_dfg_playout_tests",
+            "case": "performance_sampling_is_seeded_and_timestamped"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.oc_causal_net.variants.extensive",
@@ -7068,8 +7131,29 @@
           "selector": "BASIC_PLAYOUT"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/playout.hpp",
+        "src/backend/playout.cpp",
+        "src/backend/tests/test_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.petri_net.variants.basic_playout",
+        "implementation": [
+          {
+            "path": "include/minera/playout.hpp",
+            "symbol": "playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_playout.cpp",
+            "executable": "minera_playout_tests",
+            "case": "basic_playout_acceptance_controls"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.petri_net.variants.extensive",
@@ -7082,8 +7166,29 @@
           "selector": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/playout.hpp",
+        "src/backend/playout.cpp",
+        "src/backend/tests/test_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.petri_net.variants.extensive",
+        "implementation": [
+          {
+            "path": "include/minera/playout.hpp",
+            "symbol": "extensive_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_playout.cpp",
+            "executable": "minera_playout_tests",
+            "case": "extensive_playout_accepts_explicit_markers"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.petri_net.variants.stochastic_playout",
@@ -7096,8 +7201,29 @@
           "selector": "STOCHASTIC_PLAYOUT"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/playout.hpp",
+        "src/backend/playout.cpp",
+        "src/backend/tests/test_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.petri_net.variants.stochastic_playout",
+        "implementation": [
+          {
+            "path": "include/minera/playout.hpp",
+            "symbol": "stochastic_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_playout.cpp",
+            "executable": "minera_playout_tests",
+            "case": "deterministic_and_timestamped"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.process_tree.variants.basic_playout",
@@ -7110,8 +7236,29 @@
           "selector": "BASIC_PLAYOUT"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_playout.hpp",
+        "src/backend/process_tree_playout.cpp",
+        "src/backend/tests/test_process_tree_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.process_tree.variants.basic_playout",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_playout.hpp",
+            "symbol": "basic_process_tree_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_playout.cpp",
+            "executable": "minera_process_tree_playout_tests",
+            "case": "process_tree_basic_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.process_tree.variants.extensive",
@@ -7124,8 +7271,29 @@
           "selector": "EXTENSIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_playout.hpp",
+        "src/backend/process_tree_playout.cpp",
+        "src/backend/tests/test_process_tree_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.process_tree.variants.extensive",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_playout.hpp",
+            "symbol": "extensive_process_tree_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_playout.cpp",
+            "executable": "minera_process_tree_playout_tests",
+            "case": "process_tree_extensive_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.playout.process_tree.variants.topbottom",
@@ -7138,8 +7306,29 @@
           "selector": "TOPBOTTOM"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/process_tree_playout.hpp",
+        "src/backend/process_tree_playout.cpp",
+        "src/backend/tests/test_process_tree_playout.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.playout.process_tree.variants.topbottom",
+        "implementation": [
+          {
+            "path": "include/minera/process_tree_playout.hpp",
+            "symbol": "topbottom_process_tree_playout"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_process_tree_playout.cpp",
+            "executable": "minera_process_tree_playout_tests",
+            "case": "process_tree_topbottom_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.tree_generator.variants.basic",
@@ -7152,8 +7341,29 @@
           "selector": "BASIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/random_tree.hpp",
+        "src/backend/random_tree.cpp",
+        "src/backend/tests/test_random_tree.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.tree_generator.variants.basic",
+        "implementation": [
+          {
+            "path": "include/minera/random_tree.hpp",
+            "symbol": "RandomTreeVariant::kBasic"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_random_tree.cpp",
+            "executable": "minera_random_tree_tests",
+            "case": "deterministic_and_valid"
+          }
+        ]
+      }
     },
     {
       "module": "algo.simulation.tree_generator.variants.ptandloggenerator",
@@ -7166,8 +7376,29 @@
           "selector": "PTANDLOGGENERATOR"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/random_tree.hpp",
+        "src/backend/random_tree.cpp",
+        "src/backend/tests/test_random_tree.cpp"
+      ],
+      "proofs": {
+        "module": "algo.simulation.tree_generator.variants.ptandloggenerator",
+        "implementation": [
+          {
+            "path": "include/minera/random_tree.hpp",
+            "symbol": "RandomTreeVariant::kPtAndLogGenerator"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_random_tree.cpp",
+            "executable": "minera_random_tree_tests",
+            "case": "ptandlog_generation_is_seeded_and_bounded"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_features.util.locally_linear_embedding",
@@ -7240,8 +7471,29 @@
           "selector": "OPEN_PATHS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/interval_tree.hpp",
+        "src/backend/interval_tree.cpp",
+        "src/backend/tests/test_interval_tree.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_interval_tree.variants.open_paths",
+        "implementation": [
+          {
+            "path": "include/minera/interval_tree.hpp",
+            "symbol": "discover_open_path_intervals"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_interval_tree.cpp",
+            "executable": "minera_interval_tree_tests",
+            "case": "first_following_and_epsilon"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_target.variants.next_activity",
@@ -7254,8 +7506,29 @@
           "selector": "NEXT_ACTIVITY"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_target.hpp",
+        "src/backend/log_to_target.cpp",
+        "src/backend/tests/test_log_to_target.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_target.variants.next_activity",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_target.hpp",
+            "symbol": "LogToTargetVariant::NEXT_ACTIVITY"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_target.cpp",
+            "executable": "minera_log_to_target_tests",
+            "case": "next_activity_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_target.variants.next_time",
@@ -7268,8 +7541,29 @@
           "selector": "NEXT_TIME"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_target.hpp",
+        "src/backend/log_to_target.cpp",
+        "src/backend/tests/test_log_to_target.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_target.variants.next_time",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_target.hpp",
+            "symbol": "LogToTargetVariant::NEXT_TIME"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_target.cpp",
+            "executable": "minera_log_to_target_tests",
+            "case": "next_time_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.log_to_target.variants.remaining_time",
@@ -7282,8 +7576,29 @@
           "selector": "REMAINING_TIME"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/log_to_target.hpp",
+        "src/backend/log_to_target.cpp",
+        "src/backend/tests/test_log_to_target.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.log_to_target.variants.remaining_time",
+        "implementation": [
+          {
+            "path": "include/minera/log_to_target.hpp",
+            "symbol": "LogToTargetVariant::REMAINING_TIME"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_log_to_target.cpp",
+            "executable": "minera_log_to_target_tests",
+            "case": "remaining_time_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.description.variants.variant1",
@@ -7296,8 +7611,29 @@
           "selector": "VARIANT1"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.description.variants.variant1",
+        "implementation": [
+          {
+            "path": "include/minera/ocel.hpp",
+            "symbol": "describe_ocel_text"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel.cpp",
+            "executable": "minera_ocel_tests",
+            "case": "variant1_text_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.description.variants.variant2",
@@ -7310,8 +7646,29 @@
           "selector": "VARIANT2"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel.hpp",
+        "src/backend/ocel.cpp",
+        "src/backend/tests/test_ocel.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.description.variants.variant2",
+        "implementation": [
+          {
+            "path": "include/minera/ocel.hpp",
+            "symbol": "describe_ocel_tuples"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel.cpp",
+            "executable": "minera_ocel_tests",
+            "case": "variant2_tuple_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events_objects.prefix_features",
@@ -7639,8 +7996,29 @@
           "selector": "ANCESTORS_DESCENDANTS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_transform.hpp",
+        "src/backend/ocel_transform.cpp",
+        "src/backend/tests/test_ocel_transform.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.split_ocel.variants.ancestors_descendants",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_transform.hpp",
+            "symbol": "OcelSplitVariant::kAncestorsDescendants"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_transform.cpp",
+            "executable": "minera_ocel_transform_tests",
+            "case": "ancestors_descendants_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.split_ocel.variants.connected_components",
@@ -7653,8 +8031,29 @@
           "selector": "CONNECTED_COMPONENTS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_transform.hpp",
+        "src/backend/ocel_transform.cpp",
+        "src/backend/tests/test_ocel_transform.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.split_ocel.variants.connected_components",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_transform.hpp",
+            "symbol": "OcelSplitVariant::kConnectedComponents"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_transform.cpp",
+            "executable": "minera_ocel_transform_tests",
+            "case": "connected_components_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.to_embeddings.util.embed_sentence",

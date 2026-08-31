@@ -9,6 +9,80 @@
 #include "minera/oc_causal_net.hpp"
 #include "minera/saw_nets.hpp"
 
+namespace {
+
+void variant1_text_contract(const minera::Ocel& log) {
+  const auto text = minera::describe_ocel_text(log);
+  assert(text.find("\n\nevents:\n") != std::string::npos);
+  assert(text.find("Create ( related objects: o1 )  timestamp: "
+                   "2024-01-01T00:00:00Z") != std::string::npos);
+  assert(text.find("Ship ( related objects: o1, o2 )  timestamp: "
+                   "2024-01-02T00:00:00Z") != std::string::npos);
+  assert(text.find("\n\nobjects:\n") != std::string::npos);
+  assert(text.find("o1 object type: order ( lifecycle start: "
+                   "2024-01-01T00:00:00Z ; lifecycle end: "
+                   "2024-01-02T00:00:00Z ; lifecycle duration: 86400") !=
+         std::string::npos);
+  assert(text.find("o2 object type: item") != std::string::npos);
+
+  const auto variant1 = minera::serialize_ocel_description_json(
+      log, minera::OcelDescriptionVariant::kVariant1);
+  assert(variant1.find("\"family\":\"OCEL_DESCRIPTION\"") !=
+         std::string::npos);
+  assert(variant1.find("\"variant\":\"VARIANT1\"") !=
+         std::string::npos);
+  assert(variant1.find("\"text\":") != std::string::npos);
+  assert(variant1.find("\"event_count\":2") != std::string::npos &&
+         variant1.find("\"object_count\":2") != std::string::npos);
+}
+
+void variant2_tuple_contract(const minera::Ocel& log) {
+  const auto tuple_description = minera::describe_ocel_tuples(log);
+  assert(tuple_description.includes_timestamps);
+  assert(tuple_description.events.size() == 2 &&
+         tuple_description.objects.size() == 2);
+  assert(tuple_description.events[0].activity == "Create");
+  assert(tuple_description.events[0].related_objects.size() == 1 &&
+         tuple_description.events[0].related_objects[0] == "o1");
+  assert(tuple_description.events[0].timestamp == "2024-01-01T00:00:00Z");
+  assert(tuple_description.events[1].activity == "Ship");
+  assert(tuple_description.events[1].related_objects.size() == 2 &&
+         tuple_description.events[1].related_objects[0] == "o1" &&
+         tuple_description.events[1].related_objects[1] == "o2");
+  assert(tuple_description.objects[0].id == "o1" &&
+         tuple_description.objects[0].has_lifecycle &&
+         tuple_description.objects[0].lifecycle_start ==
+             "2024-01-01T00:00:00Z" &&
+         tuple_description.objects[0].lifecycle_end ==
+             "2024-01-02T00:00:00Z" &&
+         tuple_description.objects[0].lifecycle_seconds == 86400.0);
+  const auto tuple_json =
+      minera::serialize_ocel_description_json(tuple_description);
+  assert(tuple_json.find("includes_timestamps") != std::string::npos &&
+         tuple_json.find("lifecycle_seconds") != std::string::npos);
+
+  minera::OcelDescriptionOptions no_timestamps;
+  no_timestamps.include_timestamps = false;
+  const auto without_timestamps =
+      minera::describe_ocel_tuples(log, no_timestamps);
+  assert(!without_timestamps.includes_timestamps &&
+         without_timestamps.events[0].timestamp.empty());
+  assert(minera::serialize_ocel_description_json(without_timestamps).find(
+             "\"timestamp\"") == std::string::npos);
+
+  const auto variant2 = minera::serialize_ocel_description_json(
+      log, minera::OcelDescriptionVariant::kVariant2);
+  assert(variant2.find("\"variant\":\"VARIANT2\"") !=
+         std::string::npos);
+  assert(variant2.find("\"events\":[[\"Create\",\"o1\",") !=
+         std::string::npos);
+  assert(variant2.find("\"event_object_counts\":[1,2]") !=
+         std::string::npos);
+  assert(variant2.find("\"objects\":[[") != std::string::npos);
+}
+
+}  // namespace
+
 int main() {
   const std::string input =
       R"({"ocel:events":{"e2":{"ocel:activity":"Ship","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:omap":["o1","o2"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"source"},{"ocel:oid":"o2","ocel:qualifier":"target"}],"ocel:vmap":{"count":2}},"e1":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"amount":12.5}},"o2":{"ocel:type":"item","ocel:ovmap":{}}}})";
@@ -599,47 +673,8 @@ int main() {
     total_missing += place.missing;
   assert(total_missing > 0 && replay_diagnostics.transition_activations[1] == 1);
 
-  const auto tuple_description = minera::describe_ocel_tuples(log);
-  assert(tuple_description.includes_timestamps);
-  assert(tuple_description.events.size() == 2 && tuple_description.objects.size() == 2);
-  assert(tuple_description.events[0].activity == "Create");
-  assert(tuple_description.events[0].related_objects.size() == 1 &&
-         tuple_description.events[0].related_objects[0] == "o1");
-  assert(tuple_description.events[0].timestamp == "2024-01-01T00:00:00Z");
-  assert(tuple_description.objects[0].id == "o1" &&
-         tuple_description.objects[0].has_lifecycle &&
-         tuple_description.objects[0].lifecycle_start == "2024-01-01T00:00:00Z" &&
-         tuple_description.objects[0].lifecycle_end == "2024-01-02T00:00:00Z" &&
-         tuple_description.objects[0].lifecycle_seconds == 86400.0);
-  assert(minera::describe_ocel_text(log).find("events:") != std::string::npos);
-  const auto tuple_json = minera::serialize_ocel_description_json(tuple_description);
-  assert(tuple_json.find("includes_timestamps") != std::string::npos &&
-         tuple_json.find("lifecycle_seconds") != std::string::npos);
-  minera::OcelDescriptionOptions no_timestamps;
-  no_timestamps.include_timestamps = false;
-  const auto without_timestamps = minera::describe_ocel_tuples(log, no_timestamps);
-  assert(!without_timestamps.includes_timestamps &&
-         without_timestamps.events[0].timestamp.empty());
-  assert(minera::serialize_ocel_description_json(without_timestamps).find(
-             "\"timestamp\"") == std::string::npos);
-  const auto variant1 = minera::serialize_ocel_description_json(
-      log, minera::OcelDescriptionVariant::kVariant1);
-  assert(variant1.find("\"family\":\"OCEL_DESCRIPTION\"") !=
-         std::string::npos);
-  assert(variant1.find("\"variant\":\"VARIANT1\"") !=
-         std::string::npos);
-  assert(variant1.find("\"text\":") != std::string::npos);
-  assert(variant1.find("\"event_count\":2") != std::string::npos &&
-         variant1.find("\"object_count\":2") != std::string::npos);
-  const auto variant2 = minera::serialize_ocel_description_json(
-      log, minera::OcelDescriptionVariant::kVariant2);
-  assert(variant2.find("\"variant\":\"VARIANT2\"") !=
-         std::string::npos);
-  assert(variant2.find("\"events\":[[\"Create\",\"o1\",") !=
-         std::string::npos);
-  assert(variant2.find("\"event_object_counts\":[1,2]") !=
-         std::string::npos);
-  assert(variant2.find("\"objects\":[[") != std::string::npos);
+  variant1_text_contract(log);
+  variant2_tuple_contract(log);
 
   minera::Ocel catalog;
   catalog.event_type_attributes["EmptyEvent"] = {{"planned_at", "datetime"}};

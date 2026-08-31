@@ -83,6 +83,10 @@ LogToTargetResult log_to_target(const EventLog& log,
           std::unique(result.classes.begin(), result.classes.end()),
           result.classes.end());
     }
+  } else if (options.variant == LogToTargetVariant::NEXT_TIME) {
+    result.classes = {"@@next_time"};
+  } else {
+    result.classes = {"@@remaining_time"};
   }
   result.target_width = options.variant == LogToTargetVariant::NEXT_ACTIVITY
                             ? result.classes.size()

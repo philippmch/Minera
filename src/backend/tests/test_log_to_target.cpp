@@ -26,8 +26,11 @@ minera::EventLog sample() {
   return minera::EventLog{{first, second}};
 }
 
-void next_activity() {
-  const auto result = minera::log_to_target(sample());
+void next_activity_contract() {
+  minera::LogToTargetOptions options;
+  options.variant = minera::LogToTargetVariant::NEXT_ACTIVITY;
+  const auto result = minera::log_to_target(sample(), options);
+  assert(result.variant == minera::LogToTargetVariant::NEXT_ACTIVITY);
   assert((result.classes == std::vector<std::string>{"A", "B", "C"}));
   assert(result.rows.size() == 2);
   assert(result.trace_count == 2 && result.target_width == 3);
@@ -39,17 +42,31 @@ void next_activity() {
                      [](double value) { return value == 0.0; }));
 }
 
-void temporal() {
-  auto result = minera::log_to_target(
-      sample(), {.variant = minera::LogToTargetVariant::NEXT_TIME});
-  assert(result.classes.empty());
+void next_time_contract() {
+  minera::LogToTargetOptions options;
+  options.variant = minera::LogToTargetVariant::NEXT_TIME;
+  const auto result = minera::log_to_target(sample(), options);
+  assert(result.variant == minera::LogToTargetVariant::NEXT_TIME);
+  assert((result.classes == std::vector<std::string>{"@@next_time"}));
+  assert(result.target_width == 1 && result.rows.size() == 2);
   assert(std::abs(result.rows[0][0][0] - 1.5) < 1e-9);
   assert(std::abs(result.rows[0][1][0] - 2.5) < 1e-9);
   assert(result.rows[0][2][0] == 0.0);
-  result = minera::log_to_target(
-      sample(), {.variant = minera::LogToTargetVariant::REMAINING_TIME});
+  assert(result.rows[1].size() == 1 && result.rows[1][0][0] == 0.0);
+}
+
+void remaining_time_contract() {
+  minera::LogToTargetOptions options;
+  options.variant = minera::LogToTargetVariant::REMAINING_TIME;
+  const auto result = minera::log_to_target(sample(), options);
+  assert(result.variant == minera::LogToTargetVariant::REMAINING_TIME);
+  assert((result.classes ==
+          std::vector<std::string>{"@@remaining_time"}));
+  assert(result.target_width == 1 && result.rows.size() == 2);
   assert(std::abs(result.rows[0][0][0] - 4.0) < 1e-9);
   assert(std::abs(result.rows[0][1][0] - 2.5) < 1e-9);
+  assert(result.rows[0][2][0] == 0.0);
+  assert(result.rows[1].size() == 1 && result.rows[1][0][0] == 0.0);
 }
 
 void options_and_errors() {
@@ -121,7 +138,10 @@ void empty_and_invalid_time() {
   minera::LogToTargetOptions temporal_only;
   temporal_only.activity_key.clear();
   temporal_only.variant = minera::LogToTargetVariant::NEXT_TIME;
-  assert(minera::log_to_target(sample(), temporal_only).rows.size() == 2);
+  const auto temporal_result = minera::log_to_target(sample(), temporal_only);
+  assert(temporal_result.rows.size() == 2);
+  assert((temporal_result.classes ==
+          std::vector<std::string>{"@@next_time"}));
   minera::Trace trace;
   trace.events = {event("A", "bad")};
   bool threw = false;
@@ -160,8 +180,9 @@ void json_shape() {
 }  // namespace
 
 int main() {
-  next_activity();
-  temporal();
+  next_activity_contract();
+  next_time_contract();
+  remaining_time_contract();
   options_and_errors();
   empty_and_invalid_time();
   json_shape();

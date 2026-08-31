@@ -17,6 +17,7 @@ void classic_is_best_first_and_deterministic() {
   DfgActivityCounts starts{{"A", 1}};
   DfgActivityCounts ends{{"B", 1}, {"C", 1}};
   minera::DfgPlayoutOptions options;
+  options.variant = minera::DfgPlayoutVariant::kClassic;
   options.max_variants = 2;
   options.max_occurrences_per_activity = 1;
   const auto first = minera::dfg_playout(dfg, starts, ends, options);
