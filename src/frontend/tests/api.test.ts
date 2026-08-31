@@ -1855,6 +1855,10 @@ describe("OCEL API", () => {
       variant: "objects", interaction_graph_source: "event_and_o2o",
     })).toBe("variant=objects&interaction_graph_source=event_and_o2o");
     expect(ocelFeaturesQuery({
+      variant: "objects", include_obj_con_in_graph_features: true,
+      object_neighbor_graph: "cobirth",
+    })).toBe("variant=objects&object_neighbor_graph=cobirth&include_obj_con_in_graph_features=true");
+    expect(ocelFeaturesQuery({
       variant: "objects", include_lifecycle_length_features: false,
       include_lifecycle_unique_activity_features: false,
       include_lifecycle_duration_features: false,
@@ -1902,6 +1906,10 @@ describe("OCEL API", () => {
       variant: "events_objects", include_prefix_features: false,
     })).toBe("variant=events_objects&include_prefix_features=false");
     expect(ocelFeaturesQuery({
+      variant: "events_objects", include_prefix_features: false,
+      include_prefix_length_features: true,
+    })).toBe("variant=events_objects&include_prefix_features=false&include_prefix_length_features=true");
+    expect(ocelFeaturesQuery({
       variant: "events_objects", include_event_pointwise_features: false,
       include_object_pointwise_features: true,
     })).toBe("variant=events_objects&include_event_pointwise_features=false&include_object_pointwise_features=true");
@@ -1923,6 +1931,13 @@ describe("OCEL API", () => {
     expect(() => ocelFeaturesQuery({
       variant: "objects", interaction_graph_source: "other" as never,
     })).toThrow(/event_cooccurrence/);
+    expect(() => ocelFeaturesQuery({
+      variant: "objects", include_obj_con_in_graph_features: true,
+      object_neighbor_graph: "other" as never,
+    })).toThrow(/object_neighbor_graph/);
+    expect(() => ocelFeaturesQuery({
+      variant: "objects", object_neighbor_graph: "interaction",
+    })).toThrow(/requires include_obj_con/);
     expect(() => ocelFeaturesQuery({ variant: "events_objects", include_all_object_features: false }))
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({
@@ -1944,6 +1959,8 @@ describe("OCEL API", () => {
     expect(() => ocelFeaturesQuery({ variant: "events_objects", include_new_interactions_features: false }))
       .toThrow(/events/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_duration_features: false }))
+      .toThrow(/objects/);
+    expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_features: false }))
       .toThrow(/objects/);
     expect(() => ocelFeaturesQuery({ variant: "events", include_lifecycle_wip_features: true }))
       .toThrow(/objects/);
@@ -2359,7 +2376,7 @@ describe("OCEL API", () => {
       }) };
     }));
     await expect(requestOcelFeatures(new File(["{}"], "log.json"), {
-      variant: "events", include_lifecycle_features: false,
+      variant: "events", include_relation_features: false,
     })).resolves.toMatchObject({ family: "OCEL_FEATURES", variant: "EVENTS" });
     vi.unstubAllGlobals();
   });

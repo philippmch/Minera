@@ -1162,6 +1162,23 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_ocel_features_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_features_tests COMMAND minera_ocel_features_tests)
 
+  add_executable(minera_ocel_feature_components_tests
+    src/backend/tests/test_ocel_feature_components.cpp
+  )
+  target_link_libraries(minera_ocel_feature_components_tests PRIVATE minera::core)
+  target_compile_features(minera_ocel_feature_components_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_ocel_feature_components_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_ocel_feature_components_tests
+           COMMAND minera_ocel_feature_components_tests)
+
+  add_test(NAME minera_ocel_features_cli_lifecycle_paths
+           COMMAND minera_ocel
+                   "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/ocel_split.json"
+                   --features objects
+                   --features-lifecycle-paths)
+  set_tests_properties(minera_ocel_features_cli_lifecycle_paths PROPERTIES
+    PASS_REGULAR_EXPRESSION "@@ocel_lif_path_Create##Pack")
+
   add_executable(minera_oc_causal_net_tests
     src/backend/tests/test_oc_causal_net.cpp
   )

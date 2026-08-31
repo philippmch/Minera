@@ -442,21 +442,28 @@ object-count bound. The `minera_ocel --split` CLI, multipart local
 
 OCEL feature evidence: `extract_ocel_features` provides deterministic numeric
 tables for event rows, object rows, and exploded event-object rows. Event
-features cover activity indicators, timestamps/calendar parts, independently
-selectable overall and per-type related-object counts, independently selectable
-lifecycle starts and ends, attribute counts, custom numeric/string attributes,
-newly observed interactions, and opt-in min/max aggregation of the
+features cover first-observed activity indicators, UTC epoch timestamps with
+source-local calendar parts, independently selectable overall and per-type
+related-object counts, relation-stream lifecycle starts and ends, attribute
+counts, custom numeric/string attributes, newly observed interactions, and
+opt-in min/max aggregation of the
 selected object feature vector over each event's related objects. Object features cover type
 indicators, lifecycle length/duration/endpoints, activity/path counts, custom
 attributes, opt-in work-in-progress, normalized interaction-graph degree, and optional
-per-object-type interaction counts. Degree centrality is independently
+per-object-type interaction counts. Per-type event counts deduplicate repeated
+object identities while the overall count retains relation multiplicity;
+categorical selectors stringify non-null scalar values without merging null and
+empty-string categories. Degree centrality is independently
 selectable from the interaction feature group, so OBJECTS callers can request
 degree alone or interaction-by-type columns without degree. Lifecycle length,
 unique-activity, duration/endpoints,
 activity, path, and work-in-progress columns can be enabled independently
 while the legacy lifecycle switch remains a group-level override. Work-in-progress
 uses a deterministic forward window over lifecycle start/end boundaries and
-restores the original object row order; it is disabled by default. Optional
+restores the original object row order; objects without relations receive the
+zero-boundary count of one, and the feature is disabled by default. Lifecycle
+activity and path columns retain occurrence multiplicity, while paths are an
+opt-in family rather than part of the broad preset. Optional
 OBJECTS-only graph columns cover general
 interaction degree, descendants and inheritance incoming/outgoing counts, and
 cobirth/codeath degree. The OBJECTS table also supports opt-in related-event
@@ -473,10 +480,12 @@ feature columns and original row order; missing types produce an empty table,
 while the selector is rejected for event and exploded event-object variants.
 The optional `include_all_object_features` control (and matching CLI, server,
 and frontend adapters) enables the degree, per-object-type interaction, and
-all five general graph scalar families together for OBJECTS only. It does not
-enable lifecycle, related-event/activity, neighbor, or related-object paths;
-explicit child false values suppress their family, while explicit false and an
-omitted preset control retain compact defaults.
+all five general graph scalar families together for OBJECTS only. Complete
+nested object projections use a stable preset containing the standard
+lifecycle and graph families while suppressing recursive related-event,
+related-activity, and neighbor projections; selected numeric/string attributes
+remain explicit. Explicit child false values suppress their family, while
+explicit false and an omitted preset control retain compact defaults.
 Exploded pointwise event and object projections can be disabled independently
 with `include_event_pointwise_features` and
 `include_object_pointwise_features` (or the matching CLI switches); an unset
@@ -488,8 +497,9 @@ Exploded rows also provide object-specific relation prefixes by default:
 activity counts named `@@ev_obj_pref_act_<activity>`. Prefixes follow relation
 order, retain each earlier event at most once per object, and use zero for
 missing timestamps; length, timediff, and activity groups can be disabled
-independently through native, server, CLI, and typed frontend options that are
-strictly limited to the exploded variant.
+or enabled independently through native, server, CLI, and typed frontend
+options that are strictly limited to the exploded variant. An explicit child
+selection overrides a disabled prefix-group preset.
 The `include_related_objects_features` control and its
 `--features-related-objects` CLI counterpart enable this aggregation; they are
 strictly limited to EVENTS and remain disabled for the exploded projection,
@@ -504,14 +514,24 @@ enabled.
 The `interaction_graph_source` selector chooses the edge source for normalized
 degree, per-object-type interaction counts, and neighboring-object min/max
 projections: `event_cooccurrence` uses only objects sharing an event, while
-`event_and_o2o` preserves the native union with explicit O2O links. The latter
-is the default when the selector is omitted. An explicitly supplied selector
+`event_and_o2o` enables the union with explicit O2O links. Event co-occurrence
+is the default when the selector is omitted, and degree normalization uses only
+active graph nodes; declared isolated objects remain zero. An explicitly supplied selector
 is strictly limited to OBJECTS, or to the
 related-object EVENTS context, and does not alter the separate general graph
 scalar families, which remain event-cooccurrence based.
+The `object_neighbor_graph` selector independently chooses interaction,
+cobirth, or codeath neighborhoods for neighboring-object min/max projections;
+CLI, server, and frontend validation require the neighboring projection itself
+to be selected.
 Strict feature-count, selector, and relation-id validation is shared by
 `minera_ocel --features`, multipart local `POST /api/ocel/features`, and the
 typed frontend query/response adapter.
+The component audit assigns 29 event, prefix, lifecycle, graph, attribute, and
+related-projection modules to distinct declared option members and distinct
+called contract cases in `minera_ocel_feature_components_tests`; the parity
+verifier checks owner-qualified data-member declarations without accepting
+comments, assignments, local variables, or reused cases.
 The optional `feature_name_style=compatibility` mode (or
 `--features-name-style compatibility`) maps categorical event/object columns
 to `@@event_attr_value_<key>_<value>` and

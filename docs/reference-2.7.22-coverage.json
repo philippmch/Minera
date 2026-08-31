@@ -7676,8 +7676,29 @@
       "owner": "algo.transformation.ocel.features.events_objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events_objects.prefix_features",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_prefix_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "prefix_features_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_activity",
@@ -7685,8 +7706,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_activity",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_activity_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_activity_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_end_ot",
@@ -7694,8 +7736,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_end_ot",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_event_end_ot_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_end_ot_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_num_attributes",
@@ -7703,8 +7766,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_num_attributes",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::numeric_event_attributes"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_numeric_attributes_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_num_rel_objs",
@@ -7712,8 +7796,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_num_rel_objs",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_event_num_rel_objs_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_num_rel_objs_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_num_rel_objs_type",
@@ -7721,8 +7826,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_num_rel_objs_type",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_event_num_rel_objs_type_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_num_rel_objs_type_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_start_ot",
@@ -7730,8 +7856,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_start_ot",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_event_start_ot_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_start_ot_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_str_attributes",
@@ -7739,8 +7886,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_str_attributes",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::string_event_attributes"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_string_attributes_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.event_timestamp",
@@ -7748,8 +7916,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.event_timestamp",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_timestamp_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_timestamp_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.new_interactions",
@@ -7757,8 +7946,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.new_interactions",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_new_interactions_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "event_new_interactions_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.events.related_objects_features",
@@ -7766,8 +7976,29 @@
       "owner": "algo.transformation.ocel.features.events",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.events.related_objects_features",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_related_objects_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "related_objects_features_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.obj_con_in_graph_features",
@@ -7775,8 +8006,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.obj_con_in_graph_features",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_obj_con_in_graph_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "obj_con_in_graph_features_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_cobirth_graph",
@@ -7784,8 +8036,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_cobirth_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_cobirth_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_cobirth_graph_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_codeath_graph",
@@ -7793,8 +8066,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_codeath_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_codeath_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_codeath_graph_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_degree_centrality",
@@ -7802,8 +8096,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_degree_centrality",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_degree_centrality_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_degree_centrality_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_general_descendants_graph",
@@ -7811,8 +8126,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_general_descendants_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_general_descendants_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_general_descendants_graph_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_general_inheritance_graph",
@@ -7820,8 +8156,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_general_inheritance_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_general_inheritance_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_general_inheritance_graph_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_general_interaction_graph",
@@ -7829,8 +8186,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_general_interaction_graph",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_general_interaction_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_general_interaction_graph_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_lifecycle_activities",
@@ -7838,8 +8216,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_lifecycle_activities",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_activity_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_lifecycle_activities_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_lifecycle_duration",
@@ -7847,8 +8246,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_lifecycle_duration",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_duration_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_lifecycle_duration_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_lifecycle_length",
@@ -7856,8 +8276,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_lifecycle_length",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_length_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_lifecycle_length_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_lifecycle_paths",
@@ -7865,8 +8306,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_lifecycle_paths",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_path_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_lifecycle_paths_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_lifecycle_unq_act",
@@ -7874,8 +8336,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_lifecycle_unq_act",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_unique_activity_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_lifecycle_unq_act_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_num_attributes",
@@ -7883,8 +8366,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_num_attributes",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::numeric_object_attributes"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_num_attributes_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_str_attributes",
@@ -7892,8 +8396,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_str_attributes",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::string_object_attributes"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_str_attributes_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.object_work_in_progress",
@@ -7901,8 +8426,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.object_work_in_progress",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_lifecycle_wip_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "object_work_in_progress_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.objects_interaction_graph_ot",
@@ -7910,8 +8456,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.objects_interaction_graph_ot",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_interaction_by_type_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "objects_interaction_graph_ot_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.related_activities_features",
@@ -7919,8 +8486,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.related_activities_features",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_related_activities_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "related_activities_features_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.features.objects.related_events_features",
@@ -7928,8 +8516,29 @@
       "owner": "algo.transformation.ocel.features.objects",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/ocel_features.hpp",
+        "src/backend/ocel_features.cpp",
+        "src/backend/tests/test_ocel_feature_components.cpp"
+      ],
+      "proofs": {
+        "module": "algo.transformation.ocel.features.objects.related_events_features",
+        "implementation": [
+          {
+            "path": "include/minera/ocel_features.hpp",
+            "symbol": "OcelFeatureOptions::include_related_events_features"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_ocel_feature_components.cpp",
+            "executable": "minera_ocel_feature_components_tests",
+            "case": "related_events_features_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.transformation.ocel.graphs.object_cobirth_graph",

@@ -242,11 +242,223 @@ function codeContainsSymbol(source, symbol) {
     new RegExp(`\\b${escapeRegExp(parts.at(-1))}\\b`, "u").test(code);
 }
 
+function typeBodyRanges(code, owner, declaration) {
+  const matcher = new RegExp("\\b(?:" + declaration + ")\\s+" +
+    escapeRegExp(owner) + "\\b", "gu");
+  const ranges = [];
+  for (const match of code.matchAll(matcher)) {
+    let cursor = match.index + match[0].length;
+    while (cursor < code.length) {
+      const current = code[cursor];
+      if (current === "(") {
+        const close = matchingDelimiter(code, cursor, "(", ")");
+        if (close < 0) break;
+        cursor = close + 1;
+        continue;
+      }
+      if (current === "[") {
+        const close = matchingDelimiter(code, cursor, "[", "]");
+        if (close < 0) break;
+        cursor = close + 1;
+        continue;
+      }
+      if (current === "{") {
+        const close = matchingDelimiter(code, cursor, "{", "}");
+        if (close >= 0) ranges.push({ begin: cursor + 1, end: close });
+        break;
+      }
+      if (current === ";") break;
+      ++cursor;
+    }
+  }
+  return ranges;
+}
+
+function topLevelIdentifierPositions(code, begin, end, token) {
+  const matcher = new RegExp("\\b" + escapeRegExp(token) + "\\b", "gu");
+  const positions = [];
+  let depth = 0;
+  let cursor = begin;
+  for (const match of code.matchAll(matcher)) {
+    if (match.index < begin) continue;
+    if (match.index >= end) break;
+    while (cursor < match.index) {
+      if (code[cursor] === "{") ++depth;
+      else if (code[cursor] === "}" && depth > 0) --depth;
+      ++cursor;
+    }
+    if (depth === 0) positions.push(match.index);
+    cursor = match.index + match[0].length;
+  }
+  return positions;
+}
+
+function topLevelMemberStatementStart(code, begin, target) {
+  let depth = 0;
+  let start = begin;
+  for (let index = begin; index < target; ++index) {
+    if (code[index] === "{") ++depth;
+    else if (code[index] === "}") {
+      if (depth > 0) --depth;
+      if (depth === 0) start = index + 1;
+    } else if (depth === 0 && code[index] === ";") start = index + 1;
+  }
+  return start;
+}
+
+function topLevelMemberStatementEnd(code, target, end) {
+  let depth = 0;
+  for (let index = target; index < end; ++index) {
+    if (code[index] === "{") {
+      if (depth === 0) return { end: index, delimiter: "{" };
+      ++depth;
+    } else if (code[index] === "}") {
+      if (depth === 0) return { end: index, delimiter: "}" };
+      --depth;
+    } else if (depth === 0 && code[index] === ";") {
+      return { end: index, delimiter: ";" };
+    }
+  }
+  return { end, delimiter: "" };
+}
+
+function removeAccessLabels(prefix) {
+  let result = prefix.trim();
+  while (true) {
+    const match = result.match(/^(?:public|private|protected)\s*:\s*/u);
+    if (!match) return result;
+    result = result.slice(match[0].length).trim();
+  }
+}
+
+function looksLikeMemberType(prefix) {
+  const normalized = removeAccessLabels(prefix);
+  if (!normalized || /[=(){};.'"+\-/%!?|^]/u.test(normalized)) return false;
+  if (/\b(?:return|co_return|if|else|for|while|switch|case|goto|throw|friend|using|typedef)\b/u.test(normalized)) {
+    return false;
+  }
+  if (!/^[A-Za-z0-9_\s:<>*&,\[\]]+$/u.test(normalized)) return false;
+  return /[A-Za-z_]\w*/u.test(normalized);
+}
+
+function bodyDeclaresDataMember(code, body, member) {
+  for (const target of topLevelIdentifierPositions(code, body.begin, body.end, member)) {
+    const start = topLevelMemberStatementStart(code, body.begin, target);
+    const statement = topLevelMemberStatementEnd(code, target, body.end);
+    const prefix = code.slice(start, target);
+    const suffix = code.slice(target + member.length, statement.end).trim();
+    const suffixWithDelimiter = suffix || statement.delimiter;
+    if (!/^(?:=|\{|:|,|;|\[|$)/u.test(suffixWithDelimiter)) continue;
+    if (looksLikeMemberType(prefix)) return true;
+  }
+  return false;
+}
+
+function codeDeclaresDataMember(code, owner, member) {
+  return typeBodyRanges(code, owner, "class|struct|union")
+    .some((body) => bodyDeclaresDataMember(code, body, member));
+}
+
+function bodyDeclaresEnumMember(code, body, member) {
+  for (const target of topLevelIdentifierPositions(code, body.begin, body.end, member)) {
+    let start = body.begin;
+    let depth = 0;
+    for (let index = body.begin; index < target; ++index) {
+      if (code[index] === "{") ++depth;
+      else if (code[index] === "}" && depth > 0) --depth;
+      else if (depth === 0 && code[index] === ",") start = index + 1;
+    }
+    const statement = topLevelMemberStatementEnd(code, target, body.end);
+    const prefix = code.slice(start, target).trim();
+    const suffix = code.slice(target + member.length, statement.end).trim() || statement.delimiter;
+    if (!prefix && /^(?:=|,|;|\})/u.test(suffix)) return true;
+    if (!prefix && suffix === "") return true;
+  }
+  return false;
+}
+
+function codeDeclaresEnumMember(code, owner, member) {
+  return typeBodyRanges(code, owner, "enum(?:\\s+(?:class|struct))?")
+    .some((body) => bodyDeclaresEnumMember(code, body, member));
+}
+
+function codeDeclaresFunction(code, token) {
+  const matcher = new RegExp("\\b" + escapeRegExp(token) + "\\s*\\(", "gu");
+  for (const match of code.matchAll(matcher)) {
+    const openParen = code.indexOf("(", match.index);
+    const closeParen = matchingDelimiter(code, openParen, "(", ")");
+    if (closeParen < 0) continue;
+    let cursor = closeParen + 1;
+    while (cursor < code.length && /\s/u.test(code[cursor])) ++cursor;
+    while (cursor < code.length && code[cursor] !== ";" && code[cursor] !== "{") ++cursor;
+    if (cursor >= code.length) continue;
+    const boundary = Math.max(
+      code.lastIndexOf("\n", match.index - 1),
+      code.lastIndexOf(";", match.index - 1),
+      code.lastIndexOf("{", match.index - 1),
+      code.lastIndexOf("}", match.index - 1),
+    );
+    const prefix = code.slice(boundary + 1, match.index).trim();
+    if (prefix && !prefix.includes("=") &&
+      !/\b(?:return|co_return|throw|new|delete)\s+(?:[A-Za-z_]\w*::)*$/u.test(prefix) &&
+      /(?:\]\]|\b[A-Za-z_]\w*|[*&>])(?:\s+[A-Za-z_]\w*::)*$/u.test(prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function bodyDeclaresFunction(code, body, member) {
+  for (const target of topLevelIdentifierPositions(code, body.begin, body.end, member)) {
+    let cursor = target + member.length;
+    while (cursor < body.end && /\s/u.test(code[cursor])) ++cursor;
+    if (code[cursor] !== "(") continue;
+    const closeParen = matchingDelimiter(code, cursor, "(", ")");
+    if (closeParen < 0 || closeParen >= body.end) continue;
+    const start = topLevelMemberStatementStart(code, body.begin, target);
+    if (!looksLikeMemberType(code.slice(start, target))) continue;
+    const statement = topLevelMemberStatementEnd(code, target, body.end);
+    if (statement.delimiter === ";" || statement.delimiter === "{") return true;
+  }
+  return false;
+}
+
+function codeDeclaresOwnedFunction(code, owner, member) {
+  if (codeDeclaresFunction(code, `${owner}::${member}`)) return true;
+  return typeBodyRanges(code, owner, "class|struct|union")
+    .some((body) => bodyDeclaresFunction(code, body, member));
+}
+
+function bodyDeclaresNestedType(code, body, member) {
+  for (const target of topLevelIdentifierPositions(code, body.begin, body.end, member)) {
+    const start = topLevelMemberStatementStart(code, body.begin, target);
+    const prefix = removeAccessLabels(code.slice(start, target));
+    if (/\b(?:class|struct|union|enum(?:\s+(?:class|struct))?|using)\s*$/u.test(prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function codeDeclaresNestedType(code, owner, member) {
+  return typeBodyRanges(code, owner, "class|struct|union")
+    .some((body) => bodyDeclaresNestedType(code, body, member));
+}
+
 function codeDeclaresSymbol(source, symbol) {
   const parts = symbolParts(symbol);
   if (!parts || typeof source !== "string") return false;
   const code = maskCommentsAndLiterals(source);
   const token = escapeRegExp(parts.at(-1));
+  if (parts.length > 1) {
+    // A qualified data member must be declared inside the named owner type in
+    // this same production artifact. Do not let a local variable or a mere
+    // use of the final component satisfy a qualified proof.
+    if (codeDeclaresDataMember(code, parts.at(-2), parts.at(-1)) ||
+      codeDeclaresEnumMember(code, parts.at(-2), parts.at(-1))) return true;
+    return codeDeclaresNestedType(code, parts.at(-2), parts.at(-1)) ||
+      codeDeclaresOwnedFunction(code, parts.at(-2), parts.at(-1));
+  }
   const patterns = [
     new RegExp(`\\b(?:class|struct|union|enum(?:\\s+class)?|using)\\s+${token}\\b`, "u"),
     new RegExp(`(?:^|[,;{}]|\\n)\\s*${token}\\s*(?:=|,|;)`, "mu"),

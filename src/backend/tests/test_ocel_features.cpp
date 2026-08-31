@@ -118,7 +118,7 @@ int main() {
       log, minera::OcelFeatureVariant::kEvents, options);
   assert(events.row_ids.size() == 3 && events.values.size() == 3);
   assert(events.feature_names.size() == events.values.front().size());
-  assert(events.feature_names.front() == "@@event_act_Close");
+  assert(events.feature_names.front() == "@@event_act_Create");
   assert(events.feature_names.back() == "@@event_new_interactions");
   assert(events.values[0][events.feature_names.size() - 1] == 1.0);
   const auto e2e_out = std::find(events.feature_names.begin(),
@@ -218,7 +218,7 @@ int main() {
   assert(std::find(compatibility_event_table.feature_names.begin(),
                    compatibility_event_table.feature_names.end(),
                    "@@event_attr_value_kind_fast") !=
-         compatibility_event_table.feature_names.end());
+  compatibility_event_table.feature_names.end());
   assert(std::find(compatibility_event_table.feature_names.begin(),
                    compatibility_event_table.feature_names.end(),
                    "@@rel_obj_fea_min_@@object_attr_value_color_blue") !=
@@ -266,6 +266,7 @@ int main() {
   lifecycle_options.include_attribute_counts = false;
   lifecycle_options.include_interaction_features = false;
   lifecycle_options.include_lifecycle_wip_features = true;
+  lifecycle_options.include_lifecycle_path_features = true;
   const auto lifecycle_table = minera::extract_ocel_features(
       lifecycle_order, minera::OcelFeatureVariant::kObjects,
       lifecycle_options);
@@ -520,10 +521,10 @@ int main() {
   const auto priority_max = neighbor_column(
       "@@obj_graph_con_max_@@object_num_priority");
   assert(neighbors.values[0][priority_min] == 5.0 &&
-         neighbors.values[0][priority_max] == 9.0);
+         neighbors.values[0][priority_max] == 5.0);
   assert(neighbors.values[1][priority_min] == 1.0 &&
          neighbors.values[1][priority_max] == 9.0);
-  assert(neighbors.values[2][priority_min] == 1.0 &&
+  assert(neighbors.values[2][priority_min] == 5.0 &&
          neighbors.values[2][priority_max] == 5.0);
   assert(neighbors.values[3][priority_min] == 0.0 &&
          neighbors.values[3][priority_max] == 0.0);
@@ -604,12 +605,12 @@ int main() {
              selected_related_objects.feature_names.begin(),
              selected_related_objects.feature_names.end(), [](const auto& name) {
                return name.find("@@rel_obj_fea_min_@@rel_eve_") == 0;
-             }) != selected_related_objects.feature_names.end());
+             }) == selected_related_objects.feature_names.end());
   assert(std::find_if(
              selected_related_objects.feature_names.begin(),
              selected_related_objects.feature_names.end(), [](const auto& name) {
                return name.find("@@rel_obj_fea_min_@@obj_graph_con_") == 0;
-             }) != selected_related_objects.feature_names.end());
+             }) == selected_related_objects.feature_names.end());
   auto capped_related_objects = related_object_options;
   capped_related_objects.include_related_events_features = false;
   capped_related_objects.include_related_activities_features = false;
@@ -678,8 +679,9 @@ int main() {
   const auto item = column(item_column);
   const auto order = column(order_column);
   const auto other = column(other_column);
-  // o1 and o2 share an event (same-type), o1/i1 and o2/i1 cross types,
-  // i2/x1 is O2O-only, and z1 is isolated. Duplicate links count once.
+  // o1 and o2 share an event (same-type), o1/i1 and o2/i1 cross types.
+  // O2O-only objects and the declared isolated object are outside the default
+  // event-cooccurrence active-node denominator. Duplicate links count once.
   assert(interaction_table.values[0][item] == 1.0 &&
          interaction_table.values[0][order] == 1.0 &&
          interaction_table.values[0][other] == 0.0);
@@ -687,13 +689,17 @@ int main() {
          interaction_table.values[1][order] == 1.0);
   assert(interaction_table.values[2][item] == 0.0 &&
          interaction_table.values[2][order] == 2.0);
-  assert(interaction_table.values[3][other] == 1.0);
-  assert(interaction_table.values[4][item] == 1.0);
+  assert(interaction_table.values[3][item] == 0.0 &&
+         interaction_table.values[3][order] == 0.0 &&
+         interaction_table.values[3][other] == 0.0);
+  assert(interaction_table.values[4][item] == 0.0 &&
+         interaction_table.values[4][order] == 0.0 &&
+         interaction_table.values[4][other] == 0.0);
   assert(interaction_table.values[5][item] == 0.0 &&
          interaction_table.values[5][order] == 0.0 &&
          interaction_table.values[5][other] == 0.0);
   for (const auto& row : interaction_table.values)
-    assert(row[item] + row[order] + row[other] == row[degree] * 5.0);
+    assert(row[item] + row[order] + row[other] == row[degree] * 2.0);
 
   const auto source_log = interaction_source_sample();
   auto source_options = interaction_options;
@@ -721,10 +727,10 @@ int main() {
   assert(event_only.values[0][event_degree] == 0.0 &&
          event_only.values[0][event_order] == 0.0 &&
          event_only.values[0][event_item] == 0.0);
-  assert(event_only.values[1][event_degree] == 0.5 &&
+  assert(event_only.values[1][event_degree] == 1.0 &&
          event_only.values[1][event_order] == 0.0 &&
          event_only.values[1][event_item] == 1.0);
-  assert(event_only.values[2][event_degree] == 0.5 &&
+  assert(event_only.values[2][event_degree] == 1.0 &&
          event_only.values[2][event_order] == 1.0 &&
          event_only.values[2][event_item] == 0.0);
   assert(event_only.values[0][event_neighbor_min] == 0.0 &&
@@ -769,9 +775,9 @@ int main() {
   default_source_options.interaction_graph_source.reset();
   const auto default_source_table = minera::extract_ocel_features(
       source_log, minera::OcelFeatureVariant::kObjects, default_source_options);
-  assert(default_source_table.row_ids == union_table.row_ids &&
-         default_source_table.feature_names == union_table.feature_names &&
-         default_source_table.values == union_table.values);
+  assert(default_source_table.row_ids == event_only.row_ids &&
+         default_source_table.feature_names == event_only.feature_names &&
+         default_source_table.values == event_only.values);
   auto invalid_source = minera::OcelFeatureOptions{};
   for (const auto source : {minera::OcelInteractionGraphSource::kEventCooccurrence,
                             minera::OcelInteractionGraphSource::kEventAndO2O}) {
@@ -1147,7 +1153,7 @@ int main() {
          exploded.values[0][event_kind_fast] == 0.0);
   assert(exploded.values[1][event_amount] == 2.0 &&
          exploded.values[1][event_object_count] == 3.0 &&
-         exploded.values[1][event_order_count] == 2.0);
+         exploded.values[1][event_order_count] == 1.0);
   assert(exploded.values[2][event_kind_fast] == 0.0 &&
          exploded.values[2][event_start_order] == 1.0 &&
          exploded.values[2][object_color_blue] == 1.0 &&
@@ -1248,7 +1254,8 @@ int main() {
   disabled.include_endpoint_features = false;
   disabled.include_attribute_counts = false;
   disabled.include_interaction_features = false;
-  disabled.include_lifecycle_features = false;
+  disabled.include_event_pointwise_features = false;
+  disabled.include_object_pointwise_features = false;
   disabled.include_prefix_features = false;
   disabled.include_prefix_length_features = false;
   disabled.include_prefix_timediff_features = false;
@@ -1297,9 +1304,9 @@ int main() {
                 duplicate_prefixes.feature_names.end(), "@@ev_obj_pref_act_Create") -
       duplicate_prefixes.feature_names.begin());
   assert(duplicate_prefixes.values[0][duplicate_length] == 0.0 &&
-         duplicate_prefixes.values[1][duplicate_length] == 1.0 &&
+         duplicate_prefixes.values[1][duplicate_length] == 0.0 &&
          duplicate_prefixes.values[2][duplicate_length] == 0.0);
-  assert(duplicate_prefixes.values[1][duplicate_create] == 1.0);
+  assert(duplicate_prefixes.values[1][duplicate_create] == 0.0);
 
   auto no_prefix = prefix_options;
   no_prefix.include_prefix_features = false;
