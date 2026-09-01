@@ -419,6 +419,7 @@ body {
     "map variants"
     "activities variants"
     "dfgvariants dfgvariants"
+    "dfgdataframe dfgdataframe"
     "correlation correlation"
     "efg efg";
   gap: 0;
@@ -436,13 +437,14 @@ body {
 }
 .activities-panel { grid-area: activities; border-top: 1px solid var(--line); }
 .dfg-variants-panel { grid-area: dfgvariants; border-top: 1px solid var(--line); }
+.dfg-dataframe-panel { grid-area: dfgdataframe; border-top: 1px solid var(--line); }
 .correlation-panel { grid-area: correlation; border-top: 1px solid var(--line); }
 .efg-panel { grid-area: efg; border-top: 1px solid var(--line); }
 
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;
-    grid-template-areas: "map" "variants" "activities" "dfgvariants" "correlation" "efg";
+    grid-template-areas: "map" "variants" "activities" "dfgvariants" "dfgdataframe" "correlation" "efg";
   }
   .variants-panel { border-left: none; border-top: 1px solid var(--line); position: static; max-height: none; }
   .kpis { grid-template-columns: repeat(2, 1fr); }

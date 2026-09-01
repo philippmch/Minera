@@ -47,11 +47,11 @@ symbols must occur as code identifiers outside comments and string literals;
 test proofs must name a case built by a registered CMake test executable, and
 that case must exercise the implementation symbol. This normal check is a
 structural coverage precondition; it is not a claim that rows marked partial,
-adapter, integration, or missing are complete. The current manifest records 23
-complete and 63 partial dispatcher rows, plus 84 complete and 303 partial
+adapter, integration, or missing are complete. The current manifest records 24
+complete and 62 partial dispatcher rows, plus 87 complete and 300 partial
 non-dispatcher module rows. The completed module group covers the implemented
-simulation, core transformation, Petri-analysis, organizational, and ten
-statistical DFG modules with distinct registered tests; 366 coverage units
+simulation, core transformation, Petri-analysis, organizational, and thirteen
+statistical DFG modules with distinct registered tests; 362 coverage units
 still require exact proof.
 A release may
 additionally run the strict gate:
@@ -130,7 +130,7 @@ are reconciled.
 | Discovery: Heuristics | classic and Heuristics Miner++ | **Partial (implemented core; proof pending)** — both variants, exact dependency/AND/loop behavior, DFG pre-cleaning, filtering, performance aggregation, interval concurrency, and classic DFG input are available |
 | Discovery: optimization | ILP classic and Genetic classic | **Partial** — bounded deterministic ILP and Genetic classic implementations are available through native, JSON, CLI, local-server, and frontend adapters; ILP supports one-trace-per-variant normalization, configurable silent boundaries, cumulative alpha sequence encoding, derived or overridden causal edges, and frequency-based noise filtering; Genetic results expose their normalized causal matrix and use the public matrix-to-workflow-net conversion, while differential edge-contract review and full solver parity remain |
 | Discovery: declarative | Declare classic and log skeleton classic | **Partial (implemented core; proof pending)** |
-| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial; native DFG utilities and ten modules proof-complete** — all eight statistical dispatcher routes and ten statistical DFG variant, adapter, replacement, and utility modules have focused native contracts; dataframe partial-order/concurrency and advanced graph options plus holiday-aware work calendars remain open, while both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses remain implemented but proof-pending |
+| Discovery: graph/statistical | DFG frequency/performance/frequency triples/case attributes/clean; causal alpha/heuristic; correlation classic/classic-split/trace-based; minimum self-distance | **Partial overall; the DFG dispatcher and thirteen modules are complete** — all eight statistical DFG routes, eager and lazy table adapters, performance behavior, replacement helpers, and graph utilities have focused native contracts plus JSON/CLI/server/frontend integration; both causal variants, all three correlation-miner variants, eventually-follows, and minimum self-distance with witnesses remain implemented but proof-pending in their separately tracked packages |
 | Discovery: footprints | log entire/trace-by-trace, DFG, Petri reachability, process-tree bottom-up, POWL bottom-up | **Partial (implemented core; proof pending)** — dataframe and lazyframe forms are adapters over the same native semantics |
 | Discovery: structured | transition system view-based; POWL brute-force/dynamic-clustering/frequency/maximal/tree cuts | **Partial (implemented core; proof pending)** — transition systems support sequence/set/multiset views, forward/backward direction, arbitrary windows including zero, and optional occurrence data; POWL exposes TREE, BRUTE_FORCE, MAXIMAL, DYNAMIC_CLUSTERING, and DYNAMIC_CLUSTERING_PLAIN/frequency behavior with filtering and order-frequency settings |
 | Discovery: temporal/behavioral | temporal profile; performance spectrum connected/disconnected plus log/dataframe projections; batches | **Partial (implemented core; proof pending)** — temporal profiles, all six named performance-spectrum projections, and all five batch classifications are available; batch activity/resource/timestamp/case-id selectors and columnar/lazyframe adapters share the native contract |
@@ -171,6 +171,15 @@ first-class fields; custom selectors read typed event attributes, participate in
 timestamp ordering and business-hour elapsed time, and reject missing fields
 deterministically. Strict request parsing, standalone CLI flags, cached-server
 mining, and typed frontend controls serialize the selectors consistently.
+
+The table-native DFG surface adds eager and lazy graph adapters with frequency,
+performance, combined, and cost measures; independent source and target
+activity selectors; case, completion, start, cost, and index selectors; sorting,
+window, per-case retention, aggregation, reduction, and business-time controls;
+frequency triples; partial-order pairs; and inclusive or strict concurrent-event
+pairs. Deterministic JSON, a standalone export path, the cached local endpoint,
+and a typed frontend panel expose the same options. An explicit `none` schedule
+means zero business time, while omission selects the standard weekday schedule.
 
 Extensive process-tree playout also supports an opt-in set-string result. The
 native result helper returns the deduplicated activity-word set while the
@@ -1770,12 +1779,16 @@ independently inside each trace. FREQ_TRIPLES counts overlapping contiguous
 triples and intentionally ignores the window and deduplication settings.
 
 PERFORMANCE and PERFORMANCE_GREEDY are named aliases over adjacent waiting
-times. A target's configured start-timestamp attribute falls back to its
-complete timestamp; negative waits clamp to zero. Mean, median, minimum,
+times. Omitting the start-timestamp selector uses the target's completion
+timestamp; an explicitly named missing selector is rejected. Negative waits
+clamp to zero. Mean, median, minimum,
 maximum, sum, sample standard deviation, raw observations, and the complete
 summary are selectable. Timestamp parsing is strict. Weekly business-hour
 slots support the pinned Monday-Friday default, caller-defined ranges,
-timezone-bearing timestamps, and multiweek intervals.
+timezone-bearing timestamps, explicit empty schedules, one-second-gap merging,
+and multiweek intervals. The opaque work-calendar parameter is accepted and
+preserved but intentionally has no effect because the pinned calculation does
+not consult it.
 
 CASE_ATTRIBUTES counts every requested trace attribute on directly-following
 edges, maps `concept:name` to the native case id, skips missing attributes, and
@@ -1802,7 +1815,7 @@ activities against the shared registry and preserves alias names; the frontend
 exposes all settings and renders frequency, triple, performance,
 case-attribute, clean-time, and causal artifacts.
 
-The statistical dispatcher routes and ten non-dispatcher rows now carry
+The statistical dispatcher routes and thirteen non-dispatcher rows now carry
 machine-checked implementation and registered-test proofs. Focused contracts
 separately exercise selector routing, frequency-triple and clean adapters,
 clean and clean-time boundary behavior, the in-place edge-value replacement
@@ -1815,10 +1828,18 @@ dense matrices, distinct and weighted variant summaries, directed graphs, and
 cyclic transitive predecessor/successor closure. Canonical native maps replace
 the source runtime's multiple container shapes; missing maxima use
 `std::optional`, while invalid adjacency rows and empty component assignment
-remain explicit errors. The package stays partial because the dataframe
-statistics adapters still lack partial-order/concurrent-event operations,
-cost/target/sorting controls, and the performance variation still lacks a
-holiday-aware work-calendar abstraction.
+remain explicit errors.
+
+The dataframe statistics proofs cover global-shift and within-case-shift graph
+behavior, target-side selectors, cost nulls, custom aggregation, sorting and
+window zero, explicit and default schedules, partial-order first-following
+selection, and the adapters' intentionally different concurrency boundaries,
+null handling, and index rules. Native pair vectors preserve complete typed
+events and expose configured helper-column names as result metadata instead of
+returning a language-runtime joined dataframe. Lazy table inputs currently
+materialize into the value-semantic table engine before discovery; this affects
+memory usage, not results. With those native representation differences stated,
+the DFG dispatcher package and its tracked statistical modules are complete.
 
 DFG precision evidence: `evaluate_dfg_precision` builds weighted observed
 prefix observations, admits only prefixes reachable through the supplied start
