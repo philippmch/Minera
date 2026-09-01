@@ -82,8 +82,35 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.analysis.extended_marking_equation.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_analysis.hpp",
+              "symbol": "solve_extended_marking_equation"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+              "executable": "minera_analysis_parity_contracts_tests",
+              "case": "classic_extended_marking_equation_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/petri_analysis.hpp",
         "include/minera/petri_analysis_json.hpp",
@@ -92,6 +119,7 @@
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp",
         "src/backend/tests/test_petri_analysis.cpp",
         "src/backend/tests/test_request_params.cpp",
         "src/frontend/src/api.ts",
@@ -117,8 +145,35 @@
           "symbol": "CLASSIC"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "CLASSIC": {
+          "selector": "CLASSIC",
+          "binding": {
+            "selector": "CLASSIC",
+            "modules": [
+              "algo.analysis.marking_equation.variants.classic"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLASSIC"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_analysis.hpp",
+              "symbol": "solve_marking_equation"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+              "executable": "minera_analysis_parity_contracts_tests",
+              "case": "classic_marking_equation_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/petri_analysis.hpp",
         "include/minera/petri_analysis_json.hpp",
@@ -127,6 +182,7 @@
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp",
         "src/backend/tests/test_petri_analysis.cpp",
         "src/backend/tests/test_request_params.cpp",
         "src/frontend/src/api.ts",
@@ -152,8 +208,35 @@
           "symbol": null
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.analysis.woflan.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_analysis.hpp",
+              "symbol": "analyze_soundness"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+              "executable": "minera_analysis_parity_contracts_tests",
+              "case": "woflan_pipeline_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/petri_analysis.hpp",
         "include/minera/petri_analysis_json.hpp",
@@ -162,6 +245,7 @@
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp",
         "src/backend/tests/test_petri_analysis.cpp",
         "src/backend/tests/test_request_params.cpp",
         "src/frontend/src/api.ts",
@@ -187,8 +271,35 @@
           "symbol": "PETRI_NET"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "PETRI_NET": {
+          "selector": "PETRI_NET",
+          "binding": {
+            "selector": "PETRI_NET",
+            "modules": [
+              "algo.analysis.workflow_net.variants.petri_net"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PETRI_NET"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/petri_analysis.hpp",
+              "symbol": "check_workflow_net"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+              "executable": "minera_analysis_parity_contracts_tests",
+              "case": "workflow_net_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/petri_analysis.hpp",
         "include/minera/petri_analysis_json.hpp",
@@ -197,6 +308,7 @@
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp",
         "src/backend/tests/test_petri_analysis.cpp",
         "src/backend/tests/test_request_params.cpp",
         "src/frontend/src/api.ts",
@@ -1880,8 +1992,35 @@
           "symbol": null
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.organizational_mining.local_diagnostics.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/local_diagnostics.hpp",
+              "symbol": "discover_local_diagnostics"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "local_diagnostics_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/local_diagnostics.hpp",
         "src/backend/local_diagnostics.cpp",
@@ -1889,6 +2028,7 @@
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
         "src/backend/tests/test_local_diagnostics.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
         "src/frontend/tests/api.test.ts",
@@ -1911,8 +2051,35 @@
           "symbol": "DATAFRAME"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "DATAFRAME": {
+          "selector": "DATAFRAME",
+          "binding": {
+            "selector": "DATAFRAME",
+            "modules": [
+              "algo.organizational_mining.network_analysis.variants.dataframe"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "DATAFRAME"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/network_analysis.hpp",
+              "symbol": "discover_network_analysis"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "network_analysis_dataframe_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/network_analysis.hpp",
         "src/backend/network_analysis.cpp",
@@ -1921,6 +2088,7 @@
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
         "src/backend/tests/test_network_analysis.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
         "src/frontend/tests/api.test.ts",
@@ -1943,14 +2111,47 @@
           "symbol": null
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.organizational_mining.resource_profiles.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/resource_profiles.hpp",
+              "symbol": "discover_resource_profiles"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "resource_profiles_log_contract"
+            },
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "fraction_case_completions_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/resource_profiles.hpp",
         "src/backend/resource_profiles.cpp",
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/backend/tests/test_resource_profiles.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
@@ -1984,8 +2185,60 @@
           "symbol": "PANDAS"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "LOG": {
+          "selector": "LOG",
+          "binding": {
+            "selector": "LOG",
+            "modules": [
+              "algo.organizational_mining.roles.variants.log"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/role_discovery.hpp",
+              "symbol": "RoleDiscoveryVariant::LOG"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "roles_log_contract"
+            }
+          ]
+        },
+        "PANDAS": {
+          "selector": "PANDAS",
+          "binding": {
+            "selector": "PANDAS",
+            "modules": [
+              "algo.organizational_mining.roles.variants.pandas"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/role_discovery.hpp",
+              "symbol": "RoleDiscoveryVariant::PANDAS"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "roles_pandas_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/role_discovery.hpp",
         "src/backend/role_discovery.cpp",
@@ -1993,6 +2246,7 @@
         "src/backend/request_params.cpp",
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/backend/tests/test_role_discovery.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
@@ -2016,11 +2270,39 @@
           "symbol": null
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "default": {
+          "selector": "default",
+          "binding": {
+            "selector": "default",
+            "modules": [
+              "algo.organizational_mining.roles.common.algorithm"
+            ],
+            "kind": "default",
+            "class": null,
+            "symbol": null
+          },
+          "implementation": [
+            {
+              "path": "include/minera/role_discovery.hpp",
+              "symbol": "DiscoveredRole::resources"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "roles_common_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/role_discovery.hpp",
         "src/backend/role_discovery.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/backend/tests/test_role_discovery.cpp"
       ]
     },
@@ -2110,8 +2392,210 @@
           "symbol": "JOINTACTIVITIES_PANDAS"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "HANDOVER_LOG": {
+          "selector": "HANDOVER_LOG",
+          "binding": {
+            "selector": "HANDOVER_LOG",
+            "modules": [
+              "algo.organizational_mining.sna.variants.log.handover"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "HANDOVER_LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::HANDOVER"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_handover_log_contract"
+            }
+          ]
+        },
+        "WORKING_TOGETHER_LOG": {
+          "selector": "WORKING_TOGETHER_LOG",
+          "binding": {
+            "selector": "WORKING_TOGETHER_LOG",
+            "modules": [
+              "algo.organizational_mining.sna.variants.log.working_together"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "WORKING_TOGETHER_LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::WORKING_TOGETHER"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_working_together_log_contract"
+            }
+          ]
+        },
+        "SUBCONTRACTING_LOG": {
+          "selector": "SUBCONTRACTING_LOG",
+          "binding": {
+            "selector": "SUBCONTRACTING_LOG",
+            "modules": [
+              "algo.organizational_mining.sna.variants.log.subcontracting"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SUBCONTRACTING_LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::SUBCONTRACTING"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_subcontracting_log_contract"
+            }
+          ]
+        },
+        "JOINTACTIVITIES_LOG": {
+          "selector": "JOINTACTIVITIES_LOG",
+          "binding": {
+            "selector": "JOINTACTIVITIES_LOG",
+            "modules": [
+              "algo.organizational_mining.sna.variants.log.jointactivities"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "JOINTACTIVITIES_LOG"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::JOINTACTIVITIES"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_joint_activities_log_contract"
+            }
+          ]
+        },
+        "HANDOVER_PANDAS": {
+          "selector": "HANDOVER_PANDAS",
+          "binding": {
+            "selector": "HANDOVER_PANDAS",
+            "modules": [
+              "algo.organizational_mining.sna.variants.pandas.handover"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "HANDOVER_PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::HANDOVER_PANDAS"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_handover_pandas_contract"
+            }
+          ]
+        },
+        "WORKING_TOGETHER_PANDAS": {
+          "selector": "WORKING_TOGETHER_PANDAS",
+          "binding": {
+            "selector": "WORKING_TOGETHER_PANDAS",
+            "modules": [
+              "algo.organizational_mining.sna.variants.pandas.working_together"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "WORKING_TOGETHER_PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::WORKING_TOGETHER_PANDAS"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_working_together_pandas_contract"
+            }
+          ]
+        },
+        "SUBCONTRACTING_PANDAS": {
+          "selector": "SUBCONTRACTING_PANDAS",
+          "binding": {
+            "selector": "SUBCONTRACTING_PANDAS",
+            "modules": [
+              "algo.organizational_mining.sna.variants.pandas.subcontracting"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "SUBCONTRACTING_PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::SUBCONTRACTING_PANDAS"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_subcontracting_pandas_contract"
+            }
+          ]
+        },
+        "JOINTACTIVITIES_PANDAS": {
+          "selector": "JOINTACTIVITIES_PANDAS",
+          "binding": {
+            "selector": "JOINTACTIVITIES_PANDAS",
+            "modules": [
+              "algo.organizational_mining.sna.variants.pandas.jointactivities"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "JOINTACTIVITIES_PANDAS"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/organizational_mining.hpp",
+              "symbol": "OrganizationalSnaVariant::JOINTACTIVITIES_PANDAS"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+              "executable": "minera_organizational_parity_contracts_tests",
+              "case": "sna_joint_activities_pandas_contract"
+            }
+          ]
+        }
+      },
       "artifacts": [
         "include/minera/organizational_mining.hpp",
         "src/backend/organizational_mining.cpp",
@@ -2120,6 +2604,7 @@
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
         "src/backend/tests/test_organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp",
         "src/frontend/src/api.ts",
         "src/frontend/src/types.ts",
         "src/frontend/tests/api.test.ts",
@@ -3451,8 +3936,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.extended_marking_equation.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "solve_extended_marking_equation"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "classic_extended_marking_equation_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.marking_equation.variants.classic",
@@ -3465,8 +3971,29 @@
           "selector": "CLASSIC"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.marking_equation.variants.classic",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "solve_marking_equation"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "classic_marking_equation_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.graphs.minimal_coverability_graph.minimal_coverability_graph",
@@ -3474,8 +4001,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.graphs.minimal_coverability_graph.minimal_coverability_graph",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::coverability_markings"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_coverability_markings_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.graphs.reachability_graph.reachability_graph",
@@ -3483,8 +4031,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.graphs.reachability_graph.reachability_graph",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::reachability_markings"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_reachability_markings_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.graphs.restricted_coverability_graph.restricted_coverability_graph",
@@ -3492,8 +4061,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.graphs.restricted_coverability_graph.restricted_coverability_graph",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::restricted_coverability_markings"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_restricted_coverability_markings_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.graphs.utility",
@@ -3501,8 +4091,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.graphs.utility",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::coverability_edges"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_coverability_edges_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.not_well_handled_pairs.not_well_handled_pairs",
@@ -3510,8 +4121,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.not_well_handled_pairs.not_well_handled_pairs",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::not_well_handled_pairs"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_not_well_handled_pairs_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.place_invariants.place_invariants",
@@ -3519,8 +4151,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.place_invariants.place_invariants",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::place_invariant_basis"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_place_invariant_basis_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.place_invariants.s_component",
@@ -3528,8 +4181,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.place_invariants.s_component",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::s_components"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_s_components_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.place_invariants.uniform_invariant",
@@ -3537,8 +4211,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.place_invariants.uniform_invariant",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::uniform_place_invariants"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_uniform_place_invariants_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.woflan.place_invariants.utility",
@@ -3546,8 +4241,29 @@
       "owner": "algo.analysis.woflan",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.woflan.place_invariants.utility",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "SoundnessResult::weighted_place_invariants"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "woflan_weighted_place_invariants_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.analysis.workflow_net.variants.petri_net",
@@ -3560,8 +4276,29 @@
           "selector": "PETRI_NET"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/petri_analysis.hpp",
+        "src/backend/petri_analysis.cpp",
+        "src/backend/tests/test_analysis_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.analysis.workflow_net.variants.petri_net",
+        "implementation": [
+          {
+            "path": "include/minera/petri_analysis.hpp",
+            "symbol": "check_workflow_net"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_analysis_parity_contracts.cpp",
+            "executable": "minera_analysis_parity_contracts_tests",
+            "case": "workflow_net_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.anonymization.pripel.util.AttributeAnonymizer",
@@ -6558,8 +7295,29 @@
           "selector": "DATAFRAME"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/network_analysis.hpp",
+        "src/backend/network_analysis.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.network_analysis.variants.dataframe",
+        "implementation": [
+          {
+            "path": "include/minera/network_analysis.hpp",
+            "symbol": "discover_network_analysis"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "network_analysis_dataframe_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.resource_profiles.variants.log",
@@ -6567,8 +7325,29 @@
       "owner": "algo.organizational_mining.resource_profiles",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/resource_profiles.hpp",
+        "src/backend/resource_profiles.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.resource_profiles.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/resource_profiles.hpp",
+            "symbol": "ResourceProfileMetric::DISTINCT_ACTIVITIES"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "resource_profiles_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.resource_profiles.variants.pandas",
@@ -6576,8 +7355,29 @@
       "owner": "algo.organizational_mining.resource_profiles",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/resource_profiles.hpp",
+        "src/backend/resource_profiles.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.resource_profiles.variants.pandas",
+        "implementation": [
+          {
+            "path": "include/minera/resource_profiles.hpp",
+            "symbol": "ResourceProfilesOptions::case_id_attribute"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "resource_profiles_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.roles.variants.log",
@@ -6590,8 +7390,29 @@
           "selector": "LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/role_discovery.hpp",
+        "src/backend/role_discovery.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.roles.variants.log",
+        "implementation": [
+          {
+            "path": "include/minera/role_discovery.hpp",
+            "symbol": "RoleDiscoveryVariant::LOG"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "roles_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.roles.variants.pandas",
@@ -6604,8 +7425,29 @@
           "selector": "PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/role_discovery.hpp",
+        "src/backend/role_discovery.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.roles.variants.pandas",
+        "implementation": [
+          {
+            "path": "include/minera/role_discovery.hpp",
+            "symbol": "RoleDiscoveryVariant::PANDAS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "roles_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.util",
@@ -6613,8 +7455,29 @@
       "owner": "algo.organizational_mining.sna",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.util",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaDiagnostics::computed"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "organizational_sna_util_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.log.handover",
@@ -6627,8 +7490,29 @@
           "selector": "HANDOVER_LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.log.handover",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::HANDOVER"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_handover_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.log.jointactivities",
@@ -6641,8 +7525,29 @@
           "selector": "JOINTACTIVITIES_LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.log.jointactivities",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::JOINTACTIVITIES"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_joint_activities_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.log.subcontracting",
@@ -6655,8 +7560,29 @@
           "selector": "SUBCONTRACTING_LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.log.subcontracting",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::SUBCONTRACTING"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_subcontracting_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.log.working_together",
@@ -6669,8 +7595,29 @@
           "selector": "WORKING_TOGETHER_LOG"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.log.working_together",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::WORKING_TOGETHER"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_working_together_log_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.pandas.handover",
@@ -6683,8 +7630,29 @@
           "selector": "HANDOVER_PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.pandas.handover",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::HANDOVER_PANDAS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_handover_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.pandas.jointactivities",
@@ -6697,8 +7665,29 @@
           "selector": "JOINTACTIVITIES_PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.pandas.jointactivities",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::JOINTACTIVITIES_PANDAS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_joint_activities_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.pandas.subcontracting",
@@ -6711,8 +7700,29 @@
           "selector": "SUBCONTRACTING_PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.pandas.subcontracting",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::SUBCONTRACTING_PANDAS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_subcontracting_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.sna.variants.pandas.working_together",
@@ -6725,8 +7735,29 @@
           "selector": "WORKING_TOGETHER_PANDAS"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/organizational_mining.hpp",
+        "src/backend/organizational_mining.cpp",
+        "src/backend/tests/test_organizational_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.organizational_mining.sna.variants.pandas.working_together",
+        "implementation": [
+          {
+            "path": "include/minera/organizational_mining.hpp",
+            "symbol": "OrganizationalSnaVariant::WORKING_TOGETHER_PANDAS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_organizational_parity_contracts.cpp",
+            "executable": "minera_organizational_parity_contracts_tests",
+            "case": "sna_working_together_pandas_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.organizational_mining.util",
