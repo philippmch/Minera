@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <functional>
 #include <map>
 #include <optional>
@@ -21,6 +22,7 @@
 #include "minera/communication_history.hpp"
 #include "minera/knowledge_injection.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/dfg_dataframe.hpp"
 #include "minera/footprints.hpp"
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
@@ -113,6 +115,19 @@ namespace minera {
 [[nodiscard]] std::string error_json(std::string_view message);
 
 // The discovery options parsed from a mine request's form fields.
+// Operation selected by the dataframe-backed DFG transport. The native table
+// options remain separate from the established event-log statistical options
+// so callers can request either surface without changing defaults.
+enum class DfgTableOperation {
+  kGraph,
+  kPartialOrder,
+  kConcurrentEvents,
+
+  GRAPH = kGraph,
+  PARTIAL_ORDER = kPartialOrder,
+  CONCURRENT_EVENTS = kConcurrentEvents,
+};
+
 struct MineParams {
   CsvImportOptions csv;
   XesImportOptions xes;
@@ -135,6 +150,13 @@ struct MineParams {
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
   DfgStatisticalOptions dfg_statistics;
+  // Dataframe/lazy-table DFG transport settings. `dfg_dataframe_requested`
+  // is true when any dataframe-specific field was supplied, allowing the
+  // server and CLI to keep this operation opt-in.
+  DfgTableOptions dfg_table_options;
+  DfgTableOperation dfg_operation = DfgTableOperation::kGraph;
+  DfgTableBackend dfg_backend = DfgTableBackend::kPandas;
+  bool dfg_dataframe_requested = false;
   // Correlation mining is strictly opt-in; an empty list preserves the
   // historical request behaviour and avoids requiring timestamps by default.
   std::vector<std::string> correlation_variants;

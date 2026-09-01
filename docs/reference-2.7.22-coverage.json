@@ -1199,7 +1199,7 @@
           "symbol": "CLEAN"
         }
       ],
-      "status": "partial",
+      "status": "complete",
       "evidence": "docs/reference-2.7.22-parity.md",
       "proofs": {
         "NATIVE": {
@@ -1404,8 +1404,12 @@
         }
       },
       "artifacts": [
+        "include/minera/dfg_dataframe.hpp",
+        "include/minera/dfg_dataframe_json.hpp",
         "include/minera/dfg_variants.hpp",
         "include/minera/dfg_utils.hpp",
+        "src/backend/dfg_dataframe.cpp",
+        "src/backend/dfg_dataframe_json.cpp",
         "src/backend/dfg_variants.cpp",
         "src/backend/dfg_utils.cpp",
         "src/backend/json_export.cpp",
@@ -1413,12 +1417,16 @@
         "src/backend/tools/minera_export.cpp",
         "src/backend/tools/minera_server.cpp",
         "src/backend/tests/test_dfg_variants.cpp",
+        "src/backend/tests/test_dfg_dataframe.cpp",
+        "src/backend/tests/test_dfg_dataframe_json.cpp",
         "src/backend/tests/test_dfg_parity_contracts.cpp",
         "src/backend/tests/test_dfg_utils.cpp",
         "src/backend/tests/test_request_params.cpp",
         "src/frontend/src/api.ts",
+        "src/frontend/src/components/DfgDataframe.tsx",
         "src/frontend/src/types.ts",
         "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/dfg-dataframe.test.ts",
         "src/frontend/tests/types.test.ts"
       ]
     },
@@ -5548,8 +5556,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_dataframe.hpp",
+        "src/backend/dfg_dataframe.cpp",
+        "src/backend/tests/test_dfg_dataframe.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.adapters.pandas.df_statistics",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_dataframe.hpp",
+            "symbol": "discover_pandas_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_dataframe.cpp",
+            "executable": "minera_dfg_dataframe_tests",
+            "case": "graph_measure_selectors_and_ordering"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.adapters.pandas.freq_triples",
@@ -5587,8 +5616,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_dataframe.hpp",
+        "src/backend/dfg_dataframe.cpp",
+        "src/backend/tests/test_dfg_dataframe.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.adapters.polars.df_statistics",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_dataframe.hpp",
+            "symbol": "discover_polars_concurrent_events"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_dataframe.cpp",
+            "executable": "minera_dfg_dataframe_tests",
+            "case": "concurrency_contracts"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.adapters.polars.freq_triples",
@@ -5903,8 +5953,29 @@
           "selector": "PERFORMANCE_GREEDY"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_dataframe.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.performance",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "discover_performance_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_dataframe.cpp",
+            "executable": "minera_dfg_dataframe_tests",
+            "case": "event_log_projection_selector_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.footprints.dfg.variants.dfg",

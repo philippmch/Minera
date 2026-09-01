@@ -38,6 +38,8 @@
 #include "minera/decision_mining.hpp"
 #include "minera/decision_table.hpp"
 #include "minera/dfg_variants.hpp"
+#include "minera/dfg_dataframe.hpp"
+#include "minera/dfg_dataframe_json.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/dfg_playout.hpp"
 #include "minera/dfg_alignment.hpp"
@@ -1049,6 +1051,23 @@ int usage(const char* program) {
                "  --dfg-business-hour-slots <start-end,...> Weekly seconds\n"
                "  --dfg-case-attributes <a,b,...> Attributes for case DFG\n"
                "  --dfg-return-node-attributes Include case attributes on nodes\n"
+               "  --dfg-dataframe-output <path> Write dataframe DFG JSON\n"
+               "  --dfg-operation <id>      graph, partial_order, or concurrent_events\n"
+               "  --dfg-measure <id>        frequency, performance, both, or cost\n"
+               "  --dfg-backend <id>        pandas or polars\n"
+               "  --dfg-target-activity-attribute <name> Target-side activity field\n"
+               "  --dfg-cost-attribute <name> Cost field for the cost measure\n"
+               "  --dfg-case-id-attribute <name> Case-id field for table rows\n"
+               "  --dfg-sort-caseid-required <bool> Sort rows by case (default true)\n"
+               "  --dfg-sort-timestamp-along-case-id <bool> Timestamp tie-breaker\n"
+               "  --dfg-reduce-columns <bool> Preserve/reduce table columns\n"
+               "  --dfg-workcalendar <token> Opaque work-calendar token\n"
+               "  --dfg-event-index-attribute <name> Pair-row index field\n"
+               "  --dfg-max-start-column <name> Concurrent max-start field\n"
+               "  --dfg-min-complete-column <name> Concurrent min-complete field\n"
+               "  --dfg-overlap-column <name> Concurrent overlap field\n"
+               "  --dfg-strict <bool>       Require strictly positive overlap\n"
+               "  --dfg-keep-first-following <bool> Keep first following pair\n"
                "  --correlation-variants <a,b,...> Correlation miner analyses:\n"
                "                            classic, classic_split, trace_based\n"
                "  --correlation-start-timestamp-attribute <name> Correlation start time\n"
@@ -1429,6 +1448,7 @@ int main(int argc, char** argv) {
   std::filesystem::path check_ptml;
   std::filesystem::path xes_output;
   std::filesystem::path dfg_output;
+  std::filesystem::path dfg_dataframe_output;
   std::filesystem::path playout_output;
   bool log_conversion_requested = false;
   std::map<std::string, std::string> log_conversion_fields;
@@ -1585,6 +1605,8 @@ int main(int argc, char** argv) {
   std::vector<std::string> dfg_statistical_variants;
   std::vector<std::string> dfg_causal_variants;
   minera::DfgStatisticalOptions dfg_statistics_options;
+  std::map<std::string, std::string> dfg_dataframe_fields;
+  bool dfg_dataframe_option_used = false;
   std::vector<std::string> correlation_variants;
   minera::CorrelationMinerOptions correlation_options;
   bool concept_drift_requested = false;
@@ -3196,9 +3218,37 @@ int main(int argc, char** argv) {
       }
       if (arg == "--dfg-activity-attribute") {
         dfg_statistics_options.activity_attribute = trim_text(value);
+        dfg_dataframe_fields["dfg_activity_attribute"] = trim_text(value);
       } else {
         dfg_statistics_options.timestamp_attribute = trim_text(value);
+        dfg_dataframe_fields["dfg_timestamp_attribute"] = trim_text(value);
       }
+      continue;
+    }
+    if (arg == "--dfg-dataframe-output") {
+      const auto* value = next();
+      if (!value || std::string_view(value).empty()) return usage(argv[0]);
+      dfg_dataframe_output = value;
+      continue;
+    }
+    if (arg == "--dfg-operation" || arg == "--dfg-measure" ||
+        arg == "--dfg-backend" ||
+        arg == "--dfg-target-activity-attribute" ||
+        arg == "--dfg-cost-attribute" || arg == "--dfg-case-id-attribute" ||
+        arg == "--dfg-sort-caseid-required" ||
+        arg == "--dfg-sort-timestamp-along-case-id" ||
+        arg == "--dfg-reduce-columns" || arg == "--dfg-workcalendar" ||
+        arg == "--dfg-event-index-attribute" ||
+        arg == "--dfg-max-start-column" ||
+        arg == "--dfg-min-complete-column" ||
+        arg == "--dfg-overlap-column" || arg == "--dfg-strict" ||
+        arg == "--dfg-keep-first-following") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string key(arg.substr(2));
+      std::replace(key.begin(), key.end(), '-', '_');
+      dfg_dataframe_fields.insert_or_assign(std::move(key), value);
+      dfg_dataframe_option_used = true;
       continue;
     }
     if (arg == "--dfg-playout-variant" || arg == "--dfg-playout-traces" ||
@@ -4010,12 +4060,14 @@ int main(int argc, char** argv) {
       try {
         dfg_statistics_options.window =
             parse_nonnegative_size(value, "--dfg-window");
+        dfg_dataframe_fields["dfg_window"] = value;
       } catch (const std::invalid_argument& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
       }
     } else if (arg == "--dfg-keep-once-per-case") {
       dfg_statistics_options.keep_once_per_case = true;
+      dfg_dataframe_fields["dfg_keep_once_per_case"] = "true";
     } else if (arg == "--dfg-performance-aggregation") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -4049,18 +4101,28 @@ int main(int argc, char** argv) {
                      "median, min, max, stdev, sum, raw_values, or all\n";
         return 2;
       }
+      dfg_dataframe_fields["dfg_performance_aggregation"] = value;
     } else if (arg == "--dfg-start-timestamp-attribute") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       dfg_statistics_options.start_timestamp_attribute = value;
+      dfg_dataframe_fields["dfg_start_timestamp_attribute"] = value;
     } else if (arg == "--dfg-business-hours") {
       dfg_statistics_options.use_business_hours = true;
+      dfg_dataframe_fields["dfg_business_hours"] = "true";
     } else if (arg == "--dfg-business-hour-slots") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       try {
-        dfg_statistics_options.business_hour_slots =
-            parse_dfg_business_hour_slots(value);
+        if (std::string_view(value) == "none") {
+          dfg_statistics_options.business_hour_slots.clear();
+          dfg_statistics_options.business_hour_slots_explicit = true;
+        } else {
+          dfg_statistics_options.business_hour_slots =
+              parse_dfg_business_hour_slots(value);
+          dfg_statistics_options.business_hour_slots_explicit = true;
+        }
+        dfg_dataframe_fields["dfg_business_hour_slots"] = value;
       } catch (const std::invalid_argument& error) {
         std::cerr << "error: " << error.what() << '\n';
         return 2;
@@ -4440,6 +4502,11 @@ int main(int argc, char** argv) {
   if (spectrum_option_used && !spectrum_requested) {
     std::cerr << "error: --spectrum-variant/--spectrum-sample-size/"
                  "--spectrum-sort-log/--spectrum-*-key require --spectrum\n";
+    return 2;
+  }
+  if (dfg_dataframe_option_used && dfg_dataframe_output.empty()) {
+    std::cerr << "error: --dfg-operation/--dfg-measure/--dfg-backend and "
+                 "other dataframe DFG options require --dfg-dataframe-output\n";
     return 2;
   }
   if (decision_option_used && decisions_miner.empty() &&
@@ -5243,6 +5310,66 @@ int main(int argc, char** argv) {
       const auto params = minera::parse_mine_params(lookup, present);
       if (params.ltl_enabled && params.ltl)
         log = minera::filter_ltl_event_log(log, *params.ltl);
+    }
+    if (!dfg_dataframe_output.empty()) {
+      const auto lookup = [&](std::string_view name) {
+        const auto it = dfg_dataframe_fields.find(std::string(name));
+        return it == dfg_dataframe_fields.end() ? std::string{} : it->second;
+      };
+      const auto present = [&](std::string_view name) {
+        return dfg_dataframe_fields.contains(std::string(name));
+      };
+      const auto params = minera::parse_mine_params(lookup, present);
+      const auto table = minera::event_log_to_table(log);
+      std::string body;
+      if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
+        if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+          body = minera::serialize_dfg_dataframe_json(
+              minera::discover_pandas_dfg(table, params.dfg_table_options));
+        } else {
+          body = minera::serialize_dfg_dataframe_json(
+              minera::discover_polars_dfg(
+                  minera::LazyEventTable::from_table(table),
+                  params.dfg_table_options));
+        }
+      } else if (params.dfg_operation ==
+                 minera::DfgTableOperation::kPartialOrder) {
+        if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+          body = minera::serialize_dfg_partial_order_json(
+              minera::discover_pandas_partial_order(
+                  table, params.dfg_table_options));
+        } else {
+          body = minera::serialize_dfg_partial_order_json(
+              minera::discover_polars_partial_order(
+                  minera::LazyEventTable::from_table(table),
+                  params.dfg_table_options));
+        }
+      } else {
+        if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+          body = minera::serialize_dfg_concurrent_events_json(
+              minera::discover_pandas_concurrent_events(
+                  table, params.dfg_table_options));
+        } else {
+          body = minera::serialize_dfg_concurrent_events_json(
+              minera::discover_polars_concurrent_events(
+                  minera::LazyEventTable::from_table(table),
+                  params.dfg_table_options));
+        }
+      }
+      std::ofstream dataframe_file(dfg_dataframe_output,
+                                   std::ios::binary | std::ios::trunc);
+      if (!dataframe_file) {
+        std::cerr << "error: cannot open dataframe DFG output file "
+                  << dfg_dataframe_output << '\n';
+        return 1;
+      }
+      dataframe_file << body << '\n';
+      if (!dataframe_file) {
+        std::cerr << "error: failed writing dataframe DFG output file "
+                  << dfg_dataframe_output << '\n';
+        return 1;
+      }
+      return 0;
     }
     std::optional<minera::IntervalEventOverlapCounts> overlap_interval_events;
     std::optional<minera::CaseOverlapCounts> overlap_cases;

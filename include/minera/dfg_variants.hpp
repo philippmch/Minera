@@ -2,8 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <any>
+#include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -101,6 +104,17 @@ struct DfgPerformanceStatistics {
 
 using DfgPerformance =
     std::map<DfgActivityPair, DfgPerformanceStatistics>;
+
+// Resolve one of the standard event projections or a generic event
+// attribute. An empty selector resolves the activity projection; timestamp
+// consumers normalize an empty selector to the completion projection before
+// calling this helper. Callers that need another projection name it
+// explicitly.
+// A null or missing cell is represented by nullptr.  The helper intentionally
+// understands all first-class projections so a selector remains valid after a
+// flat import has selected a non-default source key.
+[[nodiscard]] const std::string* dfg_event_field_value(
+    const Event& event, std::string_view selector);
 using DfgAttributeValueCounts = std::map<std::string, std::uint64_t>;
 using DfgNamedAttributeCounts =
     std::map<std::string, DfgAttributeValueCounts>;
@@ -130,12 +144,21 @@ struct DfgStatisticalOptions {
   // event's generic attribute list.
   std::string activity_attribute = "concept:name";
   std::string timestamp_attribute = "time:timestamp";
-  std::string start_timestamp_attribute = "start_timestamp";
+  // Empty means completion timestamp.  An explicit non-empty selector is
+  // used when interval starts are available; a missing selected start falls
+  // back to completion for the event-log operation.
+  std::string start_timestamp_attribute;
   DfgPerformanceAggregation performance_aggregation =
       DfgPerformanceAggregation::kMean;
   bool use_business_hours = false;
-  // Empty selects Monday-Friday 07:00-17:00.
+  // Empty selects Monday-Friday 07:00-17:00 unless the caller explicitly
+  // marks an empty schedule below. The explicit marker preserves the
+  // distinction required by dataframe and event-log compatibility layers.
   std::vector<BusinessHourSlot> business_hour_slots;
+  bool business_hour_slots_explicit = false;
+  // Accepted for compatibility with table adapters. The pinned calculation
+  // does not consult this opaque calendar value.
+  std::any workcalendar;
 
   // The default is the XES case id, concept:name. Minera also accepts
   // case_id as a spelling for Trace::case_id.

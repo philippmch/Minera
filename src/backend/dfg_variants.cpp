@@ -30,34 +30,27 @@ double required_timestamp(std::string_view text,
 std::string_view start_timestamp(const Event& event,
                                  const DfgStatisticalOptions& options) {
   if (!options.start_timestamp_attribute.empty()) {
-    if (const auto* value = event.attribute(
-            options.start_timestamp_attribute)) {
+    if (const auto* value = dfg_event_field_value(
+            event, options.start_timestamp_attribute)) {
       return *value;
     }
+    throw std::invalid_argument(
+        "DFG discovery: event is missing start timestamp attribute '" +
+        options.start_timestamp_attribute + "'");
   }
-  if (options.timestamp_attribute.empty() ||
-      options.timestamp_attribute == "time:timestamp" ||
-      options.timestamp_attribute == "timestamp") {
-    return event.timestamp;
-  }
-  if (const auto* value = event.attribute(options.timestamp_attribute)) {
+  const auto selector = options.timestamp_attribute.empty()
+                            ? std::string_view("time:timestamp")
+                            : std::string_view(options.timestamp_attribute);
+  if (const auto* value = dfg_event_field_value(event, selector))
     return *value;
-  }
-  throw std::invalid_argument(
-      "DFG discovery: event is missing timestamp attribute '" +
-      options.timestamp_attribute + "'");
-}
-
-bool standard_activity_attribute(std::string_view key) {
-  return key.empty() || key == "concept:name" || key == "activity";
+  throw std::invalid_argument("DFG discovery: event is missing timestamp attribute '" +
+                              options.timestamp_attribute + "'");
 }
 
 const std::string& activity_value(const Event& event,
                                   const DfgStatisticalOptions& options) {
-  if (standard_activity_attribute(options.activity_attribute)) {
-    return event.activity;
-  }
-  if (const auto* value = event.attribute(options.activity_attribute)) {
+  if (const auto* value =
+          dfg_event_field_value(event, options.activity_attribute)) {
     return *value;
   }
   throw std::invalid_argument(
@@ -65,16 +58,12 @@ const std::string& activity_value(const Event& event,
       options.activity_attribute + "'");
 }
 
-bool standard_timestamp_attribute(std::string_view key) {
-  return key.empty() || key == "time:timestamp" || key == "timestamp";
-}
-
 const std::string& timestamp_value(const Event& event,
                                    const DfgStatisticalOptions& options) {
-  if (standard_timestamp_attribute(options.timestamp_attribute)) {
-    return event.timestamp;
-  }
-  if (const auto* value = event.attribute(options.timestamp_attribute)) {
+  const auto selector = options.timestamp_attribute.empty()
+                            ? std::string_view("time:timestamp")
+                            : std::string_view(options.timestamp_attribute);
+  if (const auto* value = dfg_event_field_value(event, selector)) {
     return *value;
   }
   throw std::invalid_argument(
@@ -97,7 +86,7 @@ std::optional<double> local_wall_timestamp(std::string_view text) {
 std::vector<BusinessHourSlot> normalized_business_slots(
     const DfgStatisticalOptions& options) {
   auto slots = options.business_hour_slots;
-  if (slots.empty()) {
+  if (slots.empty() && !options.business_hour_slots_explicit) {
     slots.reserve(5);
     for (int day = 0; day < 5; ++day) {
       const double start = day * kDaySeconds + 7.0 * 3600.0;
@@ -119,7 +108,10 @@ std::vector<BusinessHourSlot> normalized_business_slots(
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds) {
+    // The source business-hours helper unifies slots whose gap is at most one
+    // second, including fractional-second gaps.
+    if (!merged.empty() &&
+        slot.start_seconds <= merged.back().end_seconds + 1.0) {
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     } else {
@@ -257,6 +249,79 @@ std::optional<std::string> case_attribute_value(const Trace& trace,
 }
 
 }  // namespace
+
+const std::string* dfg_event_field_value(const Event& event,
+                                         std::string_view selector) {
+  const auto first_class = [](const std::string& value,
+                              FirstClassAttributeState state)
+      -> const std::string* {
+    if (state == FirstClassAttributeState::kNull) return nullptr;
+    if (state != FirstClassAttributeState::kMissing || !value.empty()) {
+      return &value;
+    }
+    return static_cast<const std::string*>(nullptr);
+  };
+  const auto matches_source = [&](std::string_view source_key,
+                                  std::string_view selected) {
+    return !source_key.empty() && source_key == selected;
+  };
+
+  // An explicitly selected first-class source key has precedence over the
+  // generic attribute list.  This matters when a flat adapter stores a
+  // custom activity/timestamp key in the corresponding projection metadata.
+  if (selector.empty() || selector == "concept:name" ||
+      selector == "activity" ||
+      matches_source(event.activity_source_key, selector)) {
+    if (const auto* value = first_class(event.activity, event.activity_state))
+      return value;
+    if (selector.empty() || selector == "concept:name" ||
+        selector == "activity" ||
+        matches_source(event.activity_source_key, selector)) {
+      if (event.activity_attribute &&
+          !event.activity_attribute->is_null &&
+          (selector.empty() || selector == event.activity_attribute->key ||
+           matches_source(event.activity_source_key, selector))) {
+        return &event.activity_attribute->value;
+      }
+    }
+  }
+
+  if (selector == "time:timestamp" || selector == "timestamp" ||
+      matches_source(event.timestamp_source_key, selector)) {
+    if (const auto* value =
+            first_class(event.timestamp, event.timestamp_state))
+      return value;
+    if (event.timestamp_attribute && !event.timestamp_attribute->is_null)
+      return &event.timestamp_attribute->value;
+  }
+  if (selector == "org:resource" || selector == "resource" ||
+      matches_source(event.resource_source_key, selector)) {
+    if (const auto* value = first_class(event.resource, event.resource_state))
+      return value;
+    if (event.resource_attribute && !event.resource_attribute->is_null)
+      return &event.resource_attribute->value;
+  }
+  if (selector == "lifecycle:transition" || selector == "lifecycle" ||
+      matches_source(event.lifecycle_source_key, selector)) {
+    if (const auto* value =
+            first_class(event.lifecycle, event.lifecycle_state))
+      return value;
+    if (event.lifecycle_attribute && !event.lifecycle_attribute->is_null)
+      return &event.lifecycle_attribute->value;
+  }
+  if (selector == "case:concept:name" || selector == "case_id" ||
+      selector == "case" || matches_source(event.case_id_source_key, selector)) {
+    if (const auto* value = first_class(event.case_id, event.case_id_state))
+      return value;
+  }
+
+  for (const auto& attribute : event.attributes) {
+    if (attribute.key == selector) {
+      return attribute.is_null ? nullptr : &attribute.value;
+    }
+  }
+  return nullptr;
+}
 
 DfgFrequency discover_frequency_dfg(const EventLog& log,
                                     const DfgStatisticalOptions& options) {

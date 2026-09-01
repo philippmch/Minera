@@ -3296,6 +3296,173 @@ export function isDfgPrecisionResult(value: unknown): value is DfgPrecisionResul
     "activated_transitions", "escaping_transitions"].every((key) =>
     Number.isSafeInteger(value[key]) && (value[key] as number) >= 0);
 }
+
+const dfgDataframeMeasures = new Set<DfgDataframeMeasure>([
+  "frequency", "performance", "both", "cost",
+]);
+const dfgDataframeBackends = new Set<DfgDataframeBackend>(["pandas", "polars"]);
+const dfgDataframeKinds = new Set<DfgDataframeAttributeKind>([
+  "string", "date", "int", "float", "boolean", "id",
+]);
+const dfgDataframeContainers = new Set<DfgDataframeAttributeContainer>([
+  "scalar", "list", "container",
+]);
+const dfgDataframeStates = new Set<DfgDataframeAttributeState>([
+  "missing", "present", "null",
+]);
+const dfgDataframeRoles = new Set<DfgDataframeAttributeRole>([
+  "none", "case_id", "activity", "timestamp", "resource", "lifecycle",
+]);
+
+function isDfgDataframeAttribute(
+  value: unknown,
+  depth = 0,
+): value is DfgDataframeAttribute {
+  if (!isRecord(value) || Array.isArray(value) || depth > 64 ||
+      typeof value.key !== "string" || typeof value.value !== "string" ||
+      !dfgDataframeKinds.has(value.kind as DfgDataframeAttributeKind) ||
+      !dfgDataframeContainers.has(value.container as DfgDataframeAttributeContainer) ||
+      typeof value.null !== "boolean") return false;
+  if (value.typed_value !== undefined &&
+      !(value.typed_value === null || typeof value.typed_value === "string" ||
+        typeof value.typed_value === "boolean" || finite(value.typed_value))) return false;
+  if (value.first_class_role !== undefined &&
+      !dfgDataframeRoles.has(value.first_class_role as DfgDataframeAttributeRole)) return false;
+  if (value.first_class_state !== undefined &&
+      !dfgDataframeStates.has(value.first_class_state as DfgDataframeAttributeState)) return false;
+  if (value.first_class_source_key !== undefined &&
+      typeof value.first_class_source_key !== "string") return false;
+  if (value.children !== undefined &&
+      (!Array.isArray(value.children) ||
+       !value.children.every((child) => isDfgDataframeAttribute(child, depth + 1)))) return false;
+  return true;
+}
+
+function isDfgDataframeEvent(value: unknown): value is DfgDataframeEvent {
+  if (!isRecord(value) || Array.isArray(value)) return false;
+  const strings = [
+    value.case_id, value.case_id_source_key, value.activity,
+    value.activity_source_key, value.timestamp, value.timestamp_source_key,
+    value.resource, value.resource_source_key, value.lifecycle,
+    value.lifecycle_source_key,
+  ];
+  const states = [
+    value.case_id_state, value.activity_state, value.timestamp_state,
+    value.resource_state, value.lifecycle_state,
+  ];
+  if (!strings.every((item) => typeof item === "string") ||
+      !states.every((item) => dfgDataframeStates.has(item as DfgDataframeAttributeState)) ||
+      !Number.isSafeInteger(value.input_order) || (value.input_order as number) < 0 ||
+      !Array.isArray(value.attributes) ||
+      !value.attributes.every((attribute) => isDfgDataframeAttribute(attribute))) return false;
+  return [
+    value.activity_attribute, value.timestamp_attribute,
+    value.resource_attribute, value.lifecycle_attribute,
+  ].every((attribute) =>
+    attribute === undefined || isDfgDataframeAttribute(attribute));
+}
+
+function isDfgDataframeSummary(value: unknown): value is DfgDataframePerformanceSummary {
+  if (!isRecord(value) || Array.isArray(value) ||
+      !Number.isSafeInteger(value.count) || (value.count as number) < 0) return false;
+  return [value.mean, value.median, value.min, value.max, value.stdev, value.sum]
+    .every((item) => finite(item));
+}
+
+function isDfgDataframePerformanceValue(
+  value: unknown,
+): value is DfgDataframePerformanceValue {
+  return finite(value) ||
+    (Array.isArray(value) && value.every((item) => finite(item))) ||
+    isDfgDataframeSummary(value);
+}
+
+function isDfgDataframePerformanceEdge(value: unknown): value is DfgDataframePerformanceEdge {
+  if (!isRecord(value) || Array.isArray(value) ||
+      typeof value.source !== "string" || typeof value.target !== "string" ||
+      !isDfgDataframeSummary(value.summary) || !Array.isArray(value.raw_values) ||
+      !value.raw_values.every((item) => finite(item)) ||
+      !isDfgDataframePerformanceValue(value.value)) return false;
+  return value.raw_values.length === value.summary.count;
+}
+
+function isDfgDataframeFrequencyEdge(value: unknown): value is DfgDataframeFrequencyEdge {
+  return isRecord(value) && !Array.isArray(value) &&
+    typeof value.source === "string" && typeof value.target === "string" &&
+    Number.isSafeInteger(value.count) && (value.count as number) >= 0;
+}
+
+function isDfgDataframeGraphResult(value: unknown): value is DfgDataframeGraphResult {
+  if (!isRecord(value) || Array.isArray(value) || value.operation !== "graph" ||
+      !dfgDataframeBackends.has(value.backend as DfgDataframeBackend) ||
+      !dfgDataframeMeasures.has(value.measure as DfgDataframeMeasure)) return false;
+  const frequency = value.frequency;
+  const performance = value.performance;
+  const cost = value.cost;
+  if (frequency !== undefined &&
+      (!Array.isArray(frequency) || !frequency.every(isDfgDataframeFrequencyEdge))) return false;
+  if (performance !== undefined &&
+      (!Array.isArray(performance) || !performance.every(isDfgDataframePerformanceEdge))) return false;
+  if (cost !== undefined &&
+      (!Array.isArray(cost) || !cost.every(isDfgDataframePerformanceEdge))) return false;
+  switch (value.measure as DfgDataframeMeasure) {
+    case "frequency":
+      return Array.isArray(frequency) && performance === undefined && cost === undefined;
+    case "performance":
+      return Array.isArray(performance) && frequency === undefined && cost === undefined;
+    case "both":
+      return Array.isArray(frequency) && Array.isArray(performance) && cost === undefined;
+    case "cost":
+      return Array.isArray(cost) && frequency === undefined && performance === undefined;
+  }
+}
+
+function isDfgDataframePartialOrderPair(value: unknown): value is DfgDataframePartialOrderPair {
+  return isRecord(value) && !Array.isArray(value) &&
+    finite(value.source_index) && finite(value.target_index) &&
+    typeof value.source_index_value === "string" &&
+    typeof value.target_index_value === "string" && finite(value.flow_time_seconds) &&
+    isDfgDataframeEvent(value.source) && isDfgDataframeEvent(value.target);
+}
+
+function isDfgDataframePartialOrderResult(value: unknown): value is DfgDataframePartialOrderResult {
+  return isRecord(value) && !Array.isArray(value) && value.operation === "partial_order" &&
+    dfgDataframeBackends.has(value.backend as DfgDataframeBackend) &&
+    Array.isArray(value.pairs) && value.pairs.every(isDfgDataframePartialOrderPair);
+}
+
+function isDfgDataframeConcurrentPair(value: unknown): value is DfgDataframeConcurrentPair {
+  return isRecord(value) && !Array.isArray(value) &&
+    finite(value.left_index) && finite(value.right_index) &&
+    typeof value.left_index_value === "string" &&
+    typeof value.right_index_value === "string" &&
+    finite(value.max_start_seconds) && finite(value.min_complete_seconds) &&
+    finite(value.overlap_seconds) && isDfgDataframeEvent(value.left) &&
+    isDfgDataframeEvent(value.right);
+}
+
+function isDfgDataframeConcurrentResult(value: unknown): value is DfgDataframeConcurrentResult {
+  if (!isRecord(value) || Array.isArray(value) || value.operation !== "concurrent_events" ||
+      !dfgDataframeBackends.has(value.backend as DfgDataframeBackend) ||
+      !Array.isArray(value.pairs) || !value.pairs.every(isDfgDataframeConcurrentPair)) return false;
+  if (value.columns === undefined) return true;
+  if (!isRecord(value.columns) || Array.isArray(value.columns)) return false;
+  const columns = value.columns;
+  const validName = (primary: string, alternate: string) =>
+    (columns[primary] === undefined || typeof columns[primary] === "string") &&
+    (columns[alternate] === undefined || typeof columns[alternate] === "string") &&
+    (columns[primary] !== undefined || columns[alternate] !== undefined);
+  return validName("max_start", "max_start_column") &&
+    validName("min_complete", "min_complete_column") &&
+    validName("overlap", "overlap_column");
+}
+
+export function isDfgDataframeResult(value: unknown): value is DfgDataframeResult {
+  return isDfgDataframeGraphResult(value) ||
+    isDfgDataframePartialOrderResult(value) ||
+    isDfgDataframeConcurrentResult(value);
+}
+export const isDataframeDfgResult = isDfgDataframeResult;
 const nonNegativeIntArray = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every((item) => Number.isInteger(item) && (item as number) >= 0);
 export function isDfgPetriConversionResult(
@@ -3638,6 +3805,225 @@ export interface DfgVariantsAnalysis {
   statistical: DfgStatisticalAnalysis[];
   causal: DfgCausalAnalysis[];
 }
+
+/** Operations exposed by the table-backed DFG endpoint. */
+export type DfgDataframeOperation =
+  | "graph"
+  | "partial_order"
+  | "concurrent_events";
+export type DfgDataframeMeasure =
+  | "frequency"
+  | "performance"
+  | "both"
+  | "cost";
+export type DfgDataframeBackend = "pandas" | "polars";
+export type DfgDataframePerformanceAggregation =
+  | "mean"
+  | "median"
+  | "min"
+  | "max"
+  | "stdev"
+  | "sum"
+  | "raw_values"
+  | "all";
+
+/**
+ * Options for one table-backed DFG request. The short property names are the
+ * typed frontend API; `dfg_*` aliases are accepted for callers that already
+ * model query parameters as object keys.
+ */
+export interface DfgDataframeOptions {
+  operation?: DfgDataframeOperation;
+  measure?: DfgDataframeMeasure;
+  backend?: DfgDataframeBackend;
+  activity_attribute?: string;
+  target_activity_attribute?: string;
+  timestamp_attribute?: string;
+  start_timestamp_attribute?: string;
+  cost_attribute?: string;
+  case_id_attribute?: string;
+  window?: number;
+  keep_once_per_case?: boolean;
+  performance_aggregation?: DfgDataframePerformanceAggregation;
+  business_hours?: boolean;
+  /** `none` explicitly selects an empty business-time schedule. */
+  business_hour_slots?: string;
+  sort_caseid_required?: boolean;
+  sort_timestamp_along_case_id?: boolean;
+  reduce_columns?: boolean;
+  /** Preserved compatibility token; it has no holiday/calendar effects. */
+  workcalendar?: string;
+  event_index_attribute?: string;
+  max_start_column?: string;
+  min_complete_column?: string;
+  overlap_column?: string;
+  strict?: boolean;
+  keep_first_following?: boolean;
+
+  dfg_operation?: DfgDataframeOperation;
+  dfg_measure?: DfgDataframeMeasure;
+  dfg_backend?: DfgDataframeBackend;
+  dfg_activity_attribute?: string;
+  dfg_target_activity_attribute?: string;
+  dfg_timestamp_attribute?: string;
+  dfg_start_timestamp_attribute?: string;
+  dfg_cost_attribute?: string;
+  dfg_case_id_attribute?: string;
+  dfg_window?: number;
+  dfg_keep_once_per_case?: boolean;
+  dfg_performance_aggregation?: DfgDataframePerformanceAggregation;
+  dfg_business_hours?: boolean;
+  dfg_business_hour_slots?: string;
+  dfg_sort_caseid_required?: boolean;
+  dfg_sort_timestamp_along_case_id?: boolean;
+  dfg_reduce_columns?: boolean;
+  dfg_workcalendar?: string;
+  dfg_event_index_attribute?: string;
+  dfg_max_start_column?: string;
+  dfg_min_complete_column?: string;
+  dfg_overlap_column?: string;
+  dfg_strict?: boolean;
+  dfg_keep_first_following?: boolean;
+}
+
+export type DfgDataframeAttributeKind =
+  | "string"
+  | "date"
+  | "int"
+  | "float"
+  | "boolean"
+  | "id";
+export type DfgDataframeAttributeContainer = "scalar" | "list" | "container";
+export type DfgDataframeAttributeState = "missing" | "present" | "null";
+export type DfgDataframeAttributeRole =
+  | "none"
+  | "case_id"
+  | "activity"
+  | "timestamp"
+  | "resource"
+  | "lifecycle";
+export type DfgDataframeTypedValue = string | number | boolean | null;
+
+export interface DfgDataframeAttribute {
+  key: string;
+  value: string;
+  kind: DfgDataframeAttributeKind;
+  container: DfgDataframeAttributeContainer;
+  null: boolean;
+  typed_value?: DfgDataframeTypedValue;
+  first_class_role?: DfgDataframeAttributeRole;
+  first_class_state?: DfgDataframeAttributeState;
+  first_class_source_key?: string;
+  children?: DfgDataframeAttribute[];
+}
+
+export interface DfgDataframeEvent {
+  case_id: string;
+  case_id_state: DfgDataframeAttributeState;
+  case_id_source_key: string;
+  activity: string;
+  activity_state: DfgDataframeAttributeState;
+  activity_source_key: string;
+  timestamp: string;
+  timestamp_state: DfgDataframeAttributeState;
+  timestamp_source_key: string;
+  resource: string;
+  resource_state: DfgDataframeAttributeState;
+  resource_source_key: string;
+  lifecycle: string;
+  lifecycle_state: DfgDataframeAttributeState;
+  lifecycle_source_key: string;
+  input_order: number;
+  activity_attribute?: DfgDataframeAttribute;
+  timestamp_attribute?: DfgDataframeAttribute;
+  resource_attribute?: DfgDataframeAttribute;
+  lifecycle_attribute?: DfgDataframeAttribute;
+  attributes: DfgDataframeAttribute[];
+}
+
+export interface DfgDataframeFrequencyEdge {
+  source: string;
+  target: string;
+  count: number;
+}
+export interface DfgDataframePerformanceSummary {
+  count: number;
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  stdev: number;
+  sum: number;
+}
+export type DfgDataframePerformanceValue =
+  | number
+  | number[]
+  | DfgDataframePerformanceSummary;
+export interface DfgDataframePerformanceEdge {
+  source: string;
+  target: string;
+  summary: DfgDataframePerformanceSummary;
+  raw_values: number[];
+  value: DfgDataframePerformanceValue;
+}
+export interface DfgDataframeGraphResult {
+  operation: "graph";
+  backend: DfgDataframeBackend;
+  measure: DfgDataframeMeasure;
+  frequency?: DfgDataframeFrequencyEdge[];
+  performance?: DfgDataframePerformanceEdge[];
+  cost?: DfgDataframePerformanceEdge[];
+}
+export interface DfgDataframePartialOrderPair {
+  source_index: number;
+  target_index: number;
+  source_index_value: string;
+  target_index_value: string;
+  flow_time_seconds: number;
+  source: DfgDataframeEvent;
+  target: DfgDataframeEvent;
+}
+export interface DfgDataframePartialOrderResult {
+  operation: "partial_order";
+  backend: DfgDataframeBackend;
+  pairs: DfgDataframePartialOrderPair[];
+}
+export interface DfgDataframeConcurrentPair {
+  left_index: number;
+  right_index: number;
+  left_index_value: string;
+  right_index_value: string;
+  max_start_seconds: number;
+  min_complete_seconds: number;
+  overlap_seconds: number;
+  left: DfgDataframeEvent;
+  right: DfgDataframeEvent;
+}
+export interface DfgDataframeConcurrentColumns {
+  /** Canonical helper-column names emitted by the concurrent adapter. */
+  max_start?: string;
+  min_complete?: string;
+  overlap?: string;
+  /** Alternate wire spellings accepted from older adapter builds. */
+  max_start_column?: string;
+  min_complete_column?: string;
+  overlap_column?: string;
+}
+export interface DfgDataframeConcurrentResult {
+  operation: "concurrent_events";
+  backend: DfgDataframeBackend;
+  columns?: DfgDataframeConcurrentColumns;
+  pairs: DfgDataframeConcurrentPair[];
+}
+export type DfgDataframeResult =
+  | DfgDataframeGraphResult
+  | DfgDataframePartialOrderResult
+  | DfgDataframeConcurrentResult;
+
+// Compatibility aliases for callers that name the feature after its table
+// adapter rather than the dataframe endpoint.
+export type DataframeDfgOptions = DfgDataframeOptions;
+export type DataframeDfgResult = DfgDataframeResult;
 
 export type CorrelationMinerVariant =
   | "classic"

@@ -16,6 +16,8 @@ import {
   type DfgPrecisionResult,
   type DfgPetriConversionOptions,
   type DfgPetriConversionResult,
+  type DfgDataframeOptions,
+  type DfgDataframeResult,
   type EditDistanceOptions,
   type EditDistanceResult,
   type EvaluationOptions,
@@ -210,6 +212,7 @@ import {
   type PetriUsageComparisonOptions,
   isDfgAlignmentResult,
   isDfgPetriConversionResult,
+  isDfgDataframeResult,
   isEditDistanceResult,
   isModelEvaluation,
   isPetriAnalysisResult,
@@ -1153,7 +1156,7 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
     const aggregations = ["mean", "median", "min", "max", "stdev", "sum", "raw_values", "all"];
     if (options.dfgPerformanceAggregation && aggregations.includes(options.dfgPerformanceAggregation) && options.dfgPerformanceAggregation !== "mean")
       add("dfg_performance_aggregation", options.dfgPerformanceAggregation);
-    if (options.dfgStartTimestampAttribute?.trim() && options.dfgStartTimestampAttribute.trim() !== "start_timestamp")
+    if (options.dfgStartTimestampAttribute?.trim())
       add("dfg_start_timestamp_attribute", options.dfgStartTimestampAttribute.trim());
     if (options.dfgBusinessHours) add("dfg_business_hours", "true");
     const businessHourSlots = options.dfgBusinessHourSlots?.trim();
@@ -2972,6 +2975,224 @@ export async function fetchDfg(options: DfgExportOptions = {}): Promise<string> 
   }
   return response.text();
 }
+
+const dfgDataframeOperationNames = [
+  "graph", "partial_order", "concurrent_events",
+] as const;
+const dfgDataframeMeasureNames = [
+  "frequency", "performance", "both", "cost",
+] as const;
+const dfgDataframeBackendNames = ["pandas", "polars"] as const;
+const dfgDataframeAggregationNames = [
+  "mean", "median", "min", "max", "stdev", "sum", "raw_values", "all",
+] as const;
+
+function dfgDataframeOption(options: DfgDataframeOptions, key: string): unknown {
+  const values = options as unknown as Record<string, unknown>;
+  const direct = values[key];
+  const prefixed = values[`dfg_${key}`];
+  if (direct !== undefined && prefixed !== undefined &&
+      JSON.stringify(direct) !== JSON.stringify(prefixed)) {
+    throw new Error(`${key} and dfg_${key} must not disagree`);
+  }
+  return direct !== undefined ? direct : prefixed;
+}
+
+function dfgDataframeEnum<T extends string>(
+  value: unknown,
+  name: string,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !allowed.includes(value as T))
+    throw new Error(`${name} must be one of ${allowed.join(", ")}`);
+  return value as T;
+}
+
+function dfgDataframeString(
+  options: DfgDataframeOptions,
+  key: string,
+  allowEmpty = false,
+): string | undefined {
+  const value = dfgDataframeOption(options, key);
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new Error(`${key} must be a string`);
+  const normalized = value.trim();
+  if (!allowEmpty && !normalized) throw new Error(`${key} must not be empty`);
+  return normalized || undefined;
+}
+
+function dfgDataframeBoolean(
+  options: DfgDataframeOptions,
+  key: string,
+): boolean | undefined {
+  const value = dfgDataframeOption(options, key);
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${key} must be boolean`);
+  return value;
+}
+
+function dfgDataframeNonnegativeInteger(
+  options: DfgDataframeOptions,
+  key: string,
+): number | undefined {
+  const value = dfgDataframeOption(options, key);
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) < 0)
+    throw new Error(`${key} must be a non-negative integer`);
+  return value as number;
+}
+
+function dfgDataframeSlotString(
+  options: DfgDataframeOptions,
+  businessHours: boolean | undefined,
+): string | undefined {
+  const raw = dfgDataframeOption(options, "business_hour_slots");
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string")
+    throw new Error("business_hour_slots must be `none` or start-end pairs");
+  const slots = raw.trim();
+  if (!slots) throw new Error("business_hour_slots must be `none` or start-end pairs");
+  if (businessHours !== true)
+    throw new Error("business_hour_slots requires business_hours=true");
+  if (slots === "none") return slots;
+  const valid = slots.split(",").every((part) => {
+    const separator = part.includes(":") ? part.indexOf(":") : part.indexOf("-");
+    if (separator <= 0 || separator === part.length - 1) return false;
+    const start = Number(part.slice(0, separator).trim());
+    const end = Number(part.slice(separator + 1).trim());
+    return Number.isFinite(start) && Number.isFinite(end) &&
+      start >= 0 && start < end && end <= 604800;
+  });
+  if (!valid)
+    throw new Error("business_hour_slots must satisfy 0 <= start < end <= 604800");
+  return slots;
+}
+
+/** Stable query serialization and validation for table-backed DFG requests. */
+export function dfgDataframeQuery(options: DfgDataframeOptions = {}): string {
+  const operation = dfgDataframeEnum(
+    dfgDataframeOption(options, "operation"), "operation",
+    dfgDataframeOperationNames, "graph",
+  );
+  const measureRaw = dfgDataframeOption(options, "measure");
+  const measure = dfgDataframeEnum(
+    measureRaw, "measure", dfgDataframeMeasureNames, "frequency",
+  );
+  const backend = dfgDataframeEnum(
+    dfgDataframeOption(options, "backend"), "backend",
+    dfgDataframeBackendNames, "pandas",
+  );
+  const activity = dfgDataframeString(options, "activity_attribute");
+  const targetActivity = dfgDataframeString(options, "target_activity_attribute", true);
+  const timestamp = dfgDataframeString(options, "timestamp_attribute");
+  const startTimestamp = dfgDataframeString(options, "start_timestamp_attribute");
+  // A cost selector is meaningful only for the cost measure. Ignore stale
+  // text from the form when another graph measure is selected.
+  const cost = measure === "cost"
+    ? dfgDataframeString(options, "cost_attribute")
+    : undefined;
+  const caseId = dfgDataframeString(options, "case_id_attribute");
+  const window = dfgDataframeNonnegativeInteger(options, "window");
+  const keepOnce = dfgDataframeBoolean(options, "keep_once_per_case");
+  const aggregationRaw = dfgDataframeOption(options, "performance_aggregation");
+  const aggregation = dfgDataframeEnum(
+    aggregationRaw, "performance_aggregation", dfgDataframeAggregationNames, "mean",
+  );
+  const businessHours = dfgDataframeBoolean(options, "business_hours");
+  const businessSlots = dfgDataframeSlotString(options, businessHours);
+  const sortCaseId = dfgDataframeBoolean(options, "sort_caseid_required");
+  const sortTimestamp = dfgDataframeBoolean(options, "sort_timestamp_along_case_id");
+  const reduceColumns = dfgDataframeBoolean(options, "reduce_columns");
+  const workcalendar = dfgDataframeString(options, "workcalendar");
+  const eventIndex = dfgDataframeString(options, "event_index_attribute");
+  const maxStart = dfgDataframeString(options, "max_start_column");
+  const minComplete = dfgDataframeString(options, "min_complete_column");
+  const overlap = dfgDataframeString(options, "overlap_column");
+  const strict = dfgDataframeBoolean(options, "strict");
+  const keepFirst = dfgDataframeBoolean(options, "keep_first_following");
+
+  const supplied = (key: string) => dfgDataframeOption(options, key) !== undefined;
+  if (operation !== "graph") {
+    for (const key of [
+      "measure", "target_activity_attribute", "cost_attribute",
+      "performance_aggregation", "window", "keep_once_per_case",
+    ]) {
+      if (supplied(key)) throw new Error(`${key} applies only to graph operation`);
+    }
+  }
+  if (operation !== "concurrent_events") {
+    for (const key of ["max_start_column", "min_complete_column", "overlap_column", "strict"]) {
+      if (supplied(key)) throw new Error(`${key} applies only to concurrent_events operation`);
+    }
+  }
+  if (operation === "graph" && supplied("event_index_attribute"))
+    throw new Error("event_index_attribute applies only to partial_order");
+  if (operation === "graph" && supplied("keep_first_following"))
+    throw new Error("keep_first_following applies only to partial_order");
+  if (operation === "concurrent_events" && supplied("event_index_attribute"))
+    throw new Error("event_index_attribute applies only to partial_order");
+  if (operation === "concurrent_events" && supplied("keep_first_following"))
+    throw new Error("keep_first_following applies only to partial_order");
+  if (measure === "cost" && cost === undefined)
+    throw new Error("cost measure requires cost_attribute");
+
+  const query = new URLSearchParams();
+  const add = (name: string, value: unknown) => {
+    if (value !== undefined) query.set(name, String(value));
+  };
+  add("dfg_operation", dfgDataframeOption(options, "operation") === undefined ? undefined : operation);
+  add("dfg_measure", measureRaw === undefined ? undefined : measure);
+  add("dfg_backend", dfgDataframeOption(options, "backend") === undefined ? undefined : backend);
+  add("dfg_activity_attribute", activity);
+  add("dfg_target_activity_attribute", targetActivity);
+  add("dfg_timestamp_attribute", timestamp);
+  add("dfg_start_timestamp_attribute", startTimestamp);
+  add("dfg_cost_attribute", cost);
+  add("dfg_case_id_attribute", caseId);
+  add("dfg_window", window);
+  add("dfg_keep_once_per_case", keepOnce);
+  add("dfg_performance_aggregation", aggregationRaw === undefined ? undefined : aggregation);
+  add("dfg_business_hours", businessHours);
+  add("dfg_business_hour_slots", businessSlots);
+  add("dfg_sort_caseid_required", sortCaseId);
+  add("dfg_sort_timestamp_along_case_id", sortTimestamp);
+  add("dfg_reduce_columns", reduceColumns);
+  add("dfg_workcalendar", workcalendar);
+  add("dfg_event_index_attribute", eventIndex);
+  add("dfg_max_start_column", maxStart);
+  add("dfg_min_complete_column", minComplete);
+  add("dfg_overlap_column", overlap);
+  add("dfg_strict", strict);
+  add("dfg_keep_first_following", keepFirst);
+  return query.toString();
+}
+
+/** Fetches one table-backed DFG result for the active mined session. */
+export async function requestDfgDataframe(
+  options: DfgDataframeOptions = {},
+): Promise<DfgDataframeResult> {
+  const query = dfgDataframeQuery(options);
+  let response: Response;
+  try {
+    response = await fetch(`/api/dfg-dataframe${query ? `?${query}` : ""}`, {
+      method: "GET",
+    });
+  } catch {
+    throw new Error("could not reach the Minera backend — is minera_server running?");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (payload && typeof payload === "object" && "error" in payload)
+    throw new Error(String((payload as { error: unknown }).error));
+  if (!response.ok)
+    throw new Error(`the Minera backend answered with status ${response.status}`);
+  if (!isDfgDataframeResult(payload))
+    throw new Error("the Minera backend returned an invalid dataframe DFG result");
+  return payload;
+}
+export const dataframeDfgQuery = dfgDataframeQuery;
+export const requestDataframeDfg = requestDfgDataframe;
 
 /** Validates and normalizes a classic DFG text document through the backend. */
 export async function importDfg(document: Blob): Promise<string> {

@@ -2208,8 +2208,15 @@ MineParams parse_mine_params(const FieldLookup& field,
   }
   if (const auto value = field("dfg_business_hour_slots");
       present ? present("dfg_business_hour_slots") : !value.empty()) {
-    params.dfg_statistics.business_hour_slots =
-        parse_business_hour_slots(value, "dfg_business_hour_slots");
+    params.dfg_statistics.business_hour_slots_explicit = true;
+    if (value.empty() || value == "none") {
+      // An explicitly supplied empty schedule is different from an omitted
+      // schedule: the former disables all business-time contribution.
+      params.dfg_statistics.business_hour_slots.clear();
+    } else {
+      params.dfg_statistics.business_hour_slots =
+          parse_business_hour_slots(value, "dfg_business_hour_slots");
+    }
   }
   if (const auto value = field("dfg_case_attributes");
       present ? present("dfg_case_attributes") : !value.empty()) {
@@ -2223,6 +2230,152 @@ MineParams parse_mine_params(const FieldLookup& field,
       present ? present("dfg_return_node_attributes") : !value.empty()) {
     params.dfg_statistics.return_node_attributes =
         parse_boolean(value, "dfg_return_node_attributes");
+  }
+
+  // The dataframe-backed DFG surface shares the ordinary activity,
+  // timestamp, interval, window, retention, business-time, and aggregation
+  // selectors above. Keep its object separate so old statistical requests do
+  // not acquire new defaults or side effects.
+  params.dfg_table_options.activity_attribute =
+      params.dfg_statistics.activity_attribute;
+  params.dfg_table_options.timestamp_attribute =
+      params.dfg_statistics.timestamp_attribute;
+  params.dfg_table_options.window = params.dfg_statistics.window;
+  params.dfg_table_options.keep_once_per_case =
+      params.dfg_statistics.keep_once_per_case;
+  params.dfg_table_options.performance_aggregation =
+      params.dfg_statistics.performance_aggregation;
+  params.dfg_table_options.business_hours =
+      params.dfg_statistics.use_business_hours;
+  if (params.dfg_statistics.business_hour_slots_explicit) {
+    params.dfg_table_options.business_hour_slots =
+        params.dfg_statistics.business_hour_slots;
+  }
+  if (present ? present("dfg_start_timestamp_attribute")
+              : !field("dfg_start_timestamp_attribute").empty()) {
+    params.dfg_table_options.start_timestamp_attribute =
+        params.dfg_statistics.start_timestamp_attribute;
+  }
+
+  const auto table_supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  const auto table_value = [&](std::string_view name) {
+    return field(name);
+  };
+  const bool table_specific_supplied =
+      table_supplied("dfg_operation") || table_supplied("dfg_measure") ||
+      table_supplied("dfg_backend") ||
+      table_supplied("dfg_target_activity_attribute") ||
+      table_supplied("dfg_cost_attribute") ||
+      table_supplied("dfg_case_id_attribute") ||
+      table_supplied("dfg_sort_caseid_required") ||
+      table_supplied("dfg_sort_timestamp_along_case_id") ||
+      table_supplied("dfg_reduce_columns") || table_supplied("dfg_workcalendar") ||
+      table_supplied("dfg_event_index_attribute") ||
+      table_supplied("dfg_max_start_column") ||
+      table_supplied("dfg_min_complete_column") ||
+      table_supplied("dfg_overlap_column") || table_supplied("dfg_strict") ||
+      table_supplied("dfg_keep_first_following");
+  params.dfg_dataframe_requested = table_specific_supplied;
+
+  if (table_supplied("dfg_operation")) {
+    const auto value = table_value("dfg_operation");
+    if (value == "graph") {
+      params.dfg_operation = DfgTableOperation::kGraph;
+    } else if (value == "partial_order") {
+      params.dfg_operation = DfgTableOperation::kPartialOrder;
+    } else if (value == "concurrent_events") {
+      params.dfg_operation = DfgTableOperation::kConcurrentEvents;
+    } else {
+      throw std::invalid_argument(
+          "dfg_operation: expected graph, partial_order, or concurrent_events");
+    }
+  }
+  if (table_supplied("dfg_measure")) {
+    const auto value = table_value("dfg_measure");
+    if (value == "frequency") {
+      params.dfg_table_options.measure = DfgTableMeasure::kFrequency;
+    } else if (value == "performance") {
+      params.dfg_table_options.measure = DfgTableMeasure::kPerformance;
+    } else if (value == "both") {
+      params.dfg_table_options.measure = DfgTableMeasure::kBoth;
+    } else if (value == "cost") {
+      params.dfg_table_options.measure = DfgTableMeasure::kCost;
+    } else {
+      throw std::invalid_argument(
+          "dfg_measure: expected frequency, performance, both, or cost");
+    }
+  }
+  if (table_supplied("dfg_backend")) {
+    const auto value = table_value("dfg_backend");
+    if (value == "pandas") {
+      params.dfg_backend = DfgTableBackend::kPandas;
+    } else if (value == "polars") {
+      params.dfg_backend = DfgTableBackend::kPolars;
+    } else {
+      throw std::invalid_argument("dfg_backend: expected pandas or polars");
+    }
+  }
+  const auto table_selector = [&](std::string_view name, std::string& target,
+                                  bool allow_empty = false) {
+    if (!table_supplied(name)) return;
+    target = table_value(name);
+    if (!allow_empty && target.empty()) {
+      throw std::invalid_argument(std::string(name) +
+                                  ": must not be empty when supplied");
+    }
+  };
+  table_selector("dfg_target_activity_attribute",
+                 params.dfg_table_options.target_activity_attribute, true);
+  if (table_supplied("dfg_cost_attribute")) {
+    const auto value = table_value("dfg_cost_attribute");
+    if (value.empty())
+      throw std::invalid_argument(
+          "dfg_cost_attribute: must not be empty when supplied");
+    params.dfg_table_options.cost_attribute = value;
+  }
+  if (params.dfg_table_options.measure == DfgTableMeasure::kCost &&
+      !params.dfg_table_options.cost_attribute) {
+    throw std::invalid_argument(
+        "dfg_cost_attribute: required when dfg_measure=cost");
+  }
+  table_selector("dfg_case_id_attribute",
+                 params.dfg_table_options.case_id_attribute);
+  table_selector("dfg_event_index_attribute",
+                 params.dfg_table_options.event_index_attribute);
+  table_selector("dfg_max_start_column",
+                 params.dfg_table_options.max_start_column);
+  table_selector("dfg_min_complete_column",
+                 params.dfg_table_options.min_complete_column);
+  table_selector("dfg_overlap_column", params.dfg_table_options.overlap_column);
+  if (table_supplied("dfg_sort_caseid_required")) {
+    params.dfg_table_options.sort_caseid_required = parse_boolean(
+        table_value("dfg_sort_caseid_required"), "dfg_sort_caseid_required");
+  }
+  if (table_supplied("dfg_sort_timestamp_along_case_id")) {
+    params.dfg_table_options.sort_timestamp_along_case_id = parse_boolean(
+        table_value("dfg_sort_timestamp_along_case_id"),
+        "dfg_sort_timestamp_along_case_id");
+  }
+  if (table_supplied("dfg_reduce_columns")) {
+    params.dfg_table_options.reduce_columns =
+        parse_boolean(table_value("dfg_reduce_columns"), "dfg_reduce_columns");
+  }
+  if (table_supplied("dfg_strict")) {
+    params.dfg_table_options.strict =
+        parse_boolean(table_value("dfg_strict"), "dfg_strict");
+  }
+  if (table_supplied("dfg_keep_first_following")) {
+    params.dfg_table_options.keep_first_following = parse_boolean(
+        table_value("dfg_keep_first_following"), "dfg_keep_first_following");
+  }
+  if (table_supplied("dfg_workcalendar")) {
+    const auto value = table_value("dfg_workcalendar");
+    if (value.empty())
+      throw std::invalid_argument(
+          "dfg_workcalendar: must not be empty when supplied");
+    params.dfg_table_options.workcalendar = std::any(value);
   }
 
   // Correlation miner variants are deliberately opt-in. Keep a canonical

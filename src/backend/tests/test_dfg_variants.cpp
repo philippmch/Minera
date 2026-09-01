@@ -151,12 +151,23 @@ void performance_aggregations_start_fallback_and_validation() {
   assert(all.minimum == 5.0 && all.maximum == 15.0 && all.sum == 20.0);
   assert(std::abs(all.standard_deviation - std::sqrt(50.0)) < 1e-9);
 
-  // Missing configured start attributes fall back to Event.timestamp, and a
-  // target before its predecessor's completion is clamped to zero.
+  bool missing_start = false;
+  try {
+    (void)discover_performance_dfg(
+        log({trace("c", {event("A", "2026-01-05T00:00:10Z"),
+                          event("B", "2026-01-05T00:00:05Z")})}),
+        options);
+  } catch (const std::invalid_argument&) {
+    missing_start = true;
+  }
+  assert(missing_start);
+
+  // The omitted selector uses completion timestamps, and a target before its
+  // predecessor is clamped to zero.
+  options.start_timestamp_attribute.clear();
   const auto clamped = discover_performance_dfg(
       log({trace("c", {event("A", "2026-01-05T00:00:10Z"),
-                        event("B", "2026-01-05T00:00:05Z")})}),
-      options);
+                        event("B", "2026-01-05T00:00:05Z")})}), options);
   assert(performance(clamped, "A", "B").summary.mean == 0.0);
 
   bool invalid = false;

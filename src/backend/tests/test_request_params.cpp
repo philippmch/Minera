@@ -1983,8 +1983,7 @@ void parse_mine_params_maps_dfg_variant_options() {
   assert(defaults.dfg_statistics.timestamp_attribute == "time:timestamp");
   assert(defaults.dfg_statistics.performance_aggregation ==
          minera::DfgPerformanceAggregation::kMean);
-  assert(defaults.dfg_statistics.start_timestamp_attribute ==
-         "start_timestamp");
+  assert(defaults.dfg_statistics.start_timestamp_attribute.empty());
   assert(!defaults.dfg_statistics.use_business_hours);
   assert(defaults.dfg_statistics.business_hour_slots.empty());
   assert((defaults.dfg_statistics.case_attributes ==
@@ -2070,6 +2069,153 @@ void parse_mine_params_rejects_invalid_dfg_variant_options() {
     }
     assert(threw);
   }
+}
+
+void parse_mine_params_maps_dataframe_dfg_options() {
+  const auto params = minera::parse_mine_params(fields({
+      {"dfg_operation", "concurrent_events"},
+      {"dfg_measure", "cost"},
+      {"dfg_backend", "polars"},
+      {"dfg_activity_attribute", "event:activity"},
+      {"dfg_target_activity_attribute", "event:target"},
+      {"dfg_timestamp_attribute", "event:complete"},
+      {"dfg_start_timestamp_attribute", "event:start"},
+      {"dfg_cost_attribute", "event:cost"},
+      {"dfg_case_id_attribute", "case:external"},
+      {"dfg_window", "2"},
+      {"dfg_keep_once_per_case", "true"},
+      {"dfg_sort_caseid_required", "false"},
+      {"dfg_sort_timestamp_along_case_id", "false"},
+      {"dfg_reduce_columns", "false"},
+      {"dfg_workcalendar", "calendar-token"},
+      {"dfg_event_index_attribute", "row-id"},
+      {"dfg_max_start_column", "max-start"},
+      {"dfg_min_complete_column", "min-complete"},
+      {"dfg_overlap_column", "overlap"},
+      {"dfg_strict", "true"},
+      {"dfg_keep_first_following", "false"},
+      {"dfg_business_hours", "true"},
+      {"dfg_business_hour_slots", "0-3600,7200-10800"},
+      {"dfg_performance_aggregation", "sum"},
+  }));
+  assert(params.dfg_dataframe_requested);
+  assert(params.dfg_operation == minera::DfgTableOperation::kConcurrentEvents);
+  assert(params.dfg_backend == minera::DfgTableBackend::kPolars);
+  const auto& options = params.dfg_table_options;
+  assert(options.measure == minera::DfgTableMeasure::kCost);
+  assert(options.activity_attribute == "event:activity");
+  assert(options.target_activity_attribute == "event:target");
+  assert(options.timestamp_attribute == "event:complete");
+  assert(options.start_timestamp_attribute &&
+         *options.start_timestamp_attribute == "event:start");
+  assert(options.cost_attribute && *options.cost_attribute == "event:cost");
+  assert(options.case_id_attribute == "case:external");
+  assert(options.window == 2);
+  assert(options.keep_once_per_case);
+  assert(!options.sort_caseid_required);
+  assert(!options.sort_timestamp_along_case_id);
+  assert(!options.reduce_columns);
+  assert(std::any_cast<std::string>(options.workcalendar) == "calendar-token");
+  assert(options.event_index_attribute == "row-id");
+  assert(options.max_start_column == "max-start");
+  assert(options.min_complete_column == "min-complete");
+  assert(options.overlap_column == "overlap");
+  assert(options.strict);
+  assert(!options.keep_first_following);
+  assert(options.business_hours);
+  assert(options.business_hour_slots && options.business_hour_slots->size() == 2);
+  assert(options.performance_aggregation ==
+         minera::DfgPerformanceAggregation::kSum);
+}
+
+void parse_mine_params_preserves_dataframe_slot_presence() {
+  const auto defaults = minera::parse_mine_params(fields({}));
+  assert(!defaults.dfg_table_options.business_hour_slots.has_value());
+  const std::map<std::string, std::string> values = {
+      {"dfg_business_hour_slots", ""},
+  };
+  const auto lookup = [&values](std::string_view name) {
+    const auto it = values.find(std::string(name));
+    return it == values.end() ? std::string{} : it->second;
+  };
+  const auto present = [&values](std::string_view name) {
+    return values.contains(std::string(name));
+  };
+  const auto empty = minera::parse_mine_params(lookup, present);
+  assert(empty.dfg_table_options.business_hour_slots.has_value());
+  assert(empty.dfg_table_options.business_hour_slots->empty());
+
+  const auto none = minera::parse_mine_params(
+      fields({{"dfg_business_hour_slots", "none"}}));
+  assert(none.dfg_table_options.business_hour_slots.has_value());
+  assert(none.dfg_table_options.business_hour_slots->empty());
+}
+
+void parse_mine_params_rejects_invalid_dataframe_dfg_options() {
+  for (const auto& item : {
+           std::pair{"dfg_operation", "bad"},
+           std::pair{"dfg_measure", "bad"},
+           std::pair{"dfg_backend", "bad"},
+           std::pair{"dfg_sort_caseid_required", "yes"},
+           std::pair{"dfg_sort_timestamp_along_case_id", "yes"},
+           std::pair{"dfg_reduce_columns", "yes"},
+           std::pair{"dfg_strict", "yes"},
+           std::pair{"dfg_keep_first_following", "yes"},
+       }) {
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(fields({item}));
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  for (const auto name : {std::string_view{"dfg_case_id_attribute"},
+                          std::string_view{"dfg_cost_attribute"}}) {
+    const std::map<std::string, std::string> values = {
+        {std::string(name), ""},
+    };
+    const auto lookup = [&values](std::string_view key) {
+      const auto it = values.find(std::string(key));
+      return it == values.end() ? std::string{} : it->second;
+    };
+    const auto present = [&values](std::string_view key) {
+      return values.contains(std::string(key));
+    };
+    bool threw = false;
+    try {
+      (void)minera::parse_mine_params(lookup, present);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    assert(threw);
+  }
+  const std::map<std::string, std::string> empty_calendar = {
+      {"dfg_workcalendar", ""},
+  };
+  const auto lookup = [&empty_calendar](std::string_view name) {
+    const auto it = empty_calendar.find(std::string(name));
+    return it == empty_calendar.end() ? std::string{} : it->second;
+  };
+  const auto present = [&empty_calendar](std::string_view name) {
+    return empty_calendar.contains(std::string(name));
+  };
+  bool calendar_threw = false;
+  try {
+    (void)minera::parse_mine_params(lookup, present);
+  } catch (const std::invalid_argument&) {
+    calendar_threw = true;
+  }
+  assert(calendar_threw);
+
+  bool missing_cost_threw = false;
+  try {
+    (void)minera::parse_mine_params(
+        fields({{"dfg_measure", "cost"}}));
+  } catch (const std::invalid_argument&) {
+    missing_cost_threw = true;
+  }
+  assert(missing_cost_threw);
 }
 
 void parse_alignment_params_maps_variants_and_costs() {
@@ -3805,6 +3951,9 @@ int main() {
   parse_mine_params_maps_dfg_variant_options();
   parse_mine_params_preserves_explicit_empty_dfg_attributes();
   parse_mine_params_rejects_invalid_dfg_variant_options();
+  parse_mine_params_maps_dataframe_dfg_options();
+  parse_mine_params_preserves_dataframe_slot_presence();
+  parse_mine_params_rejects_invalid_dataframe_dfg_options();
   parse_alignment_params_maps_variants_and_costs();
   parse_alignment_params_rejects_invalid_and_dependent_values();
   parse_dfg_and_edit_alignment_params_contract();

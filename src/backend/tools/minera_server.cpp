@@ -48,6 +48,8 @@
 #include "minera/decision_table.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/dfg_conversion.hpp"
+#include "minera/dfg_dataframe.hpp"
+#include "minera/dfg_dataframe_json.hpp"
 #include "minera/dfg_filter.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/dfg_precision.hpp"
@@ -6439,6 +6441,99 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
+void handle_dfg_dataframe(const httplib::Request& request,
+                          httplib::Response& response) {
+  std::shared_ptr<const MinedSession> session;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    session = g_session;
+  }
+  if (!session) {
+    response.status = 409;
+    response.set_content(error_json("no mined log; mine a log first"),
+                         "application/json");
+    return;
+  }
+  try {
+    static const std::set<std::string> allowed = {
+        "dfg_operation", "dfg_measure", "dfg_backend",
+        "dfg_activity_attribute", "dfg_target_activity_attribute",
+        "dfg_timestamp_attribute", "dfg_start_timestamp_attribute",
+        "dfg_cost_attribute", "dfg_case_id_attribute", "dfg_window",
+        "dfg_keep_once_per_case", "dfg_performance_aggregation",
+        "dfg_business_hours", "dfg_business_hour_slots",
+        "dfg_sort_caseid_required", "dfg_sort_timestamp_along_case_id",
+        "dfg_reduce_columns", "dfg_workcalendar",
+        "dfg_event_index_attribute", "dfg_max_start_column",
+        "dfg_min_complete_column", "dfg_overlap_column", "dfg_strict",
+        "dfg_keep_first_following"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key))
+        throw std::invalid_argument("unknown dataframe DFG parameter: " +
+                                    key);
+    }
+    const auto lookup = [&](std::string_view name) {
+      const auto key = std::string(name);
+      return request.has_param(key) ? request.get_param_value(key)
+                                    : std::string{};
+    };
+    const auto present = [&](std::string_view name) {
+      return request.has_param(std::string(name));
+    };
+    const auto params = minera::parse_mine_params(lookup, present);
+    const auto table = minera::event_log_to_table(session->log);
+    if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
+      if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+        response.set_content(
+            minera::serialize_dfg_dataframe_json(
+                minera::discover_pandas_dfg(table, params.dfg_table_options)),
+            "application/json");
+      } else {
+        const auto lazy = minera::LazyEventTable::from_table(table);
+        response.set_content(
+            minera::serialize_dfg_dataframe_json(
+                minera::discover_polars_dfg(lazy, params.dfg_table_options)),
+            "application/json");
+      }
+    } else if (params.dfg_operation ==
+               minera::DfgTableOperation::kPartialOrder) {
+      if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+        response.set_content(
+            minera::serialize_dfg_partial_order_json(
+                minera::discover_pandas_partial_order(
+                    table, params.dfg_table_options)),
+            "application/json");
+      } else {
+        const auto lazy = minera::LazyEventTable::from_table(table);
+        response.set_content(
+            minera::serialize_dfg_partial_order_json(
+                minera::discover_polars_partial_order(
+                    lazy, params.dfg_table_options)),
+            "application/json");
+      }
+    } else {
+      if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+        response.set_content(
+            minera::serialize_dfg_concurrent_events_json(
+                minera::discover_pandas_concurrent_events(
+                    table, params.dfg_table_options)),
+            "application/json");
+      } else {
+        const auto lazy = minera::LazyEventTable::from_table(table);
+        response.set_content(
+            minera::serialize_dfg_concurrent_events_json(
+                minera::discover_polars_concurrent_events(
+                    lazy, params.dfg_table_options)),
+            "application/json");
+      }
+    }
+  } catch (const std::exception& error) {
+    response.status = 400;
+    response.set_content(error_json(error.what()), "application/json");
+  }
+}
+
 void handle_dfg_import(const httplib::Request& request,
                        httplib::Response& response) {
   try {
@@ -7022,6 +7117,7 @@ int main(int argc, char** argv) {
   server.Options("/api/playout", preflight);
   server.Options("/api/monte-carlo", preflight);
   server.Options("/api/dfg", preflight);
+  server.Options("/api/dfg-dataframe", preflight);
   server.Options("/api/dfg-precision", preflight);
   server.Options("/api/dfg-to-petri", preflight);
   server.Options("/api/process-cube", preflight);
@@ -7123,6 +7219,8 @@ int main(int argc, char** argv) {
   server.Get("/api/ptml", handle_ptml);
   server.Get("/api/xes", handle_xes);
   server.Get("/api/dfg", handle_dfg);
+  server.Get("/api/dfg-dataframe", handle_dfg_dataframe);
+  server.Post("/api/dfg-dataframe", handle_dfg_dataframe);
   server.Post("/api/dfg", handle_dfg_import);
   server.Post("/api/dfg-precision", handle_dfg_precision);
   server.Post("/api/dfg-to-petri", handle_dfg_conversion);

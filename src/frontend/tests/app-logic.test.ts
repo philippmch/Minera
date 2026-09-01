@@ -1169,6 +1169,13 @@ describe("mineFormEntries", () => {
       dfgCaseAttributes: ["concept:name"], dfgBusinessHourSlots: "0-604801",
     })).toEqual([["dfg_statistical_variants", "native"]]);
     expect(mineFormEntries({
+      dfgStatisticalVariants: ["performance"],
+      dfgStartTimestampAttribute: "start_timestamp",
+    })).toEqual([
+      ["dfg_statistical_variants", "performance"],
+      ["dfg_start_timestamp_attribute", "start_timestamp"],
+    ]);
+    expect(mineFormEntries({
       dfgStatisticalVariants: ["clean_time"], dfgWindow: 0,
       dfgKeepOncePerCase: true, dfgPerformanceAggregation: "all",
       dfgStartTimestampAttribute: "started", dfgBusinessHours: true,

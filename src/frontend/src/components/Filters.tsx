@@ -527,7 +527,8 @@ export function Filters({
   const [dfgActivityAttribute, setDfgActivityAttribute] = useState("concept:name");
   const [dfgTimestampAttribute, setDfgTimestampAttribute] = useState("time:timestamp");
   const [dfgPerformanceAggregation, setDfgPerformanceAggregation] = useState<NonNullable<MinerOptions["dfgPerformanceAggregation"]>>("mean");
-  const [dfgStartTimestampAttribute, setDfgStartTimestampAttribute] = useState("start_timestamp");
+  // An empty selector preserves the adapter's completion-timestamp default.
+  const [dfgStartTimestampAttribute, setDfgStartTimestampAttribute] = useState("");
   const [dfgBusinessHours, setDfgBusinessHours] = useState(false);
   const [dfgBusinessHourSlots, setDfgBusinessHourSlots] = useState("");
   const [dfgCaseAttributes, setDfgCaseAttributes] = useState("concept:name");
@@ -1263,7 +1264,7 @@ export function Filters({
     setDfgWindow("1");
     setDfgKeepOncePerCase(false);
     setDfgPerformanceAggregation("mean");
-    setDfgStartTimestampAttribute("start_timestamp");
+    setDfgStartTimestampAttribute("");
     setDfgBusinessHours(false);
     setDfgBusinessHourSlots("");
     setDfgCaseAttributes("concept:name");
@@ -2056,8 +2057,9 @@ export function Filters({
               </select>
             </label>
             <label className="filters-field">
-              <span>Start timestamp attribute</span>
-              <input type="text" value={dfgStartTimestampAttribute}
+              <span>Start timestamp attribute <small>(optional; completion timestamp default)</small></span>
+              <input type="text" placeholder="completion timestamp"
+                value={dfgStartTimestampAttribute}
                 disabled={!dfgPerformanceOptionsActive}
                 onChange={(event) => setDfgStartTimestampAttribute(event.target.value)} />
             </label>
