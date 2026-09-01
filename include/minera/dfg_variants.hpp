@@ -20,6 +20,20 @@ using DfgActivityTriple =
 using DfgFrequency = std::map<DfgActivityPair, std::uint64_t>;
 using DfgTripleFrequency = std::map<DfgActivityTriple, std::uint64_t>;
 
+// Updates only edges already present in `target`; replacement-only edges are
+// deliberately ignored. Returning the target reference supports both in-place
+// and expression-oriented use without copying a graph.
+template <typename Value>
+std::map<DfgActivityPair, Value>& replace_dfg_values(
+    std::map<DfgActivityPair, Value>& target,
+    const std::map<DfgActivityPair, Value>& replacements) {
+  for (auto& [edge, value] : target) {
+    const auto found = replacements.find(edge);
+    if (found != replacements.end()) value = found->second;
+  }
+  return target;
+}
+
 enum class DfgStatisticalVariant {
   kNative,
   kFrequency = kNative,

@@ -63,7 +63,8 @@
     "algo.transformation.ocel.features.events",
     "algo.transformation.ocel.features.events_objects",
     "algo.transformation.ocel.features.objects",
-    "algo.transformation.ocel.split_ocel"
+    "algo.transformation.ocel.split_ocel",
+    "algo.discovery.dfg"
   ],
   "packages": [
     {
@@ -1199,7 +1200,227 @@
         }
       ],
       "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "proofs": {
+        "NATIVE": {
+          "selector": "NATIVE",
+          "binding": {
+            "selector": "NATIVE",
+            "modules": [
+              "algo.discovery.dfg.variants.native"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "NATIVE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::NATIVE"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "native_selector_contract"
+            }
+          ]
+        },
+        "FREQUENCY": {
+          "selector": "FREQUENCY",
+          "binding": {
+            "selector": "FREQUENCY",
+            "modules": [
+              "algo.discovery.dfg.variants.native"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "FREQUENCY"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::FREQUENCY"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "frequency_selector_contract"
+            }
+          ]
+        },
+        "PERFORMANCE": {
+          "selector": "PERFORMANCE",
+          "binding": {
+            "selector": "PERFORMANCE",
+            "modules": [
+              "algo.discovery.dfg.variants.performance"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PERFORMANCE"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::PERFORMANCE"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "performance_selector_contract"
+            }
+          ]
+        },
+        "FREQUENCY_GREEDY": {
+          "selector": "FREQUENCY_GREEDY",
+          "binding": {
+            "selector": "FREQUENCY_GREEDY",
+            "modules": [
+              "algo.discovery.dfg.variants.native"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "FREQUENCY_GREEDY"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::FREQUENCY_GREEDY"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "frequency_greedy_selector_contract"
+            }
+          ]
+        },
+        "PERFORMANCE_GREEDY": {
+          "selector": "PERFORMANCE_GREEDY",
+          "binding": {
+            "selector": "PERFORMANCE_GREEDY",
+            "modules": [
+              "algo.discovery.dfg.variants.performance"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "PERFORMANCE_GREEDY"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::PERFORMANCE_GREEDY"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "performance_greedy_selector_contract"
+            }
+          ]
+        },
+        "FREQ_TRIPLES": {
+          "selector": "FREQ_TRIPLES",
+          "binding": {
+            "selector": "FREQ_TRIPLES",
+            "modules": [
+              "algo.discovery.dfg.variants.freq_triples"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "FREQ_TRIPLES"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::FREQ_TRIPLES"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "freq_triples_selector_contract"
+            }
+          ]
+        },
+        "CASE_ATTRIBUTES": {
+          "selector": "CASE_ATTRIBUTES",
+          "binding": {
+            "selector": "CASE_ATTRIBUTES",
+            "modules": [
+              "algo.discovery.dfg.variants.case_attributes"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CASE_ATTRIBUTES"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::CASE_ATTRIBUTES"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "case_attributes_selector_contract"
+            }
+          ]
+        },
+        "CLEAN": {
+          "selector": "CLEAN",
+          "binding": {
+            "selector": "CLEAN",
+            "modules": [
+              "algo.discovery.dfg.variants.clean"
+            ],
+            "kind": "enum",
+            "class": "Variants",
+            "symbol": "CLEAN"
+          },
+          "implementation": [
+            {
+              "path": "include/minera/dfg_variants.hpp",
+              "symbol": "DfgStatisticalVariant::CLEAN"
+            }
+          ],
+          "tests": [
+            {
+              "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+              "executable": "minera_dfg_parity_contracts_tests",
+              "case": "clean_selector_contract"
+            }
+          ]
+        }
+      },
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "include/minera/dfg_utils.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/dfg_utils.cpp",
+        "src/backend/json_export.cpp",
+        "src/backend/request_params.cpp",
+        "src/backend/tools/minera_export.cpp",
+        "src/backend/tools/minera_server.cpp",
+        "src/backend/tests/test_dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp",
+        "src/backend/tests/test_dfg_utils.cpp",
+        "src/backend/tests/test_request_params.cpp",
+        "src/frontend/src/api.ts",
+        "src/frontend/src/types.ts",
+        "src/frontend/tests/api.test.ts",
+        "src/frontend/tests/types.test.ts"
+      ]
     },
     {
       "package": "algo.discovery.footprints",
@@ -5336,8 +5557,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.adapters.pandas.freq_triples",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgTripleFrequency"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "pandas_freq_triples_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.adapters.polars.df_statistics",
@@ -5354,8 +5596,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.adapters.polars.freq_triples",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgStatisticalAnalysis"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "polars_freq_triples_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.replacement",
@@ -5363,8 +5626,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.replacement",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "replace_dfg_values"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "replacement_values_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.utils.dfg_utils",
@@ -5372,8 +5656,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "support",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_utils.hpp",
+        "src/backend/dfg_utils.cpp",
+        "src/backend/tests/test_dfg_utils.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.utils.dfg_utils",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_utils.hpp",
+            "symbol": "make_dfg_matrix"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_utils.cpp",
+            "executable": "minera_dfg_utils_tests",
+            "case": "neighbours_and_matrix_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.case_attributes",
@@ -5386,8 +5691,29 @@
           "selector": "CASE_ATTRIBUTES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.case_attributes",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "discover_case_attribute_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "case_attributes_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.clean",
@@ -5400,8 +5726,29 @@
           "selector": "CLEAN"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.clean",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "discover_clean_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "clean_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.clean_polars",
@@ -5409,8 +5756,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.clean_polars",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgStatisticalVariant::CLEAN_POLARS"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "clean_polars_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.clean_time",
@@ -5418,8 +5786,29 @@
       "owner": "algo.discovery.dfg",
       "classification": "internal-variant",
       "selectors": [],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.clean_time",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "DfgStatisticalVariant::CLEAN_TIME"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "clean_time_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.freq_triples",
@@ -5432,8 +5821,29 @@
           "selector": "FREQ_TRIPLES"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.freq_triples",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "discover_frequency_triples"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "freq_triples_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.native",
@@ -5454,8 +5864,29 @@
           "selector": "NATIVE"
         }
       ],
-      "status": "partial",
-      "evidence": "docs/reference-2.7.22-parity.md"
+      "status": "complete",
+      "evidence": "docs/reference-2.7.22-parity.md",
+      "artifacts": [
+        "include/minera/dfg_variants.hpp",
+        "src/backend/dfg_variants.cpp",
+        "src/backend/tests/test_dfg_parity_contracts.cpp"
+      ],
+      "proofs": {
+        "module": "algo.discovery.dfg.variants.native",
+        "implementation": [
+          {
+            "path": "include/minera/dfg_variants.hpp",
+            "symbol": "discover_frequency_dfg"
+          }
+        ],
+        "tests": [
+          {
+            "path": "src/backend/tests/test_dfg_parity_contracts.cpp",
+            "executable": "minera_dfg_parity_contracts_tests",
+            "case": "native_variant_contract"
+          }
+        ]
+      }
     },
     {
       "module": "algo.discovery.dfg.variants.performance",
