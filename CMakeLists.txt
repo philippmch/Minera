@@ -57,6 +57,7 @@ add_library(minera_core
   src/backend/dfg_io.cpp
   src/backend/dfg_precision.cpp
   src/backend/decomposed_alignment.cpp
+  src/backend/dfg_utils.cpp
   src/backend/dfg_variants.cpp
   src/backend/directly_follows_graph.cpp
   src/backend/embeddings.cpp
@@ -894,6 +895,22 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_dfg_variants_tests PRIVATE ${MINERA_TEST_OPTIONS})
 
   add_test(NAME minera_dfg_variants_tests COMMAND minera_dfg_variants_tests)
+
+  add_executable(minera_dfg_parity_contracts_tests
+    src/backend/tests/test_dfg_parity_contracts.cpp
+  )
+  target_link_libraries(minera_dfg_parity_contracts_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_parity_contracts_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_parity_contracts_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_parity_contracts_tests COMMAND minera_dfg_parity_contracts_tests)
+
+  add_executable(minera_dfg_utils_tests
+    src/backend/tests/test_dfg_utils.cpp
+  )
+  target_link_libraries(minera_dfg_utils_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_utils_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_utils_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_utils_tests COMMAND minera_dfg_utils_tests)
 
   add_executable(minera_dfg_playout_tests
     src/backend/tests/test_dfg_playout.cpp
